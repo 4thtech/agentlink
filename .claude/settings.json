@@ -3,5 +3,23 @@
     "commit": "",
     "pr": "",
     "sessionUrl": false
+  },
+  "permissions": {
+    "deny": [
+      "Bash(gh pr review *)",
+      "Bash(gh api *pending_deployments*)",
+      "Bash(gh pr merge *--admin*)",
+      "Bash(npm publish*)",
+      "Bash(pnpm publish*)",
+      "Bash(npm dist-tag*)",
+      "Bash(*changeset publish*)",
+      "Bash(*wrangler deploy*)",
+      "Bash(*wrangler versions deploy*)",
+      "Bash(*wrangler secret*)",
+      "Bash(*forge script*--broadcast*)",
+      "Bash(git push * main)",
+      "Bash(git push *:main)",
+      "Bash(git push *HEAD:main*)"
+    ]
   }
 }
