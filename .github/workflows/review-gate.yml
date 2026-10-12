@@ -1,0 +1,287 @@
+# Review gate: security class and review evidence (docs/process/audit-rules.md §2-§3, decision D-25).
+#
+# Required status check: `review-gate`.
+#
+# Agents may enable GitHub auto-merge; GitHub then merges only when every required check is
+# green and, on code-owned paths (.github/CODEOWNERS = the S2 paths plus CI and agent rules),
+# a code owner who is not the author has approved. This check adds what CODEOWNERS cannot see:
+#   (a) derives the security class from the changed files. The rules mirror the path defaults
+#       of audit-rules.md §2.2, and the highest class wins. Keep them in sync with that table.
+#   (b) the PR body's "Security class" section must declare at least the derived class.
+#   (c) S1/S2: the "Independent review" section must reference a review report (an `IR-...` ID,
+#       audit-rules.md §4.3) and must not state a FAIL verdict.
+#       This is attested by the orchestrator: CI checks that the report is referenced, not that
+#       the review happened. The report itself is private (audit-rules.md §4.5).
+#       Automated PRs (see below) satisfy (c) by a code-owner approval on the head commit instead.
+#   (d) S2: an APPROVED review by @talirezun or @denisjazbec who is not the PR author, given on
+#       the current head commit, plus non-empty "Threat note" and "Tests-first evidence" sections.
+#   (e) fails while the repository variable DEPLOY_FREEZE is 'true'. Setting the variable does
+#       not re-run this check on open pull requests: whoever sets the freeze also disables
+#       auto-merge on open PRs (release-and-deployment.md §3.1).
+# The class used for (c) and (d) is the higher of the derived and the declared class, so a
+# content-rule S2 (audit-rules.md §2.4) on an S1 path still needs the S2 evidence.
+#
+# Automated PRs (Renovate, Changesets "Version packages"): a PR is automated only when its AUTHOR
+# (`pull_request.user.login`, set by GitHub from the account or app that opened it) is
+# `renovate[bot]` or `github-actions[bot]`. Commit author names, e-mail addresses and the
+# `verified` flag are NOT consulted: they can be forged by anyone who can push to the branch.
+# For an automated PR, (c) is satisfied only by an APPROVED review by @talirezun or @denisjazbec
+# on the current head commit (a new commit invalidates it); there is no report ID to cite, the
+# bot writes no PR body. (b) does not require a ticked class for it. (d) applies unchanged for
+# S2, including the "Threat note" and "Tests-first evidence" sections (a human fills them in);
+# the bot is the author, so any code owner's approval counts. There is no other exemption.
+# Owner action (ci-cd.md checklist): restrict who may push to `renovate/**` and
+# `changeset-release/**` branches, so that nobody else can add commits to a bot-authored PR.
+#
+# Pull request titles, bodies, file names and patches are attacker-controlled text. They are read
+# through the API inside actions/github-script and are never interpolated into a shell script or
+# into the script source; they are logged only as JSON strings. Uses `pull_request` and
+# `pull_request_review` (never `pull_request_target`), checks out nothing, uses no secrets.
+#
+# Skeleton-tolerant: needs nothing but the pull request. A docs-only S0 PR passes as long as
+# its Security class box is ticked.
+name: Review gate
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+    branches-ignore: [sync]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+  # A merge queue is optional. On merge_group runs only (e) is checked; (a)-(d) passed on the PR.
+  merge_group:
+
+permissions: {}
+
+concurrency:
+  group: review-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review-gate:
+    name: review-gate
+    # pull_request_review has no branch filter: ignore reviews on PRs into the coordination branch.
+    if: github.event_name == 'merge_group' || github.event.pull_request.base.ref != 'sync'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read # repository metadata for the API calls
+      pull-requests: read # the PR, its changed files, commits and reviews
+    steps:
+      - name: Check security class, review evidence and deploy freeze
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
+        with:
+          script: |
+            const problems = [];
+            const show = (s) => JSON.stringify(String(s));
+            const CLASS_NAMES = ['S0', 'S1', 'S2'];
+
+            // (e) Deploy freeze.
+            if ((process.env.DEPLOY_FREEZE ?? '').trim().toLowerCase() === 'true') {
+              problems.push(
+                'DEPLOY_FREEZE is set: nothing merges until the owner clears it (release-and-deployment.md §3.1).',
+              );
+            }
+
+            const finish = () => {
+              if (problems.length > 0) {
+                for (const problem of problems) core.error(problem);
+                core.setFailed(`review-gate: ${problems.length} problem(s). See the annotations above.`);
+              } else {
+                core.info('review-gate: all requirements met.');
+              }
+            };
+
+            if (context.eventName === 'merge_group') {
+              finish();
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const number = context.payload.pull_request?.number;
+            if (!number) {
+              core.setFailed('No pull request in the event payload.');
+              return;
+            }
+
+            // Always read the current state; a review event's payload can be older than the PR.
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+            const author = (pr.user?.login ?? '').toLowerCase();
+            const headSha = pr.head?.sha ?? '';
+            const CODE_OWNERS = ['talirezun', 'denisjazbec'];
+            // Automated PR: decided ONLY by the PR author, which GitHub sets and nobody can forge.
+            // Commit author names, e-mail addresses and the "verified" flag are never consulted.
+            const BOT_AUTHORS = ['renovate[bot]', 'github-actions[bot]'];
+            const isBotPr = BOT_AUTHORS.includes(author);
+
+            // (a) Derive the class from the changed files (audit-rules.md §2.2; highest wins).
+            const RULES = [
+              [2, /^packages\/(crypto|core|node)\//],
+              [2, /^apps\/(console|cloud-agent|submitter)\//],
+              [2, /^test-vectors\//],
+              [2, /^docs\/foundation\/04-security-and-crypto\.md$/],
+              [1, /^packages\/(chain|transport-nostr|storage|types|ui)\//],
+              [1, /^apps\/(cli|verify|invite)\//],
+              [1, /^(e2e|skills)\//],
+              [1, /^\.github\//],
+              [1, /^\.claude\//],
+              [1, /^(renovate\.json|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|turbo\.json)$/],
+              // pnpm and npm configuration at any depth: .npmrc, and pnpm hook files (.pnpmfile.cjs, .pnpmfile.mjs),
+              // which pnpm executes (audit-rules.md §2.2; the composite action refuses them).
+              [1, /(^|\/)(\.npmrc|\.pnpmfile\.[^/]+)$/],
+              [1, /^(\.gitleaks\.toml|\.gitleaksignore|\.changeset\/config\.json)$/],
+              [1, /^docs\/(foundation|process)\//],
+              [1, /^(AGENTS|CLAUDE|SECURITY)\.md$/],
+            ];
+            const classify = (path) =>
+              RULES.reduce((highest, [cls, re]) => (re.test(path) ? Math.max(highest, cls) : highest), 0);
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number: number,
+              per_page: 100,
+            });
+            let derived = 0;
+            for (const f of files) {
+              derived = Math.max(derived, classify(f.filename));
+              if (f.previous_filename) derived = Math.max(derived, classify(f.previous_filename));
+            }
+            const fileListComplete = files.length === pr.changed_files;
+            if (!fileListComplete) {
+              // The files API stops at 3000 entries. Fail closed.
+              derived = 2;
+              core.warning(`Listed ${files.length} of ${pr.changed_files} changed files; treating the PR as S2.`);
+            }
+            core.info(`Derived security class from ${files.length} changed file(s): ${CLASS_NAMES[derived]}`);
+
+            // Parse the PR body like pr-hygiene: "##"/"###" headings; HTML comments and fenced code ignored.
+            const body = (pr.body ?? '').replace(/\r\n?/g, '\n').replace(/<!--[\s\S]*?-->/g, '');
+            const sections = [];
+            let current = null;
+            let inFence = false;
+            for (const line of body.split('\n')) {
+              if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
+              const heading = inFence ? null : /^#{2,3}\s+(.+?)\s*#*\s*$/.exec(line);
+              if (heading) {
+                current = { heading: heading[1], lines: [] };
+                sections.push(current);
+              } else if (current) {
+                current.lines.push(line);
+              }
+            }
+            const sectionText = (re) => {
+              const s = sections.find((x) => re.test(x.heading));
+              return s ? s.lines.join('\n').trim() : null;
+            };
+            const PLACEHOLDER = /^(n\/?a|none|tbd|todo|-+|\.\.\.|…)\.?$/i;
+            const filled = (text) => text !== null && text !== '' && !PLACEHOLDER.test(text);
+
+            // Declared class: exactly one ticked S0/S1/S2 box in the "Security class" section.
+            let declared = null;
+            const classText = sectionText(/^security class\b/i);
+            if (classText !== null) {
+              const ticked = classText
+                .split('\n')
+                .map((l) => /^\s*[-*+]\s+\[[xX]\]\s*[*_`]*S([012])\b/.exec(l))
+                .filter(Boolean);
+              if (ticked.length === 1) declared = Number(ticked[0][1]);
+            }
+
+            // (b) Declared class covers the derived class.
+            let effective = derived;
+            if (declared === null) {
+              if (!isBotPr) {
+                problems.push('Security class: tick exactly one of S0, S1, S2 (.github/pull_request_template.md).');
+              }
+            } else {
+              effective = Math.max(derived, declared);
+              if (declared < derived) {
+                problems.push(
+                  `Security class: declared ${CLASS_NAMES[declared]}, but the changed files are ${CLASS_NAMES[derived]} ` +
+                    '(audit-rules.md §2.2). Only the owner may lower a class (§2.4); raise the declaration.',
+                );
+              }
+            }
+            core.info(`Effective security class: ${CLASS_NAMES[effective]}`);
+
+            // Code-owner approvals on the current head commit. The latest non-comment review of each user
+            // counts, so a later "changes requested" or a dismissal removes an approval, and a new commit
+            // (a different head SHA) invalidates it. Needed for S2 (d) and for automated PRs (c).
+            let approvers = [];
+            if (effective === 2 || (isBotPr && effective >= 1)) {
+              const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                owner,
+                repo,
+                pull_number: number,
+                per_page: 100,
+              });
+              const latest = new Map();
+              for (const r of reviews) {
+                const login = (r.user?.login ?? '').toLowerCase();
+                if (!login || r.state === 'COMMENTED' || r.state === 'PENDING') continue;
+                latest.set(login, r); // chronological order: the last state wins
+              }
+              approvers = [...latest.entries()]
+                .filter(([login]) => CODE_OWNERS.includes(login) && login !== author)
+                .filter(([, r]) => r.state === 'APPROVED' && r.commit_id === headSha)
+                .map(([login]) => login);
+            }
+
+            // (c) Independent review for S1/S2.
+            if (effective >= 1) {
+              if (isBotPr) {
+                // Automated PR: no report to cite. Only a code owner's approval on the head commit counts.
+                if (approvers.length === 0) {
+                  problems.push(
+                    `${CLASS_NAMES[effective]}: the PR is authored by ${show(author)}; its independent review is satisfied ` +
+                      'only by an APPROVED review on the current head commit by @talirezun or @denisjazbec ' +
+                      '(audit-rules.md §3.3). The commit author and "verified" flags are not trusted.',
+                  );
+                } else {
+                  core.info(`Automated PR by ${show(author)}: code-owner approval on the head commit by: ${approvers.map(show).join(', ')}`);
+                }
+              } else {
+                const review = sectionText(/^independent review\b/i);
+                if (!filled(review)) {
+                  problems.push(
+                    `${CLASS_NAMES[effective]}: the "Independent review" section is empty. ` +
+                      'Add the report line (audit-rules.md §4.5): report ID, verdict, finding counts, tracker IDs.',
+                  );
+                } else {
+                  if (!/\bIR-[A-Za-z0-9]+(-[A-Za-z0-9]+)+\b/.test(review)) {
+                    problems.push('Independent review: no review report ID (IR-<TASK-ID>-<n>) found.');
+                  }
+                  if (/verdict\W{0,4}fail\b/i.test(review)) {
+                    problems.push('Independent review: the referenced review verdict is FAIL.');
+                  }
+                }
+              }
+            }
+
+            // (d) S2: non-author code-owner approval on the head commit, threat note, tests-first evidence.
+            if (effective === 2) {
+              if (approvers.length === 0) {
+                // For an automated PR the same missing approval was reported under (c).
+                if (!isBotPr) {
+                  problems.push(
+                    'S2: needs an APPROVED review on the current head commit by @talirezun or @denisjazbec ' +
+                      'who is not the PR author. A review relayed in chat does not count (audit-rules.md §3).',
+                  );
+                }
+              } else {
+                core.info(`S2 approval on the head commit by: ${approvers.map(show).join(', ')}`);
+              }
+              if (!filled(sectionText(/^threat note\b/i))) {
+                problems.push('S2: the "Threat note" section is empty (full threat note, audit-rules.md §3.1).');
+              }
+              if (!filled(sectionText(/^tests-first evidence\b/i))) {
+                problems.push(
+                  'S2: the "Tests-first evidence" section is empty (failing-test commit and red run, audit-rules.md §3).',
+                );
+              }
+            }
+
+            finish();

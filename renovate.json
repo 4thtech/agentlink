@@ -1,0 +1,45 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigestsToSemver"
+  ],
+  "description": ["Renovate for the AgentLink monorepo. Supply-chain posture: cooldown before adopting new releases, no automerge, major updates and security-critical libraries reviewed by hand, GitHub Actions pinned to commit SHAs. PR titles start with DEPS (pr-hygiene rule)."],
+  "timezone": "UTC",
+  "semanticCommits": "disabled",
+  "commitMessagePrefix": "DEPS:",
+  "labels": ["dependencies"],
+  "dependencyDashboard": true,
+  "automerge": false,
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 5am on monday"]
+  },
+  "vulnerabilityAlerts": {
+    "labels": ["dependencies", "security"]
+  },
+  "packageRules": [
+    {
+      "description": ["Pin devDependencies to exact versions"],
+      "matchDepTypes": ["devDependencies"],
+      "rangeStrategy": "pin"
+    },
+    {
+      "description": ["Major updates wait for approval on the Dependency Dashboard"],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": ["Security-critical crypto and transport dependencies (allowlisted in 04 section 8): longer cooldown, one reviewed group, labelled security-sensitive"],
+      "matchPackageNames": ["@noble/*", "@hpke/*", "nostr-tools", "viem", "aws4fetch"],
+      "groupName": "security-critical crypto and transport",
+      "minimumReleaseAge": "7 days",
+      "addLabels": ["security-sensitive"],
+      "prBodyNotes": [
+        "**Security-sensitive dependency.** Read the changelog and the diff of every package in this group, check that no install scripts were added, and re-run `pnpm vectors:check`. Security class S1 or higher: human review plus an independent review session (docs/foundation/10-build-plan.md, working rule 7)."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+# --- Held private (owner decision 2026-10-12): never commit to this public repo ---
+# Commercial brief and legacy-repo audit (contains unpatched vulnerability details).
+# They move to a private repo; until then this guard prevents accidental commits.
+docs/foundation/01-commercial-brief.md
+docs/foundation/09-repositories-and-reuse.md
+# Contract source lives only in the private occ-v2-contracts repo
+*.sol
+
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.dev.vars
+
+# --- Tooling / OS ---
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+.wrangler/
+playwright-report/
+test-results/
+*.log
+.DS_Store

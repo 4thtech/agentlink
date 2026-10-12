@@ -1,0 +1,203 @@
+# Security checks: dependency review, secret scan (full history), CodeQL, zizmor.
+#
+# `security-gate` is the single required status check for this workflow.
+#
+# Everything here runs without secrets and with a read-only token (plus
+# `security-events: write` for CodeQL, which GitHub always grants to
+# pull_request runs for code-scanning uploads). It is safe for fork PRs.
+#
+# Requires the owner to NOT enable CodeQL "default setup" in the repository
+# settings (it would conflict with the `codeql` job below).
+#
+# On merge_group runs the scanning jobs are skipped (they already passed on the
+# pull request) so that `security-gate` still reports if a merge queue is enabled.
+#
+# The orphan coordination branch `sync` (markdown only, pushed directly, no pull
+# requests) is NOT triggered from here: a push-triggered workflow always runs from the
+# pushed branch, so pushes to `sync` are scanned by a stub workflow that lives on that
+# branch and calls secret-scan.yml. The `secret-scan-sync` job below re-scans `sync`
+# weekly from this (reviewed) definition as a backstop. See docs/process/ci-cd.md.
+name: Security
+
+on:
+  pull_request:
+    branches-ignore: [sync]
+  push:
+    branches: [main]
+  merge_group:
+  schedule:
+    # Weekly full scan of main (Monday 05:23 UTC) to catch newly published
+    # advisories and new secret/CodeQL rules. Scheduled workflows are disabled
+    # by GitHub after 60 days without repository activity.
+    - cron: "23 5 * * 1"
+
+permissions: {}
+
+concurrency:
+  group: security-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  dependency-review:
+    name: dependency-review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Needs the dependency graph to be enabled (default on public repositories).
+      # `allow-licenses` is used instead of the deprecated `deny-licenses`: anything not
+      # listed (AGPL, GPL, LGPL, SSPL, BUSL, "no license", unknown) fails the check.
+      # Packages that legitimately need another license are exempted one by one with
+      # `allow-dependencies-licenses` (purl list), reviewed by an owner.
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+          fail-on-scopes: runtime, development
+          license-check: true
+          vulnerability-check: true
+          allow-licenses: >-
+            0BSD,
+            Apache-2.0,
+            BlueOak-1.0.0,
+            BSD-2-Clause,
+            BSD-3-Clause,
+            CC0-1.0,
+            CC-BY-3.0,
+            CC-BY-4.0,
+            ISC,
+            MIT,
+            MIT-0,
+            MPL-2.0,
+            Python-2.0,
+            Unlicense,
+            Zlib
+
+  # Full-history gitleaks scan; the implementation is the reusable workflow secret-scan.yml
+  # (official release binary, checksum-verified; see that file).
+  secret-scan:
+    name: secret-scan
+    if: github.event_name != 'merge_group'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/secret-scan.yml
+
+  # Weekly backstop for the orphan coordination branch `sync`, scanned with the reviewed definition from the
+  # default branch. Pushes to `sync` are scanned by a stub workflow that lives on that branch
+  # (docs/process/ci-cd.md, "The sync branch"); a workflow on main cannot be triggered by pushes to another branch.
+  secret-scan-sync:
+    name: secret-scan-sync
+    if: github.event_name == 'schedule'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/secret-scan.yml
+    with:
+      ref: sync
+
+  codeql:
+    name: codeql (${{ matrix.language }})
+    if: github.event_name != 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write # upload code-scanning results
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, javascript-typescript]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # CodeQL errors out when it finds no source for a language, so skip the
+      # JavaScript/TypeScript leg until the first source file is committed.
+      - name: Check for sources in this language
+        id: scope
+        shell: bash
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        run: |
+          set -euo pipefail
+          analyze=true
+          if [ "$LANGUAGE" = "javascript-typescript" ]; then
+            count="$(git ls-files -- '*.js' '*.jsx' '*.mjs' '*.cjs' '*.ts' '*.tsx' '*.mts' '*.cts' | wc -l)"
+            if [ "$count" -eq 0 ]; then
+              analyze=false
+              echo "::notice::No JavaScript/TypeScript sources yet; CodeQL for $LANGUAGE is skipped."
+            fi
+          fi
+          echo "analyze=$analyze" >> "$GITHUB_OUTPUT"
+
+      - name: Initialize CodeQL
+        if: steps.scope.outputs.analyze == 'true'
+        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-extended
+
+      - name: Analyze
+        if: steps.scope.outputs.analyze == 'true'
+        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          category: /language:${{ matrix.language }}
+
+  zizmor:
+    name: zizmor
+    if: github.event_name != 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Official action; it runs the zizmor container image pinned by digest
+      # inside the action itself. Findings are shown as annotations and fail the job
+      # (no SARIF upload, so no `security-events: write` and it works for fork PRs).
+      # Policy lives in .github/zizmor.yml (every `uses:` must be hash-pinned).
+      - name: Audit GitHub Actions workflows
+        uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
+        with:
+          version: "1.30.1"
+          advanced-security: false
+          annotations: true
+          persona: regular
+
+  security-gate:
+    name: security-gate
+    needs: [dependency-review, secret-scan, secret-scan-sync, codeql, zizmor]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require every upstream job to have succeeded or been skipped
+        shell: bash
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          echo "Upstream job results: $RESULTS"
+          for result in $RESULTS; do
+            case "$result" in
+              success | skipped) ;;
+              *)
+                echo "::error::An upstream job ended as '$result'."
+                exit 1
+                ;;
+            esac
+          done

@@ -1,0 +1,108 @@
+# Local composite action: Node.js + pnpm + frozen, script-free install.
+#
+# Used by ci.yml and release.yml so the toolchain setup (and the pinned action
+# SHAs it contains) lives in exactly one place. The repository must already be
+# checked out (actions/checkout) before this action runs.
+#
+# Supply-chain rules enforced here (docs/foundation/04 §7, AGENTS.md):
+#   - pnpm version comes from the "packageManager" field in package.json (no unpinned installs)
+#   - `pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile`: lockfile is law, no
+#     lifecycle scripts, and no pnpm hooks. `--ignore-scripts` does NOT stop pnpm from executing
+#     a repository `.pnpmfile.*`, so the pnpmfile is ignored explicitly. This project uses no
+#     pnpmfile and must not need one: this action also runs in jobs holding `id-token: write`
+#     (release.yml publish jobs), where repo-supplied code must never execute. Hooks can also be
+#     pointed at through `.npmrc` or `pnpm-workspace.yaml` settings (`pnpmfile`, `globalPnpmfile`,
+#     `configDependencies`), and newer pnpm releases load the pnpmfile for more commands than
+#     `install` (run, exec, rebuild, pack, publish), so the first step refuses all of them.
+#     Those paths are S1 and code-owned (audit-rules.md §2.2, .github/CODEOWNERS).
+#   - the pnpm store cache can be switched off for publishing workflows
+name: Set up Node.js and pnpm
+description: >-
+  Installs pnpm (version from package.json "packageManager") and Node.js
+  (from .nvmrc, default 24), then runs a frozen-lockfile install with
+  lifecycle scripts and pnpm hooks (pnpmfile) disabled.
+
+inputs:
+  cache:
+    description: >-
+      Cache the pnpm store between runs. Set to "false" in any workflow that
+      publishes artifacts (cache poisoning).
+    required: false
+    default: "true"
+  install:
+    description: Run `pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile`.
+    required: false
+    default: "true"
+  rebuild:
+    description: >-
+      Space-separated allowlist of packages whose install scripts must run
+      (executed as `pnpm rebuild <packages>` after the script-free install),
+      for example "better-sqlite3". Empty means no script runs at all.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    # Always runs, also with install=false: later `pnpm run/exec/pack/publish` calls may load hooks too.
+    - name: Refuse pnpm hooks (pnpmfile)
+      shell: bash
+      run: |
+        set -euo pipefail
+        status=0
+        # File names are not echoed: they come from the checked-out tree.
+        if [ -n "$(find . \( -name node_modules -o -name .git \) -prune -o -name '.pnpmfile.*' -print -quit)" ]; then
+          echo "::error::A .pnpmfile.* exists in the repository. This project uses no pnpmfile (it would run code during pnpm commands)."
+          status=1
+        fi
+        for config in .npmrc pnpm-workspace.yaml package.json; do
+          if [ -f "$config" ] && grep -Eiq 'pnpmfile|configDependencies' "$config"; then
+            echo "::error file=$config::pnpmfile or configDependencies is referenced. This project uses no pnpm hooks."
+            status=1
+          fi
+        done
+        exit "$status"
+
+    - name: Resolve Node.js version
+      id: node
+      shell: bash
+      run: |
+        set -euo pipefail
+        version=24
+        if [ -f .nvmrc ]; then
+          candidate="$(head -n 1 .nvmrc | tr -d '[:space:]')"
+          if [[ "$candidate" =~ ^[A-Za-z0-9._*/-]+$ ]]; then
+            version="$candidate"
+          else
+            echo "::warning file=.nvmrc::Unrecognised .nvmrc content; falling back to Node 24."
+          fi
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
+    # Reads "packageManager" from package.json when no `version` input is given.
+    - name: Set up pnpm
+      uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+    - name: Set up Node.js
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: ${{ steps.node.outputs.version }}
+        cache: ${{ inputs.cache == 'true' && 'pnpm' || '' }}
+        package-manager-cache: false
+
+    # --ignore-pnpmfile: no repository hook code runs during install (see the header comment).
+    - name: Install dependencies (frozen lockfile, no lifecycle scripts, no pnpmfile)
+      if: inputs.install == 'true'
+      shell: bash
+      run: pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile
+
+    - name: Rebuild allowlisted native packages
+      if: inputs.install == 'true' && inputs.rebuild != ''
+      shell: bash
+      env:
+        REBUILD: ${{ inputs.rebuild }}
+      run: |
+        set -euo pipefail
+        # Intentional word splitting: REBUILD is a space-separated package list.
+        # shellcheck disable=SC2086
+        pnpm rebuild $REBUILD

@@ -1,0 +1,46 @@
+# CODEOWNERS for 4thtech/agentlink: the S2 gate (decision D-25).
+#
+# The `main` ruleset requires a code-owner review, with 0 required approvals otherwise. A pull
+# request that touches a path below therefore merges (or auto-merges) only after an approving
+# review by @talirezun or @denisjazbec who is not its author. Pull requests are opened under
+# @talirezun's account, so agent-built S2 work needs @denisjazbec's GitHub approval. A review
+# relayed in chat does not satisfy it. Paths not listed here have no code owner.
+#
+# Listed: the S2 path defaults of docs/process/audit-rules.md §2.2, plus CI and release
+# configuration, the supply-chain files that execute code (package.json, pnpm-workspace.yaml,
+# .npmrc, .pnpmfile.*) and the agent rules. Keep this list, audit-rules.md §2.2 and the class rules in
+# .github/workflows/review-gate.yml in sync. Content-rule S2 changes on other paths
+# (audit-rules.md §2.4) are caught by review-gate, not here.
+#
+# Changing this file is itself code-owned (/.github/) and an owner-only decision.
+
+# S2: crypto, keys, owner presence, envelope/pairing protocol, policy engine
+/packages/crypto/                               @talirezun @denisjazbec
+/packages/core/                                 @talirezun @denisjazbec
+/packages/node/                                 @talirezun @denisjazbec
+
+# S2: owner console, cloud agent (seeds), submitter (gas keys)
+/apps/console/                                  @talirezun @denisjazbec
+/apps/cloud-agent/                              @talirezun @denisjazbec
+/apps/submitter/                                @talirezun @denisjazbec
+
+# S2: canonical protocol vectors and the invariants
+/test-vectors/                                  @talirezun @denisjazbec
+/docs/foundation/04-security-and-crypto.md      @talirezun @denisjazbec
+
+# CI, release and repository configuration (incl. this file, review-gate and release workflows)
+/.github/                                       @talirezun @denisjazbec
+
+# Supply-chain configuration that can run code or redirect installs and publishing in CI: the root
+# manifest, pnpm workspace settings, .npmrc and pnpm hook files (.pnpmfile.cjs/.mjs), which pnpm
+# executes and which could otherwise reach a job holding the npm OIDC token. No leading slash on
+# the last two: they apply at any depth, like the class rule in review-gate.yml.
+/package.json                                   @talirezun @denisjazbec
+/pnpm-workspace.yaml                            @talirezun @denisjazbec
+.npmrc                                          @talirezun @denisjazbec
+.pnpmfile.*                                     @talirezun @denisjazbec
+
+# Agent rules and harness settings
+/AGENTS.md                                      @talirezun @denisjazbec
+/CLAUDE.md                                      @talirezun @denisjazbec
+/.claude/                                       @talirezun @denisjazbec

@@ -1,0 +1,91 @@
+name: Task
+description: A backlog task from the build plan (docs/foundation/10-build-plan.md)
+title: "M?-?: "
+labels: ["task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One task per issue, one issue per pull request. The task ID goes in the branch name and the PR title.
+        Read `AGENTS.md`, `docs/foundation/04-security-and-crypto.md` and the spec for your component before you start.
+  - type: input
+    id: task_id
+    attributes:
+      label: Task ID
+      description: As in the build plan, for example M1-5. Use OPS-<n> for operations work.
+      placeholder: M1-5
+    validations:
+      required: true
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Milestone
+      options:
+        - M0 Foundations
+        - M1 Local beta on testnets
+        - M2 Owner console / self-host / design
+        - M3 Mainnet beta
+        - M4 Expansion
+        - M5 Agent commerce
+        - Operations (OPS)
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is the output of this task, in a few sentences?
+    validations:
+      required: true
+  - type: textarea
+    id: spec_refs
+    attributes:
+      label: Spec references
+      description: Sections of docs/foundation/ that define this work (for example 04 §3.5, 07 §4.2).
+      placeholder: |
+        - 04 §3.5 Transport wrapping
+        - 07 §4.2 Inbox sync
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Copy the acceptance column from the build plan and add anything that is needed to call it done. Use a checklist.
+      placeholder: |
+        - [ ] ...
+        - [ ] Tests pass in CI
+        - [ ] Docs updated
+    validations:
+      required: true
+  - type: dropdown
+    id: security_class
+    attributes:
+      label: Security class
+      description: S0 none. S1 sensitive (policies, approvals, MCP surface, untrusted-input parsing, storage credentials, CI). S2 critical (crypto, keys, owner presence, contracts, signing, submitter, release). S1 needs an independent AI review session (audit-rules.md §3; the owner MAY also review, it is not a merge precondition). S2 adds a GitHub approval by a code owner who is not the author (the engineer, @denisjazbec, for PRs opened under the owner's account), a full threat note and tests-first evidence.
+      options:
+        - S0 none
+        - S1 sensitive
+        - S2 critical
+    validations:
+      required: true
+  - type: dropdown
+    id: model_tier
+    attributes:
+      label: Model tier
+      description: Model tier for the worker that implements this task (routing rules in AGENTS.md).
+      options:
+        - Haiku (mechanical and well-specified)
+        - Sonnet (standard implementation)
+        - Opus (design-heavy or security-critical)
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Task IDs or issues that must be finished first, and external prerequisites. Write "None" if there are none.
+      placeholder: |
+        - Blocked by M1-1 (@agentlink/crypto)
+    validations:
+      required: true

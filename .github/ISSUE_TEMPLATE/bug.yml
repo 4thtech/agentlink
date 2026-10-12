@@ -1,0 +1,78 @@
+name: Bug report
+description: Something does not work as documented
+title: "Bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security problems do not belong here.** If you think you found a vulnerability, use
+        [Report a vulnerability](https://github.com/4thtech/agentlink/security/advisories/new) in the Security tab instead.
+
+        **Never paste** private keys, seeds, recovery codes, file keys, salts, presigned URLs, message contents or
+        tokens into this issue. Redact logs before you attach them.
+  - type: checkboxes
+    id: not_security
+    attributes:
+      label: Before you submit
+      options:
+        - label: This is not a security vulnerability, and I have removed all secrets and private content from this report.
+          required: true
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - CLI / MCP server
+        - Local approval UI
+        - Owner console
+        - Verify page
+        - Invite page
+        - Cloud agent template
+        - Submitter
+        - Packages (crypto / core / chain / transport / storage / node / types)
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Output of `agentlink --version`, a package version, or a commit SHA.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Node.js version, harness (Claude Code, Claude Desktop, Codex, Gemini CLI, ...) and its version, network (testnet name).
+      placeholder: |
+        - OS:
+        - Node.js:
+        - Harness:
+        - Network:
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and output (redacted)
+      description: Use the built-in redacting logger output. Check it for anything private before pasting.
+      render: shell

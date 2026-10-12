@@ -1,0 +1,245 @@
+# CI/CD reference
+
+Scope: GitHub Actions workflows and repository hygiene for `4thtech/agentlink` (task M0-2, CI part; continuous delivery per D-25). Security rules come from `AGENTS.md` and `docs/foundation/04-security-and-crypto.md` §7 (supply chain) and §8. The delivery model (staging, production, rollback, `DEPLOY_FREEZE`) is normative in `release-and-deployment.md`; this file is the implementation reference and the owner's setup checklist. The OCC v2 contracts live in a separate private repository with its own CI; nothing in this repository references its contents.
+
+## Workflows
+
+| File | Runs on | What it checks or does | Required check |
+|---|---|---|---|
+| `.github/workflows/ci.yml` | pull request, push to `main`, merge queue | `detect` looks at what exists; `checks` runs `pnpm lint`, `typecheck`, `build`, `test`; `vectors` runs `pnpm vectors:check` (Playwright browsers only if Playwright is in the lockfile); `context-budget` enforces the size budgets of `AGENTS.md` (≤ 8 KB) and `CLAUDE.md` (≤ 1 KB) (`development-process.md` §3.6) | `ci-gate` |
+| `.github/workflows/security.yml` | pull request, push to `main`, merge queue, weekly (Mon 05:23 UTC) | dependency review (PRs; moderate+ vulnerabilities and a license allowlist), gitleaks over the full git history (via `secret-scan.yml`; weekly also over the `sync` branch), CodeQL (`actions`, `javascript-typescript`), zizmor on the workflows | `security-gate` |
+| `.github/workflows/secret-scan.yml` | reusable (`workflow_call`) only | the gitleaks scan itself: official release binary, verified against the release checksums and a digest pinned in the file | none (reported through `security-gate`) |
+| `.github/workflows/pr-hygiene.yml` | pull request (opened, edited, synchronize, reopened) | title starts with a task ID (`M<n>-<n>[a-z]`, `OPS-<n>`, `DOCS`, `CHORE`, `DEPS`); body has every section of the PR template, filled in, with exactly one security class ticked | `pr-hygiene` |
+| `.github/workflows/review-gate.yml` | pull request (opened, edited, synchronize, reopened, ready_for_review), pull request review (submitted, edited, dismissed), merge queue | (a) derives the security class from the changed files (rules mirror `audit-rules.md` §2.2, highest wins); (b) the ticked class is at least that; (c) S1/S2: "Independent review" references a report ID `IR-…` and no FAIL verdict (a PR authored by `renovate[bot]` or `github-actions[bot]` instead needs a code-owner approval on the head commit); (d) S2: an approval on the head commit by `@talirezun` or `@denisjazbec` who is not the author, plus "Threat note" and "Tests-first evidence"; (e) red while `DEPLOY_FREEZE` is `true`. Details below | `review-gate` |
+| `.github/workflows/release.yml` | push to `main` | inactive until `.changeset/config.json`, `package.json` and `pnpm-lock.yaml` exist; then the Changesets "Version packages" PR, and npm publishing via trusted publishing (OIDC) with provenance: prereleases to `next` automatically (environment `npm-next`), stable releases to `latest` after the owner's approval click (environment `npm-publish`), health check, the product GitHub Release `v<version>` (from `CHANGELOG.md`; none for prereleases), rollback, freeze and deploy record | none |
+| Cloudflare deploy workflow (`deploy-cloudflare.yml`) | not built yet | contract in `release-and-deployment.md` §4.5–§4.6; built with the first deployable app (M1-10) | none |
+
+CI, security, PR hygiene and the review gate never run for the `sync` branch except the secret scan (see "The sync branch" below).
+
+Supporting files: `.github/actions/setup-node-pnpm/action.yml` (shared Node + pnpm + frozen install), `.github/zizmor.yml` (every remote `uses:` must be hash-pinned; the `self-repository` audit is disabled with a written rationale, see the file), `.github/CODEOWNERS` (the S2 gate), `.github/pull_request_template.md`, `.github/ISSUE_TEMPLATE/*`, `renovate.json`, `SECURITY.md`.
+
+### Required status checks
+
+Add exactly these four to the `main` ruleset: **`ci-gate`**, **`security-gate`**, **`pr-hygiene`**, **`review-gate`**.
+
+`ci-gate` and `security-gate` are aggregator jobs that always run. They fail if any upstream job failed or was cancelled; a skipped job counts as success. That is what keeps the repository green while it is docs-only, and why individual jobs (which come and go) are never listed as required. `pr-hygiene` is skipped on merge-queue runs, which GitHub treats as a pass. `review-gate` checks only `DEPLOY_FREEZE` on merge-queue runs.
+
+### Review gate (`review-gate`)
+
+`review-gate` and `CODEOWNERS` together are the GitHub-enforced half of `audit-rules.md` §3:
+
+- **CODEOWNERS** lists only the S2 path defaults plus `/.github/`, `/AGENTS.md`, `/CLAUDE.md`, `/.claude/` and the supply-chain files that can execute code or redirect installs and publishing (`/package.json`, `/pnpm-workspace.yaml`, and `.npmrc` and `.pnpmfile.*` at any depth), each owned by `@talirezun @denisjazbec`. `review-gate` classifies the same files as S1. With "Require review from Code Owners" on, a PR touching them merges only after an approval by one of them who is not the author. PRs are opened under `@talirezun`'s account, so agent-built work there needs `@denisjazbec`'s GitHub approval.
+- **`review-gate`** covers what CODEOWNERS cannot: the declared class, content-rule S2 on non-owned paths (the effective class is the higher of derived and declared), the review evidence in the PR body, and the freeze.
+- It reads the four PR template sections **Security class**, **Independent review**, **Threat note** and **Tests-first evidence**, using the same parser as `pr-hygiene` (`##`/`###` headings, HTML comments and fences ignored). Placeholders (`N/A`, `None`, `TBD`, `-`) count as empty where a section is required.
+- **(c) is attested, not proven.** CI checks that a review report is referenced; the report itself is private (`audit-rules.md` §4.5), and the orchestrator attests that the review happened as specified. DECISION NEEDED (owner): run the independent review as a machine job in CI (backlog M0-20). It would need an `ANTHROPIC_API_KEY` secret in an environment unreachable from fork PRs and from non-`main` branches, its output would be advisory, and the PR content it reads is untrusted input (I-5).
+- **(d)** counts only the latest non-comment review of each user, and only on the current head commit; a later "changes requested", a dismissal or a new commit removes it. Rebasing an S2 PR therefore needs a fresh approval, as does the ruleset's stale-approval dismissal.
+- **Automated PRs (no exemption, one substitution).** A PR is automated only when its **author** (`pull_request.user.login`, set by GitHub) is `renovate[bot]` or `github-actions[bot]` (the Changesets "Version packages" PR). Commit author names, e-mail addresses and the `verified` flag are not consulted: anyone who can push to the branch can forge them. For an automated PR, (c) is satisfied **only** by an APPROVED review by `@talirezun` or `@denisjazbec` on the current head commit (no report ID exists to cite); a new commit, including a bot rebase or "Update branch", invalidates it. (b) does not require a ticked class for it, and (d) applies unchanged for S2 (the bot is the author, so either code owner's approval counts; a human fills in the Threat note and Tests-first evidence sections). If the Changesets action ever uses a GitHub App token, add that app's login to `BOT_AUTHORS` in `review-gate.yml` and update `pr-hygiene.yml`. Pushes to `renovate/**` and `changeset-release/**` must be restricted to the bots (checklist section 2), otherwise a human with write access could add commits to a bot-authored PR; the head-commit approval is what still catches that.
+- **Freeze (e):** setting `DEPLOY_FREEZE` does not re-run the check on open PRs. Whoever sets the freeze also disables auto-merge on open PRs (`gh pr merge --disable-auto`); see `release-and-deployment.md` §3.1.
+- Skeleton-tolerant: it needs nothing but the pull request, checks out nothing and uses no secrets. A docs-only S0 PR passes once its class box is ticked.
+
+### Skeleton tolerance and strict mode
+
+Until the monorepo skeleton exists, `detect` finds no `package.json` + `pnpm-lock.yaml` and every Node job is skipped. It activates by itself when both files appear. Rules once they do:
+
+- `package.json` must pin pnpm with `"packageManager": "pnpm@x.y.z"`, otherwise `detect` fails.
+- A missing root script (`lint`, `typecheck`, `build`, `test`) is a warning annotation and the step is skipped. `vectors:check` is optional.
+- **Strict mode:** commit an empty file `.github/ci-strict` and a missing root script (or a `package.json` without a lockfile) becomes a failure. Add it in the same PR that completes the skeleton, so a deleted `test` script can never turn CI silently green. `.github/` is code-owned, so the change needs a code-owner approval.
+
+### Contract with the monorepo skeleton
+
+- Root scripts: `lint`, `typecheck`, `build`, `test` (each typically `turbo run <task>`), plus `vectors:check` and `test:e2e` per `docs/process/repo-reference.md`. Turbo dependencies (`typecheck` and `test` after `^build`) belong in `turbo.json`.
+- `.nvmrc` is optional; without it CI uses Node 24 (the Active LTS line at the time of writing). The release jobs need npm ≥ 11.21.0 (or ≥ 12.2.0 on npm 12) for OIDC dist-tag rollback; pin a Node release whose bundled npm meets that.
+- `@playwright/test` must be a root devDependency if the vectors run in a browser; CI runs `pnpm exec playwright install --with-deps chromium`.
+- **Install scripts are disabled in CI** (`--ignore-scripts`). Packages that need a native build, such as `better-sqlite3` in `packages/node`, need an explicit allowlist: in `ci.yml` pass `rebuild: better-sqlite3` to the setup step (a comment shows where). Do not remove `--ignore-scripts`.
+- `pnpm-workspace.yaml`: set pnpm's own `minimumReleaseAge` so Renovate's lockfile maintenance respects the same cooldown as `renovate.json` (check the unit in the pnpm docs).
+- `e2e` (`pnpm test:e2e`) needs testnet RPC and relays and is not run in PR CI. Add a separate scheduled or manually triggered workflow with its own environment when M1-13 lands.
+- Every published package: `publishConfig.access = "public"` and no `publishConfig.registry`, a correct `repository` field (needed for provenance), no `postinstall` scripts. `.npmrc` sets no registry and no credentials. The release jobs refuse to publish otherwise, because the OIDC token would follow a foreign registry.
+- `@4thtech/agentlink --version` prints the version (the release smoke tests check it).
+- npm channels: prereleases on `next` are made in Changesets pre mode (`changeset pre enter next`); `changeset pre exit` prepares the stable release for `latest` (`release-and-deployment.md` §4.1).
+
+## Action pins
+
+Every action is pinned to a full commit SHA with the release tag in a trailing comment. Resolved on 2026-10-12 with `gh api` (annotated tags dereferenced to their commits). Renovate keeps these current (`helpers:pinGitHubActionDigestsToSemver`, 3-day cooldown); zizmor and the repository setting "require actions to be pinned to a full-length commit SHA" reject unpinned ones.
+
+| Action | Version | Commit SHA | Used in | Why |
+|---|---|---|---|---|
+| `actions/checkout` | v7.0.1 | `3d3c42e5aac5ba805825da76410c181273ba90b1` | all workflows except `review-gate` | GitHub-owned |
+| `actions/setup-node` | v7.1.0 | `949feb2413d6458794dcd2491c4babbbce0c15c1` | setup action | GitHub-owned; built-in pnpm store cache |
+| `actions/github-script` | v9.0.0 | `3a2844b7e9c422d3c10d287c895573f7108da1b3` | pr-hygiene, review-gate | GitHub-owned |
+| `actions/dependency-review-action` | v5.0.0 | `a1d282b36b6f3519aa1f3fc636f609c47dddb294` | security | GitHub-owned |
+| `github/codeql-action` (`init`, `analyze`) | v4.38.3 | `24c54180a607b1449ed407dd24f251e4e9147c8d` | security | GitHub-owned |
+| `pnpm/action-setup` | v6.1.0 | `ea17c68df8912ef543352723c149a84f56e3d413` | setup action | **Third party.** Official pnpm action; installs the exact pnpm from `packageManager`. Alternative is `corepack`, which is not pinned by hash |
+| `changesets/action` (`select-mode`, `version`, `pack`, `publish`) | v2.1.2 | `ae32849d5ba541f9ae29e40e22a623bc13562f51` | release | **Third party.** Official Changesets action; its split sub-actions keep `id-token: write` on the publish jobs only |
+| `zizmorcore/zizmor-action` | v0.6.4 | `cc914d7f3750a2d13d75c7f184a1060aa0e9d482` | security | **Third party.** Official zizmor action; runs a container image pinned by digest inside the action. Version input pinned to zizmor 1.30.1 |
+
+Pinned non-action artifacts:
+
+| Artifact | Version | Pin |
+|---|---|---|
+| gitleaks release binary (`secret-scan.yml`) | 8.30.1 | tarball SHA-256 `551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb` in the workflow, and also verified against the release's `checksums.txt` |
+
+Why not `gitleaks/gitleaks-action`: it requires a paid licence for organisations. The binary is MIT-licensed and free.
+
+## Security properties of these workflows
+
+- Top-level `permissions: {}`; each job requests only what it needs. Write permissions exist only in `version` (contents, pull-requests), `publish-next` and `publish-latest` (contents, id-token), `rollback-latest` (id-token) and `codeql` (security-events). `record` reads Actions data (who approved).
+- No `pull_request_target`. No event data interpolated into `run:` scripts or into `github-script` source; values reach scripts through `env:` or the event payload object, and attacker-controlled strings are logged only as JSON strings.
+- One secret: `DEPLOY_FREEZE_TOKEN`, only in environment `deploy-freeze` (deployment branch `main`), used only by the `freeze` job to set `DEPLOY_FREEZE`. Future Cloudflare tokens live only in environments `staging` and `production` (`release-and-deployment.md` §6). No PR workflow can reach any secret.
+- `actions/checkout` always with `persist-credentials: false`.
+- `pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile` everywhere (the composite action). `--ignore-scripts` alone does not stop pnpm from running a repository `.pnpmfile.*`, and both publish jobs run the install while holding `id-token: write`. The project uses no pnpmfile; the action's first step also fails the job if a `.pnpmfile.*` exists, or `pnpmfile` or `configDependencies` appears in `.npmrc`, `pnpm-workspace.yaml` or `package.json` (newer pnpm releases load the pnpmfile for more commands than `install`). `.pnpmfile.*`, `.npmrc`, `pnpm-workspace.yaml` and the root `package.json` are S1 and code-owned. The pnpm store cache is off in every release job.
+- The post-publish health checks in `release.yml` run `npm install --ignore-scripts` of the exact `name@version` just published, in an empty scratch directory, only to feed `npm audit signatures`; zizmor's `adhoc-packages` finding is ignored inline on those two steps for that reason (no manifest or lockfile can exist for a version published a minute earlier). Both publish jobs also refuse a project `.npmrc` `tag=` line and any `publishConfig.tag`, besides registry and credential overrides.
+- Build code never runs in a job holding `id-token: write` (Changesets pack/publish split), and no job holding it runs package code: post-publish health checks read the registry only, and the CLI smoke tests run in jobs without credentials.
+- `timeout-minutes` on every job (the two jobs that call the reusable `secret-scan.yml` cannot set one; the job inside it has 15 minutes); PR runs cancel superseded runs; release jobs never cancel in flight.
+- npm publishing uses trusted publishing (OIDC) and provenance, bound to GitHub Environments that only `main` can enter. There is no `NPM_TOKEN` and none should be added.
+- Every publish or deploy job is skipped while `DEPLOY_FREEZE` is `true` and re-checks it when it starts.
+- Dependency licenses: only an allowlist of permissive licenses passes (`0BSD`, `Apache-2.0`, `BlueOak-1.0.0`, `BSD-2-Clause`, `BSD-3-Clause`, `CC0-1.0`, `CC-BY-3.0`, `CC-BY-4.0`, `ISC`, `MIT`, `MIT-0`, `MPL-2.0`, `Python-2.0`, `Unlicense`, `Zlib`). AGPL, GPL, LGPL, SSPL, BUSL and unknown licenses fail. The action's `deny-licenses` option is deprecated, hence an allowlist. The repository's own licence is MIT (D-12).
+
+## Owner setup checklist
+
+Everything below is manual (GitHub, npm or Cloudflare settings) and owner-only: rulesets, CODEOWNERS, environments and organisation settings are never changed by agents (`release-and-deployment.md` §3.2). Items marked **Decision** have a recommendation but are yours to confirm.
+
+### 0. Order of operations (bootstrap)
+
+1. Push the initial commit to `main` (rulesets do not exist yet).
+2. Open one small PR titled `CHORE: bootstrap CI` using the PR template, so that `ci-gate`, `security-gate`, `pr-hygiene` and `review-gate` each run once. A required check can only be selected in the ruleset after it has reported at least once.
+3. Create the environments (section 4) and the `main` ruleset (section 2), then merge the bootstrap PR through it. It touches `.github/`, so it needs `@denisjazbec`'s approval.
+4. Verify on two fixture PRs (backlog M0-17): an S0 PR auto-merges once the checks are green; a PR touching an S2 path cannot merge without a non-author code-owner approval.
+5. Install Renovate (section 6).
+6. Create the orphan `sync` branch and add its secret-scan stub (see "The sync branch"), then enable its ruleset.
+
+### 1. Repository settings (Settings, General and Code security)
+
+- [ ] Merging: allow **squash merging only** (default message: pull request title and description); disable merge commits and rebase merging; auto-delete head branches. The PR title, which `pr-hygiene` validates, becomes the commit subject.
+- [ ] **Allow auto-merge: on** (D-25). Agents enable it per PR (`gh pr merge --auto --squash`); GitHub merges when every required check and the code-owner review are satisfied.
+- [ ] Private vulnerability reporting: **enable** (`SECURITY.md` depends on it).
+- [ ] Dependency graph and Dependabot alerts: **enable** (dependency review and Renovate's `vulnerabilityAlerts` use them). **Decision:** leave Dependabot *security updates* off, Renovate opens those PRs.
+- [ ] Secret scanning and **push protection**: **enable**.
+- [ ] Code scanning: do **not** enable CodeQL "default setup"; `security.yml` is the advanced setup and the two conflict.
+- [ ] Create labels: `task`, `bug`, `dependencies`, `security`, `security-sensitive`.
+- [ ] Repository secrets: add none. Repository variables: `DEPLOY_FREEZE` only (section 8).
+
+### 2. Ruleset for `main` (Settings, Rules, Rulesets)
+
+- [ ] Target: default branch; enforcement: Active; **bypass list: empty**. No bypass actors, and the owner's account is never one: with a bypass, an agent holding the owner's credentials could merge past every gate.
+- [ ] Restrict deletions; block force pushes.
+- [ ] Require linear history.
+- [ ] Require a pull request before merging: allowed merge method squash; **required approvals: 0**; **require review from Code Owners: on**; dismiss stale approvals on new commits; require conversation resolution. Required approvals stay 0 because PRs are opened under the owner's account; the code-owner rule makes the S2, CI and agent-rule paths need a non-author approval (`CODEOWNERS`).
+- [ ] Require status checks to pass: **`ci-gate`**, **`security-gate`**, **`pr-hygiene`**, **`review-gate`** (source: GitHub Actions). **Decision:** "require branches to be up to date" is safer and causes more rebases; recommended on. Let the bots rebase their own PRs (section 6); a rebase or manual "Update branch" on a bot PR changes its head commit, so its code-owner approval has to be given again.
+- [ ] **Decision (optional):** require signed commits. Squash merges made in the web UI and commits created by the Changesets action through the API are signed by GitHub. Direct pushes need a local signing key.
+- [ ] **Decision (optional):** "Require code scanning results" for CodeQL (high or higher), after the first clean run.
+- [ ] Second ruleset on tags (`refs/tags/*`): restrict updates and deletions, but **not** creation (the release jobs create tags).
+- [ ] Ruleset on the bot branches (`renovate/**` and `changeset-release/**`): enforcement Active; **restrict who can push**, with the Renovate GitHub App (and the actor that pushes the Changesets branch) as the only bypass actors. Without it, anyone with write access can add commits to a branch behind a bot-authored PR; `review-gate` identifies automated PRs by their author, so only a code-owner approval on the head commit stands between such a commit and the merge. Block force pushes and deletions as well if the apps allow it. Not verified: whether the `GITHUB_TOKEN` of `release.yml` (`github-actions[bot]`) can be a bypass actor; if not, pass a GitHub App token as `github-token` to the `version` job (section 3), or leave `changeset-release/**` out and rely on the head-commit approval.
+- [ ] Third ruleset on the coordination branch `sync`: target `sync`, enforcement Active, bypass list empty; **block force pushes and restrict deletions** only. No pull-request requirement, no status checks, no linear-history rule (it is pushed to directly).
+
+### 3. Actions settings (Settings, Actions, General)
+
+- [ ] Allowed actions: "Allow *org*, and select non-*org*, actions and reusable workflows". Tick "Allow actions created by GitHub". **Decision:** leave "verified creators" unticked; the list below is complete. Allowed patterns: `pnpm/action-setup@*`, `changesets/action@*`, `zizmorcore/zizmor-action@*`.
+- [ ] **Require actions to be pinned to a full-length commit SHA** (`sha_pinning_required`): on.
+- [ ] Workflow permissions: **Read repository contents and packages permissions** (default `GITHUB_TOKEN` read-only).
+- [ ] "Allow GitHub Actions to create and approve pull requests": **off** for now. **Decision before the first release:** the Changesets "Version packages" PR needs either this toggle on (it also lets workflows approve PRs; an Actions approval never satisfies the code-owner rule or `review-gate`, which count only `@talirezun` and `@denisjazbec`) or a GitHub App token passed as `github-token` to the `version` job (more secure, more setup). PRs opened with `GITHUB_TOKEN` do not trigger other workflows: close and reopen the PR to run the required checks.
+- [ ] Fork pull request workflows: "Require approval for all external contributors"; do not send write tokens or secrets to fork PR workflows.
+
+### 4. Environments (Settings, Environments)
+
+| Environment | Used by | Required reviewer | Deployment branches and tags | Secrets / variables |
+|---|---|---|---|---|
+| `npm-next` | `release.yml` → `publish-next` | none (staging is automatic) | `main` only | none |
+| `npm-publish` | `release.yml` → `publish-latest`, `rollback-latest` | **`@talirezun`** | `main`, and tags matching the Changesets tag pattern (`*@*`) | none |
+| `staging` | Cloudflare deploy workflow → staging jobs (not built yet) | none | `main` only | secret `CLOUDFLARE_API_TOKEN` (staging token); variable `CLOUDFLARE_ACCOUNT_ID` |
+| `production` | Cloudflare deploy workflow → production jobs (not built yet) | **`@talirezun`** | `main`, and release tags | secret `CLOUDFLARE_API_TOKEN` (production token); variable `CLOUDFLARE_ACCOUNT_ID` |
+| `deploy-freeze` | `release.yml` → `freeze` (later also the Cloudflare workflow) | none | `main` only | secret `DEPLOY_FREEZE_TOKEN` (section 8) |
+
+- [ ] Create the five environments as above. For `npm-publish` and `production`, **"Prevent self-review" stays off**: merges, and therefore the runs waiting for approval, happen under your account, so with it on you could never approve.
+- [ ] Do not define `DEPLOY_FREEZE` as an environment variable anywhere: an environment variable of the same name shadows the repository variable inside that job.
+- [ ] Approving is one click on the waiting run (web or GitHub mobile). GitHub shows all environments of a run that wait for you in one dialog.
+
+### 5. npm
+
+- [ ] Create the npm organisation(s) for the `@agentlink` scope (and `@4thtech` for `@4thtech/agentlink`) with **2FA required**.
+- [ ] Bootstrap each new package once by hand, with 2FA, on `latest` with a stable version (Changesets publishes a package that has only prereleases to `latest`, even in pre mode). Not verified: whether a trusted publisher can be configured before the first publish.
+- [ ] For every package, Settings → Trusted Publisher → GitHub Actions, organisation `4thtech`, repository `agentlink`, workflow filename `release.yml`, **two** entries: environment `npm-next` (publishing only), and environment `npm-publish` with **"Allow npm dist-tag"** on (automatic rollback of `latest`). npm allows up to 10 trusted publishers per package and validates them only at publish time. If npm refuses two entries for the same workflow file, split `publish-next` into its own workflow file (a code-owned PR). Then set the package's publishing access to "Require two-factor authentication and disallow tokens".
+- [ ] Do not create or store an `NPM_TOKEN`.
+
+### 6. Renovate
+
+- [ ] Install the Renovate GitHub App on this repository only. `renovate.json` already exists, so there is no onboarding PR. Its PRs are titled `DEPS: ...`, labelled `dependencies`; the crypto and transport group (`@noble/*`, `@hpke/*`, `nostr-tools`, `viem`, `aws4fetch`) additionally gets `security-sensitive` and a 7-day cooldown; majors wait for approval on the Dependency Dashboard issue.
+- [ ] Let Renovate rebase its own PRs. `review-gate` treats a PR as automated by its author (`renovate[bot]`) only, never by commit metadata, and wants a code-owner approval on the head commit for every S1/S2 Renovate PR; each rebase needs a fresh approval. Restrict who can push to `renovate/**` (section 2).
+- [ ] If you use self-hosted Renovate or a differently named bot, change the author check in `pr-hygiene.yml` and `review-gate.yml`.
+
+### 7. Organisation (`4thtech`)
+
+- [ ] Require two-factor authentication for all members.
+- [ ] Base repository permission: **Read**.
+- [ ] Disable forking of private repositories (protects the contracts repository during beta).
+- [ ] Plan: stays on GitHub **Free** (D-27; see "GitHub Free plan notes").
+
+### 8. `DEPLOY_FREEZE`
+
+- [ ] Repository variable `DEPLOY_FREEZE` (Settings → Secrets and variables → Actions → Variables). Absent or `false` = deploys allowed; `true` = every publish and deploy job is skipped and `review-gate` is red. Repository level only.
+- [ ] Agents MAY set it to `true` (`gh variable set DEPLOY_FREEZE --body true`); only you clear it (`release-and-deployment.md` §3.1).
+- [ ] Freeze credential `DEPLOY_FREEZE_TOKEN` in environment `deploy-freeze`, able to write this repository's Actions variables and nothing else. The `freeze` job uses it to set the variable after a failed production deploy; without it, the job fails loudly and the orchestrator sets the freeze. DECISION NEEDED (owner): fine-grained personal access token (repository `4thtech/agentlink`, "Variables: read and write" only, expiry ≤ 90 days) or a GitHub App with only that permission (no user-bound token; needs one more pinned GitHub-owned action, `actions/create-github-app-token`). Proposed: the GitHub App before the first production deploy, the token until then.
+
+### 9. Cloudflare (backlog M0-2g)
+
+- [ ] CI deploys use a scoped API token per environment, stored only as the `CLOUDFLARE_API_TOKEN` environment secret of `staging` and `production`; `CLOUDFLARE_ACCOUNT_ID` is an environment variable. Scope: Workers Scripts and Routes on the account, plus `4thtech.io` zone DNS / Workers Routes for the production token only (staging deploys to `workers.dev` and needs no zone access).
+- [ ] Your local Wrangler OAuth login is personal. Agents never use it and never run `wrangler deploy` from a workstation.
+- [ ] Production secrets (gas hot keys) are set by you with `wrangler secret put`, never through GitHub.
+- [ ] Storage-adapter tests against R2 use a separate bucket-scoped R2 token (the OAuth login has no R2 scope), held outside PR workflows (`release-and-deployment.md` §6).
+
+## The sync branch
+
+`sync` is an orphan branch (no shared history with `main`) that holds coordination markdown only (`board.md` and per-person files). It is pushed to directly, with no pull requests, so it is deliberately outside the review rules of `main`. Safeguards:
+
+- `ci.yml`, `pr-hygiene.yml` and `review-gate.yml` do not run for it: they trigger on pushes to `main` only and ignore pull requests into `sync`.
+- **Secret scan on every push.** GitHub runs a push-triggered workflow from the workflow files *in the pushed branch*, so a workflow on `main` can never fire for pushes to `sync`. The branch therefore carries one small stub, `.github/workflows/secret-scan.yml`, that calls the reviewed reusable workflow on `main`. The stub is the only non-markdown file on `sync`:
+
+  ```yaml
+  name: Secret scan (sync)
+  on:
+    push:
+      branches: [sync]
+  permissions: {}
+  concurrency:
+    group: secret-scan-sync
+    cancel-in-progress: true
+  jobs:
+    secret-scan:
+      name: secret-scan
+      permissions:
+        contents: read
+      uses: 4thtech/agentlink/.github/workflows/secret-scan.yml@<FULL-COMMIT-SHA-OF-main>
+  ```
+
+  Replace the placeholder with a full 40-character commit SHA of `main` that contains `secret-scan.yml` (`git rev-parse origin/main`). A full SHA (not `@main`) keeps the stub compatible with the repository's SHA-pinning setting. Update it only when `secret-scan.yml` changes on `main`, for example a gitleaks upgrade.
+- **Weekly backstop.** `security.yml` re-scans the `sync` branch every week using the definition on `main`, so a missing or altered stub is noticed within a week (a missing branch is a no-op).
+- GitHub push protection and secret scanning (checklist section 1) also apply to pushes to `sync`.
+- Nobody reviews content on `sync`; keep secrets, keys, seeds, plaintext and presigned URLs out of it, as everywhere else.
+
+## GitHub Free plan notes
+
+The organisation stays on the **Free** plan (D-27); revisit before M3.
+
+- Rulesets, branch protection and environment required reviewers work for **public** repositories only. `4thtech/agentlink` enforces everything above. The private repositories (`occ-v2-contracts`, `agentlink-ops`) have no rulesets and no environment protection, so there: testnet keys only, low balances, process discipline (`contracts-gate` verified by the owner before every merge; the testnet deploy workflow triggered manually by the owner). Mainnet keys never touch GitHub.
+- Private repositories on Free also lack secret scanning, push protection and code scanning (GitHub Advanced Security features), and Actions minutes are limited (2,000 per month). The contracts template therefore runs the checks it can in CI and notes the rest.
+- Scheduled workflows in a public repository are disabled by GitHub after 60 days without activity; re-enable them if the weekly security scan stops.
+- Merge queue is optional. `ci.yml`, `security.yml`, `pr-hygiene.yml` and `review-gate.yml` already have `merge_group` triggers so a queue does not stall.
+
+## Contracts repository (private)
+
+`docs/process` deliberately holds no contract details. A Foundry CI template (fmt, build with sizes, unit/fuzz/invariant tests with a CI fuzz profile, gas snapshot check, Slither, Aderyn, a deployer-holds-no-role placeholder, and a `contracts-gate` aggregator) was prepared outside this repository for the private contracts repo. Testnet contract deploys stay CI-driven there; no explorer source verification on testnets (D-11, `release-and-deployment.md` §4.2).
+
+## Not verified when this was written
+
+- None of the workflows has run yet; no `actionlint`, `zizmor` or `shellcheck` was available locally. YAML syntax was validated, and the `review-gate` script was exercised against mocked pull requests (S0/S1/S2, stale and self approvals, automated PRs by author including forged commit identities, path classification, freeze). The first CI run is the real test. Expect to triage any zizmor finding; to relax it temporarily set `min-severity: low` on the zizmor step.
+- That a ruleset with **0 required approvals and "Require review from Code Owners" on** blocks a PR touching a code-owned path until a non-author code owner approves, and lets other PRs merge without approval. Verify with the bootstrap fixture PRs (section 0, step 4).
+- That zizmor 1.30.1 accepts `rules.self-repository.disable: true` in `.github/zizmor.yml` (documented since 1.13.0) and honours `# zizmor: ignore[adhoc-packages]` on a `run: |` line (documented example form); neither was run locally. If the inline ignore is not honoured, a `release.yml` ignore entry in `zizmor.yml` (`rules.adhoc-packages.ignore`, `release.yml:<line>`) is the fallback.
+- That `pnpm install --ignore-pnpmfile` is accepted by the pinned pnpm (documented as the `ignorePnpmfile` setting); the first CI run proves it. `pnpm rebuild` (the optional `rebuild` input, unused so far) does not get the flag; the hooks guard step covers it.
+- That a ruleset restricting pushes to `renovate/**` and `changeset-release/**` can list the Renovate app and the Changesets pusher as bypass actors (checklist section 2).
+- That the `review-gate` check run created by a `pull_request_review` event updates the required check on the PR (the latest run of a check name counts).
+- npm: two trusted publishers for the same workflow file with different environments; dist-tag changes over OIDC with "Allow npm dist-tag" (documented on docs.npmjs.com/trusted-publishers, read 2026-10-12, requires npm ≥ 11.21.0 or ≥ 12.2.0); the registry field `dist.attestations.provenance.predicateType` used by the health checks.
+- That a job waiting for environment approval holds its job-level concurrency group, so newer promotions queue behind it.
+- `gitleaks git --redact --no-banner --verbose --exit-code 1` flags (checked against the 8.x CLI from memory, not by running it).
+- The Changesets v2 `pack` + `publish` flow with pnpm, and the `version` job running with `persist-credentials: false`, are untested until the first real release. Dry-run the release on a throwaway package before the first real publish. Checked in the sources at the pinned SHAs: artifact mode refuses a custom `--tag` and takes the tag from the publish plan (pre-mode tag, else `latest`).
+- The `publish-latest` steps that check `CHANGELOG.md` and create the GitHub Release (`gh release create --target <sha>` makes the tag; `create-github-releases: false` on the Changesets publish steps) were tested only with stubbed `gh` and `git`. Verify them in the first dry run, together with the `version-packages` script that rolls `CHANGELOG.md` (`versioning.md` §5).
+- The `sync` stub, the reusable-workflow call with a full-SHA ref, and the `git ls-remote` branch check in `secret-scan.yml` were never run. Verify with a throwaway push to `sync` after the first merge to `main`.
+- A gitleaks scan will flag deliberate secret-looking values in `test-vectors/`. Handle that with a narrow, owner-reviewed `.gitleaks.toml` or `.gitleaksignore` entry (fingerprint), not a directory-wide allowlist.

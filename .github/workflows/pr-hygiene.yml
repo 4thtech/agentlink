@@ -1,0 +1,129 @@
+# PR hygiene: title starts with a task ID, body contains the sections of
+# .github/pull_request_template.md (docs/foundation/10-build-plan.md, working rules 1 and 6).
+#
+# Required status check: `pr-hygiene`.
+#
+# The pull request title and body are attacker-controlled text. They are read
+# from the event payload inside actions/github-script and are never interpolated
+# into a shell script or into the script source. This workflow uses the
+# `pull_request` trigger only (never `pull_request_target`) and needs no token
+# permissions at all.
+#
+# Keep the section list below in sync with .github/pull_request_template.md.
+#
+# Exempt (title and body are machine-generated):
+#   - Renovate pull requests (author renovate[bot], branch in this repository);
+#     their titles are prefixed "DEPS:" through renovate.json anyway.
+#   - The Changesets "Version packages" pull request (author github-actions[bot],
+#     branch changeset-release/*, branch in this repository).
+#
+# On merge_group runs the job is skipped, which GitHub treats as a pass for a
+# required check, so enabling a merge queue does not stall on this check.
+name: PR hygiene
+
+# Pull requests into the markdown-only coordination branch `sync` are ignored (that branch is pushed to directly).
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches-ignore: [sync]
+  merge_group:
+
+permissions: {}
+
+concurrency:
+  group: pr-hygiene-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-hygiene:
+    name: pr-hygiene
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Check PR title and description
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const title = pr.title ?? '';
+            const body = (pr.body ?? '').replace(/\r\n?/g, '\n');
+            const author = pr.user?.login ?? '';
+            const authorType = pr.user?.type ?? '';
+            const headRef = pr.head?.ref ?? '';
+            const sameRepo = !!pr.head?.repo && pr.head.repo.full_name === pr.base.repo.full_name;
+
+            // Machine-generated pull requests from this repository are exempt.
+            const isRenovate = sameRepo && authorType === 'Bot' && author === 'renovate[bot]';
+            const isChangesets =
+              sameRepo && authorType === 'Bot' && author === 'github-actions[bot]' && headRef.startsWith('changeset-release/');
+            if (isRenovate || isChangesets) {
+              core.info(`Exempt: automated pull request by ${author}.`);
+              return;
+            }
+
+            const problems = [];
+
+            // 1. Title starts with a task ID (or an allowed prefix).
+            const TITLE_RE = /^(M[0-9]+-([0-9]+[a-z]?|GATE)|OPS-(L?[0-9]+)|DESIGN-D[0-9]+|DOCS|CHORE|DEPS)\b/;
+            if (!TITLE_RE.test(title)) {
+              problems.push(
+                'Title must start with a task ID such as "M1-5 transport-nostr sync" ' +
+                  '(allowed: M<n>-<n>[a-z], OPS-<n>, DOCS, CHORE, DEPS).',
+              );
+            }
+
+            // 2. Body contains every required section, filled in.
+            // Sections are "##" or "###" headings; HTML comments and fenced code are ignored.
+            const REQUIRED = [
+              { name: 'Task ID & summary', re: /^task id\b/i },
+              { name: 'Spec sections implemented', re: /^spec sections\b/i },
+              { name: 'Invariants touched', re: /^invariants\b/i },
+              { name: 'Security class', re: /^security class\b/i },
+              { name: 'Tests added', re: /^tests\b/i },
+              { name: 'Docs / spec updated', re: /^docs\b/i },
+              { name: 'Dependencies added', re: /^dependencies\b/i },
+              { name: 'Review requirements', re: /^review\b/i },
+              { name: 'Open questions', re: /^open questions\b/i },
+              { name: 'Checklist', re: /^(pr )?checklist\b/i },
+            ];
+
+            const sections = [];
+            let current = null;
+            let inFence = false;
+            for (const line of body.replace(/<!--[\s\S]*?-->/g, '').split('\n')) {
+              if (/^\s*(```|~~~)/.test(line)) {
+                inFence = !inFence;
+              }
+              const heading = inFence ? null : /^#{2,3}\s+(.+?)\s*#*\s*$/.exec(line);
+              if (heading) {
+                current = { heading: heading[1], lines: [] };
+                sections.push(current);
+              } else if (current) {
+                current.lines.push(line);
+              }
+            }
+
+            for (const { name, re } of REQUIRED) {
+              const match = sections.find((s) => re.test(s.heading));
+              if (!match) {
+                problems.push(`Missing section "${name}" (use .github/pull_request_template.md).`);
+              } else if (match.lines.join('\n').trim() === '') {
+                problems.push(`Section "${name}" is empty (write "None" or "N/A" if nothing applies).`);
+              } else if (name === 'Security class') {
+                const ticked = match.lines.filter((l) => /^\s*[-*+]\s+\[[xX]\]\s*[*_`]*S[012]\b/.test(l));
+                if (ticked.length !== 1) {
+                  problems.push('Security class: tick exactly one of S0, S1, S2.');
+                }
+              }
+            }
+
+            if (problems.length > 0) {
+              for (const problem of problems) {
+                core.error(problem);
+              }
+              core.setFailed(`PR hygiene: ${problems.length} problem(s) found. See the annotations above.`);
+            } else {
+              core.info('PR title and description look good.');
+            }

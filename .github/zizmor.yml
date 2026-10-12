@@ -1,0 +1,23 @@
+# zizmor policy (GitHub Actions static analysis), picked up automatically by the
+# `zizmor` job in .github/workflows/security.yml.
+#
+# Every remote `uses:` (anything but a local ./ path) must be pinned to a full commit SHA, including GitHub-owned
+# actions (docs/process/ci-cd.md). This is zizmor's default since v1.20.0; it is
+# spelled out here so the rule survives a future change of defaults.
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        "*": hash-pin
+
+  # `self-repository` asks for the `$/...` form instead of `./.github/...` when a workflow
+  # calls the composite action (.github/actions/setup-node-pnpm) or the reusable workflow
+  # (.github/workflows/secret-scan.yml) of this same repository. Disabled on purpose: those
+  # files live in this repository, run at the commit of the calling workflow itself (so they
+  # are pinned implicitly to that commit) and are code-owned (/.github/ in CODEOWNERS, S1).
+  # No third-party code is involved, so there is no ref to pin.
+  # Syntax: `rules.<id>.disable: true` (zizmor >= 1.13.0, docs.zizmor.sh/configuration).
+  # Revisit if the `./` form is ever deprecated by GitHub or if a job stops checking out the
+  # repository before calling the local action.
+  self-repository:
+    disable: true

@@ -1,0 +1,866 @@
+# Release: Changesets "Version packages" pull request, npm prereleases to `next` (automatic,
+# staging) and stable releases to `latest` (production, after the owner's approval click).
+# npm trusted publishing (OIDC) with provenance; no long-lived npm token anywhere.
+# Decision D-25; docs/process/release-and-deployment.md §4.1.
+#
+# ---------------------------------------------------------------------------
+# GUARD
+#   This workflow does nothing until the repository is ready: the `guard` job checks for
+#   .changeset/config.json, package.json and pnpm-lock.yaml on main. While any of them is
+#   missing every other job is skipped and the run is green. It also does nothing outside the
+#   4thtech organisation (forks).
+#
+# CHANNELS (changesets/action v2 sub-actions, Changesets CLI v3)
+#   select-mode -> "version" -> opens/updates the "Version packages" PR
+#               -> "publish" -> pack (build + tarballs, no publish rights), then ONE of:
+#     publish-next    `.changeset/pre.json` in pre mode with tag `next` (`changeset pre enter next`).
+#                     Environment `npm-next`: no reviewer, so merging the Version packages PR
+#                     publishes prereleases (x.y.z-next.n) automatically. Then smoke-next.
+#     publish-latest  otherwise. Environment `npm-publish`: waits for the owner's approval click.
+#   Why not "publish to next, then promote with a dist-tag": Changesets v3 publishes from the
+#   packed artifacts ("artifact mode") so that build code never runs in the job holding
+#   `id-token: write`, and artifact mode refuses a custom --tag. The tag comes from the publish
+#   plan: the pre-mode tag, otherwise `latest`. npm trusted publishing does support dist-tag
+#   changes over OIDC (npm >= 11.21.0 / 12.2.0, "Allow npm dist-tag" on the trusted publisher),
+#   but there is no stable version on `next` to promote. So `publish-latest` IS the publish step,
+#   behind the approval, and OIDC dist-tag access is used only to roll `latest` back.
+#
+# AFTER A `latest` PUBLISH
+#   publish-latest  checks the registry without running package code (version on `latest`,
+#                   provenance, registry signatures); on failure it moves `latest` back to the
+#                   previous version in the same job (no second click). When all of that passed it
+#                   creates the product GitHub Release `v<version>` from the root CHANGELOG.md
+#                   section (D-43, docs/process/versioning.md §6). The section is checked BEFORE
+#                   publishing, so a missing one blocks the release while nothing is published.
+#   smoke-latest    runs the CLI from npm in a job without credentials.
+#   freeze          sets DEPLOY_FREEZE when a publish failed after publishing or smoke-latest failed.
+#   rollback-latest after a failed smoke-latest: moves `latest` back. It needs the `npm-publish`
+#                   environment, so it waits for one approval click (no unattended job can move
+#                   `latest`).
+#   record          writes the deploy record draft to the run summary.
+#
+# GITHUB RELEASES (D-43)
+#   Releases exist only for the product tag `v<version>` of stable versions. The Changesets publish
+#   steps therefore run with `create-github-releases: false` (their per-package releases would be
+#   `<package>@<version>`); per-package git tags are still pushed. Prereleases on `next` get no
+#   GitHub Release. The step lives in `publish-latest` (not a separate job in `npm-publish`, which
+#   would ask for a second approval click); `contents: write` is already held by that job for the tags.
+#
+# DEPLOY_FREEZE
+#   Every publish job is skipped while the repository variable DEPLOY_FREEZE is 'true', and
+#   re-checks it when it starts (after the approval wait). Rollback jobs are remediation and
+#   are not frozen. Define DEPLOY_FREEZE only at repository level: an environment-level variable
+#   of the same name would shadow it.
+#
+# CONCURRENCY
+#   No workflow-level group: a run waiting days for the production click must not hold back the
+#   Version packages PR or `next` releases of later merges. Each writing job has its own group and
+#   never cancels in flight. If several promotions wait, approve the newest and reject the rest.
+#
+# MANUAL SETTINGS REQUIRED (docs/process/ci-cd.md, "Owner setup checklist", sections 4, 5 and 8)
+#   1. GitHub Environments:
+#        npm-next       no required reviewer; deployment branches: main only; no secrets.
+#        npm-publish    required reviewer @talirezun, "Prevent self-review" OFF;
+#                       deployment branches: main and tags; no secrets.
+#        deploy-freeze  no required reviewer; deployment branches: main only;
+#                       secret DEPLOY_FREEZE_TOKEN (can write repository variables, nothing else).
+#   2. On npmjs.com, for EVERY published package, two trusted publishers (GitHub Actions,
+#      owner `4thtech`, repository `agentlink`, workflow filename `release.yml`):
+#        environment `npm-next`     (publishing only)
+#        environment `npm-publish`  with "Allow npm dist-tag" (needed for rollback)
+#      npm validates this only at publish time. The first publish of a brand-new package is a
+#      manual owner bootstrap with 2FA; bootstrap it on `latest` with a stable version, because
+#      Changesets publishes a package that has only prereleases to `latest` even in pre mode.
+#   3. Each package.json: "publishConfig": {"access": "public"} (no "registry"), a correct
+#      "repository" field (needed for provenance); @changesets/cli ^3 as a root devDependency
+#      (changesets/action v2 refuses CLI v2). The CLI prints its version for `--version`.
+#   4. Settings -> Actions -> General: "Allow GitHub Actions to create and approve pull requests"
+#      ON for the version job, OR a GitHub App token as `github-token:` (owner decision, see the
+#      checklist). Pull requests opened with GITHUB_TOKEN do not trigger other workflows: close
+#      and reopen the "Version packages" PR to run the required checks.
+#   5. No NPM_TOKEN secret is needed or used. Do not add one.
+#
+# Publishing needs npm >= 11.5.1; jobs that may roll `latest` back need npm >= 11.21.0 (or
+# >= 12.2.0 on npm 12). The jobs assert this and fail early otherwise.
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+env:
+  # Never follow a registry from a project .npmrc in a publishing workflow (see "Refuse registry overrides").
+  NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+
+jobs:
+  guard:
+    name: guard
+    if: github.repository_owner == '4thtech'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+      channel: ${{ steps.check.outputs.channel }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check that the release pipeline is set up and pick the npm channel
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+          enabled=true
+          for required in .changeset/config.json package.json pnpm-lock.yaml; do
+            if [ ! -f "$required" ]; then
+              enabled=false
+              echo "::notice::$required not found; release workflow is inactive until the monorepo skeleton and Changesets are set up."
+            fi
+          done
+
+          # Pre mode with tag `next` publishes prereleases unattended; anything else goes through the approval.
+          channel=latest
+          if [ -f .changeset/pre.json ]; then
+            mode="$(jq -r '.mode // ""' .changeset/pre.json)"
+            tag="$(jq -r '.tag // ""' .changeset/pre.json)"
+            if [ "$mode" = "pre" ]; then
+              if [ "$tag" != "next" ]; then
+                echo "::error file=.changeset/pre.json::Pre mode must use the tag \"next\" (changeset pre enter next)."
+                exit 1
+              fi
+              channel=next
+            fi
+          fi
+          echo "Channel for a publish from this commit: $channel"
+          echo "enabled=$enabled" >> "$GITHUB_OUTPUT"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+
+  select-mode:
+    name: select-mode
+    needs: guard
+    if: needs.guard.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      mode: ${{ steps.select.outputs.mode }}
+      publish-plan-artifact-id: ${{ steps.select.outputs.publish-plan-artifact-id }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Decide between version and publish
+        id: select
+        uses: changesets/action/select-mode@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+
+  version:
+    name: version
+    needs: select-mode
+    if: needs.select-mode.outputs.mode == 'version'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: release-version
+      cancel-in-progress: false
+    permissions:
+      contents: write # push the release branch
+      pull-requests: write # open/update the "Version packages" pull request
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      # Title and commit message use the CHORE prefix so they satisfy pr-hygiene's title rule.
+      # If `changeset version` leaves pnpm-lock.yaml stale, add a root script
+      # (version-packages: changeset version && pnpm install --lockfile-only --ignore-scripts)
+      # and pass `script: pnpm run version-packages` here. The same script must roll the root
+      # CHANGELOG.md for a stable version (docs/process/versioning.md §5): [Unreleased] becomes
+      # "## [<version>] - <date>"; the PR branch is push-restricted, so nobody can do it by hand there.
+      - name: Open or update the Version packages pull request
+        uses: changesets/action/version@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          commit-message: "CHORE: Version packages"
+          pr-title: "CHORE: Version packages"
+
+  pack:
+    name: pack
+    needs: select-mode
+    if: needs.select-mode.outputs.mode == 'publish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # no id-token here: build code never sees the OIDC token
+    outputs:
+      pack-dir-artifact-id: ${{ steps.pack.outputs.pack-dir-artifact-id }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      # Unlike CI there is no skip-if-missing here: a release without a build must fail.
+      - name: Build
+        run: pnpm build
+
+      - name: Pack publishable packages
+        id: pack
+        uses: changesets/action/pack@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          publish-plan-artifact-id: ${{ needs.select-mode.outputs.publish-plan-artifact-id }}
+
+  # ---------------------------------------------------------------------------
+  # Staging: prereleases to `next`, unattended.
+  publish-next:
+    name: publish-next
+    needs: [guard, select-mode, pack]
+    if: needs.select-mode.outputs.mode == 'publish' && needs.guard.outputs.channel == 'next' && vars.DEPLOY_FREEZE != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: npm-next
+    concurrency:
+      group: release-npm-next
+      cancel-in-progress: false
+    permissions:
+      contents: write # git tags (no GitHub Releases for prereleases)
+      id-token: write # npm trusted publishing (OIDC) and provenance
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+      packages: ${{ steps.publish.outputs.published-packages }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Stop if DEPLOY_FREEZE is set
+        shell: bash
+        env:
+          DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
+        run: |
+          set -euo pipefail
+          if [ "${DEPLOY_FREEZE:-}" = "true" ]; then
+            echo "::error::DEPLOY_FREEZE is set; nothing is published until the owner clears it."
+            exit 1
+          fi
+
+      # The Changesets CLI (a devDependency) must be installed; the package contents come from the packed tarballs.
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Refuse registry overrides
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=0
+          # No `grep -q` here: with pipefail, an early exit would SIGPIPE the first grep and hide a match.
+          if [ -f .npmrc ] && grep -Ev '^[[:space:]]*([#;]|$)' .npmrc | grep -Ei 'registry|_auth|^[[:space:]]*//' > /dev/null; then
+            echo "::error file=.npmrc::.npmrc must not set a registry or credentials (the OIDC token would follow it)."
+            status=1
+          fi
+          # The dist-tag comes from the publish plan only (`next` in pre mode, else `latest`): a project-level
+          # `tag=` line or `publishConfig.tag` could send a publish to another tag.
+          if [ -f .npmrc ] && grep -Ev '^[[:space:]]*([#;]|$)' .npmrc | grep -Ei '^[[:space:]]*tag[[:space:]]*=' > /dev/null; then
+            echo "::error file=.npmrc::.npmrc must not set tag (the dist-tag comes from the publish plan)."
+            status=1
+          fi
+          while IFS= read -r -d '' manifest; do
+            registry="$(jq -r '.publishConfig.registry // empty' "$manifest")"
+            if [ -n "$registry" ] && [ "$registry" != "https://registry.npmjs.org/" ]; then
+              echo "::error file=$manifest::publishConfig.registry must be absent or https://registry.npmjs.org/."
+              status=1
+            fi
+            # True when publishConfig is an object with a "tag" key, whatever its value; a jq parse error fails the step.
+            has_tag="$(jq -r '(.publishConfig | objects | has("tag")) // false' "$manifest")"
+            if [ "$has_tag" = "true" ]; then
+              echo "::error file=$manifest::publishConfig.tag must be absent (the dist-tag comes from the publish plan)."
+              status=1
+            fi
+          done < <(git ls-files -z -- ':(glob)**/package.json')
+          exit "$status"
+
+      - name: Require an npm version that supports trusted publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          required="11.5.1"
+          current="$(npm --version)"
+          lowest="$(printf '%s\n%s\n' "$required" "$current" | sort -V | head -n 1)"
+          echo "npm $current (minimum $required)"
+          if [ "$lowest" != "$required" ]; then
+            echo "::error::npm $current is older than $required, which cannot publish with OIDC trusted publishing. Use a newer Node 24 release in .nvmrc."
+            exit 1
+          fi
+
+      # No NPM_TOKEN / NODE_AUTH_TOKEN is set on purpose: npm falls back to OIDC only when no token is present.
+      # The dist-tag comes from the publish plan: `next` in pre mode.
+      - name: Publish prereleases to npm (next, trusted publishing, with provenance)
+        id: publish
+        uses: changesets/action/publish@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
+        with:
+          pack-dir-artifact-id: ${{ needs.pack.outputs.pack-dir-artifact-id }}
+          create-github-releases: "false" # GitHub Releases only for stable `v<version>` product tags (versioning.md §6)
+
+      # Registry reads only; no package code runs in this job. Any failure here sets DEPLOY_FREEZE
+      # (job `freeze`): a version without provenance, or an unattended job moving `latest`, is an
+      # incident (audit-rules.md §10.1).
+      # zizmor adhoc-packages is ignored on the `run:` line below: the `npm install` is already exact
+      # (`name@version` from this run's publish output, matched against strict regexes), uses
+      # --ignore-scripts and runs in an empty scratch directory. A manifest and lockfile cannot exist for a
+      # version published a minute ago, and the install only feeds `npm audit signatures`.
+      - name: Check the registry (next updated, latest untouched, provenance, signatures)
+        if: steps.publish.outputs.published == 'true'
+        shell: bash
+        env:
+          PACKAGES: ${{ steps.publish.outputs.published-packages }}
+        run: | # zizmor: ignore[adhoc-packages] exact name@version of this run's own packages, --ignore-scripts, scratch dir
+          set -euo pipefail
+          name_re='^(@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*$'
+          version_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+          mkdir -p "$RUNNER_TEMP/registry-check"
+          cd "$RUNNER_TEMP/registry-check"
+          status=0
+          specs=()
+          while IFS=$'\t' read -r name version; do
+            if ! [[ "$name" =~ $name_re && "$version" =~ $version_re ]]; then
+              echo "::error::Unexpected package name or version in the publish output."
+              exit 1
+            fi
+            for _ in $(seq 1 20); do
+              npm view "$name@$version" version > /dev/null 2>&1 && break
+              sleep 15
+            done
+            next_tag="$(npm view "$name" dist-tags.next 2> /dev/null || true)"
+            latest_tag="$(npm view "$name" dist-tags.latest 2> /dev/null || true)"
+            predicate="$(npm view --json "$name@$version" dist 2> /dev/null | jq -r '.attestations.provenance.predicateType // empty' || true)"
+            echo "$name@$version: next=$next_tag latest=$latest_tag provenance=${predicate:-none}"
+            if [ "$next_tag" != "$version" ]; then
+              echo "::error::$name: dist-tag next is not $version."
+              status=1
+            fi
+            if [ "$latest_tag" = "$version" ]; then
+              echo "::error::$name: the unattended job moved latest to $version. Incident: the owner fixes latest by hand."
+              status=1
+            fi
+            case "$predicate" in
+              https://slsa.dev/provenance/*) ;;
+              *)
+                echo "::error::$name@$version has no provenance attestation."
+                status=1
+                ;;
+            esac
+            specs+=("$name@$version")
+          done < <(jq -r '.[] | [.name, .version] | @tsv' <<< "$PACKAGES")
+          if [ "${#specs[@]}" -gt 0 ]; then
+            printf '{"name":"registry-check","version":"0.0.0","private":true}\n' > package.json
+            npm install --ignore-scripts --no-audit --no-fund "${specs[@]}" > /dev/null
+            npm audit signatures || status=1
+          fi
+          exit "$status"
+
+  smoke-next:
+    name: smoke-next
+    needs: publish-next
+    if: needs.publish-next.result == 'success' && needs.publish-next.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read # no credentials: this job runs the published code
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+          install: "false"
+
+      # Clean-machine smoke test of the CLI as users install it. The MCP Inspector schema check is
+      # added here by M1-9 (release-and-deployment.md §4.1).
+      - name: Smoke-test the CLI from npm
+        shell: bash
+        env:
+          PACKAGES: ${{ needs.publish-next.outputs.packages }}
+        run: |
+          set -euo pipefail
+          version_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+          cli="$(jq -r '.[] | select(.name == "@4thtech/agentlink") | .version' <<< "$PACKAGES")"
+          if [ -z "$cli" ]; then
+            echo "::notice::@4thtech/agentlink is not part of this release; nothing to smoke-test."
+            exit 0
+          fi
+          [[ "$cli" =~ $version_re ]] || { echo "::error::Unexpected CLI version."; exit 1; }
+          cd "$RUNNER_TEMP"
+          out="$(npx -y "@4thtech/agentlink@$cli" --version)"
+          case "$out" in
+            *"$cli"*) echo "CLI $cli runs." ;;
+            *) echo "::error::@4thtech/agentlink@$cli --version did not print $cli."; exit 1 ;;
+          esac
+
+  # ---------------------------------------------------------------------------
+  # Production: stable releases to `latest`, after the owner's approval click.
+  publish-latest:
+    name: publish-latest
+    needs: [guard, select-mode, pack]
+    if: needs.select-mode.outputs.mode == 'publish' && needs.guard.outputs.channel == 'latest' && vars.DEPLOY_FREEZE != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Required reviewer @talirezun: this job waits for the approval click.
+    environment: npm-publish
+    concurrency:
+      group: release-npm-latest
+      cancel-in-progress: false
+    permissions:
+      contents: write # git tags and the product GitHub Release v<version>
+      id-token: write # npm trusted publishing (OIDC), provenance, dist-tag rollback
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+      packages: ${{ steps.publish.outputs.published-packages }}
+      previous: ${{ steps.previous.outputs.previous }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Evaluated after the approval wait: a freeze set while the job waited still stops it.
+      - name: Stop if DEPLOY_FREEZE is set
+        shell: bash
+        env:
+          DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
+        run: |
+          set -euo pipefail
+          if [ "${DEPLOY_FREEZE:-}" = "true" ]; then
+            echo "::error::DEPLOY_FREEZE is set; nothing is published until the owner clears it."
+            exit 1
+          fi
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Refuse registry overrides
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=0
+          # No `grep -q` here: with pipefail, an early exit would SIGPIPE the first grep and hide a match.
+          if [ -f .npmrc ] && grep -Ev '^[[:space:]]*([#;]|$)' .npmrc | grep -Ei 'registry|_auth|^[[:space:]]*//' > /dev/null; then
+            echo "::error file=.npmrc::.npmrc must not set a registry or credentials (the OIDC token would follow it)."
+            status=1
+          fi
+          # The dist-tag comes from the publish plan only (`next` in pre mode, else `latest`): a project-level
+          # `tag=` line or `publishConfig.tag` could send a publish to another tag.
+          if [ -f .npmrc ] && grep -Ev '^[[:space:]]*([#;]|$)' .npmrc | grep -Ei '^[[:space:]]*tag[[:space:]]*=' > /dev/null; then
+            echo "::error file=.npmrc::.npmrc must not set tag (the dist-tag comes from the publish plan)."
+            status=1
+          fi
+          while IFS= read -r -d '' manifest; do
+            registry="$(jq -r '.publishConfig.registry // empty' "$manifest")"
+            if [ -n "$registry" ] && [ "$registry" != "https://registry.npmjs.org/" ]; then
+              echo "::error file=$manifest::publishConfig.registry must be absent or https://registry.npmjs.org/."
+              status=1
+            fi
+            # True when publishConfig is an object with a "tag" key, whatever its value; a jq parse error fails the step.
+            has_tag="$(jq -r '(.publishConfig | objects | has("tag")) // false' "$manifest")"
+            if [ "$has_tag" = "true" ]; then
+              echo "::error file=$manifest::publishConfig.tag must be absent (the dist-tag comes from the publish plan)."
+              status=1
+            fi
+          done < <(git ls-files -z -- ':(glob)**/package.json')
+          exit "$status"
+
+      # Rollback is planned before deploy: no publish to `latest` without a working OIDC dist-tag rollback.
+      - name: Require an npm version that supports OIDC publishing and dist-tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          current="$(npm --version)"
+          required="11.21.0"
+          if [ "${current%%.*}" -ge 12 ]; then required="12.2.0"; fi
+          lowest="$(printf '%s\n%s\n' "$required" "$current" | sort -V | head -n 1)"
+          echo "npm $current (minimum $required)"
+          if [ "$lowest" != "$required" ]; then
+            echo "::error::npm $current cannot change dist-tags over OIDC (needs $required), so latest could not be rolled back. Use a newer Node 24 release in .nvmrc."
+            exit 1
+          fi
+
+      - name: Record the current latest versions (rollback targets)
+        id: previous
+        shell: bash
+        run: |
+          set -euo pipefail
+          name_re='^(@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*$'
+          previous='{}'
+          while IFS= read -r -d '' manifest; do
+            name="$(jq -r 'select(.private != true) | .name // empty' "$manifest")"
+            [ -n "$name" ] || continue
+            [[ "$name" =~ $name_re ]] || { echo "::error file=$manifest::Unexpected package name."; exit 1; }
+            current="$(cd "$RUNNER_TEMP" && npm view "$name" dist-tags.latest 2> /dev/null || true)"
+            previous="$(jq -c --arg n "$name" --arg v "$current" '. + {($n): $v}' <<< "$previous")"
+          done < <(git ls-files -z -- ':(glob)**/package.json')
+          echo "Rollback targets: $previous"
+          echo "previous=$previous" >> "$GITHUB_OUTPUT"
+
+      # Release notes for the product GitHub Release, checked before anything is published. The product
+      # version is the CLI's (one fixed Changesets group, D-43). While the CLI is not in the repository, or
+      # its version is not stable, there is nothing to prepare and the step does nothing.
+      - name: Check the release notes (root CHANGELOG.md section for the product version)
+        id: notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_re='^[0-9]+\.[0-9]+\.[0-9]+$'
+          version=""
+          while IFS= read -r -d '' manifest; do
+            version="$(jq -r 'select(.name == "@4thtech/agentlink" and .private != true) | .version // empty' "$manifest")"
+            [ -z "$version" ] || break
+          done < <(git ls-files -z -- ':(glob)**/package.json')
+          if [ -z "$version" ] || ! [[ "$version" =~ $version_re ]]; then
+            echo "::notice::No stable @4thtech/agentlink version in this commit; no GitHub Release is prepared."
+            echo "version=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          notes="$RUNNER_TEMP/release-notes.md"
+          awk -v v="$version" '
+            /^\[[^]]+\]:/ { exit }
+            /^## \[/ { if (found) exit; found = (index($0, "## [" v "]") == 1); next }
+            found { print }
+          ' CHANGELOG.md > "$notes"
+          if ! grep -q '[^[:space:]]' "$notes"; then
+            echo "::error file=CHANGELOG.md::CHANGELOG.md has no non-empty \"## [$version]\" section; the release PR must roll [Unreleased] into it (docs/process/versioning.md §5)."
+            exit 1
+          fi
+          echo "Release notes for v$version found."
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # No NPM_TOKEN / NODE_AUTH_TOKEN is set on purpose: npm falls back to OIDC only when no token is present.
+      - name: Publish to npm (latest, trusted publishing, with provenance)
+        id: publish
+        uses: changesets/action/publish@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
+        with:
+          pack-dir-artifact-id: ${{ needs.pack.outputs.pack-dir-artifact-id }}
+          create-github-releases: "false" # the product release is created below, for the `v<version>` tag only
+
+      # Health check: registry reads only, no package code runs in this job (it holds the OIDC token).
+      # zizmor adhoc-packages is ignored on the `run:` line below, for the reason given in `publish-next`:
+      # exact `name@version` of this run's own packages, --ignore-scripts, empty scratch directory.
+      - name: Health check (latest updated, provenance, signatures)
+        if: steps.publish.outputs.published == 'true'
+        shell: bash
+        env:
+          PACKAGES: ${{ steps.publish.outputs.published-packages }}
+        run: | # zizmor: ignore[adhoc-packages] exact name@version of this run's own packages, --ignore-scripts, scratch dir
+          set -euo pipefail
+          name_re='^(@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*$'
+          version_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+          mkdir -p "$RUNNER_TEMP/registry-check"
+          cd "$RUNNER_TEMP/registry-check"
+          status=0
+          specs=()
+          while IFS=$'\t' read -r name version; do
+            if ! [[ "$name" =~ $name_re && "$version" =~ $version_re ]]; then
+              echo "::error::Unexpected package name or version in the publish output."
+              exit 1
+            fi
+            for _ in $(seq 1 20); do
+              npm view "$name@$version" version > /dev/null 2>&1 && break
+              sleep 15
+            done
+            latest_tag="$(npm view "$name" dist-tags.latest 2> /dev/null || true)"
+            predicate="$(npm view --json "$name@$version" dist 2> /dev/null | jq -r '.attestations.provenance.predicateType // empty' || true)"
+            echo "$name@$version: latest=$latest_tag provenance=${predicate:-none}"
+            if [ "$latest_tag" != "$version" ]; then
+              echo "::error::$name: dist-tag latest is not $version."
+              status=1
+            fi
+            case "$predicate" in
+              https://slsa.dev/provenance/*) ;;
+              *)
+                echo "::error::$name@$version has no provenance attestation."
+                status=1
+                ;;
+            esac
+            specs+=("$name@$version")
+          done < <(jq -r '.[] | [.name, .version] | @tsv' <<< "$PACKAGES")
+          if [ "${#specs[@]}" -gt 0 ]; then
+            printf '{"name":"registry-check","version":"0.0.0","private":true}\n' > package.json
+            npm install --ignore-scripts --no-audit --no-fund "${specs[@]}" > /dev/null
+            npm audit signatures || status=1
+          fi
+          exit "$status"
+
+      # Automatic rollback: runs when anything above failed after at least one package was published.
+      - name: Roll latest back to the recorded versions
+        if: failure() && steps.publish.outputs.published == 'true'
+        shell: bash
+        env:
+          PACKAGES: ${{ steps.publish.outputs.published-packages }}
+          PREVIOUS: ${{ steps.previous.outputs.previous }}
+        run: |
+          set -euo pipefail
+          name_re='^(@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*$'
+          version_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+          cd "$RUNNER_TEMP"
+          status=0
+          while IFS=$'\t' read -r name version; do
+            [[ "$name" =~ $name_re && "$version" =~ $version_re ]] || { echo "::error::Unexpected package in the publish output."; exit 1; }
+            target="$(jq -r --arg n "$name" '.[$n] // empty' <<< "$PREVIOUS")"
+            if [ -z "$target" ] || [ "$target" = "$version" ] || ! [[ "$target" =~ $version_re ]]; then
+              echo "::error::$name: no previous latest to roll back to. Owner action: deprecate $version (release-and-deployment.md §8)."
+              status=1
+              continue
+            fi
+            npm dist-tag add "$name@$target" latest
+            echo "::warning::$name: latest rolled back from $version to $target."
+          done < <(jq -r '.[] | [.name, .version] | @tsv' <<< "$PACKAGES")
+          exit "$status"
+
+      # The product GitHub Release (D-43, versioning.md §6) and its `v<version>` tag, at the released commit,
+      # with the CHANGELOG section as the body. Runs only if every step above passed, inside the
+      # owner-approved environment (no second click). A failure here is a warning, not a rollback or a
+      # freeze (continue-on-error): the owner creates the release by hand. If smoke-latest fails later and
+      # `latest` is rolled back, the owner edits or deletes this release.
+      - name: Create the GitHub Release v<version> from the CHANGELOG
+        if: steps.publish.outputs.published == 'true' && steps.notes.outputs.version != ''
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+          VERSION: ${{ steps.notes.outputs.version }}
+          PACKAGES: ${{ steps.publish.outputs.published-packages }}
+        run: |
+          set -euo pipefail
+          version_re='^[0-9]+\.[0-9]+\.[0-9]+$'
+          [[ "$VERSION" =~ $version_re ]] || { echo "::error::Unexpected product version."; exit 1; }
+          published="$(jq -r '.[] | select(.name == "@4thtech/agentlink") | .version' <<< "$PACKAGES")"
+          if [ "$published" != "$VERSION" ]; then
+            echo "::warning::@4thtech/agentlink@$VERSION was not part of this publish; no GitHub Release created."
+            exit 0
+          fi
+          if gh release view "v$VERSION" --repo "$REPOSITORY" > /dev/null 2>&1; then
+            echo "::notice::GitHub Release v$VERSION already exists; left as it is."
+            exit 0
+          fi
+          if ! gh release create "v$VERSION" --repo "$REPOSITORY" --target "$COMMIT" --title "v$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md"; then
+            echo "::warning::GitHub Release v$VERSION could not be created. Owner: create it by hand from the CHANGELOG section (docs/process/versioning.md §6)."
+            exit 1
+          fi
+
+  smoke-latest:
+    name: smoke-latest
+    needs: publish-latest
+    if: needs.publish-latest.result == 'success' && needs.publish-latest.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read # no credentials: this job runs the published code
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+          install: "false"
+
+      # Clean-machine smoke test of the CLI as users install it. The MCP Inspector schema check is
+      # added here by M1-9 (release-and-deployment.md §4.1).
+      - name: Smoke-test the CLI from npm
+        shell: bash
+        env:
+          PACKAGES: ${{ needs.publish-latest.outputs.packages }}
+        run: |
+          set -euo pipefail
+          version_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+          cli="$(jq -r '.[] | select(.name == "@4thtech/agentlink") | .version' <<< "$PACKAGES")"
+          if [ -z "$cli" ]; then
+            echo "::notice::@4thtech/agentlink is not part of this release; nothing to smoke-test."
+            exit 0
+          fi
+          [[ "$cli" =~ $version_re ]] || { echo "::error::Unexpected CLI version."; exit 1; }
+          cd "$RUNNER_TEMP"
+          out="$(npx -y "@4thtech/agentlink@$cli" --version)"
+          case "$out" in
+            *"$cli"*) echo "CLI $cli runs." ;;
+            *) echo "::error::@4thtech/agentlink@$cli --version did not print $cli."; exit 1 ;;
+          esac
+
+  # One approval click: no unattended job can move `latest`.
+  rollback-latest:
+    name: rollback-latest
+    needs: [publish-latest, smoke-latest]
+    if: always() && needs.smoke-latest.result == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: npm-publish
+    concurrency:
+      group: release-npm-rollback
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write # npm dist-tag over OIDC
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+          install: "false"
+
+      - name: Require an npm version that supports OIDC dist-tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          current="$(npm --version)"
+          required="11.21.0"
+          if [ "${current%%.*}" -ge 12 ]; then required="12.2.0"; fi
+          lowest="$(printf '%s\n%s\n' "$required" "$current" | sort -V | head -n 1)"
+          if [ "$lowest" != "$required" ]; then
+            echo "::error::npm $current cannot change dist-tags over OIDC (needs $required). Owner rolls back by hand (release-and-deployment.md §8)."
+            exit 1
+          fi
+
+      - name: Roll latest back to the recorded versions
+        shell: bash
+        env:
+          PACKAGES: ${{ needs.publish-latest.outputs.packages }}
+          PREVIOUS: ${{ needs.publish-latest.outputs.previous }}
+        run: |
+          set -euo pipefail
+          name_re='^(@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*$'
+          version_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+          cd "$RUNNER_TEMP"
+          status=0
+          while IFS=$'\t' read -r name version; do
+            [[ "$name" =~ $name_re && "$version" =~ $version_re ]] || { echo "::error::Unexpected package in the publish output."; exit 1; }
+            target="$(jq -r --arg n "$name" '.[$n] // empty' <<< "$PREVIOUS")"
+            if [ -z "$target" ] || [ "$target" = "$version" ] || ! [[ "$target" =~ $version_re ]]; then
+              echo "::error::$name: no previous latest to roll back to. Owner action: deprecate $version (release-and-deployment.md §8)."
+              status=1
+              continue
+            fi
+            npm dist-tag add "$name@$target" latest
+            echo "::warning::$name: latest rolled back from $version to $target."
+          done < <(jq -r '.[] | [.name, .version] | @tsv' <<< "$PACKAGES")
+          exit "$status"
+
+  # Sets the freeze immediately; it does not wait for the rollback click.
+  freeze:
+    name: freeze
+    needs: [publish-next, publish-latest, smoke-latest]
+    if: >-
+      always() && vars.DEPLOY_FREEZE != 'true' && (
+      (needs.publish-next.outputs.published == 'true' && needs.publish-next.result != 'success') ||
+      (needs.publish-latest.outputs.published == 'true' && needs.publish-latest.result != 'success') ||
+      needs.smoke-latest.result == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: deploy-freeze
+    permissions: {}
+    steps:
+      - name: Set DEPLOY_FREEZE
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.DEPLOY_FREEZE_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::DEPLOY_FREEZE_TOKEN is not configured. The orchestrator or the owner sets DEPLOY_FREEZE=true now (release-and-deployment.md §3.1)."
+            exit 1
+          fi
+          gh variable set DEPLOY_FREEZE --body true --repo "$REPOSITORY"
+          echo "::error::A release failed after publishing. DEPLOY_FREEZE is set; only the owner clears it."
+          exit 1
+
+  record:
+    name: record
+    needs: [publish-latest, smoke-latest]
+    if: always() && needs.publish-latest.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read # who approved the deployment
+    steps:
+      - name: Write the deploy record draft
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT: ${{ github.sha }}
+          PACKAGES: ${{ needs.publish-latest.outputs.packages }}
+          PREVIOUS: ${{ needs.publish-latest.outputs.previous }}
+          PUBLISH_RESULT: ${{ needs.publish-latest.result }}
+          SMOKE_RESULT: ${{ needs.smoke-latest.result }}
+        run: |
+          set -euo pipefail
+          previous="${PREVIOUS:-}"
+          [ -n "$previous" ] || previous='{}'
+          approvals="$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID/approvals" \
+            --jq '[.[] | "\(.user.login) \(.state) \([.environments[].name] | join(","))"] | join("; ")' || echo "unavailable")"
+          {
+            echo "## Deploy record draft (npm latest)"
+            echo
+            echo "No secrets here. The orchestrator files the final record in 4thtech/agentlink-ops (release-and-deployment.md §5.2)."
+            echo
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Artifact | npm packages |"
+            echo "| Environment | npm-publish (dist-tag latest) |"
+            echo "| Commit | \`$COMMIT\` |"
+            echo "| Date (UTC) | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"
+            echo "| Approved by | $approvals |"
+            echo "| Executed by | GitHub Actions, run $RUN_URL |"
+            echo "| Health check (publish-latest) | $PUBLISH_RESULT |"
+            echo "| Smoke test (smoke-latest) | $SMOKE_RESULT |"
+            echo
+            echo "| Package | Version | Rollback target |"
+            echo "|---|---|---|"
+            jq -r --argjson prev "$previous" '.[] | "| \(.name) | \(.version) | \(if ($prev[.name] // "") == "" then "none" else $prev[.name] end) |"' <<< "$PACKAGES"
+          } >> "$GITHUB_STEP_SUMMARY"
