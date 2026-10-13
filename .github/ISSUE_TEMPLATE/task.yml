@@ -62,7 +62,7 @@ body:
     id: security_class
     attributes:
       label: Security class
-      description: S0 none. S1 sensitive (policies, approvals, MCP surface, untrusted-input parsing, storage credentials, CI). S2 critical (crypto, keys, owner presence, contracts, signing, submitter, release). S1 needs an independent AI review session (audit-rules.md §3; the owner MAY also review, it is not a merge precondition). S2 adds a GitHub approval by a code owner who is not the author (the engineer, @denisjazbec, for PRs opened under the owner's account), a full threat note and tests-first evidence.
+      description: S0 none. S1 sensitive (policies, approvals, MCP surface, untrusted-input parsing, storage credentials, CI). S2 critical (crypto, keys, owner presence, contracts, signing, submitter, release). S1 needs an independent AI review session (audit-rules.md §3; the owner MAY also review, it is not a merge precondition). S2 adds a full threat note, tests-first evidence and the owner's (@talirezun) explicit merge go-ahead (D-51); sensitive paths (.github/**, AGENTS.md, CLAUDE.md, .claude/**, supply-chain files) need the same go-ahead. Denis's approval is not required.
       options:
         - S0 none
         - S1 sensitive

@@ -8,7 +8,7 @@
 
 ## 1. Principles
 
-1. **Free to start.** Install, pairing, messages and files cost nothing and need no balance.
+1. **Free to start.** Install, pairing, messages and files cost nothing and need no balance (files within the encrypted drop's quotas, §2).
 2. **Pay only for proof.** Fees apply only to on-chain actions.
 3. **Token-less.** There is no project token. Fees are paid in established USD stablecoins.
 4. **Priced in US dollars.** Every quote is shown in dollars before any paid action.
@@ -30,9 +30,11 @@
 
 Prices are the protocol fee charged through official clients. A third-party app may add its own fee, always shown separately (§5).
 
-**Free:** install, identity, pairing, contacts; encrypted messages and off-chain acknowledgements; sending files (your own storage provider may bill you); owner console, policies and approvals; verifying a proof pack (CLI and public page); fee quotes and credit balances; receipts on a notarized record (prepaid by the sender, so the recipient pays nothing).
+**Free:** install, identity, pairing, contacts; encrypted messages and off-chain acknowledgements; sending files, through the 4thTech encrypted drop within its quotas (proposed 100 MB per file and 1 GB per agent per week, D-48) or through your own storage (your provider may bill you); owner console, policies and approvals; verifying a proof pack (CLI and public page); fee quotes and credit balances; receipts on a notarized record (prepaid by the sender, so the recipient pays nothing).
 
 **Network costs.** For proofs and receipts sent through a submitter, the submitter pays the network cost (gas) and recovers it from protocol fees; there is no extra charge. Calls you make yourself (direct mode, a deposit from your own account, a withdrawal) pay the network's own cost from the calling address. AgentLink adds no fee to deposits or withdrawals.
+
+**Files.** The encrypted drop needs no setup and no payment. Its cost (Cloudflare R2, about $0.015 per GB-month with free egress; objects live at most 7 days) is borne by 4thTech. Paid larger quotas are a possible later option, not offered now (`DECISION NEEDED (owner)`, later). Above the quotas, or for longer retention, users connect their own storage (02 F-32, F-36).
 
 **Testnets:** free. A 4thTech faucet credits testnet agents through `depositFor` (05 §9). Testnet credits have no value.
 
@@ -143,6 +145,13 @@ The signed `maxFee` (§4) protects every payer even if a change happens between 
 - **Permissionless sweep.** `sweep` can be called by anyone and only ever pays the published treasury.
 - **Events.** Every charge, deposit, withdrawal and configuration change emits an event (05 §6).
 
+### 7.1 Revenue flow, reporting and invoicing (D-50)
+
+- **Flow.** Each charge emits `Charged` (05 §6). The protocol part accrues in `OCCFeeVault` per chain and token; anyone can `sweep` it to the published treasury Safe on that chain (§4.3). Integrators withdraw their own part. Fees are stablecoin-only (D-46), so revenue is already in US dollars.
+- **Reporting.** During beta, 4thTech builds a monthly revenue report from public events only (`Charged`, `Deposited`, `Withdrawn`, `Swept`, per chain), checked against explorers and the Safe. Anyone can rebuild the same figures from the chain. After beta, an internal read-only dashboard indexes the same events; it holds no keys, and fee or treasury changes still go through the Safe (§6).
+- **Invoices on request.** A business that needs invoices creates an opt-in **billing profile**: it signs once with its owner key (an owner operation, never an MCP tool) to link its agent addresses to its billing details, and its on-chain charges can then be invoiced. Without a profile, payers stay pseudonymous. Registered agents (OCCRegistry, M2) and verified domains (D-34) help match agents to the business. Billing details are held only by 4thTech operations and never include message or file content, so zero access holds. Counsel reviews data protection and VAT before invoices are issued (§9, D-47).
+- **No fiat.** Card and bank payments stay out of scope until the legal questions in §9 are settled.
+
 ---
 
 ## 8. Cost model (why $0.10)
@@ -151,6 +160,7 @@ All figures are **estimates** and move with network prices.
 
 - **Network cost per proof.** A record plus up to three receipts uses at most about 160k + 3 × 75k gas (05 §3.4 targets). On Base and Gnosis this is about **$0.001–0.01** per record.
 - **Who carries it.** The submitter sponsors that cost and recovers it from protocol fees, together with running the submitter, the faucet, audits and the bug bounty.
+- **Files.** The encrypted drop's storage cost (R2, about $0.015 per GB-month, free egress, at most 7 days per object) is borne by 4thTech; files are free within the quotas (§2, D-48).
 - **What you buy.** A proof is not a bare timestamp. It can be a **proof of agreement**: the sender's signature over the exact content hash, plus the recipient's signed receipts for delivery, opening and acceptance, so an accepted record shows that both sides assented to the same terms. Anyone can check it without trusting 4thTech. (It does not by itself establish legal enforceability, 02 F-43.)
 - **Why a fixed price.** One flat USD price is easy to budget (policies use `dailyBudgetUSD`, 06 §3) and does not change with short-term network congestion.
 
@@ -185,3 +195,7 @@ Sybil considerations:
 | Native coins behind `PRICE_UPDATER` (§3.4) | Owner; design and security review first (M4) |
 | Welcome credits (§10) | Owner (optional) |
 | Tax and VAT assessment (§9) | Counsel, before paid mainnet (M3-7) |
+| Encrypted drop quotas: confirm the proposed 100 MB per file and 1 GB per agent per week (D-48) | Owner, before the drop goes live (M1b) |
+| Paid larger drop quotas (D-48) | Owner, later; not offered now |
+| Billing profiles: data protection and VAT, accounting treatment of stablecoin revenue (§7.1, D-50) | Counsel and owner (M3-7) |
+| Indexer for the internal finance dashboard (D-50) | Owner (M4) |

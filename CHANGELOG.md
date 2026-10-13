@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Added
+
+- Build plan "At a glance" (building blocks, stages, external services) and plain-language explainers on messaging, files and payments under `docs/explainers/`.
+
+### Changed
+
+- Specification (D-48): files over 12 KB go through a zero-knowledge 4thTech encrypted drop by default (ciphertext only, signed uploads, 7-day expiry, per-agent quotas), so file exchange needs no setup; own storage becomes optional. Resolves D-13 and amends D-05 and core principle 5.
+- Specification (D-49): one-click Google Drive, Dropbox and OneDrive storage connectors are planned for the M2 desktop apps, with OAuth tokens kept only in the OS keychain; S3-compatible storage stays the Advanced option.
+- Specification (D-50): phased revenue operations: a monthly revenue report from on-chain events in beta, an internal read-only finance dashboard later, and invoices on request through opt-in billing profiles.
+- Specification (review IR-D48-1): the encrypted drop uses a dedicated drop signing key, encrypts each file once and sends the ciphertext hash at commit, keeps no request URLs or signatures in logs, and follows `files.deleteAfter` (default: keep until expiry); consumer-connector links are revoked at expiry on a best-effort basis; `apps/drop/**` is S2.
+- Process (D-51, simplified): agents work under the owner's GitHub account; code-owner review is not required and Denis's approval is optional. S0/S1 pull requests auto-merge when all checks are green; S2 and sensitive-path pull requests merge only after CI, the independent AI review and the owner's explicit go-ahead (a process control, revisited before mainnet).
+
 ## [0.0.1] - 2026-10-12
 
 M0 Foundations: specifications (spec pack v0.3), development and audit process, CI/security workflows, versioning framework, agent instructions; no product code yet.

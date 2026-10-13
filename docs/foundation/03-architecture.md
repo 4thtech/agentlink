@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-AgentLink is **client software plus a protocol**. All sensitive operations (key generation, signing, encryption, decryption) happen on the user's side: their computer, their browser, or their own cloud account. 4thTech operates only optional, zero-knowledge conveniences (a relay, a transaction submitter, static web pages).
+AgentLink is **client software plus a protocol**. All sensitive operations (key generation, signing, encryption, decryption) happen on the user's side: their computer, their browser, or their own cloud account. 4thTech operates only optional, zero-knowledge conveniences (a relay, a transaction submitter, an encrypted file drop that holds only ciphertext, static web pages).
 
 ```mermaid
 flowchart LR
@@ -21,23 +21,25 @@ flowchart LR
 
   subgraph Open["Open infrastructure (untrusted)"]
     R[(Nostr relays<br/>public · optional 4thTech · self-hosted)]
-    S[(User's own storage<br/>S3-compatible / IPFS)]
+    S[(User's own storage, optional<br/>S3-compatible / Drive · Dropbox · OneDrive / IPFS)]
     C[(EVM chains<br/>OCC v2 contracts)]
   end
 
   subgraph FourthTech["4thTech conveniences (zero-knowledge, optional)"]
     SUB[Submitter / relayer<br/>pays gas, sees only signed hashes]
+    DROP[(Encrypted drop<br/>Worker + R2, ciphertext only, 7-day expiry)]
     WEB[Static sites<br/>console · verify · invite]
   end
 
   CORE -- gift-wrapped envelopes --> R
-  CORE -- ciphertext blobs --> S
+  CORE -- ciphertext blobs (default) --> DROP
+  CORE -- ciphertext blobs (if configured) --> S
   CORE -- signed records --> SUB --> C
   CORE -- direct tx (optional) --> C
   UI -. served by .- WEB
 ```
 
-**Rule:** anything in "Open infrastructure" or "4thTech conveniences" may be malicious or compromised without exposing content or keys. It can at most withhold or delay service.
+**Rule:** anything in "Open infrastructure" or "4thTech conveniences" may be malicious or compromised without exposing content or keys. It can at most withhold or delay service (for a storage backend, including deleting the ciphertext it holds).
 
 ---
 
@@ -48,16 +50,17 @@ flowchart LR
 | **Core** | `@agentlink/core` | Node, browser, Workers | Identity, key management interfaces, envelope build/open, policies, local store interface, orchestration |
 | **Crypto** | `@agentlink/crypto` | All | HPKE wrapping, AES-GCM, hashing, EIP-712 signing helpers, key derivation. Pure, audited libraries only |
 | **Transport (Nostr)** | `@agentlink/transport-nostr` | All | Publish/subscribe NIP-59 gift-wrapped events; relay pool; dedup; inbox sync |
-| **Storage** | `@agentlink/storage` | All | `put/get/delete` of ciphertext blobs; S3 adapter (presigned URLs); inline adapter; IPFS adapter later |
+| **Storage** | `@agentlink/storage` | All | `put/get/delete` of ciphertext blobs; inline adapter; **drop** adapter (default, D-48); S3 adapter (presigned URLs); Google Drive, Dropbox and OneDrive connectors (M2, D-49); IPFS adapter later; storage selection (07 §5.6) |
 | **Chain** | `@agentlink/chain` | All | viem clients per chain; OCC v2 contract bindings; fee quotes; credits; submitter client; proof verification |
 | **MCP server** | `@4thtech/agentlink` (bin) | Local (stdio) or Worker (HTTP) | Tool definitions, schemas, approval flow, inbound-content sanitization |
-| **CLI** | same package, `agentlink` bin | Local | init, pair, policies, storage setup, backup/restore, verify |
-| **Local approval UI** | same package | `127.0.0.1` | Approvals, settings, storage setup, top-up link |
+| **CLI** | same package, `agentlink` bin | Local | init, pair, policies, optional own-storage setup, backup/restore, verify |
+| **Local approval UI** | same package | `127.0.0.1` | Approvals, settings, optional own-storage setup, top-up link |
 | **Desktop app** (M2) | `apps/desktop` | User's computer (macOS, Windows, Linux) | Tray app hosting the local MCP server; full local dashboard (shared `packages/ui`); native approval window; OS-biometric owner key; harness auto-setup; signed auto-update (08 §8) |
 | **Owner console** | `apps/console` | Browser (PWA) | Passkey owner identity, reading all agent traffic, approvals, policies, proofs, credits |
 | **Self-host template** | `apps/cloud-agent` | User's Cloudflare | Always-on agent, inbox Durable Object, remote MCP + OAuth |
 | **Verify** | `apps/verify` + CLI | Browser / CLI | Verify proof packs against chain via public RPC |
 | **Submitter** | `apps/submitter` | 4thTech Cloudflare Worker | Accepts signed records/receipts/authorizations, simulates, submits; pays gas; rate-limited by on-chain credits |
+| **Encrypted drop** | `apps/drop` | 4thTech Cloudflare Worker + R2 | Default store for file ciphertext (D-48): verifies agent-signed uploads, issues short-lived upload targets and signed download URLs, enforces size caps, quotas, rate limits and the hard 7-day expiry; random object keys, no file names, no accounts; holds no user secrets (07 §5.4) |
 | **Relay (optional)** | strfry or similar, ops repo | 4thTech or user | Free Nostr relay with longer retention (30 days); stores only gift-wrapped ciphertext |
 | **Contracts** | `occ-v2-contracts` (private) | EVM chains | `OCCFeeVault` (credits, fees), `OCCNotary` (records, receipts), `OCCRegistry` (verified agents) |
 
@@ -118,13 +121,13 @@ sequenceDiagram
   MB-->>B: messages (marked as UNTRUSTED content)
 ```
 
-### 4.2 Send file (free, BYO storage)
+### 4.2 Send file (free, encrypted drop or own storage)
 
 1. Core generates a random file key; encrypts the file with AES-256-GCM in chunks (see 04).
-2. Storage adapter uploads the ciphertext and returns a locator (bucket object key) plus a **presigned GET URL** valid until expiry.
+2. Core picks the storage (07 §5.6, policy `files.storage`): own storage if configured, otherwise the **encrypted drop** if the file is within its limits, otherwise `needs_setup`. The adapter uploads the ciphertext and returns a locator plus a download URL valid until expiry: for the drop, a **signed drop URL** obtained with an upload request signed by the agent's drop key (07 §5.4); for S3-compatible storage, a **presigned GET URL**; for a consumer connector (M2), a time-limited **share link**. No backend receives the file name, the file key or the recipient.
 3. The envelope payload contains `{fileName, size, mime, sha256(ciphertext), url, fileKey, expiresAt}`; the envelope itself is encrypted as in 4.1.
 4. Recipient core downloads, checks SHA-256, decrypts, saves to the allowed folder, and optionally sends a free off-chain ack.
-5. On expiry or confirmed receipt (policy), the sender deletes the object; keys are discarded (crypto-shred).
+5. On expiry or confirmed receipt (policy), the sender deletes the object; keys are discarded (crypto-shred). The drop follows the same policy (deletion is a DELETE signed with the uploader's drop key) and deletes every object 7 days after upload in any case (D-48).
 
 Files ≤ 12 KB skip storage and travel inline in the envelope.
 
@@ -172,7 +175,8 @@ Console: approval request is sent as an encrypted envelope to the owner key; the
 | Party | Can see | Cannot see / do |
 |---|---|---|
 | **Relays** | Gift-wrap ciphertext, recipient Nostr pubkey (ephemeral sender key per NIP-59), timestamps (randomized), IP of connecting client | Sender identity, content, file keys |
-| **Storage provider** | Ciphertext blob, size, uploader IP | Content, recipient |
+| **4thTech encrypted drop** | Ciphertext blob, size, upload and download times, uploader IP, the uploader's drop key (signed uploads, quotas; unlinkable to the agent's public identity), downloading IP | Content, file name, file key, recipient identity; cannot alter a file undetected (`ciphertextSha256`, `plaintextSha256`); can only deny, delete or delay (I-3). Logs aggregate counters only (04 §4); Cloudflare, as the infrastructure operator, can see request metadata |
+| **Own storage provider** (S3-compatible; Drive, Dropbox, OneDrive in M2) | Ciphertext blob, size, uploader and downloader IPs; for consumer connectors also the user's provider account | Content, file name, file key, recipient identity |
 | **Chain / public** | Record hash, signer address (pseudonymous agent key), recipient commitment (salted hash), kind, timestamp, receipts, fee payments | Content, recipient identity (without salt) |
 | **4thTech submitter** | Signed records and receipts (same as public chain, earlier), submitting IP | Content, keys; cannot forge or alter records (signatures) |
 | **4thTech static sites** | Page loads (IP); never the URL fragment | Keys (generated in the browser), content |
@@ -198,7 +202,7 @@ Console: approval request is sent as an encrypted envelope to the owner key; the
 | Deterministic deploys | CreateX (CREATE3) | Same addresses on every chain despite per-chain initializer arguments |
 | Web apps | Vite + React, static output; shared `packages/ui` built from the Claude Design system | Static hosting, no server state; one component library for local UI and console |
 | Desktop app (M2) | `DECISION NEEDED (architecture task, security review)`: e.g. Tauri with a Node sidecar vs Electron | Reuse `@agentlink/core` in Node; OS keystore with biometrics; signed auto-update; shares `packages/ui` with the console (08 §8) |
-| Hosting | Cloudflare Workers (static assets, Durable Objects, R2) | One platform for console, submitter, template |
+| Hosting | Cloudflare Workers (static assets, Durable Objects, R2) | One platform for console, submitter, encrypted drop, template |
 | Testing | Vitest, Playwright, Foundry fuzz/invariant tests | |
 
 ---

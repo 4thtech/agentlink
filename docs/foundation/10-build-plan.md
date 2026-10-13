@@ -6,6 +6,48 @@ Every task ends with: tests passing in CI, docs updated, and the relevant accept
 
 ---
 
+## At a glance
+
+We build in public, in stages, and each stage ends with something you can try. This is the map; the task tables below hold the detail. Durations are indicative, not commitments.
+
+### The 9 building blocks
+
+| # | Block | What it covers |
+|---|---|---|
+| 1 | Crypto | Keys, encryption, signatures |
+| 2 | Messaging | Encrypted messages over Nostr relays |
+| 3 | Core | Pairing, contacts, threads, the owner's rules and approvals |
+| 4 | Local node | OS keychain and a local database |
+| 5 | MCP server + CLI | How your agent (and you) use AgentLink |
+| 6 | Files | Encrypted drop by default, own storage optional (D-48, D-49) |
+| 7 | Proof | Contracts (OCCFeeVault, OCCNotary), chain client, submitter |
+| 8 | Apps | Local approval UI, then owner console, then desktop apps for macOS, Windows and Linux |
+| 9 | Cloud agent | Self-host in your own Cloudflare account |
+
+### Stages
+
+| Stage | What you can do at the end | Blocks | Duration | Version |
+|---|---|---|---|---|
+| **M0** | Repo, CI and rules are in place | none (foundations) | ~1 week | 0.0.x |
+| **M1a** | Two agents pair and chat. The J9 dogfood: Tali's and Denis's agents sync this project through AgentLink | 1–5 | ~2–3 weeks | 0.1.0 |
+| **M1b** | Send files and get proof on testnets; 10 internal testers | 6, 7, local UI of 8 | ~3–4 weeks | 0.2.0 |
+| **M2** | Console, desktop apps, cloud agent, verify and invite pages, verified domains, storage connectors; 20–50 external testers | 8, 9, 6, 7 | ~4–6+ weeks | 0.3.0 |
+| **M3** | External audit, then mainnet on Base and Gnosis | 7 | ~4 weeks | 1.0.0 |
+| **M4/M5** | More chains, batching, finance dashboard, then deals and payments | 7, 8 | rolling | after 1.0.0 |
+
+### External services by stage
+
+What and when only. Cost estimates are tracked internally.
+
+| When | Services |
+|---|---|
+| Now (free tiers) | GitHub, npm, public Nostr relays, testnet faucets, public RPCs |
+| M1b | Cloudflare Workers Paid, R2 for the drop, an RPC provider |
+| M2 | Apple Developer ID, Windows code signing, OAuth app registrations (Google, Dropbox, Microsoft), the production domain after the trademark check |
+| M3 | Hardware wallets for Safe signers, an external audit firm, legal counsel, mainnet gas |
+
+---
+
 ## M0 — Foundations (≈ 1 week)
 
 | Task | Output | Acceptance |
@@ -31,6 +73,8 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 |---|---|---|
 | Product name and trademark check (D-38) | During M1 (start early) | Must precede the production-domain choice (M2-10): owner passkeys bind to that domain |
 | Apple Developer ID (organisation) and a Windows code-signing certificate (D-36) | Start in M1b; needed in M2 | Enrolment and validation take weeks; the desktop signing pipeline (M2-11) needs them |
+| Encrypted drop: R2 bucket, lifecycle rule and `drop.` hostname; counsel review of the hosting terms, terms of service and takedown process (D-48) | Start in M1a; needed before the drop goes live in M1b | The drop (M1-27) cannot serve testers without the bucket, and the terms need counsel |
+| OAuth client registration and app review with Google, Dropbox and Microsoft (D-49) | Start in M1b; needed in M2 | Provider app reviews and verification take weeks; the connectors (M2-15) need them |
 
 ## M1 — Local beta on testnets (≈ 5–7 weeks, in two phases)
 
@@ -60,16 +104,17 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 | M1-1 `@agentlink/crypto` (rest) | crypto | Test vectors for STREAM file encryption, EIP-712 (`Record`, `Receipt`, `Registration`) with commitments, passkey PRF wrapping and the recovery code pass in all three runtimes |
 | M1-3 Contracts: OCCFeeVault + OCCNotary | contracts | Full unit/fuzz/invariant suite (incl. ERC-1271 signers); gas targets met; Slither/Aderyn clean; deployed to Base Sepolia + Gnosis Chiado via CreateX (CREATE3) with identical addresses |
 | M1-4 `@agentlink/chain` | chain | EIP-712 parity with contract test vectors; quote, notarize (direct + submitter), acknowledge, verifyProofPack against testnets; zero-config chain selection (D-40): the client ships the chain list, picks the default chain if funded, otherwise the cheapest funded one, and never asks for a chain outside Advanced |
-| M1-6 `@agentlink/storage` (inline + S3 via aws4fetch) | storage | Upload/presign/download/delete against R2 and MinIO; streaming 1 GB file without loading into memory |
+| M1-6 `@agentlink/storage` (inline + encrypted drop + S3 via aws4fetch) | storage | Upload/presign/download/delete against R2 and MinIO; streaming 1 GB file without loading into memory; `drop` adapter against the drop Worker (signed upload, signed GET, signed delete); storage selection per 07 §5.6 (D-48) |
+| M1-27 Encrypted drop Worker + R2 (D-48) | apps/drop | Signed uploads verified against test vectors; random 128-bit object keys; size cap and weekly quota per drop key, rate limits per drop key and per IP; hard 7-day expiry (Worker check plus R2 lifecycle rule); DELETE only by the uploading drop key; objects served only as attachments; no request URLs, signed URLs, object keys or upload signatures in any log (asserted in tests); deployed to `drop.agentlink.4thtech.io` |
 | M1-7 `@agentlink/core` (rest) | core | Files, proofs and receipts; policy rules for files, proofs and receipts; proof of agreement (D-32): notarized final terms plus the counterparty's ACCEPTED receipt, which falls under `commitments` |
 | M1-8 `@agentlink/node` (rest) | node | OwnerKeyStore unlocked by a localhost passkey (PRF) as well; local approval server (in-memory token, host/origin checks) |
-| M1-9 CLI + MCP server (rest) | apps/cli | File and proof tools from 06; `storage connect`, `backup`, `credits`, `verify`, `ui`; Claude Desktop one-click extension |
+| M1-9 CLI + MCP server (rest) | apps/cli | File and proof tools from 06; `storage connect` (optional), `backup`, `credits`, `verify`, `ui`; Claude Desktop one-click extension |
 | M1-10 Submitter (testnets) + credits faucet | apps/submitter | Simulates, submits, batches; rate limits; health endpoint; faucet endpoint calls `depositFor` with testnet credits (rate-limited per agent) |
-| M1-11 Local approval UI (functional and unstyled; styled from D1 when it lands) | apps/cli | Owner passkey setup, approvals with passkey, storage connect, allowed folders, policies, credits (faucet on testnet), backup |
+| M1-11 Local approval UI (functional and unstyled; styled from D1 when it lands) | apps/cli | Owner passkey setup, approvals with passkey, storage (drop usage; optional own storage), allowed folders, policies, credits (faucet on testnet), backup |
 | M1-12 Skill file + quickstart docs (rest) | skills/, docs | A new user completes J1 from docs alone |
-| M1-13 E2E suite (rest) | e2e | 5 MB file, notarize, DELIVERED/OPENED, export + verify pack; J8 with on-chain proof of agreement; prompt-injection suite on file and proof tools (06 §9) |
+| M1-13 E2E suite (rest) | e2e | 5 MB file with zero storage setup (encrypted drop), notarize, DELIVERED/OPENED, export + verify pack; J8 with on-chain proof of agreement; prompt-injection suite on file and proof tools (06 §9) |
 
-**Gate M1:** 10 internal testers on ≥ 3 harness combinations complete J1, J2, J4, J5 on testnets, and J3 using faucet credits; J8 completed with on-chain proof of agreement. UX (D-39, D-40): no wallet, browser extension, gas or chain choice appears in any J1–J9 default flow, and install → first message stays under 5 minutes.
+**Gate M1:** 10 internal testers on ≥ 3 harness combinations complete J1, J2, J4, J5 on testnets, and J3 using faucet credits; J8 completed with on-chain proof of agreement. In J1 a file over 12 KB (5 MB in the e2e suite) is sent with zero storage setup through the encrypted drop (D-48). UX (D-39, D-40): no wallet, browser extension, gas or chain choice appears in any J1–J9 default flow, and install → first message stays under 5 minutes.
 
 ## M2 — Owner console, desktop apps, self-host, design (≈ 4–6 weeks; desktop apps add scope, re-estimated in M2-11)
 
@@ -84,6 +129,7 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 | M2-11 Desktop apps for macOS, Windows, Linux (D-36, D-41) | apps/desktop | First an architecture task: framework choice (e.g. Tauri with a Node sidecar vs Electron), Opus, with a security review. Then per-OS builds on the same core: a tray app hosting the MCP server, a native approval window with OS biometrics (Touch ID / Windows Hello) gating the owner key in the OS keychain, harness auto-setup, and the full local dashboard (activity, threads, contacts, approvals, proofs, credits, policies, storage, settings) from `packages/ui`. Signed and notarized; auto-update with signature verification. Needs the owner's certificates |
 | M2-12 Domain verification (D-34) | contracts, chain, core, console | The owner proves control of a domain (DNS TXT or `/.well-known`); ships with OCCRegistry; clients check it themselves before showing it |
 | M2-13 Browser counterparty view-and-accept (D-35, P1) | web client | A counterparty without an agent opens the invite link, views the offer and accepts in the browser; keys generated in the browser, same identity model as the console; design in D2 |
+| M2-15 Consumer storage connectors (D-49, P1) | packages/storage, apps/desktop | Google Drive, Dropbox and OneDrive adapters behind the same `StorageAdapter` interface; Settings → Storage → Connect in the desktop apps with OAuth (PKCE, loopback redirect), minimal scopes and tokens only in the OS keychain; only ciphertext with random names in an app folder; time-limited share links, or the owner's decision per provider (07 §5.5); round trips against each provider |
 
 **Gate M2:** 20–50 early adopters (external) on testnets; UX metric "install → first message < 5 min" met; no wallet, browser extension, gas or chain choice in any J1–J9 default flow, including the desktop apps and the browser counterparty (D-39).
 
@@ -98,12 +144,13 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 | M3-5 Submitter mainnet with gas monitoring and alerts | — |
 | M3-6 Publish verified contract source (BUSL-1.1) + addresses | Explorers verified |
 | M3-7 Legal review of terms and positioning (entity jurisdiction) | Sign-off before public launch |
+| M3-16 Monthly revenue report from on-chain events (D-50) | CSV per chain from `Charged`, `Deposited`, `Withdrawn` and `Swept`; totals reconcile with the treasury Safe and explorers |
 
 **Gate M3:** first paid notarizations; zero security incidents.
 
 ## M4 — Expansion (rolling)
 
-Arbitrum, Optimism, Polygon deployments · native-coin fees behind a bounded `PRICE_UPDATER` role, if the owner decides to offer them (D-46, 12 §3.4) · batched receipts (OCCAnchor) · ERC-8004 bridge · hosted remote MCP in approval mode (P2, after design review; self-host stays the default cloud path, D-37) · eIDAS qualified e-signature research for legal weight (D-34) · IPFS pinning adapter · XMTP transport adapter · ElizaOS plugin rewrite on `@agentlink/core` · group threads.
+Arbitrum, Optimism, Polygon deployments · native-coin fees behind a bounded `PRICE_UPDATER` role, if the owner decides to offer them (D-46, 12 §3.4) · batched receipts (OCCAnchor) · ERC-8004 bridge · hosted remote MCP in approval mode (P2, after design review; self-host stays the default cloud path, D-37) · eIDAS qualified e-signature research for legal weight (D-34) · IPFS pinning adapter · XMTP transport adapter · ElizaOS plugin rewrite on `@agentlink/core` · group threads · internal finance dashboard and opt-in billing profiles for invoicing (`agentlink-ops`, D-50).
 
 ## M5 — Agent commerce
 

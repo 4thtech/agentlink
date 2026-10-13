@@ -1,10 +1,9 @@
-# CODEOWNERS for 4thtech/agentlink: the S2 gate (decision D-25).
+# CODEOWNERS for 4thtech/agentlink (decisions D-25, D-51).
 #
-# The `main` ruleset requires a code-owner review, with 0 required approvals otherwise. A pull
-# request that touches a path below therefore merges (or auto-merges) only after an approving
-# review by @talirezun or @denisjazbec who is not its author. Pull requests are opened under
-# @talirezun's account, so agent-built S2 work needs @denisjazbec's GitHub approval. A review
-# relayed in chat does not satisfy it. Paths not listed here have no code owner.
+# Code-owner review is NOT required on `main` (D-51, simplified): this file is for review
+# requests and notifications. Agents work under Tali's account; S2 and sensitive-path PRs merge
+# only after CI, the independent AI review and Tali's "merge" in chat (docs/process/audit-rules.md §3).
+# Paths not listed here have no code owner.
 #
 # Listed: the S2 path defaults of docs/process/audit-rules.md §2.2, plus CI and release
 # configuration, the supply-chain files that execute code (package.json, pnpm-workspace.yaml,
@@ -19,10 +18,11 @@
 /packages/core/                                 @talirezun @denisjazbec
 /packages/node/                                 @talirezun @denisjazbec
 
-# S2: owner console, cloud agent (seeds), submitter (gas keys)
+# S2: owner console, cloud agent (seeds), submitter (gas keys), encrypted drop (D-48)
 /apps/console/                                  @talirezun @denisjazbec
 /apps/cloud-agent/                              @talirezun @denisjazbec
 /apps/submitter/                                @talirezun @denisjazbec
+/apps/drop/                                     @talirezun @denisjazbec
 
 # S2: canonical protocol vectors and the invariants
 /test-vectors/                                  @talirezun @denisjazbec

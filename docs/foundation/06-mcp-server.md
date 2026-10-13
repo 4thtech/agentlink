@@ -27,7 +27,7 @@ Notation: `?` = optional. `Contact` = contact ID, display name or invite alias (
 
 | Tool | Input | Output (structured) | Notes |
 |---|---|---|---|
-| `agentlink_status` | `{}` | `{agent: {name, id, fingerprint}, owner: {fingerprint}, contacts: n, unread: n, pendingApprovals: n, storage: {configured, provider?}, credits: [{chain, token, amount, usd}], chains: [...]}` | Call first in a new session |
+| `agentlink_status` | `{}` | `{agent: {name, id, fingerprint}, owner: {fingerprint}, contacts: n, unread: n, pendingApprovals: n, storage: {mode: "drop" \| "own", provider?}, credits: [{chain, token, amount, usd}], chains: [...]}` | Call first in a new session. `storage.mode` is the backend `send_file` uses for files over 12 KB under the current policy (§3, 07 §5.6): `drop` (the encrypted drop, D-48) or `own`; `provider` names the own-storage provider |
 | `create_invite` | `{label?, expiresInDays? = 7}` | `{inviteUrl, ownerFingerprint, expiresAt}` | Invite is single use. No safety code yet: it is derived from both sides' keys (04 §3.6), and the inviter does not know the other side's keys until the handshake arrives. `ownerFingerprint` is the inviter's own |
 | `accept_invite` | `{inviteUrl, approvalId?}` | `{contact: {id, name, ownerFingerprint, safetyCode, verified}}` | Policy `contacts.acceptInvites`: `approval` (default) or `auto`. Runs the pairing protocol (04 §3.6). Returns the `safetyCode`, which the inviter's side shows too once the handshake arrives (`list_contacts`), so both owners can compare it through another channel |
 | `list_contacts` | `{}` | `{contacts: [{id, name, ownerFingerprint, safetyCode, verified, lastActivity, unread}]}` | `safetyCode` is the same 12 digits on both sides (04 §3.6) |
@@ -44,7 +44,7 @@ Notation: `?` = optional. `Contact` = contact ID, display name or invite alias (
 
 | Tool | Input | Output | Notes |
 |---|---|---|---|
-| `send_file` | `{to: Contact, path: string, message?: string, notarize? = false, expiresInDays? = 7 (max 7), approvalId?, clientRequestId?}` | `{envelopeId, file: {name, size, plaintextSha256}, delivery: "inline" \| "storage", expiresAt, proof?}` | `path` (resolved with realpath) must be inside an owner-allowed folder (policy `files.allowedFolders`); ≤ 12 KB inline, otherwise storage required → `needs_setup` if none |
+| `send_file` | `{to: Contact, path: string, message?: string, notarize? = false, expiresInDays? = 7 (max 7), approvalId?, clientRequestId?}` | `{envelopeId, file: {name, size, plaintextSha256}, delivery: "inline" \| "drop" \| "own", expiresAt, proof?}` | `path` (resolved with realpath) must be inside an owner-allowed folder (policy `files.allowedFolders`); ≤ 12 KB inline, otherwise stored per `files.storage` (§3, 07 §5.6): own storage if configured, else the encrypted drop. No storage setup is needed within the drop limits. `needs_setup` (own storage) only when the drop cannot take the file (above its size cap or weekly quota, or policy `own`) and no own storage is configured or selected (§3) |
 | `fetch_file` | `{envelopeId, fileIndex? = 0}` | `{savedTo, name, size, integrity: "verified", receipt?: "DELIVERED recorded"}` | Applies SSRF rules (04 §4); checks both hashes; saves into `files.inboxFolder`; never executes. Records `DELIVERED` if notarized and `receipts.autoDelivered` |
 
 ### 2.4 Proof (paid)
@@ -106,8 +106,9 @@ files:
   inboxFolder: ~/AgentLink/Inbox
   maxSendSizeMB: 100
   maxReceiveSizeMB: 200
-  defaultExpiryDays: 7         # max 7 (presigned URL limit)
-  deleteAfter: expiry          # expiry (default) | receipt
+  storage: auto                # auto (default: own storage if configured, else the encrypted drop) | drop | own
+  defaultExpiryDays: 7         # max 7 (presigned URL limit; the drop's hard expiry)
+  deleteAfter: expiry          # expiry (default) | receipt; applies to every backend, the drop included (D-48, 04 §4)
   ownerArchive: false          # P1: keep owner copies beyond expiry in owner storage
 envelopes:
   maxEnvelopeKB: 24
@@ -126,6 +127,8 @@ commitments:
   autoAcceptContacts: []    # optional allowlist of contact IDs eligible for auto-accept
   autoAcceptMaxUSD: 0       # auto-accept only when terms.price ≤ this, and only for allowlisted contacts
 ```
+
+**Storage choice (D-48).** `files.storage` decides where files over 12 KB go. `auto` (default) uses own storage if it is configured, otherwise the encrypted drop within its limits (proposed 100 MB per file, 1 GB per agent per week). `drop` always uses the drop. `own` never uses the drop, for owners whose rules keep files in their own storage. Above the drop limits, `send_file` uses own storage under `auto` if configured, and otherwise returns `needs_setup`. There is no silent fallback from configured own storage to the drop.
 
 **Commitments (D-31).** Under `approval`, every commitment waits for the owner, except that an `accept` or an `ACCEPTED` receipt proceeds without a new approval when the contact is in `autoAcceptContacts` **and** `terms.price` is at most `autoAcceptMaxUSD`. Terms without a `price`, or priced in a currency other than USD or a USD stablecoin, are never auto-accepted; auto-accept never applies to `REJECTED`. `deny` blocks commitments entirely (`status: "rejected"`). The approval screen shows the terms and the changes from the previous version; the tool's `summary` names only the contact and the action, never inbound text (§4). `DECISION NEEDED (owner)`: whether sending a **notarized `offer`** with `terms` (a firm offer the counterparty can accept, J8) also falls under `commitments.accept`. Proposed: yes, otherwise a proof of agreement could show terms that the offering owner never approved.
 
@@ -211,7 +214,7 @@ agentlink init [--agent <name>]          # create identity, configure harnesses
 agentlink ui                             # open local approval/settings UI
 agentlink invite | accept <url>
 agentlink contacts [--verify <id>]
-agentlink storage connect              † # guided S3-compatible setup (creds → keychain)
+agentlink storage connect              † # optional: guided S3-compatible setup (creds → keychain); not needed for files within the drop limits
 agentlink policy show | set <key> <value>   †
 agentlink credits [--topup]              # shows agent address, balances, top-up options
 agentlink backup export | restore <file>   †
@@ -225,9 +228,10 @@ agentlink doctor                         # diagnostics (relays, RPC, keychain, s
 ## 9. Acceptance tests (MCP)
 
 - MCP Inspector passes schema validation for all tools (inputs and outputs).
-- End-to-end: Claude Code instance A ↔ Codex instance B on separate machines: pair, send message, send 5 MB file, notarize, DELIVERED + OPENED receipts, export and verify proof pack.
+- End-to-end: Claude Code instance A ↔ Codex instance B on separate machines: pair, send message, send a 5 MB file with zero storage setup (encrypted drop), notarize, DELIVERED + OPENED receipts, export and verify proof pack.
 - Prompt-injection suite: inbound messages containing tool-like instructions, closing tags, invite links and file paths do not cause any tool call by our code and are always wrapped.
 - `send_file` outside allowed folders → `needs_setup` with local UI link; never reads the file.
+- `send_file` with no own storage: a 5 MB file → `ok` with `delivery: "drop"`; a file above the drop cap or over the weekly quota → `needs_setup` (own storage); under `files.storage: own` with none configured → `needs_setup`, and nothing is uploaded to the drop.
 - Policy changes impossible through any MCP tool (assert by tool list review in CI).
 - An agent cannot accept without approval under the defaults: `send_message` with `type: "accept"` and `acknowledge` with `accepted` or `rejected` return `pending_approval`, and nothing is sent or signed until the owner approves; an `accept` whose `termsHash` does not match a received offer is refused.
 - Agent-run `init` never changes harness config without the user's confirmation and never prints or accepts owner secrets (§7).

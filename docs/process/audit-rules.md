@@ -4,7 +4,7 @@
 |---|---|
 | **Purpose** | The review and audit regime for AgentLink: security classes, review requirements, independent reviews, milestone and external audits, findings, stop-the-line. |
 | **Applies to** | Every change to `4thtech/agentlink` (public) and `4thtech/occ-v2-contracts` (private), every release, and every reviewer, human or AI. |
-| **Status** | Normative · v0.2 · 12 Oct 2026 (continuous delivery, D-25) |
+| **Status** | Normative · v0.3 · 13 Oct 2026 (merge rules D-51, simplified; `apps/drop/**` S2, D-48; continuous delivery, D-25) |
 | **Companions** | `development-process.md` · `release-and-deployment.md` · `backlog.md` · `sync-protocol.md` |
 | **Source of truth** | Invariants I-1…I-10 and the threat model are in `docs/foundation/04-security-and-crypto.md`. This document never relaxes them. |
 
@@ -14,7 +14,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 
 ## 1. Principles
 
-1. **Nobody reviews their own work.** An author is every person and every AI session that wrote code in the diff, including the orchestrator that integrated it. The owner directs the agents, and PRs are opened under the owner's account, so S1/S2 changes need reviewers who did not direct them (§3), and S2 changes need a GitHub approval by a code owner who is not the PR author.
+1. **Nobody reviews their own work.** An author is every person and every AI session that wrote code in the diff, including the orchestrator that integrated it. The owner directs the agents, so S1/S2 changes need an independent reviewer who did not direct them (§3). Agents work under the owner's account; S2 and sensitive-path changes merge only after the owner's explicit "merge" in chat, recorded in the PR (D-51, simplified).
 2. **Evidence over claims.** A requirement is met only by an artifact a third party can check: test name and output, CI run, command output, file and line at a commit. "Worker reported" is not evidence.
 3. **Every finding is tracked to closure** (§9). A finding mentioned only in chat does not exist.
 4. **Never weaken a test, invariant or policy default** to make something pass. Flag it instead.
@@ -43,13 +43,14 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 | `packages/node/**` | S2 | Keychain `KeyStore`, `OwnerKeyStore`, local approval server |
 | `packages/chain/**` | S1 | Chain client (content rules raise EIP-712/signing code to S2) |
 | `packages/transport-nostr/**` | S1 | Inbound content |
-| `packages/storage/**` | S1 | Storage credentials, presigned URLs, SSRF |
+| `packages/storage/**` | S1 | Storage credentials, presigned URLs, OAuth tokens, SSRF (the drop adapter's request signing → S2) |
 | `packages/types/**` | S1 | Inbound validation schemas (envelope, payload, policy schema changes → S2) |
 | `packages/ui/**` | S1 | Approval and policy UI; runs inside the console origin |
 | `apps/cli/**` | S1 | MCP tool surface, files, inbound content (owner operations → S2) |
 | `apps/console/**` | S2 | Generates and holds the owner seed; signs approvals and policies |
 | `apps/cloud-agent/**` | S2 | Generates and holds agent seeds; OAuth owner proof |
 | `apps/submitter/**` | S2 | Submitter, gas keys, faucet |
+| `apps/drop/**` | S2 | Encrypted drop (D-48): signed-upload verification, quotas, expiry, no logging of URLs, keys or signatures (04 §4) |
 | `apps/verify/**`, `apps/invite/**` | S1 | Untrusted proof packs and invites; URL fragment |
 | `test-vectors/**` | S2 | Canonical protocol vectors |
 | `e2e/**`, `skills/**` | S1 | Prompt-injection suite; agent-facing instructions |
@@ -61,12 +62,12 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 
 This table is mirrored in two places that MUST change with it in the same PR:
 
-- **`.github/CODEOWNERS`** lists the S2 rows plus `/.github/`, `/AGENTS.md`, `/CLAUDE.md`, `/.claude/` and the code-executing supply-chain files (`/package.json`, `/pnpm-workspace.yaml`, `.npmrc` and `.pnpmfile.*` at any depth), owned by `@talirezun @denisjazbec` (D-25). These paths merge only with a GitHub approval by a code owner who is not the author.
+- **`.github/CODEOWNERS`** lists the S2 rows plus `/.github/`, `/AGENTS.md`, `/CLAUDE.md`, `/.claude/` and the code-executing supply-chain files (`/package.json`, `/pnpm-workspace.yaml`, `.npmrc` and `.pnpmfile.*` at any depth), owned by `@talirezun @denisjazbec` (D-25). The ruleset requires a code-owner review on these paths (D-51), from a code owner who is not the PR author. Under D-51 (simplified) code-owner review is off; CODEOWNERS requests reviews and notifies, and the owner's "merge" go-ahead is the gate (§3). `@denisjazbec` is also a code owner, and his approval is optional but sufficient.
 - **`.github/workflows/review-gate.yml`** derives the class from the changed files with the same rules (§3.3).
 
 The root `package.json`, `pnpm-workspace.yaml`, `.npmrc` and `.pnpmfile.*` are code-owned because they can execute code or redirect installs and publishing (a pnpmfile, lifecycle-script settings, a registry). The setup action also refuses any pnpmfile and installs with `--ignore-pnpmfile` (`ci-cd.md`).
 
-DECISION NEEDED (owner): whether the remaining supply-chain files (`pnpm-lock.yaml`, `turbo.json`, `renovate.json`, `.changeset/config.json`, `.gitleaks.toml`, `.gitleaksignore`) should also be code-owned. As S1 they can auto-merge with an orchestrator-attested independent review and no human approval. They can shorten dependency cooldowns or silence the secret scan. Proposed: code-own `renovate.json`, `.gitleaks.toml` and `.gitleaksignore`.
+DECISION NEEDED (owner): whether the remaining supply-chain files (`pnpm-lock.yaml`, `turbo.json`, `renovate.json`, `.changeset/config.json`, `.gitleaks.toml`, `.gitleaksignore`) should also be code-owned. As S1 non-code-owned files they can auto-merge with an orchestrator-attested independent review and no human approval. They can shorten dependency cooldowns or silence the secret scan. Proposed: code-own `renovate.json`, `.gitleaks.toml` and `.gitleaksignore`.
 
 ### 2.3 Path defaults: `4thtech/occ-v2-contracts` (private)
 
@@ -87,27 +88,27 @@ The **highest applicable class wins.** The orchestrator assigns the class on the
 
 ## 3. Review requirements
 
-Merging is continuous (D-25): agents MAY enable GitHub auto-merge, and GitHub merges only when every gate below that GitHub enforces is green. Required approvals are **0**, because PRs are opened under the owner's account; the human gate is the **code-owner review** on the paths in `.github/CODEOWNERS` (§2.2), and `review-gate` checks the evidence in the PR body (§3.3). Agents never approve a PR or a deployment and never merge with admin bypass. The `main` ruleset has no bypass actors (`ci-cd.md`, owner setup checklist).
+Merging is continuous (D-25, amended by D-51, simplified): agents work under Tali's GitHub account. S0/S1 PRs outside the sensitive paths auto-merge when every GitHub-enforced gate below is green. **S2 PRs and sensitive-path PRs** (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files, §2.2) merge only after CI, the independent AI review and **Tali's explicit "merge" in chat**, recorded in the PR. This is a process control, not GitHub-enforced. Code-owner review is off; `@denisjazbec` stays a code owner for notifications, and his approval is not required. Agents never approve a PR or a deployment and never merge with admin bypass. The `main` ruleset has no bypass actors (`ci-cd.md`). The residual risk is owner-accepted and is revisited before M3 (`development-process.md` §1.3).
 
 | Requirement | S0 | S1 | S2 | Enforced by |
 |---|---|---|---|---|
 | CI gates (public) | `ci-gate`, `security-gate`, `pr-hygiene`, `review-gate` | same | same | Ruleset (required checks) |
 | CI gates (contracts repo) | `contracts-gate` | same | same | Owner, before merging (Free plan, §6.1) |
-| Owner review before merge | — | — | — | Not a merge precondition: the owner MAY review any PR and MAY disable its auto-merge; the owner approves each production release (`release-and-deployment.md` §3) |
+| Owner's merge go-ahead | — | ✅ on sensitive paths only (§2.2) | ✅ Tali's explicit "merge" in chat, recorded in the PR (D-51) | Process control (D-51, simplified). Code-owner review is off. The owner MAY review any PR and MAY disable its auto-merge, and approves each production release (`release-and-deployment.md` §3) |
 | Independent AI review session (Opus 5.5, §4) | — (a Sonnet non-security review MAY be used) | ✅ checklists for the areas touched | ✅ all applicable checklists + invariant walkthrough | `review-gate` (c): report ID referenced in the PR, no FAIL verdict. Attested by the orchestrator: CI sees the reference, not the review. Automated PRs: a code-owner approval on the head commit instead (below) |
-| GitHub approval by a code owner who is not the author | — | — (MAY be requested) | ✅ `@denisjazbec` for PRs opened under the owner's account; `@talirezun` for PRs authored by `@denisjazbec`. A review relayed in chat **does not** count | Ruleset code-owner review on code-owned paths; `review-gate` (d) on every S2 PR, on the head commit |
+| Feedback from `@denisjazbec` | — | MAY | Usually relayed through the owner and logged with a disposition (`development-process.md` §14); review comments welcome; his GitHub approval is optional (D-51) and also satisfies the code-owner rule | Process |
 | Tests-first evidence | — | Regression test for every fix | ✅ failing-test commit precedes implementation; red run in PR | `review-gate` (d): section filled. Content: independent reviewer |
 | Threat note (§3.1) | — | Short | Full | `review-gate` (d) for S2: section filled |
 | External-audit scope register entry (§3.2) | — | — | ✅ | Process (orchestrator after merge) |
-| Re-review after new commits | — | If the reviewed area changed | Always: delta review by a fresh session, and a fresh code-owner approval (stale approvals are dismissed) | Process + ruleset |
+| Re-review after new commits | — | If the reviewed area changed | Always: delta review by a fresh session, and a code-owner approval on the new head commit | Ruleset dismisses stale approvals; `review-gate` (d) |
 
-**If `@denisjazbec`'s review of an S2 PR exists only in chat,** the PR cannot auto-merge, and the owner decides: ask for the approval on GitHub (the normal path), or, as a recorded break-glass action (§6), change the ruleset temporarily. Agents never work around it.
+**S2 and code-owned merges (D-51).** The orchestrator marks the PR ready, reports the PR to Tali, and enables auto-merge. The merge happens when the owner's GitHub approval arrives and every other gate is green. Agents never accept a chat message, or a relayed or quoted approval, in place of the GitHub approval, and never work around the rule. Feedback from `@denisjazbec`, including a "Request changes" review, is logged with a disposition and weighed by the owner before he approves.
 
-**Automated PRs (Renovate, Changesets "Version packages").** A PR is automated only when its **author** (GitHub's `pull_request.user.login`) is `renovate[bot]` or `github-actions[bot]`. Commit author names, e-mail addresses and the `verified` flag are never used: anyone who can push to the branch can forge them. An automated PR has no report to cite, so for S1/S2 `review-gate` (c) is satisfied **only** by an APPROVED GitHub review from `@talirezun` or `@denisjazbec` on the current head commit; a new commit invalidates it. Nothing else is exempt: (b) needs no ticked class, and (d) applies unchanged for S2 (the bot is the author, so either code owner's approval counts; a human fills in the Threat note and Tests-first evidence sections). Crypto dependency updates remain S2 (`development-process.md` §11): the approver SHOULD have the orchestrator's review of the new version's changelog and diff first. Owner action (`ci-cd.md`, checklist section 6): a ruleset restricting who may push to `renovate/**` and `changeset-release/**` branches, so nobody else can add commits to a bot-authored PR.
+**Sensitive paths (resolved by D-51, simplified).** S1 changes on sensitive paths (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files, including `review-gate.yml`, the root `package.json`, `pnpm-workspace.yaml`, `.npmrc` and `.pnpmfile.*`) need a human gate: Tali's explicit "merge" in chat, the same as S2. It is a process control, not enforced by the ruleset or by `review-gate`.
 
-**Releases:** any mainnet-bound contract release or crypto release (`@agentlink/crypto`, or any package whose crypto code changed since the last reviewed release) MUST have `@denisjazbec`'s review recorded on the release PR: for npm, his GitHub approval on the "Version packages" PR (the code-owner rule alone would also accept the owner's).
+**Automated PRs (Renovate, Changesets "Version packages").** A PR is automated only when its **author** (GitHub's `pull_request.user.login`) is `renovate[bot]` or `github-actions[bot]`. Commit author names, e-mail addresses and the `verified` flag are never used: anyone who can push to the branch can forge them. An automated PR has no report to cite, so for S1/S2 `review-gate` (c) is satisfied **only** by an APPROVED GitHub review from `@talirezun` or `@denisjazbec` on the current head commit; a new commit invalidates it. Nothing else is exempt: (b) needs no ticked class, and (d) applies unchanged for S2 (a human fills in the Threat note and Tests-first evidence sections), and the code-owner approval applies as for any S2 PR. The bot is the author, so the owner's own approval counts for (c). Crypto dependency updates remain S2 (`development-process.md` §11): the approver SHOULD have the orchestrator's review of the new version's changelog and diff first. Owner action (`ci-cd.md`, checklist section 6): a ruleset restricting who may push to `renovate/**` and `changeset-release/**` branches, so nobody else can add commits to a bot-authored PR.
 
-DECISION NEEDED (owner): a waiver path when `@denisjazbec` is unavailable for an S2 review or a mainnet-bound release (e.g. alternate engineer, external reviewer, or block). Until decided, the S2 PR or release waits.
+**Releases:** any mainnet-bound contract release or crypto release (`@agentlink/crypto`, or any package whose crypto code changed since the last reviewed release) MUST have the owner's GitHub approval as a non-author code owner (D-51) and an independent review recorded on the release PR. `@denisjazbec`'s review is recommended for contracts.
 
 ### 3.1 Threat note
 
@@ -126,7 +127,7 @@ One entry per merged S2 PR: task ID, PR, merge commit, files, invariants touched
 | a | Derives the class from the changed files (old and new names of renames) with the §2.2 rules; the highest wins. If the file list is incomplete (over 3000 files), it assumes S2. |
 | b | Requires the PR template's **Security class** section to tick exactly one class, at least the derived one (an automated PR may leave it unticked; the derived class then applies). |
 | c | S1/S2: requires the **Independent review** section to reference a report ID `IR-<TASK-ID>-<n>` (§4.3) and fails on a FAIL verdict. The orchestrator attests that the referenced review happened per §4; CI cannot see the private report. For an automated PR (author `renovate[bot]` or `github-actions[bot]`, §3) it requires instead an APPROVED review by `@talirezun` or `@denisjazbec` on the current head commit. |
-| d | S2: requires an APPROVED review by `@talirezun` or `@denisjazbec` who is not the PR author, given on the current head commit, plus filled **Threat note** and **Tests-first evidence** sections. |
+| d | S2: requires filled **Threat note** and **Tests-first evidence** sections. The S2 approval check was removed by the owner (D-51, simplified); the owner's go-ahead is a process control recorded in the PR. |
 | e | Fails while `DEPLOY_FREEZE` is `true` (`release-and-deployment.md` §3.1). |
 
 The class used for (c) and (d) is the higher of the derived and the declared class. Automated PRs have no exemption beyond (b) and (c) as described above (§3, `ci-cd.md`). A red `review-gate` is never bypassed by an agent; only the owner's break-glass (§6) applies.
@@ -322,7 +323,8 @@ DECISION NEEDED (owner): pause behaviour of `withdrawIntegrator` and `sweep` (05
 | Workflow security (zizmor) | `security.yml` → `security-gate` | Yes |
 | Task-ID title, PR template sections | `pr-hygiene.yml` → `pr-hygiene` | Yes |
 | Security class, review evidence, S2 approval, deploy freeze (§3.3) | `review-gate.yml` → `review-gate` | Yes |
-| Code-owner approval on S2, CI and agent-rule paths | `CODEOWNERS` + ruleset | Yes |
+| Non-author code-owner review on S2, CI, agent-rule and supply-chain paths (D-51) | Ruleset "Require review from Code Owners" + `CODEOWNERS` | Yes |
+| Agents under the owner's account: no admin bypass, deny rules, owner go-ahead for S2 and sensitive paths (D-51) | Ruleset (empty bypass list), harness deny rules, process | Partly (process) |
 | Context budgets of auto-loaded files (`development-process.md` §3.6) | `ci.yml` → `context-budget` → `ci-gate` | Yes |
 | Contracts: fmt, build, tests incl. fuzz and invariant, gas snapshot, Slither, Aderyn, deployer-holds-no-role | `contracts-gate` | Yes (by process: Free plan, §6.1) |
 | Dependency cooldown | `renovate.json` | — |

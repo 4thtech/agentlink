@@ -119,7 +119,7 @@ jobs:
             // (a) Derive the class from the changed files (audit-rules.md §2.2; highest wins).
             const RULES = [
               [2, /^packages\/(crypto|core|node)\//],
-              [2, /^apps\/(console|cloud-agent|submitter)\//],
+              [2, /^apps\/(console|cloud-agent|submitter|drop)\//],
               [2, /^test-vectors\//],
               [2, /^docs\/foundation\/04-security-and-crypto\.md$/],
               [1, /^packages\/(chain|transport-nostr|storage|types|ui)\//],

@@ -12,7 +12,7 @@ All packages live in the public `agentlink` monorepo (see 09). Every package mus
 | `@agentlink/crypto` | noble, hpke | Key derivation, HPKE seal/open, AES-GCM, STREAM file encryption, hashing, JCS, BIP-340 sign/verify, EIP-712 helpers |
 | `@agentlink/chain` | viem, types, crypto | Chain configs, contract ABIs, fee quotes, credits, record/receipt building, submitter client, proof verification |
 | `@agentlink/transport-nostr` | nostr-tools, crypto | `Transport` implementation: relay pool, gift wrap/unwrap, subscriptions, sync cursors |
-| `@agentlink/storage` | crypto | `StorageAdapter` interface; `inline`, `s3` adapters (P0); `ipfs-pinning` (P2) |
+| `@agentlink/storage` | crypto | `StorageAdapter` interface; `inline`, `drop` (default, D-48) and `s3` adapters (P0); `gdrive`, `dropbox`, `onedrive` connectors (P1, M2, D-49); `ipfs-pinning` (P2); storage selection (§5.6) |
 | `@agentlink/core` | all above | `AgentLinkClient`: identity, contacts, envelopes, threads, files, proofs, policies, approvals; `KeyStore`, `Store`, `ApprovalChannel` interfaces |
 | `@agentlink/node` | core | Node implementations: keychain `KeyStore`, SQLite `Store`, local approval server (Node only) |
 | `@4thtech/agentlink` | node, core | CLI + MCP server (stdio) (Node only) |
@@ -27,7 +27,7 @@ Integrators use `@agentlink/core` directly (with their own `KeyStore`/`Store`) a
 const client = await AgentLinkClient.create({
   keyStore, store, approvals,
   transport: new NostrTransport({ relays }),
-  storage: storageAdapterFromConfig(cfg),       // inline + optional s3
+  storage: storageAdapterFromConfig(cfg),       // inline + drop (default) + optional own storage (§5.6)
   chains: defaultChains({ enabled: ["base", "gnosis"] }),
   submitters: ["https://submit.agentlink.example"], // optional; direct mode always available
   appId: ZERO_APP_ID,
@@ -105,8 +105,8 @@ An XMTP adapter (P2) implements the same interface; envelopes are unchanged.
 
 ```ts
 interface StorageAdapter {
-  kind: "inline" | "s3" | "ipfs";
-  put(ciphertext: ReadableStream | Uint8Array, opts: { size: number; expiresAt: Date }): Promise<StoredObject>;
+  kind: "inline" | "drop" | "s3" | "gdrive" | "dropbox" | "onedrive" | "ipfs";
+  put(ciphertext: ReadableStream | Uint8Array, opts: { size: number; expiresAt: Date }): Promise<StoredObject>; // hashes the ciphertext while streaming (one encryption pass, §5.4); StoredObject.sha256 is that hash
   presignGet(obj: StoredObject, expiresAt: Date): Promise<string>;   // URL the recipient can use without credentials
   delete(obj: StoredObject): Promise<void>;
 }
@@ -128,11 +128,57 @@ type StoredObject = { kind: string; locator: string; size: number; sha256: strin
 
 Files ≤ 12 KB are base64url inside the payload; no storage needed.
 
-### 5.4 Later adapters
+### 5.4 Encrypted drop adapter and service (P0, D-48)
+
+The default store for files over 12 KB, so file exchange needs no setup. The `drop` adapter implements the same `StorageAdapter` interface; the service is a 4thTech Cloudflare Worker (`apps/drop`) in front of an R2 bucket, served from its own host (beta: `drop.agentlink.4thtech.io`, D-28). Security rules are in 04 §4.
+
+| Endpoint | Request | Behaviour |
+|---|---|---|
+| `POST /v1/upload` | Signed by the agent's drop key (04 §2.1): `{v: 1, size, expiresAt (≤ 7 days), nonce, ts}` plus the signature and the drop key's public key | Verifies the signature, the nonce and timestamp window, the size cap, the weekly quota per drop key and the rate limits per drop key and per IP. Returns `{objectId (random 128-bit), uploadUrl, expiresAt}`: `uploadUrl` is a short-lived (minutes), single-use signed PUT target that accepts exactly `size` bytes |
+| `PUT <uploadUrl>` | Ciphertext bytes (ALF1) | Stores the object, hashing it as it streams; rejects a different length, an expired target or a second PUT. Files above 64 MB get one signed target per part (multipart), under the same limits |
+| `POST /v1/o/{objectId}/commit` | Signed by the same drop key: `{v: 1, objectId, ciphertextSha256, nonce, ts}` | Completes the upload: compares `ciphertextSha256` with the hash computed while storing. On a match the object becomes readable and the Worker returns `{getUrl, expiresAt}`, a signed GET valid until `expiresAt`; on a mismatch it deletes the object |
+| `GET <getUrl>` | — | Serves the ciphertext as `application/octet-stream`, `Content-Disposition: attachment`, `nosniff`, a sandboxing CSP and CORS for browser recipients (08 §7); refuses after `expiresAt` or above the per-object download limit |
+| `DELETE /v1/o/{objectId}` | Signed by the uploading drop key (same format, method `DELETE`) | Deletes the object when retention triggers (`files.deleteAfter`, 04 §4). Only the uploading drop key can delete |
+| `POST /v1/report` | Object URL, reason | Abuse report path: deletes only that object; blocking a drop key needs human review (04 §4). Never accepts file keys, envelopes or plaintext |
+| `GET /v1/health` | — | Liveness only; aggregate counters stay internal |
+
+- **Signature format.** Proposed: a NIP-98-style HTTP-auth event (kind 27235) in the `Authorization` header, signed with the drop key (BIP-340) through the `KeyStore`, with the method, URL and the SHA-256 of the request body as tags; the alternative is an EIP-712 struct signed with the drop key that includes the host. Either way it is domain-separated from envelopes, records and receipts, and the drop key is never the agent's Nostr or EVM identity key. Signatures travel in a header or the body, not in the URL path or query. The drop card fixes the format with test vectors in all three runtimes.
+- **Mapping to the interface.** `put` = `POST /v1/upload`, `PUT` of the ciphertext, then the signed commit. The file is encrypted exactly once, with one file key and one nonce prefix; the core hashes the ciphertext as it streams it (hash as you go) and sends `ciphertextSha256` in the commit. If a hash is ever needed before the upload, the core encrypts once to a private temporary file and uploads exactly those bytes. It never re-encrypts with the same file key and nonce prefix; a retry re-sends the same bytes or encrypts afresh with a new file key and nonce prefix. Threat note: if the file changed between two encryption passes, the same key and nonces would encrypt different plaintext (AES-GCM nonce reuse). `presignGet` returns the `getUrl` from the commit; the object expires at the requested `expiresAt` (at most 7 days after upload), and a `refresh-link` answer cannot extend it. `delete` = signed `DELETE`.
+- **Expiry.** Hard 7 days from upload, enforced by the Worker on every GET and by an R2 lifecycle rule as the backstop.
+- **Limits.** Proposed 100 MB per file and 1 GB per drop key per week; the Worker returns a typed `limit` error that the core maps to `needs_setup` (06 §2.3). Per-IP rate limits (IPv6 per /64) and a global cap back the per-key quota; many drop keys from one source are the residual sybil risk (04 §4).
+- **State.** Quota and nonce counters in Durable Objects; no accounts, no file names, no recipient data. Logging per 04 §4 (I-7): aggregate counters only; no request URLs, signed URLs, object IDs, drop keys or upload signatures in any log, metric label or analytics, with or without IPs. Workers observability and request logging and Logpush stay off for the drop Worker in production. Residual risk: Cloudflare, as the infrastructure operator, can see request metadata; contents stay ciphertext.
+
+### 5.5 Consumer storage connectors (P1, M2, D-49)
+
+`gdrive`, `dropbox` and `onedrive` adapters implement the same interface, in the desktop apps (08 §8): Settings → Storage → Connect. OAuth uses PKCE with a loopback redirect; tokens stay in the OS keychain (04 §4). Each adapter stores only ALF1 ciphertext with a random 128-bit name in a dedicated app folder; `presignGet` creates a share link for one file; `delete` removes the file (and its link). Registering the OAuth clients is an owner action.
+
+| Provider | Scope (minimal) | Expiring public link | Status |
+|---|---|---|---|
+| Google Drive | `drive.file` (files the app created) in a dedicated folder | **No:** "anyone with the link" permissions cannot expire (only user and group permissions can) | `DECISION NEEDED (owner)`: accept sender-side revocation at expiry, or ship without Drive |
+| Dropbox | App-folder access | **Paid plans only:** link expiry is not available on free (Basic) accounts; temporary download links last only hours | `DECISION NEEDED (owner)`: free accounts fall back to sender-side revocation, or are not offered |
+| OneDrive | App folder (`Files.ReadWrite.AppFolder`) | `createLink` accepts `expirationDateTime`; support on personal accounts must be verified | `DECISION NEEDED (owner)`: Graph documents `Files.ReadWrite` as the least-privileged permission for `createLink` on personal accounts, broader than the app folder |
+
+- **Sender-side revocation**, where a provider has no expiring link: the sender's agent deletes the file and revokes the link at expiry or on receipt, per `files.deleteAfter`. This is best effort: it runs only while the sender's device is online, so a link can outlive 7 days (D-18, amended in D-49) until the next start; the content stays encrypted.
+- Each adapter card verifies the provider's current link semantics, direct-download URLs (within the SSRF redirect cap of 2) and CORS for browser recipients (08 §7) before it ships.
+- **Not a transfer point:** the sender's local disk is never used to serve files, because the recipient may fetch while the sender is offline. Local copies of sent and received files stay on the device.
+- **Cloud agents** keep the R2 bucket the template creates in the user's own Cloudflare account (08 §3.1).
+
+### 5.6 Storage selection
+
+Applied by the core for every file (06 §3 `files.storage`):
+
+1. File ≤ 12 KB → `inline` (§5.3).
+2. `files.storage: own` → own storage; if none is configured → `needs_setup`. Never the drop.
+3. `files.storage: auto` (default) and own storage configured → own storage. No silent fallback to the drop if own storage fails.
+4. `auto` or `drop`, within the drop limits (size cap, weekly quota) → `drop`.
+5. Otherwise → `needs_setup`, naming the limit and the own-storage option.
+
+Own storage means the S3-compatible adapter, or a consumer connector from M2. `agentlink_status` reports the result as `storage.mode` (06 §2.1).
+
+### 5.7 Later adapters
 
 - `ipfs-pinning`: Pinata / Filebase / Storacha (P2).
 - Filecoin Onchain Cloud or a future PollinationX v3 adapter (post-beta).
-- D-13 (open): optional 4thTech temporary encrypted drop (R2, ciphertext only, 7-day expiry, size-capped) for users without storage.
 
 ---
 
