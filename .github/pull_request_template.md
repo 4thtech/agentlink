@@ -50,7 +50,7 @@ Write "None" if no invariant is touched.
 ## Review requirements
 <!-- audit-rules.md §3, D-51. S0/S1: agents may enable auto-merge (`gh pr merge --auto --squash`); GitHub merges when every check is green. S2 and sensitive paths (.github, AGENTS.md, CLAUDE.md, .claude, supply-chain files): merge only after CI, the independent AI review and Tali's "merge" in chat; record the go-ahead here. Agents never approve and never use admin bypass. -->
 - [ ] S1/S2: independent review report referenced under "Independent review"
-- [ ] S2 and code-owned paths (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files): a GitHub approval from a code owner who is not the PR author, normally the owner's (D-51); Denis's is optional
+- [ ] S2 and sensitive paths (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files): Tali's explicit "merge" in chat, recorded here (D-51); Denis's approval is not required
 - [ ] S2: threat note and tests-first evidence filled in below
 
 
