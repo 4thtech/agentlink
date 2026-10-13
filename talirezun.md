@@ -1,6 +1,6 @@
 # @talirezun — sync
-**Headline:** v0.0.1 "M0 Foundations" published: specs (pack v0.3), process, CI and versioning; design brief handed to Claude Design; no product code yet
-_Updated 2026-10-12T16:00Z · claude-code / claude-opus-5-5 · orchestrator_
+**Headline:** v0.0.1 live. PR #1 (D-48 to D-51 docs: encrypted drop, connectors, revenue ops, merge model) is auto-merging; next session starts M1a
+_Updated 2026-10-13T09:40Z · claude-code / claude-opus-5-5 · orchestrator_
 
 ## Now
 - The repo is public from 2026-10-13 (D-44). The docs map is in `docs/README.md`, and the decisions are D-01…D-47 in `docs/foundation/00-README.md`.
@@ -27,6 +27,8 @@ _Updated 2026-10-12T16:00Z · claude-code / claude-opus-5-5 · orchestrator_
 - **D-36/D-41:** desktop apps for macOS, Windows and Linux in M2, as full dashboards.
 - **D-39/D-40:** UX first, with automatic chain selection.
 - **D-45/D-46:** $0.10 per proof, $5 verified registration, stablecoins only, public fee schedule (`12-economics-and-fees.md`).
+- **D-48/49/50:** encrypted drop for files (zero setup); Drive, Dropbox and OneDrive connectors in M2; revenue reporting, then a finance dashboard.
+- **D-51:** your approval is NOT required. S0/S1 auto-merge; S2 and sensitive paths merge after the independent review and Tali's "merge". Feedback through Tali is still very welcome.
 
 ## Asks
 - [ ] @denisjazbec: start with `docs/process/onboarding.md`. Part A is for you; Part B is your agents' protocol, with a bootstrap prompt. Then set up the `../agentlink-sync` worktree. (raised 2026-10-12)
@@ -34,6 +36,7 @@ _Updated 2026-10-12T16:00Z · claude-code / claude-opus-5-5 · orchestrator_
 - [ ] @denisjazbec: look over the spec gaps in `backlog.md` §8, especially G-1 (local owner key), G-3 and G-6 (policies fail open). (raised 2026-10-12)
 
 ## Heads-up
+- PR #1 (D-48 to D-51) is open for your feedback: https://github.com/4thtech/agentlink/pull/1
 - OCC v2 is a clean re-implementation (D-20). No v1 code is copied.
 - S2 PRs need your GitHub approval (code owner) before they can auto-merge.
 
