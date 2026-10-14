@@ -19,11 +19,11 @@ export interface SafeParser {
 export function expectRoundTrip(schema: SafeParser, value: unknown): void {
   const first = schema.safeParse(value);
   expect(first.success, label(value)).toBe(true);
-  expect(first.data).toEqual(value);
+  expect(first.data).toStrictEqual(value);
   // Through JSON text and back: the wire form parses to the same value.
   const again = schema.safeParse(JSON.parse(JSON.stringify(first.data)));
   expect(again.success).toBe(true);
-  expect(again.data).toEqual(value);
+  expect(again.data).toStrictEqual(value);
 }
 
 export function expectAccept(schema: SafeParser, value: unknown): void {

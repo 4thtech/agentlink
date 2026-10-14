@@ -46,6 +46,11 @@ import {
 const SCHEMAS = [
   ['envelope', envelopeSchema, envelope],
   ['payload', payloadSchema, () => payloads().handshake],
+  // IR-M1-2a-1 L-8: text with files, the owner-channel bodies and the request body.
+  ['payload (text with files)', payloadSchema, () => payloads().text],
+  ['payload (request)', payloadSchema, () => payloads().request],
+  ['payload (approval-request)', payloadSchema, () => payloads()['approval-request']],
+  ['payload (revoke)', payloadSchema, () => payloads().revoke],
   ['fileEntry', fileEntrySchema, fileEntryInline],
   ['ownerAction', ownerActionSchema, approvalDecideAction],
   ['signedOwnerAction', signedOwnerActionSchema, () => signed(approvalDecideAction())],

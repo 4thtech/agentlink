@@ -1,7 +1,7 @@
 {
   "$schema": "../schema/vector-file.schema.json",
   "suite": "owner-action",
-  "version": 1,
+  "version": 2,
   "generator": {
     "tool": "python (hashlib, coincurve 21.0.0, pycryptodome 3.23.0, rfc8785 0.1.4)",
     "version": "cpython 3.12.13",
@@ -1288,7 +1288,7 @@
     },
     {
       "id": "sign-policy-set",
-      "source": "04 \u00a72.5.1 SignedOwnerAction, policy.set with the 06 \u00a73 defaults as policy (proposed until M1-2b)",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, policy.set with the 06 \u00a73 defaults in the policy JSON form as policy (G-32)",
       "input": {
         "op": "sign",
         "body": {
@@ -1320,8 +1320,8 @@
               },
               "proofs": {
                 "notarize": "allow",
-                "dailyBudgetUSD": 5,
-                "perActionMaxUSD": 1,
+                "dailyBudgetUSD": "5",
+                "perActionMaxUSD": "1",
                 "allowKeyDisclosure": "approval",
                 "exportFolder": "~/AgentLink/Proofs",
                 "defaultChain": "base"
@@ -1333,10 +1333,11 @@
               "commitments": {
                 "accept": "approval",
                 "autoAcceptContacts": [],
-                "autoAcceptMaxUSD": 0,
+                "autoAcceptMaxUSD": "0",
                 "autoAcceptDirection": "buy",
                 "autoAcceptMinUSD": null
-              }
+              },
+              "contactRules": []
             }
           },
           "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
@@ -1347,10 +1348,92 @@
         "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
       },
       "expected": {
-        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"policy.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"policy\":{\"commitments\":{\"accept\":\"approval\",\"autoAcceptContacts\":[],\"autoAcceptDirection\":\"buy\",\"autoAcceptMaxUSD\":0,\"autoAcceptMinUSD\":null},\"contacts\":{\"acceptInvites\":\"approval\",\"allowed\":\"paired\",\"rateLimitPerContactPerHour\":120,\"unknownSenders\":\"queue\"},\"envelopes\":{\"maxEnvelopeKB\":24},\"files\":{\"allowedFolders\":[],\"defaultExpiryDays\":7,\"deleteAfter\":\"expiry\",\"inboxFolder\":\"~/AgentLink/Inbox\",\"maxReceiveSizeMB\":200,\"maxSendSizeMB\":100,\"ownerArchive\":false,\"storage\":\"auto\"},\"proofs\":{\"allowKeyDisclosure\":\"approval\",\"dailyBudgetUSD\":5,\"defaultChain\":\"base\",\"exportFolder\":\"~/AgentLink/Proofs\",\"notarize\":\"allow\",\"perActionMaxUSD\":1},\"receipts\":{\"autoDelivered\":true,\"autoOpened\":false}},\"version\":1},\"v\":1}",
-        "bodyHash": "a7df043256fa03f1f3f681aea054d39cefb5a99dd2b725cc543f5ce6f44fa9a3",
-        "signatureInput": "b3c187355db5fea7107657b44345f85361209a87df896bc759bb290a70bb50f2",
-        "sig": "d8962fca5baa92337b18e75ef9b0f3a18ebc5c799ffbe86c270f3af58b702bdbfe1ee1f32429476b351808d66d2e84c9dfb1f87be7161a0a9e75582bd8b5f177"
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"policy.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"policy\":{\"commitments\":{\"accept\":\"approval\",\"autoAcceptContacts\":[],\"autoAcceptDirection\":\"buy\",\"autoAcceptMaxUSD\":\"0\",\"autoAcceptMinUSD\":null},\"contactRules\":[],\"contacts\":{\"acceptInvites\":\"approval\",\"allowed\":\"paired\",\"rateLimitPerContactPerHour\":120,\"unknownSenders\":\"queue\"},\"envelopes\":{\"maxEnvelopeKB\":24},\"files\":{\"allowedFolders\":[],\"defaultExpiryDays\":7,\"deleteAfter\":\"expiry\",\"inboxFolder\":\"~/AgentLink/Inbox\",\"maxReceiveSizeMB\":200,\"maxSendSizeMB\":100,\"ownerArchive\":false,\"storage\":\"auto\"},\"proofs\":{\"allowKeyDisclosure\":\"approval\",\"dailyBudgetUSD\":\"5\",\"defaultChain\":\"base\",\"exportFolder\":\"~/AgentLink/Proofs\",\"notarize\":\"allow\",\"perActionMaxUSD\":\"1\"},\"receipts\":{\"autoDelivered\":true,\"autoOpened\":false}},\"version\":1},\"v\":1}",
+        "bodyHash": "56bc1174f07137ff8dc6bd9812e51f7a6b55a46cbe119493c3482032532457fd",
+        "signatureInput": "05f3310d45169593c816e86bbeb8ab4056e1d5f42a8d68f2c5b65a3a02138468",
+        "sig": "c898d76c2faa62dbe38262a2c296d76208199693b5e332b3ce06d14884aa3cf0f9a037b46b8b7b6754dfe3bf00c267e6cd3bc473240b4da03835d438e8608923"
+      }
+    },
+    {
+      "id": "sign-policy-set-contact-rules",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, policy.set with two contactRules, sorted by contact, in JCS key order once canonicalised (06 \u00a73, G-32)",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "policy.set",
+          "params": {
+            "version": 2,
+            "policy": {
+              "contacts": {
+                "acceptInvites": "approval",
+                "unknownSenders": "queue",
+                "allowed": "paired",
+                "rateLimitPerContactPerHour": 120
+              },
+              "files": {
+                "allowedFolders": [],
+                "inboxFolder": "~/AgentLink/Inbox",
+                "maxSendSizeMB": 100,
+                "maxReceiveSizeMB": 200,
+                "storage": "auto",
+                "defaultExpiryDays": 7,
+                "deleteAfter": "expiry",
+                "ownerArchive": false
+              },
+              "envelopes": {
+                "maxEnvelopeKB": 24
+              },
+              "proofs": {
+                "notarize": "allow",
+                "dailyBudgetUSD": "5",
+                "perActionMaxUSD": "1",
+                "allowKeyDisclosure": "approval",
+                "exportFolder": "~/AgentLink/Proofs",
+                "defaultChain": "base"
+              },
+              "receipts": {
+                "autoDelivered": true,
+                "autoOpened": false
+              },
+              "commitments": {
+                "accept": "approval",
+                "autoAcceptContacts": [],
+                "autoAcceptMaxUSD": "0",
+                "autoAcceptDirection": "buy",
+                "autoAcceptMinUSD": null
+              },
+              "contactRules": [
+                {
+                  "proofs": {
+                    "perActionMaxUSD": "2.5",
+                    "notarize": "allow"
+                  },
+                  "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01"
+                },
+                {
+                  "proofs": {
+                    "perActionMaxUSD": "0.01"
+                  },
+                  "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613"
+                }
+              ]
+            }
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 1760000600
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"policy.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"policy\":{\"commitments\":{\"accept\":\"approval\",\"autoAcceptContacts\":[],\"autoAcceptDirection\":\"buy\",\"autoAcceptMaxUSD\":\"0\",\"autoAcceptMinUSD\":null},\"contactRules\":[{\"contact\":\"0x16d4667155468cfe1b1cf411a1413bbb59470f01\",\"proofs\":{\"notarize\":\"allow\",\"perActionMaxUSD\":\"2.5\"}},{\"contact\":\"0x879e48ea18a3dd814b18b51e5e6e665f87c1e613\",\"proofs\":{\"perActionMaxUSD\":\"0.01\"}}],\"contacts\":{\"acceptInvites\":\"approval\",\"allowed\":\"paired\",\"rateLimitPerContactPerHour\":120,\"unknownSenders\":\"queue\"},\"envelopes\":{\"maxEnvelopeKB\":24},\"files\":{\"allowedFolders\":[],\"defaultExpiryDays\":7,\"deleteAfter\":\"expiry\",\"inboxFolder\":\"~/AgentLink/Inbox\",\"maxReceiveSizeMB\":200,\"maxSendSizeMB\":100,\"ownerArchive\":false,\"storage\":\"auto\"},\"proofs\":{\"allowKeyDisclosure\":\"approval\",\"dailyBudgetUSD\":\"5\",\"defaultChain\":\"base\",\"exportFolder\":\"~/AgentLink/Proofs\",\"notarize\":\"allow\",\"perActionMaxUSD\":\"1\"},\"receipts\":{\"autoDelivered\":true,\"autoOpened\":false}},\"version\":2},\"v\":1}",
+        "bodyHash": "d0332700128fe60bb3662c8bde73d18e1dfb7468134f140fac6fa92f1f6362d4",
+        "signatureInput": "cdcdf3a2d1f8f5d7c4eb1733c40ad9654f66d302b272f57d31999d3eafb9ff64",
+        "sig": "6f4fedf5ed6d2fa4c7c9ee404e8af9f3c0b668a5c17f92a6eb14d589013ca68d8e1283532dd6e4771e8c9df1ed70f1ba6e904fea3057656948e490eb1faec119"
       }
     },
     {
@@ -1829,6 +1912,1073 @@
             "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
             "expiresAt": 1760086400
           }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-policy-set-pre-g32-form",
+      "source": "04 \u00a72.5.1: policy.set: the pre-G-32 policy (owner-action version 1: USD limits as JSON numbers, no contactRules); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "policy.set",
+            "params": {
+              "version": 1,
+              "policy": {
+                "contacts": {
+                  "acceptInvites": "approval",
+                  "unknownSenders": "queue",
+                  "allowed": "paired",
+                  "rateLimitPerContactPerHour": 120
+                },
+                "files": {
+                  "allowedFolders": [],
+                  "inboxFolder": "~/AgentLink/Inbox",
+                  "maxSendSizeMB": 100,
+                  "maxReceiveSizeMB": 200,
+                  "storage": "auto",
+                  "defaultExpiryDays": 7,
+                  "deleteAfter": "expiry",
+                  "ownerArchive": false
+                },
+                "envelopes": {
+                  "maxEnvelopeKB": 24
+                },
+                "proofs": {
+                  "notarize": "allow",
+                  "dailyBudgetUSD": 5,
+                  "perActionMaxUSD": 1,
+                  "allowKeyDisclosure": "approval",
+                  "exportFolder": "~/AgentLink/Proofs",
+                  "defaultChain": "base"
+                },
+                "receipts": {
+                  "autoDelivered": true,
+                  "autoOpened": false
+                },
+                "commitments": {
+                  "accept": "approval",
+                  "autoAcceptContacts": [],
+                  "autoAcceptMaxUSD": 0,
+                  "autoAcceptDirection": "buy",
+                  "autoAcceptMinUSD": null
+                }
+              }
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "d8962fca5baa92337b18e75ef9b0f3a18ebc5c799ffbe86c270f3af58b702bdbfe1ee1f32429476b351808d66d2e84c9dfb1f87be7161a0a9e75582bd8b5f177"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-policy-set-usd-number",
+      "source": "04 \u00a72.5.1: policy.set: `proofs.dailyBudgetUSD` as the JSON number 5; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "policy.set",
+            "params": {
+              "version": 1,
+              "policy": {
+                "contacts": {
+                  "acceptInvites": "approval",
+                  "unknownSenders": "queue",
+                  "allowed": "paired",
+                  "rateLimitPerContactPerHour": 120
+                },
+                "files": {
+                  "allowedFolders": [],
+                  "inboxFolder": "~/AgentLink/Inbox",
+                  "maxSendSizeMB": 100,
+                  "maxReceiveSizeMB": 200,
+                  "storage": "auto",
+                  "defaultExpiryDays": 7,
+                  "deleteAfter": "expiry",
+                  "ownerArchive": false
+                },
+                "envelopes": {
+                  "maxEnvelopeKB": 24
+                },
+                "proofs": {
+                  "notarize": "allow",
+                  "dailyBudgetUSD": 5,
+                  "perActionMaxUSD": "1",
+                  "allowKeyDisclosure": "approval",
+                  "exportFolder": "~/AgentLink/Proofs",
+                  "defaultChain": "base"
+                },
+                "receipts": {
+                  "autoDelivered": true,
+                  "autoOpened": false
+                },
+                "commitments": {
+                  "accept": "approval",
+                  "autoAcceptContacts": [],
+                  "autoAcceptMaxUSD": "0",
+                  "autoAcceptDirection": "buy",
+                  "autoAcceptMinUSD": null
+                },
+                "contactRules": []
+              }
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "f216235dc7c8a2a62f3479d7ee3b32298465d394f4e09593d89c8f1b2b51967f6e5186daae10d991cbf6d6cd6f42ec5efbe12561db087b6ae4a596290cbfcae3"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-policy-set-usd-trailing-zeros",
+      "source": "04 \u00a72.5.1: policy.set: `proofs.dailyBudgetUSD` \"5.00\" (a trailing zero, 04 \u00a72.4.1); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "policy.set",
+            "params": {
+              "version": 1,
+              "policy": {
+                "contacts": {
+                  "acceptInvites": "approval",
+                  "unknownSenders": "queue",
+                  "allowed": "paired",
+                  "rateLimitPerContactPerHour": 120
+                },
+                "files": {
+                  "allowedFolders": [],
+                  "inboxFolder": "~/AgentLink/Inbox",
+                  "maxSendSizeMB": 100,
+                  "maxReceiveSizeMB": 200,
+                  "storage": "auto",
+                  "defaultExpiryDays": 7,
+                  "deleteAfter": "expiry",
+                  "ownerArchive": false
+                },
+                "envelopes": {
+                  "maxEnvelopeKB": 24
+                },
+                "proofs": {
+                  "notarize": "allow",
+                  "dailyBudgetUSD": "5.00",
+                  "perActionMaxUSD": "1",
+                  "allowKeyDisclosure": "approval",
+                  "exportFolder": "~/AgentLink/Proofs",
+                  "defaultChain": "base"
+                },
+                "receipts": {
+                  "autoDelivered": true,
+                  "autoOpened": false
+                },
+                "commitments": {
+                  "accept": "approval",
+                  "autoAcceptContacts": [],
+                  "autoAcceptMaxUSD": "0",
+                  "autoAcceptDirection": "buy",
+                  "autoAcceptMinUSD": null
+                },
+                "contactRules": []
+              }
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "4af80a89ec9ff3c017749a8084e9da7e5954a51af4b71213cbc07c4c78580e9e71d4109f45f2b6e529321b0a76541533192c6b67120f808b368f953791e23222"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-policy-set-usd-seven-decimals",
+      "source": "04 \u00a72.5.1: policy.set: `proofs.perActionMaxUSD` \"5.0000001\" (more than 6 decimals); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "policy.set",
+            "params": {
+              "version": 1,
+              "policy": {
+                "contacts": {
+                  "acceptInvites": "approval",
+                  "unknownSenders": "queue",
+                  "allowed": "paired",
+                  "rateLimitPerContactPerHour": 120
+                },
+                "files": {
+                  "allowedFolders": [],
+                  "inboxFolder": "~/AgentLink/Inbox",
+                  "maxSendSizeMB": 100,
+                  "maxReceiveSizeMB": 200,
+                  "storage": "auto",
+                  "defaultExpiryDays": 7,
+                  "deleteAfter": "expiry",
+                  "ownerArchive": false
+                },
+                "envelopes": {
+                  "maxEnvelopeKB": 24
+                },
+                "proofs": {
+                  "notarize": "allow",
+                  "dailyBudgetUSD": "5",
+                  "perActionMaxUSD": "5.0000001",
+                  "allowKeyDisclosure": "approval",
+                  "exportFolder": "~/AgentLink/Proofs",
+                  "defaultChain": "base"
+                },
+                "receipts": {
+                  "autoDelivered": true,
+                  "autoOpened": false
+                },
+                "commitments": {
+                  "accept": "approval",
+                  "autoAcceptContacts": [],
+                  "autoAcceptMaxUSD": "0",
+                  "autoAcceptDirection": "buy",
+                  "autoAcceptMinUSD": null
+                },
+                "contactRules": []
+              }
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "f9ebf7301d06ea78aa1c18fa16393bf1af19b515c54f504c3f61ae9e81b45e06f816bb2354c6c722fe706c9d0a8809e959a7479132ecc0c8d8e73112c61fc41e"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-policy-set-unsorted-auto-accept-contacts",
+      "source": "04 \u00a72.5.1: policy.set: `commitments.autoAcceptContacts` not sorted; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "policy.set",
+            "params": {
+              "version": 1,
+              "policy": {
+                "contacts": {
+                  "acceptInvites": "approval",
+                  "unknownSenders": "queue",
+                  "allowed": "paired",
+                  "rateLimitPerContactPerHour": 120
+                },
+                "files": {
+                  "allowedFolders": [],
+                  "inboxFolder": "~/AgentLink/Inbox",
+                  "maxSendSizeMB": 100,
+                  "maxReceiveSizeMB": 200,
+                  "storage": "auto",
+                  "defaultExpiryDays": 7,
+                  "deleteAfter": "expiry",
+                  "ownerArchive": false
+                },
+                "envelopes": {
+                  "maxEnvelopeKB": 24
+                },
+                "proofs": {
+                  "notarize": "allow",
+                  "dailyBudgetUSD": "5",
+                  "perActionMaxUSD": "1",
+                  "allowKeyDisclosure": "approval",
+                  "exportFolder": "~/AgentLink/Proofs",
+                  "defaultChain": "base"
+                },
+                "receipts": {
+                  "autoDelivered": true,
+                  "autoOpened": false
+                },
+                "commitments": {
+                  "accept": "approval",
+                  "autoAcceptContacts": [
+                    "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+                    "0x16d4667155468cfe1b1cf411a1413bbb59470f01"
+                  ],
+                  "autoAcceptMaxUSD": "0",
+                  "autoAcceptDirection": "buy",
+                  "autoAcceptMinUSD": null
+                },
+                "contactRules": []
+              }
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "27ae21636007ff8deb7225592eaef7621d0f690d8ceacd6899f4125ccdc9c851b4aed26ad163e93fedf612ad1e38d3ce337c080780a7f4b3a27f72e1f3e78824"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-policy-set-unsorted-contact-rules",
+      "source": "04 \u00a72.5.1: policy.set: `contactRules` not sorted by contact; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "policy.set",
+            "params": {
+              "version": 1,
+              "policy": {
+                "contacts": {
+                  "acceptInvites": "approval",
+                  "unknownSenders": "queue",
+                  "allowed": "paired",
+                  "rateLimitPerContactPerHour": 120
+                },
+                "files": {
+                  "allowedFolders": [],
+                  "inboxFolder": "~/AgentLink/Inbox",
+                  "maxSendSizeMB": 100,
+                  "maxReceiveSizeMB": 200,
+                  "storage": "auto",
+                  "defaultExpiryDays": 7,
+                  "deleteAfter": "expiry",
+                  "ownerArchive": false
+                },
+                "envelopes": {
+                  "maxEnvelopeKB": 24
+                },
+                "proofs": {
+                  "notarize": "allow",
+                  "dailyBudgetUSD": "5",
+                  "perActionMaxUSD": "1",
+                  "allowKeyDisclosure": "approval",
+                  "exportFolder": "~/AgentLink/Proofs",
+                  "defaultChain": "base"
+                },
+                "receipts": {
+                  "autoDelivered": true,
+                  "autoOpened": false
+                },
+                "commitments": {
+                  "accept": "approval",
+                  "autoAcceptContacts": [],
+                  "autoAcceptMaxUSD": "0",
+                  "autoAcceptDirection": "buy",
+                  "autoAcceptMinUSD": null
+                },
+                "contactRules": [
+                  {
+                    "proofs": {
+                      "perActionMaxUSD": "0.01"
+                    },
+                    "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613"
+                  },
+                  {
+                    "proofs": {
+                      "perActionMaxUSD": "2.5",
+                      "notarize": "allow"
+                    },
+                    "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01"
+                  }
+                ]
+              }
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "33d037b0a2329de6fc9a1865d6b735a4d06a390c7b58811bd6d7efc46cfc27abd3a772af79bf7c964afcd9926f9e65ca3943f0619714cd1fd5308ef1808077d2"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-policy-set-duplicate-contact-rule",
+      "source": "04 \u00a72.5.1: policy.set: two `contactRules` for one contact; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "policy.set",
+            "params": {
+              "version": 1,
+              "policy": {
+                "contacts": {
+                  "acceptInvites": "approval",
+                  "unknownSenders": "queue",
+                  "allowed": "paired",
+                  "rateLimitPerContactPerHour": 120
+                },
+                "files": {
+                  "allowedFolders": [],
+                  "inboxFolder": "~/AgentLink/Inbox",
+                  "maxSendSizeMB": 100,
+                  "maxReceiveSizeMB": 200,
+                  "storage": "auto",
+                  "defaultExpiryDays": 7,
+                  "deleteAfter": "expiry",
+                  "ownerArchive": false
+                },
+                "envelopes": {
+                  "maxEnvelopeKB": 24
+                },
+                "proofs": {
+                  "notarize": "allow",
+                  "dailyBudgetUSD": "5",
+                  "perActionMaxUSD": "1",
+                  "allowKeyDisclosure": "approval",
+                  "exportFolder": "~/AgentLink/Proofs",
+                  "defaultChain": "base"
+                },
+                "receipts": {
+                  "autoDelivered": true,
+                  "autoOpened": false
+                },
+                "commitments": {
+                  "accept": "approval",
+                  "autoAcceptContacts": [],
+                  "autoAcceptMaxUSD": "0",
+                  "autoAcceptDirection": "buy",
+                  "autoAcceptMinUSD": null
+                },
+                "contactRules": [
+                  {
+                    "proofs": {
+                      "perActionMaxUSD": "2.5",
+                      "notarize": "allow"
+                    },
+                    "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01"
+                  },
+                  {
+                    "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01",
+                    "proofs": {
+                      "notarize": "deny"
+                    }
+                  }
+                ]
+              }
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "96e6defe13d214fb7258c2982d75792c4248119d99fb5b17b698ea4d80256268cc5f8b64777c0f7b1d155294572f28dacb86461c2d130f2f09b13cfa53e402bc"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-policy-set-contact-rule-empty-proofs",
+      "source": "04 \u00a72.5.1: policy.set: a ContactRule with `proofs: {}`; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "policy.set",
+            "params": {
+              "version": 1,
+              "policy": {
+                "contacts": {
+                  "acceptInvites": "approval",
+                  "unknownSenders": "queue",
+                  "allowed": "paired",
+                  "rateLimitPerContactPerHour": 120
+                },
+                "files": {
+                  "allowedFolders": [],
+                  "inboxFolder": "~/AgentLink/Inbox",
+                  "maxSendSizeMB": 100,
+                  "maxReceiveSizeMB": 200,
+                  "storage": "auto",
+                  "defaultExpiryDays": 7,
+                  "deleteAfter": "expiry",
+                  "ownerArchive": false
+                },
+                "envelopes": {
+                  "maxEnvelopeKB": 24
+                },
+                "proofs": {
+                  "notarize": "allow",
+                  "dailyBudgetUSD": "5",
+                  "perActionMaxUSD": "1",
+                  "allowKeyDisclosure": "approval",
+                  "exportFolder": "~/AgentLink/Proofs",
+                  "defaultChain": "base"
+                },
+                "receipts": {
+                  "autoDelivered": true,
+                  "autoOpened": false
+                },
+                "commitments": {
+                  "accept": "approval",
+                  "autoAcceptContacts": [],
+                  "autoAcceptMaxUSD": "0",
+                  "autoAcceptDirection": "buy",
+                  "autoAcceptMinUSD": null
+                },
+                "contactRules": [
+                  {
+                    "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01",
+                    "proofs": {}
+                  }
+                ]
+              }
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "5e62966f4cf7f884b3d701adb6ec7a8a17749670e397659b5b6d2998dfb626250cfeb5fa2a7a1996b4b9af31f8e0a8c415c76ca7f8157c06d5fa88b3dc958648"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-policy-set-contact-rule-unknown-key",
+      "source": "04 \u00a72.5.1: policy.set: an unknown key in a ContactRule; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "policy.set",
+            "params": {
+              "version": 1,
+              "policy": {
+                "contacts": {
+                  "acceptInvites": "approval",
+                  "unknownSenders": "queue",
+                  "allowed": "paired",
+                  "rateLimitPerContactPerHour": 120
+                },
+                "files": {
+                  "allowedFolders": [],
+                  "inboxFolder": "~/AgentLink/Inbox",
+                  "maxSendSizeMB": 100,
+                  "maxReceiveSizeMB": 200,
+                  "storage": "auto",
+                  "defaultExpiryDays": 7,
+                  "deleteAfter": "expiry",
+                  "ownerArchive": false
+                },
+                "envelopes": {
+                  "maxEnvelopeKB": 24
+                },
+                "proofs": {
+                  "notarize": "allow",
+                  "dailyBudgetUSD": "5",
+                  "perActionMaxUSD": "1",
+                  "allowKeyDisclosure": "approval",
+                  "exportFolder": "~/AgentLink/Proofs",
+                  "defaultChain": "base"
+                },
+                "receipts": {
+                  "autoDelivered": true,
+                  "autoOpened": false
+                },
+                "commitments": {
+                  "accept": "approval",
+                  "autoAcceptContacts": [],
+                  "autoAcceptMaxUSD": "0",
+                  "autoAcceptDirection": "buy",
+                  "autoAcceptMinUSD": null
+                },
+                "contactRules": [
+                  {
+                    "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01",
+                    "proofs": {
+                      "notarize": "allow"
+                    },
+                    "note": "x"
+                  }
+                ]
+              }
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "7fa3711f5a47e54f7bfa629c56e2a53751888338a12f9af25490f3f65cb3dea417ea0fc19444c7a8606c5f750fddedddd8c5b2d7ae378bd6595a0f0aeaf61e0d"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-policy-set-missing-key",
+      "source": "04 \u00a72.5.1: policy.set: `files.storage` missing (never filled from a default); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "policy.set",
+            "params": {
+              "version": 1,
+              "policy": {
+                "contacts": {
+                  "acceptInvites": "approval",
+                  "unknownSenders": "queue",
+                  "allowed": "paired",
+                  "rateLimitPerContactPerHour": 120
+                },
+                "files": {
+                  "allowedFolders": [],
+                  "inboxFolder": "~/AgentLink/Inbox",
+                  "maxSendSizeMB": 100,
+                  "maxReceiveSizeMB": 200,
+                  "defaultExpiryDays": 7,
+                  "deleteAfter": "expiry",
+                  "ownerArchive": false
+                },
+                "envelopes": {
+                  "maxEnvelopeKB": 24
+                },
+                "proofs": {
+                  "notarize": "allow",
+                  "dailyBudgetUSD": "5",
+                  "perActionMaxUSD": "1",
+                  "allowKeyDisclosure": "approval",
+                  "exportFolder": "~/AgentLink/Proofs",
+                  "defaultChain": "base"
+                },
+                "receipts": {
+                  "autoDelivered": true,
+                  "autoOpened": false
+                },
+                "commitments": {
+                  "accept": "approval",
+                  "autoAcceptContacts": [],
+                  "autoAcceptMaxUSD": "0",
+                  "autoAcceptDirection": "buy",
+                  "autoAcceptMinUSD": null
+                },
+                "contactRules": []
+              }
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "f02f06c33415b640162592a02f8e3add3d21b9230c003545b41ae655d31cf668b8c593c1d9fe09964dad5abff2c870faf8f6884402a22bca351d406b7bbd0199"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-policy-set",
+      "source": "04 \u00a72.5.1: policy.set, the 06 \u00a73 defaults as version 1, no policy applied yet (appliedPolicyVersion absent = 0); verification passes",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "policy.set",
+            "params": {
+              "version": 1,
+              "policy": {
+                "contacts": {
+                  "acceptInvites": "approval",
+                  "unknownSenders": "queue",
+                  "allowed": "paired",
+                  "rateLimitPerContactPerHour": 120
+                },
+                "files": {
+                  "allowedFolders": [],
+                  "inboxFolder": "~/AgentLink/Inbox",
+                  "maxSendSizeMB": 100,
+                  "maxReceiveSizeMB": 200,
+                  "storage": "auto",
+                  "defaultExpiryDays": 7,
+                  "deleteAfter": "expiry",
+                  "ownerArchive": false
+                },
+                "envelopes": {
+                  "maxEnvelopeKB": 24
+                },
+                "proofs": {
+                  "notarize": "allow",
+                  "dailyBudgetUSD": "5",
+                  "perActionMaxUSD": "1",
+                  "allowKeyDisclosure": "approval",
+                  "exportFolder": "~/AgentLink/Proofs",
+                  "defaultChain": "base"
+                },
+                "receipts": {
+                  "autoDelivered": true,
+                  "autoOpened": false
+                },
+                "commitments": {
+                  "accept": "approval",
+                  "autoAcceptContacts": [],
+                  "autoAcceptMaxUSD": "0",
+                  "autoAcceptDirection": "buy",
+                  "autoAcceptMinUSD": null
+                },
+                "contactRules": []
+              }
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "c898d76c2faa62dbe38262a2c296d76208199693b5e332b3ce06d14884aa3cf0f9a037b46b8b7b6754dfe3bf00c267e6cd3bc473240b4da03835d438e8608923"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "verify-policy-set-contact-rules",
+      "source": "04 \u00a72.5.1: policy.set, the policy with two contactRules as version 2 over applied version 1; verification passes",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "policy.set",
+            "params": {
+              "version": 2,
+              "policy": {
+                "contacts": {
+                  "acceptInvites": "approval",
+                  "unknownSenders": "queue",
+                  "allowed": "paired",
+                  "rateLimitPerContactPerHour": 120
+                },
+                "files": {
+                  "allowedFolders": [],
+                  "inboxFolder": "~/AgentLink/Inbox",
+                  "maxSendSizeMB": 100,
+                  "maxReceiveSizeMB": 200,
+                  "storage": "auto",
+                  "defaultExpiryDays": 7,
+                  "deleteAfter": "expiry",
+                  "ownerArchive": false
+                },
+                "envelopes": {
+                  "maxEnvelopeKB": 24
+                },
+                "proofs": {
+                  "notarize": "allow",
+                  "dailyBudgetUSD": "5",
+                  "perActionMaxUSD": "1",
+                  "allowKeyDisclosure": "approval",
+                  "exportFolder": "~/AgentLink/Proofs",
+                  "defaultChain": "base"
+                },
+                "receipts": {
+                  "autoDelivered": true,
+                  "autoOpened": false
+                },
+                "commitments": {
+                  "accept": "approval",
+                  "autoAcceptContacts": [],
+                  "autoAcceptMaxUSD": "0",
+                  "autoAcceptDirection": "buy",
+                  "autoAcceptMinUSD": null
+                },
+                "contactRules": [
+                  {
+                    "proofs": {
+                      "perActionMaxUSD": "2.5",
+                      "notarize": "allow"
+                    },
+                    "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01"
+                  },
+                  {
+                    "proofs": {
+                      "perActionMaxUSD": "0.01"
+                    },
+                    "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613"
+                  }
+                ]
+              }
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "6f4fedf5ed6d2fa4c7c9ee404e8af9f3c0b668a5c17f92a6eb14d589013ca68d8e1283532dd6e4771e8c9df1ed70f1ba6e904fea3057656948e490eb1faec119"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "appliedPolicyVersion": 1
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "reject-policy-set-version-equal",
+      "source": "04 \u00a72.5.1: policy.set, `version` 2 equal to the applied version 2 (rollback rule); rejected",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "policy.set",
+            "params": {
+              "version": 2,
+              "policy": {
+                "contacts": {
+                  "acceptInvites": "approval",
+                  "unknownSenders": "queue",
+                  "allowed": "paired",
+                  "rateLimitPerContactPerHour": 120
+                },
+                "files": {
+                  "allowedFolders": [],
+                  "inboxFolder": "~/AgentLink/Inbox",
+                  "maxSendSizeMB": 100,
+                  "maxReceiveSizeMB": 200,
+                  "storage": "auto",
+                  "defaultExpiryDays": 7,
+                  "deleteAfter": "expiry",
+                  "ownerArchive": false
+                },
+                "envelopes": {
+                  "maxEnvelopeKB": 24
+                },
+                "proofs": {
+                  "notarize": "allow",
+                  "dailyBudgetUSD": "5",
+                  "perActionMaxUSD": "1",
+                  "allowKeyDisclosure": "approval",
+                  "exportFolder": "~/AgentLink/Proofs",
+                  "defaultChain": "base"
+                },
+                "receipts": {
+                  "autoDelivered": true,
+                  "autoOpened": false
+                },
+                "commitments": {
+                  "accept": "approval",
+                  "autoAcceptContacts": [],
+                  "autoAcceptMaxUSD": "0",
+                  "autoAcceptDirection": "buy",
+                  "autoAcceptMinUSD": null
+                },
+                "contactRules": [
+                  {
+                    "proofs": {
+                      "perActionMaxUSD": "2.5",
+                      "notarize": "allow"
+                    },
+                    "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01"
+                  },
+                  {
+                    "proofs": {
+                      "perActionMaxUSD": "0.01"
+                    },
+                    "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613"
+                  }
+                ]
+              }
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "6f4fedf5ed6d2fa4c7c9ee404e8af9f3c0b668a5c17f92a6eb14d589013ca68d8e1283532dd6e4771e8c9df1ed70f1ba6e904fea3057656948e490eb1faec119"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "appliedPolicyVersion": 2
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-policy-set-version-lower",
+      "source": "04 \u00a72.5.1: policy.set, `version` 1 below the applied version 2 (rollback rule); rejected",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "policy.set",
+            "params": {
+              "version": 1,
+              "policy": {
+                "contacts": {
+                  "acceptInvites": "approval",
+                  "unknownSenders": "queue",
+                  "allowed": "paired",
+                  "rateLimitPerContactPerHour": 120
+                },
+                "files": {
+                  "allowedFolders": [],
+                  "inboxFolder": "~/AgentLink/Inbox",
+                  "maxSendSizeMB": 100,
+                  "maxReceiveSizeMB": 200,
+                  "storage": "auto",
+                  "defaultExpiryDays": 7,
+                  "deleteAfter": "expiry",
+                  "ownerArchive": false
+                },
+                "envelopes": {
+                  "maxEnvelopeKB": 24
+                },
+                "proofs": {
+                  "notarize": "allow",
+                  "dailyBudgetUSD": "5",
+                  "perActionMaxUSD": "1",
+                  "allowKeyDisclosure": "approval",
+                  "exportFolder": "~/AgentLink/Proofs",
+                  "defaultChain": "base"
+                },
+                "receipts": {
+                  "autoDelivered": true,
+                  "autoOpened": false
+                },
+                "commitments": {
+                  "accept": "approval",
+                  "autoAcceptContacts": [],
+                  "autoAcceptMaxUSD": "0",
+                  "autoAcceptDirection": "buy",
+                  "autoAcceptMinUSD": null
+                },
+                "contactRules": []
+              }
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "c898d76c2faa62dbe38262a2c296d76208199693b5e332b3ce06d14884aa3cf0f9a037b46b8b7b6754dfe3bf00c267e6cd3bc473240b4da03835d438e8608923"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "appliedPolicyVersion": 2
         }
       },
       "expected": {
