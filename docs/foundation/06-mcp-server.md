@@ -347,7 +347,7 @@ A stdio server runs only while the harness runs, so nothing tells the user that 
 
 - **Interactive terminal:** a prompt.
 - **Run by an agent (no TTY):** `init` prints the diff and a one-time confirmation code, then exits without writing. The agent shows the diff to the user and re-runs `init --confirm <code>` only after the user agrees in chat. This confirmation is for transparency, not a security boundary: a shell-capable agent could edit its harness config anyway. Owner operations stay protected by owner presence (04 §2.5).
-- **Owner setup never goes through the agent:** `init` opens the local setup page (or the desktop app) where the user creates the passkey or the owner code (or an opted-in owner passphrase, 04 §2.2). It never prints secrets and never accepts an owner passphrase as an argument or environment variable. Until the local setup page exists (M1b), the owner creates the owner key with `agentlink owner init` †, run personally, on keychain machines too (04 §2.2, D-67; proposed, owner confirms at merge).
+- **Owner setup never goes through the agent:** `init` opens the local setup page (or the desktop app) where the user creates the passkey or the owner code (or an opted-in owner passphrase, 04 §2.2). It never prints secrets and never accepts an owner passphrase as an argument or environment variable. Until the local setup page exists (M1b), the owner creates the owner key with `agentlink owner init` †, run personally, on keychain machines too (04 §2.2; D-67, confirmed by D-68 (3)).
 - **No OS keychain (containers, WSL, SSH; D-54):** `init` returns `needs_setup` and names the opt-in command. The passphrase-locked file KeyStore is created only by `agentlink init --keystore file` in an interactive terminal, never by an agent-run `init`; the owner key there is a separate step, `agentlink owner init` †, which the user runs personally (04 §2.8, 07 §9). Both are UX guards: an agent that fakes a terminal can run them, and owner presence then depends on the owner doing the owner step personally.
 - The **desktop app** (M2) runs the same detection and confirmation from its setup screen, pointing harness configs to its bundled CLI shim (08 §8).
 
@@ -407,7 +407,7 @@ agentlink credits [--topup]              # shows agent address, balances, top-up
 agentlink backup export | restore <file>   †
 agentlink verify <proof.json>
 agentlink approve <approvalId> | deny <approvalId>   †
-agentlink approve                      † # review every pending approval as one list; one entry of the owner code covers exactly the reviewed items (04 §2.5.2, D-68)
+agentlink approve [--agent <name>]     † # review one agent's pending approvals as one list; one entry of the owner code covers exactly the reviewed items; commitments are decided one by one (04 §2.5.2, D-68)
 agentlink cancel <approvalId>          † # void an approval not yet used, or the unused parts of a commitment approval, e.g. a receipt still waiting (D-55, G-7)
 agentlink doctor                         # diagnostics (relays, RPC, keychain or file KeyStore, storage)
 ```
