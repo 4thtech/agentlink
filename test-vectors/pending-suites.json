@@ -29,10 +29,6 @@
       "card": "M1-1c",
       "phase": "M1a"
     },
-    "jcs": {
-      "card": "M1-1a",
-      "phase": "M1a"
-    },
     "keystore-file": {
       "card": "M1-1f",
       "phase": "M1a"
@@ -55,10 +51,6 @@
     },
     "safety-code": {
       "card": "M1-1f",
-      "phase": "M1a"
-    },
-    "tagged-hash": {
-      "card": "M1-1a",
       "phase": "M1a"
     }
   }

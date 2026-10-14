@@ -9,10 +9,22 @@ import { defineConfig } from 'vitest/config';
 
 const SHARED = 'harness/vectors.test.ts';
 
+// Suites test the source of @agentlink/crypto, not a build of it: the vectors job does not build,
+// and a stale dist/ must never be what passes. Inline projects do not inherit a root `resolve`, so
+// every project repeats it.
+const resolve = {
+  alias: {
+    '@agentlink/crypto': decodeURIComponent(
+      new URL('../packages/crypto/src/index.ts', import.meta.url).pathname,
+    ),
+  },
+};
+
 export default defineConfig({
   test: {
     projects: [
       {
+        resolve,
         test: {
           name: 'node',
           environment: 'node',
@@ -21,6 +33,7 @@ export default defineConfig({
         },
       },
       {
+        resolve,
         test: {
           name: 'browser',
           include: [SHARED],
@@ -47,6 +60,7 @@ export default defineConfig({
             },
           }),
         ],
+        resolve,
         test: {
           name: 'workers',
           include: [SHARED],

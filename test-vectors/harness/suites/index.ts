@@ -1,5 +1,7 @@
 import type { SuiteModule } from '../suite';
+import { jcs } from './jcs';
 import { placeholderSha256 } from './placeholder-sha256';
+import { taggedHashSuite } from './tagged-hash';
 
 /**
  * Suite name (= directory under test-vectors/) to suite module. A vector file without one fails,
@@ -7,5 +9,7 @@ import { placeholderSha256 } from './placeholder-sha256';
  * also has a module fails too, so the card that adds the module removes the pending entry.
  */
 export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
+  ['jcs', jcs],
   ['placeholder-sha256', placeholderSha256],
+  ['tagged-hash', taggedHashSuite],
 ]);
