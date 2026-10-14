@@ -125,9 +125,8 @@ export {
   type SecretKind,
   type SecretSource,
 } from './secret-code.js';
+export { KEYSTORE_KDF_BOUNDS, KEYSTORE_KDF_DEFAULTS } from './argon2.js';
 export {
-  KEYSTORE_KDF_BOUNDS,
-  KEYSTORE_KDF_DEFAULTS,
   type ExpectedOwner,
   type KeystoreEntry,
   type KeystoreFormat,

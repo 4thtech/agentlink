@@ -27,7 +27,9 @@ export {
   newKeystoreKek,
   openKeystoreFile,
   openKeystoreFileWithKek,
+  keystoreSecretUnlocks,
   openOwnerSeed,
+  ownerSecretUnlocks,
   sealKeystoreFile,
   sealOwnerSeed,
 } from './keystore-file.js';

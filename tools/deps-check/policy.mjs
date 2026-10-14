@@ -289,6 +289,28 @@ export const libraryMessage = (lib) =>
     : `${lib.group[0]} may be imported only in ${lib.zones.join(', ')}${
         lib.testZones?.length ? ` (and in test files of ${lib.testZones.join(', ')})` : ''
       }; everything else uses ${lib.via} (AGENTS.md).`;
+/**
+ * Deep imports into a workspace package (IR-M1-1f-1 L-2): `<package>/dist…` or `<package>/src…`
+ * reach modules the package's `exports` map does not publish (for example the fixed-nonce sealers in
+ * dist/keystore-file.js, or the restricted keystore functions by another path), so they are refused
+ * in every zone. Packages are imported by their name and their declared subpaths only.
+ */
+export const DEEP_IMPORT_DIRS = ['dist', 'src'];
+
+/** The ESLint `group` patterns for the deep imports of one workspace package. */
+export const deepImportGroup = (name) =>
+  DEEP_IMPORT_DIRS.flatMap((dir) => [`${name}/${dir}`, `${name}/${dir}/*`]);
+
+/** True when `specifier` is a deep import into the workspace package `name`. */
+export function isDeepImport(name, specifier) {
+  if (!specifier.startsWith(`${name}/`)) return false;
+  const first = specifier.slice(name.length + 1).split('/')[0];
+  return DEEP_IMPORT_DIRS.includes(first) || first === '..' || first === '.';
+}
+
+export const deepImportMessage = (name) =>
+  `${name}: deep import into the package's build or sources is not allowed; import ${name} or a subpath its package.json "exports" declares (IR-M1-1f-1 L-2).`;
+
 export const restrictedEntryMessage = (entry) =>
   `${entry.group[0]} may be imported only in ${entry.zones.join(', ')}; everything else uses ${entry.via}.`;
 export const layerMessage = (zone, name) =>
@@ -314,6 +336,8 @@ export function violationFor(zone, specifier, file) {
     }
     return null;
   }
+  const workspace = workspaceNameOf(specifier);
+  if (workspace !== null && isDeepImport(workspace, specifier)) return deepImportMessage(workspace);
   for (const entry of RESTRICTED_ENTRY_POINTS) {
     if (matchesGroup(specifier, entry.group) && !entry.zones.includes(zone)) {
       return restrictedEntryMessage(entry);

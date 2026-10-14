@@ -4,8 +4,9 @@
 //   digest     = taggedHash("agentlink/safety-code/v1", T)                                (pairingDigest)
 //   code       = u64be(digest[0..8]) mod 10^12, shown as "dddd dddd dddd"
 // cardA is the inviter's (the invite card), cardB the invitee's (the handshake card); order is by
-// role, never sorted. Every value is public once pairing completes. The recomputation from the
-// signed handshake H and ack K (steps 1–5) needs the envelope helpers of M1-1c and is not here.
+// role, never sorted. Every value is public once pairing completes. No code is computed unless
+// nonceA opens codeCommit (step 3, IR-M1-1f-1 M-2). The recomputation from the signed handshake H
+// and ack K (steps 1–5) needs the envelope helpers of M1-1c and is not here.
 import { agentCardJcsHash } from './agent-card.js';
 import { assertBytes, concatBytes, equalBytes } from './bytes.js';
 import { CryptoInputError } from './errors.js';
@@ -50,8 +51,11 @@ export interface SafetyCodeInput {
   /** The card in the handshake (role: invitee), card JSON form. */
   readonly inviteeCard: unknown;
   readonly inviteId: Uint8Array;
+  /** The revealed nonceA (the ack's `codeReveal`); it must open `codeCommit`. */
   readonly nonceA: Uint8Array;
   readonly nonceB: Uint8Array;
+  /** The invite's `codeCommit` (32 bytes). Required: the code exists only for a valid reveal. */
+  readonly codeCommit: Uint8Array;
 }
 
 export interface SafetyCode {
@@ -94,8 +98,20 @@ export function safetyCodeFromDigest(digest: Uint8Array): { integer: bigint; cod
   return { integer, code: `${digits.slice(0, 4)} ${digits.slice(4, 8)} ${digits.slice(8, 12)}` };
 }
 
-/** T, pairingDigest and the code for one pairing. */
+/**
+ * T, pairingDigest and the code for one pairing. Refuses (`commitment_mismatch`, no digits) unless
+ * nonceA opens codeCommit for inviteId (04 §3.6.1 step 3); a missing codeCommit is refused too.
+ */
 export function computeSafetyCode(input: SafetyCodeInput): SafetyCode {
+  if (typeof input !== 'object' || input === null || input.codeCommit === undefined) {
+    throw new CryptoInputError('invalid_argument', 'computeSafetyCode: codeCommit is required');
+  }
+  if (!checkSafetyCodeReveal(input.inviteId, input.nonceA, input.codeCommit)) {
+    throw new CryptoInputError(
+      'commitment_mismatch',
+      'computeSafetyCode: the revealed nonce does not open the commitment; no code is shown',
+    );
+  }
   const transcript = safetyCodeTranscript(input);
   const digest = pairingDigest(transcript);
   return Object.freeze({ transcript, pairingDigest: digest, ...safetyCodeFromDigest(digest) });
@@ -112,6 +128,7 @@ export function safetyCodeForRole(input: {
   readonly inviteId: Uint8Array;
   readonly nonceA: Uint8Array;
   readonly nonceB: Uint8Array;
+  readonly codeCommit: Uint8Array;
 }): SafetyCode {
   if (typeof input !== 'object' || input === null) {
     throw new CryptoInputError('invalid_argument', 'safetyCodeForRole: input must be an object');
@@ -129,5 +146,6 @@ export function safetyCodeForRole(input: {
     inviteId: input.inviteId,
     nonceA: input.nonceA,
     nonceB: input.nonceB,
+    codeCommit: input.codeCommit,
   });
 }

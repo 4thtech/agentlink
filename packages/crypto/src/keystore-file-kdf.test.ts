@@ -48,7 +48,8 @@ function crafted(format: 'ALKS' | 'ALKO', f: HeaderFields, agentId = AGENT, body
   head[11] = f.t ?? 2;
   head[12] = f.p ?? 1;
   head[29] = f.aead ?? 1;
-  const id = format === 'ALKS' ? Uint8Array.of(agentId.length, ...encodeUtf8(agentId)) : new Uint8Array(0);
+  const id =
+    format === 'ALKS' ? Uint8Array.of(agentId.length, ...encodeUtf8(agentId)) : new Uint8Array(0);
   const out = new Uint8Array(head.length + id.length + body);
   out.set(head, 0);
   out.set(id, head.length);
@@ -100,18 +101,27 @@ describe('ALKS: refusals happen before the KDF', () => {
 
   it('out-of-bounds parameters and unknown header values', async () => {
     for (const fields of OUT_OF_BOUNDS) {
-      await refusedBeforeKdf(() => openKeystoreFile(crafted('ALKS', fields), PHRASE, AGENT), 'open_failed');
+      await refusedBeforeKdf(
+        () => openKeystoreFile(crafted('ALKS', fields), PHRASE, AGENT),
+        'open_failed',
+      );
     }
   });
 
   it('a foreign agent ID, a wrong magic, a short file and plaintext above 64 KiB', async () => {
     const other = deriveAgentId(sha256(encodeUtf8('keystore-file-kdf.test/other')));
-    await refusedBeforeKdf(() => openKeystoreFile(crafted('ALKS', {}, other), PHRASE, AGENT), 'open_failed');
+    await refusedBeforeKdf(
+      () => openKeystoreFile(crafted('ALKS', {}, other), PHRASE, AGENT),
+      'open_failed',
+    );
     await refusedBeforeKdf(
       () => openKeystoreFile(crafted('ALKS', { magic: 'ALKO' }), PHRASE, AGENT),
       'open_failed',
     );
-    await refusedBeforeKdf(() => openKeystoreFile(crafted('ALKS', {}, AGENT, 15), PHRASE, AGENT), 'open_failed');
+    await refusedBeforeKdf(
+      () => openKeystoreFile(crafted('ALKS', {}, AGENT, 15), PHRASE, AGENT),
+      'open_failed',
+    );
     await refusedBeforeKdf(
       () => openKeystoreFile(crafted('ALKS', {}, AGENT, 65536 + 17), PHRASE, AGENT),
       'open_failed',

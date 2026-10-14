@@ -241,10 +241,7 @@ describe('roles (property test)', () => {
 // IR-M1-1f-1 M-2: 04 §3.6.1 step 3. No digits without a codeReveal (nonceA) that opens codeCommit.
 describe('the commitment check before any code (step 3)', () => {
   it('refuses a nonceA that does not open codeCommit, with no code', () => {
-    refusedWith(
-      () => computeSafetyCode({ ...baseInput, nonceA: NONCE_B }),
-      'commitment_mismatch',
-    );
+    refusedWith(() => computeSafetyCode({ ...baseInput, nonceA: NONCE_B }), 'commitment_mismatch');
     const otherInvite = INVITE_ID.slice();
     otherInvite[0] = (otherInvite[0] as number) ^ 1;
     refusedWith(
@@ -253,7 +250,10 @@ describe('the commitment check before any code (step 3)', () => {
     );
     const flipped = COMMIT.slice();
     flipped[0] = (flipped[0] as number) ^ 1;
-    refusedWith(() => computeSafetyCode({ ...baseInput, codeCommit: flipped }), 'commitment_mismatch');
+    refusedWith(
+      () => computeSafetyCode({ ...baseInput, codeCommit: flipped }),
+      'commitment_mismatch',
+    );
     for (const role of ['inviter', 'invitee'] as const) {
       refusedWith(
         () =>
@@ -272,7 +272,8 @@ describe('the commitment check before any code (step 3)', () => {
   });
 
   it('requires codeCommit: a missing or malformed commitment is refused', () => {
-    const { codeCommit: _omitted, ...withoutCommit } = baseInput;
+    const withoutCommit: Partial<typeof baseInput> = { ...baseInput };
+    delete withoutCommit.codeCommit;
     refusedWith(
       () => computeSafetyCode(withoutCommit as unknown as typeof baseInput),
       'invalid_argument',

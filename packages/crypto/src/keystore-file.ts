@@ -7,7 +7,7 @@
 // checked before it (header values, KDF floor and cap, agent ID, sizes, secret normalisation). Every
 // file-level failure is the same `open_failed` error, so a wrong secret and a tampered file are
 // indistinguishable. Files and paths are @agentlink/node's job; this module only handles bytes.
-import { argon2id, type Argon2idParams } from './argon2.js';
+import { argon2id, kdfInBounds, KEYSTORE_KDF_DEFAULTS, type Argon2idParams } from './argon2.js';
 import { AES_GCM_NONCE_LENGTH, aes256GcmOpen, aes256GcmSeal } from './aes-gcm.js';
 import { assertBytes, concatBytes, equalBytes } from './bytes.js';
 import { decodeHex0x, decodeUtf8, encodeUtf8 } from './encoding.js';
@@ -24,23 +24,6 @@ import {
 import { wipe } from './wipe.js';
 
 export type KeystoreFormat = 'ALKS' | 'ALKO';
-
-/** 04 §2.8: defaults for new files and owner wraps (RFC 9106's second recommended set, p = 1). */
-export const KEYSTORE_KDF_DEFAULTS: Argon2idParams = Object.freeze({
-  memoryKiB: 65536,
-  iterations: 3,
-  parallelism: 1,
-});
-
-/** 04 §2.8: floor and cap, checked on read before the KDF runs (and on create). */
-export const KEYSTORE_KDF_BOUNDS = Object.freeze({
-  minMemoryKiB: 19456,
-  maxMemoryKiB: 262144,
-  minIterations: 2,
-  maxIterations: 8,
-  minParallelism: 1,
-  maxParallelism: 4,
-});
 
 const LABELS: Readonly<Record<KeystoreFormat, string>> = Object.freeze({
   ALKS: 'agentlink/v1/keystore-file',
@@ -127,24 +110,6 @@ const openFailed = (): CryptoInputError =>
 const sameParams = (a: Argon2idParams, b: Argon2idParams): boolean =>
   a.memoryKiB === b.memoryKiB && a.iterations === b.iterations && a.parallelism === b.parallelism;
 
-function kdfInBounds(params: Argon2idParams): boolean {
-  const b = KEYSTORE_KDF_BOUNDS;
-  const int = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v);
-  return (
-    typeof params === 'object' &&
-    params !== null &&
-    int(params.memoryKiB) &&
-    int(params.iterations) &&
-    int(params.parallelism) &&
-    params.memoryKiB >= b.minMemoryKiB &&
-    params.memoryKiB <= b.maxMemoryKiB &&
-    params.iterations >= b.minIterations &&
-    params.iterations <= b.maxIterations &&
-    params.parallelism >= b.minParallelism &&
-    params.parallelism <= b.maxParallelism
-  );
-}
-
 function assertFormat(format: unknown, what: string): asserts format is KeystoreFormat {
   if (format !== 'ALKS' && format !== 'ALKO') {
     throw new CryptoInputError('invalid_argument', `${what}: format must be ALKS or ALKO`);
@@ -227,12 +192,41 @@ export async function deriveKeystoreKek(
   }
 }
 
-/** A kek with a fresh random salt: on create and on every passphrase change (04 §2.8). */
-export function newKeystoreKek(
+const MIN_PASSPHRASE_CODE_POINTS = 12;
+
+/** Code points of the normalised password (UTF-8 bytes that are not continuation bytes). */
+function codePoints(password: Uint8Array): number {
+  let n = 0;
+  for (const byte of password) if ((byte & 0xc0) !== 0x80) n += 1;
+  return n;
+}
+
+/**
+ * A kek with a fresh random salt: on create and on every passphrase change (04 §2.8). For `ALKS`, a
+ * chosen passphrase (kind 2) needs at least 12 Unicode code points after NFKC
+ * (`passphrase_too_short`, 04 §2.8 "Passphrase strength"); checked only here, never on open.
+ */
+export async function newKeystoreKek(
   format: KeystoreFormat,
   secret: KeystoreSecret,
   params: Argon2idParams = KEYSTORE_KDF_DEFAULTS,
 ): Promise<KeystoreKek> {
+  if (
+    format === 'ALKS' &&
+    typeof secret === 'object' &&
+    secret !== null &&
+    secret.secretKind === 2
+  ) {
+    const password = normalizeSecret(secret.secret, 2, secret.source);
+    const length = codePoints(password);
+    wipe(password);
+    if (length < MIN_PASSPHRASE_CODE_POINTS) {
+      throw new CryptoInputError(
+        'passphrase_too_short',
+        'newKeystoreKek: a chosen passphrase needs at least 12 characters',
+      );
+    }
+  }
   return deriveKeystoreKek(format, secret, randomBytes(SALT_LENGTH), params);
 }
 
@@ -565,14 +559,8 @@ export function sealOwnerSeed(
   return sealOwnerSeedWithNonceUnsafe(kek, randomBytes(AES_GCM_NONCE_LENGTH), seed, options);
 }
 
-/**
- * 04 §2.8 `ALKO` v1: the owner seed. Refused before the KDF: any size other than 90 bytes, a header
- * that is not ALKO v1, KDF parameters out of bounds (`open_failed`), and kind 2 on a file-KeyStore
- * machine (`secret_kind_refused`). After decryption the seed must derive the card's `ownerEvm` and
- * `ownerNostr` (04 §2.1, epoch 0), compared as bytes; otherwise it is wiped and refused. Wipe the
- * returned seed when done.
- */
-export async function openOwnerSeed(
+/** openOwnerSeed without the prompt-only rule (shared with ownerSecretUnlocks). */
+async function openOwnerSeedFrom(
   blob: Uint8Array,
   secret: KeystoreUnlockSecret,
   expected: ExpectedOwner,
@@ -639,5 +627,71 @@ export async function openOwnerSeed(
     return out;
   } finally {
     wipe(kek.kek, seed);
+  }
+}
+
+/**
+ * 04 §2.8: the owner secret only from a prompt (D-54). Refused before the KDF: any size other than
+ * 90 bytes, a header that is not ALKO v1, KDF parameters out of bounds (`open_failed`), and kind 2 on
+ * a file-KeyStore machine (`secret_kind_refused`). After decryption the seed must derive the card's
+ * `ownerEvm` and `ownerNostr` (04 §2.1, epoch 0), compared as bytes; otherwise it is wiped and
+ * refused. Wipe the returned seed when done.
+ */
+export function openOwnerSeed(
+  blob: Uint8Array,
+  secret: KeystoreUnlockSecret,
+  expected: ExpectedOwner,
+  options: { readonly fileKeystoreMachine: boolean },
+): Promise<Uint8Array> {
+  // D-54, 04 §2.8: the owner secret comes only from an interactive prompt, never from a file. (The
+  // agent ≠ owner probe below may test an agent secret read from a file.)
+  if (typeof secret !== 'object' || secret === null || secret.source !== 'prompt') {
+    return Promise.reject(
+      new CryptoInputError(
+        'invalid_argument',
+        'openOwnerSeed: the owner secret comes from a prompt',
+      ),
+    );
+  }
+  return openOwnerSeedFrom(blob, secret, expected, options);
+}
+
+/**
+ * 04 §2.8 "agent and owner secrets always differ": does `candidate` unlock this owner wrap? The
+ * candidate is normalised the way the blob's kind requires; one that fails that normalisation, or
+ * any other refusal, "does not unlock" (false), never an error. A seed the check unwraps is wiped at
+ * once and never returned.
+ */
+export async function ownerSecretUnlocks(
+  blob: Uint8Array,
+  candidate: KeystoreUnlockSecret,
+  expected: ExpectedOwner,
+): Promise<boolean> {
+  try {
+    const seed = await openOwnerSeedFrom(blob, candidate, expected, { fileKeystoreMachine: false });
+    wipe(seed);
+    return true;
+  } catch (error) {
+    if (error instanceof CryptoInputError) return false;
+    throw error;
+  }
+}
+
+/**
+ * 04 §2.8, the other direction: does `candidate` open this agent's `ALKS` file? Same rules as
+ * ownerSecretUnlocks: refusals are false, and every unwrapped entry and the kek are wiped at once.
+ */
+export async function keystoreSecretUnlocks(
+  file: Uint8Array,
+  candidate: KeystoreUnlockSecret,
+  expectedAgentId: string,
+): Promise<boolean> {
+  try {
+    const opened = await openKeystoreFile(file, candidate, expectedAgentId);
+    wipe(opened.kek.kek, ...opened.entries.map((e) => e.value));
+    return true;
+  } catch (error) {
+    if (error instanceof CryptoInputError) return false;
+    throw error;
   }
 }

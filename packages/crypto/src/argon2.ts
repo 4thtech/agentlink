@@ -30,6 +30,38 @@ const MAX_OUTPUT_LENGTH = 1024;
 const isIntegerIn = (value: unknown, min: number, max: number): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= min && value <= max;
 
+/** 04 §2.8: defaults for new files and owner wraps (RFC 9106's second recommended set, p = 1). */
+export const KEYSTORE_KDF_DEFAULTS: Argon2idParams = Object.freeze({
+  memoryKiB: 65536,
+  iterations: 3,
+  parallelism: 1,
+});
+
+/**
+ * 04 §2.8: floor and cap, checked before any production Argon2id run (on read, before the KDF; on
+ * create; and in the argon2id export itself, IR-M1-1f-1 L-1).
+ */
+export const KEYSTORE_KDF_BOUNDS = Object.freeze({
+  minMemoryKiB: 19456,
+  maxMemoryKiB: 262144,
+  minIterations: 2,
+  maxIterations: 8,
+  minParallelism: 1,
+  maxParallelism: 4,
+});
+
+/** True when the parameters are integers within KEYSTORE_KDF_BOUNDS. */
+export function kdfInBounds(params: Argon2idParams): boolean {
+  const b = KEYSTORE_KDF_BOUNDS;
+  return (
+    typeof params === 'object' &&
+    params !== null &&
+    isIntegerIn(params.memoryKiB, b.minMemoryKiB, b.maxMemoryKiB) &&
+    isIntegerIn(params.iterations, b.minIterations, b.maxIterations) &&
+    isIntegerIn(params.parallelism, b.minParallelism, b.maxParallelism)
+  );
+}
+
 /** Throws unless the parameters are within RFC 9106 (m ≥ 8p) and the 256 MiB ceiling. */
 export function assertArgon2idParams(params: Argon2idParams, what: string): void {
   if (
@@ -85,14 +117,21 @@ export async function argon2idRaw(
 
 /**
  * Argon2id v1.3 with no secret value (K) and no associated data (X), 32-byte output: the KDF of
- * 04 §2.3 and §2.8. `password` is the output of normalizeSecret, never raw text. Inputs are not
- * modified; wipe the result when done.
+ * 04 §2.3 and §2.8. Parameters outside the 04 §2.8 floor and cap are refused before it runs (the
+ * RFC 9106 test parameters run only through the test seam). `password` is the output of
+ * normalizeSecret, never raw text. Inputs are not modified; wipe the result when done.
  */
-export function argon2id(
+export async function argon2id(
   password: Uint8Array,
   salt: Uint8Array,
   params: Argon2idParams,
 ): Promise<Uint8Array> {
+  if (!kdfInBounds(params)) {
+    throw new CryptoInputError(
+      'invalid_argument',
+      'argon2id: parameters must be within the 04 §2.8 floor and cap',
+    );
+  }
   return argon2idRaw(password, salt, params, {
     secret: new Uint8Array(0),
     ad: new Uint8Array(0),

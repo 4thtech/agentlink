@@ -28,7 +28,11 @@ export type CryptoInputErrorCode =
   /** M1-1f: a chosen owner passphrase (secretKind 2) on a file-KeyStore machine (04 §2.8). */
   | 'secret_kind_refused'
   /** M1-1f: the owner passphrase wrap is for local storage only, never for relay publication (04 §2.3). */
-  | 'relay_publication_refused';
+  | 'relay_publication_refused'
+  /** M1-1f (IR-M1-1f-1 M-2): codeReveal (nonceA) does not open codeCommit; no code (04 §3.6.1 step 3). */
+  | 'commitment_mismatch'
+  /** M1-1f (IR-M1-1f-1 L-4): a chosen agent passphrase under 12 code points after NFKC (04 §2.8). */
+  | 'passphrase_too_short';
 
 /**
  * The one error type @agentlink/crypto throws for input it refuses.
