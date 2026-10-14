@@ -13,6 +13,7 @@ import { EnvelopeService } from './envelopes.js';
 import type { CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import { IdentityService, finishPendingRotation } from './identity.js';
+import { PairingService } from './pairing.js';
 import type { Store, StoreCipher } from './store/store.js';
 
 export interface AgentLinkClientOptions {
@@ -37,13 +38,16 @@ export class AgentLinkClient {
   readonly contacts: ContactBook;
   /** Envelope build, receive and processing (M1-7b; 04 §3.1.1). */
   readonly envelopes: EnvelopeService;
+  /** Invites and pairing (M1-7c; 04 §3.6, §3.6.1). Inbound pairing runs in envelopes.processReceived. */
+  readonly pairing: PairingService;
   readonly approvals: ApprovalChannel;
 
   private constructor(agentId: string, ctx: CoreContext, approvals: ApprovalChannel) {
     this.agentId = agentId;
     this.identity = new IdentityService(ctx);
     this.contacts = new ContactBook(ctx);
-    this.envelopes = new EnvelopeService(ctx, this.identity, this.contacts);
+    this.pairing = new PairingService(ctx, this.identity, this.contacts);
+    this.envelopes = new EnvelopeService(ctx, this.identity, this.contacts, this.pairing);
     this.approvals = approvals;
   }
 

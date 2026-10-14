@@ -8,6 +8,10 @@
 //   counterparty's handshake or ack stored as received from the card's own key, and ours as sent),
 //   checks the rules again, writes the contact with pairing `complete` and deletes the staged row.
 //   A card alone is public and replayable, so it completes nothing (04 §2.9).
+// - The evidence is bound to the pairing (M1-7c, IR-M1-7a-1 R2-L1): the pairing ID is the handshake
+//   envelope `id`, and the two envelopes must verify as a 04 §3.6.1 transcript whose counterparty
+//   card is the staged card and whose other card is this agent's. Concurrent pairings converge by
+//   the 04 §2.9 tie-break (the later handshake `createdAt`, then the larger envelopeHash).
 // - A re-pair (an agentId that is already a contact) is allowed only with unchanged owner keys and a
 //   keyEpoch that is not lower, and never for a revoked agentId (a `revoked_agents` row is never
 //   deleted).
@@ -23,13 +27,16 @@
 //   key_epoch and the owner fingerprint (a hash of the owner's public keys) (M-3).
 import {
   canonicalize,
+  decodeBase64url,
   decodeHex,
   encodeBase64url,
   encodeHex,
   formatFingerprint,
   randomBytes,
   type AgentCard,
+  type JsonValue,
 } from '@agentlink/crypto';
+import type { ContactDisplayName, IdentityLabel, OwnerAlias } from '@agentlink/types';
 import {
   agentNostrKey,
   checkReceivedCard,
@@ -41,7 +48,10 @@ import {
 } from './card.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
+import { restrictName } from './names.js';
+import { verifyPairingTranscript, type PairingTranscript } from './safety-code.js';
 import type { Row } from './store/schema.js';
+import { openStoredPairingMessage, ownKids } from './stored-envelope.js';
 import type { StoreTx } from './store/store.js';
 
 export type ContactStatus = Row<'contacts'>['status'];
@@ -57,12 +67,22 @@ export interface ContactView {
     /** True for a name the counterparty chose (04 §2.4): label it self-declared. */
     readonly selfDeclared: boolean;
   };
+  /**
+   * How the contact is shown outside the untrusted block (06 §2.1): an owner-set alias, or the
+   * restricted name (restrictName), with its identity label. Render with renderContactName.
+   */
+  readonly display: ContactDisplayName;
   readonly card: AgentCard;
   readonly keyEpoch: number;
   /** Display only: identifies, does not authenticate (04 §2.9). */
   readonly ownerFingerprint: { readonly short: string; readonly long: string };
   readonly status: ContactStatus;
   readonly pairing: PairingState;
+  /**
+   * Derived on every read from the stored `contacts.safety_check` object, never from a flag. Its
+   * verification against a fresh recomputation is M1-7c-b (04 §2.5.1, §3.6.1, G-28); until then no
+   * stored object counts and this is false (fail closed).
+   */
   readonly safetyCodeChecked: boolean;
   readonly createdAt: number;
   readonly updatedAt: number;
@@ -74,13 +94,53 @@ export interface StagePairingInput extends CardInput {
   readonly role: 'inviter' | 'invitee';
   /** When the staged pairing lapses, in unix seconds: the invite's expiry (04 §2.9). */
   readonly expiresAt: number;
+  /**
+   * The pairing ID: the `handshake` envelope `id` (16 bytes, base64url), which binds the completion
+   * evidence to this pairing (IR-M1-7a-1 R2-L1). Default: 16 random bytes, the `id` the invitee then
+   * gives its handshake.
+   */
+  readonly pairingId?: string;
 }
 
 /** The completion evidence: both pairing envelopes, as stored by M1-7c (04 §3.6, §3.4.1). */
 export interface CompletePairingInput {
   readonly pairingId: string;
+  /** Must equal `pairingId`: the pairing ID is the handshake envelope `id`. */
   readonly handshakeEnvelopeId: string;
   readonly handshakeAckEnvelopeId: string;
+}
+
+/** A staged pairing's checked card and its values (07 §3 `pairings`). */
+export interface StagedPairing {
+  readonly pairingId: string;
+  readonly role: 'inviter' | 'invitee';
+  readonly card: AgentCard;
+  readonly cardSig: string;
+  readonly cardAgentSig: string | null;
+  /** Self-declared, untrusted (I-5). */
+  readonly name: string;
+  readonly relays: readonly string[];
+  readonly expiresAt: number;
+}
+
+/** A checked card ready to stage inside the caller's store transaction. */
+export interface PreparedStage {
+  readonly staged: StagedPairing;
+  /** Writes the `pairings` row; throws a CoreError (aborting the transaction) when a rule fails. */
+  readonly apply: (tx: StoreTx) => void;
+}
+
+/** What a completion wrote: the contact row, and whether this pairing replaced the stored one. */
+export interface PairingCompletion {
+  readonly row: Row<'contacts'>;
+  /** False when a concurrent pairing with a later handshake was kept (04 §2.9). */
+  readonly replaced: boolean;
+}
+
+/** A verified, bound completion ready to apply inside the caller's store transaction. */
+export interface PreparedCompletion {
+  readonly contactId: string;
+  readonly apply: (tx: StoreTx) => PairingCompletion;
 }
 
 /** A card-update body (04 §3.4.1): no cardAgentSig is needed. */
@@ -215,6 +275,13 @@ export class ContactBook {
       return unreadable();
     }
     const name = await open(this.#ctx, 'contacts', 'name', key, row.name);
+    const short = formatFingerprint(decodeHex(row.owner_fingerprint, { length: 32 }), 'short');
+    const safetyCodeChecked = false;
+    const label: IdentityLabel = safetyCodeChecked ? 'safety-code-checked' : 'self-declared';
+    const display: ContactDisplayName =
+      row.name_source === 'owner'
+        ? { name: name as OwnerAlias, label, nameSource: 'owner' }
+        : { name: restrictName(name, short), label, nameSource: 'counterparty' };
     return {
       id: row.contact_id,
       name: {
@@ -222,15 +289,16 @@ export class ContactBook {
         source: row.name_source,
         selfDeclared: row.name_source === 'counterparty',
       },
+      display,
       card,
       keyEpoch: row.key_epoch,
       ownerFingerprint: {
-        short: formatFingerprint(decodeHex(row.owner_fingerprint, { length: 32 }), 'short'),
+        short,
         long: row.owner_fingerprint,
       },
       status: row.status,
       pairing: row.pairing,
-      safetyCodeChecked: row.safety_code_checked === 1,
+      safetyCodeChecked,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -262,10 +330,12 @@ export class ContactBook {
   }
 
   /**
-   * Stages a pairing from a received card (04 §2.9). Checks the card and the re-pair rules, then
-   * stores it in `pairings`. Nothing about an existing contact changes until completePairing.
+   * Checks a received card for staging (04 §2.9): the card, the re-pair rules and the key rule, and
+   * seals its values. `apply` writes the `pairings` row inside the caller's store transaction and
+   * checks the rules again there; nothing in `contacts` changes. The pairing flow (M1-7c) stages and
+   * stores its own pairing envelope in one transaction.
    */
-  async stagePairing(input: StagePairingInput): Promise<{ readonly pairingId: string }> {
+  async prepareStage(input: StagePairingInput): Promise<PreparedStage> {
     const ctx = this.#ctx;
     const now = nowOf(ctx);
     const checked = checkReceivedCard(input, { requireAgentSig: true, now });
@@ -283,11 +353,21 @@ export class ContactBook {
     if (card.agentEvm === own.agentId) {
       throw new CoreError('contact_is_self', 'An agent cannot add itself as a contact.');
     }
+    let pairingId: string;
+    if (input.pairingId === undefined) {
+      pairingId = encodeBase64url(randomBytes(PAIRING_ID_BYTES));
+    } else {
+      try {
+        decodeBase64url(input.pairingId, { length: PAIRING_ID_BYTES });
+      } catch {
+        throw new CoreError('pairing_not_found', 'No pairing in progress has that ID.');
+      }
+      pairingId = input.pairingId;
+    }
     const ownKeys = await this.#ownKeys();
     const id = card.agentEvm;
     const nostr = agentNostrKey(card);
     const fingerprint = ownerFingerprintHex(card);
-    const pairingId = encodeBase64url(randomBytes(PAIRING_ID_BYTES));
     const key = [pairingId];
     const row: Row<'pairings'> = {
       pairing_id: pairingId,
@@ -302,7 +382,17 @@ export class ContactBook {
       created_at: now,
       expires_at: input.expiresAt,
     };
-    await ctx.store.transaction((tx) => {
+    const staged: StagedPairing = {
+      pairingId,
+      role: input.role,
+      card,
+      cardSig: checked.cardSig,
+      cardAgentSig: checked.cardAgentSig,
+      name: checked.name,
+      relays: checked.relays,
+      expiresAt: input.expiresAt,
+    };
+    const apply = (tx: StoreTx): void => {
       const existing = tx.get('contacts', { contact_id: id });
       if (isRevoked(tx, id, existing)) {
         throw new CoreError('contact_revoked', 'That agent has been revoked and cannot be paired.');
@@ -310,8 +400,18 @@ export class ContactBook {
       assertRepairAllowed(existing, { ownerFingerprint: fingerprint, keyEpoch: card.keyEpoch });
       assertKeyFree(tx, id, nostr, ownKeys);
       tx.insert('pairings', row);
-    });
-    return { pairingId };
+    };
+    return { staged, apply };
+  }
+
+  /**
+   * Stages a pairing from a received card (04 §2.9). Checks the card and the re-pair rules, then
+   * stores it in `pairings`. Nothing about an existing contact changes until completePairing.
+   */
+  async stagePairing(input: StagePairingInput): Promise<{ readonly pairingId: string }> {
+    const prepared = await this.prepareStage(input);
+    await this.#ctx.store.transaction((tx) => prepared.apply(tx));
+    return { pairingId: prepared.staged.pairingId };
   }
 
   /** Drops a staged pairing that will not complete. Changes nothing else. */
@@ -325,35 +425,25 @@ export class ContactBook {
   }
 
   /**
-   * Commits a staged pairing once its handshake completed (04 §2.9, §3.6), in one store transaction:
-   * the evidence, the revocation and re-pair rules and the key rule are checked again, the contact is
-   * written with pairing `complete` and the staged row is deleted. A completed re-pair replaces the
-   * card and the pairing columns and clears the safety check (a new pairing has a new code). A removed
-   * contact becomes active again; a blocked one stays blocked.
+   * A staged pairing read back and checked again in full (its card, also its expiry at `now`), or
+   * undefined when none has that ID. A row that does not match its own clear columns is unreadable.
    */
-  async completePairing(input: CompletePairingInput): Promise<ContactView> {
+  async readStaged(pairingId: string): Promise<StagedPairing | undefined> {
     const ctx = this.#ctx;
-    const { pairingId } = input;
-    const staged = await ctx.store.transaction((tx) =>
-      tx.get('pairings', { pairing_id: pairingId }),
-    );
-    if (staged === undefined) {
-      throw new CoreError('pairing_not_found', 'No pairing in progress has that ID.');
-    }
-    const now = nowOf(ctx);
-    const skey = [pairingId];
+    const row = await ctx.store.transaction((tx) => tx.get('pairings', { pairing_id: pairingId }));
+    if (row === undefined) return undefined;
+    const key = [pairingId];
     const stored = parseStoredCard(
-      await open(ctx, 'pairings', 'agent_card_json', skey, staged.agent_card_json),
+      await open(ctx, 'pairings', 'agent_card_json', key, row.agent_card_json),
     );
-    const name = await open(ctx, 'pairings', 'name', skey, staged.name);
-    const relaysText = await open(ctx, 'pairings', 'relays', skey, staged.relays);
+    const name = await open(ctx, 'pairings', 'name', key, row.name);
+    const relaysText = await open(ctx, 'pairings', 'relays', key, row.relays);
     let relays: unknown;
     try {
       relays = JSON.parse(relaysText);
     } catch {
       return unreadable();
     }
-    // The staged card is checked again in full (also its expiry at `now`).
     const checked = checkReceivedCard(
       {
         card: stored.card,
@@ -362,38 +452,89 @@ export class ContactBook {
         name,
         relays,
       },
-      { requireAgentSig: true, now },
+      { requireAgentSig: true, now: nowOf(ctx) },
     );
     const { card } = checked;
     if (
-      card.agentEvm !== staged.contact_id ||
-      agentNostrKey(card) !== staged.agent_nostr ||
-      card.keyEpoch !== staged.key_epoch ||
-      ownerFingerprintHex(card) !== staged.owner_fingerprint
+      card.agentEvm !== row.contact_id ||
+      agentNostrKey(card) !== row.agent_nostr ||
+      card.keyEpoch !== row.key_epoch ||
+      ownerFingerprintHex(card) !== row.owner_fingerprint
     ) {
       return unreadable();
     }
+    return {
+      pairingId,
+      role: row.role,
+      card,
+      cardSig: checked.cardSig,
+      cardAgentSig: checked.cardAgentSig,
+      name: checked.name,
+      relays: checked.relays,
+      expiresAt: row.expires_at,
+    };
+  }
+
+  /**
+   * Prepares the completion of a staged pairing from its verified transcript (04 §2.9, §3.6,
+   * §3.6.1). The binding (IR-M1-7a-1 R2-L1): the pairing ID is the `handshake` envelope `id`, the
+   * transcript passed 04 §3.6.1 steps 1-5 for this agent, this side's role is the staged role, and
+   * the counterparty card in it is exactly the staged card. So another pairing's envelopes, even
+   * between the same two agents, complete nothing here. `apply` runs inside the caller's store
+   * transaction: the staged row and both envelope rows (by ID and envelopeHash, the counterparty's
+   * received from the card key and processed, ours sent) are checked again, then the revocation,
+   * re-pair and key rules, the 04 §2.9 tie-break for concurrent pairings, and the contact is written
+   * and the staged row deleted. A completed re-pair replaces the card and the pairing columns and
+   * clears the safety check (a new pairing has a new code). A removed contact becomes active again;
+   * a blocked one stays blocked.
+   */
+  async prepareCompletion(
+    staged: StagedPairing,
+    transcript: PairingTranscript,
+  ): Promise<PreparedCompletion> {
+    const ctx = this.#ctx;
+    const missing = (): never => {
+      throw new CoreError(
+        'pairing_evidence_missing',
+        'The pairing has not completed: its handshake is missing.',
+      );
+    };
+    const self = await ctx.keyStore.getPublicBundle();
+    if (
+      transcript.handshake.envelope.id !== staged.pairingId ||
+      transcript.role !== staged.role ||
+      canonicalize(transcript.peerCard as unknown as JsonValue) !==
+        canonicalize(staged.card as unknown as JsonValue) ||
+      (staged.role === 'inviter' ? transcript.inviterCard : transcript.inviteeCard).agentEvm !==
+        self.agentId
+    ) {
+      return missing();
+    }
+    const now = nowOf(ctx);
+    const { card } = staged;
     const ownKeys = await this.#ownKeys();
     const id = card.agentEvm;
+    const nostr = agentNostrKey(card);
+    const fingerprint = ownerFingerprintHex(card);
     const ckey = [id];
-    const sealedCard = await seal(
-      ctx,
-      'contacts',
-      'agent_card_json',
-      ckey,
-      storedCardText(checked),
-    );
-    const sealedName = await seal(ctx, 'contacts', 'name', ckey, checked.name);
+    const signed: StoredCard = {
+      card,
+      cardSig: staged.cardSig,
+      cardAgentSig: staged.cardAgentSig,
+    };
+    const sealedCard = await seal(ctx, 'contacts', 'agent_card_json', ckey, storedCardText(signed));
+    const sealedName = await seal(ctx, 'contacts', 'name', ckey, staged.name);
     const sealedRelays = await seal(
       ctx,
       'contacts',
       'relays',
       ckey,
-      canonicalize([...checked.relays]),
+      canonicalize([...staged.relays]),
     );
-
-    const row = await ctx.store.transaction((tx): Row<'contacts'> => {
-      const current = tx.get('pairings', { pairing_id: pairingId });
+    const handshakeId = transcript.handshake.envelope.id;
+    const ackId = transcript.ack.envelope.id;
+    const apply = (tx: StoreTx): PairingCompletion => {
+      const current = tx.get('pairings', { pairing_id: staged.pairingId });
       if (current === undefined) {
         throw new CoreError('pairing_not_found', 'No pairing in progress has that ID.');
       }
@@ -403,23 +544,31 @@ export class ContactBook {
           'The pairing has expired. Start again with a new invite.',
         );
       }
-      // Evidence (04 §2.9 liveness): the counterparty's envelope was received from the card's key
-      // and processed; ours was sent. M1-7c verifies and stores both before calling this.
-      const handshake = tx.get('envelopes', { envelope_id: input.handshakeEnvelopeId });
-      const ack = tx.get('envelopes', { envelope_id: input.handshakeAckEnvelopeId });
+      if (
+        current.role !== staged.role ||
+        current.contact_id !== id ||
+        current.agent_nostr !== nostr ||
+        current.key_epoch !== card.keyEpoch ||
+        current.owner_fingerprint !== fingerprint
+      ) {
+        return missing();
+      }
+      // Evidence (04 §2.9 liveness): both envelopes stored exactly as verified; the counterparty's
+      // received from the card's key and processed, ours sent.
+      const handshake = tx.get('envelopes', { envelope_id: handshakeId });
+      const ack = tx.get('envelopes', { envelope_id: ackId });
       const [theirs, ours] = current.role === 'inviter' ? [handshake, ack] : [ack, handshake];
       if (
         handshake?.type !== 'handshake' ||
+        handshake.envelope_hash !== transcript.handshake.hash ||
         ack?.type !== 'handshake-ack' ||
+        ack.envelope_hash !== transcript.ack.hash ||
         theirs?.direction !== 'in' ||
         theirs.state !== 'ok' ||
         theirs.from_key !== current.agent_nostr ||
         ours?.direction !== 'out'
       ) {
-        throw new CoreError(
-          'pairing_evidence_missing',
-          'The pairing has not completed: its handshake is missing.',
-        );
+        return missing();
       }
       const existing = tx.get('contacts', { contact_id: id });
       if (isRevoked(tx, id, existing)) {
@@ -430,6 +579,26 @@ export class ContactBook {
         keyEpoch: current.key_epoch,
       });
       assertKeyFree(tx, id, current.agent_nostr, ownKeys);
+      for (const envelopeId of [handshakeId, ackId]) {
+        tx.update('envelopes', { envelope_id: envelopeId }, { contact_id: id });
+      }
+      if (tx.delete('pairings', { pairing_id: staged.pairingId }) !== 1) {
+        throw new CoreError('pairing_not_found', 'No pairing in progress has that ID.');
+      }
+      // 04 §2.9 concurrent pairings: keep the completed pairing whose handshake has the later
+      // createdAt, ties broken by the larger envelopeHash (compared as bytes: same-length lowercase
+      // hex compares the same way). Both sides hold both handshakes, so both keep the same one.
+      if (existing?.pairing === 'complete' && existing.handshake_envelope_id !== null) {
+        const kept = tx.get('envelopes', { envelope_id: existing.handshake_envelope_id });
+        const createdAt = transcript.handshake.envelope.createdAt;
+        if (
+          kept !== undefined &&
+          (kept.created_at > createdAt ||
+            (kept.created_at === createdAt && kept.envelope_hash > transcript.handshake.hash))
+        ) {
+          return { row: existing, replaced: false };
+        }
+      }
       const fields = {
         agent_card_json: sealedCard,
         relays: sealedRelays,
@@ -438,8 +607,8 @@ export class ContactBook {
         owner_fingerprint: current.owner_fingerprint,
         verified: 0 as const,
         pairing: 'complete' as const,
-        handshake_envelope_id: input.handshakeEnvelopeId,
-        handshake_ack_envelope_id: input.handshakeAckEnvelopeId,
+        handshake_envelope_id: handshakeId,
+        handshake_ack_envelope_id: ackId,
         code_commit: null,
         nonce_b: null,
         safety_check: null,
@@ -478,13 +647,54 @@ export class ContactBook {
         }
         written = { ...existing, ...patch };
       }
-      if (tx.delete('pairings', { pairing_id: pairingId }) !== 1) {
-        throw new CoreError('pairing_not_found', 'No pairing in progress has that ID.');
-      }
-      return written;
-    });
-    ctx.log.info('pairing completed', { keyEpoch: row.key_epoch });
-    return this.#view(row);
+      return { row: written, replaced: true };
+    };
+    return { contactId: id, apply };
+  }
+
+  /**
+   * Commits a staged pairing from its two stored pairing envelopes (04 §2.9, §3.6). Both are opened
+   * with the agent's own key and verified as a transcript (04 §3.6.1 steps 1-5) bound to this
+   * pairing (prepareCompletion); a pair that does not verify, or that belongs to another pairing, is
+   * `pairing_evidence_missing`. The pairing flow (M1-7c) completes inside the transaction that
+   * stores the last envelope; this entry point completes from envelopes already stored.
+   */
+  async completePairing(input: CompletePairingInput): Promise<ContactView> {
+    const ctx = this.#ctx;
+    const staged = await this.readStaged(input.pairingId);
+    if (staged === undefined) {
+      throw new CoreError('pairing_not_found', 'No pairing in progress has that ID.');
+    }
+    const missing = (): never => {
+      throw new CoreError(
+        'pairing_evidence_missing',
+        'The pairing has not completed: its handshake is missing.',
+      );
+    };
+    if (input.handshakeEnvelopeId !== input.pairingId) return missing();
+    const rows = await ctx.store.transaction((tx) => ({
+      handshake: tx.get('envelopes', { envelope_id: input.handshakeEnvelopeId }),
+      ack: tx.get('envelopes', { envelope_id: input.handshakeAckEnvelopeId }),
+    }));
+    if (rows.handshake === undefined || rows.ack === undefined) return missing();
+    let transcript: PairingTranscript;
+    try {
+      const kids = await ownKids(ctx);
+      transcript = verifyPairingTranscript({
+        self: (await ctx.keyStore.getPublicBundle()).agentId,
+        contactCard: staged.card,
+        handshake: await openStoredPairingMessage(ctx, rows.handshake.envelope_json, kids),
+        ack: await openStoredPairingMessage(ctx, rows.ack.envelope_json, kids),
+      });
+    } catch (error) {
+      if (error instanceof CoreError && error.code === 'safety_code_unavailable') return missing();
+      throw error;
+    }
+    if (transcript.ack.envelope.id !== input.handshakeAckEnvelopeId) return missing();
+    const prepared = await this.prepareCompletion(staged, transcript);
+    const done = await ctx.store.transaction((tx) => prepared.apply(tx));
+    ctx.log.info('pairing completed', { keyEpoch: done.row.key_epoch });
+    return this.#view(done.row);
   }
 
   /** Applies a verified card-update (04 §2.6, §3.4.1): same agent and owner, strictly higher epoch. */

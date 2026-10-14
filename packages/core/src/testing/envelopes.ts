@@ -31,8 +31,8 @@ import {
   RecordingApprovalChannel,
   TestStoreCipher,
   passphrase,
-  storePairingEnvelope,
 } from './fixtures.js';
+import { craftTranscript, pairingTime, storeTranscript } from './pairing.js';
 
 export interface TestAgent {
   readonly client: AgentLinkClient;
@@ -73,30 +73,28 @@ export async function makeAgent(
   return { client, store, cipher, keyStore, owner, id: client.agentId };
 }
 
-/** `self` adds `peer` as a contact through a staged, completed pairing (04 §2.9). */
+/**
+ * `self` adds `peer` as a contact through a staged, completed pairing (04 §2.9): `self` plays the
+ * invitee, and the completion evidence is a real signed handshake and ack made with both agents'
+ * keys (04 §3.6.1), stored on `self`'s side only.
+ */
 export async function pairWith(clock: FakeClock, self: TestAgent, peer: TestAgent): Promise<void> {
   const card = await peer.client.identity.signedCard();
-  const { pairingId } = await self.client.contacts.stagePairing({
+  const pairingId = encodeBase64url(randomBytes(16));
+  await self.client.contacts.stagePairing({
     ...card,
     role: 'invitee',
     expiresAt: clock.t + 3_600,
-  });
-  const own = (await self.client.identity.signedCard()).card.agentNostr.slice(2);
-  const handshakeEnvelopeId = await storePairingEnvelope(self.store, {
-    type: 'handshake',
-    direction: 'out',
-    from: own,
-  });
-  const handshakeAckEnvelopeId = await storePairingEnvelope(self.store, {
-    type: 'handshake-ack',
-    direction: 'in',
-    from: card.card.agentNostr.slice(2),
-  });
-  await self.client.contacts.completePairing({
     pairingId,
-    handshakeEnvelopeId,
-    handshakeAckEnvelopeId,
   });
+  const transcript = await craftTranscript({
+    inviter: { keyStore: peer.keyStore, signed: card },
+    invitee: { keyStore: self.keyStore, signed: await self.client.identity.signedCard() },
+    createdAt: pairingTime(clock.t),
+    handshakeId: pairingId,
+  });
+  const evidence = await storeTranscript(self, transcript, 'invitee');
+  await self.client.contacts.completePairing({ pairingId, ...evidence });
 }
 
 /** Rotates an agent to its next key epoch with its owner (04 §2.6, M1-1g-d). */

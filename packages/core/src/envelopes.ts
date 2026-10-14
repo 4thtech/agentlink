@@ -140,8 +140,23 @@ export type InboundReason =
   | 'future_created_at'
   | 'duplicate_id'
   | 'unreadable'
-  /** A type this build has no handler for from that sender (pairing or revoke from an unknown key). */
+  /** A type this build has no handler for from that sender (a revoke from an unknown key). */
   | 'type_unhandled'
+  // Pairing (04 §3.6, §3.6.1; M1-7c). A drop keeps nothing; a refusal keeps a `refused` row.
+  /** A `handshake` naming no invite this agent holds (dropped before any store write). */
+  | 'invite_unknown'
+  /** A `handshake` for an invite past its stored expiry. */
+  | 'invite_expired'
+  /** A second valid answer to a used invite: refused, and the owner is warned (04 §3.6). */
+  | 'invite_used'
+  /** A `handshake-ack` naming no pairing in progress from that key (dropped). */
+  | 'pairing_unknown'
+  /** A pairing message that fails a 04 §3.6 or §3.4.1 check (proof, sender key, card, binding). */
+  | 'pairing_invalid'
+  /** A valid pairing refused by the 04 §2.9 rules (revoked, owner keys changed, key in use, self). */
+  | 'pairing_refused'
+  /** A `handshake-ack` whose `codeReveal` does not open `codeCommit`: the pairing stays pending. */
+  | 'safety_commit_mismatch'
   /** An owner-authored type (`approval`, `revoke`) signed by the agent's own key. */
   | 'agent_key_type'
   /** `receive` was given a gift-wrap id that is not 64 lowercase hex (a caller bug). */
@@ -159,6 +174,47 @@ export interface InboundReport {
    * and 9): the activity feed flags it. Never set for a sender that is not a contact.
    */
   readonly flagged: boolean;
+}
+
+/**
+ * A `handshake` or `handshake-ack` that passed 04 §3.1.1 steps 3–9 (M1-7c). The pairing flow runs
+ * the 04 §3.6 receiver rules and stores the outcome itself, inside one store transaction that
+ * `claim`s the row first.
+ */
+export interface InboundPairing {
+  readonly envelopeId: string;
+  readonly envelopeHash: string;
+  readonly envelopeJson: string;
+  readonly envelope: Envelope;
+  readonly payload: Payload;
+  readonly payloadText: string;
+  /** Set when `from` is a contact's current key (a re-pair). */
+  readonly contactId?: string;
+  /** True while the row is still where processing found it, with the same envelopeHash. */
+  claim(tx: StoreTx): boolean;
+  /** Writes the outcome row in place of the `received` row. */
+  write(tx: StoreTx, row: Row<'envelopes'>): void;
+}
+
+/** The pairing flow's outcome: stored by the flow (`done`), or a drop or refusal stored here. */
+export type PairingOutcome =
+  | { readonly kind: 'done'; readonly report?: InboundReport }
+  | { readonly kind: 'drop'; readonly reason: InboundReason; readonly contactId?: string }
+  | {
+      readonly kind: 'refuse';
+      readonly reason: InboundReason;
+      readonly contactId?: string;
+      readonly flagged: boolean;
+    };
+
+/** The pairing flow as the envelope pipeline sees it (M1-7c). */
+export interface PairingHandler {
+  /**
+   * Inside a store transaction, before step 8: whether a pairing exists that this message could
+   * belong to. A reason drops it at once, so a flood from strangers stores nothing (IR-M1-7b-1 M-1).
+   */
+  screen(tx: StoreTx, payload: Payload, from: string): InboundReason | undefined;
+  handle(inbound: InboundPairing): Promise<PairingOutcome>;
 }
 
 export interface ReceiveResult {
@@ -185,18 +241,13 @@ const OWNER_CHANNEL_TYPES: ReadonlySet<PayloadType> = new Set([
   'approval',
   'policy',
 ]);
-/** Pairing types: their receiver rules are M1-7c (04 §3.6). */
+/** Pairing types: their receiver rules are the pairing flow's (M1-7c, 04 §3.6, §3.4.1). */
 const PAIRING_TYPES: ReadonlySet<PayloadType> = new Set(['handshake', 'handshake-ack']);
 /**
- * Accepted types whose effects later cards implement (M1-7c pairing, M1-7d/M1-7e approvals and
- * policies, M1-7h revoke). Steps 5–9 run; the row then stays `received` for that handler.
+ * Accepted types whose effects later cards implement (M1-7d/M1-7e approvals and policies, M1-7h
+ * revoke). Steps 5–9 run; the row then stays `received` for that handler.
  */
-const DEFERRED_TYPES: ReadonlySet<PayloadType> = new Set([
-  ...PAIRING_TYPES,
-  'approval',
-  'policy',
-  'revoke',
-]);
+const DEFERRED_TYPES: ReadonlySet<PayloadType> = new Set(['approval', 'policy', 'revoke']);
 /** Types the agent key never signs (04 §3.1.1 key table: owner-authored). */
 const OWNER_AUTHORED_TYPES: ReadonlySet<PayloadType> = new Set(['approval', 'revoke']);
 /** Types the agent sends on its owner channel (04 §3.4.1). */
@@ -267,6 +318,7 @@ type Disposition =
       readonly cardUpdate?: PreparedCardUpdate;
     }
   | { readonly kind: 'deferred'; readonly contactId?: string; readonly senderCard?: AgentCard }
+  | { readonly kind: 'pairing'; readonly contactId?: string; readonly senderCard: AgentCard }
   | { readonly kind: 'hold'; readonly ownerKid: string }
   | { readonly kind: 'keep_held' };
 
@@ -297,11 +349,18 @@ export class EnvelopeService {
   readonly #ctx: CoreContext;
   readonly #identity: IdentityService;
   readonly #contacts: ContactBook;
+  readonly #pairing: PairingHandler | undefined;
 
-  constructor(ctx: CoreContext, identity: IdentityService, contacts: ContactBook) {
+  constructor(
+    ctx: CoreContext,
+    identity: IdentityService,
+    contacts: ContactBook,
+    pairing?: PairingHandler,
+  ) {
     this.#ctx = ctx;
     this.#identity = identity;
     this.#contacts = contacts;
+    this.#pairing = pairing;
   }
 
   // --- Send --------------------------------------------------------------------------------------
@@ -339,7 +398,7 @@ export class EnvelopeService {
     if (payload.type === 'card-update' && payload.body.card.agentEvm !== self.agentId) {
       throw new CoreError('payload_invalid', 'The message content is not valid.');
     }
-    const parties: { readonly enc: Uint8Array; readonly nostr: string }[] = [];
+    const parties: Party[] = [];
     if (contactId !== undefined) {
       const contact = await this.#contacts.get(contactId);
       if (contact.status !== 'active' || contact.pairing !== 'complete') {
@@ -355,80 +414,18 @@ export class EnvelopeService {
       { enc: bytesOf(ownCard.ownerEnc), nostr: ownCard.ownerNostr.slice(2) },
       { enc: bundle.agentEnc, nostr: encodeHex(bundle.agentNostr) },
     );
-    // One entry per distinct `enc` key, one gift wrap per distinct Nostr key (04 §3.1.1, §3.5).
-    const encKeys: Uint8Array[] = [];
-    const seenEnc = new Set<string>();
-    const nostrKeys: string[] = [];
-    for (const party of parties) {
-      const hex = encodeHex(party.enc);
-      if (!seenEnc.has(hex)) {
-        seenEnc.add(hex);
-        encKeys.push(party.enc);
-      }
-      if (!nostrKeys.includes(party.nostr)) nostrKeys.push(party.nostr);
-    }
-
     const thread = await this.#threadFor(input, payload, contactId);
-    const now = nowOf(ctx);
-    const id = randomBytes(ENVELOPE_ID_LENGTH);
-    const payloadText = canonicalize(payload as unknown as JsonValue);
-    const plaintext = encodeUtf8(payloadText);
-    // 04 §3.1.1 limits: `ct` is at most AEAD_CT_MAX_LENGTH bytes (plaintext plus the 16-byte tag).
-    if (plaintext.length + AEAD_TAG_LENGTH > AEAD_CT_MAX_LENGTH) {
-      throw new CoreError('envelope_too_large', 'The message is too large to send.');
-    }
-    const cek = generateCek();
-    let unsigned: Omit<Envelope, 'sig'>;
-    try {
-      const recipients: EnvelopeRecipient[] = [];
-      for (const pk of encKeys) {
-        const wrapped = await wrapCek(pk, id, cek);
-        recipients.push({
-          kid: kidOf(pk),
-          enc: encodeBase64url(wrapped.enc),
-          wk: encodeBase64url(wrapped.wk),
-        });
-      }
-      const header: EnvelopeHeader = {
-        v: 1,
-        id: encodeBase64url(id),
-        thread,
-        from: encodeHex(bundle.agentNostr),
-        createdAt: now,
-        recipients,
-      };
-      const aead = await encryptPayload(header, cek, plaintext);
-      unsigned = { ...header, aead };
-    } finally {
-      wipe(cek);
-    }
-    const hash = envelopeHash(unsigned);
-    const envelope = parseEnvelope({ ...unsigned, sig: await ctx.keyStore.signEnvelopeHash(hash) });
-    const envelopeJson = canonicalize(envelope as unknown as JsonValue);
-    if (encodeUtf8(envelopeJson).length > MAX_ENVELOPE_BYTES) {
-      throw new CoreError('envelope_too_large', 'The message is too large to send.');
-    }
-    const hashHex = encodeHex0x(hash);
-    const sealed = await seal(ctx, 'envelopes', 'payload_json', [envelope.id], payloadText);
+    const sealed = await sealOutbound(ctx, { parties, payload, thread });
+    const row = await outboundRow(ctx, sealed, contactId ?? null);
     await ctx.store.transaction((tx) => {
-      tx.insert('envelopes', {
-        envelope_id: envelope.id,
-        envelope_hash: hashHex,
-        thread_id: thread,
-        direction: 'out',
-        contact_id: contactId ?? null,
-        from_key: envelope.from,
-        type: payload.type,
-        state: 'ok',
-        refused_reason: null,
-        created_at: now,
-        envelope_json: envelopeJson,
-        payload_json: sealed,
-        read_at: null,
-        delivery: 'queued',
-      });
+      tx.insert('envelopes', row);
     });
-    return { envelope, envelopeHash: hashHex, thread, recipientNostrKeys: nostrKeys };
+    return {
+      envelope: sealed.envelope,
+      envelopeHash: sealed.envelopeHash,
+      thread,
+      recipientNostrKeys: sealed.recipientNostrKeys,
+    };
   }
 
   /** The thread: given, the replied-to envelope's, the one in use with that party, or a new one. */
@@ -834,6 +831,9 @@ export class EnvelopeService {
       };
       return { report: await this.#settle(o.item, final, o.envelope, o.payload.type) };
     }
+    if (disposition.kind === 'pairing') {
+      return { report: await this.#pairingOutcome(o, disposition) };
+    }
     if (
       disposition.kind === 'deferred' ||
       (disposition.state !== 'sent_copy' && DEFERRED_TYPES.has(o.payload.type))
@@ -886,11 +886,10 @@ export class EnvelopeService {
       if (sender.kind === 'superseded') {
         return { kind: 'refuse', reason: 'superseded_key', contactId, flagged: false };
       }
+      if (PAIRING_TYPES.has(type)) return this.#screenPairing(o, contactId);
       const senderCard = book.byId.get(contactId)?.card;
       if (senderCard === undefined) return { kind: 'drop', reason: 'unreadable' };
-      return PAIRING_TYPES.has(type)
-        ? { kind: 'deferred', contactId, senderCard }
-        : { kind: 'accept', state: 'ok', contactId, senderCard };
+      return { kind: 'accept', state: 'ok', contactId, senderCard };
     }
 
     // Unknown key. A card-update is accepted only from the new key its own card names, for a
@@ -905,9 +904,9 @@ export class EnvelopeService {
       if (named.status !== 'active') return { kind: 'drop', reason: named.status };
       return this.#cardUpdate(o, named.id);
     }
-    // Pairing types from an unknown key: no invite or staged pairing can exist before M1-7c, so
-    // they are dropped rather than parked in `received` (IR-M1-7b-1 M-1). M1-7c replaces this.
-    if (PAIRING_TYPES.has(type)) return { kind: 'drop', reason: 'type_unhandled' };
+    // Pairing types from an unknown key: only for an invite or a pairing in progress, otherwise
+    // dropped at once, never parked in `received` or queued (IR-M1-7b-1 M-1, 04 §3.6).
+    if (PAIRING_TYPES.has(type)) return this.#screenPairing(o);
     // Arrival order: a stored contact owner's `kid` among the recipients holds it while any such
     // contact is active (IR-M1-7b-1 M-2). With only blocked, removed or revoked matches it is
     // dropped at once, and a held row with any inactive match is dropped at release instead of
@@ -931,6 +930,63 @@ export class EnvelopeService {
         : { kind: 'accept', state: 'request' };
     }
     return { kind: 'hold', ownerKid: kidOf(bytesOf(first.card.ownerEnc)) };
+  }
+
+  /**
+   * Step 7 for a pairing message (M1-7c): the pairing flow's screen decides whether a pairing exists
+   * that it could belong to; otherwise it is dropped. Its body card is the step 8 sender card (it
+   * is verified in full by the pairing flow; a card that does not hold the wraps only refuses).
+   */
+  async #screenPairing(o: Opened, contactId?: string): Promise<Disposition> {
+    const handler = this.#pairing;
+    const { payload, envelope } = o;
+    const contact = contactId === undefined ? {} : { contactId };
+    if (
+      handler === undefined ||
+      (payload.type !== 'handshake' && payload.type !== 'handshake-ack')
+    ) {
+      return { kind: 'drop', reason: 'type_unhandled', ...contact };
+    }
+    const reason = await this.#ctx.store.transaction((tx) =>
+      handler.screen(tx, payload, envelope.from),
+    );
+    if (reason !== undefined) return { kind: 'drop', reason, ...contact };
+    return { kind: 'pairing', senderCard: payload.body.card as AgentCard, ...contact };
+  }
+
+  /** Hands a pairing message that passed steps 3–9 to the pairing flow and stores a drop or refusal. */
+  async #pairingOutcome(
+    o: Opened,
+    d: Extract<Disposition, { kind: 'pairing' }>,
+  ): Promise<InboundReport | undefined> {
+    const handler = this.#pairing;
+    const contact = d.contactId === undefined ? {} : { contactId: d.contactId };
+    let outcome: PairingOutcome;
+    if (handler === undefined) {
+      outcome = { kind: 'drop', reason: 'type_unhandled', ...contact };
+    } else {
+      const { item } = o;
+      try {
+        outcome = await handler.handle({
+          envelopeId: item.envelopeId,
+          envelopeHash: item.envelopeHash,
+          envelopeJson: item.envelopeJson,
+          envelope: o.envelope,
+          payload: o.payload,
+          payloadText: o.payloadText,
+          ...contact,
+          claim: (tx) => claim(tx, item),
+          write: (tx, row) => {
+            writeRow(tx, item, row);
+          },
+        });
+      } catch (error) {
+        if (!(error instanceof CoreError) || error.code === 'store_unreadable') throw error;
+        outcome = { kind: 'drop', reason: 'pairing_invalid', ...contact };
+      }
+    }
+    if (outcome.kind === 'done') return outcome.report;
+    return this.#settle(o.item, outcome, o.envelope, o.payload.type);
   }
 
   /** A card-update for `contactId`: §3.4.1 through ContactBook; its card is the step 8 sender card. */
@@ -1161,6 +1217,170 @@ export class EnvelopeService {
     });
     return result;
   }
+}
+
+// --- Outbound sealing (shared by build and the pairing flow) ----------------------------------------
+
+/** One recipient party: its `enc` key and the Nostr key its gift wrap goes to. */
+interface Party {
+  readonly enc: Uint8Array;
+  readonly nostr: string;
+}
+
+/** A signed outbound envelope, not yet stored. */
+export interface SealedOutbound {
+  readonly envelope: Envelope;
+  /** `0x` + 64 lowercase hex (04 §2.4.1). */
+  readonly envelopeHash: string;
+  /** The JCS text stored in `envelopes.envelope_json`. */
+  readonly envelopeJson: string;
+  readonly payload: Payload;
+  readonly payloadText: string;
+  readonly thread: string;
+  readonly createdAt: number;
+  readonly recipientNostrKeys: readonly string[];
+}
+
+/**
+ * Seals and signs a payload to the given parties (04 §3.1–§3.3): one entry per distinct `enc` key
+ * and one gift wrap per distinct Nostr key, in party order; a fresh CEK, wiped before returning;
+ * the agent key signs envelopeHash; the JCS form is at most MAX_ENVELOPE_BYTES.
+ */
+async function sealOutbound(
+  ctx: CoreContext,
+  input: {
+    readonly parties: readonly Party[];
+    readonly payload: Payload;
+    readonly thread: string;
+    readonly id?: Uint8Array;
+  },
+): Promise<SealedOutbound> {
+  const bundle = await ctx.keyStore.getPublicBundle();
+  const encKeys: Uint8Array[] = [];
+  const seenEnc = new Set<string>();
+  const nostrKeys: string[] = [];
+  for (const party of input.parties) {
+    const hex = encodeHex(party.enc);
+    if (!seenEnc.has(hex)) {
+      seenEnc.add(hex);
+      encKeys.push(party.enc);
+    }
+    if (!nostrKeys.includes(party.nostr)) nostrKeys.push(party.nostr);
+  }
+  const now = nowOf(ctx);
+  const id = input.id ?? randomBytes(ENVELOPE_ID_LENGTH);
+  const payloadText = canonicalize(input.payload as unknown as JsonValue);
+  const plaintext = encodeUtf8(payloadText);
+  // 04 §3.1.1 limits: `ct` is at most AEAD_CT_MAX_LENGTH bytes (plaintext plus the 16-byte tag).
+  if (plaintext.length + AEAD_TAG_LENGTH > AEAD_CT_MAX_LENGTH) {
+    throw new CoreError('envelope_too_large', 'The message is too large to send.');
+  }
+  const cek = generateCek();
+  let unsigned: Omit<Envelope, 'sig'>;
+  try {
+    const recipients: EnvelopeRecipient[] = [];
+    for (const pk of encKeys) {
+      const wrapped = await wrapCek(pk, id, cek);
+      recipients.push({
+        kid: kidOf(pk),
+        enc: encodeBase64url(wrapped.enc),
+        wk: encodeBase64url(wrapped.wk),
+      });
+    }
+    const header: EnvelopeHeader = {
+      v: 1,
+      id: encodeBase64url(id),
+      thread: input.thread,
+      from: encodeHex(bundle.agentNostr),
+      createdAt: now,
+      recipients,
+    };
+    const aead = await encryptPayload(header, cek, plaintext);
+    unsigned = { ...header, aead };
+  } finally {
+    wipe(cek);
+  }
+  const hash = envelopeHash(unsigned);
+  const envelope = parseEnvelope({ ...unsigned, sig: await ctx.keyStore.signEnvelopeHash(hash) });
+  const envelopeJson = canonicalize(envelope as unknown as JsonValue);
+  if (encodeUtf8(envelopeJson).length > MAX_ENVELOPE_BYTES) {
+    throw new CoreError('envelope_too_large', 'The message is too large to send.');
+  }
+  return {
+    envelope,
+    envelopeHash: encodeHex0x(hash),
+    envelopeJson,
+    payload: input.payload,
+    payloadText,
+    thread: input.thread,
+    createdAt: now,
+    recipientNostrKeys: nostrKeys,
+  };
+}
+
+/** The `envelopes` row of a sealed outbound envelope: stored as sent, the payload sealed. */
+export async function outboundRow(
+  ctx: CoreContext,
+  sealed: SealedOutbound,
+  contactId: string | null,
+): Promise<Row<'envelopes'>> {
+  const { envelope } = sealed;
+  return {
+    envelope_id: envelope.id,
+    envelope_hash: sealed.envelopeHash,
+    thread_id: sealed.thread,
+    direction: 'out',
+    contact_id: contactId,
+    from_key: envelope.from,
+    type: sealed.payload.type,
+    state: 'ok',
+    refused_reason: null,
+    created_at: sealed.createdAt,
+    envelope_json: sealed.envelopeJson,
+    payload_json: await seal(ctx, 'envelopes', 'payload_json', [envelope.id], sealed.payloadText),
+    read_at: null,
+    delivery: 'queued',
+  };
+}
+
+/**
+ * Seals a `handshake` or `handshake-ack` (04 §3.6, §3.4.1) to the counterparty of a pairing, which
+ * is not (or not yet) a contact: recipients per 04 §3.2 from the counterparty's card and this
+ * agent's. Core-internal: no MCP tool reaches it (04 §3.4.1, I-4), and it is not exported from the
+ * package. `id` is the envelope id (the handshake's id is the pairing ID).
+ */
+export async function sealPairingEnvelope(
+  ctx: CoreContext,
+  identity: IdentityService,
+  input: {
+    readonly payload: unknown;
+    readonly peer: AgentCard;
+    readonly thread: string;
+    readonly id?: Uint8Array;
+  },
+): Promise<SealedOutbound> {
+  await identity.assertCanSend();
+  const parsed = payloadSchema.safeParse(input.payload);
+  if (!parsed.success || !PAIRING_TYPES.has(parsed.data.type)) {
+    throw new CoreError('payload_invalid', 'The message content is not valid.');
+  }
+  const self = await identity.get();
+  if (self === undefined) {
+    throw new CoreError('identity_missing', 'This agent has no identity yet. Run init first.');
+  }
+  const bundle = await ctx.keyStore.getPublicBundle();
+  const parties: Party[] = [
+    { enc: bytesOf(input.peer.agentEnc), nostr: agentNostrKey(input.peer) },
+    { enc: bytesOf(input.peer.ownerEnc), nostr: input.peer.ownerNostr.slice(2) },
+    { enc: bytesOf(self.card.ownerEnc), nostr: self.card.ownerNostr.slice(2) },
+    { enc: bundle.agentEnc, nostr: encodeHex(bundle.agentNostr) },
+  ];
+  return sealOutbound(ctx, {
+    parties,
+    payload: parsed.data,
+    thread: input.thread,
+    ...(input.id === undefined ? {} : { id: input.id }),
+  });
 }
 
 // --- Store helpers (inside one transaction) ------------------------------------------------------

@@ -2,7 +2,7 @@
 // the handshake completes (04 §2.9); re-pair rules and revoked agents (04 §2.9, §3.4.1); card updates
 // (04 §2.6, §3.4.1); list, block and remove with a tombstone (02 F-14); names marked self-declared
 // (04 §2.4, 06 §2.1); the inbound sender screen.
-import { encodeHex0x, type AgentCard, type OwnerKeyStore } from '@agentlink/crypto';
+import { encodeHex0x, type AgentCard, type KeyStore, type OwnerKeyStore } from '@agentlink/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
 import { createLogger } from '@agentlink/log';
 import { describe, expect, it } from 'vitest';
@@ -32,19 +32,30 @@ import {
   pairWith,
   rotate,
 } from './testing/envelopes.js';
+import {
+  craftTranscript,
+  pairingTime,
+  storeTranscript,
+  type CraftTranscriptOptions,
+} from './testing/pairing.js';
 
 const clock = new FakeClock();
 
 async function agent(agentSeed: number, keyEpoch = 0, store = new MemoryStore()) {
+  const keyStore = new MemoryKeyStore(seed(agentSeed), { keyEpoch });
+  const cipher = new TestStoreCipher();
   const client = await AgentLinkClient.create({
-    keyStore: new MemoryKeyStore(seed(agentSeed), { keyEpoch }),
+    keyStore,
     store,
-    cipher: new TestStoreCipher(),
+    cipher,
     approvals: new RecordingApprovalChannel(),
     clock: clock.now,
   });
-  return { client, store };
+  return { client, store, keyStore, cipher };
 }
+
+/** The KeyStore of each peer card's agent, by its agentNostr (for real pairing evidence). */
+const peerKeyStores = new Map<string, KeyStore>();
 
 /** A peer agent's signed card at an epoch: init at 0, then rotate up to `keyEpoch`. */
 async function peerCard(
@@ -67,8 +78,10 @@ async function peerCard(
       ownerKeys: await owner.getPublicKeys(),
     });
   }
-  const { client: last } = await agent(agentSeed, options.keyEpoch ?? 0, store);
-  return last.identity.signedCard();
+  const { client: last, keyStore } = await agent(agentSeed, options.keyEpoch ?? 0, store);
+  const signed = await last.identity.signedCard();
+  peerKeyStores.set(signed.card.agentNostr, keyStore);
+  return signed;
 }
 
 /** A card-update signed by `owner` for an arbitrary card body (no agent signature needed). */
@@ -98,20 +111,29 @@ async function self(): Promise<Self> {
 
 const nostrOf = (card: SignedCard) => card.card.agentNostr.slice(2);
 
-/** Stores the two pairing envelopes for `card` (the counterparty's one inbound, ours outbound). */
-async function evidence(s: Self, card: SignedCard, role: 'inviter' | 'invitee') {
-  const own = (await s.client.identity.signedCard()).card.agentNostr.slice(2);
-  const handshakeEnvelopeId = await storePairingEnvelope(s.store, {
-    type: 'handshake',
-    direction: role === 'inviter' ? 'in' : 'out',
-    from: role === 'inviter' ? nostrOf(card) : own,
+/**
+ * Stores real completion evidence for `card` (04 §3.6.1): the handshake (id = the pairing ID) and the
+ * ack, signed by the two agents' own keys; the counterparty's inbound, ours outbound.
+ */
+async function evidence(
+  s: Self,
+  card: SignedCard,
+  role: 'inviter' | 'invitee',
+  pairingId: string,
+  options: Partial<CraftTranscriptOptions> = {},
+) {
+  const peerKeyStore = peerKeyStores.get(card.card.agentNostr);
+  if (peerKeyStore === undefined) throw new Error('test: unknown peer card');
+  const peer = { keyStore: peerKeyStore, signed: card };
+  const me = { keyStore: s.keyStore, signed: await s.client.identity.signedCard() };
+  const t = await craftTranscript({
+    inviter: role === 'inviter' ? me : peer,
+    invitee: role === 'inviter' ? peer : me,
+    createdAt: pairingTime(clock.t),
+    handshakeId: pairingId,
+    ...options,
   });
-  const handshakeAckEnvelopeId = await storePairingEnvelope(s.store, {
-    type: 'handshake-ack',
-    direction: role === 'inviter' ? 'out' : 'in',
-    from: role === 'inviter' ? own : nostrOf(card),
-  });
-  return { handshakeEnvelopeId, handshakeAckEnvelopeId };
+  return storeTranscript(s, t, role);
 }
 
 async function pair(s: Self, card: SignedCard, role: 'inviter' | 'invitee' = 'invitee') {
@@ -120,10 +142,13 @@ async function pair(s: Self, card: SignedCard, role: 'inviter' | 'invitee' = 'in
     role,
     expiresAt: clock.t + 3_600,
   });
-  return s.client.contacts.completePairing({ pairingId, ...(await evidence(s, card, role)) });
+  return s.client.contacts.completePairing({
+    pairingId,
+    ...(await evidence(s, card, role, pairingId)),
+  });
 }
 
-const contactRow = (s: Self, id: string) =>
+const contactRow = (s: { readonly store: MemoryStore }, id: string) =>
   s.store.transaction((tx) => tx.get('contacts', { contact_id: id }));
 
 describe('pairing: stage, then commit on completion (04 §2.9)', () => {
@@ -335,7 +360,8 @@ describe('pairing: stage, then commit on completion (04 §2.9)', () => {
     expect(await contactRow(s, id)).toEqual(before);
     const mid = await s.client.contacts.get(id);
     expect(mid.keyEpoch).toBe(0);
-    expect(mid.safetyCodeChecked).toBe(true);
+    // Derived from the stored safety_check object (verified by M1-7c-b), never from the flag column.
+    expect(mid.safetyCodeChecked).toBe(false);
     expect(mid.pairing).toBe('complete');
     // The new key is not the contact's until completion.
     expect(await s.client.contacts.screenInbound(nostrOf(v1))).toEqual({
@@ -345,7 +371,7 @@ describe('pairing: stage, then commit on completion (04 §2.9)', () => {
 
     const done = await s.client.contacts.completePairing({
       pairingId,
-      ...(await evidence(s, v1, 'invitee')),
+      ...(await evidence(s, v1, 'invitee', pairingId)),
     });
     expect(done.keyEpoch).toBe(1);
     expect(done.pairing).toBe('complete');
@@ -386,7 +412,7 @@ describe('pairing: stage, then commit on completion (04 §2.9)', () => {
       role: 'invitee',
       expiresAt: clock.t + 60,
     });
-    const proof = await evidence(s, card, 'invitee');
+    const proof = await evidence(s, card, 'invitee', pairingId);
     clock.t += 60;
     try {
       await expect(
@@ -418,7 +444,7 @@ describe('pairing: stage, then commit on completion (04 §2.9)', () => {
     await expect(
       s.client.contacts.completePairing({
         pairingId,
-        ...(await evidence(s, await peerCard(2, ownerC, { keyEpoch: 1 }), 'invitee')),
+        ...(await evidence(s, await peerCard(2, ownerC, { keyEpoch: 1 }), 'invitee', pairingId)),
       }),
     ).rejects.toMatchObject({ code: 'repair_owner_changed' });
     expect((await s.client.contacts.get(v0.card.agentEvm)).keyEpoch).toBe(0);
@@ -757,10 +783,12 @@ describe('logging (I-7)', () => {
     const lines: string[] = [];
     const logger = createLogger({ name: 'core', sink: (_level, line) => lines.push(line) });
     const store = new MemoryStore();
+    const keyStore = new MemoryKeyStore(seed(1));
+    const cipher = new TestStoreCipher();
     const client = await AgentLinkClient.create({
-      keyStore: new MemoryKeyStore(seed(1)),
+      keyStore,
       store,
-      cipher: new TestStoreCipher(),
+      cipher,
       approvals: new RecordingApprovalChannel(),
       clock: clock.now,
       logger,
@@ -772,7 +800,7 @@ describe('logging (I-7)', () => {
       relays: RELAYS,
     });
     const card = await peerCard(2, ownerB, { name: 'Peer-name-canary' });
-    await pair({ client, store }, card);
+    await pair({ client, store, keyStore, cipher }, card);
     await client.contacts.applyCardUpdate(
       await peerCard(2, ownerB, { keyEpoch: 1, name: 'Peer-name-canary' }),
     );
