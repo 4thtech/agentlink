@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CryptoInputError,
-  FINGERPRINT_TAGS,
+  TAGS,
   agentFingerprint,
   concatBytes,
   decodeHex0x,
@@ -25,13 +25,16 @@ function expectRefused(run: () => unknown): void {
   expect(run).toThrow(CryptoInputError);
 }
 
-describe('FINGERPRINT_TAGS', () => {
-  it('holds the 04 §2.9 tags and cannot be changed at run time', () => {
-    expect(FINGERPRINT_TAGS).toEqual({
-      owner: 'agentlink/owner-fingerprint/v1',
-      agent: 'agentlink/agent-fingerprint/v1',
-    });
-    expect(Object.isFrozen(FINGERPRINT_TAGS)).toBe(true);
+describe('fingerprint tags (IR-M1-1b-1 L-1: one frozen registry)', () => {
+  it('are the 04 §2.9 tags, held in the frozen TAGS registry', () => {
+    expect(TAGS.ownerFingerprint).toBe('agentlink/owner-fingerprint/v1');
+    expect(TAGS.agentFingerprint).toBe('agentlink/agent-fingerprint/v1');
+    expect(Object.isFrozen(TAGS)).toBe(true);
+  });
+
+  it('are distinct from every other protocol tag', () => {
+    const tags = Object.values(TAGS);
+    expect(new Set(tags).size).toBe(tags.length);
   });
 });
 

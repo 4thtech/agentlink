@@ -5,14 +5,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   CryptoInputError,
-  bip340PublicKey,
-  bip340Sign,
   bip340Verify,
   decodeHex,
   encodeHex,
   isBip340PublicKey,
   sha256,
 } from './index.js';
+import { bip340PublicKey, bip340Sign } from './keystore.js';
 
 const N_HEX = 'fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141';
 const P_HEX = 'fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f';
@@ -82,6 +81,18 @@ describe('bip340Sign and bip340PublicKey', () => {
     }
     expect(bip340PublicKey(scalar(N - 1n))).toHaveLength(32);
     expect(bip340PublicKey(scalar(1n))).toHaveLength(32);
+  });
+
+  it('refuses an out-of-range key with its own check, before the library sees it (IR-M1-1b-1 I-1)', () => {
+    for (const secretKey of [new Uint8Array(32), scalar(N), scalar(N + 1n)]) {
+      for (const error of [
+        expectRefused(() => bip340PublicKey(secretKey)),
+        expectRefused(() => bip340Sign(secretKey, MSG1, AUX1)),
+      ]) {
+        expect(error.code).toBe('invalid_argument');
+        expect(error.message).toBe('bip340: the secret key is out of range');
+      }
+    }
   });
 
   it('refuses aux randomness that is not 32 bytes and a message that is not bytes', () => {

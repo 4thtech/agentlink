@@ -9,11 +9,6 @@ import {
   concatBytes,
   decodeHex,
   decodeHex0x,
-  deriveAgentId,
-  deriveKey,
-  derivePublicIdentity,
-  derivePublicKey,
-  deriveSecretKey,
   encodeHex,
   encodeUtf8,
   evmAddressChecksummed,
@@ -22,6 +17,13 @@ import {
   sha256,
 } from './index.js';
 import { selectSecp256k1SecretKey } from './keys.js';
+import {
+  deriveAgentId,
+  deriveKey,
+  derivePublicIdentity,
+  derivePublicKey,
+  deriveSecretKey,
+} from './keystore.js';
 
 const SEED_A = decodeHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
 const SEED_B = decodeHex('e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88');

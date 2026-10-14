@@ -367,3 +367,45 @@ describe('IR-M0-10-2: symlinks and CommonJS', () => {
     ).toEqual([]);
   });
 });
+
+describe('IR-M1-1b-1 M-1: the restricted @agentlink/crypto/keystore subpath', () => {
+  const keystore = `import { deriveSecretKey } from '@agentlink/crypto/keystore';\n`;
+
+  it('fails when packages/core imports it, in every form', () => {
+    for (const code of [
+      keystore,
+      `export { deriveKey } from '@agentlink/crypto/keystore';\n`,
+      `const m = await import('@agentlink/crypto/keystore');\n`,
+      `type T = import('@agentlink/crypto/keystore').PublicIdentity;\n`,
+    ]) {
+      expect(src('packages/core', code).join('\n')).toMatch(
+        /@agentlink\/crypto\/keystore may be imported only in packages\/node, test-vectors/,
+      );
+    }
+    expect(
+      violationFor('packages/core', '@agentlink/crypto/keystore', 'packages/core/src/a.ts'),
+    ).toMatch(/KeyStore interface/);
+  });
+
+  // packages/node hosts the KeyStore backends. Whether it may import @agentlink/crypto at all is the
+  // package layering (ZONES), which today does not list crypto for it; the card that adds the file
+  // and keychain backends widens that. This rule must not be what stops it.
+  const RESTRICTED =
+    /@agentlink\/crypto\/keystore may be imported only in packages\/node, test-vectors/;
+  const ruleFor = (zone) =>
+    violationFor(zone, '@agentlink/crypto/keystore', `${zone}/src/a.ts`) ?? '';
+
+  it('applies in every zone except packages/node, even where @agentlink/crypto is allowed', () => {
+    const exempt = Object.keys(ZONES).filter((zone) => !RESTRICTED.test(ruleFor(zone)));
+    expect(exempt).toEqual(['packages/node']);
+    expect(violationFor('packages/core', '@agentlink/crypto', 'packages/core/src/a.ts')).toBeNull();
+  });
+
+  it('exempts packages/node (layering still applies) and allows the vector harness', () => {
+    expect(ruleFor('packages/node')).not.toMatch(RESTRICTED);
+    expect(src('packages/node', keystore).join('\n')).not.toMatch(RESTRICTED);
+    // test-vectors has no layering entry (its own ESLint config governs its imports, and pnpm lint
+    // passes with the suites importing the subpath); this rule must not name it.
+    expect(ruleFor('test-vectors')).not.toMatch(RESTRICTED);
+  });
+});

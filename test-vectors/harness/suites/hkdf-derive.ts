@@ -6,14 +6,12 @@
 import {
   CryptoInputError,
   KEY_LABELS,
-  deriveAgentId,
-  deriveKey,
-  derivePublicKey,
   encodeBase64url,
   evmAddressChecksummed,
   hkdfSha256,
   type KeyLabel,
 } from '@agentlink/crypto';
+import { deriveAgentId, deriveKey, derivePublicKey } from '@agentlink/crypto/keystore';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 
