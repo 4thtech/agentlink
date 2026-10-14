@@ -28,6 +28,14 @@ integer, unknown key; plus a missing key, wrong types and wrong lengths. The oth
 agent, wrong owner, another signer, the envelope tag, no tag, a body changed after signing, an
 unknown op, a bad reason and expiresAt != 0 for agent.revoke.
 
+`approval.decideBatch` (D-68, 04 §2.5.2), version 3: signing and verify vectors for batches of 2
+and 20 items with mixed decisions, in strictly ascending `approvalId` order compared as bytes (the
+2-item pair is ordered differently case-insensitively); rejection vectors, each validly signed, for
+0, 1 and 21 items, unsorted items, a duplicate item and a duplicate `approvalId`, an unknown key in
+an item or in params, an upper-case or `0x` item `actionDigest`, and a batch body carrying
+`approval.decide` params and the reverse. The verify context's `pendingApprovals` holds every
+request the batches name, each expiring after the batch.
+
 Usage: python3 -I tools/vectors/generate_owner_action.py --check [FILE] | --write
 """
 
@@ -40,7 +48,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import vectorlib as v  # noqa: E402
 
 SUITE = "owner-action"
-VERSION = 2
+VERSION = 3
 TAG = "agentlink/owner-action/v1"
 ENVELOPE_TAG = "agentlink/envelope/v1"
 SPEC = "04 §2.5.1"
@@ -128,11 +136,11 @@ def build():
             )
         )
 
-    def reject(case_id, why, signed, ctx=context):
+    def reject(case_id, why, signed, ctx=context, spec=SPEC):
         cases.append(
             v.case(
                 case_id,
-                f"{SPEC}: {why}; rejected, never normalised",
+                f"{spec}: {why}; rejected, never normalised",
                 {"op": "verify", "signed": signed, "context": ctx},
                 {"outcome": "reject"},
             )
@@ -291,6 +299,119 @@ def build():
     ]:
         reject(case_id, why, signed_body(b), decide_ctx)
 
+    # approval.decideBatch (D-68; 04 §2.5.1, §2.5.2): {items: [...]}, 2 to BATCH_MAX items, each
+    # exactly the approval.decide params, in strictly ascending approvalId order compared as bytes.
+    # Written here from 04 §2.5.2, never taken from `@agentlink/types`. The context lists every
+    # pending request the batches below name (`pendingApprovals`), each expiring well after the
+    # batch, so a rejection vector can only be refused for the defect its id names.
+    batch_spec = "04 §2.5.1, §2.5.2 (D-68)"
+    batch_max = 20
+    requests = []
+    for i in range(batch_max + 1):
+        a = {"tool": "agentlink_send_message", "args": {"contact": other_agent, "text": f"batch request {i}"}, "context": {}}
+        requests.append(
+            {
+                "approvalId": "apr_" + v.b64u(v.det(f"owner-action/batch/approval-id/{i}", 16)),
+                "actionDigest": v.hx(v.sha256(v.jcs(a))),
+                "expiresAt": ISSUED_AT + 3600 * (1 + i % 24),
+            }
+        )
+
+    def id_bytes(r):
+        return r["approvalId"].encode("ascii")
+
+    requests.sort(key=id_bytes)
+    if len({id_bytes(r) for r in requests}) != len(requests):
+        v.fail("batch approvalIds must be unique")
+    batch_ctx = {**context, "pendingApprovals": requests}
+    batch_expires = ISSUED_AT + 600  # the CLI and local UI bound (04 §2.5.2), below every request's expiresAt
+    if batch_expires > min(r["expiresAt"] for r in requests):
+        v.fail("batch expiresAt must not exceed the earliest request's expiresAt")
+
+    def item(r, decision):
+        return {"approvalId": r["approvalId"], "actionDigest": r["actionDigest"], "decision": decision}
+
+    def items_of(reqs):
+        # Mixed decisions: every third item is a deny.
+        return [item(r, "deny" if k % 3 == 1 else "approve") for k, r in enumerate(reqs)]
+
+    def batch_body(items, **overrides):
+        return op_body("approval.decideBatch", {"items": items}, expires_at=batch_expires, **overrides)
+
+    # The 2-item batch is a pair whose byte order differs from a case-insensitive order (an upper-case
+    # or '_' character against a lower-case one), so a verifier that sorts with locale or
+    # case-folding rules refuses the canonical form and accepts the reversed one.
+    def folded(r):
+        return r["approvalId"].lower().encode("ascii")
+
+    pair = next(
+        ((x, y) for n, x in enumerate(requests) for y in requests[n + 1 :] if folded(x) > folded(y)),
+        None,
+    )
+    if pair is None:
+        v.fail("no approvalId pair whose byte order differs from the case-insensitive order")
+    items2 = items_of(list(pair))
+    items20 = items_of(requests[:batch_max])
+    if [i_["decision"] for i_ in items2] != ["approve", "deny"] or len({i_["decision"] for i_ in items20}) != 2:
+        v.fail("batch signing vectors must carry mixed decisions")
+    for case_id, why, b in [
+        ("sign-batch-2", "approval.decideBatch with 2 items (the minimum), approve and deny, ascending approvalId by bytes", batch_body(items2)),
+        ("sign-batch-20", f"approval.decideBatch with {batch_max} items (the maximum), mixed decisions", batch_body(items20)),
+    ]:
+        cases.append(
+            v.case(
+                case_id,
+                f"{batch_spec} SignedOwnerAction, {why}",
+                {"op": "sign", "body": b, "secretKey": v.hx(owner), "auxRand": v.hx(aux)},
+                {
+                    "jcs": jcs_lenient(b).decode("utf-8"),
+                    "bodyHash": v.hx(body_hash(b)),
+                    "signatureInput": v.hx(v.tagged_hash(TAG, body_hash(b))),
+                    "sig": sign(b, owner, aux),
+                },
+            )
+        )
+    for case_id, why, items in [
+        ("verify-batch-2", "a 2-item batch of pending requests verifies", items2),
+        ("verify-batch-20", f"a {batch_max}-item batch of pending requests verifies", items20),
+    ]:
+        cases.append(
+            v.case(
+                case_id,
+                f"{batch_spec}: {why}",
+                {"op": "verify", "signed": signed_body(batch_body(items)), "context": batch_ctx},
+                {"outcome": "accept"},
+            )
+        )
+
+    def with_item(items, k, **fields):
+        out = copy.deepcopy(items)
+        out[k].update(fields)
+        return out
+
+    swapped20 = copy.deepcopy(items20)
+    swapped20[9], swapped20[10] = swapped20[10], swapped20[9]
+    first = requests[0]
+    duplicate_same = [item(first, "approve"), item(first, "approve")]
+    duplicate_decisions = [item(first, "approve"), item(first, "deny")]
+    single_decide = {"approvalId": first["approvalId"], "actionDigest": first["actionDigest"], "decision": "approve"}
+    for case_id, why, b, ctx in [
+        ("reject-batch-1-item", "a batch of 1 item (one decision is always an approval.decide)", batch_body(items_of(requests[:1])), batch_ctx),
+        ("reject-batch-21-items", f"a batch of {batch_max + 1} items (above the maximum of {batch_max})", batch_body(items_of(requests)), batch_ctx),
+        ("reject-batch-0-items", "a batch with an empty `items`", batch_body([]), batch_ctx),
+        ("reject-batch-unsorted", "the 2 items in descending approvalId order (they are in ascending order case-insensitively)", batch_body(list(reversed(items2))), batch_ctx),
+        ("reject-batch-unsorted-middle", "items 10 and 11 of a 20-item batch swapped", batch_body(swapped20), batch_ctx),
+        ("reject-batch-duplicate-item", "the same item twice", batch_body(duplicate_same), batch_ctx),
+        ("reject-batch-duplicate-approval-id", "one approvalId twice, approved and denied", batch_body(duplicate_decisions), batch_ctx),
+        ("reject-batch-item-unknown-key", "an unknown key in an item", batch_body(with_item(items2, 1, note="x")), batch_ctx),
+        ("reject-batch-params-unknown-key", "an unknown key next to `items` in params", op_body("approval.decideBatch", {"items": items2, "note": "x"}, expires_at=batch_expires), batch_ctx),
+        ("reject-batch-digest-uppercase", "an item's `actionDigest` in upper-case hex", batch_body(with_item(items2, 0, actionDigest=items2[0]["actionDigest"].upper())), batch_ctx),
+        ("reject-batch-digest-0x-prefix", "an item's `actionDigest` with a 0x prefix (bare hex, §2.4.1)", batch_body(with_item(items2, 1, actionDigest="0x" + items2[1]["actionDigest"])), batch_ctx),
+        ("reject-batch-with-decide-params", "op approval.decideBatch carrying approval.decide params", op_body("approval.decideBatch", single_decide, expires_at=batch_expires), batch_ctx),
+        ("reject-decide-with-batch-params", "op approval.decide carrying approval.decideBatch params", op_body("approval.decide", {"items": items2}), {**batch_ctx, "pendingApproval": {k: first[k] for k in ("approvalId", "actionDigest", "expiresAt")}}),
+    ]:
+        reject(case_id, why, signed_body(b), ctx, spec=batch_spec)
+
     # policy.set schema rejections (06 §3 "Policy JSON form", G-32; 04 §2.5.1 "params match the
     # op's schema"). Each policy breaks one rule and is validly signed, so only the schema refuses it.
     def policy_edit(base, path, value=None, delete=False):
@@ -411,6 +532,10 @@ CONTEXT = {
         "ownerNostr": {"type": "string", "pattern": "^0x[0-9a-f]{64}$"},
         "now": v.INTEGER,
         "pendingApproval": v.strict_object({"approvalId": v.STRING, "actionDigest": v.hexn(32), "expiresAt": v.INTEGER}),
+        "pendingApprovals": {
+            "type": "array",
+            "items": v.strict_object({"approvalId": v.STRING, "actionDigest": v.hexn(32), "expiresAt": v.INTEGER}),
+        },
         "pairing": v.strict_object({"contact": v.ADDRESS, "pairingDigest": v.hexn(32)}),
         "appliedPolicyVersion": v.INTEGER,
     },
@@ -420,7 +545,8 @@ SCHEMA = v.case_schema(
     "04 §2.5.1 SignedOwnerAction. `sign`: JCS text, sha256 body hash, tagged signature input and "
     "sig for a body. `verify`: accept or reject a SignedOwnerAction for a receiving core whose "
     "agent address, card ownerNostr and clock are given in `context` (nonce store empty; "
-    "`appliedPolicyVersion` absent means 0).",
+    "`appliedPolicyVersion` absent means 0; `pendingApprovals` lists the pending requests an "
+    "approval.decideBatch names).",
     {
         "sign": (
             {"body": v.OBJECT, "secretKey": v.hexn(32), "auxRand": v.hexn(32)},
