@@ -24,7 +24,9 @@ export type TransportErrorCode =
   /** The rumor key is not the seal key (NIP-59). */
   | 'rumor_mismatch'
   /** The rumor has no `["agentlink", "1"]` tag. */
-  | 'missing_agentlink_tag';
+  | 'missing_agentlink_tag'
+  /** A relay list that is empty, over 32 entries, or has an entry that fails the relay URL rule (04 §4). */
+  | 'invalid_relays';
 
 /**
  * The one error type the transport throws for an envelope or event it refuses.
