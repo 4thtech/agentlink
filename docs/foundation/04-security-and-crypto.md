@@ -95,27 +95,40 @@ Display names are **self-declared** unless the agent is registered (F-41); UIs m
 
 #### 2.4.1 Canonical binary encodings (proposed; owner confirms at merge)
 
-Every binary value has exactly one spelling, fixed by the domain it comes from. The rule covers every JSON object the protocol signs, hashes, sends or exports: cards, owner actions, envelopes, payload bodies, proof packs and tool results. Non-JSON carriers (the DNS TXT record of §2.7) keep their own stated form.
+Every binary value has exactly one spelling. The rule covers every JSON object the protocol signs, hashes, sends or exports: cards, owner actions, envelopes, payload bodies, proof packs and tool results. Non-JSON carriers (the DNS TXT record of §2.7) keep their own stated form.
 
-| Class | Form | Values |
-|---|---|---|
-| Nostr-native | Lowercase hex, no prefix: 64 characters for 32 bytes, 128 for 64 bytes (NIP-01) | Nostr x-only public keys outside EIP-712 messages (envelope `from`, OwnerAction `owner`, CommitmentScope `counterparty.ownerKey`); Nostr event ids; BIP-340 signatures (envelope and owner-action `sig`) |
-| EVM-native | `0x` + lowercase hex of the exact length | EVM addresses (`0x` + 40). Every value with an ABI or EIP-712 type: the `bytes32` fields of the 05 structs and events (`recordId`, `salt`, `envelopeHash`, `recipientCommitment`, `parentRecordId`, `appId`), every address or `bytes32` field of an EIP-712 message (the AgentCard; `DomainClaim`, §2.7), EIP-712 digests and struct hashes, transaction hashes, and ECDSA signatures (`cardSig`, record and receipt signatures: `0x` + 130 for a 65-byte EOA signature; an ERC-1271 signature has the length its account returns). `uint256` values (Record `maxFee`, `nonce`) are decimal strings with no sign and no leading zero |
-| Content digests | Lowercase hex, no prefix, 64 characters | SHA-256 values that never enter a contract or an EIP-712 message: `termsHash`, `previousTermsHash`, `actionDigest`, `plaintextSha256`, `ciphertextSha256`, `policyHash` |
-| Other bytes | base64url, no padding (§3.1) | Identifiers, nonces, keys and secrets (`id`, `thread`, `inviteId`, `secret`, `termsId`, the owner-action and drop `nonce`, `kid`, `enc`, `wk`, `iv`, `fileKey`, `contentKey`), ciphertext and payload bytes (`ct`, `inline`), the `handshake` `proof` |
+**Decision rule, applied per field name.** A field name has one encoding everywhere in the protocol:
+1. **`0x` + lowercase hex** if the value is ever an EIP-712 field or an ABI value: it goes on-chain, into a Record or Receipt, or into an EIP-712 message. A field that appears in both worlds counts as EVM-native everywhere. Examples: `envelopeHash` (in a commitment scope and in a Record), and `recordId` and `salt` (in the `proof` body and on-chain).
+2. Otherwise, **bare lowercase hex** if the value is a Nostr value, or a digest that is only ever signed or verified under a Nostr key (BIP-340: envelope `sig`, owner-action `sig`).
+3. Otherwise, **base64url without padding** (§3.1).
 
-- **The carrying structure decides the class.** A Nostr key inside an EIP-712 message is a `bytes32` there. The card's `ownerNostr` is `0x` + 64 hex, while the same key as an OwnerAction `owner` or an envelope `from` is 64 hex without a prefix.
+An object embedded in another one keeps its own bytes. For example, a proof pack carries a `SignedOwnerAction` or a disclosed envelope verbatim, so their fields keep the forms below. Being inside a pack never re-encodes a field. A new field that would enter a Record or an EIP-712 message is EVM-native from its first version. An existing bare-hex field is never moved on-chain under the same name.
+
+| Encoding | Field names |
+|---|---|
+| `0x` + 40 hex (address) | `agent`, `agentId`, `parties[]`, `deliverables[].by`, `price.payer`, `counterparty.agentId`, card `agentEvm` and `ownerEvm`; proof pack `notary`, `signer.evm`, `recipient.evm`, `receipts[].signer`; Record and Receipt `signer`, `feeToken` |
+| `0x` + 64 hex (`bytes32`) | `recordId`, `salt`, `envelopeHash`, `recipientCommitment`, `parentRecordId`, `appId`, `recordStructHash`, `txHash`; card `agentNostr`, `agentEnc`, `ownerNostr`, `ownerEnc`, `nameHash`, `relaysHash`; EIP-712 digests and struct hashes; `DomainClaim` `ownerNostr` (§2.7) |
+| `0x` + hex (ECDSA signature) | `cardSig`, proof pack `signature`, and Record and Receipt signatures: 130 hex for a 65-byte EOA signature; an ERC-1271 signature has the length its account returns |
+| Decimal string (`uint256`) | Record `maxFee` and `nonce`: no sign and no leading zero |
+| Bare hex, 64 (Nostr key) | envelope `from`, OwnerAction `owner`, CommitmentScope `counterparty.ownerKey`, Nostr event ids |
+| Bare hex, 128 (BIP-340) | envelope `sig`, `SignedOwnerAction` `sig` |
+| Bare hex, 64 (digest under a Nostr key only) | `actionDigest`, `termsHash`, `previousTermsHash`, `plaintextSha256`, `ciphertextSha256`, `policyHash` |
+| base64url | `id`, `thread`, `envelopeId`, `replyTo`, `handshakeId`, `inviteId`, `secret`, `termsId`, the owner-action and drop `nonce`, `kid`, `enc`, `wk`, `iv`, `ct`, `inline`, `fileKey`, `contentKey`, the `handshake` `proof` |
+
+**Hashes that reach a Record.** The Record and Receipt commit only `envelopeHash`, `recipientCommitment` (from `salt`), `parentRecordId` and `appId`. Files and terms reach the chain only through `envelopeHash`. `termsHash`, `plaintextSha256` and `ciphertextSha256` are never Record fields, so they stay bare hex everywhere, including inside a disclosed envelope in a proof pack.
+
+- **The field name decides, not the key it holds.** A Nostr key inside an EIP-712 message is a `bytes32` there. The card's `ownerNostr` is `0x` + 64 hex, while the same key as an OwnerAction `owner` or an envelope `from` is 64 hex without a prefix.
 - **Compare bytes, never strings.** Each value first passes its strict parse. Every equality between two encoded values then decodes both to bytes and compares the bytes. Examples: OwnerAction `owner` with the card's `ownerNostr` (§2.5.1, §3.4.1 `revoke`), envelope `from` with the card's `agentNostr` (§3.4.1), the seal key with `from` (§3.5), and a stored card's fields with a new card's (`card-update`). Nothing re-encodes, trims or lower-cases a value in order to compare it. `@agentlink/types` provides the decoders, so no caller writes its own conversion.
 - **Non-canonical forms are rejected on parse, never normalised:**
   - upper-case or mixed-case hex, including EIP-55 checksummed addresses (checksums are for display only);
-  - a missing `0x` on an EVM-native value, a `0x` on a Nostr-native value or digest, and `0X`;
+  - a missing `0x` on a `0x` field, a `0x` on a bare-hex field, and `0X`;
   - a wrong length, or whitespace anywhere;
   - base64url with padding, `+` or `/`, or non-zero trailing bits;
   - for decimal strings, a sign, a leading zero, or a value outside the type's range.
 - **Integers** other than `uint256` are JSON integers in [0, 2^53 − 1], including the card's `uint8`, `uint32` and `uint64` fields. A `uint64` value above 2^53 − 1 is rejected.
-- **Test vectors (M1-1h).** M1-1h carries accept and reject vectors for each class:
-  - the canonical form of each value listed above;
-  - each non-canonical form above, applied to a value of each class;
+- **Test vectors (M1-1h).** M1-1h carries accept and reject vectors for each row of the table:
+  - the canonical form of each field listed above;
+  - each non-canonical form above, applied to a field of each row;
   - the cross-class cases: a card `ownerNostr` and an OwnerAction `owner` for the same key compare equal as bytes; an `owner` with `0x`, and a card key without it, are each rejected; a `proof` body whose `recordId` or `salt` is base64url is rejected.
 
 ### 2.5 Owner operations and user presence
@@ -481,7 +494,7 @@ All binary values are base64url **without padding** in JSON unless §2.4.1 puts 
     "validUntil": 1760600000,                     // unix seconds; the terms lapse after this
     "previousTermsHash": "<64 lowercase hex> | null" // termsHash of the version this one replaces
   },
-  "termsHash": "<64 lowercase hex>",              // sha256(JCS(terms)), RFC 8785; a content digest (§2.4.1)
+  "termsHash": "<64 lowercase hex>",              // sha256(JCS(terms)), RFC 8785; bare hex (§2.4.1)
   "note": "string | null"                         // free text, not covered by termsHash; only on reject and on unrecorded offers (never on accept or a firm offer)
 }
 ```
@@ -523,7 +536,7 @@ All binary values are base64url **without padding** in JSON unless §2.4.1 puts 
 - **On-chain.** For a registered agent, the console also submits the Registry `revoke` (05 §4, M2-4b). Contacts and the verify page treat either one as revocation.
 
 **`approval-request` fields.**
-- `approvalId`: `apr_` followed by 16 random bytes (base64url). `agent`: the requesting agent's EVM address in the canonical form (§2.5.1). `actionDigest`: 64 lowercase hex (a content digest, §2.4.1).
+- `approvalId`: `apr_` followed by 16 random bytes (base64url). `agent`: the requesting agent's EVM address in the canonical form (§2.5.1). `actionDigest`: 64 lowercase hex, no prefix (§2.4.1).
 - `action`: the exact action the owner approves, `{tool, args, context}`. `tool` is the MCP tool name (06 §2.0). `args` is the tool input after defaults are applied, without `approvalId` and `clientRequestId`, with paths resolved by `realpath`. `context` holds the facts the core bound when it evaluated policy (for example the contact's agent EVM address, the file's `plaintextSha256`, and for paid actions the fee `{token, amount, usd}`), so the digest covers them. Its per-tool fields are fixed in M1-2b.
 - `actionDigest` = `sha256(JCS(action))` (M1-7e). The console recomputes it and refuses a mismatch, and the owner's `approval.decide` signs this digest. An approval therefore cannot be reused for any other action, even one the agent describes the same way.
 - `summary`: core-generated template text (≤ 200 characters) naming the contact (under the contact-name rule, 06 §2.1) and the action, never inbound text (06 §4). The console treats it as a label only and renders the approval card from `action`.
