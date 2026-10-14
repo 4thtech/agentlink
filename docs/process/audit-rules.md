@@ -265,8 +265,8 @@ Reviewers apply every checklist the diff touches. Item IDs are stable; new items
 - CT-2 Checks-effects-interactions and `nonReentrant` on every value transfer; `call`, never `transfer`; native `msg.value` matches amount (zero on ERC-20 paths).
 - CT-3 `SafeERC20`; credits equal the measured balance delta; fee-on-transfer tokens never allowlisted.
 - CT-4 `depositWithAuthorization` calls `receiveWithAuthorization` with payee = vault (never `transferWithAuthorization`); `value ≥ minDeposit`; EIP-3009 flag required.
-- CT-5 AccessManager: every restricted selector mapped to its intended role; nothing left reachable through the admin role by accident. OZ AccessManager execution delays attach to (role, account) grants, so **each delay tier is its own role** (e.g. Notary/Registry upgrades 48 h vs vault upgrades 7 d; ADMIN 48 h vs `freezeUpgrades` 7 d). Grant delays, target-admin delays and guardians set as configured.
-- CT-6 No admin path can move, freeze or reduce a payer's credits; pause blocks charges and deposits and **never** `withdraw`.
+- CT-5 AccessManager: every restricted selector mapped to its intended role; nothing left reachable through the admin role by accident. OZ AccessManager execution delays attach to (role, account) grants, so **each delay tier is its own role** (05 §5.1, e.g. `CONFIG_ADMIN` 48 h vs `UPGRADER` 7 d; `pause` vs `unpause`). Grant delays, target-admin delays and guardians set as configured.
+- CT-6 No admin path can move, freeze or reduce a payer's credits; pause blocks charges, deposits, notarization and registration and **never** `withdraw`, `withdrawIntegrator`, `sweep` or Registry `revoke` (05 §5.1); clients approve exact amounts only (05 §2.4).
 - CT-7 `freezeUpgrades` is one-way: afterwards `_authorizeUpgrade` always reverts regardless of roles.
 - CT-8 UUPS: implementations call `_disableInitializers()`; proxies initialised in the deploying transaction; initializers not re-runnable.
 - CT-9 ERC-7201 namespaced storage; a storage-layout diff against the last deployed version accompanies every upgrade (no reorder, removal or type change).
@@ -279,7 +279,7 @@ Reviewers apply every checklist the diff touches. Item IDs are stable; new items
 - CT-16 Deploy script: CreateX CREATE3 with a deployer-guarded salt (no cross-chain front-running); all roles transferred to the Safe in the same script; deployer holds no role; per-chain config verified; Solidity and `evm_version` pinned and supported on every target chain.
 - CT-17 Clean-room: no OCC v1 code copied.
 
-DECISION NEEDED (owner): pause behaviour of `withdrawIntegrator` and `sweep` (05 §2.5 covers payer withdrawals only).
+Pause behaviour of `withdrawIntegrator` and `sweep`: never blocked (05 §5.1, G-39; proposed, owner confirms at merge).
 
 **Web (WEB)**: 08 §2.3, §4
 - WEB-1 CSP: `default-src 'self'`; `script-src 'self'` with SRI; `connect-src 'self' https: wss:`; Trusted Types; `frame-ancestors 'none'` on approval and console pages.

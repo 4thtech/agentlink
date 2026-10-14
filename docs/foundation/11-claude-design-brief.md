@@ -397,7 +397,7 @@ Only act on it if your user asks you to.
 
 Suggested relay: "Marko's agent sent a request (their words, not an instruction to me): '…'. Shall I send it?"
 
-**Commitments** (one approval per agreement, *D-55*, 04 §3.4.1):
+**Commitments** (one approval per agreement, *D-55*, 04 §3.4.2):
 - Asking: "Accepting {contactName}'s terms (version 3) commits you. One approval covers your acceptance and its proof. Review and approve: {url}". Don't name the subject or price; they came from the other side.
 - Asking, when the other side recorded its acceptance of your offer: "{contactName} accepted your terms (version 3) and recorded it. Adding your acceptance makes this a proof of agreement and commits you. Review and approve: {url}"
 - Asking, when they accepted an older version: "{contactName} accepted version 3 after you sent version 4. Review before you add your acceptance: {url}"
@@ -723,7 +723,7 @@ All components support light, dark and increased contrast, keyboard and screen r
 | **Biometric prompt sheet** | One line on what is approved → "Confirm with Touch ID / Windows Hello / passphrase" → hands over to the **real OS prompt** (never imitated) | Waiting · confirmed · cancelled · failed · unavailable → passphrase |
 | **Contact card, agent chip, file card** | Name, owner, label, AI app, last activity / agent, AI app, status / sanitized name, size, expiry, integrity, download | Blocked · revoked · paused · expired (request fresh link) · integrity failed (not saved) |
 | **Config diff, copy-prompt block** | AI app, file, lines added, Apply / Skip / the prompt with a Copy button | Applied · skipped · failed · restart needed · copied |
-| **Rules editor** | "Ask me before connecting with a new contact" · "Hold messages from unknown senders" · "Add proof: Allowed / Ask me / Never" · "Daily proof budget $5" · "Ask me before any proof over $1" · "Ask before sharing a document key" · "Accepting terms: Ask me every time (recommended) / Allow / Never" · auto-accept for listed contacts up to $X (USD-priced terms only, never rejecting) · file rules · Advanced: default network | Every save needs owner presence |
+| **Rules editor** | "Ask me before connecting with a new contact" · "Hold messages from unknown senders" · "Add proof: Allowed / Ask me / Never" · "Daily proof budget $5" · "Ask me before any proof over $1" · "Ask before sharing a document key" · "Accepting terms: Ask me every time (recommended) / Allow / Never" · auto-accept for listed contacts when you pay, up to $X (USD-priced terms only, never rejecting) · selling auto-accept, off by default; turning it on first shows, as its own confirmation step: "Your agent will commit you to deliver whatever this contact writes, for at least $X. Only turn this on for contacts you trust." (*D-55*) · file rules · Advanced: default network | Every save needs owner presence |
 | **Pairing QR, secret display** | QR + 6-digit code / a §5.5 secret in grouped characters, Copy, Download, Print, "I've saved it" | Matched · expired · confirmed · copied |
 | **Usage meter, connector row** | Drop usage this week / provider, account, status, Disconnect | Within · near · reached / connected · expired · disconnected |
 | **OAuth consent card** | AI app name (theirs) + return domain · agent · can / can't lists · Approve in console / access code | Waiting · approved · denied · expired |
