@@ -1109,6 +1109,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Field validation: base64url without padding, byte lengths (id/thread/kid 16 B, keys 32 B), hex formats.
   - G-23/G-28 (04 §2.9, §3.6, §3.6.1, §3.4.1): `agentId` (`0x` + 40 lowercase hex). Invite: `cardAgentSig` and `codeCommit`. `handshake`: `cardAgentSig`, `codeNonce`, `codeCommit` and `inviterCardHash` (bare hex 64). `handshake-ack`: `handshakeHash` (`0x` + 64 hex, an `envelopeHash`), `codeReveal`, `card` and `cardSig`. `contact.check` params: `{contact, pairingDigest}`, where `pairingDigest` is 64 lowercase hex with no prefix. The 32-byte fields are base64url of exactly 32 bytes, and `inviteId` is exactly 16 bytes. Every field is required, and non-canonical forms are rejected.
   - Security S2 because envelope/payload schema changes are S2 (`audit-rules.md` §2.2).
+- **Split (orchestrator):** the G-23/G-28 pairing-body fields above (invite, `handshake`, `handshake-ack`) are done under M1-2d together with the G-24 `relays` change, so the pairing bodies land complete before M1-7c. The other parts stay here.
 - **Acceptance:**
   - Vector suite `encodings`: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - Round-trip tests for every schema; property-based fuzzing never throws anything but a validation error.
@@ -1164,7 +1165,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Each Low is fixed with a negative control, or recorded as covered by the spec PR.
 
 #### M1-2d · types: G-24 relay schema changes (new)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** ready · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types, tools/vectors, test-vectors
 - **Depends on:** M1-2a; gap G-24 resolved (branch `docs/G-24-owner-copy-relays`, pending owner)
 - **Spec:** 04 §3.4 (`relays` 2–16), §3.4.1 (`handshake-ack` `relays`), §3.6; 07 §4.3
@@ -1176,6 +1177,8 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - An ack without `relays`, and any carried list with 1 or 17 entries, is rejected; the regenerated vectors pass in all five runtimes.
   - Lands before M1-7c freezes pairing.
+- **Split (orchestrator):** this card also takes the M1-2a G-23/G-28 pairing-body fields: invite `cardAgentSig` and `codeCommit`; `handshake` `cardAgentSig`, `codeNonce`, `codeCommit` and `inviterCardHash`; `handshake-ack` `handshakeHash`, `codeReveal`, `card` and `cardSig`. The vectors come from an independent generator session (M1-1h rules) that writes neither `packages/types` nor `packages/core`; a separate session writes the schemas against the committed vectors.
+- **Threat note (draft):** a lax pairing-body schema could (a) accept a carried relay list of 1 entry, which can never reach `sent`, or of more than 16, which widens the connect (SSRF) surface; (b) accept a `handshake-ack` without `relays`, so the invitee's owner never learns the inviter's list and a revoke falls back to the bootstrap set (G-24); (c) accept a pairing body without `codeCommit`, `codeNonce` or `codeReveal`, or with a nonce of the wrong length, so the commit-then-reveal step is skipped or the fixed 144-byte transcript becomes ambiguous and the safety code stops detecting a MITM (04 §3.6.1); (d) accept an unknown key or a second spelling (padded base64url, upper-case hex, `0x` on `inviterCardHash`), giving one signed body two readings or defeating a byte comparison (04 §2.4.1); (e) for the invite link, accept a zlib or gzip wrapper or trailing bytes (two readings of one link) or inflate without a cap (a deflate bomb). Stopped by: strict schemas that reject and never normalise (04 §2.4.1, §3.4, §3.6); fixed byte lengths; the core's signature, `nameHash`/`relaysHash` and commitment checks (M1-7c, 04 §3.4.1, §3.6.1); I-5. Residual: a schema cannot check signatures or hashes, so a well-formed body with a wrong `relaysHash` passes it and is refused only by the core (M1-7c); the inflate cap is not yet a number in the spec (G-12).
 
 #### M1-2e · types: `approval.decideBatch` schema and vectors (new, D-68)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
