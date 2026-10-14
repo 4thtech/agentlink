@@ -29,7 +29,7 @@ When a drop lands, the orchestrator records it here: the date, the links or file
 ## How the owner delivers
 
 Use either or both:
-- **Claude Design links:** paste the artifact links here or into the drop's `MANIFEST.md`, or give them to the orchestrator. Agents read them with the Artifact tool.
+- **Claude Design links:** paste the links into the drop's `MANIFEST.md`. They are for people; whether agents can read Claude Design links is unverified (check before D1), so agents build only from exported files.
 - **Exported files:** committed under `docs/design/` as below. This repo is public; anything that must stay private goes to `agentlink-ops`.
 
 ### Folder layout
@@ -61,6 +61,12 @@ docs/design/
 - **Brand assets:** `agentlink-<asset>-<variant>[-<size>].<ext>`, e.g. `agentlink-mark-mono-16.png`, `agentlink-tray-macos-approvals-36.png`.
 - **Tokens:** W3C Design Tokens JSON plus `tokens.css`, named per 11 §11.7.
 - Lowercase, hyphens, no spaces.
+
+### What to export
+
+- **Minimum PNG set** (keeps a drop under about 25 MB): each screen's default state in light and dark at its primary size; key components (approval card, commitment card, untrusted container, safety code, proof badge) also in increased contrast; all brand assets.
+- **Everything else** (other states, sizes, prototypes) stays in the Claude Design project, linked from `MANIFEST.md`. If Claude Design offers an HTML or handoff-bundle export, include it when small or link it; at intake an agent renders further PNGs from it with a headless browser.
+- **Formats Claude Design may not produce:** tokens as W3C JSON, ICO and ICNS, and every PNG icon size are requested "if available". Otherwise export the CSS or a token table and the SVG masters, and the intake agent converts them.
 
 ### Size and source files
 

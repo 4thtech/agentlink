@@ -1855,6 +1855,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - On fresh machines, a user's agent installs AgentLink from the prompt alone, in under 5 minutes, on Claude Code, Codex and Gemini CLI (transcripts or recordings with times in the PR).
   - `init` writes no harness config without an explicit confirmation, and owner setup refuses non-TTY input (tests); prompts pass the vocabulary lint.
 
+#### M1-31 · Local UI passkey origin: `localhost` vs `127.0.0.1` (new, IR-D56-1 F12)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · docs/foundation/08-clients-console-cloud.md §1, docs/foundation/06-mcp-server.md §2.5 (example URL), apps/cli (local UI server)
+- **Depends on:** — (before M1-8e and M1-11a are implemented)
+- **Spec:** 08 §1; 04 §2.5; 06 §2.5; 11 §6.2.1
+- **Invariants:** I-4
+- **Scope:**
+  - 08 §1 serves the local UI on `127.0.0.1` but registers the owner passkey for the RP ID `localhost`. WebAuthn does not accept an IP address as an RP ID, so the page must be opened as `http://localhost:<port>`. Fix 08 §1, the 06 §2.5 approval URL example and 11 §6.2.1 to one origin, and keep the `Host`-header and DNS-rebinding checks consistent with it.
+  - Check how `localhost` resolves on each OS (IPv4 and IPv6) and bind accordingly, without listening on non-loopback interfaces.
+- **Acceptance:**
+  - Specs name one origin for the local UI; a test registers and uses a PRF passkey on that origin, and requests with any other `Host` value are rejected.
+
 #### M1-GATE · Milestone 1 gate: internal audit and user testing
 - **Status:** backlog · **Size:** M · **Tier:** Opus (audit session) + Owner (sign-off) · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** private audit store (`audit-rules.md` §4.5); summary in the owner's sync file
