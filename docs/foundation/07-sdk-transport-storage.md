@@ -109,7 +109,7 @@ An XMTP adapter (P2) implements the same interface; envelopes are unchanged.
 ### 4.2 Nostr implementation
 
 - **Wrapping:** NIP-59 gift wrap (kind 1059) of a NIP-59 seal (kind 13) containing an unsigned rumor (kind 14, tag `["agentlink","1"]`, `content` = envelope JSON). NIP-44 v2 encryption. Randomized `created_at` per NIP-59.
-- **Relays:** each agent card lists 3–5 relays (default: a curated set of reliable public relays + the optional 4thTech relay). Publish to the **recipient's** relays and the sender's own relays. Relay URLs from cards, invites and bodies are inbound content. They pass the raw-string relay URL schema at parse (04 §4, relay URLs).
+- **Relays:** each agent card lists 3–5 relays (default: a curated set of reliable public relays + the optional 4thTech relay). Publish to the **recipient's** relays and the sender's own relays. Relay URLs from cards, invites and bodies are inbound content. They pass the raw-string relay URL schema at parse (04 §4, relay URLs). A relay host name with an all-numeric or `0x`-hex label anywhere (for example `1.relay.example`) is rejected, so relay operators, the 4thTech relay included, avoid such names.
 - **Relay connections (M1-5; proposed, owner confirms at merge).** These rules close DNS rebinding and SSRF at connect time, on runtimes that control their own sockets (Node; the desktop app):
   1. Resolve the validated host string (A and AAAA).
   2. Accept the relay only if **every** resolved address is globally routable. Any other address skips the relay, and the activity log names it without the address.
