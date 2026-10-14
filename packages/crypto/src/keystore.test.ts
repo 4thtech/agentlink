@@ -17,14 +17,12 @@ const SEED_OR_SECRET = [
   'derivePublicIdentity',
   'bip340Sign',
   'bip340PublicKey',
-  // M1-1g: NIP-44 functions that take a secret key or a conversation key, and the in-memory
-  // KeyStores that are built from a seed (tests and development only).
+  // M1-1g: NIP-44 functions that take a secret key or a conversation key. The in-memory KeyStores
+  // are in the test-only subpath @agentlink/crypto/testing (IR-M1-1g-1 M-2), not here.
   nip44('ConversationKey'),
   nip44('MessageKeys'),
   nip44('EncryptWithKey'),
   nip44('DecryptWithKey'),
-  'MemoryKeyStore',
-  'MemoryOwnerKeyStore',
 ];
 
 describe('@agentlink/crypto/keystore', () => {
@@ -77,7 +75,7 @@ describe('@agentlink/crypto/keystore', () => {
     const manifest = (await import('../package.json', { with: { type: 'json' } })).default as {
       exports: Record<string, unknown>;
     };
-    expect(Object.keys(manifest.exports).sort()).toEqual(['.', './keystore']);
+    expect(Object.keys(manifest.exports).sort()).toEqual(['.', './keystore', './testing']);
     expect(manifest.exports['./keystore']).toEqual({
       types: './dist/keystore.d.ts',
       default: './dist/keystore.js',

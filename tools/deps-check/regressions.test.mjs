@@ -409,3 +409,52 @@ describe('IR-M1-1b-1 M-1: the restricted @agentlink/crypto/keystore subpath', ()
     expect(ruleFor('test-vectors')).not.toMatch(RESTRICTED);
   });
 });
+
+describe('IR-M1-1g-1 M-2: the test-only @agentlink/crypto/testing subpath', () => {
+  const testing = `import { MemoryKeyStore } from '@agentlink/crypto/testing';\nvoid MemoryKeyStore;\n`;
+  const TEST_ONLY = /@agentlink\/crypto\/testing may be imported only in test files/;
+
+  it('is refused in production source of every zone, packages/node included', () => {
+    for (const zone of Object.keys(ZONES)) {
+      expect(violationFor(zone, '@agentlink/crypto/testing', `${zone}/src/a.ts`), zone).toMatch(
+        TEST_ONLY,
+      );
+    }
+    expect(
+      violationFor('packages/node', '@agentlink/crypto/testing/x', 'packages/node/src/a.ts'),
+    ).toMatch(TEST_ONLY);
+  });
+
+  it('is refused in production source in every import form', () => {
+    for (const code of [
+      testing,
+      `export { MemoryKeyStore } from '@agentlink/crypto/testing';\n`,
+      `const m = await import('@agentlink/crypto/testing');\n`,
+      `type T = import('@agentlink/crypto/testing').MemoryKeyStore;\n`,
+    ]) {
+      expect(src('packages/core', code).join('\n')).toMatch(TEST_ONLY);
+    }
+  });
+
+  it('is allowed in test files, the vector harness and e2e (layering still applies)', () => {
+    expect(src('packages/core', testing, 'src/a.test.ts')).toEqual([]);
+    expect(src('packages/core', testing, 'test/b.test.mts')).toEqual([]);
+    expect(
+      violationFor('packages/core', '@agentlink/crypto/testing', 'packages/core/src/a.test.ts'),
+    ).toBeNull();
+    // test-vectors/ and e2e/ have no layering entry (their own ESLint configs govern them); only
+    // the test-only rule is under test here.
+    expect(
+      violationFor('test-vectors', '@agentlink/crypto/testing', 'test-vectors/harness/x.ts') ?? '',
+    ).not.toMatch(TEST_ONLY);
+    expect(violationFor(null, '@agentlink/crypto/testing', 'e2e/flows/x.ts') ?? '').not.toMatch(
+      TEST_ONLY,
+    );
+  });
+
+  it('does not count a name that only looks like a test file', () => {
+    for (const file of ['src/a.test.ts.bak', 'src/test.ts', 'src/a.testing.ts', 'src/tests/a.ts']) {
+      expect(src('packages/core', testing, file).join('\n'), file).toMatch(TEST_ONLY);
+    }
+  });
+});

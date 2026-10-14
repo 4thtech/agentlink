@@ -14,7 +14,7 @@ import {
   type OwnerPresence,
 } from './keystore-api.js';
 import { KEY_LABELS, derivePublicIdentity, derivePublicKey, deriveSecretKey } from './keys.js';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from './memory-keystore.js';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from './testing.js';
 import { nip44ConversationKey, nip44DecryptWithKey, nip44EncryptWithKey } from './nip44.js';
 import { verifyNostrEvent } from './nostr-event.js';
 
@@ -359,6 +359,59 @@ describe('MemoryOwnerKeyStore', () => {
     await one.close();
     expect(await codeOf(() => one.signOwnerAction(action()))).toBe('owner_locked');
     expect(await two.signOwnerAction(action())).toMatch(/^[0-9a-f]{128}$/);
+  });
+
+  it('owner-channel operations fail closed until G-2 is decided (IR-M1-1g-1 M-1)', async () => {
+    const session = await owner.unlock(passphrase(CODE));
+    const peer = nostrHex(SEED_A);
+    const event = { kind: 13, created_at: 0, tags: [], content: '' };
+    const ops = [
+      () => session.signEnvelopeHash(new Uint8Array(32)),
+      () => session.signNostr(event),
+      () => session.nip44Decrypt(peer, 'A'.repeat(132)),
+      () =>
+        session.hpkeOpen({ enc: new Uint8Array(32), wk: new Uint8Array(48) }, new Uint8Array(0)),
+    ];
+    for (const op of ops) expect(await codeOf(op)).toBe('unsupported_operation');
+    await session.close();
+    for (const op of ops) expect(await codeOf(op)).toBe('owner_locked');
+  });
+
+  it('expiry is enforced on the monotonic clock too: a wall clock set back does not extend it (IR-M1-1g-1 L-1)', async () => {
+    const session = await owner.unlock(passphrase(CODE), { ttlMs: 1000 });
+    const perf = (globalThis as unknown as { performance: { now(): number } }).performance;
+    const start = perf.now();
+    vi.setSystemTime(Date.now() - 10_000_000);
+    const spy = vi.spyOn(perf, 'now').mockReturnValue(start + 1000);
+    try {
+      expect(session.isActive()).toBe(false);
+      expect(await codeOf(() => session.signOwnerAction(action()))).toBe('owner_locked');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('lock cancels an unlock that is still in flight (IR-M1-1g-1 L-2)', async () => {
+    const presence = passphrase(CODE);
+    const pending = owner.unlock(presence);
+    await owner.lock();
+    expect(await codeOf(() => pending)).toBe('owner_locked');
+    expect(presence.kind === 'passphrase' && presence.secret.every((x) => x === 0)).toBe(true);
+    const after = await owner.unlock(passphrase(CODE));
+    expect(after.isActive()).toBe(true);
+  });
+
+  it('wipes the bytes of a malformed presence proof too (IR-M1-1g-1 I-1)', async () => {
+    const short = new Uint8Array(31).fill(9);
+    const wrongKind = new Uint8Array(32).fill(9);
+    expect(
+      await codeOf(() => owner.unlock({ kind: 'passkey-prf', prfOutput: short } as never)),
+    ).toBe('presence_required');
+    expect(
+      await codeOf(() => owner.unlock({ kind: 'environment', secret: wrongKind } as never)),
+    ).toBe('presence_required');
+    expect(short.every((x) => x === 0)).toBe(true);
+    expect(wrongKind.every((x) => x === 0)).toBe(true);
   });
 
   it('owner sign712 fails closed until M1-1e', async () => {

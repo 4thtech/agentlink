@@ -56,7 +56,8 @@ describe('KeyStore (type level)', () => {
 describe('OwnerKeyStore (type level)', () => {
   it('returns no bytes from any method, its sessions included', () => {
     expectTypeOf<BytesReturning<OwnerKeyStore>>().toEqualTypeOf<never>();
-    expectTypeOf<BytesReturning<OwnerSession>>().toEqualTypeOf<never>();
+    // hpkeOpen under the owner key returns a CEK, as on the KeyStore; never a key or seed.
+    expectTypeOf<BytesReturning<OwnerSession>>().toEqualTypeOf<'hpkeOpen'>();
     expectTypeOf<keyof OwnerPublicKeys>().toEqualTypeOf<'ownerEvm' | 'ownerNostr' | 'ownerEnc'>();
   });
 
@@ -75,6 +76,19 @@ describe('OwnerKeyStore (type level)', () => {
       // @ts-expect-error: unlock requires an OwnerPresence argument.
       store.unlock();
     expect(typeof unlockWithout).toBe('function');
+  });
+
+  it('a session has the owner signatures and the owner-channel operations (M-1, G-2)', () => {
+    expectTypeOf<MethodNames<OwnerSession>>().toEqualTypeOf<
+      | 'isActive'
+      | 'signOwnerAction'
+      | 'sign712'
+      | 'signEnvelopeHash'
+      | 'signNostr'
+      | 'nip44Decrypt'
+      | 'hpkeOpen'
+      | 'close'
+    >();
   });
 
   it('accepts only the two presence kinds of 04 §2.5', () => {

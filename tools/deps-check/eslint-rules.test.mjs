@@ -200,3 +200,28 @@ describe('IR-M1-1b-1 M-1: @agentlink/crypto/keystore is for KeyStore backends on
     expect(await lint('packages/core/src/a.ts', main)).toEqual([]);
   });
 });
+
+describe('IR-M1-1g-1 M-2: @agentlink/crypto/testing is for test files only', () => {
+  const testing = `import { MemoryKeyStore } from '@agentlink/crypto/testing';\nvoid MemoryKeyStore;\n`;
+
+  it.each(['packages/core/src/a.ts', 'packages/node/src/a.ts', 'apps/cli/src/a.ts'])(
+    'rejects a static import in production source %s',
+    async (filePath) => {
+      const messages = await lint(filePath, testing);
+      expect(messages.map((m) => m.message).join('\n')).toMatch(
+        /@agentlink\/crypto\/testing may be imported only in test files/,
+      );
+    },
+  );
+
+  it('rejects a dynamic import in production source', async () => {
+    const code = `const m = await import('@agentlink/crypto/testing');`;
+    expect(rules(await lint('packages/core/src/a.ts', code))).toContain('boundaries/no-bypass');
+  });
+
+  it('allows it in a test file of a zone that may import @agentlink/crypto', async () => {
+    expect(await lint('packages/core/src/a.test.ts', testing)).toEqual([]);
+    const dynamic = `const m = await import('@agentlink/crypto/testing');\nvoid m;\n`;
+    expect(await lint('packages/core/src/a.test.ts', dynamic)).toEqual([]);
+  });
+});

@@ -5,7 +5,7 @@ import { encodeHex } from './encoding.js';
 import { CryptoInputError } from './errors.js';
 import { createGiftWrap } from './gift-wrap.js';
 import { derivePublicIdentity } from './keys.js';
-import { MemoryKeyStore } from './memory-keystore.js';
+import { MemoryKeyStore } from './testing.js';
 import { NOSTR_KIND_GIFT_WRAP, NOSTR_KIND_SEAL, verifyNostrEvent } from './nostr-event.js';
 
 const SENDER = Uint8Array.from({ length: 32 }, (_, i) => i + 10);
