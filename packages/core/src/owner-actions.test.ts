@@ -10,7 +10,7 @@ import { AgentLinkClient } from './client.js';
 import { computeActionDigest } from './owner-action.js';
 import { evaluate } from './policy-engine.js';
 import { MemoryStore } from './store/memory-store.js';
-import { rowKeyOf } from './store/store.js';
+import { rowKeyOf, type StoreTx } from './store/store.js';
 import {
   FakeClock,
   RELAYS,
@@ -21,10 +21,32 @@ import {
 } from './testing/fixtures.js';
 import { MemoryPolicyMark, newApprovalId, newNonce, ownerHex, signWith } from './testing/owner.js';
 
+/**
+ * A MemoryStore that can run one write of its own just before a later transaction, to model a
+ * same-user process editing a row between the core's read and its apply transaction.
+ */
+class RacingStore extends MemoryStore {
+  #pending: { skip: number; write: (tx: StoreTx) => void } | undefined;
+
+  /** Runs `write` in its own transaction right before the `skip`-th transaction from now. */
+  raceBefore(skip: number, write: (tx: StoreTx) => void): void {
+    this.#pending = { skip, write };
+  }
+
+  override async transaction<R>(body: (tx: StoreTx) => R): Promise<R> {
+    const p = this.#pending;
+    if (p !== undefined && --p.skip === 0) {
+      this.#pending = undefined;
+      await super.transaction(p.write);
+    }
+    return super.transaction(body);
+  }
+}
+
 async function setup(options: { mark?: MemoryPolicyMark | null } = {}) {
   const keyStore = new MemoryKeyStore(seed(1));
   const owner = new MemoryOwnerKeyStore(seed(101), passphrase());
-  const store = new MemoryStore();
+  const store = new RacingStore();
   const cipher = new TestStoreCipher();
   const clock = new FakeClock();
   const mark = options.mark === undefined ? new MemoryPolicyMark() : options.mark;
@@ -394,6 +416,26 @@ describe('approval.decideBatch (D-68, 04 §2.5.2)', () => {
     expect((await t.row(a.approvalId))?.status).toBe('pending');
   });
 
+  it('a commitment scope set between the read and the apply transaction refuses the batch (IR-M1-7d-1 F-5)', async () => {
+    const t = await setup();
+    const a = await t.addRequest();
+    const b = await t.addRequest();
+    const text = await t.signed('approval.decideBatch', t.batch([a, b]));
+    // apply(): identity read (1), nonce read (2), request read (3), then the apply transaction (4).
+    t.store.raceBefore(4, (tx) =>
+      tx.update(
+        'approvals',
+        { approval_id: b.approvalId },
+        { scope_json: '{"kind":"agentlink/commitment"}', scope_key: `scope-${b.approvalId}` },
+      ),
+    );
+    const out = await t.client.ownerActions.apply(text);
+    expect(out).toMatchObject({ status: 'refused', reason: 'store_changed', nonceBurnt: true });
+    expect(out.status === 'refused' && out.items?.map((i) => i.approvalId)).toEqual([b.approvalId]);
+    expect((await t.row(a.approvalId))?.status).toBe('pending');
+    expect((await t.row(b.approvalId))?.status).toBe('pending');
+  });
+
   it('a request edited in the store after the batch was signed no longer matches its item', async () => {
     const t = await setup();
     const a = await t.addRequest();
@@ -436,15 +478,41 @@ describe('approval.cancel (D-55, G-7)', () => {
     });
   });
 
-  it('refuses to cancel a pending request (the owner denies it instead) and writes nothing', async () => {
+  it('a cancel of a pending request denies it (04 §2.5.1; IR-M1-7d-1 F-4)', async () => {
     const t = await setup();
     const r = await t.addRequest();
+    const cancel = await t.signed('approval.cancel', { approvalId: r.approvalId });
+    expect(await t.client.ownerActions.apply(cancel)).toMatchObject({
+      status: 'applied',
+      op: 'approval.cancel',
+    });
+    expect(await t.row(r.approvalId)).toMatchObject({
+      status: 'denied',
+      signed_cancel: cancel,
+      signed_decision: null,
+      decided_at: t.clock.t,
+    });
+    expect(await t.nonces()).toHaveLength(1);
+    expect(await t.client.ownerActions.checkApproval(r.approvalId, r.action)).toEqual({
+      status: 'denied',
+    });
+    // A later approval of the same request no longer finds it pending.
+    expect(
+      await t.client.ownerActions.apply(await t.signed('approval.decide', t.decide(r))),
+    ).toMatchObject({ status: 'refused', reason: 'not_pending' });
+  });
+
+  it('a cancel of a denied request has nothing to void and writes nothing', async () => {
+    const t = await setup();
+    const r = await t.addRequest();
+    await t.client.ownerActions.apply(await t.signed('approval.decide', t.decide(r, 'deny')));
     const cancel = await t.signed('approval.cancel', { approvalId: r.approvalId });
     expect(await t.client.ownerActions.apply(cancel)).toMatchObject({
       status: 'refused',
       reason: 'not_approved',
     });
-    expect(await t.nonces()).toHaveLength(0);
+    expect(await t.nonces()).toHaveLength(1);
+    expect((await t.row(r.approvalId))?.signed_cancel).toBeNull();
   });
 });
 

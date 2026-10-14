@@ -207,11 +207,11 @@ export function pendingCases(report, suites = [], required = REQUIRED_RUNTIMES) 
  * Pending cases only shrink, like pending suites (M1-7d). Each `cases` entry of pending-suites.json
  * names a card, a phase and a non-empty list of distinct case ids. Compared with the base branch, a
  * case may be pending only if it did not run there: it was pending there under the same card and
- * phase, or its whole suite was pending there, or the suite is new. A suite that ran all its cases
- * on the base can never start skipping one.
+ * phase, or its whole suite was pending there (and the cases keep that suite's phase), or the suite
+ * is new. A suite that ran all its cases on the base can never start skipping one.
  *
  * @param {{ cases: ReadonlyMap<string, { card?: unknown, phase?: unknown, ids?: unknown }> }} head
- * @param {{ pending: ReadonlyMap<string, unknown>, cases: ReadonlyMap<string, { card?: unknown, phase?: unknown, ids?: unknown }>, suites: ReadonlySet<string> }} base
+ * @param {{ pending: ReadonlyMap<string, { phase?: unknown }>, cases: ReadonlyMap<string, { card?: unknown, phase?: unknown, ids?: unknown }>, suites: ReadonlySet<string> }} base
  * @returns {string[]} Problems.
  */
 export function checkPendingCaseShrinks(head, base) {
@@ -246,7 +246,17 @@ export function checkPendingCaseShrinks(head, base) {
           `${suite}: cases ${added.join(', ')} ran on the base; pending cases only shrink`,
         );
       }
-    } else if (!base.pending.has(suite) && base.suites.has(suite)) {
+    } else if (base.pending.has(suite)) {
+      // Suite -> cases transition (IR-M1-7d-1 F-3): the leftover cases keep the suite's phase, so
+      // they cannot move to a later card's phase and leave its release gate. checkPendingCards then
+      // ties that phase to the card's backlog phase.
+      const suiteEntry = /** @type {{ phase?: unknown } | undefined} */ (base.pending.get(suite));
+      if (suiteEntry?.phase !== entry.phase) {
+        problems.push(
+          `${suite}: pending cases must keep the phase ${String(suiteEntry?.phase)} the suite had on the base, not ${String(entry.phase)}`,
+        );
+      }
+    } else if (base.suites.has(suite)) {
       problems.push(`${suite}: ran all its cases on the base branch; pending cases only shrink`);
     }
   }

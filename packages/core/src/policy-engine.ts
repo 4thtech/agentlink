@@ -145,6 +145,21 @@ function isAllowedContact(policy: PolicyDocument, contact: string): boolean {
   return allowed === 'paired' || (allowed as readonly string[]).includes(contact);
 }
 
+/**
+ * TODO(G-6 reading (owner decision pending, IR-M1-7d-1 F-1)): what a paired contact's envelope gets
+ * while the policy fails closed. `strict` (current): `contacts.allowed` is a decision value that can
+ * no longer be read, so an unreadable narrower list counts as a deny and becomes approval (06 §3):
+ * receiving from and sending to a paired contact both need the owner. `paired`: read `allowed` as
+ * "paired" under fail closed, so paired-contact Talk keeps working within the hard caps (a narrower
+ * list is then not honoured while the policy is invalid). Switching is this one constant plus its
+ * test rows; 06 §3 is not changed here.
+ */
+export const FAIL_CLOSED_CONTACTS = 'strict' as 'strict' | 'paired';
+
+/** A paired contact's envelope while the policy fails closed (see FAIL_CLOSED_CONTACTS). */
+const failClosedContact = (): PolicyDecision =>
+  FAIL_CLOSED_CONTACTS === 'paired' ? 'allow' : 'approval';
+
 const unknownSender = (policy: PolicyDocument): PolicyDecision =>
   policy.contacts.unknownSenders === 'drop' ? 'deny' : 'approval';
 
@@ -173,13 +188,13 @@ export function evaluate(
       const count = hourlyCount(context);
       // The Nth envelope of the hour passes; the N + 1th is dropped (07 §3.2, decided at #44).
       if (count >= limits.rateLimitPerContactPerHour) return 'deny';
-      if (policy === undefined) return 'approval';
+      if (policy === undefined) return failClosedContact();
       return isAllowedContact(policy, action.sender.contact) ? 'allow' : unknownSender(policy);
     }
 
     case 'envelope.send':
       if (action.sizeBytes > limits.maxEnvelopeBytes) return 'deny';
-      if (policy === undefined) return 'approval';
+      if (policy === undefined) return failClosedContact();
       return isAllowedContact(policy, action.contact) ? 'allow' : 'deny';
 
     case 'commitment':

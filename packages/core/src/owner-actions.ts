@@ -108,13 +108,16 @@ interface Snapshot {
   readonly status: Row<'approvals'>['status'];
   readonly actionJson: Sealed;
   readonly expiresAt: number;
+  /** The commitment scope decides whether the row may be a batch item (IR-M1-7d-1 F-5). */
+  readonly scopeJson: string | null;
 }
 
 const unchanged = (row: Row<'approvals'> | undefined, snap: Snapshot): boolean =>
   row !== undefined &&
   row.status === snap.status &&
   row.action_json === snap.actionJson &&
-  row.expires_at === snap.expiresAt;
+  row.expires_at === snap.expiresAt &&
+  row.scope_json === snap.scopeJson;
 
 const nonceRow = (signed: SignedOwnerAction, actionHash: string, now: number) => ({
   nonce: signed.body.nonce,
@@ -236,6 +239,7 @@ export class OwnerActions {
         status: row.status,
         actionJson: row.action_json,
         expiresAt: row.expires_at,
+        scopeJson: row.scope_json,
       });
       let actionDigest: string;
       let scoped = false;
@@ -364,7 +368,18 @@ export class OwnerActions {
       }
       const row = tx.get('approvals', { approval_id: approvalId });
       if (row === undefined) return refused('approval.cancel', 'approval_unknown');
-      // Cancel only voids an approved approval; a pending one is denied instead (04 §2.5.1).
+      // A pending request is denied instead (04 §2.5.1; IR-M1-7d-1 F-4): the cancel is its signed
+      // object, so the row can never be approved by a later decision.
+      if (row.status === 'pending') {
+        tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+        tx.update(
+          'approvals',
+          { approval_id: approvalId, status: 'pending' },
+          { status: 'denied', signed_cancel: text, decided_at: now },
+        );
+        return { status: 'applied', op: 'approval.cancel' };
+      }
+      // Otherwise cancel only voids an approved approval; anything else has nothing to void.
       if (row.status !== 'approved') return refused('approval.cancel', 'not_approved');
       tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
       tx.update(
@@ -543,7 +558,9 @@ export class OwnerActions {
         cancel.ok &&
         cancel.signed.body.op === 'approval.cancel' &&
         cancel.signed.body.params.approvalId === approvalId;
-      return ok ? { status: 'cancelled' } : { status: 'refused', reason: 'cancel_invalid' };
+      if (!ok) return { status: 'refused', reason: 'cancel_invalid' };
+      // A cancel of a request that was never decided denied it (04 §2.5.1).
+      return row.signed_decision === null ? { status: 'denied' } : { status: 'cancelled' };
     }
     if (row.signed_decision === null) {
       return now > row.expires_at ? { status: 'expired' } : { status: 'pending' };

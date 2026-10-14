@@ -5,6 +5,7 @@
 import { POLICY_DEFAULTS, defaultPolicy, type Policy } from '@agentlink/types';
 import { describe, expect, it } from 'vitest';
 import {
+  FAIL_CLOSED_CONTACTS,
   FAIL_CLOSED_LIMITS,
   evaluate,
   policyLimits,
@@ -354,6 +355,12 @@ const FAIL_CLOSED: readonly Row[] = [
 describe('evaluate: G-6 fail closed (06 §3)', () => {
   it.each(FAIL_CLOSED)('$name → $expected', ({ policy, action, context, expected }) => {
     expect(evaluate(policy, action, context)).toBe(expected);
+  });
+
+  it('reads paired-contact Talk strictly under fail closed until the owner decides (IR-M1-7d-1 F-1)', () => {
+    // G-6 reading, owner decision pending: switching FAIL_CLOSED_CONTACTS to 'paired' changes the
+    // two contact rows above to 'allow' and this line; nothing else.
+    expect(FAIL_CLOSED_CONTACTS).toBe('strict');
   });
 
   it('never gives allow, whatever the action', () => {

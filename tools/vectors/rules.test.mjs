@@ -304,6 +304,22 @@ describe('checkPendingCaseShrinks (M1-7d)', () => {
     expect(checkPendingCaseShrinks(head(['a']), listed)).toEqual([]);
   });
 
+  it('refuses leftover cases that change the phase of the suite that was pending (IR-M1-7d-1 F-3)', () => {
+    const wholly = {
+      pending: new Map([['owner-action', { card: 'M1-7d', phase: 'M1a' }]]),
+      cases: new Map(),
+      suites: new Set(['owner-action']),
+    };
+    const later = {
+      cases: new Map([['owner-action', { card: 'M1-7i', phase: 'M1b', ids: ['a'] }]]),
+    };
+    expect(checkPendingCaseShrinks(later, wholly)).toEqual([
+      'owner-action: pending cases must keep the phase M1a the suite had on the base, not M1b',
+    ]);
+    // Another card of the same phase is fine; its backlog phase is checked by checkPendingCards.
+    expect(checkPendingCaseShrinks(head(['a']), wholly)).toEqual([]);
+  });
+
   it('rejects a case that ran on the base, and a suite that ran all its cases there', () => {
     const listed = {
       pending: new Map(),

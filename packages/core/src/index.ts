@@ -67,6 +67,7 @@ export {
   type PolicyVersionMark,
 } from './owner-actions.js';
 export {
+  FAIL_CLOSED_CONTACTS,
   FAIL_CLOSED_LIMITS,
   POLICY_DEFAULTS_EFFECTIVE,
   evaluate,
