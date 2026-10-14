@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Added
 
 - Monorepo skeleton (M0-2d): pnpm workspace with Turborepo, strict ESM TypeScript with project references, ESLint, Prettier, Vitest and Changesets; a stub package for every directory in the repository layout; manifest checks (MIT licence, no install scripts) inside `pnpm lint`; and CI strict mode (`.github/ci-strict`), so a missing root script now fails CI. All packages are private stubs and nothing is published yet.
+- Architecture boundary guards (M0-10): package layering (which package may import which, no cycles), primitive libraries (`@noble/*`, `@hpke/*`, `nostr-tools`, `viem`, `aws4fetch`) and `crypto.subtle` confined to their packages, Node built-ins confined to `@agentlink/node` and `apps/cli`, and a per-package runtime-dependency allowlist where every entry carries a justification. Enforced twice: ESLint zones (including dynamic `import()`, `require()` and relative paths that leave a package) and `tools/deps-check`, which runs in `pnpm lint` and therefore in `ci-gate`. The policy lives in `tools/deps-check/policy.mjs`.
 - Build plan "At a glance" (building blocks, stages, external services) and plain-language explainers on messaging, files and payments under `docs/explainers/`.
 
 ### Changed

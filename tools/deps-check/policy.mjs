@@ -1,0 +1,207 @@
+// Architecture boundary policy: the single source of truth for who may import and depend on what.
+//
+// Read by three consumers, so they cannot drift apart:
+//   - eslint.config.mjs   (no-restricted-imports zones and the boundaries/no-bypass rule),
+//   - tools/deps-check/   (manifest and source scan; CI runs it through `pnpm lint`),
+//   - their tests.
+//
+// Specs: 04 §8.1 (crypto allowlist), 07 §1 (package map), development-process.md §11,
+// AGENTS.md Hard rules, backlog M0-10.
+//
+// CHANGING THIS FILE IS A REVIEWED SECURITY CHANGE (S1). Widening a zone, a layering entry or the
+// runtime-dependency allowlist must be justified in the PR. Every external entry carries a `reason`
+// line so the reviewer sees the justification in the diff.
+
+import { builtinModules } from 'node:module';
+
+/** Node built-ins (bare and `node:`) are allowed only here (repo-reference.md, 11 §6). */
+export const NODE_ZONES = ['packages/node', 'apps/cli'];
+
+/** Built-ins that exist only with the prefix (node:test, node:sqlite) are covered by `node:`. */
+export const BUILTINS = builtinModules.filter((name) => !name.startsWith('node:'));
+
+/**
+ * Crypto and transport libraries (04 §8.1): our code reaches primitives only through
+ * @agentlink/crypto. Each library may be used only by the zones that 07 §1 names as its consumer.
+ * `apps/pay` is the deposit page on the isolated `pay.` origin (08 §2.3, M2-2f); it does not exist yet.
+ */
+export const LIBRARIES = [
+  { group: ['@noble/*'], zones: ['packages/crypto'] },
+  { group: ['@hpke/*'], zones: ['packages/crypto'] },
+  {
+    group: ['nostr-tools', 'nostr-tools/*'],
+    zones: ['packages/crypto', 'packages/transport-nostr'],
+  },
+  { group: ['viem', 'viem/*'], zones: ['packages/crypto', 'packages/chain', 'apps/pay'] },
+  { group: ['aws4fetch'], zones: ['packages/storage'] },
+];
+
+/** Only this zone may touch `crypto.subtle` (backlog M0-10). */
+export const SUBTLE_ZONES = ['packages/crypto'];
+
+// --- Layering -------------------------------------------------------------------------------------
+// `uses` lists the workspace packages (by directory name under packages/) that a zone may import AND
+// declare as a dependency. Importing your own package by name is always fine. The graph must stay
+// acyclic (the tests assert it), and nothing imports an app.
+//
+// 07 §1 lists no `types` for transport-nostr and storage. They need it for Envelope and StoredObject,
+// so they get it. crypto stays minimal on purpose: it is the trusted base.
+
+const ALL_PACKAGES = [
+  'types',
+  'crypto',
+  'chain',
+  'transport-nostr',
+  'storage',
+  'core',
+  'node',
+  'ui',
+];
+const NO_NODE = ALL_PACKAGES.filter((name) => name !== 'node'); // only the CLI and desktop host Node code
+const WORKER_APP = NO_NODE.filter((name) => name !== 'ui'); // Workers: no React UI
+
+const entry = (name, uses, external = []) => ({ name, uses, external });
+
+/**
+ * Zone (directory) -> { name, uses, external }.
+ * `external` is the runtime-dependency allowlist (`dependencies`, `peerDependencies`,
+ * `optionalDependencies`): anything else a package declares fails deps-check. A new entry needs a
+ * `reason` that reviewers see in the diff. devDependencies are not runtime and are not allowlisted
+ * (the primitive-library ban still applies to them).
+ */
+export const ZONES = {
+  'packages/types': entry(
+    '@agentlink/types',
+    [],
+    [{ pattern: 'zod', reason: 'schemas for the shared types (07 §1)' }],
+  ),
+  'packages/crypto': entry(
+    '@agentlink/crypto',
+    [],
+    [
+      { pattern: '@noble/*', reason: 'the only package that implements primitives (04 §8.1)' },
+      { pattern: '@hpke/*', reason: 'HPKE seal/open (04 §8.1, 07 §1)' },
+    ],
+  ),
+  'packages/chain': entry(
+    '@agentlink/chain',
+    ['types', 'crypto'],
+    [
+      { pattern: 'viem', reason: 'chain clients and OCC v2 bindings (07 §1)' },
+      { pattern: 'viem/*', reason: 'viem subpath exports (chains, actions)' },
+      {
+        pattern: '@agentlink/occ-v2-abi',
+        reason: 'contract ABIs; the Solidity source stays private',
+      },
+    ],
+  ),
+  'packages/transport-nostr': entry(
+    '@agentlink/transport-nostr',
+    ['types', 'crypto'],
+    [
+      { pattern: 'nostr-tools', reason: 'relay pool and NIP-17/59 plumbing (07 §1)' },
+      { pattern: 'nostr-tools/*', reason: 'nostr-tools subpath exports' },
+    ],
+  ),
+  'packages/storage': entry(
+    '@agentlink/storage',
+    ['types', 'crypto'],
+    [{ pattern: 'aws4fetch', reason: 'S3-compatible presigning for the s3 adapter (07 §1)' }],
+  ),
+  'packages/core': entry('@agentlink/core', [
+    'types',
+    'crypto',
+    'chain',
+    'transport-nostr',
+    'storage',
+  ]),
+  'packages/node': entry(
+    '@agentlink/node',
+    ['core'],
+    [
+      {
+        pattern: 'better-sqlite3',
+        reason: 'SQLite Store; approved build script (pnpm-workspace.yaml)',
+      },
+    ],
+  ),
+  'packages/ui': entry(
+    '@agentlink/ui',
+    ['types'],
+    [
+      { pattern: 'react', reason: 'component library (03 §tech stack)' },
+      { pattern: 'react-dom', reason: 'component library (03 §tech stack)' },
+    ],
+  ),
+  'apps/cli': entry('@4thtech/agentlink', ALL_PACKAGES, [
+    { pattern: '@modelcontextprotocol/sdk', reason: 'MCP stdio server (repo-reference.md, stack)' },
+  ]),
+  'apps/console': entry('@agentlink/console', NO_NODE),
+  'apps/verify': entry('@agentlink/verify', NO_NODE),
+  'apps/invite': entry('@agentlink/invite', NO_NODE),
+  'apps/pay': entry('@agentlink/pay', NO_NODE),
+  'apps/cloud-agent': entry('@agentlink/cloud-agent', WORKER_APP),
+  'apps/submitter': entry('@agentlink/submitter', WORKER_APP),
+  'apps/drop': entry('@agentlink/drop', WORKER_APP),
+};
+
+/** Every workspace package name known to the policy. */
+export const WORKSPACE_NAMES = Object.values(ZONES).map(({ name }) => name);
+
+/** Allowed workspace package names for a zone (its own name included). */
+export function allowedWorkspaceNames(zone) {
+  const found = ZONES[zone];
+  if (!found) return [];
+  return [found.name, ...found.uses.map((short) => ZONES[`packages/${short}`].name)];
+}
+
+const matchesEntry = (specifier, pattern) =>
+  pattern.endsWith('/*') ? specifier.startsWith(pattern.slice(0, -1)) : specifier === pattern;
+
+/** True when `specifier` matches one of the patterns (`a/*` prefix form, or exact). */
+export const matchesGroup = (specifier, group) =>
+  group.some((pattern) => matchesEntry(specifier, pattern));
+
+/** The workspace package name an import specifier refers to, or null. */
+export function workspaceNameOf(specifier) {
+  return (
+    WORKSPACE_NAMES.find((name) => specifier === name || specifier.startsWith(`${name}/`)) ?? null
+  );
+}
+
+export function isBuiltin(specifier) {
+  return specifier.startsWith('node:') || BUILTINS.includes(specifier);
+}
+
+/** True for the Node crypto module (`crypto`, `node:crypto`, `crypto/...`). */
+export const isNodeCrypto = (specifier) => /^(node:)?crypto(\/|$)/.test(specifier);
+
+export const NODE_MSG = 'Node built-ins are allowed only in @agentlink/node and apps/cli.';
+export const CRYPTO_MSG =
+  'Node crypto is a primitive entry point; use @agentlink/crypto (AGENTS.md hard rules).';
+export const libraryMessage = (lib) =>
+  `${lib.group[0]} may be imported only in ${lib.zones.join(', ')}; everything else uses @agentlink/crypto (AGENTS.md).`;
+export const layerMessage = (zone, name) =>
+  ZONES[zone]
+    ? `${zone} may not import ${name} (package layering: tools/deps-check/policy.mjs, 07 §1).`
+    : `${name} is not allowed here: this directory has no entry in tools/deps-check/policy.mjs.`;
+
+/**
+ * The one decision function for a non-relative import specifier. Returns a message when `zone` (a key
+ * of ZONES, or null for a directory the policy does not know) may NOT use `specifier`, else null.
+ * eslint.config.mjs derives its static zones from the same data.
+ */
+export function violationFor(zone, specifier) {
+  if (isBuiltin(specifier)) {
+    if (!NODE_ZONES.includes(zone)) return NODE_MSG;
+    return isNodeCrypto(specifier) ? CRYPTO_MSG : null;
+  }
+  for (const lib of LIBRARIES) {
+    if (matchesGroup(specifier, lib.group) && !lib.zones.includes(zone)) return libraryMessage(lib);
+  }
+  const name = workspaceNameOf(specifier);
+  if (name !== null && !allowedWorkspaceNames(zone).includes(name)) {
+    return layerMessage(zone, name);
+  }
+  return null;
+}

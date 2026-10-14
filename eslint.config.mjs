@@ -1,63 +1,52 @@
-import { builtinModules } from 'node:module';
 import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
+import boundaries from './tools/deps-check/eslint-plugin.mjs';
+import {
+  BUILTINS,
+  CRYPTO_MSG,
+  LIBRARIES,
+  NODE_MSG,
+  NODE_ZONES,
+  WORKSPACE_NAMES,
+  ZONES,
+  allowedWorkspaceNames,
+  layerMessage,
+  libraryMessage,
+} from './tools/deps-check/policy.mjs';
 
 const SOURCE = '{ts,tsx,mts,cts}';
 
 // --- Import boundaries --------------------------------------------------------------------------
+// The policy (which zone may import what) lives in tools/deps-check/policy.mjs and is shared with
+// the deps-check script, which runs in `pnpm lint` and cannot be switched off by an inline comment.
+//
 // ESLint applies only the LAST matching `no-restricted-imports` block to a file, so each zone gets
-// one block that holds its complete restriction list (built by restrictionsFor).
-
-// Node built-ins (bare and `node:`) are allowed only in @agentlink/node and apps/cli
-// (docs/process/repo-reference.md): shared packages run in Node, browsers and Workers.
-const NODE_ZONES = ['packages/node', 'apps/cli'];
-// Built-ins that exist only with the prefix (node:test, node:sqlite) are covered by the node:* pattern.
-const BUILTINS = builtinModules.filter((name) => !name.startsWith('node:'));
-
-// Crypto and transport libraries (AGENTS.md hard rules, 04 §8): our code reaches primitives only
-// through @agentlink/crypto. Each library may be imported only by the zones that 07 §1 names as its
-// consumer. Widening an entry is a reviewed change to this file (S1).
-const LIBRARIES = [
-  { group: ['@noble/*'], zones: ['packages/crypto'] },
-  { group: ['@hpke/*'], zones: ['packages/crypto'] },
-  {
-    group: ['nostr-tools', 'nostr-tools/*'],
-    zones: ['packages/crypto', 'packages/transport-nostr'],
-  },
-  { group: ['viem', 'viem/*'], zones: ['packages/crypto', 'packages/chain', 'apps/submitter'] },
-  { group: ['aws4fetch'], zones: ['packages/storage'] },
-];
+// one block that holds its complete restriction list (built by restrictionsFor). Static imports are
+// handled by no-restricted-imports; dynamic import(), require(), `import x = require()`, import()
+// types, cross-package relative paths and `crypto.subtle` by the local boundaries/no-bypass rule.
 
 function restrictionsFor(zone) {
-  const nodeAllowed = zone !== null && NODE_ZONES.includes(zone);
+  const nodeAllowed = NODE_ZONES.includes(zone);
   const paths = nodeAllowed
-    ? []
-    : BUILTINS.map((name) => ({
-        name,
-        message: 'Node built-ins are allowed only in @agentlink/node and apps/cli.',
-      }));
-  const patterns = nodeAllowed
-    ? []
-    : [
-        {
-          group: ['node:*'],
-          message: 'Node built-ins are allowed only in @agentlink/node and apps/cli.',
-        },
-      ];
-  for (const { group, zones } of LIBRARIES) {
-    if (zone !== null && zones.includes(zone)) continue;
-    patterns.push({
-      group,
-      message: `${group[0]} may be imported only in ${zones.join(', ')}; everything else uses @agentlink/crypto (AGENTS.md).`,
-    });
+    ? ['crypto', 'node:crypto'].map((name) => ({ name, message: CRYPTO_MSG }))
+    : BUILTINS.map((name) => ({ name, message: NODE_MSG }));
+  const patterns = nodeAllowed ? [] : [{ group: ['node:*'], message: NODE_MSG }];
+  for (const lib of LIBRARIES) {
+    if (zone !== null && lib.zones.includes(zone)) continue;
+    patterns.push({ group: lib.group, message: libraryMessage(lib) });
   }
-  return { 'no-restricted-imports': ['error', { paths, patterns }] };
+  // Package layering: every workspace package this zone may not import (apps are never importable).
+  const allowed = allowedWorkspaceNames(zone);
+  for (const name of WORKSPACE_NAMES) {
+    if (allowed.includes(name)) continue;
+    patterns.push({ group: [name, `${name}/*`], message: layerMessage(zone, name) });
+  }
+  return {
+    'no-restricted-imports': ['error', { paths, patterns }],
+    'boundaries/no-bypass': ['error', { zone }],
+  };
 }
-
-const ZONES_WITH_EXEMPTIONS = [
-  ...new Set([...NODE_ZONES, ...LIBRARIES.flatMap(({ zones }) => zones)]),
-];
 
 export default tseslint.config(
   { ignores: ['**/dist/**', '**/node_modules/**', '**/.turbo/**', '**/coverage/**', 'docs/**'] },
@@ -70,10 +59,12 @@ export default tseslint.config(
     rules: { 'no-console': 'error' },
   },
   {
+    // Directories the policy does not know get the strictest set until they get an entry.
     files: [`packages/**/*.${SOURCE}`, `apps/**/*.${SOURCE}`],
+    plugins: { boundaries },
     rules: restrictionsFor(null),
   },
-  ...ZONES_WITH_EXEMPTIONS.map((zone) => ({
+  ...Object.keys(ZONES).map((zone) => ({
     files: [`${zone}/**/*.${SOURCE}`],
     rules: restrictionsFor(zone),
   })),
