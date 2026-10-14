@@ -61,6 +61,334 @@ export const invite = () => ({
   expiresAt: 1760600000,
 });
 
+// --- USD amounts (04 §2.4.1) ---------------------------------------------------------------------
+
+/** The strings the M1-2b card names, plus the other non-canonical USD forms of 04 §2.4.1. */
+export const BAD_USD_STRINGS = [
+  '01',
+  '1.',
+  '1.0',
+  '0.10',
+  '1e3',
+  '-1',
+  '1.0000001',
+  '1000000000',
+  '',
+  '.5',
+  '+1',
+  '00',
+  '0.0',
+  '5.00',
+  ' 1',
+  '1 ',
+  '1,5',
+  '0x1',
+  'Infinity',
+  'NaN',
+  '１',
+  '1\n',
+  '0.000000',
+];
+
+// --- policy (06 §3, G-32) ------------------------------------------------------------------------
+
+/** Two contacts' agent IDs, in strictly ascending byte order (06 §3 "Agent IDs"). */
+export const CONTACT_A = '0x' + '3d'.repeat(20);
+export const CONTACT_B = '0x' + '4e'.repeat(20);
+
+/**
+ * The 06 §3 defaults in the policy JSON form, transcribed by hand from the YAML listing of
+ * docs/foundation/06-mcp-server.md §3 and its "The defaults" bullet: `contacts.allowed: "paired"`,
+ * empty arrays, the USD values "5", "1" and "0", `autoAcceptMinUSD: null`, `contactRules: []`.
+ */
+export const policyDefaultsFromSpec = () => ({
+  contacts: {
+    acceptInvites: 'approval',
+    unknownSenders: 'queue',
+    allowed: 'paired',
+    rateLimitPerContactPerHour: 120,
+  },
+  files: {
+    allowedFolders: [],
+    inboxFolder: '~/AgentLink/Inbox',
+    maxSendSizeMB: 100,
+    maxReceiveSizeMB: 200,
+    storage: 'auto',
+    defaultExpiryDays: 7,
+    deleteAfter: 'expiry',
+    ownerArchive: false,
+  },
+  envelopes: {
+    maxEnvelopeKB: 24,
+  },
+  proofs: {
+    notarize: 'allow',
+    dailyBudgetUSD: '5',
+    perActionMaxUSD: '1',
+    allowKeyDisclosure: 'approval',
+    exportFolder: '~/AgentLink/Proofs',
+    defaultChain: 'base',
+  },
+  receipts: {
+    autoDelivered: true,
+    autoOpened: false,
+  },
+  commitments: {
+    accept: 'approval',
+    autoAcceptContacts: [],
+    autoAcceptMaxUSD: '0',
+    autoAcceptDirection: 'buy',
+    autoAcceptMinUSD: null,
+  },
+  contactRules: [],
+});
+
+/** A non-default policy: explicit contact lists, folders, sell limits and two contact rules. */
+export const policyWithRules = () => {
+  const d = policyDefaultsFromSpec();
+  return {
+    ...d,
+    contacts: { ...d.contacts, allowed: [CONTACT_A, CONTACT_B] },
+    files: { ...d.files, allowedFolders: ['~/Documents/Contracts', '/srv/agentlink/out'] },
+    proofs: {
+      ...d.proofs,
+      notarize: 'approval',
+      allowKeyDisclosure: 'deny',
+      defaultChain: 'base-sepolia',
+    },
+    commitments: {
+      ...d.commitments,
+      autoAcceptContacts: [CONTACT_A],
+      autoAcceptMaxUSD: '250.5',
+      autoAcceptDirection: 'sell',
+      autoAcceptMinUSD: '1000',
+    },
+    contactRules: [
+      { contact: CONTACT_A, proofs: { notarize: 'allow', perActionMaxUSD: '2.5' } },
+      { contact: CONTACT_B, proofs: { perActionMaxUSD: '0.01' } },
+    ],
+  };
+};
+
+// --- approvals (04 §3.4.1, §3.4.2) ---------------------------------------------------------------
+
+/** A fee token address (Record `feeToken`) and a fee of 0.1 USD in 6-decimal base units. */
+export const FEE_TOKEN = '0x' + '55'.repeat(20);
+export const fee = () => ({ token: FEE_TOKEN, amount: '100000', usd: '0.1' });
+export const counterparty = () => ({ agentId: CONTACT_A, ownerKey: hex(32, 'c4') });
+/** An envelopeHash (EVM-native, 0x, 04 §2.4.1). */
+export const ENVELOPE_HASH = hex0x(32, 'e1');
+
+/** CommitmentScope v1 (04 §3.4.2) for an `accept` with notarize. */
+export const commitmentScope = () => ({
+  v: 1,
+  kind: 'agentlink/commitment',
+  agentId: AGENT_EVM,
+  decision: 'accept',
+  counterparty: counterparty(),
+  thread: ID16_B,
+  termsId: b64u(16, 'T'),
+  version: 3,
+  termsHash: SHA,
+  answers: { envelopeId: ID16, envelopeHash: ENVELOPE_HASH },
+  notarize: true,
+  maxFeeUsd: '0.1',
+  createdAt: 1760000000,
+  expiresAt: 1760600000,
+});
+
+/** A firm offer scope: no `answers`, always notarized (04 §3.4.2). */
+export const firmOfferScope = () => ({
+  ...commitmentScope(),
+  decision: 'offer',
+  answers: null,
+});
+
+/** Stored canonical terms in `context.terms` (free JSON until M1-21 lands the strict schema). */
+const storedTerms = () => ({ termsId: b64u(16, 'T'), version: 3, subject: 'Milestone 3' });
+
+/** One valid `approval-request.action` per approval tool (06 §2.0 "Approval" column). */
+export const approvalActions = () => ({
+  agentlink_accept_invite: {
+    tool: 'agentlink_accept_invite',
+    args: { inviteUrl: 'https://agentlink.example/i#abc' },
+    context: {
+      triggers: ['contacts.acceptInvites'],
+      inviteId: ID16,
+      counterparty: counterparty(),
+    },
+  },
+  agentlink_send: {
+    tool: 'agentlink_send',
+    args: {
+      to: CONTACT_A,
+      text: 'Signed contract attached',
+      type: 'text',
+      path: '/Users/tali/Documents/Contracts/contract-signed.pdf',
+      notarize: true,
+      expiresInDays: 7,
+    },
+    context: {
+      triggers: ['proofs.notarize'],
+      counterparty: counterparty(),
+      file: { plaintextSha256: SHA, size: 1000 },
+      fee: fee(),
+    },
+  },
+  agentlink_propose_terms: {
+    tool: 'agentlink_propose_terms',
+    args: { to: CONTACT_A, terms: { subject: 'Milestone 3' }, notarize: true },
+    context: {
+      triggers: ['commitments.accept', 'proofs.perActionMaxUSD'],
+      scope: firmOfferScope(),
+      terms: storedTerms(),
+      fee: fee(),
+    },
+  },
+  agentlink_respond_to_terms: {
+    tool: 'agentlink_respond_to_terms',
+    args: { envelopeId: ID16, decision: 'accept', notarize: true },
+    context: {
+      triggers: ['commitments.accept'],
+      scope: commitmentScope(),
+      terms: storedTerms(),
+      fee: fee(),
+    },
+  },
+  agentlink_notarize: {
+    tool: 'agentlink_notarize',
+    args: { envelopeId: ID16 },
+    context: {
+      triggers: ['proofs.dailyBudgetUSD', 'proofs.perActionMaxUSD'],
+      counterparty: counterparty(),
+      envelopeHash: ENVELOPE_HASH,
+      fee: fee(),
+    },
+  },
+  agentlink_acknowledge: {
+    tool: 'agentlink_acknowledge',
+    args: { envelopeId: ID16, type: 'accepted' },
+    context: {
+      triggers: ['commitments.accept'],
+      counterparty: counterparty(),
+      recordId: B32,
+      receipt: 'ACCEPTED',
+    },
+  },
+  agentlink_export_proof_pack: {
+    tool: 'agentlink_export_proof_pack',
+    args: { envelopeId: ID16, includeContentKey: true },
+    context: {
+      triggers: ['proofs.allowKeyDisclosure'],
+      recordId: B32,
+      envelopeHash: ENVELOPE_HASH,
+    },
+  },
+});
+
+/** An approval-request body for an action (04 §3.4.1), with the G-7 TTL applied by default. */
+export const approvalRequestFor = (action: unknown, expiresAt = 1760086400) => ({
+  approvalId: APPROVAL_ID,
+  agent: AGENT_EVM,
+  action,
+  actionDigest: SHA,
+  summary: 'Accept version 3 from “Marko Novak” (self-declared)',
+  requestedAt: 1760000000,
+  expiresAt,
+});
+
+// --- proofs (07 §8, 06 §2.4) ---------------------------------------------------------------------
+
+/** The Record struct in its JSON form (05 §3.1, 04 §2.4.1). Kind 4 = ACCEPT. */
+export const record = () => ({
+  signer: AGENT_EVM,
+  envelopeHash: ENVELOPE_HASH,
+  recipientCommitment: hex0x(32, 'c1'),
+  parentRecordId: hex0x(32, '00'),
+  appId: hex0x(32, '00'),
+  kind: 4,
+  feeToken: FEE_TOKEN,
+  maxFee: '100000',
+  nonce: '123456789012345678901234567890',
+  deadline: 1760003600,
+});
+
+/** The Receipt struct in its JSON form (05 §3.1). Type 3 = ACCEPTED. */
+export const receiptStruct = () => ({
+  signer: CONTACT_A,
+  recordId: B32,
+  receiptType: 3,
+  salt: hex0x(32, '5b'),
+  deadline: 1760003600,
+});
+
+/**
+ * The 07 §8 example proof pack with every placeholder filled and every optional part present: a
+ * proof of agreement whose exporter includes its owner's approval of the commitment (04 §3.4).
+ */
+export const proofPack = () => ({
+  type: 'agentlink.proof',
+  version: 1,
+  chainId: 8453,
+  notary: hex0x(20, '9a'),
+  recordId: B32,
+  record: record(),
+  signature: CARD_SIG,
+  signer: { evm: AGENT_EVM, agentCard: agentCard(), cardSig: CARD_SIG },
+  envelopeHash: ENVELOPE_HASH,
+  envelope: envelope(),
+  recipient: { evm: CONTACT_A, salt: hex0x(32, '5b') },
+  receipts: [
+    { type: 'DELIVERED', signer: CONTACT_A, txHash: hex0x(32, '7e'), at: '2026-10-14T12:00:00Z' },
+    { type: 'ACCEPTED', signer: CONTACT_A, txHash: hex0x(32, '7f'), at: '2026-10-14T12:05:00Z' },
+  ],
+  disclosure: { contentKey: KEY32 },
+  ownerApproval: {
+    signed: signed(approvalDecideAction()),
+    action: approvalActions().agentlink_respond_to_terms,
+  },
+  exportedAt: '2026-10-14T12:30:00Z',
+});
+
+/** The smallest valid pack: no optional parts, nothing disclosed, no approval, no receipts. */
+export const minimalProofPack = () => ({
+  type: 'agentlink.proof',
+  version: 1,
+  chainId: 8453,
+  notary: hex0x(20, '9a'),
+  recordId: B32,
+  record: record(),
+  signature: CARD_SIG,
+  signer: { evm: AGENT_EVM },
+  envelopeHash: ENVELOPE_HASH,
+  receipts: [],
+  disclosure: null,
+  ownerApproval: null,
+  exportedAt: '2026-10-14T12:30:00Z',
+});
+
+/** ProofStatus (06 §2.4) for a confirmed record. */
+export const proofStatus = () => ({
+  status: 'ok',
+  chain: 'base',
+  recordId: B32,
+  txHash: hex0x(32, '7e'),
+  fee: { token: FEE_TOKEN, amount: '100000', usd: '0.1', protocolUsd: '0.1', integratorUsd: '0' },
+  receipts: [{ type: 'DELIVERED', at: '2026-10-14T12:00:00Z' }],
+  explorerUrl: `https://basescan.org/tx/${hex0x(32, '7e')}`,
+  verifyUrl: `https://verify.agentlink.example/r/${B32}`,
+});
+
+/** The 06 §2.5 `pending_approval` example with its placeholders filled. */
+export const pendingApprovalResult = () => ({
+  status: 'pending_approval',
+  approvalId: APPROVAL_ID,
+  summary: "Notarize 'contract-signed.pdf' to Marko's agent for $0.10",
+  url: `http://127.0.0.1:47321/approve/${APPROVAL_ID}`,
+  nextStep:
+    'Tell the user approval is needed and share the link. After approval, call the same tool again with approvalId.',
+});
+
 export const approvalDecideAction = () => ({
   v: 1,
   agent: AGENT_EVM,
@@ -77,7 +405,7 @@ export const policySetAction = () => ({
   agent: AGENT_EVM,
   owner: OWNER_NOSTR,
   op: 'policy.set',
-  params: { version: 2, policy: { contacts: { acceptInvites: 'approval' } } },
+  params: { version: 2, policy: policyDefaultsFromSpec() },
   nonce: ID16_B,
   issuedAt: 1760000000,
   expiresAt: 1760000600,
@@ -168,11 +496,7 @@ export const payloads = (): Record<string, Record<string, unknown>> => ({
   'approval-request': payloadOf('approval-request', {
     approvalId: APPROVAL_ID,
     agent: AGENT_EVM,
-    action: {
-      tool: 'agentlink_send',
-      args: { to: 'contact_1', type: 'accept', body: { termsHash: SHA } },
-      context: { contactEvm: OWNER_EVM },
-    },
+    action: approvalActions().agentlink_send,
     actionDigest: SHA,
     summary: 'Send an accept to “Marko Novak” (self-declared)',
     requestedAt: 1760000000,

@@ -993,6 +993,10 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Hand-offs to the owning cards; no code in types:
     - transport-nostr re-checks relay hosts at connect time against private, loopback, link-local, CGNAT, ULA and metadata addresses, because a DNS name can resolve to one (IR-M1-2a-1 M-1, part 2);
     - the invite decoder caps the inflated size before parsing (deflate bomb).
+  - Follow-ups from IR-M1-2b-1 (F-1, F-2, F-3 `notarize` and the format-character part of F-4 are fixed in M1-2b):
+    - F-4 rest: once the spec PR decides it, policy paths must be absolute: a leading `/` or `~/`, plus a Windows drive form if 06 §3 allows one. Relative paths such as `../x` are then rejected.
+    - F-3 rest, hand-off to M1-7e: the core builds `fee.amount` and `fee.usd` from one quote, because the types cannot check them against each other (token decimals are unknown there). Owner surfaces render from `context`, never from `args`.
+    - F-5, hand-off to M1-9c (MCP approval tools): pin the `pending_approval` `url` to the local UI origin or the console origin. `resultUrlSchema` accepts any https host.
 - **Acceptance:**
   - `packages/types` tests are green in Node, three browsers and workerd, and each run reports its runtime; a deliberately failing schema test fails in all five.
   - Each Low is fixed with a negative control, or recorded as covered by the spec PR.
