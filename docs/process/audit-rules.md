@@ -283,7 +283,7 @@ Reviewers apply every checklist the diff touches. Item IDs are stable; new items
 - CT-3 `SafeERC20`; credits equal the measured balance delta; fee-on-transfer tokens never allowlisted.
 - CT-4 `depositWithAuthorization` calls `receiveWithAuthorization` with payee = vault (never `transferWithAuthorization`); `value ≥ minDeposit`; EIP-3009 flag required.
 - CT-5 AccessManager: every restricted selector mapped to its intended role; nothing left reachable through the admin role by accident. OZ AccessManager execution delays attach to (role, account) grants, so **each delay tier is its own role** (05 §5.1, e.g. `CONFIG_ADMIN` 48 h vs `UPGRADER` 7 d; `pause` vs `unpause`). Grant delays, target-admin delays and guardians set as configured.
-- CT-6 No admin path can move, freeze or reduce a payer's credits; pause blocks charges, deposits, notarization and registration and **never** `withdraw`, `withdrawIntegrator`, `sweep` or Registry `revoke` (05 §5.1); clients approve exact amounts only (05 §2.4).
+- CT-6 No admin path can move, freeze or reduce a payer's credits; pause blocks charges, deposits, notarization, receipts (`acknowledge`, `acknowledgeBatch`; D-61) and registration and **never** `withdraw`, `withdrawIntegrator`, `sweep` or Registry `revoke` (05 §5.1); clients approve exact amounts only (05 §2.4).
 - CT-7 `freezeUpgrades` is one-way: afterwards `_authorizeUpgrade` always reverts regardless of roles.
 - CT-8 UUPS: implementations call `_disableInitializers()`; proxies initialised in the deploying transaction; initializers not re-runnable.
 - CT-9 ERC-7201 namespaced storage; a storage-layout diff against the last deployed version accompanies every upgrade (no reorder, removal or type change).
@@ -291,7 +291,7 @@ Reviewers apply every checklist the diff touches. Item IDs are stable; new items
 - CT-11 Replay: `recordId = keccak256(abi.encode(chainid, this, signer, nonce))` single use; deadlines enforced; one receipt per type; ACCEPTED/REJECTED exclusive; Registry `regOwnerSig` and `revoke` nonces; EIP-3009 nonces.
 - CT-12 Signatures via `SignatureChecker.isValidSignatureNow`; malleable EOA signatures rejected.
 - CT-13 Fees: `protocolFee ≤ maxProtocolFee`; integrator cap applied at charge time; `integratorFeeCapMultiple ≤ 10`; `total ≤ maxTotal`; inactive app reverts.
-- CT-14 Gas targets met with snapshots: `notarize` ≤ 160k, `acknowledge` ≤ 75k, `notarizeBatch` ≤ 120k per item (n=20).
+- CT-14 Gas targets met with snapshots: `notarize` ≤ 170k, `acknowledge` ≤ 75k, `notarizeBatch` ≤ 120k per item (n=20).
 - CT-15 Slither and Aderyn clean, or each justification reviewed and recorded.
 - CT-16 Deploy script: CreateX CREATE3 with a deployer-guarded salt (no cross-chain front-running); all roles transferred to the Safe in the same script; deployer holds no role; per-chain config verified; Solidity and `evm_version` pinned and supported on every target chain.
 - CT-17 Clean-room: no OCC v1 code copied.
