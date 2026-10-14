@@ -167,7 +167,12 @@ describe('SqliteStore shared by several processes (06 §6)', () => {
     await Promise.all([a.ready, b.ready]);
     a.go();
     b.go();
-    const codes = await Promise.all([a.done, b.done]);
+    // A writer that dies must not leave its peer waiting in lockstep for the full test timeout:
+    // kill the peer at once so the test fails now, with the dead writer's stderr.
+    const codes = await Promise.all([
+      a.done.then((code) => (code === 0 ? code : (b.kill(), code))),
+      b.done.then((code) => (code === 0 ? code : (a.kill(), code))),
+    ]);
     expect(codes, a.stderr() + b.stderr()).toEqual([0, 0]);
     expect(integrity(path)).toBe('ok');
     const store = await SqliteStore.open(path);
