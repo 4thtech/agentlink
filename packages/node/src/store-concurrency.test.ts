@@ -36,20 +36,32 @@ register('./hooks.mjs', import.meta.url);
 
 const WRITER = `
 import { SqliteStore } from ${JSON.stringify(pathToFileURL(join(SRC, 'sqlite-store.ts')).href)};
-const [path, name, count] = process.argv.slice(2);
+const [path, name, count, lockstep] = process.argv.slice(2);
 const store = await SqliteStore.open(path, { lockTimeoutMs: 60000 });
 process.send?.('ready');
 await new Promise((resolve) => process.once('message', resolve));
 process.disconnect?.();
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 for (let i = 0; i < Number(count); i += 1) {
+  if (lockstep === 'lockstep') {
+    // Round i starts only once the peer has committed its row i - 1 (this process has committed
+    // exactly i rows, so a total of 2 * i rows means the peer has i). Both writers then reach the
+    // lock together every round, and the insertion order cannot run one writer's rows in a long
+    // streak whatever the speed of the machine: SQLite's lock is not fair, and on a slow disk one
+    // writer could otherwise take most of the run.
+    const deadline = Date.now() + 60000;
+    while ((await store.transaction((tx) => tx.count('seen'))) < 2 * i) {
+      if (Date.now() > deadline) throw new Error('lockstep: the peer made no progress');
+      await sleep(1);
+    }
+  }
   await store.transaction((tx) => {
     const row = tx.get('budget_state', { slot: 'current' });
     tx.update('budget_state', { slot: 'current', newest_t: row.newest_t }, { newest_t: row.newest_t + 1 });
     tx.insert('seen', { kind: 'wrap', id: name + '-' + i, first_seen_at: i });
   });
-  // A harness does other work between writes; without a pause one writer could hold the lock
-  // back to back (SQLite's lock is not fair) and the run would test no interleaving.
-  if (i % 2 === 0) await new Promise((resolve) => setTimeout(resolve, 1));
+  // Free-running writers (the kill test): a harness does other work between writes.
+  if (lockstep !== 'lockstep' && i % 2 === 0) await sleep(1);
 }
 await store.close();
 `;
@@ -150,8 +162,8 @@ describe('SqliteStore shared by several processes (06 §6)', () => {
     const path = join(dir, 'agent.sqlite');
     await seed(path);
     const n = 150;
-    const a = run('writer.mjs', [path, 'a', String(n)]);
-    const b = run('writer.mjs', [path, 'b', String(n)]);
+    const a = run('writer.mjs', [path, 'a', String(n), 'lockstep']);
+    const b = run('writer.mjs', [path, 'b', String(n), 'lockstep']);
     await Promise.all([a.ready, b.ready]);
     a.go();
     b.go();
@@ -163,12 +175,13 @@ describe('SqliteStore shared by several processes (06 §6)', () => {
     const state = await store.transaction((tx) => tx.get('budget_state', { slot: 'current' }));
     expect(state?.newest_t).toBe(2 * n);
     await store.close();
-    // The two writers really interleaved: the insertion order switches between them many times.
+    // The two writers really interleaved: in lockstep, every round commits one row of each, so the
+    // insertion order switches writer at least once per round (n times in all), on any machine.
     const raw = new Database(path, { readonly: true });
     const order = raw.prepare('SELECT id FROM "seen" ORDER BY rowid').pluck().all() as string[];
     raw.close();
     const switches = order.filter((id, i) => i > 0 && id[0] !== order[i - 1]?.[0]).length;
-    expect(switches).toBeGreaterThan(5);
+    expect(switches).toBeGreaterThanOrEqual(n);
   }, 60_000);
 
   it('a process killed while writing leaves a store that opens and passes integrity_check', async () => {
