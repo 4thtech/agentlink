@@ -280,13 +280,19 @@ export const ZONES = {
     'transport-nostr',
     'storage',
   ]),
+  // M1-8a: `crypto` for the KeyStore interface and its restricted /keystore entry (the backends).
   'packages/node': entry(
     '@agentlink/node',
-    ['core', 'log'],
+    ['core', 'log', 'crypto'],
     [
       {
         pattern: 'better-sqlite3',
         reason: 'SQLite Store; approved build script (pnpm-workspace.yaml)',
+      },
+      {
+        pattern: '@napi-rs/keyring',
+        reason:
+          'OS keychain KeyStore (03 §6, 04 §2.2, M1-8a); prebuilt platform packages, no install script',
       },
     ],
   ),

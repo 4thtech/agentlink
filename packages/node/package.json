@@ -33,6 +33,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@agentlink/core": "workspace:*"
+    "@agentlink/core": "workspace:*",
+    "@agentlink/crypto": "workspace:*",
+    "@napi-rs/keyring": "2.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5"
   }
 }
