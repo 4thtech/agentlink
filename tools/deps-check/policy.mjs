@@ -105,6 +105,7 @@ export const isSubtleExempt = (file) => SUBTLE_EXEMPT_FILES.some((entry) => entr
 
 const ALL_PACKAGES = [
   'types',
+  'log',
   'crypto',
   'chain',
   'transport-nostr',
@@ -131,6 +132,9 @@ export const ZONES = {
     [],
     [{ pattern: 'zod', reason: 'schemas for the shared types (07 §1)' }],
   ),
+  // The redacting logger (M0-8): zero dependencies, imports nothing, usable by every package that
+  // does I/O. types, crypto and ui do not log (yet); widening that is a reviewed change.
+  'packages/log': entry('@agentlink/log', []),
   'packages/crypto': entry(
     '@agentlink/crypto',
     [],
@@ -144,7 +148,7 @@ export const ZONES = {
   ),
   'packages/chain': entry(
     '@agentlink/chain',
-    ['types', 'crypto'],
+    ['types', 'log', 'crypto'],
     [
       { pattern: 'viem', reason: 'chain clients and OCC v2 bindings (07 §1)' },
       { pattern: 'viem/*', reason: 'viem subpath exports (chains, actions)' },
@@ -156,7 +160,7 @@ export const ZONES = {
   ),
   'packages/transport-nostr': entry(
     '@agentlink/transport-nostr',
-    ['types', 'crypto'],
+    ['types', 'log', 'crypto'],
     [
       { pattern: 'nostr-tools', reason: 'relay pool and NIP-17/59 plumbing (07 §1)' },
       { pattern: 'nostr-tools/*', reason: 'nostr-tools subpath exports' },
@@ -164,11 +168,12 @@ export const ZONES = {
   ),
   'packages/storage': entry(
     '@agentlink/storage',
-    ['types', 'crypto'],
+    ['types', 'log', 'crypto'],
     [{ pattern: 'aws4fetch', reason: 'S3-compatible presigning for the s3 adapter (07 §1)' }],
   ),
   'packages/core': entry('@agentlink/core', [
     'types',
+    'log',
     'crypto',
     'chain',
     'transport-nostr',
@@ -176,7 +181,7 @@ export const ZONES = {
   ]),
   'packages/node': entry(
     '@agentlink/node',
-    ['core'],
+    ['core', 'log'],
     [
       {
         pattern: 'better-sqlite3',

@@ -269,19 +269,34 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - `grep -rn "09-repositories\|09 §" docs/ AGENTS.md` shows only references marked private, none required to complete a public task.
 
 #### M0-8 · Shared redacting logger and secret-canary CI test (new)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1
-- **Repo/path:** agentlink · packages/log (proposed name, gap G-11)
+- **Status:** done · **Size:** M · **Tier:** Opus · **Security:** S1
+- **Repo/path:** agentlink · packages/log (`@agentlink/log`, resolves gap G-11)
 - **Depends on:** M0-2d
 - **Spec:** 04 §1 I-7, §8.4; 07 §7 (submitter logging); `audit-rules.md` §6
 - **Invariants:** I-7
 - **Scope:**
   - Zero-dependency structured logger for Node, browsers and Workers; debug level still redacts.
-  - Redaction by key name (seed, secret, privateKey, fileKey, cek, salt, url, presigned, payload, plaintext, body, authorization, token, code) and by value pattern (64-hex scalars, bech32 `nsec`/`ncryptsec`, SigV4 `X-Amz-Signature`/`X-Amz-Credential`, `Authorization: AWS4-HMAC-SHA256`, local-UI `?t=` tokens, recovery-code shape, JWTs); URLs logged without query strings; `Error` messages and stacks scrubbed.
+  - Redaction by key name (seed, secret, privateKey, fileKey, cek, salt, url, presigned, payload, plaintext, body, authorization, token, code) and by value pattern (64-hex scalars, bech32 `nsec`/`ncryptsec`, SigV4 `X-Amz-Signature`/`X-Amz-Credential`, `Authorization: AWS4-HMAC-SHA256`, local-UI `?t=` tokens, recovery-code shape, JWTs); every URL logged as its origin only (scheme, host, port: paths carry API keys and object IDs, 04 §4), including under `url`-named keys (decided in review IR-M0-8-1); `code`-named keys keep only HTTP status and system error codes; `Error` messages and stacks scrubbed. The recovery-code rule is a heuristic until M1-1 pins the format.
   - ESLint `no-console` repo-wide (documented exception: the CLI's user-output channel).
   - Canary test helper: injects known canary secrets through public APIs and fails if any captured log line (all levels) contains one. Every later package adds its canaries.
 - **Acceptance:**
   - Unit test per redaction rule, including nested objects, arrays, errors and URLs.
-  - A deliberately leaking fixture makes the canary job fail in CI (red run linked in PR).
+  - A deliberately leaking fixture makes the canary job fail when run locally (local demonstration, output in PR; not pushed).
+
+#### M0-8b · Logger hardening follow-ups (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · packages/log
+- **Depends on:** M0-8
+- **Spec:** 04 §1 I-7, §8 rule 4; review IR-M0-8-2 (findings L1–L4, all Low)
+- **Invariants:** I-7
+- **Scope:**
+  - L1: the `key=value` string scanner handles JSON escapes and nesting. `valueEnd` skips an escaped character, an optional `\` is accepted before the quotes (double-encoded JSON), and a value starting with `{` or `[` is redacted up to its matching bracket, bounded by the quoted-value limit.
+  - L2: URL paths are dropped in two more forms: backslash paths (`https://host\v2\KEY`; exclude `\` from the authority) and protocol-relative URLs (`//host/path` → `//host`). Scheme-less URLs (`host.tld/v2/KEY`) stay an accepted residual risk.
+  - L3: the per-string cost of the scanner has a deterministic CI bound: a step counter (for example `pairScanWork(text)`, finder iterations plus characters scanned) asserted at most c × length on the worst cases (`'a:'.repeat(8192)`, `'a=a='.repeat(4096)`). No wall-clock limits in CI.
+  - L4: the README documents that a Map with object keys logs their values under `"[object Object]"`, with only the value-pattern layer.
+- **Acceptance:**
+  - A regression test per item, red before the fix (negative control recorded in the PR).
+  - A quadratic mutant of the scanner turns the L3 test red.
 
 #### M0-9 · Cross-runtime test-vector harness (new)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
@@ -714,11 +729,13 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/generators/
 - **Depends on:** M0-9
-- **Spec:** 04 §2.1, §2.3, §3.1, §3.3, §3.6, §4, §5, §8.2; 05 §3.1, §4, §8; `development-process.md` §9.1
+- **Spec:** 04 §2.1, §2.3, §2.4, §2.4.1, §2.5.1, §2.8, §3.1, §3.3, §3.6, §4, §5, §8.2; 05 §3.1, §4, §8; `development-process.md` §9.1
 - **Invariants:** I-6, I-8
 - **Scope:**
   - Written by a session that does not implement the TypeScript code. Generators use independent implementations (e.g. Python `cryptography`, a reference BIP-340, RFC 9180 reference vectors, an RFC 8785 reference, `eth-account`/`eth-abi` or `cast` for EIP-712).
-  - Suites (M1a, what Talk needs): HKDF derivation per 04 §2.1 (labels × epochs 0–2), BIP-340 tagged-hash envelope signatures, BIP-340 tagged-hash owner-action signatures (`agentlink/owner-action/v1`, 04 §2.5.1, G-29) with rejection vectors for every non-canonical form (checksummed or uppercase address, uppercase hex, padded base64url, out-of-range integer, unknown key), HPKE CEK wrap (fixed ephemeral keys), payload AEAD + AAD, envelope hash via JCS, pairing HMAC, safety code, owner-seed wrap (Argon2id passphrase path), file KeyStore `ALKS` v1 for both secret kinds (D-54, 04 §2.8), EIP-712 domain separator / struct hash / digest for `AgentCard` (chain-agnostic domain).
+  - Suites (M1a, what Talk needs): HKDF derivation per 04 §2.1 (labels × epochs 0–2), BIP-340 tagged-hash envelope signatures, BIP-340 tagged-hash owner-action signatures (`agentlink/owner-action/v1`, 04 §2.5.1, G-29) with rejection vectors for every non-canonical form (checksummed or uppercase address, uppercase hex, padded base64url, out-of-range integer, unknown key), HPKE CEK wrap (fixed ephemeral keys), payload AEAD + AAD, envelope hash via JCS, pairing HMAC (with `proofKey` = HKDF label `agentlink/v1/pairing-proof` and the byte-exact input of 04 §3.6), safety code, owner-seed wrap `ALKO` v1 for both secret kinds plus the `ALKO`/`ALKS` cross-type failures, file KeyStore `ALKS` v1 for both secret kinds (D-54, 04 §2.8), the `password()` rule (kind 1 as the 15 decoded bytes, with accepted spellings and refusals; kind 2 with fatal UTF-8 and control-character refusals), EIP-712 domain separator / struct hash / digest for `AgentCard` (chain-agnostic domain) with `cardSig` reject vectors (high `s`, `v` ∈ {0, 1}).
+  - Encoding suite (04 §2.4.1): accept and reject vectors per table row, including the integer tokens `1.0`, `1e3`, `-0` and `9007199254740991.4`; the cross-class cases (card `ownerNostr` against OwnerAction `owner`, `0x` on a bare field and the reverse); and a `proof` body with a base64url `recordId` or `salt` (rejected).
+  - Relay URL schema (04 §4): accept and reject cases for the raw-string grammar, including percent-encoding, full-width characters, U+3002, numeric labels in each base, the denied names and a trailing dot.
   - Proof-layer suites (STREAM, PRF wrap, `Record`, `Receipt`, `Registration`) are M1-1i (M1b).
   - These are the **canonical** vectors; the contracts repo checks parity against a pinned commit (D-19).
   - Vectors that depend on open gap G-28 are added only after it is resolved.
@@ -834,7 +851,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Invariants:** I-1, I-4
 - **Scope:**
   - Owner passphrase wrapping of the owner seed for local storage only: Argon2id (m = 64 MiB, t = 3, p = 1), AES-256-GCM (the M1a owner-presence minimum, D-33).
-  - Pairing proof HMAC-SHA256(secret, "agentlink-handshake" ‖ inviteId ‖ SHA-256(JCS(B card))); safety code per 04 §3.6 with the encoding fixed by G-28.
+  - Pairing proof HMAC-SHA256(proofKey, "agentlink-handshake" ‖ inviteId ‖ SHA-256(JCS(B card))), with `proofKey` = HKDF-SHA256(secret, "", "agentlink/v1/pairing-proof") and the byte-exact input of 04 §3.6; safety code per 04 §3.6 with the encoding fixed by G-28.
   - Versioned wrapped-blob format (alg, params, salt, nonce), shared with M1-1k.
   - Owner passphrase wrap pins HKDF label `agentlink/v1/owner-passphrase-wrap` and file magic `ALKO` (D-54, 04 §2.8), with a `secretKind` header byte (1 = generated owner code, 2 = chosen passphrase) covered by the AAD and the same normalisation by kind as `ALKS` (04 §2.8); vectors for both kinds (M1-1h).
   - File KeyStore seal/open for `ALKS` v1 (D-54, 04 §2.8): Argon2id with the header's parameters (floor and cap checked before the KDF runs), HKDF label `agentlink/v1/keystore-file`, AES-256-GCM with the whole header (including `secretKind` and `agentId`) as AAD; entry parser with the 04 §2.8 refusals; entries as `Uint8Array`; 120-bit code generation (15 CSPRNG bytes, RFC 4648 base32) and normalisation by `secretKind`.
@@ -955,7 +972,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · src/OCCFeeVault.sol, test/unit
 - **Depends on:** M1-3a; gap G-39 resolved (PR #11, pending owner)
-- **Spec:** 05 §2.1–§2.6, §5, §6, §7
+- **Spec:** 05 §2.1–§2.6, §5, §5.2, §6, §7
 - **Invariants:** I-10
 - **Scope:**
   - Credits: `deposit`, `depositFor` (native + allowlisted ERC-20 via SafeERC20, measured balance delta), `withdraw` (works while paused), `creditsOf`, `minDeposit`.
@@ -963,8 +980,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Apps: `registerApp` (appId = keccak256(abi.encode(integrator, keccak256(bytes(name))))), `setIntegratorFee`, `setIntegrator` (appId unchanged), `setAppActive`; appId 0 = no integrator.
   - Treasury: permissionless `sweep` via `call`; `withdrawIntegrator`; treasury change with 7-day delay; pause blocks charges and deposits only, never `withdraw`, `sweep` or `withdrawIntegrator` (05 §5.1, G-39); CEI + `nonReentrant` on every value transfer.
   - Out: `depositWithAuthorization` (M1-3c).
+  - Initial configuration in the initializer (IR-M1-3a-1 M-1): the vault initializer takes the treasury, allowed tokens, fees and caps, `minDeposit`, the integrator multiple and the initial modules (the Notary at its CREATE3-predicted address), so the configuration is atomic with the proxy deployment. The deployer never needs a role, and no later transaction has to run inside a window where it still holds `ADMIN_ROLE` (M1-3g).
+  - Events and names as in 05 §5.2 and §6 (proposed, IR-M1-3a-1): add `Paused`/`Unpaused` to the shared base, rename the error `Paused()` to `EnforcedPause()` in the interfaces (it also reverts `pause` while paused; `unpause` while not paused reverts the new `ExpectedPause()`, with no event on a revert), add `MultipleAboveMax()` for `setIntegratorFeeCapMultiple` above `MAX_MULTIPLE`, and add `TreasuryChanged`, `MinDepositSet`, `IntegratorFeeCapMultipleSet`, `IntegratorChanged` and `IntegratorWithdrawn`. If M1-3a has not merged yet, this is a fix-up commit to it.
+  - Open Low (IR-M1-3a-1 L-3): make `_authorizeUpgrade` non-virtual in `OCCManaged` and offer an empty `_beforeUpgrade` hook, so a derived contract cannot drop the role check by not calling `super`. Skip if M1-3a already fixed it.
 - **Acceptance:**
   - Tests first (failing-test commit precedes implementation); a unit test for every function and every applicable revert in 05 §7.
+  - Role tests run against the real contract (IR-M1-3a-1 M-2): switch `RoleFixture._deploy` from the `VaultHarness` stub to `OCCFeeVault`, so the `RoleMap` end-to-end check (outsiders refused) and `RoleBound` cover shipping code. Add a test that every non-view selector in the concrete ABI is either in `docs/roles.md` or callable by an outsider without `AccessManagedUnauthorized`.
+  - A test per event in 05 §6 checks its name, indexed fields and emitting function, including `TreasuryChanged` on `setTreasury` and `IntegratorWithdrawn` on `withdrawIntegrator`.
   - No restricted selector can reduce `credits[payer][token]` (test enumerates all selectors).
   - Withdraw succeeds while paused; fee-on-transfer and reentrant token/receiver mocks cannot over-credit or re-enter.
   - Withdraw of credits in a token that was removed from the allowlist succeeds (05 §2.2, 12 §3.2).
@@ -985,15 +1007,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · src/OCCNotary.sol, test/unit
 - **Depends on:** M1-3a (uses `IOCCFeeVault` with a mock until M1-3b lands), M1-1i; gap G-4 resolved
-- **Spec:** 05 §3.1–§3.4, §5 (freeze), §6, §7; 04 §5
+- **Spec:** 05 §3.1–§3.4, §5 (freeze), §5.2, §6, §7; 04 §5
 - **Invariants:** I-6
 - **Scope:**
   - EIP-712 `Record`/`Receipt`; `notarize`, `notarizeBatch` (semantics per G-4), `notarizeDirect` (payable; `msg.sender == r.signer`; `depositFromModule` then `charge`), `acknowledge`, `acknowledgeBatch`, `getRecord`, `computeRecordId`.
   - recordId = keccak256(abi.encode(block.chainid, address(this), signer, nonce)) (also the single-use nonce); `RecordState` packed into 5 slots incl. `recordStructHash`; receipt flags; ACCEPTED/REJECTED exclusive; commitment check `keccak256(abi.encode(rc.signer, rc.salt)) == recipientCommitment`.
   - `SignatureChecker.isValidSignatureNow` (EOA + ERC-1271); deadlines; pause; one-way `freezeUpgrades()`.
   - CI parity job: EIP-712 hashes equal the canonical public vectors at the pinned commit.
+  - Open Low (IR-M1-3a-1 L-3): the Notary's freeze goes through a `_beforeUpgrade` hook, not an override of `_authorizeUpgrade` (see M1-3b), so the role check stays in the base.
 - **Acceptance:**
-  - Tests first; unit test for every function and revert (`Expired`, `InvalidSignature`, `RecordExists`, `RecordNotFound`, `ReceiptExists`, `ConflictingReceipt`, `NotRecipient`, `NotSigner`, `FeeAboveMax`, `Paused`, `UpgradesAreFrozen`).
+  - Tests first; unit test for every function and revert (`Expired`, `InvalidSignature`, `RecordExists`, `RecordNotFound`, `ReceiptExists`, `ConflictingReceipt`, `NotRecipient`, `NotSigner`, `FeeAboveMax`, `EnforcedPause`, `ExpectedPause`, `UpgradesAreFrozen`).
+  - Role tests run against the real contract (IR-M1-3a-1 M-2): switch `RoleFixture._deploy` from the `NotaryHarness` stub to `OCCNotary`, so `RoleMap` and `RoleBound` (including `freezeUpgrades` → `FREEZER`, `pause`/`unpause`, `upgradeToAndCall`) cover shipping code; the "every non-view selector is in `docs/roles.md` or callable by an outsider" test from M1-3b covers the Notary too.
   - Gas snapshots meet 05 §3.4: `notarize` (credits, EOA) ≤ 160k, `acknowledge` ≤ 75k, `notarizeBatch` per item (n = 20) ≤ 120k; CI fails on regression.
   - A test recomputes `recordStructHash` from a full `Record` and matches `getRecord` (verification without logs).
   - Cross-chain, cross-contract and high-s signature replays rejected.
@@ -1009,6 +1033,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Fuzz: signatures, fee/cap/multiple arithmetic, credits.
   - ERC-1271 signers: Safe-style (threshold owners) and passkey-style (P-256/WebAuthn) smart-account mocks, including invalid and reverting `isValidSignature`.
   - Slither and Aderyn: clean, or each finding justified in `audits/static-analysis.md`.
+  - Open Low and Info (IR-M1-3a-1 L-4, I-1): `OCCRoleSetup` is S2 and contains assembly but is skipped by Slither (`--skip ./script/**`) and Aderyn (`src/` only), so move it to `src/libraries/` (scripts can still import it). Anchor the CI path filter as `(^|/)(lib|test|script)/`, so a future `src/lib/` is not hidden.
 - **Acceptance:**
   - Invariant suite runs in `contracts-gate` with the CI fuzz profile and nightly with a deep profile (runs/depth recorded).
   - ERC-1271 record and receipt paths pass; every static-analysis finding has a disposition.
@@ -1036,7 +1061,9 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Foundry script: implementations and UUPS proxies via CreateX CREATE3 with deploy-and-initialise in one call; salt scheme per G-8; per-chain config (fee tokens with EIP-3009 flags, fees, caps, min deposits, treasury Safe, role holders, delays).
   - In the same script: all roles granted to the testnet Safe and the testnet ops key per 05 §5.1 (mainnet layout, scaled delays), Notary registered as vault module, every deployer role revoked. Mainnet variant (M3-2c): contracts initialised paused until the grant and target admin delays are in effect.
-  - Post-deploy check script (in CI): deployer holds no role; delays equal `docs/roles.md`; addresses identical on both chains.
+  - No deployer-only window (IR-M1-3a-1 M-1). Until `OCCRoleSetup.configure` runs, every selector is unmapped and defaults to `ADMIN_ROLE`, so the deployer would hold 0-delay `upgradeToAndCall`, `setTreasury` and `registerModule` on live proxies. The vault's initial configuration therefore goes in its initializer (M1-3b), and the script either (a) does manager deployment, proxies, initialisation and `OCCRoleSetup` in one transaction through a one-shot deployer contract, or (b) calls `configure` against the CREATE3-predicted proxy addresses before deploying the proxies. The Notary is registered as a module through the initializer, not by a later call.
+  - Post-deploy check script (in CI): deployer holds no role; delays equal `docs/roles.md`; addresses identical on both chains; the ERC-1967 implementation slot of each proxy equals the expected implementation; `authority()`, `paused()` and the vault configuration read back as configured.
+  - Open Lows (IR-M1-3a-1 L-1, L-2, I-2): `OCCRoleSetup.calls` checks the mainnet delay floor itself (make it `view` and call `checkDelays` first), not only `configure`; on a mainnet `configure` reverts unless the vault, the Notary (and the Registry, if set) report `paused()` true, with a test; on a mainnet it requires exactly two ops keys (05 §5.1).
   - Deploy runs from CI in the private repo, triggered manually by the owner (Free plan: no environment protection); testnet-only key, low balance. Agents never broadcast from a workstation.
   - Resolved (D-11, D-19): no explorer or Sourcify source verification on testnets; the source stays private until mainnet verification (M3-6). Testnet deploys publish ABIs and addresses only (`release-and-deployment.md` §4.2).
 - **Acceptance:**
@@ -1260,7 +1287,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-1, I-4, I-5
 - **Scope:**
   - Invite `{v, inviteId, secret, card, cardSig, name, relays, expiresAt}` → base64url(deflate) → `https://<invite-host>/i#<payload>`; accept from the full URL or the bare payload; default expiry 7 days.
-  - A stores `{inviteId, sha256(secret), expiresAt, used}`. B verifies `cardSig` and expiry, applies `contacts.acceptInvites` (default `approval` → `pending_approval`), then sends `handshake` with the HMAC proof.
+  - A stores `{inviteId, proofKey, expiresAt, used}` (`proofKey` = HKDF of the secret, label `agentlink/v1/pairing-proof`, encrypted at rest; never the raw secret, 04 §3.6). B verifies `cardSig` and expiry, applies `contacts.acceptInvites` (default `approval` → `pending_approval`), then sends `handshake` with the HMAC proof.
   - Contact names (D-53, 06 §2.1 contact-name rule): the invite `label` is stored as A's suggested alias for B and shown restricted until A's owner confirms it (it is agent-written); B's owner types or confirms an alias on the pairing approval, prefilled with the restricted self-declared name. Only owner-set aliases are shown unrestricted. A shared `restrictName` helper exactly per 06 §2.1 (NFKC; only `[\p{L}\p{N} .'-]`; spaces collapsed; ≤ 32 code points; fallback "Contact" plus short owner fingerprint for empty, mixed-script or confusable names beyond UTS #39 moderately restrictive, or names containing a reserved label word) renders names quoted, followed by the identity label, with `nameSource`; the raw self-declared name is stored as untrusted data.
   - A accepts a `handshake` from an unknown sender only for an unused, unexpired invite; marks it used, adds B, replies `handshake-ack`. This processing runs in the background loop or on `agentlink_inbox`, never in a read-only status call (06 §2.0, §6). Both sides compute the safety code once the handshake is done; `createInvite` returns `{inviteUrl, ownerFingerprint, expiresAt}` and no safety code (it needs both sides' keys, 04 §3.6).
 - **Acceptance:**
@@ -1558,7 +1585,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - D-53 and D-55 assertions: the snapshot holds exactly the 15 tools of 06 §2.0; `agentlink_send`'s `type` enum has no `offer`, `accept` or `reject`; every name starts with `agentlink_`; the four annotations are set explicitly on every tool and match the 06 §2.0 table; every tool that can return `pending_approval` accepts `approvalId`; after 0.1.0, a removed or renamed tool or a removed or newly required field fails CI unless the PR records a decision-log entry; no tool name, description or argument installs, changes or removes harness hooks or harness configuration.
   - Deny assertions: no tool name, description or argument that changes policy, exports keys, adds storage credentials, decides approvals or reads arbitrary files. Vocabulary lint over summaries and server instructions.
 - **Acceptance:**
-  - Adding a fixture tool `set_policy` or an argument `privateKey` fails CI (red run linked); so do a fixture tool without the `agentlink_` prefix and a fixture write tool marked `readOnlyHint: true` (red runs linked); Inspector validation passes for every tool.
+  - Adding a fixture tool `set_policy` or an argument `privateKey` fails the check when run locally (local demonstration, output in PR; not pushed); so do a fixture tool without the `agentlink_` prefix and a fixture write tool marked `readOnlyHint: true` (local demonstrations); Inspector validation passes for every tool.
 
 #### M1-9f · Claude Desktop one-click extension bundle
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -3071,7 +3098,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 8. **G-8 (H) CREATE3 salts and deployer lifecycle.** 05 §9; `release-and-deployment.md` §4.2. CreateX guarded salts bind addresses to the deployer; identical addresses for the Registry (M2) and M4 chains need the same deployer and salt scheme; proxies must be deployed and initialised atomically; testnet and mainnet deployers differ, so testnet and mainnet addresses differ. *Proposed:* specify salt layout (deployer-guarded, no cross-chain redeploy protection), deploy-and-init, and cold-storage retention of the mainnet deployer key until all planned chains are deployed. *Blocks:* M1-3g, M3-2b, M3-2c, M4-EPIC.
 9. **G-9 (M) Store schema gaps.** 07 §3 lacks the outbox (07 §4.2, 24 h retry), the ≥ 7-day seen-set (07 §4.2), idempotency results (06 §1 rule 6), budget ledger and rate counters (06 §3), and `SignedOwnerAction` nonces, the stored signed objects, the revoked-agent set and contact status `revoked` (04 §2.5.1, §3.4.1); the policy-version high-water mark lives in the KeyStore (04 §2.5.1). *Proposed:* extend 07 §3. *Blocks:* M1-5b, M1-5c, M1-7a, M1-8b.
 10. **G-10 (M) Where `@agentlink/occ-v2-abi` is published.** 05 §9; D-19. npm provenance is not generated for private source repos (verify). *Proposed* (`development-process.md` §9.2): import release artifacts into public `packages/occ-v2-abi` and publish from there. *Blocks:* M1-3f.
-11. **G-11 (L) Logger package missing from the package map.** 04 §8.4 vs 07 §1. *Proposed:* add `@agentlink/log` (zero dependencies). *Blocks:* M0-8.
+11. **G-11 (L) Logger package missing from the package map.** RESOLVED by M0-8: `@agentlink/log` (zero dependencies) is in the 07 §1 package map and `repo-reference.md`. *Was:* 04 §8.4 vs 07 §1. *Blocked:* M0-8.
 12. **G-12 (M) JCS and invite compression.** 04 §3.1, §3.6; `AGENTS.md` dependency allowlist. No JCS implementation is allowlisted although `envelopeHash` depends on it; "deflate" does not say raw DEFLATE or zlib. *Proposed:* approve a vetted RFC 8785 implementation (or in-repo code with RFC vectors); specify `deflate-raw` via `CompressionStream`. *Blocks:* M1-1a, M1-7c.
 13. **G-13 (L) Record kind ↔ payload type.** 05 §3.1 kinds vs 04 §3.4 payload types; no mapping. *Blocks:* M1-7g.
 14. **G-14 (M) `agentlink_fetch_file` and SSRF in Workers.** 06 §2.3 (`savedTo`, inbox folder) vs 08 §3 (no filesystem); 04 §4 DNS checks are not possible in Workers. *Proposed:* cloud `agentlink_fetch_file` stores the decrypted file in the user's R2 and returns a short-lived link; Workers SSRF = https + IP-literal and hostname checks, documented reliance on Workers egress. *Blocks:* M1-15, M2-3b.

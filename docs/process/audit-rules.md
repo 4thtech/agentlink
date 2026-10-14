@@ -98,7 +98,7 @@ Merging is continuous (D-25, amended by D-51 and D-52): agents work under Tali's
 | Owner's merge go-ahead | — | ✅ on sensitive paths only (§2.2) | ✅ Tali's explicit "merge" in chat on the PR, or a go-ahead recorded in chat that covers this specific piece of work (`delivery-process.md` §4), recorded in the PR body (D-51, D-52) | Process control (D-51, simplified). Code-owner review is off. The owner MAY review any PR and MAY disable its auto-merge. Services deploy to production automatically once staging smoke tests are green; npm `latest` needs the owner's approval click (D-52, `release-and-deployment.md` §3) |
 | Independent AI review session (Opus 5.5, §4) | — (a Sonnet non-security review MAY be used) | ✅ checklists for the areas touched | ✅ all applicable checklists + invariant walkthrough | `review-gate` (c): report ID referenced in the PR, no FAIL verdict. Attested by the orchestrator: CI sees the reference, not the review. Automated PRs: a code-owner approval on the head commit instead (below) |
 | Feedback from `@denisjazbec` | — | MAY | Usually relayed through the owner and logged with a disposition (`development-process.md` §14); review comments welcome; his GitHub approval is optional (D-51) | Process |
-| Tests-first evidence | — | Regression test for every fix | ✅ failing-test commit precedes implementation; red run in PR | `review-gate` (d): section filled. Content: independent reviewer |
+| Tests-first evidence | — | Regression test for every fix | ✅ failing-test commit (`RED (expected):`) precedes implementation; its local red run recorded in the PR (SHA, command, output excerpt); never pushed on its own (LL-14) | `review-gate` (d): section filled. Content: independent reviewer reproduces the red (§3.4) |
 | Threat note (§3.1) | — | Short | Full | `review-gate` (d) for S2: section filled |
 | External-audit scope register entry (§3.2) | — | — | ✅ | Process (orchestrator after merge) |
 | Re-review after new commits | — | If the reviewed area changed | Always: delta review by a fresh session, and the owner's "merge" (or the covering go-ahead) still valid for the new head commit: a review-fix round within the same scope stays covered, new scope needs a new go-ahead | Process; `review-gate` (d) re-checks the Threat note and Tests-first evidence |
@@ -133,6 +133,14 @@ One entry per merged S2 PR: task ID, PR, merge commit, files, invariants touched
 
 The class used for (c) and (d) is the higher of the derived and the declared class. Automated PRs have no exemption beyond (b) and (c) as described above (§3, `ci-cd.md`). A red `review-gate` is never bypassed by an agent; only the owner's break-glass (§6) applies.
 
+### 3.4 Tests-first evidence (S2)
+
+Proved locally, not with a red CI run: a deliberately red run e-mails the owner (LL-14).
+- The builder commits the failing tests as their own commit, message prefix `RED (expected):`, runs them locally and records in the PR's **Tests-first evidence** section the commit SHA, the exact command and a short output excerpt that shows the failures.
+- The builder does not push that commit alone. The branch is pushed once the implementation commit sits on top, so CI's first run is green. The RED commit stays in the branch history; do not rebase or squash it away before review.
+- The reviewer checks out the RED commit in a scratch worktree, confirms it is an ancestor of the head and holds tests only, re-runs the command and confirms it fails for the stated reason. The report records `tests-first reproduced: yes|no`; a `no` is a High finding (§9.1): the review is REJECTED until the red is reproduced.
+- Negative controls (break the code on purpose, see the test go red, restore) are also done locally and recorded in the PR; they never go into a pushed commit.
+
 ---
 
 ## 4. Independent review session
@@ -145,7 +153,7 @@ The class used for (c) and (d) is the higher of the derived and the declared cla
 | Invariants I-1…I-10 | Worker or orchestrator rationale, PR description, commit messages |
 | The diff (`<base SHA>...<head SHA>`) | The threat note |
 | Test and CI output for the head commit | Curator content, sync files |
-| Read-only access to the repository at the head commit | Prior review reports for this PR (except for a delta review: the finding list only) |
+| Read-only access to the repository at the head commit; for S2, the RED commit SHA and its test command (facts to reproduce, §3.4) | Prior review reports for this PR (except for a delta review: the finding list only) |
 | The area checklists of §5 | — |
 
 The session is a **fresh Opus 5.5 subagent**, spawned by the orchestrator, in read-only mode. It MAY run tests in a scratch worktree. It MUST NOT push, comment or write outside its report.
@@ -157,7 +165,8 @@ The session is a **fresh Opus 5.5 subagent**, spawned by the orchestrator, in re
 3. Work through **each item** and record exactly one result: `finding <ID>`, `no finding`, or `n/a: <reason>`. Silence on an item makes the review incomplete; incomplete reviews are rejected.
 4. For S2: walk through each touched invariant (I-x) and state how the diff preserves it, with file:line.
 5. Judge test adequacy: missing tests for security behaviour are findings.
-6. Give a verdict: `PASS` · `PASS WITH FINDINGS` (no Critical/High) · `FAIL`.
+6. For S2: reproduce the red on the RED commit (§3.4) and record the result.
+7. Give a verdict: `PASS` · `PASS WITH FINDINGS` (no Critical/High) · `FAIL`.
 
 ### 4.3 Output format
 
@@ -169,6 +178,7 @@ Class / areas:     <S1|S2> / <checklist IDs applied>
 Inputs:            <list of spec sections, CI run IDs>
 CHECKLIST:         <item ID> | finding <ID> | no finding | n/a: <reason>   (one line per item)
 INVARIANTS (S2):   I-x | holds: <evidence file:line> | finding <ID>
+TESTS-FIRST (S2):  tests-first reproduced: yes | no   (no = High finding, REJECTED; <RED SHA>, <command>, <failure excerpt>)
 FINDINGS:
   ID:              IR-<TASK-ID>-<n>-F<nn>
   Severity:        Critical | High | Medium | Low | Info   (§9.1)
@@ -206,7 +216,7 @@ Reviewers apply every checklist the diff touches. Item IDs are stable; new items
 - CR-7 Recipient set always includes recipient agent, recipient owner, sender owner, sender agent (I-9, 04 §3.2).
 - CR-8 CEK 32 random bytes per envelope; AES-GCM IVs 12 random bytes, never reused under a key; randomness only from `globalThis.crypto` via libraries.
 - CR-9 STREAM file format per 04 §4: `ALF1` header, nonce `noncePrefix‖u32be(index)`, AAD `u8(isFinal)`; truncation and reordering detected.
-- CR-10 Pairing: invite stores only `sha256(secret)`; single use; expiry; proof `HMAC-SHA256(secret, "agentlink-handshake"‖inviteId‖sha256(JCS(B card)))` compared in constant time; safety code per 04 §3.6.
+- CR-10 Pairing: the invite store holds `proofKey = HKDF-SHA256(secret, "", "agentlink/v1/pairing-proof")`, encrypted at rest, and never the raw `secret`; single use; expiry; proof `HMAC-SHA256(proofKey, "agentlink-handshake"‖inviteId‖sha256(JCS(B card)))` over the raw bytes of 04 §3.6, compared in constant time; safety code per 04 §3.6.
 - CR-11 Owner seed wrap per 04 §2.3 (PRF salt, HKDF info, AES-256-GCM); recovery code 120 bits with Argon2id m=64 MiB, t=3, p=1; no user-chosen passphrase for relay-published blobs.
 - CR-12 Secrets zeroed with `fill(0)` where the platform allows; decrypt failures give uniform errors.
 - CR-13 Vectors exist for every new use and pass in Node, Playwright and Miniflare; existing vectors unchanged unless the spec changed.
@@ -382,7 +392,7 @@ Milestone additions: **M1**: same-OS-user test, prompt-injection suite, testnet 
 | Severity | Definition (any one suffices) |
 |---|---|
 | **Critical** | Any breach of **I-1, I-2, I-3 or I-4**; loss, theft or freezing of user credits or funds; forged records, receipts, approvals or policies; bypass of owner presence; key or seed extraction; remote code execution. |
-| **High** | Practical breach of I-5…I-10 (e.g. inbound content causing a tool call, replay of a record or receipt, secrets in local logs, owner unable to decrypt, no export path); SSRF to internal addresses; path escape from allowed folders; contract DoS of core functions; charging above `maxFee`. |
+| **High** | Practical breach of I-5…I-10 (e.g. inbound content causing a tool call, replay of a record or receipt, secrets in local logs, owner unable to decrypt, no export path); SSRF to internal addresses; path escape from allowed folders; contract DoS of core functions; charging above `maxFee`.  An S2 red that the reviewer cannot reproduce (`tests-first reproduced: no`, §3.4). |
 | **Medium** | Defence-in-depth failure without a direct exploit; spec deviation in security behaviour; missing tests for security behaviour; gas target missed. |
 | **Low** | Hardening and best-practice gaps. |
 | **Info** | Observations. |
