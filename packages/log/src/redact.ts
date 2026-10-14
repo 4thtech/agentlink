@@ -179,9 +179,18 @@ function origin(scheme: string, authority: string): string {
 interface ValuePattern {
   /** The card rule (or extra rule) this pattern implements; used by the tests. */
   readonly rule: string;
-  readonly pattern: RegExp;
-  readonly replace: string | ((match: string, ...groups: string[]) => string);
+  readonly apply: (text: string) => string;
 }
+
+/** A rule made of one global regex and its replacement. */
+const regexRule = (
+  rule: string,
+  pattern: RegExp,
+  replace: string | ((match: string, ...groups: string[]) => string),
+): ValuePattern => ({
+  rule,
+  apply: (text) => text.replace(pattern, replace as (match: string, ...groups: string[]) => string),
+});
 
 // TODO(M1-1): 04 §2.3 fixes the length (24 base32 characters) but not the grouping or alphabet.
 // When M1-1 pins the format, replace these heuristics with one exact rule and add its canary.
@@ -223,116 +232,119 @@ function redactGroups(run: string, separator: '-' | ' '): string {
   return out.join(separator);
 }
 
-/** `name<sep>value` inside a string: the value is replaced when the name is a sensitive key. */
-const KEY_VALUE =
-  /(\b[A-Za-z][A-Za-z0-9_.-]{0,63})(["']?\s*[:=]\s*)("[^"\r\n]{0,2048}"?|'[^'\r\n]{0,2048}'?|[^\s"'&,;}]{1,512})/g;
+/** A name followed by `:` or `=` (quoted names too: `"name":`). Only the name and separator. */
+const NAME_SEPARATOR = /(\b[A-Za-z][A-Za-z0-9_.-]{0,63})(["']?[ \t]{0,8}[:=][ \t]{0,8})/g;
+const MAX_QUOTED_VALUE = 2048;
+const MAX_BARE_VALUE = 512;
+const BARE_VALUE_END = /[\s"'&,;}]/;
 
-function redactPair(match: string, name: string, separator: string, value: string): string {
-  const kind = classifyKey(name);
-  if (kind === 'none' || kind === 'url') {
-    // The value may hold the next pair ("failed: password=…"): look inside it too. The value is
-    // shorter than the match, so the recursion ends.
-    return `${name}${separator}${value.replace(new RegExp(KEY_VALUE.source, 'g'), redactPair)}`;
+/** End of the value that starts at `start`: a quoted string (closing quote included) or a bare word. */
+function valueEnd(text: string, start: number): number {
+  const quote = text[start];
+  if (quote === '"' || quote === "'") {
+    const limit = Math.min(text.length, start + 1 + MAX_QUOTED_VALUE);
+    for (let at = start + 1; at < limit; at += 1) {
+      const char = text[at];
+      if (char === quote) return at + 1;
+      if (char === '\n' || char === '\r') return at;
+    }
+    return limit;
   }
-  const bare = value.replace(/^["']|["']$/g, '');
-  if (kind === 'code' && (isAllowedCode(bare) || isAllowedCode(Number(bare)))) return match;
-  const quote = value.startsWith('"') || value.startsWith("'") ? value[0]! : '';
-  const closing = quote !== '' && value.length > 1 && value.endsWith(quote) ? quote : '';
-  return `${name}${separator}${quote}${REDACTED}${closing}`;
+  const limit = Math.min(text.length, start + MAX_BARE_VALUE);
+  let at = start;
+  while (at < limit && !BARE_VALUE_END.test(text[at]!)) at += 1;
+  return at;
+}
+
+/**
+ * `name=value`, `name: value` and `"name":"value"` pairs: the value is replaced when the name is
+ * a sensitive key. One left-to-right scan; after a harmless pair the scan continues right after its
+ * separator, so a pair inside its value ("failed: password=…") is still seen. Linear in the length.
+ */
+function redactPairs(text: string): string {
+  const finder = new RegExp(NAME_SEPARATOR.source, 'g');
+  let out = '';
+  let copied = 0;
+  const kinds = new Map<string, KeyClass>();
+  for (let match = finder.exec(text); match !== null; match = finder.exec(text)) {
+    const name = match[1]!;
+    let kind = kinds.get(name);
+    if (kind === undefined) {
+      kind = classifyKey(name);
+      kinds.set(name, kind);
+    }
+    if (kind === 'none' || kind === 'url') continue;
+    const start = match.index + match[0].length;
+    const end = valueEnd(text, start);
+    if (end === start) continue;
+    const value = text.slice(start, end);
+    const quote = value[0] === '"' || value[0] === "'" ? value[0] : '';
+    const closing = quote !== '' && value.length > 1 && value.endsWith(quote) ? quote : '';
+    const bare = value.slice(quote.length, value.length - closing.length);
+    if (kind === 'code' && (isAllowedCode(bare) || isAllowedCode(Number(bare)))) continue;
+    out += `${text.slice(copied, start)}${quote}${REDACTED}${closing}`;
+    copied = end;
+    finder.lastIndex = end;
+  }
+  return copied === 0 ? text : out + text.slice(copied);
 }
 
 export const VALUE_PATTERNS: readonly ValuePattern[] = [
-  {
-    // An Authorization header line (any scheme, including AWS4-HMAC-SHA256 and Bearer): the whole value.
-    rule: 'authorization-header',
-    pattern: /(\bauthorization\b["']?\s*[:=]\s*)[^\r\n]*/gi,
-    replace: `$1${REDACTED}`,
-  },
-  {
-    // SigV4 authorization value wherever it appears, with or without the header name.
-    rule: 'aws4-hmac-sha256',
-    pattern: /\bAWS4-HMAC-SHA256\b[^\r\n]*/g,
-    replace: `AWS4-HMAC-SHA256 ${REDACTED}`,
-  },
-  {
-    // SigV4 query parameters and headers: X-Amz-Signature, X-Amz-Credential, X-Amz-Security-Token,
-    // also percent-encoded (`%3D`, `%253D`) inside another URL's query string.
-    rule: 'sigv4-params',
-    pattern:
-      /(X-Amz-(?:Signature|Credential|Security-Token)["']?\s*(?:[=:]|%(?:25)?3D)\s*)(?:(?!%(?:25)?26)[^&\s"',;]){1,4096}/gi,
-    replace: `$1${REDACTED}`,
-  },
-  {
-    // Bearer tokens outside an Authorization header (for example in an error message).
-    rule: 'bearer',
-    pattern: /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi,
-    replace: `Bearer ${REDACTED}`,
-  },
-  {
-    // Basic credentials outside an Authorization line (header tuples, Object.entries(headers)).
-    // The lookahead needs a digit, "+", "/" or "=", so "Basic authentication" is left alone.
-    rule: 'basic',
-    pattern: /\bBasic\s+(?=[A-Za-z0-9+/]{0,512}[0-9+/=])[A-Za-z0-9+/]{8,512}={0,2}/g,
-    replace: `Basic ${REDACTED}`,
-  },
-  {
-    // Local-UI session token in a relative URL or path (08 §1: `/?t=…`). Absolute URLs are already
-    // reduced to their origin before this runs.
-    rule: 'local-ui-token',
-    pattern: /([?&#;]t=)[^&#\s"'<>`]+/g,
-    replace: `$1${REDACTED}`,
-  },
-  {
-    // JWT: base64url header starting with eyJ ("{"), payload and signature.
-    rule: 'jwt',
-    pattern: /\beyJ[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]*/g,
-    replace: REDACTED,
-  },
-  {
-    // bech32 Nostr secret keys (nsec) and encrypted secret keys (NIP-49 ncryptsec), any case.
-    rule: 'bech32-nsec',
-    pattern: /(?:nsec|ncryptsec)1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{6,}/gi,
-    replace: REDACTED,
-  },
-  {
-    // 64 or more hex digits, optionally 0x-prefixed: private scalars, seeds, file keys, salts and
-    // SigV4 signatures. Also hits hashes and transaction IDs (accepted over-redaction).
-    rule: 'hex64',
-    pattern: /(?:0x)?[0-9a-fA-F]{64,}/g,
-    replace: REDACTED,
-  },
-  {
-    // data: URIs carry file content inline.
-    rule: 'data-uri',
-    pattern: /\bdata:[^,\s"'<>`]{0,200},[^\s"'<>`]*/gi,
-    replace: `data:${REDACTED}`,
-  },
+  // An Authorization header line (any scheme, including AWS4-HMAC-SHA256 and Bearer): the whole value.
+  regexRule(
+    'authorization-header',
+    /(\bauthorization\b["']?\s*[:=]\s*)[^\r\n]*/gi,
+    `$1${REDACTED}`,
+  ),
+  // SigV4 authorization value wherever it appears, with or without the header name.
+  regexRule('aws4-hmac-sha256', /\bAWS4-HMAC-SHA256\b[^\r\n]*/g, `AWS4-HMAC-SHA256 ${REDACTED}`),
+  // SigV4 query parameters and headers: X-Amz-Signature, X-Amz-Credential, X-Amz-Security-Token,
+  // also percent-encoded (`%3D`, `%253D`) inside another URL's query string.
+  regexRule(
+    'sigv4-params',
+    /(X-Amz-(?:Signature|Credential|Security-Token)["']?\s*(?:[=:]|%(?:25)?3D)\s*)(?:(?!%(?:25)?26)[^&\s"',;]){1,4096}/gi,
+    `$1${REDACTED}`,
+  ),
+  // Bearer tokens outside an Authorization header (for example in an error message).
+  regexRule('bearer', /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, `Bearer ${REDACTED}`),
+  // Basic credentials outside an Authorization line (header tuples, Object.entries(headers)).
+  // The lookahead needs a digit, "+", "/" or "=", so "Basic authentication" is left alone.
+  regexRule(
+    'basic',
+    /\bBasic\s+(?=[A-Za-z0-9+/]{0,512}[0-9+/=])[A-Za-z0-9+/]{8,512}={0,2}/g,
+    `Basic ${REDACTED}`,
+  ),
+  // Local-UI session token in a relative URL or path (08 §1: `/?t=…`). Absolute URLs are already
+  // reduced to their origin before this runs.
+  regexRule('local-ui-token', /([?&#;]t=)[^&#\s"'<>`]+/g, `$1${REDACTED}`),
+  // JWT: base64url header starting with eyJ ("{"), payload and signature.
+  regexRule('jwt', /\beyJ[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]*/g, REDACTED),
+  // bech32 Nostr secret keys (nsec) and encrypted secret keys (NIP-49 ncryptsec), any case.
+  regexRule('bech32-nsec', /(?:nsec|ncryptsec)1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{6,}/gi, REDACTED),
+  // 64 or more hex digits, optionally 0x-prefixed: private scalars, seeds, file keys, salts and
+  // SigV4 signatures. Also hits hashes and transaction IDs (accepted over-redaction).
+  regexRule('hex64', /(?:0x)?[0-9a-fA-F]{64,}/g, REDACTED),
+  // data: URIs carry file content inline.
+  regexRule('data-uri', /\bdata:[^,\s"'<>`]{0,200},[^\s"'<>`]*/gi, `data:${REDACTED}`),
   {
     // `name=value`, `name: value`, `"name":"value"` with a sensitive name (password=…, a JSON dump
     // of { privateKey }). Quoted values are replaced up to the closing quote.
     rule: 'key-value',
-    pattern: KEY_VALUE,
-    replace: redactPair,
+    apply: redactPairs,
   },
-  {
-    // Recovery code in hyphen-separated groups, any case ("ABCD-EFGH-…", "abcd-efgh-…").
-    rule: 'recovery-code',
-    pattern: /\b[A-Za-z0-9]{3,12}(?:-[A-Za-z0-9]{3,12}){1,7}\b/g,
-    replace: (run: string) => redactGroups(run, '-'),
-  },
-  {
-    // Recovery code in space-separated groups: upper case and digits only, so prose is not hit.
-    rule: 'recovery-code',
-    pattern: /\b[A-Z0-9]{3,12}(?: [A-Z0-9]{3,12}){1,7}\b/g,
-    replace: (run: string) => redactGroups(run, ' '),
-  },
-  {
-    // Recovery code without separators: 24 base32 characters (RFC 4648 alphabet), upper case, or
-    // any case when it contains a digit, so a long camelCase identifier is not hit.
-    rule: 'recovery-code',
-    pattern: /\b[A-Za-z2-7]{24}\b/g,
-    replace: (run: string) => (run === run.toUpperCase() || /[2-7]/.test(run) ? REDACTED : run),
-  },
+  // Recovery code in hyphen-separated groups, any case ("ABCD-EFGH-…", "abcd-efgh-…").
+  regexRule('recovery-code', /\b[A-Za-z0-9]{3,12}(?:-[A-Za-z0-9]{3,12}){1,7}\b/g, (run: string) =>
+    redactGroups(run, '-'),
+  ),
+  // Recovery code in space-separated groups: upper case and digits only, so prose is not hit.
+  regexRule('recovery-code', /\b[A-Z0-9]{3,12}(?: [A-Z0-9]{3,12}){1,7}\b/g, (run: string) =>
+    redactGroups(run, ' '),
+  ),
+  // Recovery code without separators: 24 base32 characters (RFC 4648 alphabet), upper case, or
+  // any case when it contains a digit, so a long camelCase identifier is not hit.
+  regexRule('recovery-code', /\b[A-Za-z2-7]{24}\b/g, (run: string) =>
+    run === run.toUpperCase() || /[2-7]/.test(run) ? REDACTED : run,
+  ),
 ];
 
 /**
@@ -352,9 +364,7 @@ export function stripUrls(text: string): string {
 export function redactString(text: string): string {
   if (text.length > MAX_STRING_LENGTH) return `${REDACTED} (string of ${text.length} characters)`;
   let out = stripUrls(text);
-  for (const { pattern, replace } of VALUE_PATTERNS) {
-    out = out.replace(pattern, replace as (match: string, ...groups: string[]) => string);
-  }
+  for (const { apply } of VALUE_PATTERNS) out = apply(out);
   return out;
 }
 
