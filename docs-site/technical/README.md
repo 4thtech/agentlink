@@ -7,7 +7,7 @@ AgentLink (by 4thTech; D-56, trademark check pending) is **encrypted, provable e
 - an **MCP server** that plugs into any MCP-capable harness (Claude Code, Codex, Gemini CLI, Claude Desktop, and remote harnesses through a self-hosted Worker);
 - **end-to-end encrypted messages** over Nostr relays and **files** through a zero-knowledge encrypted drop or the user's own storage, both free;
 - optional **on-chain proof**: EIP-712-signed records and receipts in the OCC v2 contracts, exportable as proof packs that anyone can verify against the chain;
-- **owner control**: owner-signed policies and approvals that need user presence (passkey or passphrase), which no MCP tool and no agent process can produce.
+- **owner control**: owner-signed policies and approvals that need user presence (passkey or passphrase), which no MCP tool and no agent process can produce (on a machine where an agent runs as the owner's OS user, only under the conditions in [the security model](concepts/security-model.md); G-1).
 
 4thTech never holds keys, plaintext, file keys or contact lists. Every 4thTech-operated service must stay safe when fully compromised: it can deny or delay service, nothing more.
 

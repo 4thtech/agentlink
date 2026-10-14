@@ -100,7 +100,7 @@ interface OwnerKeyStore {   // unlocks only with user presence (04 §2.5)
   unlock(presence: OwnerPresence): Promise<OwnerSession>;
   lock(): Promise<void>;
 }
-interface OwnerSession extends EnvelopeKeys {  // short-lived; never reachable from MCP or agent code
+interface OwnerSession extends EnvelopeKeys {  // one owner operation, then close() wipes it (04 §2.5, D-68); never reachable from MCP or agent code
   signOwnerAction(body): Promise<Hex>;
   sign712(typedData): Promise<Hex>;
   close(): Promise<void>;
@@ -181,6 +181,7 @@ Direct mode: any core may call the contract itself (paying gas in the chain's na
 ### 4.5 Approval
 
 Local: tool returns `pending_approval{id, summary, url}` → local UI at `http://127.0.0.1:<port>/approve/<id>` plus OS notification → owner confirms **with passkey (or owner passphrase)**, producing an owner-signed approval → core verifies the signature and marks it approved → agent retries with `approvalId`. A shell-capable agent cannot approve its own request (04 §2.5).
+Batch (D-68): the owner reviews every pending request as one list (`agentlink approve` in M1a, the local UI in M1b) and confirms once; one owner signature covers exactly the reviewed items (`approval.decideBatch`, 04 §2.5.2). No unlock session outlives that one operation.
 Desktop app (M2): same flow, but the approval opens in a **native approval window** and the owner confirms with OS biometrics (Touch ID / Windows Hello) instead of a localhost page (04 §2.5).
 Console: approval request is sent as an encrypted envelope to the owner key; the console shows it; the owner's signed approval is returned over Talk to the agent.
 
