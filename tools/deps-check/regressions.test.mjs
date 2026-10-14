@@ -409,3 +409,25 @@ describe('IR-M1-1b-1 M-1: the restricted @agentlink/crypto/keystore subpath', ()
     expect(ruleFor('test-vectors')).not.toMatch(RESTRICTED);
   });
 });
+
+describe('M1-1c: the crypto test seam @agentlink/crypto/testing', () => {
+  const seam = `import { encryptPayloadWithIv } from '@agentlink/crypto/testing';\n`;
+  const RESTRICTED = /@agentlink\/crypto\/testing may be imported only in test-vectors/;
+
+  it('fails in every zone, packages/node and packages/crypto included', () => {
+    for (const zone of Object.keys(ZONES)) {
+      expect(violationFor(zone, '@agentlink/crypto/testing', `${zone}/src/a.ts`), zone).toMatch(
+        RESTRICTED,
+      );
+    }
+    for (const code of [seam, `const m = await import('@agentlink/crypto/testing');\n`]) {
+      expect(src('packages/core', code).join('\n')).toMatch(RESTRICTED);
+    }
+  });
+
+  it('allows the vector harness', () => {
+    expect(
+      violationFor('test-vectors', '@agentlink/crypto/testing', 'test-vectors/a.ts') ?? '',
+    ).not.toMatch(RESTRICTED);
+  });
+});

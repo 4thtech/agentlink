@@ -20,6 +20,8 @@ const resolve = {
   alias: [
     { find: /^@agentlink\/crypto$/, replacement: cryptoSource('index.ts') },
     { find: /^@agentlink\/crypto\/keystore$/, replacement: cryptoSource('keystore.ts') },
+    // The deterministic test seam (M1-1c): source only, never built and not in the package exports.
+    { find: /^@agentlink\/crypto\/testing$/, replacement: cryptoSource('testing.ts') },
   ],
 };
 

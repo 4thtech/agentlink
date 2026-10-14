@@ -13,6 +13,17 @@ const SEED_OR_SECRET = [
   'derivePublicIdentity',
   'bip340Sign',
   'bip340PublicKey',
+  // M1-1c: HPKE open of a CEK with the recipient's secret key, and envelope-hash signing.
+  'unwrapCek',
+  'signEnvelopeHash',
+];
+
+// M1-1c: the deterministic test seam (fixed HPKE ephemeral key or AES-GCM IV, raw RFC 9180 suite).
+const TEST_SEAM = [
+  'wrapCekWithEphemeralKey',
+  'encryptPayloadWithIv',
+  'hpkeSealSequence',
+  'hpkeOpen',
 ];
 
 describe('@agentlink/crypto/keystore', () => {
@@ -39,6 +50,20 @@ describe('@agentlink/crypto/keystore', () => {
       'agentFingerprint',
       'formatFingerprint',
       'KEY_LABELS',
+      // M1-1c: envelope structure, hashes and verification, and the CEK and payload operations,
+      // which take a per-envelope CEK but no long-term secret (03 §3: hpkeOpen returns the CEK).
+      'parseEnvelope',
+      'parseUnsignedEnvelope',
+      'parseEnvelopeHeader',
+      'envelopeHash',
+      'envelopeAad',
+      'envelopeSignatureInput',
+      'verifyEnvelope',
+      'cekInfo',
+      'wrapCek',
+      'generateCek',
+      'encryptPayload',
+      'decryptPayload',
     ]) {
       expect(Object.keys(main), name).toContain(name);
     }
@@ -53,5 +78,21 @@ describe('@agentlink/crypto/keystore', () => {
       types: './dist/keystore.d.ts',
       default: './dist/keystore.js',
     });
+  });
+
+  it('exports the deterministic test seam from no entry point (M1-1c)', async () => {
+    const seam = await import('./testing.js');
+    expect(Object.keys(seam).sort()).toEqual([...TEST_SEAM].sort());
+    for (const name of TEST_SEAM) {
+      expect(Object.keys(main), name).not.toContain(name);
+      expect(Object.keys(keystore), name).not.toContain(name);
+    }
+  });
+
+  it('never builds the test seam: tsconfig.json excludes src/testing.ts from dist (M1-1c)', async () => {
+    const config = (await import('../tsconfig.json', { with: { type: 'json' } })).default as {
+      exclude: string[];
+    };
+    expect(config.exclude).toContain('src/testing.ts');
   });
 });

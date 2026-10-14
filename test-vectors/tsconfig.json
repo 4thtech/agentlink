@@ -8,6 +8,9 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "resolveJsonModule": true,
+    // The crypto test seam (M1-1c) is never built and has no package export: type-check it from
+    // source, as vitest.config.ts resolves it.
+    "paths": { "@agentlink/crypto/testing": ["../packages/crypto/src/testing.ts"] },
     "composite": false,
     "declaration": false,
     "noEmit": true

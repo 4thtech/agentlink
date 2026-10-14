@@ -12,3 +12,7 @@ export {
   deriveSecretKey,
 } from './keys.js';
 export { bip340PublicKey, bip340Sign } from './bip340.js';
+// M1-1c: HPKE open of a CEK with the recipient's X25519 secret key (KeyStore.hpkeOpen, 03 §3) and
+// BIP-340 signing of an envelopeHash (the KeyStore's envelope-hash signing, 04 §3.1).
+export { unwrapCek } from './hpke.js';
+export { signEnvelopeHash } from './envelope.js';

@@ -81,6 +81,15 @@ export const RESTRICTED_ENTRY_POINTS = [
     via: 'the KeyStore interface (04 §8.1)',
     reason: 'master seeds and secret keys stay inside KeyStore backends (04 §8.1, §2.5)',
   },
+  // M1-1c: the deterministic test seam (fixed HPKE ephemeral key, fixed AES-GCM IV, raw RFC 9180
+  // suite). It is never built and has no package export; only the vector harness's Vitest alias
+  // resolves it. This entry also refuses it by name everywhere else.
+  {
+    group: ['@agentlink/crypto/testing', '@agentlink/crypto/testing/*'],
+    zones: ['test-vectors'],
+    via: 'the public entry points (the test seam is never built)',
+    reason: 'a fixed ephemeral key or IV must never reach production code (M1-1c)',
+  },
 ];
 
 /**
