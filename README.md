@@ -8,7 +8,7 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 
 ## Status
 
-> **Phase:** M0 Foundations done, M1a crypto in progress (pre-alpha) · **Version:** v0.0.1 (M0 Foundations) · **Last updated:** 2026-10-14
+> **Phase:** M0 Foundations nearly complete, M1a crypto in progress (pre-alpha) · **Version:** v0.0.1 (M0 Foundations) · **Last updated:** 2026-10-14
 >
 > - **Done in M0:**
 >   - the monorepo skeleton (pnpm workspace with Turborepo, strict CI), the Foundry skeleton in the private contracts repo, architecture boundary guards and the cross-runtime test-vector harness (M0-9);
@@ -22,7 +22,7 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 >   - the owner passphrase wrap, the pairing proof and the pairing safety code;
 >   - independent test vectors for these suites, and the shared policy, approval, proof pack and tool-result types in `@agentlink/types`, tested in Node, three browsers and workerd.
 > - **Also landed:**
->   - the specification for envelope signatures and key interfaces (gap G-2; decision D-62 accepted by the owner at merge);
+>   - the specification for envelope signatures and key interfaces (gap G-2; decision D-62 accepted by the owner at merge, except one detail that stays proposed: the cap on held envelopes);
 >   - the first design drop (D1: brand core, tokens, components, local approvals screens), with the second drop (D2: console, desktop apps, onboarding and more) partly in, tracked in [`docs/design/`](docs/design/README.md);
 >   - the notary contract (record and receipt logic) in the private contracts repo. Its test and static-analysis suites are in review; nothing is deployed.
 > - **In progress:** the rest of the crypto layer (file encryption), the remaining contract work and test vectors, then the core and the node runtime.

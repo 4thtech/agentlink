@@ -237,7 +237,7 @@ Owner-only operations: approve/deny, change policies, add/remove allowed folders
 ### 2.6 Key rotation
 
 - A new `keyEpoch` derives new Nostr and encryption keys (EVM key unchanged) and issues a new agent card. Old epoch keys are re-derivable from the seed, so history stays readable.
-- Signing and encryption always use the current epoch. Decryption picks the epoch from the recipient `kid` or the gift wrap's `p` tag. A new envelope is accepted only from the sender's current key, except a `card-update` (§3.1.1, G-2; proposed, owner confirms at merge).
+- Signing and encryption always use the current epoch. Decryption picks the epoch from the recipient `kid` or the gift wrap's `p` tag. A new envelope is accepted only from the sender's current key, except a `card-update` (§3.1.1, G-2; D-62, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34).
 - Contacts update the card when they see a higher epoch signed by the same owner (envelope type `card-update`).
 - Owner key rotation (re-signing all agent cards) is P2.
 
@@ -677,7 +677,7 @@ Decrypting stored history with an older epoch key stays allowed (§2.6). Only ac
 - `info = utf8("agentlink/v1/cek") || id` (`id` as its raw 16 bytes).
 - Each recipient entry seals the CEK independently (empty AAD).
 - Sender authenticity comes from `sig` and the agent card binding `from` to the owner, not from HPKE Auth mode.
-- **Requirement: one plaintext for every recipient (G-46; owner decision, 14 Oct 2026, D-61).** Every recipient entry, every owner (I-9) and a proof-pack verifier obtain the same plaintext for a given `envelopeHash`, or fail to decrypt. The payload AEAD as specified above does not guarantee this on its own. The owner decided the requirement; the construction is open. *Timing (proposed, build plan; owner confirms at merge, D-62):* the construction is fixed before M1-7b becomes `ready` and before the `aead-envelope` and `envelope-sig` vectors freeze.
+- **Requirement: one plaintext for every recipient (G-46; owner decision, 14 Oct 2026, D-61).** Every recipient entry, every owner (I-9) and a proof-pack verifier obtain the same plaintext for a given `envelopeHash`, or fail to decrypt. The payload AEAD as specified above does not guarantee this on its own. The owner decided the requirement; the construction is open. *Timing (build plan; D-62, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34):* the construction is fixed before M1-7b becomes `ready` and before the `aead-envelope` and `envelope-sig` vectors freeze.
 
 ### 3.4 Payload (plaintext inside `aead.ct`)
 
