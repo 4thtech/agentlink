@@ -3,7 +3,6 @@
 // `*.canary.test.ts` with their canaries (see README.md).
 
 import { describe, expect, it } from 'vitest';
-import { leakyExercise } from '../test/leaky-fixture.js';
 import { LEVELS } from './logger.js';
 import { SENSITIVE_KEYS } from './redact.js';
 import {
@@ -91,17 +90,6 @@ const ALL: readonly Canary[] = [...PATTERN_CANARIES, KEY_ONLY_CANARY];
 describe('secret canaries (@agentlink/log)', () => {
   it('no canary appears in any captured line at any level', async () => {
     await assertNoCanaryLeaks({ canaries: ALL, exercise, minLines: 100 });
-  });
-
-  // NEGATIVE CONTROL (temporary, reverted in the next commit): the leaking fixture must turn CI red.
-  it('NEGATIVE CONTROL: leaking fixture wired into the canary job', async () => {
-    await assertNoCanaryLeaks({
-      canaries: ALL,
-      exercise: (run) => {
-        exercise(run);
-        leakyExercise(run);
-      },
-    });
   });
 
   it('the exercise really logs every level', async () => {
