@@ -91,10 +91,15 @@ async function evaluateInput(input: KeystoreFileInput): Promise<readonly Compari
     }
     case 'sealAlko': {
       const kek = await kekOf('ALKO', input);
-      const blob = await sealOwnerSeedWithNonce(kek, hexToBytes(input.nonce), hexToBytes(input.seed), {
-        destination: 'local',
-        fileKeystoreMachine: false,
-      });
+      const blob = await sealOwnerSeedWithNonce(
+        kek,
+        hexToBytes(input.nonce),
+        hexToBytes(input.seed),
+        {
+          destination: 'local',
+          fileKeystoreMachine: false,
+        },
+      );
       return [{ field: 'file', actual: bytesToHex(blob) }];
     }
     case 'open': {

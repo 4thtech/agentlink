@@ -10,6 +10,7 @@ import {
   CryptoInputError,
   KEYSTORE_KDF_BOUNDS,
   KEYSTORE_KDF_DEFAULTS,
+  decodeUtf8,
   encodeUtf8,
   sha256,
 } from './index.js';
@@ -105,7 +106,7 @@ describe('ALKS v1', () => {
 
     const file = await sealKeystoreFile(kek, AGENT_1, entriesFor(SEED_1));
     const again = await sealKeystoreFile(kek, AGENT_1, entriesFor(SEED_1));
-    expect(new TextDecoder().decode(file.subarray(0, 4))).toBe('ALKS');
+    expect(decodeUtf8(file.subarray(0, 4))).toBe('ALKS');
     expect(file.subarray(30, 42)).not.toEqual(again.subarray(30, 42));
     // header 43 + 42-character agent ID, entries `seed` (2+4+4+32) and `store-key` (2+9+4+32), tag.
     expect(file.length).toBe(85 + 42 + 47 + 16);
@@ -120,26 +121,48 @@ describe('ALKS v1', () => {
 
   it('opens a generated code in any accepted spelling', async () => {
     const code = generateSecretCode();
-    const kek = await newKeystoreKek('ALKS', { secret: code, secretKind: 1, source: 'prompt' }, FLOOR);
+    const kek = await newKeystoreKek(
+      'ALKS',
+      { secret: code, secretKind: 1, source: 'prompt' },
+      FLOOR,
+    );
     const file = await sealKeystoreFile(kek, AGENT_1, entriesFor(SEED_1));
-    const spelled = encodeUtf8(`${new TextDecoder().decode(code).toLowerCase()}\r\n`);
+    const spelled = encodeUtf8(`${decodeUtf8(code).toLowerCase()}\r\n`);
     const opened = await openKeystoreFile(file, { secret: spelled, source: 'file' }, AGENT_1);
     expect(opened.entries[0]?.value).toEqual(SEED_1);
   });
 
   it('gives one generic error for a wrong passphrase and a tampered file', async () => {
-    const kek = await newKeystoreKek('ALKS', { secret: PHRASE, secretKind: 2, source: 'prompt' }, FLOOR);
+    const kek = await newKeystoreKek(
+      'ALKS',
+      { secret: PHRASE, secretKind: 2, source: 'prompt' },
+      FLOOR,
+    );
     const file = await sealKeystoreFile(kek, AGENT_1, entriesFor(SEED_1));
-    const wrong = await refusedWith(() => openKeystoreFile(file, phrase(OTHER_PHRASE), AGENT_1), 'open_failed');
+    const wrong = await refusedWith(
+      () => openKeystoreFile(file, phrase(OTHER_PHRASE), AGENT_1),
+      'open_failed',
+    );
     const messages = new Set([wrong.message]);
     for (const offset of [0, 4, 5, 6, 10, 11, 12, 13, 29, 30, 42, 43, 85, file.length - 1]) {
       const tampered = file.slice();
       tampered[offset] = (tampered[offset] as number) ^ 0x01;
-      const error = await refusedWith(() => openKeystoreFile(tampered, phrase(PHRASE), AGENT_1), 'open_failed');
+      const error = await refusedWith(
+        () => openKeystoreFile(tampered, phrase(PHRASE), AGENT_1),
+        'open_failed',
+      );
       messages.add(error.message);
     }
-    for (const cut of [file.subarray(0, file.length - 1), file.subarray(0, 85), file.subarray(0, 20), new Uint8Array(0)]) {
-      const error = await refusedWith(() => openKeystoreFile(cut, phrase(PHRASE), AGENT_1), 'open_failed');
+    for (const cut of [
+      file.subarray(0, file.length - 1),
+      file.subarray(0, 85),
+      file.subarray(0, 20),
+      new Uint8Array(0),
+    ]) {
+      const error = await refusedWith(
+        () => openKeystoreFile(cut, phrase(PHRASE), AGENT_1),
+        'open_failed',
+      );
       messages.add(error.message);
     }
     expect(messages.size).toBe(1);
@@ -147,7 +170,11 @@ describe('ALKS v1', () => {
   });
 
   it('binds the agent: two agents with the same passphrase cannot swap files', async () => {
-    const kek = await newKeystoreKek('ALKS', { secret: PHRASE, secretKind: 2, source: 'prompt' }, FLOOR);
+    const kek = await newKeystoreKek(
+      'ALKS',
+      { secret: PHRASE, secretKind: 2, source: 'prompt' },
+      FLOOR,
+    );
     const file1 = await sealKeystoreFile(kek, AGENT_1, entriesFor(SEED_1));
     const file2 = await sealKeystoreFile(kek, AGENT_2, entriesFor(SEED_2));
     await refusedWith(() => openKeystoreFile(file2, phrase(PHRASE), AGENT_1), 'open_failed');
@@ -155,7 +182,11 @@ describe('ALKS v1', () => {
   });
 
   it('refuses to seal a seed entry that does not derive the agent ID', async () => {
-    const kek = await newKeystoreKek('ALKS', { secret: PHRASE, secretKind: 2, source: 'prompt' }, FLOOR);
+    const kek = await newKeystoreKek(
+      'ALKS',
+      { secret: PHRASE, secretKind: 2, source: 'prompt' },
+      FLOOR,
+    );
     await refusedWith(() => sealKeystoreFile(kek, AGENT_1, entriesFor(SEED_2)), 'invalid_argument');
     await refusedWith(
       () => sealKeystoreFile(kek, AGENT_1, [{ name: 'store-key', value: STORE_VALUE }]),
@@ -164,18 +195,33 @@ describe('ALKS v1', () => {
   });
 
   it('refuses an agent ID outside the exact 04 §2.9 form before any path or KDF', async () => {
-    const kek = await newKeystoreKek('ALKS', { secret: PHRASE, secretKind: 2, source: 'prompt' }, FLOOR);
+    const kek = await newKeystoreKek(
+      'ALKS',
+      { secret: PHRASE, secretKind: 2, source: 'prompt' },
+      FLOOR,
+    );
     const file = await sealKeystoreFile(kek, AGENT_1, entriesFor(SEED_1));
-    for (const bad of [AGENT_1.toUpperCase(), AGENT_1.slice(2), AGENT_1.slice(0, -1), '../owner', 'agent_01']) {
+    for (const bad of [
+      AGENT_1.toUpperCase(),
+      AGENT_1.slice(2),
+      AGENT_1.slice(0, -1),
+      '../owner',
+      'agent_01',
+    ]) {
       await refusedWith(() => openKeystoreFile(file, phrase(PHRASE), bad), 'invalid_argument');
       await refusedWith(() => sealKeystoreFile(kek, bad, entriesFor(SEED_1)), 'invalid_argument');
     }
   });
 
   it('refuses duplicate entry names and plaintext above 64 KiB when sealing', async () => {
-    const kek = await newKeystoreKek('ALKS', { secret: PHRASE, secretKind: 2, source: 'prompt' }, FLOOR);
+    const kek = await newKeystoreKek(
+      'ALKS',
+      { secret: PHRASE, secretKind: 2, source: 'prompt' },
+      FLOOR,
+    );
     await refusedWith(
-      () => sealKeystoreFile(kek, AGENT_1, [...entriesFor(SEED_1), { name: 'seed', value: SEED_1 }]),
+      () =>
+        sealKeystoreFile(kek, AGENT_1, [...entriesFor(SEED_1), { name: 'seed', value: SEED_1 }]),
       'invalid_argument',
     );
     const big = new Uint8Array(65536);
@@ -202,9 +248,12 @@ describe('ALKO v1 (owner seed wrap, local storage only)', () => {
       { secret: PHRASE, secretKind: 2, source: 'prompt' } as const,
     ]) {
       const kek = await newKeystoreKek('ALKO', secret, FLOOR);
-      const blob = await sealOwnerSeed(kek, OWNER_SEED, { destination: 'local', fileKeystoreMachine: false });
+      const blob = await sealOwnerSeed(kek, OWNER_SEED, {
+        destination: 'local',
+        fileKeystoreMachine: false,
+      });
       expect(blob.length).toBe(90);
-      expect(new TextDecoder().decode(blob.subarray(0, 4))).toBe('ALKO');
+      expect(decodeUtf8(blob.subarray(0, 4))).toBe('ALKO');
       const seed = await openOwnerSeed(blob, { secret: secret.secret, source: 'prompt' }, OWNER, {
         fileKeystoreMachine: false,
       });
@@ -213,25 +262,48 @@ describe('ALKO v1 (owner seed wrap, local storage only)', () => {
   });
 
   it('refuses passphrase wrapping for a blob flagged for relay publication', async () => {
-    const kek = await newKeystoreKek('ALKO', { secret: PHRASE, secretKind: 2, source: 'prompt' }, FLOOR);
+    const kek = await newKeystoreKek(
+      'ALKO',
+      { secret: PHRASE, secretKind: 2, source: 'prompt' },
+      FLOOR,
+    );
     await refusedWith(
-      () => sealOwnerSeed(kek, OWNER_SEED, { destination: 'relay' as 'local', fileKeystoreMachine: false }),
+      () =>
+        sealOwnerSeed(kek, OWNER_SEED, {
+          destination: 'relay' as 'local',
+          fileKeystoreMachine: false,
+        }),
       'relay_publication_refused',
     );
-    const codeKek = await newKeystoreKek('ALKO', { secret: generateSecretCode(), secretKind: 1, source: 'prompt' }, FLOOR);
+    const codeKek = await newKeystoreKek(
+      'ALKO',
+      { secret: generateSecretCode(), secretKind: 1, source: 'prompt' },
+      FLOOR,
+    );
     await refusedWith(
-      () => sealOwnerSeed(codeKek, OWNER_SEED, { destination: 'relay' as 'local', fileKeystoreMachine: false }),
+      () =>
+        sealOwnerSeed(codeKek, OWNER_SEED, {
+          destination: 'relay' as 'local',
+          fileKeystoreMachine: false,
+        }),
       'relay_publication_refused',
     );
   });
 
   it('refuses a chosen owner passphrase on a file-KeyStore machine, on create and on open', async () => {
-    const kek = await newKeystoreKek('ALKO', { secret: PHRASE, secretKind: 2, source: 'prompt' }, FLOOR);
+    const kek = await newKeystoreKek(
+      'ALKO',
+      { secret: PHRASE, secretKind: 2, source: 'prompt' },
+      FLOOR,
+    );
     await refusedWith(
       () => sealOwnerSeed(kek, OWNER_SEED, { destination: 'local', fileKeystoreMachine: true }),
       'secret_kind_refused',
     );
-    const blob = await sealOwnerSeed(kek, OWNER_SEED, { destination: 'local', fileKeystoreMachine: false });
+    const blob = await sealOwnerSeed(kek, OWNER_SEED, {
+      destination: 'local',
+      fileKeystoreMachine: false,
+    });
     await refusedWith(
       () => openOwnerSeed(blob, phrase(PHRASE), OWNER, { fileKeystoreMachine: true }),
       'secret_kind_refused',
@@ -239,8 +311,15 @@ describe('ALKO v1 (owner seed wrap, local storage only)', () => {
   });
 
   it('refuses a seed that does not derive the expected owner', async () => {
-    const kek = await newKeystoreKek('ALKO', { secret: PHRASE, secretKind: 2, source: 'prompt' }, FLOOR);
-    const blob = await sealOwnerSeed(kek, OWNER_SEED, { destination: 'local', fileKeystoreMachine: false });
+    const kek = await newKeystoreKek(
+      'ALKO',
+      { secret: PHRASE, secretKind: 2, source: 'prompt' },
+      FLOOR,
+    );
+    const blob = await sealOwnerSeed(kek, OWNER_SEED, {
+      destination: 'local',
+      fileKeystoreMachine: false,
+    });
     await refusedWith(
       () => openOwnerSeed(blob, phrase(PHRASE), ownerOf(SEED_1), { fileKeystoreMachine: false }),
       'open_failed',
@@ -260,12 +339,19 @@ describe('ALKO v1 (owner seed wrap, local storage only)', () => {
     expect(sameSalt.kek).not.toEqual(alksKek.kek);
     // A kek of one format cannot seal the other.
     await refusedWith(
-      () => sealOwnerSeed(alksKek, OWNER_SEED, { destination: 'local', fileKeystoreMachine: false }),
+      () =>
+        sealOwnerSeed(alksKek, OWNER_SEED, { destination: 'local', fileKeystoreMachine: false }),
       'invalid_argument',
     );
-    await refusedWith(() => sealKeystoreFile(alkoKek, AGENT_1, entriesFor(SEED_1)), 'invalid_argument');
+    await refusedWith(
+      () => sealKeystoreFile(alkoKek, AGENT_1, entriesFor(SEED_1)),
+      'invalid_argument',
+    );
 
-    const blob = await sealOwnerSeed(alkoKek, OWNER_SEED, { destination: 'local', fileKeystoreMachine: false });
+    const blob = await sealOwnerSeed(alkoKek, OWNER_SEED, {
+      destination: 'local',
+      fileKeystoreMachine: false,
+    });
     const file = await sealKeystoreFile(alksKek, AGENT_1, entriesFor(SEED_1));
     await refusedWith(() => openKeystoreFile(blob, phrase(PHRASE), AGENT_1), 'open_failed');
     await refusedWith(
@@ -282,9 +368,17 @@ describe('ALKO v1 (owner seed wrap, local storage only)', () => {
   });
 
   it('refuses a seed that is not 32 bytes when sealing', async () => {
-    const kek = await newKeystoreKek('ALKO', { secret: PHRASE, secretKind: 2, source: 'prompt' }, FLOOR);
+    const kek = await newKeystoreKek(
+      'ALKO',
+      { secret: PHRASE, secretKind: 2, source: 'prompt' },
+      FLOOR,
+    );
     await refusedWith(
-      () => sealOwnerSeed(kek, OWNER_SEED.subarray(1), { destination: 'local', fileKeystoreMachine: false }),
+      () =>
+        sealOwnerSeed(kek, OWNER_SEED.subarray(1), {
+          destination: 'local',
+          fileKeystoreMachine: false,
+        }),
       'invalid_length',
     );
   });

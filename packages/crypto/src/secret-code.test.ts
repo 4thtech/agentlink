@@ -2,7 +2,7 @@
 // the generated 120-bit code. The byte-exact cases are the keystore-file vectors (`password`,
 // `passwordBytes`); these tests pin the API and the I-7 rule that errors never carry the input.
 import { describe, expect, it } from 'vitest';
-import { CryptoInputError, SECRET_CODE_LENGTH, encodeUtf8 } from './index.js';
+import { CryptoInputError, SECRET_CODE_LENGTH, decodeUtf8, encodeUtf8 } from './index.js';
 import { generateSecretCode, normalizeSecret } from './keystore.js';
 
 const ascii = (text: string): Uint8Array => encodeUtf8(text);
@@ -24,7 +24,7 @@ describe('generateSecretCode', () => {
     expect(SECRET_CODE_LENGTH).toBe(24);
     const code = generateSecretCode();
     expect(code).toBeInstanceOf(Uint8Array);
-    expect(new TextDecoder().decode(code)).toMatch(BASE32);
+    expect(decodeUtf8(code)).toMatch(BASE32);
     expect(normalizeSecret(code, 1, 'prompt').length).toBe(15);
   });
 
@@ -32,7 +32,7 @@ describe('generateSecretCode', () => {
     const seen = new Set<string>();
     const codes = new Set<string>();
     for (let i = 0; i < 200; i += 1) {
-      const text = new TextDecoder().decode(generateSecretCode());
+      const text = decodeUtf8(generateSecretCode());
       codes.add(text);
       for (const ch of text) seen.add(ch);
     }
@@ -42,11 +42,12 @@ describe('generateSecretCode', () => {
 
   it('round-trips: the decoded bytes re-encode to the same code', () => {
     const code = generateSecretCode();
-    const spelled = new TextDecoder()
-      .decode(code)
+    const spelled = decodeUtf8(code)
       .toLowerCase()
       .replace(/(.{4})(?!$)/g, '$1-');
-    expect(normalizeSecret(ascii(spelled), 1, 'prompt')).toEqual(normalizeSecret(code, 1, 'prompt'));
+    expect(normalizeSecret(ascii(spelled), 1, 'prompt')).toEqual(
+      normalizeSecret(code, 1, 'prompt'),
+    );
   });
 });
 
@@ -98,7 +99,9 @@ describe('normalizeSecret, kind 1 (generated code)', () => {
 
 describe('normalizeSecret, kind 2 (chosen passphrase)', () => {
   it('is the UTF-8 of NFKC, spaces kept', () => {
-    expect(normalizeSecret(ascii('  two  spaces  '), 2, 'prompt')).toEqual(ascii('  two  spaces  '));
+    expect(normalizeSecret(ascii('  two  spaces  '), 2, 'prompt')).toEqual(
+      ascii('  two  spaces  '),
+    );
     expect(normalizeSecret(ascii('Café ﬁle'), 2, 'prompt')).toEqual(ascii('Café file'));
     expect(normalizeSecret(ascii('Ｐａｓｓ'), 2, 'prompt')).toEqual(ascii('Pass'));
   });
@@ -129,8 +132,14 @@ describe('normalizeSecret, kind 2 (chosen passphrase)', () => {
 describe('normalizeSecret arguments', () => {
   it('refuses an unknown kind or source and non-byte input', () => {
     refusedWith(() => normalizeSecret(ascii('long phrase'), 3 as 1, 'prompt'), 'invalid_argument');
-    refusedWith(() => normalizeSecret(ascii('long phrase'), 2, 'env' as 'file'), 'invalid_argument');
-    refusedWith(() => normalizeSecret('x' as unknown as Uint8Array, 2, 'prompt'), 'invalid_argument');
+    refusedWith(
+      () => normalizeSecret(ascii('long phrase'), 2, 'env' as 'file'),
+      'invalid_argument',
+    );
+    refusedWith(
+      () => normalizeSecret('x' as unknown as Uint8Array, 2, 'prompt'),
+      'invalid_argument',
+    );
   });
 
   it('does not modify its input', () => {

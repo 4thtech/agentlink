@@ -56,6 +56,9 @@ describe('argon2id', () => {
       await refusedWith(() => argon2id(password, salt, params), 'invalid_argument');
     }
     await refusedWith(() => argon2id(password, new Uint8Array(7), SMALL), 'invalid_argument');
-    await refusedWith(() => argon2id('x' as unknown as Uint8Array, salt, SMALL), 'invalid_argument');
+    await refusedWith(
+      () => argon2id('x' as unknown as Uint8Array, salt, SMALL),
+      'invalid_argument',
+    );
   });
 });

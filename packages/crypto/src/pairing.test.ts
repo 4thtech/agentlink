@@ -56,7 +56,10 @@ describe('hmacSha256', () => {
   });
 
   it('refuses non-byte input', () => {
-    refusedWith(() => hmacSha256('k' as unknown as Uint8Array, new Uint8Array(1)), 'invalid_argument');
+    refusedWith(
+      () => hmacSha256('k' as unknown as Uint8Array, new Uint8Array(1)),
+      'invalid_argument',
+    );
   });
 });
 
@@ -89,7 +92,9 @@ describe('pairing proof', () => {
   it('does not depend on the card key order (JCS)', () => {
     const proofKey = derivePairingProofKey(LINK_SECRET);
     const reordered = Object.fromEntries(Object.entries(CARD_B).reverse());
-    expect(pairingProof(proofKey, INVITE, reordered)).toEqual(pairingProof(proofKey, INVITE, CARD_B));
+    expect(pairingProof(proofKey, INVITE, reordered)).toEqual(
+      pairingProof(proofKey, INVITE, CARD_B),
+    );
   });
 
   it('verifies the matching proof and refuses every other input', () => {
@@ -118,9 +123,9 @@ describe('pairing proof', () => {
     const proofKey = derivePairingProofKey(LINK_SECRET);
     const proof = pairingProof(proofKey, INVITE, CARD_B);
     expect(verifyPairingProof(proofKey, INVITE, CARD_B, proof.subarray(0, 31))).toBe(false);
-    expect(verifyPairingProof(proofKey, INVITE, CARD_B, concatBytes(proof, new Uint8Array(1)))).toBe(
-      false,
-    );
+    expect(
+      verifyPairingProof(proofKey, INVITE, CARD_B, concatBytes(proof, new Uint8Array(1))),
+    ).toBe(false);
   });
 
   it('refuses a secret, proofKey or inviteId of the wrong length', () => {

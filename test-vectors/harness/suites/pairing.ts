@@ -44,7 +44,10 @@ function evaluateInput(input: PairingInput): readonly Comparison[] {
   switch (input.op) {
     case 'hmacSha256':
       return [
-        { field: 'mac', actual: bytesToHex(hmacSha256(hexToBytes(input.key), hexToBytes(input.data))) },
+        {
+          field: 'mac',
+          actual: bytesToHex(hmacSha256(hexToBytes(input.key), hexToBytes(input.data))),
+        },
       ];
     case 'pairingProof': {
       const proofKey = derivePairingProofKey(decodeBase64url(input.secret, { length: 32 }));

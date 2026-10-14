@@ -32,7 +32,11 @@ const SEED_OR_SECRET = [
 ];
 
 // M1-1f: the deterministic test seam (fixed nonce for ALKS and ALKO, Argon2id with K and X).
-const TEST_SEAM = ['argon2idWithSecretAndAd', 'sealKeystoreFileWithNonce', 'sealOwnerSeedWithNonce'];
+const TEST_SEAM = [
+  'argon2idWithSecretAndAd',
+  'sealKeystoreFileWithNonce',
+  'sealOwnerSeedWithNonce',
+];
 
 describe('@agentlink/crypto/keystore', () => {
   it('exports exactly the seed and secret-key functions', () => {

@@ -16,7 +16,19 @@ export type CryptoInputErrorCode =
   | 'invalid_public_key'
   | 'invalid_signature'
   | 'invalid_typed_data'
-  | 'invalid_card';
+  | 'invalid_card'
+  /** M1-1f: a secret refused by 04 §2.8 password() before any KDF runs (not a wrong secret). */
+  | 'invalid_secret'
+  /**
+   * M1-1f: an ALKS file or ALKO blob that does not open. One code and one message for a wrong
+   * secret, a tampered or truncated file, unknown header values and out-of-bounds KDF parameters, so
+   * they are indistinguishable (04 §2.8).
+   */
+  | 'open_failed'
+  /** M1-1f: a chosen owner passphrase (secretKind 2) on a file-KeyStore machine (04 §2.8). */
+  | 'secret_kind_refused'
+  /** M1-1f: the owner passphrase wrap is for local storage only, never for relay publication (04 §2.3). */
+  | 'relay_publication_refused';
 
 /**
  * The one error type @agentlink/crypto throws for input it refuses.

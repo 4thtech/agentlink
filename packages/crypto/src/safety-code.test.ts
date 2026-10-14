@@ -117,8 +117,14 @@ describe('codeCommit and the reveal check', () => {
   it('refuses values of the wrong length (the parsers fix every length, 04 §3.6)', () => {
     refusedWith(() => safetyCodeCommit(INVITE_ID.subarray(1), NONCE_A), 'invalid_length');
     refusedWith(() => safetyCodeCommit(INVITE_ID, NONCE_A.subarray(1)), 'invalid_length');
-    refusedWith(() => checkSafetyCodeReveal(INVITE_ID, NONCE_A, COMMIT.subarray(1)), 'invalid_length');
-    refusedWith(() => checkSafetyCodeReveal(INVITE_ID, new Uint8Array(33), COMMIT), 'invalid_length');
+    refusedWith(
+      () => checkSafetyCodeReveal(INVITE_ID, NONCE_A, COMMIT.subarray(1)),
+      'invalid_length',
+    );
+    refusedWith(
+      () => checkSafetyCodeReveal(INVITE_ID, new Uint8Array(33), COMMIT),
+      'invalid_length',
+    );
   });
 });
 
@@ -179,8 +185,18 @@ describe('roles (property test)', () => {
       const nonceA = randomBytes(32);
       const nonceB = randomBytes(32);
       const shared = { inviteId, nonceA, nonceB };
-      const atA = safetyCodeForRole({ role: 'inviter', ownCard: CARD_A, peerCard: CARD_B, ...shared });
-      const atB = safetyCodeForRole({ role: 'invitee', ownCard: CARD_B, peerCard: CARD_A, ...shared });
+      const atA = safetyCodeForRole({
+        role: 'inviter',
+        ownCard: CARD_A,
+        peerCard: CARD_B,
+        ...shared,
+      });
+      const atB = safetyCodeForRole({
+        role: 'invitee',
+        ownCard: CARD_B,
+        peerCard: CARD_A,
+        ...shared,
+      });
       expect(atB.pairingDigest).toEqual(atA.pairingDigest);
       expect(atB.code).toBe(atA.code);
       const swapped = safetyCodeForRole({
