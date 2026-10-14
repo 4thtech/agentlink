@@ -52,19 +52,22 @@ class MemoryOutbox implements OutboxPersistence {
   isPending(wrapId: string): Promise<boolean> {
     return Promise.resolve(this.rows.get(wrapId)?.state === 'pending');
   }
-  recordAttempt(wrapId: string, attempt: OutboxAttempt): Promise<void> {
+  /** Compare-and-set on `pending`, as the interface requires. */
+  private cas(wrapId: string, change: Partial<Stored>): Promise<boolean> {
     if (this.failWrites) return Promise.reject(new Error('disk full'));
-    this.rows.set(wrapId, { ...this.get(wrapId), ...attempt });
-    return Promise.resolve();
+    const row = this.get(wrapId);
+    if (row.state !== 'pending') return Promise.resolve(false);
+    this.rows.set(wrapId, { ...row, ...change });
+    return Promise.resolve(true);
   }
-  markSent(wrapId: string, acks: Readonly<Record<string, number>>): Promise<void> {
-    if (this.failWrites) return Promise.reject(new Error('disk full'));
-    this.rows.set(wrapId, { ...this.get(wrapId), acks, state: 'sent' });
-    return Promise.resolve();
+  recordAttempt(wrapId: string, attempt: OutboxAttempt): Promise<boolean> {
+    return this.cas(wrapId, attempt);
   }
-  markNotDelivered(wrapId: string, reason: OutboxGiveUpReason): Promise<void> {
-    this.rows.set(wrapId, { ...this.get(wrapId), state: 'not_delivered', reason });
-    return Promise.resolve();
+  markSent(wrapId: string, acks: Readonly<Record<string, number>>): Promise<boolean> {
+    return this.cas(wrapId, { acks, state: 'sent' });
+  }
+  markNotDelivered(wrapId: string, reason: OutboxGiveUpReason): Promise<boolean> {
+    return this.cas(wrapId, { state: 'not_delivered', reason });
   }
 }
 
@@ -372,6 +375,109 @@ describe('unreadable and ended rows', () => {
     expect(summary).toMatchObject({ sent: 1, failed: 1 });
     expect(outbox.get(bad.wrapId).state).toBe('pending');
     expect(outbox.get(good.wrapId).state).toBe('sent');
+  });
+});
+
+describe('compare-and-set and the give-up cap', () => {
+  /** A pool that ends the row (a revoke) while its publish is in flight, then acknowledges. */
+  function revokingPool(outbox: MemoryOutbox, wrapId: string, relays: readonly string[]) {
+    return {
+      publish: () => {
+        outbox.rows.set(wrapId, { ...outbox.get(wrapId), state: 'not_delivered' });
+        return Promise.resolve({ results: [], acked: [...relays], sent: true });
+      },
+    };
+  }
+
+  it('does not overwrite a row a revoke ended while the publish ran (sent)', async () => {
+    const outbox = new MemoryOutbox();
+    const relays = relayUrls('cas', 2);
+    const row = makeRow(relays);
+    outbox.add(row);
+    const worker = new OutboxWorker({
+      persistence: outbox,
+      pool: revokingPool(outbox, row.wrapId, relays),
+    });
+    expect(await worker.processDue()).toMatchObject({
+      sent: 0,
+      retrying: 0,
+      notDelivered: 0,
+      failed: 0,
+    });
+    expect(outbox.get(row.wrapId).state).toBe('not_delivered');
+  });
+
+  it('does not overwrite a row a revoke ended while the publish ran (retry)', async () => {
+    const outbox = new MemoryOutbox();
+    const relays = relayUrls('casr', 2);
+    const row = makeRow(relays);
+    outbox.add(row);
+    const pool = {
+      publish: () => {
+        outbox.rows.set(row.wrapId, { ...outbox.get(row.wrapId), state: 'not_delivered' });
+        return Promise.resolve({ results: [], acked: [], sent: false });
+      },
+    };
+    const worker = new OutboxWorker({ persistence: outbox, pool });
+    expect(await worker.processDue()).toMatchObject({ retrying: 0, sent: 0 });
+    expect(outbox.get(row.wrapId)).toMatchObject({ state: 'not_delivered', attempts: 0 });
+  });
+
+  it('does not report not_delivered for a row that is no longer pending', async () => {
+    const outbox = new MemoryOutbox();
+    const relays = relayUrls('casg', 2);
+    const row = makeRow(relays, { giveUpAt: nowSeconds() - 1 });
+    outbox.add(row);
+    const listDue = outbox.listDue.bind(outbox);
+    outbox.listDue = async (now) => {
+      const rows = await listDue(now);
+      outbox.rows.set(row.wrapId, { ...outbox.get(row.wrapId), state: 'sent' });
+      return rows;
+    };
+    const worker = new OutboxWorker({
+      persistence: outbox,
+      pool: { publish: () => Promise.reject(new Error('no')) },
+    });
+    expect(await worker.processDue()).toMatchObject({ notDelivered: 0 });
+    expect(outbox.get(row.wrapId).state).toBe('sent');
+  });
+
+  it('caps a stored give_up_at that is later than created_at + 24 h', async () => {
+    const { net, outbox, worker } = setup();
+    const relays = relayUrls('cap', 2);
+    for (const url of relays) net.configure(url, { reject: true });
+    const createdAt = nowSeconds() - OUTBOX_GIVE_UP_SECONDS - 10;
+    const row = makeRow(relays, { createdAt, giveUpAt: createdAt + 10 * OUTBOX_GIVE_UP_SECONDS });
+    outbox.add(row);
+    expect(await worker().processDue()).toMatchObject({ notDelivered: 1, retrying: 0 });
+    expect(outbox.get(row.wrapId)).toMatchObject({ state: 'not_delivered', reason: 'timeout' });
+    expect(net.opens).toHaveLength(0);
+  });
+
+  it('never schedules a retry past created_at + 24 h', async () => {
+    const { net, outbox, worker } = setup();
+    const relays = relayUrls('capr', 2);
+    for (const url of relays) net.configure(url, { reject: true });
+    const createdAt = nowSeconds() - OUTBOX_GIVE_UP_SECONDS + 100;
+    const row = makeRow(relays, {
+      createdAt,
+      giveUpAt: createdAt + 10 * OUTBOX_GIVE_UP_SECONDS,
+      attempts: 20,
+    });
+    outbox.add(row);
+    const summary = await worker().processDue();
+    expect(summary.nextAttemptAt).toBe(createdAt + OUTBOX_GIVE_UP_SECONDS);
+  });
+
+  it('marks a row with a non-integer time unreadable', async () => {
+    const { net, outbox, worker } = setup();
+    const relays = relayUrls('nan', 2);
+    for (const url of relays) net.configure(url);
+    const row = makeRow(relays, { giveUpAt: Number.NaN });
+    outbox.add(row);
+    expect(await worker().processDue()).toMatchObject({ notDelivered: 1 });
+    expect(outbox.get(row.wrapId)).toMatchObject({ reason: 'unreadable' });
+    expect(net.opens).toHaveLength(0);
   });
 });
 

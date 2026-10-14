@@ -115,7 +115,11 @@ export interface RelayPoolOptions {
    * so a relay that does not need it never learns the key.
    */
   readonly authKeys?: EnvelopeKeys;
-  /** False for a relay where this pool must not log in (07 §4.3: owner key on a contact-only relay). */
+  /**
+   * True for a relay where this pool may log in with `authKeys`. Deny by default (07 §4.3: the owner
+   * key never logs in on a relay that is only in a contact's list): with no hook, no login is ever
+   * signed, so a caller must say which relays are its own.
+   */
   readonly mayAuthenticate?: (relayUrl: string) => boolean;
   readonly logger?: Logger;
   /** Clock in Unix milliseconds (default: the wall clock). */
@@ -205,7 +209,7 @@ export class RelayPool {
     this.addressCheck = options.addressCheck;
     this.nip11 = options.nip11;
     this.authKeys = options.authKeys;
-    this.mayAuthenticate = options.mayAuthenticate ?? (() => true);
+    this.mayAuthenticate = options.mayAuthenticate ?? (() => false);
     this.logger = options.logger;
     this.now = options.now ?? (() => Date.now());
     this.timers = options.timers ?? defaultTimers;
@@ -379,11 +383,16 @@ export class RelayPool {
 
   private waitForChallenge(conn: Connection): Promise<string | undefined> {
     return new Promise((resolve) => {
-      const timer = this.timers.setTimeout(() => resolve(undefined), OK_TIMEOUT_MS);
-      conn.challengeWaiters.push((challenge) => {
+      const waiter = (challenge: string | undefined): void => {
         this.timers.clearTimeout(timer);
         resolve(challenge);
-      });
+      };
+      const timer = this.timers.setTimeout(() => {
+        const at = conn.challengeWaiters.indexOf(waiter);
+        if (at !== -1) conn.challengeWaiters.splice(at, 1); // no stale waiter on a long-lived connection
+        resolve(undefined);
+      }, OK_TIMEOUT_MS);
+      conn.challengeWaiters.push(waiter);
     });
   }
 

@@ -22,6 +22,8 @@ export interface MockRelayConfig {
   requireAuth?: boolean;
   /** Advertised in NIP-11 and enforced on EVENT frames. */
   maxMessageLength?: number;
+  /** With requireAuth: refuses EVENT but never sends the AUTH challenge. */
+  noChallenge?: boolean;
   /** Answers every EVENT with OK false. */
   reject?: boolean;
   /** The text after OK (a relay sends whatever it likes). */
@@ -52,7 +54,9 @@ export class MockSocket implements RelaySocket {
     microtask(() => {
       if (this.closed) return;
       handlers.onOpen();
-      if (config.requireAuth === true) this.push(JSON.stringify(['AUTH', this.challenge]));
+      if (config.requireAuth === true && config.noChallenge !== true) {
+        this.push(JSON.stringify(['AUTH', this.challenge]));
+      }
     });
   }
 

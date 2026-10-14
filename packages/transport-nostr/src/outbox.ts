@@ -63,9 +63,15 @@ export interface OutboxPersistence {
   listDue(nowSeconds: number): Promise<readonly OutboxRow[]>;
   /** True while the row is still `pending` (a revoke may have ended it since listDue). */
   isPending(wrapId: string): Promise<boolean>;
-  recordAttempt(wrapId: string, attempt: OutboxAttempt): Promise<void>;
-  markSent(wrapId: string, acks: Readonly<Record<string, number>>): Promise<void>;
-  markNotDelivered(wrapId: string, reason: OutboxGiveUpReason): Promise<void>;
+  /**
+   * The three status writes are compare-and-set on `pending` (`... WHERE state = 'pending'`): they
+   * change the row and return true only if it is still `pending`, and return false, changing
+   * nothing, if a revoke or another writer has ended it since (07 §3.2). The worker never
+   * overwrites a state it did not read as pending.
+   */
+  recordAttempt(wrapId: string, attempt: OutboxAttempt): Promise<boolean>;
+  markSent(wrapId: string, acks: Readonly<Record<string, number>>): Promise<boolean>;
+  markNotDelivered(wrapId: string, reason: OutboxGiveUpReason): Promise<boolean>;
 }
 
 export interface OutboxWorkerOptions {
@@ -179,18 +185,30 @@ export class OutboxWorker {
   private async deliver(row: OutboxRow, nowSeconds: number): Promise<RowResult> {
     const relays = readRelays(row);
     const event = relays === undefined ? undefined : readWrap(row);
-    if (relays === undefined || event === undefined) {
-      await this.persistence.markNotDelivered(row.wrapId, 'unreadable');
-      return { kind: 'not_delivered' };
+    const created = row.createdAt;
+    if (
+      relays === undefined ||
+      event === undefined ||
+      !Number.isSafeInteger(created) ||
+      !Number.isSafeInteger(row.giveUpAt)
+    ) {
+      return (await this.persistence.markNotDelivered(row.wrapId, 'unreadable'))
+        ? { kind: 'not_delivered' }
+        : { kind: 'skipped' };
     }
+    // The stored give_up_at is not trusted: it is never later than created_at + 24 h (07 §3.2).
+    const giveUpAt = Math.min(row.giveUpAt, created + OUTBOX_GIVE_UP_SECONDS);
     const acks = this.listedAcks(row, relays);
     if (Object.keys(acks).length >= MIN_ACKS) {
-      await this.persistence.markSent(row.wrapId, acks); // a crash after the publish, before the mark
-      return { kind: 'sent' };
+      // a crash after the publish, before the mark
+      return (await this.persistence.markSent(row.wrapId, acks))
+        ? { kind: 'sent' }
+        : { kind: 'skipped' };
     }
-    if (nowSeconds >= row.giveUpAt) {
-      await this.persistence.markNotDelivered(row.wrapId, 'timeout');
-      return { kind: 'not_delivered' };
+    if (nowSeconds >= giveUpAt) {
+      return (await this.persistence.markNotDelivered(row.wrapId, 'timeout'))
+        ? { kind: 'not_delivered' }
+        : { kind: 'skipped' };
     }
     if (!(await this.persistence.isPending(row.wrapId))) return { kind: 'skipped' };
 
@@ -204,14 +222,19 @@ export class OutboxWorker {
       }
     }
     if (Object.keys(merged).length >= MIN_ACKS) {
-      await this.persistence.markSent(row.wrapId, merged);
-      return { kind: 'sent' };
+      return (await this.persistence.markSent(row.wrapId, merged))
+        ? { kind: 'sent' }
+        : { kind: 'skipped' };
     }
     const attempts = row.attempts + 1;
     const delay = Math.min(BACKOFF_BASE_SECONDS * 2 ** (attempts - 1), BACKOFF_MAX_SECONDS);
-    const nextAttemptAt = Math.min(nowSeconds + delay, row.giveUpAt);
-    await this.persistence.recordAttempt(row.wrapId, { acks: merged, attempts, nextAttemptAt });
-    return { kind: 'retrying', nextAttemptAt };
+    const nextAttemptAt = Math.min(nowSeconds + delay, giveUpAt);
+    const recorded = await this.persistence.recordAttempt(row.wrapId, {
+      acks: merged,
+      attempts,
+      nextAttemptAt,
+    });
+    return recorded ? { kind: 'retrying', nextAttemptAt } : { kind: 'skipped' };
   }
 
   /** Stored acks, limited to relays that are still in the row's list. */

@@ -2,7 +2,7 @@
 // routing, the connect-time SSRF check and the pool bounds (07 §4.2, §4.3). Mock relays only: no
 // network. Fake timers drive the 10 s, 5 min and OK timeouts.
 import { createLogger, type Level } from '@agentlink/log';
-import { encodeUtf8, randomBytes, type EnvelopeKeys } from '@agentlink/crypto';
+import { encodeHex, encodeUtf8, randomBytes, type EnvelopeKeys } from '@agentlink/crypto';
 import { MemoryKeyStore } from '@agentlink/crypto/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TransportError } from './errors.js';
@@ -220,7 +220,7 @@ describe('NIP-42 AUTH', () => {
 
   it('logs in when a relay asks for it, then publishes', async () => {
     const authKeys = await keys();
-    const { net, pool } = setup({ authKeys });
+    const { net, pool } = setup({ authKeys, mayAuthenticate: () => true });
     const [gated, open] = relayUrls('auth', 2) as [string, string];
     net.configure(gated, { requireAuth: true });
     net.configure(open);
@@ -234,16 +234,24 @@ describe('NIP-42 AUTH', () => {
     expect(authFrames).toHaveLength(1);
     // The login event is the NIP-42 kind, bound to this relay and its challenge.
     const login = (
-      JSON.parse(authFrames[0]?.frame ?? '[]') as [string, { kind: number; tags: string[][] }]
+      JSON.parse(authFrames[0]?.frame ?? '[]') as [
+        string,
+        { kind: number; pubkey: string; tags: string[][] },
+      ]
     )[1];
     expect(login.kind).toBe(22242);
     expect(login.tags).toContainEqual(['relay', gated]);
+    // Signed by the configured key, over the challenge this relay actually sent.
+    const bundle = await (authKeys as MemoryKeyStore).getPublicBundle();
+    expect(login.pubkey).toBe(encodeHex(bundle.agentNostr));
+    expect(login.tags).toContainEqual(['challenge', net.socket(gated)?.challenge]);
+    expect(net.socket(gated)?.challenge).toMatch(/^challenge-/);
   });
 
   it('never signs a login for a relay that does not ask for one', async () => {
     const authKeys = await keys();
     const sign = vi.spyOn(authKeys, 'signNostr');
-    const { net, pool } = setup({ authKeys });
+    const { net, pool } = setup({ authKeys, mayAuthenticate: () => true });
     const [a, b] = relayUrls('noauth', 2) as [string, string];
     net.configure(a);
     net.configure(b, { requireAuth: false });
@@ -269,10 +277,44 @@ describe('NIP-42 AUTH', () => {
     expect(sign).not.toHaveBeenCalled();
   });
 
+  it('denies login by default: keys without a mayAuthenticate hook are never used', async () => {
+    const authKeys = await keys();
+    const sign = vi.spyOn(authKeys, 'signNostr');
+    const { net, pool } = setup({ authKeys });
+    const [gated] = relayUrls('deny', 1) as [string];
+    net.configure(gated, { requireAuth: true });
+    expect((await pool.publish(makeWrapEvent(), [gated])).results[0]?.reason).toBe('auth_failed');
+    expect(sign).not.toHaveBeenCalled();
+    expect(net.received.some((f) => f.frame.startsWith('["AUTH"'))).toBe(false);
+  });
+
+  it('removes a timed-out challenge waiter from a long-lived connection', async () => {
+    const authKeys = await keys();
+    const { net, pool } = setup({ authKeys, mayAuthenticate: () => true });
+    const [gated] = relayUrls('stale', 1) as [string];
+    net.configure(gated, { requireAuth: true, noChallenge: true });
+    const waiters = (): number =>
+      (pool as unknown as { conns: Map<string, { challengeWaiters: unknown[] }> }).conns.get(gated)
+        ?.challengeWaiters.length ?? -1;
+    const pending = pool.publish(makeWrapEvent(), [gated]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(waiters()).toBe(1);
+    await vi.advanceTimersByTimeAsync(OK_TIMEOUT_MS);
+    expect((await pending).results[0]?.reason).toBe('auth_failed');
+    expect(waiters()).toBe(0);
+    // Repeated failures on the same connection do not accumulate waiters either.
+    for (let i = 0; i < 3; i += 1) {
+      const again = pool.publish(makeWrapEvent(), [gated]);
+      await vi.advanceTimersByTimeAsync(OK_TIMEOUT_MS);
+      await again;
+    }
+    expect(waiters()).toBe(0);
+  });
+
   it('fails the relay, without throwing, when signing the login fails', async () => {
     const authKeys = await keys();
     vi.spyOn(authKeys, 'signNostr').mockRejectedValue(new Error('locked'));
-    const { net, pool } = setup({ authKeys });
+    const { net, pool } = setup({ authKeys, mayAuthenticate: () => true });
     const [gated] = relayUrls('locked', 1) as [string];
     net.configure(gated, { requireAuth: true });
     expect((await pool.publish(makeWrapEvent(), [gated])).results[0]?.reason).toBe('auth_failed');
@@ -281,7 +323,7 @@ describe('NIP-42 AUTH', () => {
   it('ignores an oversized or non-string challenge', async () => {
     const authKeys = await keys();
     const sign = vi.spyOn(authKeys, 'signNostr');
-    const { net, pool } = setup({ authKeys });
+    const { net, pool } = setup({ authKeys, mayAuthenticate: () => true });
     const [gated] = relayUrls('chal', 1) as [string];
     net.configure(gated, { silent: true });
     const pending = pool.publish(makeWrapEvent(), [gated]);
