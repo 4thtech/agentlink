@@ -311,6 +311,21 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
 - **Acceptance:**
   - Each rule has a failing fixture test; the guard job is part of `ci-gate`.
 
+#### M0-10b · Boundary guards: residual bypasses and wider scope (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · eslint config, tools/deps-check/
+- **Depends on:** M0-10 (and M0-9 for the test-vectors items)
+- **Spec:** 04 §8.1; `development-process.md` §11; reviews IR-M0-10-1 and IR-M0-10-2 (open items)
+- **Invariants:** I-8
+- **Scope:** (the guards catch honest mistakes; they are not a security boundary against a malicious contributor, which is code review plus the crypto/KeyStore design. Do the items that stay cheap and drop the rest.)
+  - Treat `process` and `<x>.process` as a loader receiver (`.binding`, computed access, `Reflect.get(process, 'getBuiltinModule')`); report the member names `eval` and `Function` on any receiver and `.constructor(...)` calls with a string argument (IR-M0-10-2 F03, F04).
+  - Allowlist for app devDependencies that get bundled (`bundled: true` on app zones) plus a shared, reasoned dev-tools list (vite, vitest, wrangler, typescript, `@types/*`) (IR-M0-10-1 F04).
+  - Resolve `tsconfig` `paths`, Vite aliases and `new URL(..., import.meta.url)` against the relative-escape rule when the first app configs land (IR-M0-10-1 F10, IR-M0-10-2 F05).
+  - Zones for `e2e/` (no primitive libraries) and `test-vectors/` once M0-9 has landed; a check that every `SUBTLE_EXEMPT_FILES` entry exists, and removal of the placeholder-suite exemption when the first real vector suite lands (IR-M0-10-1 F11, IR-M0-10-2).
+  - A narrow, reasoned carve-out for Node built-ins in `vite.config.ts` and `vitest.config.ts` of non-Node zones (IR-M0-10-1 F12).
+- **Acceptance:**
+  - Each item has a failing fixture test; `pnpm lint` stays green on the real tree.
+
 #### M0-11 · Curator project context (new)
 - **Status:** done (setup) · **Size:** S · **Tier:** Owner · **Security:** S0
 - **Repo/path:** owner's Curator (project `agentlink`, domain `projects`); agentlink · .curator-project
@@ -1559,6 +1574,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - `POST /v1/notarize`, `POST /v1/receipt`, `GET /v1/status/:txHash`, `GET /v1/health`; signature validation and `eth_call` simulation (incl. credits) before sending; batching per G-4.
   - Per-signer and per-IP rate limits and per-chain transaction-nonce serialisation in Durable Objects; gas keys only from Worker secrets.
+  - The submitter uses viem only through `@agentlink/chain` (M0-10 policy: `apps/submitter` is not in the viem zone); needs from chain (simulation, signature checks, gas-key wallet) are added to `@agentlink/chain`, not by widening the zone.
   - No request logging beyond aggregate metrics; never signatures together with IPs. `/v1/deposit-authorization` present but disabled until M3-4b.
 - **Acceptance:**
   - Miniflare tests per endpoint: invalid signature, insufficient credits (rejected before sending), rate limit, concurrent nonce handling.

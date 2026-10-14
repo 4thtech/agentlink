@@ -1,20 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
 // Imports every shared package through its published entry point (dist), as a consumer would.
-const shared = [
-  '@agentlink/types',
-  '@agentlink/crypto',
-  '@agentlink/chain',
-  '@agentlink/transport-nostr',
-  '@agentlink/storage',
-  '@agentlink/core',
-  '@agentlink/node',
-  '@agentlink/ui',
-];
+// Literal specifiers only: the boundary guards (tools/deps-check) cannot check a computed import().
+const shared: Record<string, () => Promise<{ packageName?: unknown }>> = {
+  '@agentlink/types': () => import('@agentlink/types'),
+  '@agentlink/crypto': () => import('@agentlink/crypto'),
+  '@agentlink/chain': () => import('@agentlink/chain'),
+  '@agentlink/transport-nostr': () => import('@agentlink/transport-nostr'),
+  '@agentlink/storage': () => import('@agentlink/storage'),
+  '@agentlink/core': () => import('@agentlink/core'),
+  '@agentlink/node': () => import('@agentlink/node'),
+  '@agentlink/ui': () => import('@agentlink/ui'),
+};
 
 describe('shared packages import in Node', () => {
-  it.each(shared)('%s', async (name) => {
-    const mod = (await import(name)) as { packageName?: unknown };
+  it.each(Object.entries(shared))('%s', async (name, load) => {
+    const mod = await load();
     expect(mod.packageName).toBe(name);
   });
 });
