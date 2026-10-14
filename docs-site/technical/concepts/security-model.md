@@ -9,7 +9,7 @@
 | I-1 | Private keys are generated on the user's side and never transmitted in plaintext to any 4thTech system, relay, storage provider or chain |
 | I-2 | Plaintext content (messages, files, file keys, contact lists, policies) never leaves the user's side unencrypted |
 | I-3 | 4thTech-operated services must function correctly if fully compromised, without exposing I-1 or I-2 data; they may only deny or delay service |
-| I-4 | Policies, approvals, key export and storage credentials are owner-controlled: they take effect only with an owner signature, and the owner key unlocks only with user presence (passkey or owner passphrase). No MCP tool and no agent process can produce one |
+| I-4 | Policies, approvals, key export and storage credentials are owner-controlled: they take effect only with an owner signature, and the owner key unlocks only with user presence (passkey or owner passphrase). No MCP tool and no agent process can produce one. Scope: on a machine where an agent runs as the owner's OS user, the last sentence holds only under the conditions below (G-1; 04 §2.5) |
 | I-5 | All inbound content from other agents is untrusted data: never executed, never interpreted as tool instructions by our code, and clearly labelled as untrusted in tool results |
 | I-6 | Every on-chain record and receipt is EIP-712 signed with domain separation and replay protection |
 | I-7 | No logging of plaintext, keys, presigned URLs, salts or decrypted metadata anywhere, including local logs and debug mode |

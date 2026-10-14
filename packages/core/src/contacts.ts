@@ -91,6 +91,20 @@ export interface CardUpdateInput {
   readonly relays: unknown;
 }
 
+/** A checked card-update, ready to apply inside the caller's store transaction (M1-7b). */
+export interface PreparedCardUpdate {
+  readonly card: AgentCard;
+  /** Writes the new card; throws a CoreError (aborting the transaction) when a rule fails. */
+  readonly apply: (tx: StoreTx) => Row<'contacts'>;
+}
+
+/** A stored contact's current card and status, for the inbound checks (04 §3.1.1, M1-7b). */
+export interface InboundCard {
+  readonly id: string;
+  readonly status: ContactStatus;
+  readonly card: AgentCard;
+}
+
 export type InboundSender =
   | { readonly kind: 'contact'; readonly contactId: string }
   /** A key of an earlier card of this contact: refused except for a card-update (04 §3.1.1 step 7). */
@@ -475,6 +489,41 @@ export class ContactBook {
 
   /** Applies a verified card-update (04 §2.6, §3.4.1): same agent and owner, strictly higher epoch. */
   async applyCardUpdate(input: CardUpdateInput): Promise<ContactView> {
+    const prepared = await this.prepareCardUpdate(input);
+    const row = await this.#ctx.store.transaction((tx) => prepared.apply(tx));
+    this.#ctx.log.info('contact card updated', { keyEpoch: prepared.card.keyEpoch });
+    return this.#view(row);
+  }
+
+  /**
+   * Every stored contact's current card with its status (removed and revoked included), for the
+   * inbound checks of 04 §3.1.1 (M1-7b): the owner-key table and the hold rule by owner `kid` (step
+   * 7) and the wrap check against the sender's card (step 8). Each card is re-verified on load; one
+   * that does not verify makes the store unreadable (fail closed).
+   */
+  async inboundCards(): Promise<readonly InboundCard[]> {
+    const rows = await this.#ctx.store.transaction((tx) =>
+      tx.select('contacts', {}, { orderBy: [['contact_id', 'asc']] }).map((row) => ({
+        row,
+        revoked: isRevoked(tx, row.contact_id, row),
+      })),
+    );
+    const out: InboundCard[] = [];
+    for (const { row, revoked } of rows) {
+      const view = await this.#view(row);
+      out.push({ id: view.id, status: revoked ? 'revoked' : row.status, card: view.card });
+    }
+    return out;
+  }
+
+  /**
+   * Checks a card-update body (04 §3.4.1: cardSig, name and relays against the card) and seals its
+   * values, so the caller can apply it inside its own store transaction: M1-7b commits the
+   * envelope's outcome and the new card together (07 §3.2). `apply` checks the stored contact again
+   * (same agent and owner keys, strictly higher epoch, not removed or revoked, the key rule) and
+   * throws a CoreError otherwise, which aborts that transaction.
+   */
+  async prepareCardUpdate(input: CardUpdateInput): Promise<PreparedCardUpdate> {
     const ctx = this.#ctx;
     const now = nowOf(ctx);
     const checked = checkReceivedCard(
@@ -491,7 +540,7 @@ export class ContactBook {
     const sealedCard = await seal(ctx, 'contacts', 'agent_card_json', key, storedCardText(update));
     const name = await seal(ctx, 'contacts', 'name', key, checked.name);
     const relays = await seal(ctx, 'contacts', 'relays', key, canonicalize([...checked.relays]));
-    const row = await ctx.store.transaction((tx) => {
+    const apply = (tx: StoreTx): Row<'contacts'> => {
       const existing = tx.get('contacts', { contact_id: id });
       if (existing === undefined || existing.status === 'removed') return notFound();
       if (isRevoked(tx, id, existing)) {
@@ -519,9 +568,8 @@ export class ContactBook {
         throw new CoreError('contact_conflict', 'The contact changed meanwhile. Try again.');
       }
       return { ...existing, ...patch };
-    });
-    ctx.log.info('contact card updated', { keyEpoch: card.keyEpoch });
-    return this.#view(row);
+    };
+    return { card, apply };
   }
 
   /** Blocks a contact (F-14): its later envelopes are dropped. A revoked contact stays revoked. */
@@ -573,23 +621,30 @@ export class ContactBook {
     if (typeof from !== 'string' || !NOSTR_KEY.test(from)) {
       return { action: 'drop', reason: 'malformed' };
     }
-    return this.#ctx.store.transaction((tx): InboundScreen => {
-      for (const revoked of tx.select('revoked_agents')) {
-        if (parseKeyList(revoked.nostr_keys).includes(from)) {
-          return { action: 'drop', reason: 'revoked' };
-        }
-      }
-      let row = tx.select('contacts', { agent_nostr: from })[0];
-      let kind: 'contact' | 'superseded' = 'contact';
-      if (row === undefined) {
-        row = tx.select('contacts').find((r) => parseKeyList(r.nostr_keys).includes(from));
-        kind = 'superseded';
-      }
-      if (row === undefined) return { action: 'continue', sender: { kind: 'unknown' } };
-      if (isRevoked(tx, row.contact_id, row)) return { action: 'drop', reason: 'revoked' };
-      if (row.status === 'blocked') return { action: 'drop', reason: 'blocked' };
-      if (row.status === 'removed') return { action: 'drop', reason: 'removed' };
-      return { action: 'continue', sender: { kind, contactId: row.contact_id } };
-    });
+    return this.#ctx.store.transaction((tx) => screenInboundTx(tx, from));
   }
+}
+
+/**
+ * screenInbound inside the caller's store transaction (M1-7b: the screen and the outcome it leads to
+ * commit together, 07 §3.2). A `from` that is not 64 lowercase hex is `malformed`.
+ */
+export function screenInboundTx(tx: StoreTx, from: string): InboundScreen {
+  if (!NOSTR_KEY.test(from)) return { action: 'drop', reason: 'malformed' };
+  for (const revoked of tx.select('revoked_agents')) {
+    if (parseKeyList(revoked.nostr_keys).includes(from)) {
+      return { action: 'drop', reason: 'revoked' };
+    }
+  }
+  let row = tx.select('contacts', { agent_nostr: from })[0];
+  let kind: 'contact' | 'superseded' = 'contact';
+  if (row === undefined) {
+    row = tx.select('contacts').find((r) => parseKeyList(r.nostr_keys).includes(from));
+    kind = 'superseded';
+  }
+  if (row === undefined) return { action: 'continue', sender: { kind: 'unknown' } };
+  if (isRevoked(tx, row.contact_id, row)) return { action: 'drop', reason: 'revoked' };
+  if (row.status === 'blocked') return { action: 'drop', reason: 'blocked' };
+  if (row.status === 'removed') return { action: 'drop', reason: 'removed' };
+  return { action: 'continue', sender: { kind, contactId: row.contact_id } };
 }

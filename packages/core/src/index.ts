@@ -23,11 +23,28 @@ export {
   type CompletePairingInput,
   type ContactStatus,
   type ContactView,
+  type InboundCard,
   type InboundScreen,
   type InboundSender,
   type PairingState,
+  type PreparedCardUpdate,
   type StagePairingInput,
 } from './contacts.js';
+export {
+  EnvelopeService,
+  MAX_WRAP_CHECKS,
+  PROCESS_BATCH,
+  UNOPENED_TYPE,
+  type BuildEnvelopeInput,
+  type BuiltEnvelope,
+  type EnvelopeDestination,
+  type InboundOutcome,
+  type InboundReason,
+  type InboundReport,
+  type ReceiveInput,
+  type ReceiveResult,
+  type ReceiveStatus,
+} from './envelopes.js';
 export { CoreError, StoreConstraintError, StoreUsageError, type CoreErrorCode } from './errors.js';
 export * from './constants.js';
 export {
