@@ -1431,22 +1431,22 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - In M3-1a scope; independent review.
 
 #### M1-3n · contracts: stabilise the batch invariant suite's non-vacuity checks (new, follow-up to M1-3e)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`test/**` in `occ-v2-contracts`, audit-rules §2.3, as M1-3e and M1-3h) · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · test/invariant/**
 - **Depends on:** M1-3e
-- **Spec:** `audit-rules.md` §5 (non-vacuity of invariant suites); 05 §3.3 (batch outcomes)
+- **Spec:** `audit-rules.md` CT-1 (the invariant tests) and §3.4 (the local red run); 05 §3.3 (batch outcomes)
 - **Invariants:** I-6
 - **Scope:** a test-harness flake only; no contract change and no change to what the suite proves.
-  - **Symptom.** `test (invariant)` in contracts CI can fail on `main` and on pull requests with a `NotaryBatch` invariant suite message such as "wrong-salt or non-recipient batches: 0 <= 0". No code changed between a green run and the red one: the invariant job runs with a random fuzz seed. Reproduced locally on current `main` with the `ci` profile (fuzz seed 16: one failing run in 3,072).
-  - **Cause (measured).** The suite checks, once per run (`afterInvariant`, at 300 calls or more), that six kinds of event happened at least once. Four are driven by actions that first restore normal operation, and have wide margins (at least 28 events in every one of 6,144 measured runs). Two come only from random choices inside the receipt-batch action: a batch rejected for a wrong salt or a non-recipient signer, and an expired receipt batch. They average about 9.4 events per 500-call run, so a run with none is rare (2 such runs in about 15,000 measured, matching the Poisson estimate of one in 12,000 per check). With 512 runs per job and two such checks, roughly one invariant job in 12 to 15 is red by chance. A longer failing sequence is shrunk to exactly 300 calls (the check's arming threshold), so the printed sequence looks unrelated to the cause.
+  - **Symptom.** `test (invariant)` in the contracts CI can occasionally fail with a non-vacuity message from the batch invariant suite, with no code change between a green run and the red one: the invariant job uses a random fuzz seed.
+  - **Cause.** The suite checks once per run that each kind of event it relies on happened at least once. Most are driven by actions that restore normal operation first and have wide margins. Two kinds depend only on random choices inside the receipt-batch action and can be absent from a run by chance. The measurements are in the contracts repository, not in this file.
   - **Fix, in order of preference (never weaken or remove a check, never lower the 300-call threshold, never pin the fuzz seed to hide it):**
     1. Bias the handler: add actions that first restore normal operation and then submit a receipt batch built to be rejected for each reason (wrong salt, a signer who is not the recipient, an expired receipt), the pattern the suite already uses for the under-funded batch. Give them the selector weight needed for a safe margin.
     2. Add ghost counters of the attempts made and keep every existing floor as it is, then raise the `ci` profile's invariant depth only if the margin measured after step 1 needs it. Report the extra CI time, because the suite is already the longest invariant job.
-  - Audit the sibling suites' floors the same way (the Notary suite is thinner than the vault's: its minimum over 6,144 local runs was 2 receipts and 2 skipped duplicates; the fee-vault suite has one check). Fix only a floor whose measured margin is under the target below.
+  - Audit the sibling suites' floors the same way. Fix only a floor whose measured margin is under the target below.
 - **Acceptance:**
   - Tests first (local red run per `audit-rules.md` §3.4): show that the new or changed floors fail when the biasing action is removed.
-  - Every non-vacuity floor has a measured minimum of at least 10 per run over at least 10,000 runs at the `ci` profile (10 or more seeds, no pinned seed in the workflow); the measurement table is in the PR.
-  - All suites green for the same runs; the `deep` profile is unchanged or faster; no contract file is touched.
+  - Every non-vacuity floor has a measured minimum event count of at least 10 per run over at least 10,000 runs at the `ci` profile (10 or more seeds, no pinned seed in the workflow); the measurement table is in the PR.
+  - All suites green for the same runs; the `deep` profile's runs and depth are unchanged or higher, and every existing floor and threshold is unchanged or stricter; no contract file is touched.
   - Independent review; the sibling-suite audit is recorded (changed or "margin adequate" per suite).
 
 #### M1-14 · Testnet chain and fee configuration verification, stablecoin allowlist (D-45, D-46) (new)
@@ -1574,8 +1574,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Relay pool bounds (07 §4.3, IR-G-24-1 L-8): at most 64 open connections, idle connections closed after 5 minutes, a relay that does not connect within 10 s skipped for that attempt (fake clock; 16-relay black-hole contacts do not stall other sends).
 
 #### M1-5b-b · node: relay connector, resolver and NIP-11 fetcher; Docker relay suite (new, IR-M1-5b-1 M-1)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (path default for `packages/node/**`; the content is network and SSRF handling, S1 by nature, and only the owner may lower the class) · **Phase:** M1a (before M1-23)
-- **Repo/path:** agentlink · packages/node (connector), packages/transport-nostr (tests only, if the Docker suite lives there)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (path default for `packages/node/**`; the content is network and SSRF handling, S1 by nature, and only the owner may lower the class). The CI job edits `.github/**`, a sensitive path: that part merges only on Tali's "merge" · **Phase:** M1a (before M1-23)
+- **Repo/path:** agentlink · packages/node (connector), packages/transport-nostr (tests only, if the Docker suite lives there), .github/workflows/ci.yml (the Docker job)
 - **Depends on:** M1-5b
 - **Spec:** 07 §4.2 (relays, size, NIP-42), §4.3 (relay routing); 04 §4 (relay URL rule, SSRF)
 - **Invariants:** I-3, I-5
@@ -1588,7 +1588,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Only `packages/node` may use these network primitives (boundary guards); the connector is injected into the pool by the CLI wiring (M1-9a).
 - **Acceptance:**
   - Unit tests with a fake name server and a local socket server: the connection goes to the approved address even when a later lookup of the same name answers differently; a redirect is refused; a proxy variable in the environment is ignored; a 131 073-byte message closes the socket and a 131 072-byte one is delivered; an oversized or slow NIP-11 response is abandoned within its own timeout.
-  - Docker integration suite against 2–3 real local relays (one requiring NIP-42 AUTH, one with a small `max_message_length`): publish succeeds only with ≥ 2 `OK`, the small relay is skipped, AUTH completes, and an outbox row survives a restart and is republished. Runs in CI where Docker is available and is skipped locally with a clear message.
+  - Docker integration suite against 2–3 real local relays (one requiring NIP-42 AUTH, one with a small `max_message_length`): publish succeeds only with ≥ 2 `OK`, the small relay is skipped, AUTH completes, and an outbox row survives a restart and is republished. Runs in a CI job where Docker is available and is skipped locally with a clear message.
+  - A require-Docker flag set in CI makes the suite impossible to skip silently: with the flag set and Docker removed, the job fails (as `AGENTLINK_REQUIRE_KEYCHAIN=1` does for M1-8a-b).
   - Lands before M1-23 (the J9 dogfood, M1a gate), which runs on real relays through this connector.
 
 #### M1-5b-c · transport-nostr: hardening follow-ups (new, IR-M1-5b-1 L-2, L-6, I-1…I-3)
@@ -1598,13 +1599,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 07 §4.2, §4.3 (an owner row with fewer than 2 usable relays; relay health); 04 §4
 - **Invariants:** I-3, I-7
 - **Scope:**
-  - A hanging NIP-11 fetch must not make a working relay time out for the publish: the NIP-11 wait has its own bound, after which the relay is used with the default limits for that attempt.
+  - A hanging NIP-11 fetch must not make a working relay time out for the publish: the NIP-11 wait has its own bound, after which the relay is used with the default limits for that attempt (this is new behaviour: the PR adds a line to 07 §4.2 first).
   - A row with fewer than 2 usable relays reports why in the activity feed (07 §4.3), for example "no relay with a large enough message limit".
   - A closed pool returns its own error code, not `invalid_url`.
-  - Relay health output follows the spec's URL rule and avoids full URLs where the spec says so (origin or a short relay label).
+  - Relay health output avoids full URLs: it follows the logger's URL rule (origin only) and 07 §4.3 (the activity log names a relay without its address).
   - Jitter on the outbox backoff, so that many queued rows do not retry in step.
 - **Acceptance:**
-  - Fake-clock tests: a NIP-11 fetch that never answers does not delay a publish to a working relay beyond its own bound; a row with one usable relay stays unsent and the activity entry names the reason; a publish on a closed pool returns the closed-pool code; health output contains no path or query; the retry times of two rows differ and stay within the 24 h bound.
+  - Fake-clock tests: a NIP-11 fetch that never answers does not delay a publish to a working relay beyond its own bound; a row with one usable relay stays unsent and the activity entry names the reason; a publish on a closed pool returns the closed-pool code; health output contains no path or query; with an injected random source, the retry times of two rows differ and stay within the 24 h bound.
   - Existing M1-5b tests stay green; no test is weakened.
 
 #### M1-5c · transport-nostr: subscribe and sync with cursors and dedup
@@ -1945,7 +1946,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-8a-d · CI: pin the keychain job's runner images; gating decision (new, IR-M1-8a-b-1 notes)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (sensitive path `.github/**`: merges only on Tali's "merge") · **Phase:** M1a
 - **Repo/path:** agentlink · .github/workflows/ci.yml
-- **Depends on:** M1-8a-b (merged); 5–10 green PR runs of the `keychain` job for the gating decision
+- **Depends on:** M1-8a-b (PR #57, open: the `keychain` job does not exist on `main` yet). Pinning can start only after #57 merges; the gating decision needs 5–10 green PR runs of the job after that
 - **Spec:** M1-8a-b; docs/process/ci-cd.md
 - **Invariants:** I-1
 - **Scope:**
@@ -1973,7 +1974,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Status:** backlog (draft: confirm after IR-M1-8b-1; the items come from the M1-8b worker's open questions and may change or drop once the review reports) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core (schema, `StoreCipher`), packages/node (SQLite store), docs/foundation/07-sdk-transport-storage.md, test-vectors/**
 - **Depends on:** M1-8b
-- **Spec:** 07 §3 (`identity` columns, at-rest encryption); 04 §2.2 (key labels)
+- **Spec:** 07 §3 (`identity` columns, at-rest encryption); 04 §2.1 (key labels)
 - **Invariants:** I-2, I-7
 - **Scope:**
   - Core's schema gains `identity.prev_relays` and `identity.prev_relays_until` as 07 §3 already lists them, with a forward migration in the SQLite store.
@@ -2054,7 +2055,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-9a · CLI: init, harness setup, everyday commands
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli
-- **Depends on:** M1-8a, M1-8b, M1-8c, M1-7c; gap G-5 resolved. Only the `--keystore file` branch waits for M1-8f (off the critical path)
+- **Depends on:** M1-8a, M1-8b, M1-8c, M1-7c, M1-5b-b (relay connector wiring); gap G-5 resolved. Only the `--keystore file` branch waits for M1-8f (off the critical path)
 - **Spec:** 06 §7, §8; 07 §9; 02 F-01, J1; 04 §2.2, §2.8; D-39, D-54
 - **Invariants:** I-1, I-4
 - **Scope:**
@@ -3659,7 +3660,7 @@ Converging M1a chains that must arrive in time:
 
 - **Policy and commitments:** M1-2a → {M1-2b, M1-21}; M1-7a + M1-2b → M1-7d → {M1-7e, M1-20 (+ M1-21)} → M1-9b → (M1-9c); M1-7b + M1-7e + M1-20 + M1-21 → M1-32 → (M1-9c, M1-22), beside M1-7c → M1-7h.
 - **Pairing and card crypto:** M1-1f (after G-28, resolved by branch `docs/G-23-G-28-agentid-safety-code`, pending owner) → (M1-7c); M1-1e → (M1-7a).
-- **Transport:** M1-5a → M1-5b → M1-5c → (M1-7h); M1-18 before the dogfood.
+- **Transport:** M1-5a → M1-5b → {M1-5b-b, M1-5c} → (M1-7h); M1-5b-b → (M1-9a); M1-18 before the dogfood.
 - **Owner presence (passphrase):** M1-8a → {M1-8b, M1-8c} → M1-9a → M1-9b. Headless (off the critical path): M1-1f + M1-8a + M1-8b + M1-8c → M1-8f → M1-9a's `--keystore file` branch.
 - **Install and dogfood:** M1-16 + M1-9a + M1-12a + M1-12b → M1-25 → (M1-23); M1-13b → (M1-23); M1-19 (+ M1-25 prompt templates) for invite links; M1-9a + M1-12a → M1-29 → (M1-23).
 
