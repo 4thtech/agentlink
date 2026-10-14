@@ -24,7 +24,7 @@
 //                eslint-disable or inline eslint config that switches the boundary rules off.
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 import {
@@ -321,6 +321,8 @@ export function checkSource(zone, file, text, root) {
       } else if (isReflectSubtle(node)) {
         subtle(node);
       }
+    } else if (ts.isIdentifier(node) && node.text === 'module' && !isRequireName(node)) {
+      report(node, '"module" (CommonJS) is not allowed; the packages are ESM');
     } else if (ts.isIdentifier(node) && node.text === 'require') {
       // `require` anywhere but as the callee of a direct call: const r = require; require.call(...)
       const parent = node.parent;
@@ -400,32 +402,54 @@ function walk(dir) {
   return found;
 }
 
+const gitList = (root, args) =>
+  execFileSync('git', ['-C', root, 'ls-files', '-z', ...args], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  })
+    .split('\0')
+    .filter(Boolean);
+
 /**
- * Absolute paths of every source file under `dir` (a package directory). Inside a repository: the
- * tracked files plus untracked files that are not ignored, so an ignored build directory is left out
- * but `git add -f src/dist/x.ts` is still scanned. Without repository metadata: a full walk that
- * skips only node_modules.
+ * Every file under `dir` (a package directory) that deps-check must look at:
+ *   files    - absolute paths of source files. Inside a repository: the tracked files plus untracked
+ *              files that are not ignored, so an ignored build directory is left out but
+ *              `git add -f src/dist/x.ts` is still scanned. Without repository metadata: a full walk
+ *              that skips only node_modules.
+ *   symlinks - repo-relative paths of symbolic links (mode 120000 in the index, or found on disk). A
+ *              linked directory is one entry without a source extension and would hide its files.
  */
 export function listSourceFiles(root, dir) {
   const zonePath = relative(root, dir).split('\\').join('/');
   let paths;
+  const symlinks = new Set();
   try {
-    const out = execFileSync(
-      'git',
-      ['-C', root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', zonePath],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    paths = gitList(root, ['--cached', '--others', '--exclude-standard', '--', zonePath]).map(
+      (path) => join(root, path),
     );
-    paths = out
-      .split('\0')
-      .filter(Boolean)
-      .map((path) => join(root, path));
+    for (const entry of gitList(root, ['-s', '--', zonePath])) {
+      const [meta, path] = entry.split('\t');
+      if (meta.startsWith('120000 ')) symlinks.add(path);
+    }
   } catch {
     paths = walk(dir);
   }
-  return paths
-    .filter((path) => SOURCE_EXT.test(path) && !path.split(/[\\/]/).includes('node_modules'))
-    .filter((path) => existsSync(path))
+  const live = paths.filter((path) => !path.split(/[\\/]/).includes('node_modules'));
+  for (const path of live) {
+    try {
+      if (lstatSync(path).isSymbolicLink()) {
+        symlinks.add(relative(root, path).split('\\').join('/'));
+      }
+    } catch {
+      // deleted but still listed: nothing to scan
+    }
+  }
+  const files = live
+    .filter(
+      (path) => SOURCE_EXT.test(path) && existsSync(path) && !symlinks.has(relative(root, path)),
+    )
     .sort();
+  return { files, symlinks: [...symlinks].sort() };
 }
 
 /** Workspace directories under packages/* and apps/*: [{ zone, dir }]. */
@@ -471,7 +495,18 @@ export function runChecks(root) {
       );
     }
     if (!ZONES[zone]) continue; // already reported; do not guess its policy
-    for (const file of listSourceFiles(root, dir)) {
+    const listed = listSourceFiles(root, dir);
+    for (const link of listed.symlinks) {
+      problems.push(
+        `${link}: symbolic links are not allowed in packages/ and apps/ (they hide files from the scan)`,
+      );
+    }
+    for (const file of listed.files) {
+      if (file.endsWith('.cjs')) {
+        problems.push(
+          `${relative(root, file)}: CommonJS (.cjs) files are not allowed in packages/ and apps/; use ESM`,
+        );
+      }
       files += 1;
       problems.push(...checkSource(zone, file, readFileSync(file, 'utf8'), root));
     }
@@ -480,7 +515,10 @@ export function runChecks(root) {
   for (const zone of SUBTLE_ONLY_ZONES) {
     const dir = join(root, zone);
     if (!existsSync(dir)) continue;
-    for (const file of listSourceFiles(root, dir)) {
+    const listed = listSourceFiles(root, dir);
+    for (const link of listed.symlinks)
+      problems.push(`${link}: symbolic links are not allowed here`);
+    for (const file of listed.files) {
       files += 1;
       problems.push(...checkSource(zone, file, readFileSync(file, 'utf8'), root));
     }

@@ -78,6 +78,7 @@ const rule = {
         'Dynamic import or require with a non-literal specifier cannot be checked against the boundaries; use a string literal.',
       loader:
         '"{{name}}" reaches the module loader around the import checks; import the module with a static or literal import.',
+      commonjs: '"module" (CommonJS) is not allowed; the packages are ESM.',
       require:
         '"require" may only be called directly with a string literal; other uses bypass the import checks.',
       subtle:
@@ -153,6 +154,11 @@ const rule = {
         }
       },
       Identifier(node) {
+        // `module` as a value (module.exports, module.constructor._load, const m = module): CommonJS.
+        if (node.name === 'module' && !isDeclarationOrKey(node)) {
+          context.report({ node, messageId: 'commonjs' });
+          return;
+        }
         // `require` anywhere but as the callee of a direct call (const r = require; require.call(...)).
         if (node.name !== 'require' || isDeclarationOrKey(node)) return;
         const parent = node.parent;

@@ -16,7 +16,7 @@ docs/foundation/09-repositories-and-reuse.md
 
 # --- Tooling / OS ---
 node_modules/
-.claude/worktrees/
+/.claude/worktrees/
 dist/
 build/
 coverage/

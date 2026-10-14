@@ -149,6 +149,8 @@ describe('review IR-M0-10-1 regressions (ESLint side)', () => {
     [`Reflect.get(globalThis.crypto, 'subtle');`, 'packages/core'],
     [`Object.getOwnPropertyDescriptor(crypto, 'subtle');`, 'packages/core'],
     [`declare const k: string; void globalThis.crypto[k];`, 'packages/core'],
+    [`module.constructor._load('viem');`, 'packages/core'],
+    [`const m = module; m.require('x');`, 'apps/cli'],
     [`eval('1');`, 'packages/core'],
     [`new Function('return import("viem")');`, 'packages/core'],
   ])('rejects %s in %s', async (code, zone) => {

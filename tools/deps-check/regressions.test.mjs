@@ -2,7 +2,7 @@
 // is a red case here, in deps-check and, where the form is visible to ESLint, in ESLint too.
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -299,5 +299,71 @@ describe('test-vectors/: crypto.subtle exemption for the M0-9 placeholder suite 
     const { problems } = runChecks(root);
     rmSync(root, { recursive: true, force: true });
     expect(problems).toEqual([expect.stringContaining('test-vectors/harness/suites/second.ts:1')]);
+  });
+});
+
+describe('IR-M0-10-2: symlinks and CommonJS', () => {
+  const dirs = [];
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  function fixture({ git = true, track = true } = {}) {
+    const root = mkdtempSync(join(tmpdir(), 'deps-check-r3-'));
+    dirs.push(root);
+    const write = (path, text) => {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), text);
+    };
+    write('packages/core/package.json', JSON.stringify({ name: '@agentlink/core' }));
+    write('vendor/lib/x.ts', `export * from 'viem';`);
+    write('packages/core/src/leak.ts', `export * from './lib/x.js';`);
+    symlinkSync('../../../vendor/lib', join(root, 'packages/core/src/lib'));
+    if (git) {
+      execFileSync('git', ['init', '-q'], { cwd: root });
+      if (track) execFileSync('git', ['add', '-A'], { cwd: root });
+    }
+    return root;
+  }
+
+  it.each([
+    ['tracked symlinked directory (mode 120000)', { git: true, track: true }],
+    ['untracked symlinked directory', { git: true, track: false }],
+    ['symlink found by the full walk (no repository)', { git: false }],
+  ])('rejects a %s', (_name, options) => {
+    const { problems } = runChecks(fixture(options));
+    expect(problems).toEqual([expect.stringContaining('packages/core/src/lib: symbolic links')]);
+  });
+
+  it('rejects .cjs files in packages and apps', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deps-check-r3-'));
+    dirs.push(root);
+    mkdirSync(join(root, 'apps/cli/src'), { recursive: true });
+    writeFileSync(
+      join(root, 'apps/cli/package.json'),
+      JSON.stringify({ name: '@4thtech/agentlink' }),
+    );
+    writeFileSync(join(root, 'apps/cli/src/x.cjs'), `exports.a = 1;`);
+    expect(runChecks(root).problems).toEqual([
+      expect.stringContaining('apps/cli/src/x.cjs: CommonJS'),
+    ]);
+  });
+
+  it.each([
+    `const m = module; m.require('../../crypto/src/x.js');`,
+    `module.constructor._load('viem');`,
+    `module.constructor.createRequire(__filename)('@noble/curves');`,
+    `module.exports = {};`,
+    `export const m = { module };`,
+  ])('rejects the CommonJS module object: %s', (code) => {
+    for (const zone of ['packages/core', 'apps/cli']) {
+      expect(src(zone, code).join('\n')).toMatch(/"module" \(CommonJS\)/);
+    }
+  });
+
+  it('allows names that are only called module', () => {
+    expect(
+      src('packages/core', `import module from './module.js'; const o = { module: 1 }; o.module;`),
+    ).toEqual([]);
   });
 });
