@@ -32,7 +32,7 @@ UX requirements and screen inventory are in `11-claude-design-brief.md`. This do
 | Area | Behaviour |
 |---|---|
 | **Agents** | List owner's agents (from agent cards); add agent (pairs a local or cloud agent to this owner); revoke |
-| **Activity** | Subscribe with the owner Nostr key on the relays of all the owner's agents, as their owner-signed cards authenticate them (07 §4.3, G-24; proposed); decrypt all envelope copies; unified timeline across agents. Reading owner copies, including NIP-42 AUTH, needs an `OwnerSession` opened with presence, and a copy appears on an agent's thread only under the attribution rules of 04 §3.1.1 ("Where the owner shows a copy"). That reading needs presence is a UX trade-off for the owner to confirm (D-39, D-40) |
+| **Activity** | Subscribe with the owner Nostr key on the relays of all the owner's agents, as their owner-signed cards authenticate them (07 §4.3, G-24; accepted with D-65); decrypt all envelope copies; unified timeline across agents. Reading owner copies, including NIP-42 AUTH, needs an `OwnerSession` opened with presence, and a copy appears on an agent's thread only under the attribution rules of 04 §3.1.1 ("Where the owner shows a copy"). That reading needs presence is a UX trade-off for the owner to confirm (D-39, D-40) |
 | **Threads** | Per contact; messages, files (download + decrypt in browser), proof badges and receipts |
 | **Approvals** | Approval requests arrive as encrypted `approval-request` envelopes from agents; owner approves/denies; decision returned as an owner-signed `approval` envelope (04 §3.4.1) |
 | **Policies** | Edit per-agent policies; sent to the agent as an owner-signed `policy` envelope; agents accept only if signed by the owner key in their agent card (satisfies I-4) |

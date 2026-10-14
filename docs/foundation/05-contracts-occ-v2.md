@@ -201,7 +201,7 @@ Verifiers can check everything shown in a proof (signer, time, envelope hash, re
 |---|---|
 | `notarize` (credits, EOA) | ≤ 170k (decided by the owner in chat, 14 Oct 2026, D-61; wording confirmed at merge) |
 | `acknowledge` | ≤ 75k |
-| `notarizeBatch` per item (n = 20) | ≤ 120k |
+| `notarizeBatch` per item (n = 20) | ≤ 125k (raised from 120k by the owner, D-66 (4), 14 Oct 2026, on the AUDIT-FABLE-OCCv2-1 re-check: mixed USDC and native batches had only 158 gas of headroom under 120k) |
 
 On Base and Gnosis these cost a fraction of a cent, leaving margin for gas sponsorship by the submitter.
 
