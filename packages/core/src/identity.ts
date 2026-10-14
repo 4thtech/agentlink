@@ -283,7 +283,12 @@ export class IdentityService {
       next = bundle;
     } else if (bundle.keyEpoch === old.keyEpoch && input.epochControl !== undefined) {
       control = input.epochControl;
-      next = await control.previewEpoch(old.keyEpoch + 1);
+      try {
+        next = await control.previewEpoch(old.keyEpoch + 1);
+      } catch (error) {
+        // The KeyStore moved since it was read: the same error as a lost compare-and-set (L-3).
+        throw isEpochConflict(error) ? concurrentRotation() : error;
+      }
       if (next.agentId !== old.agentId) {
         throw new CoreError('identity_mismatch', 'The keys do not belong to this agent.');
       }
@@ -322,9 +327,21 @@ export class IdentityService {
       try {
         await control.advanceEpoch(old.keyEpoch, input.owner);
       } catch (error) {
-        if (error instanceof KeyStoreError && error.code === 'epoch_conflict') {
-          throw concurrentRotation();
-        }
+        if (isEpochConflict(error)) throw concurrentRotation();
+        // The owner is told this rotation failed, so its pending card must never finish later,
+        // after an advance from elsewhere (IR-M1-1g-d-1 L-1). Best effort, and only exactly this
+        // card: if the advance did happen, a cleared card leaves `rotation_pending`, which is safe.
+        await ctx.store
+          .transaction((tx) =>
+            tx.update(
+              'identity',
+              { ...where, pending_card_json: sealedPending },
+              {
+                pending_card_json: null,
+              },
+            ),
+          )
+          .catch(() => undefined);
         throw error;
       }
       // The control must have advanced this client's own KeyStore, to exactly the signed keys.
@@ -411,6 +428,10 @@ function concurrentRotation(): CoreError {
   );
 }
 
+function isEpochConflict(error: unknown): boolean {
+  return error instanceof KeyStoreError && error.code === 'epoch_conflict';
+}
+
 function assertNotRevoked(tx: StoreTx, agentId: string): void {
   if (tx.get('revoked_agents', { agent_evm: agentId }) !== undefined) {
     throw new CoreError('identity_revoked', 'This agent has been revoked by its owner.');
@@ -429,14 +450,15 @@ function sameAgentKeys(bundle: PublicIdentity, card: AgentCard): boolean {
 
 /**
  * The stored pending card if it finishes a rotation to the KeyStore's epoch, else undefined. It must
- * open and verify (cardSig and cardAgentSig), be for the stored epoch + 1, name exactly the
- * KeyStore's keys at that epoch, and keep the current card's owner keys, name and relays.
+ * open and verify (cardSig and cardAgentSig), be for the stored epoch + 1, not have expired, name
+ * exactly the KeyStore's keys at that epoch, and keep the current card's owner keys, name and relays.
  */
 async function usablePendingCard(
   ctx: CoreContext,
   row: Row<'identity'>,
   sealed: Sealed,
   bundle: PublicIdentity,
+  now: number,
 ): Promise<StoredCard | undefined> {
   const key = [row.agent_id];
   try {
@@ -449,6 +471,8 @@ async function usablePendingCard(
       current.agentEvm === row.agent_id &&
       current.keyEpoch === row.key_epoch &&
       pending.card.keyEpoch === row.key_epoch + 1 &&
+      // An expired card never finishes a rotation (IR-M1-1g-d-1 L-1).
+      (pending.card.expiresAt === 0 || pending.card.expiresAt > now) &&
       sameAgentKeys(bundle, pending.card) &&
       sameOwnerKeys(current, pending.card) &&
       pending.card.nameHash === current.nameHash &&
@@ -466,8 +490,20 @@ async function usablePendingCard(
  * keys, the rotation finishes without a new owner signature: the owner signed that card before the
  * KeyStore advanced. Otherwise nothing changes, and with the KeyStore ahead the identity stays
  * `rotation_pending` (no send) until the owner runs rotate again. A revoked agent never finishes.
+ *
+ * It never fails the open (IR-M1-1g-d-1 L-2): on any error nothing is committed, the client still
+ * opens to read history, and with the KeyStore ahead it refuses to send (`rotation_pending`).
  */
 export async function finishPendingRotation(ctx: CoreContext): Promise<void> {
+  try {
+    await finishIfUsable(ctx);
+  } catch {
+    // A fixed message only: the error may carry store or cipher details.
+    ctx.log.warn('pending rotation not finished');
+  }
+}
+
+async function finishIfUsable(ctx: CoreContext): Promise<void> {
   const got = await readIdentity(ctx);
   if (got === undefined || got.revoked) return;
   const { row } = got;
@@ -475,7 +511,8 @@ export async function finishPendingRotation(ctx: CoreContext): Promise<void> {
   if (sealed === null) return;
   const bundle = await ctx.keyStore.getPublicBundle();
   if (bundle.agentId !== row.agent_id || bundle.keyEpoch !== row.key_epoch + 1) return;
-  const pending = await usablePendingCard(ctx, row, sealed, bundle);
+  const now = nowOf(ctx);
+  const pending = await usablePendingCard(ctx, row, sealed, bundle, now);
   if (pending === undefined) {
     ctx.log.warn('pending rotation card not usable', { keyEpoch: row.key_epoch });
     return;
@@ -487,7 +524,6 @@ export async function finishPendingRotation(ctx: CoreContext): Promise<void> {
     [row.agent_id],
     storedCardText(pending),
   );
-  const now = nowOf(ctx);
   const finished = await ctx.store.transaction((tx) => {
     if (isRevoked(tx, row)) return false;
     // Exactly the row and the pending card that were verified; otherwise another flow moved on.

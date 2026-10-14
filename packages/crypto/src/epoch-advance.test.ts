@@ -40,8 +40,10 @@ async function codeOf(fn: () => Promise<unknown>): Promise<string> {
 async function setup(keyEpoch = 0) {
   const keys = new MemoryKeyStore(SEED, { keyEpoch });
   const owner = new MemoryOwnerKeyStore(OWNER_SEED, presence());
+  // The control is a separate object, reachable only through the owner side (IR-M1-1g-d-1 M-1).
+  const control = owner.epochControl(keys);
   const session = await owner.unlock(presence());
-  return { keys, owner, session };
+  return { keys, owner, control, session };
 }
 
 /** NIP-44 payload from the peer to the agent's Nostr key at `epoch`. */
@@ -53,28 +55,51 @@ function payloadTo(epoch: number, plaintext: string): string {
 const peerHex = encodeHex(derivePublicIdentity(PEER_SEED, 0).agentNostr);
 
 describe('MemoryKeyStore as KeyEpochControl (M1-1g-d)', () => {
-  it('implements the management surface next to the KeyStore', async () => {
-    const { keys } = await setup();
-    const control: KeyEpochControl = keys;
+  it('keeps the control a separate object: the agent KeyStore has no advance (IR-M1-1g-d-1 M-1)', async () => {
+    const { keys, control } = await setup();
+    const asControl: KeyEpochControl = control;
     const agent: KeyStore = keys;
-    expect(typeof control.advanceEpoch).toBe('function');
-    expect(typeof control.previewEpoch).toBe('function');
-    expect(typeof agent.getPublicBundle).toBe('function');
+    expect(typeof asControl.advanceEpoch).toBe('function');
+    expect(typeof asControl.previewEpoch).toBe('function');
+    expect(control).not.toBe(keys);
+    // Probe P1b: nothing on the agent KeyStore advances or previews, even through a cast.
+    expect('advanceEpoch' in agent).toBe(false);
+    expect('previewEpoch' in agent).toBe(false);
+    expect((agent as unknown as Record<string, unknown>).advanceEpoch).toBeUndefined();
+  });
+
+  it('an advance through the control is seen at once by the KeyStore (IR-M1-1g-d-1 L-5)', async () => {
+    const { keys, control, session } = await setup(0);
+    await control.advanceEpoch(0, session);
+    expect((await keys.getPublicBundle()).keyEpoch).toBe(1);
+    // A second control over the same KeyStore sees the same epoch.
+    const { owner } = await setup(0);
+    const again = owner.epochControl(keys);
+    expect(await again.previewEpoch(2)).toEqual(derivePublicIdentity(SEED, 2));
+  });
+
+  it('is made only for a MemoryKeyStore, and not by a closed owner store', async () => {
+    const { keys, owner } = await setup();
+    for (const target of [undefined, null, {}, { getPublicBundle: () => null }]) {
+      expect(() => owner.epochControl(target as never)).toThrow(CryptoInputError);
+    }
+    await owner.close();
+    expect(() => owner.epochControl(keys)).toThrow(KeyStoreError);
   });
 
   describe('previewEpoch (the epoch + 1 public preview)', () => {
     it('returns the public keys of current + 1 without advancing', async () => {
-      const { keys } = await setup(3);
-      expect(await keys.previewEpoch(4)).toEqual(derivePublicIdentity(SEED, 4));
+      const { keys, control } = await setup(3);
+      expect(await control.previewEpoch(4)).toEqual(derivePublicIdentity(SEED, 4));
       expect((await keys.getPublicBundle()).keyEpoch).toBe(3);
       // A second preview is the same and still changes nothing.
-      expect(await keys.previewEpoch(4)).toEqual(derivePublicIdentity(SEED, 4));
+      expect(await control.previewEpoch(4)).toEqual(derivePublicIdentity(SEED, 4));
       expect((await keys.getPublicBundle()).keyEpoch).toBe(3);
     });
 
     it('is public keys only: the lookup, signing and decryption at that epoch stay unavailable', async () => {
-      const { keys } = await setup(0);
-      const next = await keys.previewEpoch(1);
+      const { keys, control } = await setup(0);
+      const next = await control.previewEpoch(1);
       expect(Object.keys(next).sort()).toEqual(
         ['agentEnc', 'agentEvm', 'agentId', 'agentNostr', 'keyEpoch', 'kid'].sort(),
       );
@@ -92,42 +117,43 @@ describe('MemoryKeyStore as KeyEpochControl (M1-1g-d)', () => {
     });
 
     it('refuses any epoch but current + 1', async () => {
-      const { keys } = await setup(2);
-      expect(await codeOf(() => keys.previewEpoch(2))).toBe('epoch_conflict');
-      expect(await codeOf(() => keys.previewEpoch(0))).toBe('epoch_conflict');
-      expect(await codeOf(() => keys.previewEpoch(4))).toBe('epoch_unavailable');
+      const { control } = await setup(2);
+      expect(await codeOf(() => control.previewEpoch(2))).toBe('epoch_conflict');
+      expect(await codeOf(() => control.previewEpoch(0))).toBe('epoch_conflict');
+      expect(await codeOf(() => control.previewEpoch(4))).toBe('epoch_unavailable');
       for (const epoch of [-1, 1.5, 2 ** 32, '3', undefined]) {
-        expect(await codeOf(() => keys.previewEpoch(epoch as never))).toBe('invalid_argument');
+        expect(await codeOf(() => control.previewEpoch(epoch as never))).toBe('invalid_argument');
       }
     });
 
     it('has no epoch after the last one', async () => {
       const keys = new MemoryKeyStore(SEED, { keyEpoch: MAX_KEY_EPOCH });
-      expect(await codeOf(() => keys.previewEpoch(MAX_KEY_EPOCH + 1))).toBe('invalid_argument');
+      const control = new MemoryOwnerKeyStore(OWNER_SEED, presence()).epochControl(keys);
+      expect(await codeOf(() => control.previewEpoch(MAX_KEY_EPOCH + 1))).toBe('invalid_argument');
     });
 
     it('refuses after close', async () => {
-      const { keys } = await setup();
+      const { keys, control } = await setup();
       await keys.close();
-      expect(await codeOf(() => keys.previewEpoch(1))).toBe('keystore_closed');
+      expect(await codeOf(() => control.previewEpoch(1))).toBe('keystore_closed');
     });
   });
 
   describe('advanceEpoch (owner only, compare-and-set)', () => {
     it('advances from expected to expected + 1 and returns the new public bundle', async () => {
-      const { keys, session } = await setup(0);
-      const preview = await keys.previewEpoch(1);
-      const advanced = await keys.advanceEpoch(0, session);
+      const { keys, control, session } = await setup(0);
+      const preview = await control.previewEpoch(1);
+      const advanced = await control.advanceEpoch(0, session);
       expect(advanced).toEqual(preview);
       expect(await keys.getPublicBundle()).toEqual(derivePublicIdentity(SEED, 1));
     });
 
     it('signs and encrypts with the new epoch; older epochs decrypt only (04 §2.6)', async () => {
-      const { keys, session } = await setup(0);
+      const { keys, control, session } = await setup(0);
       const old = derivePublicIdentity(SEED, 0);
       const oldEntry = await wrapCek(old.agentEnc, ENVELOPE_ID, CEK);
       const oldPayload = payloadTo(0, 'history');
-      await keys.advanceEpoch(0, session);
+      await control.advanceEpoch(0, session);
       const next = derivePublicIdentity(SEED, 1);
 
       const event = await keys.signNostr({ kind: 13, created_at: 1, tags: [], content: '' });
@@ -154,19 +180,19 @@ describe('MemoryKeyStore as KeyEpochControl (M1-1g-d)', () => {
     });
 
     it('fails a stale expected value and changes nothing', async () => {
-      const { keys, session } = await setup(2);
+      const { keys, control, session } = await setup(2);
       for (const expected of [0, 1, 3, 4]) {
-        expect(await codeOf(() => keys.advanceEpoch(expected, session))).toBe('epoch_conflict');
+        expect(await codeOf(() => control.advanceEpoch(expected, session))).toBe('epoch_conflict');
       }
       expect((await keys.getPublicBundle()).keyEpoch).toBe(2);
     });
 
     it('a concurrent double advance: exactly one wins, the other fails the compare-and-set', async () => {
-      const { keys, session } = await setup(5);
+      const { keys, control, session } = await setup(5);
       const results = await Promise.allSettled([
-        keys.advanceEpoch(5, session),
-        keys.advanceEpoch(5, session),
-        keys.advanceEpoch(5, session),
+        control.advanceEpoch(5, session),
+        control.advanceEpoch(5, session),
+        control.advanceEpoch(5, session),
       ]);
       const won = results.filter((r) => r.status === 'fulfilled');
       const lost = results.filter((r) => r.status === 'rejected');
@@ -179,43 +205,65 @@ describe('MemoryKeyStore as KeyEpochControl (M1-1g-d)', () => {
     });
 
     it('a replayed advance with the same expected value fails and changes nothing', async () => {
-      const { keys, session } = await setup(0);
-      await keys.advanceEpoch(0, session);
-      expect(await codeOf(() => keys.advanceEpoch(0, session))).toBe('epoch_conflict');
+      const { keys, control, session } = await setup(0);
+      await control.advanceEpoch(0, session);
+      expect(await codeOf(() => control.advanceEpoch(0, session))).toBe('epoch_conflict');
       expect((await keys.getPublicBundle()).keyEpoch).toBe(1);
       // A deliberate next rotation names the epoch it starts from.
-      await keys.advanceEpoch(1, session);
+      await control.advanceEpoch(1, session);
       expect((await keys.getPublicBundle()).keyEpoch).toBe(2);
     });
 
     it('needs a live owner session: an ended or locked one is owner_locked (I-4)', async () => {
-      const { keys, owner, session } = await setup(0);
+      const { keys, control, owner, session } = await setup(0);
       await session.close();
-      expect(await codeOf(() => keys.advanceEpoch(0, session))).toBe('owner_locked');
+      expect(await codeOf(() => control.advanceEpoch(0, session))).toBe('owner_locked');
       const second = await owner.unlock(presence());
       await owner.lock();
-      expect(await codeOf(() => keys.advanceEpoch(0, second))).toBe('owner_locked');
+      expect(await codeOf(() => control.advanceEpoch(0, second))).toBe('owner_locked');
       expect((await keys.getPublicBundle()).keyEpoch).toBe(0);
     });
 
     it('refuses a call without an owner session (presence_required), and changes nothing', async () => {
-      const { keys } = await setup(0);
+      const { keys, control } = await setup(0);
       for (const owner of [undefined, null, {}, { isActive: true }, 'session']) {
-        expect(await codeOf(() => keys.advanceEpoch(0, owner as never))).toBe('presence_required');
+        expect(await codeOf(() => control.advanceEpoch(0, owner as never))).toBe(
+          'presence_required',
+        );
       }
       expect((await keys.getPublicBundle()).keyEpoch).toBe(0);
     });
 
+    it('refuses a forged session: probe P1, a duck-typed {isActive} (IR-M1-1g-d-1 M-1)', async () => {
+      const { keys, control } = await setup(0);
+      const fake = { isActive: () => true, expiresAt: Date.now() + 60_000 };
+      expect(await codeOf(() => control.advanceEpoch(0, fake as never))).toBe('presence_required');
+      // A Proxy over a real session is not that session either.
+      const { session } = await setup(0);
+      const proxied = new Proxy(session, {});
+      expect(await codeOf(() => control.advanceEpoch(0, proxied))).toBe('presence_required');
+      expect((await keys.getPublicBundle()).keyEpoch).toBe(0);
+    });
+
+    it("refuses a real session of another owner store: only the paired store's sessions count", async () => {
+      const { keys, control } = await setup(0);
+      const other = new MemoryOwnerKeyStore(OWNER_SEED, presence());
+      const foreign = await other.unlock(presence());
+      expect(foreign.isActive()).toBe(true);
+      expect(await codeOf(() => control.advanceEpoch(0, foreign))).toBe('presence_required');
+      expect((await keys.getPublicBundle()).keyEpoch).toBe(0);
+    });
+
     it('checks the session before the epoch: an ended session never learns the epoch', async () => {
-      const { keys, session } = await setup(4);
+      const { control, session } = await setup(4);
       await session.close();
-      expect(await codeOf(() => keys.advanceEpoch(1, session))).toBe('owner_locked');
+      expect(await codeOf(() => control.advanceEpoch(1, session))).toBe('owner_locked');
     });
 
     it('refuses a malformed expected value', async () => {
-      const { keys, session } = await setup(0);
+      const { keys, control, session } = await setup(0);
       for (const expected of [-1, 0.5, 2 ** 32, '0', undefined]) {
-        expect(await codeOf(() => keys.advanceEpoch(expected as never, session))).toBe(
+        expect(await codeOf(() => control.advanceEpoch(expected as never, session))).toBe(
           'invalid_argument',
         );
       }
@@ -225,17 +273,18 @@ describe('MemoryKeyStore as KeyEpochControl (M1-1g-d)', () => {
     it('has no epoch after the last one', async () => {
       const keys = new MemoryKeyStore(SEED, { keyEpoch: MAX_KEY_EPOCH });
       const owner = new MemoryOwnerKeyStore(OWNER_SEED, presence());
+      const control = owner.epochControl(keys);
       const session: OwnerSession = await owner.unlock(presence());
-      expect(await codeOf(() => keys.advanceEpoch(MAX_KEY_EPOCH, session))).toBe(
+      expect(await codeOf(() => control.advanceEpoch(MAX_KEY_EPOCH, session))).toBe(
         'epoch_unavailable',
       );
       expect((await keys.getPublicBundle()).keyEpoch).toBe(MAX_KEY_EPOCH);
     });
 
     it('refuses after close', async () => {
-      const { keys, session } = await setup(0);
+      const { keys, control, session } = await setup(0);
       await keys.close();
-      expect(await codeOf(() => keys.advanceEpoch(0, session))).toBe('keystore_closed');
+      expect(await codeOf(() => control.advanceEpoch(0, session))).toBe('keystore_closed');
     });
   });
 });

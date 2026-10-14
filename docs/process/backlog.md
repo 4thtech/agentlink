@@ -1056,7 +1056,12 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 #### M1-1g-d · crypto: owner-only epoch advance with compare-and-set, and an epoch + 1 public preview (new, IR-M1-7a-1 Q1)
 - **Status:** in-progress (branch `feat/M1-1g-d-epoch-advance`; interface, MemoryKeyStore and the core rotation flow; the Node backends implement the contract with M1-8a, M1-8f) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/crypto (interface and test doubles), packages/node (backends with M1-8a, M1-8f), packages/core (rotation flow)
-- **As built:** the preview is `KeyEpochControl.previewEpoch(n + 1)` on the management surface rather than a wider `getPublicBundle`, so the agent-path lookup keeps its 04 §3.1.1 rule (no epoch above the current one). The advance is `advanceEpoch(expected, ownerSession)`. `identity` gains `pending_card_json` (07 §3).
+- **As built:** the preview is `KeyEpochControl.previewEpoch(n + 1)` on the management surface rather than a wider `getPublicBundle`, so the agent-path lookup keeps its 04 §3.1.1 rule (no epoch above the current one). The advance is `advanceEpoch(expected, ownerSession)`. `identity` gains `pending_card_json` (07 §3). Review IR-M1-1g-d-1 fixes:
+  - The control is a separate object from `MemoryOwnerKeyStore.epochControl(keyStore)`; `MemoryKeyStore` has no advance.
+  - Only sessions minted by the paired owner store are accepted.
+  - A failed advance clears its pending card, and an expired pending card never finishes.
+  - An error while finishing on open leaves the client open and refusing to send.
+  - The M1-8a / M1-8f acceptance criteria carry the contract.
 - **Depends on:** M1-1g, M1-7a
 - **Spec:** 04 §2.6, §3.1.1 (Key interfaces, Epochs); 07 §9
 - **Invariants:** I-1, I-4
@@ -1725,6 +1730,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - CI matrix on macOS, Windows and Ubuntu (gnome-keyring in a D-Bus session) runs the keychain tests.
   - A filesystem diff during `init` shows the seed in no file; missing keychain → `needs_setup`.
+  - `KeyEpochControl` (M1-1g-d, 04 §3.1.1 "Epoch advance"; IR-M1-1g-d-1 M-1, L-5): a separate object, built only by owner flows and unreachable from the `KeyStore` instance. `advanceEpoch` accepts only sessions the paired `OwnerKeyStore` minted, checked by identity; a look-alike gets `presence_required`. The compare-and-set is atomic and durable across processes, and every `KeyStore` instance over the same keychain entry sees an advance at once. Tests: a fake session, a cast of the agent `KeyStore`, two processes advancing concurrently, and a kill during the advance.
 
 #### M1-8b · node: SQLite Store with encrypted sensitive columns
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1802,6 +1808,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Every test listed in 04 §2.8 "Required tests", written first: canary (I-7), wrong passphrase, tamper detection, agent binding, parser, normalisation, permissions, write protocol, selection, owner key, environment, unlock timing, `ALKS` v1 vectors (M1-1h).
   - CI: an Ubuntu job without D-Bus or Secret Service runs `init --keystore file` and `owner init` (with a pseudo-terminal) and a full M1a Talk round trip on the file backend; the same job without the opt-in gets `needs_setup`.
   - The M1-8c same-user script test passes on the file backend with the agent passphrase readable by the script.
+  - `KeyEpochControl` as in M1-8a (IR-M1-1g-d-1 M-1, L-5). The advance writes the epoch with the 04 §2.8 write protocol, so it is atomic and durable. Every open `KeyStore` instance over the same file sees it at once. The control accepts only sessions the paired `OwnerKeyStore` minted.
   - Unlock time on the reference container is recorded in the PR. Up to 5 s is accepted (async); above that it goes to the owner (04 §2.8), never a silent parameter change. Node's built-in `crypto.argon2` is not used without an owner allowlist decision.
 
 ### CLI and MCP server (`@4thtech/agentlink`, `apps/cli`)

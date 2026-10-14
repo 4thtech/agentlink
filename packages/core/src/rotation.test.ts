@@ -4,8 +4,11 @@
 // or refuses to send, never one that sends under a key no contact knows (04 §2.6, I-1, I-4).
 import {
   KeyStoreError,
+  agentCardNameHash,
+  agentCardRelaysHash,
   encodeHex0x,
   verifyAgentCard,
+  type AgentCard,
   type KeyEpochControl,
   type OwnerSession,
   type PublicIdentity,
@@ -14,9 +17,10 @@ import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
 import { describe, expect, it } from 'vitest';
 import { cardTypedData, parseStoredCard, storedCardText } from './card.js';
 import { AgentLinkClient } from './client.js';
+import { CoreError } from './errors.js';
 import { MemoryStore } from './store/memory-store.js';
 import type { Sealed } from './store/schema.js';
-import { rowKeyOf, type Store, type StoreTx } from './store/store.js';
+import { rowKeyOf, type SealContext, type Store, type StoreTx } from './store/store.js';
 import {
   FakeClock,
   RELAYS,
@@ -63,6 +67,20 @@ class CrashingStore implements Store {
   }
 }
 
+/** A TestStoreCipher that runs a one-shot hook before sealing `agent_card_json`. */
+class HookCipher extends TestStoreCipher {
+  onCardSeal: (() => Promise<void>) | undefined;
+
+  override async seal(context: SealContext, plaintext: string): Promise<Sealed> {
+    const hook = this.onCardSeal;
+    if (hook !== undefined && context.column === 'agent_card_json') {
+      this.onCardSeal = undefined;
+      await hook();
+    }
+    return super.seal(context, plaintext);
+  }
+}
+
 /** The commit of a rotation: the identity update that sets key_epoch. */
 const keyEpochCommit = (table: string, patch: Record<string, unknown>): boolean =>
   table === 'identity' && 'key_epoch' in patch;
@@ -71,8 +89,10 @@ async function setup(options: { agentSeed?: number; ownerSeed?: number } = {}) {
   const keyStore = new MemoryKeyStore(seed(options.agentSeed ?? 1), { keyEpoch: 0 });
   const owner = new MemoryOwnerKeyStore(seed(options.ownerSeed ?? 101), passphrase());
   const store = new CrashingStore(new MemoryStore());
-  const cipher = new TestStoreCipher();
+  const cipher = new HookCipher();
   const clock = new FakeClock();
+  // The control is a separate object, made on the owner side (IR-M1-1g-d-1 M-1).
+  const control = owner.epochControl(keyStore);
   const open = (keys = keyStore) =>
     AgentLinkClient.create({
       keyStore: keys,
@@ -88,12 +108,13 @@ async function setup(options: { agentSeed?: number; ownerSeed?: number } = {}) {
     name: 'n',
     relays: RELAYS,
   });
-  const rotateInput = async (control: KeyEpochControl = keyStore) => ({
+  const rotateInput = async (epochControl: KeyEpochControl = control, expiresAt?: number) => ({
     owner: await owner.unlock(passphrase()),
     ownerKeys: await owner.getPublicKeys(),
-    epochControl: control,
+    epochControl,
+    ...(expiresAt === undefined ? {} : { expiresAt }),
   });
-  return { keyStore, owner, store, cipher, clock, client, open, rotateInput };
+  return { keyStore, owner, control, store, cipher, clock, client, open, rotateInput };
 }
 
 async function identityRow(store: Store) {
@@ -114,14 +135,18 @@ async function pendingCard(store: Store, cipher: TestStoreCipher) {
   return parseStoredCard(text);
 }
 
-/** A control that delegates, with a hook before the advance. */
+/** A control that delegates, with a hook before the advance (and optionally the preview). */
 function controlWith(
   inner: KeyEpochControl,
   beforeAdvance: (expected: number, owner: OwnerSession) => Promise<void>,
+  beforePreview: (epoch: number) => Promise<void> = () => Promise.resolve(),
 ): KeyEpochControl & { advances: number } {
   const control = {
     advances: 0,
-    previewEpoch: (epoch: number): Promise<PublicIdentity> => inner.previewEpoch(epoch),
+    previewEpoch: async (epoch: number): Promise<PublicIdentity> => {
+      await beforePreview(epoch);
+      return inner.previewEpoch(epoch);
+    },
     advanceEpoch: async (expected: number, owner: OwnerSession): Promise<PublicIdentity> => {
       control.advances += 1;
       await beforeAdvance(expected, owner);
@@ -129,6 +154,26 @@ function controlWith(
     },
   };
   return control;
+}
+
+/**
+ * Starts a rotation whose advance never returns: a process crash just before the advance. Resolves
+ * once the pending card is stored and the advance was reached; nothing after it runs.
+ */
+async function crashBeforeAdvance(
+  s: Awaited<ReturnType<typeof setup>>,
+  expiresAt?: number,
+): Promise<void> {
+  let reached: () => void = () => undefined;
+  const atAdvance = new Promise<void>((resolve) => {
+    reached = resolve;
+  });
+  const hang = controlWith(s.control, () => {
+    reached();
+    return new Promise<void>(() => undefined);
+  });
+  void s.client.identity.rotate(await s.rotateInput(hang, expiresAt));
+  await atAdvance;
 }
 
 describe('identity.rotate with the epoch advance (M1-1g-d)', () => {
@@ -154,10 +199,8 @@ describe('identity.rotate with the epoch advance (M1-1g-d)', () => {
 
   it('a crash before the advance: nothing changed for contacts, the agent still sends, a retry finishes', async () => {
     const s = await setup();
-    const crash = controlWith(s.keyStore, () => Promise.reject(new Error('simulated crash')));
-    await expect(s.client.identity.rotate(await s.rotateInput(crash))).rejects.toThrow();
+    await crashBeforeAdvance(s);
 
-    expect(crash.advances).toBe(1);
     expect((await s.keyStore.getPublicBundle()).keyEpoch).toBe(0);
     expect((await identityRow(s.store)).key_epoch).toBe(0);
     // The owner-signed N + 1 card is stored as pending, nothing else.
@@ -206,8 +249,8 @@ describe('identity.rotate with the epoch advance (M1-1g-d)', () => {
 
   it('a stale expected epoch (advanced elsewhere) fails the compare-and-set and commits nothing', async () => {
     const s = await setup();
-    const race = controlWith(s.keyStore, async (expected, owner) => {
-      await s.keyStore.advanceEpoch(expected, owner);
+    const race = controlWith(s.control, async (expected, owner) => {
+      await s.control.advanceEpoch(expected, owner);
     });
     await expect(s.client.identity.rotate(await s.rotateInput(race))).rejects.toMatchObject({
       code: 'key_epoch_mismatch',
@@ -246,7 +289,7 @@ describe('identity.rotate with the epoch advance (M1-1g-d)', () => {
     const s = await setup();
     const session = await s.owner.unlock(passphrase());
     await s.client.identity.rotate(await s.rotateInput());
-    await expect(s.keyStore.advanceEpoch(0, session)).rejects.toMatchObject({
+    await expect(s.control.advanceEpoch(0, session)).rejects.toMatchObject({
       code: 'epoch_conflict',
     });
     expect((await s.keyStore.getPublicBundle()).keyEpoch).toBe(1);
@@ -259,7 +302,9 @@ describe('identity.rotate with the epoch advance (M1-1g-d)', () => {
   it('does not commit when the control advanced another backend than the KeyStore of this client', async () => {
     const s = await setup();
     const twin = new MemoryKeyStore(seed(1));
-    await expect(s.client.identity.rotate(await s.rotateInput(twin))).rejects.toMatchObject({
+    await expect(
+      s.client.identity.rotate(await s.rotateInput(s.owner.epochControl(twin))),
+    ).rejects.toMatchObject({
       code: 'key_epoch_mismatch',
     });
     expect((await twin.getPublicBundle()).keyEpoch).toBe(1);
@@ -271,7 +316,9 @@ describe('identity.rotate with the epoch advance (M1-1g-d)', () => {
   it('refuses a control over another agent before anything is signed, stored or advanced', async () => {
     const s = await setup();
     const other = new MemoryKeyStore(seed(2));
-    await expect(s.client.identity.rotate(await s.rotateInput(other))).rejects.toMatchObject({
+    await expect(
+      s.client.identity.rotate(await s.rotateInput(s.owner.epochControl(other))),
+    ).rejects.toMatchObject({
       code: 'identity_mismatch',
     });
     expect((await other.getPublicBundle()).keyEpoch).toBe(0);
@@ -296,7 +343,7 @@ describe('identity.rotate with the epoch advance (M1-1g-d)', () => {
       s.client.identity.rotate({
         owner: await other.unlock(passphrase()),
         ownerKeys: await s.owner.getPublicKeys(),
-        epochControl: s.keyStore,
+        epochControl: s.control,
       }),
     ).rejects.toMatchObject({ code: 'card_owner_signature_invalid' });
     expect((await s.keyStore.getPublicBundle()).keyEpoch).toBe(0);
@@ -323,7 +370,7 @@ describe('opening with a pending rotation (M1-1g-d)', () => {
     expect((await reopened.identity.get())?.keyEpoch).toBe(0);
     expect(await reopened.identity.sendState()).toBe('rotation_pending');
     // The owner finishes it: the KeyStore is already at the next epoch, so no advance is needed.
-    const control = controlWith(s.keyStore, () => Promise.resolve());
+    const control = controlWith(s.control, () => Promise.resolve());
     const v1 = await reopened.identity.rotate(await s.rotateInput(control));
     expect(control.advances).toBe(0);
     expect(v1.keyEpoch).toBe(1);
@@ -383,15 +430,15 @@ describe('opening with a pending rotation (M1-1g-d)', () => {
   it('refuses to open a KeyStore two epochs ahead, pending card or not', async () => {
     const s = await crashedAfterAdvance();
     const session = await s.owner.unlock(passphrase());
-    await s.keyStore.advanceEpoch(1, session);
+    await s.control.advanceEpoch(1, session);
     await expect(s.open()).rejects.toMatchObject({ code: 'key_epoch_mismatch' });
     expect((await identityRow(s.store)).key_epoch).toBe(0);
   });
 
   it('keeps a stale pending card inert while the KeyStore is at the stored epoch', async () => {
     const s = await setup();
-    const crash = controlWith(s.keyStore, () => Promise.reject(new Error('simulated crash')));
-    await expect(s.client.identity.rotate(await s.rotateInput(crash))).rejects.toThrow();
+    await crashBeforeAdvance(s);
+    expect((await identityRow(s.store)).pending_card_json).not.toBeNull();
     const reopened = await s.open(new MemoryKeyStore(seed(1), { keyEpoch: 0 }));
     const view = await reopened.identity.get();
     expect(view?.keyEpoch).toBe(0);
@@ -404,7 +451,7 @@ describe('KeyStoreError from the control is not swallowed', () => {
   it('passes owner_locked through when the session ended before the advance', async () => {
     const s = await setup();
     const input = await s.rotateInput();
-    const ending = controlWith(s.keyStore, async () => {
+    const ending = controlWith(s.control, async () => {
       await input.owner.close();
     });
     const rejected = await s.client.identity.rotate({ ...input, epochControl: ending }).then(
@@ -416,5 +463,211 @@ describe('KeyStoreError from the control is not swallowed', () => {
     expect((await s.keyStore.getPublicBundle()).keyEpoch).toBe(0);
     expect((await identityRow(s.store)).key_epoch).toBe(0);
     expect(await s.client.identity.sendState()).toBe('ready');
+  });
+});
+
+/** Writes an owner- and agent-signed pending card with `change` applied (signatures re-made). */
+async function forgePending(
+  s: Awaited<ReturnType<typeof setup>>,
+  change: (card: AgentCard) => AgentCard,
+  options: { readonly withoutAgentSig?: boolean } = {},
+): Promise<void> {
+  const pending = await pendingCard(s.store, s.cipher);
+  if (pending === null) throw new Error('no pending card');
+  const card = change(pending.card);
+  const session = await s.owner.unlock(passphrase());
+  const text = storedCardText({
+    card,
+    cardSig: await session.sign712(cardTypedData(card)),
+    cardAgentSig:
+      options.withoutAgentSig === true ? null : await s.keyStore.sign712(cardTypedData(card)),
+  });
+  // Both signatures verify: the card is refused for what it says, not for its signatures.
+  expect(parseStoredCard(text).card).toEqual(card);
+  const row = await identityRow(s.store);
+  const sealed = await s.cipher.seal(
+    { table: 'identity', column: 'pending_card_json', rowKey: rowKeyOf([row.agent_id]) },
+    text,
+  );
+  await s.store.transaction((tx) => tx.update('identity', {}, { pending_card_json: sealed }));
+}
+
+/** KeyStore at epoch 1, the store at 0 with a pending card: the crash after the advance. */
+async function afterAdvance(s: Awaited<ReturnType<typeof setup>>, expiresAt?: number) {
+  s.store.crashOn = keyEpochCommit;
+  await expect(s.client.identity.rotate(await s.rotateInput(s.control, expiresAt))).rejects.toThrow(
+    'simulated crash',
+  );
+  s.store.crashOn = undefined;
+}
+
+describe('review IR-M1-1g-d-1 fixes', () => {
+  it('L-1: a failed advance clears the pending card, so an advance elsewhere never finishes it', async () => {
+    const s = await setup();
+    const input = await s.rotateInput();
+    const ending = controlWith(s.control, async () => {
+      await input.owner.close();
+    });
+    await expect(
+      s.client.identity.rotate({ ...input, epochControl: ending }),
+    ).rejects.toMatchObject({ code: 'owner_locked' });
+    expect((await identityRow(s.store)).pending_card_json).toBeNull();
+
+    // Something advances the KeyStore later: the owner was told the rotation failed.
+    await s.control.advanceEpoch(0, await s.owner.unlock(passphrase()));
+    const reopened = await s.open();
+    expect((await reopened.identity.get())?.keyEpoch).toBe(0);
+    expect(await reopened.identity.sendState()).toBe('rotation_pending');
+  });
+
+  it('L-1: an expired pending card never finishes, even after the advance', async () => {
+    const s = await setup();
+    const expiresAt = s.clock.t + 100;
+    await crashBeforeAdvance(s, expiresAt);
+    expect((await pendingCard(s.store, s.cipher))?.card.expiresAt).toBe(expiresAt);
+    await s.control.advanceEpoch(0, await s.owner.unlock(passphrase()));
+    s.clock.t = expiresAt;
+    const reopened = await s.open();
+    expect((await reopened.identity.get())?.keyEpoch).toBe(0);
+    expect(await reopened.identity.sendState()).toBe('rotation_pending');
+  });
+
+  it('L-1: a pending card that has not expired yet still finishes', async () => {
+    const s = await setup();
+    const expiresAt = s.clock.t + 100;
+    await afterAdvance(s, expiresAt);
+    s.clock.t = expiresAt - 1;
+    const reopened = await s.open();
+    expect((await reopened.identity.get())?.keyEpoch).toBe(1);
+    expect(await reopened.identity.sendState()).toBe('ready');
+  });
+
+  it('L-2: a failure while finishing on open still opens the client, which refuses to send', async () => {
+    const s = await setup();
+    await afterAdvance(s);
+    s.store.crashOn = keyEpochCommit;
+    const reopened = await s.open();
+    expect((await reopened.identity.get())?.keyEpoch).toBe(0);
+    expect(await reopened.identity.sendState()).toBe('rotation_pending');
+    await expect(reopened.identity.assertCanSend()).rejects.toMatchObject({
+      code: 'rotation_pending',
+    });
+    // Once the store recovers, the next open finishes.
+    s.store.crashOn = undefined;
+    const again = await s.open();
+    expect((await again.identity.get())?.keyEpoch).toBe(1);
+    expect(await again.identity.sendState()).toBe('ready');
+  });
+
+  it('L-3: an advance elsewhere before the preview is key_epoch_mismatch, not a raw KeyStoreError', async () => {
+    const s = await setup();
+    const session = await s.owner.unlock(passphrase());
+    const late = controlWith(
+      s.control,
+      () => Promise.resolve(),
+      async (epoch) => {
+        await s.control.advanceEpoch(epoch - 1, session);
+      },
+    );
+    const rejected = await s.client.identity.rotate(await s.rotateInput(late)).then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+    expect(rejected).toBeInstanceOf(CoreError);
+    expect(rejected).toMatchObject({ code: 'key_epoch_mismatch' });
+    expect(late.advances).toBe(0);
+    expect((await identityRow(s.store)).pending_card_json).toBeNull();
+  });
+
+  describe('L-4: every check of the finish path', () => {
+    it('refuses a pending card with another name', async () => {
+      const s = await setup();
+      await afterAdvance(s);
+      await forgePending(s, (card) => ({
+        ...card,
+        nameHash: encodeHex0x(agentCardNameHash('someone else')),
+      }));
+      const reopened = await s.open();
+      expect((await identityRow(s.store)).key_epoch).toBe(0);
+      expect(await reopened.identity.sendState()).toBe('rotation_pending');
+    });
+
+    it('refuses a pending card with other relays', async () => {
+      const s = await setup();
+      await afterAdvance(s);
+      await forgePending(s, (card) => ({
+        ...card,
+        relaysHash: encodeHex0x(agentCardRelaysHash(['wss://relay.example.org'])),
+      }));
+      const reopened = await s.open();
+      expect((await identityRow(s.store)).key_epoch).toBe(0);
+      expect(await reopened.identity.sendState()).toBe('rotation_pending');
+    });
+
+    it('refuses a pending card without the agent signature', async () => {
+      const s = await setup();
+      await afterAdvance(s);
+      await forgePending(s, (card) => card, { withoutAgentSig: true });
+      const reopened = await s.open();
+      expect((await identityRow(s.store)).key_epoch).toBe(0);
+      expect(await reopened.identity.sendState()).toBe('rotation_pending');
+    });
+
+    it('refuses when the current card is not at the stored epoch', async () => {
+      const s = await setup();
+      const epoch0Card = (await identityRow(s.store)).agent_card_json;
+      await s.client.identity.rotate(await s.rotateInput());
+      // Rotating 1 -> 2 crashes after the advance; then the epoch-0 card is put back under epoch 1.
+      await afterAdvance(s);
+      expect((await s.keyStore.getPublicBundle()).keyEpoch).toBe(2);
+      await s.store.transaction((tx) => tx.update('identity', {}, { agent_card_json: epoch0Card }));
+      await s.open();
+      const row = await identityRow(s.store);
+      expect(row.key_epoch).toBe(1);
+      expect(row.pending_card_json).not.toBeNull();
+    });
+
+    it('does not finish when the agent is revoked between the check and the commit', async () => {
+      const s = await setup();
+      await afterAdvance(s);
+      const agentId = (await identityRow(s.store)).agent_id;
+      s.cipher.onCardSeal = () =>
+        s.store.transaction((tx) => {
+          tx.insert('revoked_agents', {
+            agent_evm: agentId,
+            nostr_keys: '[]',
+            signed_json: null,
+            reason: null,
+            source: 'envelope',
+            chain_id: null,
+            registry_ref: null,
+            applied_at: s.clock.t,
+          });
+        });
+      const reopened = await s.open();
+      expect(s.cipher.onCardSeal).toBeUndefined();
+      expect((await identityRow(s.store)).key_epoch).toBe(0);
+      expect(await reopened.identity.sendState()).toBe('revoked');
+    });
+
+    it('does not commit when the pending card is replaced between the check and the commit', async () => {
+      const s = await setup();
+      await afterAdvance(s);
+      const agentId = (await identityRow(s.store)).agent_id;
+      const replacement = await s.cipher.seal(
+        { table: 'identity', column: 'pending_card_json', rowKey: rowKeyOf([agentId]) },
+        'replaced',
+      );
+      s.cipher.onCardSeal = () =>
+        s.store.transaction((tx) => {
+          tx.update('identity', {}, { pending_card_json: replacement });
+        });
+      const reopened = await s.open();
+      expect(s.cipher.onCardSeal).toBeUndefined();
+      const row = await identityRow(s.store);
+      expect(row.key_epoch).toBe(0);
+      expect(row.pending_card_json).toBe(replacement);
+      expect(await reopened.identity.sendState()).toBe('rotation_pending');
+    });
   });
 });
