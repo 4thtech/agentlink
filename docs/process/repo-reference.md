@@ -50,6 +50,12 @@ pnpm lint && pnpm typecheck
 pnpm vectors:check    # crypto + EIP-712 test vectors across runtimes
 ```
 
+## Architecture boundary guards (M0-10)
+
+One policy file, `tools/deps-check/policy.mjs`, says which package may import which, which package may use each crypto library (04 §8.1), where Node built-ins and `crypto.subtle` are allowed, and the runtime-dependency allowlist per package. It is read by `eslint.config.mjs` (zones plus the local `boundaries/no-bypass` rule for dynamic `import()`, `require()`, relative paths that leave a package and `crypto.subtle`) and by `tools/deps-check`, which scans manifests and sources and runs inside `pnpm lint` (turbo task `check`), therefore in `ci-gate`. An inline `eslint-disable` cannot switch the boundary off: deps-check fails on it.
+
+Changing the policy is a reviewed S1 change. A new dependency needs an `external` entry with a `reason` line; a new package needs a `ZONES` entry; a widened layering or library zone needs a justification in the PR.
+
 ## Testing expectations
 
 - Crypto, policy engine and anything that signs: tests first, including test vectors.

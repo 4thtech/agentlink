@@ -1,0 +1,89 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "placeholder-sha256",
+  "version": 1,
+  "generator": {
+    "tool": "cpython-hashlib",
+    "version": "3.9.6",
+    "script": "tools/vectors/generate_sha256.py"
+  },
+  "cases": [
+    {
+      "id": "cavp-shortmsg-len0",
+      "source": "NIST CAVP SHAVS, SHA256ShortMsg.rsp, Len = 0",
+      "input": {
+        "hex": "",
+        "repeat": 1
+      },
+      "expected": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "id": "cavp-shortmsg-len8",
+      "source": "NIST CAVP SHAVS, SHA256ShortMsg.rsp, Len = 8",
+      "input": {
+        "hex": "d3",
+        "repeat": 1
+      },
+      "expected": {
+        "sha256": "28969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c1"
+      }
+    },
+    {
+      "id": "cavp-shortmsg-len16",
+      "source": "NIST CAVP SHAVS, SHA256ShortMsg.rsp, Len = 16",
+      "input": {
+        "hex": "11af",
+        "repeat": 1
+      },
+      "expected": {
+        "sha256": "5ca7133fa735326081558ac312c620eeca9970d1e70a4b95533d956f072d1f98"
+      }
+    },
+    {
+      "id": "fips180-one-block-abc",
+      "source": "FIPS 180-2 Appendix B.1 (NIST example SHA256.pdf): 'abc'",
+      "input": {
+        "hex": "616263",
+        "repeat": 1
+      },
+      "expected": {
+        "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+      }
+    },
+    {
+      "id": "fips180-two-block-448bit",
+      "source": "FIPS 180-2 Appendix B.2 (RFC 6234 TEST2_1): 448-bit message",
+      "input": {
+        "hex": "6162636462636465636465666465666765666768666768696768696a68696a6b696a6b6c6a6b6c6d6b6c6d6e6c6d6e6f6d6e6f706e6f7071",
+        "repeat": 1
+      },
+      "expected": {
+        "sha256": "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"
+      }
+    },
+    {
+      "id": "rfc6234-test4-640byte",
+      "source": "RFC 6234 section 8.5, TEST4: 64-byte string repeated 10 times",
+      "input": {
+        "hex": "30313233343536373031323334353637303132333435363730313233343536373031323334353637303132333435363730313233343536373031323334353637",
+        "repeat": 10
+      },
+      "expected": {
+        "sha256": "594847328451bdfa85056225462cc1d867d877fb388df0ce35f25ab5562bfbb5"
+      }
+    },
+    {
+      "id": "fips180-million-a",
+      "source": "FIPS 180-2 Appendix B.3 (RFC 6234 TEST3): one million 'a'",
+      "input": {
+        "hex": "61",
+        "repeat": 1000000
+      },
+      "expected": {
+        "sha256": "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"
+      }
+    }
+  ]
+}
