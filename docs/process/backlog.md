@@ -758,7 +758,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
     - Epochs: the enc public key and `kid` at epochs 0–2 of one seed, and an `unwrapCek` at epoch 1.
     - Owner read: an `approval` envelope from the owner (owner and agent entries) that the owner opens by its `ownerEnc` `kid`; a same-owner §3.2 set with 3 entries.
     - Wait for G-46 before freezing `aead-envelope` and `envelope-sig`, because its outcome may change the header.
-    - The `envelope-sig` harness module is registered by M1-1c (envelope hash and signature helpers), which removes the suite from `test-vectors/pending-suites.json`.
+    - This follow-up commits `envelope-sig` to `test-vectors/pending-suites.json` as pending under M1-1g, whose `KeyStore` and `OwnerSession` sign envelope hashes and open entries by epoch. M1-1g registers the harness module and removes the suite from the list (IR-M1-1c-G2-1 L-1). M1-1c ships the hash and signature helpers but does not own the suite, which did not exist when it merged.
 - **Acceptance:**
   - Every case records generator, version and inputs; regeneration from the generator scripts reproduces the files byte for byte.
   - Narrow gitleaks allowlist (fingerprints, owner-reviewed) for deliberate test keys; no directory-wide allowlist.
@@ -943,6 +943,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
     - Session expiry is enforced on a monotonic clock (L-1), and `lock()` also stops an `unlock` in flight (L-2).
 - **Acceptance:**
   - Vector suite `nip44`: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
+  - Vector suite `envelope-sig`, once the M1-1h G-2 follow-up has committed it as pending under this card: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (IR-M1-1c-G2-1 L-1).
   - Official NIP-44 v2 vectors pass in all runtimes.
   - Type-level test: no interface method returns private key or seed bytes.
   - Owner operations fail when locked; handles expire (fake-timer test).
