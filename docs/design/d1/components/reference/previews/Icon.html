@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../../tokens/tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../../screens/lib/react.production.min.js"></script><script src="../../../screens/lib/react-dom.production.min.js"></script><script src="../bundle.js"></script><meta charset="utf-8"><title>Icon</title><style>.al-icon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:4px}.al-icon-grid figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;border-radius:4px;color:var(--al-color-fg-default)}.al-icon-grid figcaption{text-align:center;overflow-wrap:anywhere}</style></head>
+<body>
+<div id="root" class="al-preview is-col"></div>
+<script>
+  var A = window.AgentLink, h = React.createElement, F = React.Fragment;
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div',{className:'al-icon-grid'}, A.iconNames.map(function(n){return h('figure',{key:n,title:n},h(A.Icon,{name:n,size:20}),h('figcaption',{className:'al-text-caption al-muted'},n));})));
+</script>
+</body>
+</html>

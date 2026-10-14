@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proof of agreement</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
+</style>
+</helmet>
+<div data-theme="dark" style="width: 1280px; height: 900px; box-sizing: border-box; padding: 24px; background: var(--al-color-bg-sunken); font-family: var(--font-sans); color: var(--al-color-fg-default);">
+<x-import component-from-global-scope="AgentLink.AppShell" os="macos" title="AgentLink — Proofs" agent="Tali's Claude (laptop)" version="v0.3.0" nav="{{nav}}" status-items="{{statusItems}}" style="display: block; height: 852px;">
+<div style="display: flex; align-items: center; gap: 8px;">
+<a href="#" class="al-text-body-sm" style="color: var(--al-color-fg-muted); text-decoration: none;">Proofs</a>
+<span class="al-text-body-sm" style="color: var(--al-color-fg-subtle);">/</span>
+<span class="al-text-body-sm">Agreement with Ana</span>
+</div>
+<section style="display: flex; align-items: center; gap: 20px; padding: 20px 24px; border: 1px solid var(--al-color-proof-border); border-radius: 6px; background: var(--al-color-proof-bg);">
+<span style="display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border: 2px solid var(--al-color-proof-seal); color: var(--al-color-proof-seal); transform: rotate(45deg); flex-shrink: 0;"><span style="display: inline-flex; transform: rotate(-45deg);"><x-import component-from-global-scope="AgentLink.Icon" name="check" size="{{s24}}"></x-import></span></span>
+<div style="display: flex; flex-direction: column; gap: 4px; flex-grow: 1;">
+<span class="al-text-label" style="color: var(--al-color-proof-fg);">Proof of agreement</span>
+<h1 class="al-text-title-1" style="margin: 0;">Agreement recorded</h1>
+<span class="al-text-body" style="color: var(--al-color-fg-muted);">Recorded 12 Oct 2026, 14:02 UTC · Ana accepted 15:10 UTC · version 3</span>
+</div>
+<div style="display: flex; gap: 8px; flex-shrink: 0;">
+<x-import component-from-global-scope="AgentLink.Button" icon="printer">Printable record</x-import>
+<x-import component-from-global-scope="AgentLink.Button" variant="primary" icon="download">Export proof</x-import>
+</div>
+</section>
+<div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: start;">
+<section style="display: flex; flex-direction: column; gap: 16px; padding: 20px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Recorded terms</span>
+<x-import component-from-global-scope="AgentLink.UntrustedContent" from="Tali's agent" kind="terms">Spec v2 – milestone 3
+d1 spec, d2 prototype</x-import>
+<dl style="margin: 0; display: grid; grid-template-columns: 140px 1fr; gap: 10px 16px;">
+<dt class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 3px;">Price</dt><dd class="al-text-body" style="margin: 0;"><span class="al-text-code">€1,500</span> · Tali pays</dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 3px;">Delivers</dt><dd class="al-text-body" style="margin: 0;">Ana: d1 spec, d2 prototype</dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 3px;">Due</dt><dd class="al-text-body" style="margin: 0;">30 Nov 2026</dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 3px;">Valid until</dt><dd class="al-text-body" style="margin: 0;">20 Oct 2026</dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 3px;">Parties</dt>
+<dd style="margin: 0; display: flex; flex-direction: column; gap: 8px;">
+<span style="display: flex; gap: 8px; align-items: center;"><span class="al-text-body">Tali's agent</span><x-import component-from-global-scope="AgentLink.IdentityLabel" kind="registered"></x-import><x-import component-from-global-scope="AgentLink.Fingerprint" value="7F3A·19C2"></x-import></span>
+<span style="display: flex; gap: 8px; align-items: center;"><span class="al-text-body">Ana's agent</span><x-import component-from-global-scope="AgentLink.IdentityLabel" kind="selfdeclared"></x-import></span>
+</dd>
+</dl>
+<p class="al-text-caption" style="margin: 0; color: var(--al-color-fg-muted);">Notes exchanged between versions are not part of the recorded terms. AgentLink records the agreement. It doesn't move money.</p>
+</section>
+<div style="display: flex; flex-direction: column; gap: 16px;">
+<section style="display: flex; flex-direction: column; gap: 12px; padding: 20px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Receipts · UTC</span>
+<x-import component-from-global-scope="AgentLink.ReceiptTimeline" steps="{{steps}}"></x-import>
+</section>
+<section style="display: flex; flex-direction: column; gap: 10px; padding: 20px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">What this proves</span>
+<p class="al-text-body" style="margin: 0;">Both agents, each bound to its owner, assented to these exact terms at these times.</p>
+<span class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 4px;">What it doesn't prove</span>
+<p class="al-text-body" style="margin: 0; color: var(--al-color-fg-muted);">Legal enforceability, authority to agree, or that the work was delivered.</p>
+<details class="al-approval-details" style="padding-top: 6px; border-top: 1px solid var(--al-color-border-subtle);">
+<summary class="al-text-body-sm">Advanced</summary>
+<div class="al-text-code" style="color: var(--al-color-fg-muted); display: flex; flex-direction: column; gap: 2px;"><span>Record ID 0x9f2c…41ab</span><span>Terms fingerprint e3b0…c442</span><span>Proof network Base</span></div>
+</details>
+</section>
+</div>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      s24: 24,
+      nav: [
+        { icon: 'activity', label: 'Home' },
+        { icon: 'approval', label: 'Approvals', count: 1 },
+        { icon: 'inbox', label: 'Threads' },
+        { icon: 'proof-seal', label: 'Proofs', active: true },
+        { icon: 'users', label: 'Contacts' },
+        { icon: 'hard-drive', label: 'Storage' },
+        { icon: 'sliders-horizontal', label: 'Rules' },
+        { icon: 'settings', label: 'Settings' }
+      ],
+      statusItems: ['48 proofs left', '7 proofs this week'],
+      steps: [
+        { key: 'recorded', label: 'Recorded by Tali’s agent', time: '14:02', done: true },
+        { key: 'delivered', label: 'Delivered to Ana’s agent', time: '14:05', done: true },
+        { key: 'opened', time: '14:20', done: true },
+        { key: 'accepted', label: 'Accepted by Ana', time: '15:10', done: true }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

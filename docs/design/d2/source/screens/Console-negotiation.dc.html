@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Negotiation thread</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
+</style>
+</helmet>
+<div data-theme="dark" style="height: 1200px; background: var(--al-color-bg-canvas); font-family: var(--font-sans); color: var(--al-color-fg-default);">
+<x-import component-from-global-scope="AgentLink.AppShell" agent="Office bot (cloud)" version="console" nav="{{nav}}" status-items="{{statusItems}}" style="display: block; height: 100%;">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+<a href="#" class="al-text-body-sm" style="color: var(--al-color-fg-muted); text-decoration: none;">Threads</a><span class="al-text-body-sm" style="color: var(--al-color-fg-subtle);">/</span><span class="al-text-body-sm">Ana · terms</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+<h1 class="al-text-title-1" style="margin: 0; flex-grow: 1;">Negotiation with Ana</h1>
+<x-import component-from-global-scope="AgentLink.IdentityLabel" kind="selfdeclared"></x-import>
+<x-import component-from-global-scope="AgentLink.StatusChip" status="needs-approval">Waiting for your approval</x-import>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+<ol style="flex: 999 1 480px; min-width: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px;">
+<li style="display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; align-items: center; gap: 10px;"><span class="al-text-label" style="color: var(--al-color-fg-muted);">v1 · offer</span><span class="al-text-body-sm" style="flex-grow: 1; color: var(--al-color-fg-muted);">From Ana's agent · 9 Oct 10:20</span><x-import component-from-global-scope="AgentLink.StatusChip" status="received"></x-import></div>
+<x-import component-from-global-scope="AgentLink.UntrustedContent" from="Ana's agent" kind="offer">Spec v2 – milestone 3
+d1 spec, d2 prototype, d3 data migration</x-import>
+<div class="al-text-body" style="display: flex; flex-wrap: wrap; gap: 20px;"><span><span class="al-text-label" style="color: var(--al-color-fg-muted);">Price </span><span class="al-text-code">€2,400</span> · Tali pays</span><span><span class="al-text-label" style="color: var(--al-color-fg-muted);">Due </span>15 Nov 2026</span></div>
+</li>
+<li style="display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; align-items: center; gap: 10px;"><span class="al-text-label" style="color: var(--al-color-fg-muted);">v2 · counter</span><span class="al-text-body-sm" style="flex-grow: 1; color: var(--al-color-fg-muted);">From your agent · 10 Oct 09:05</span><x-import component-from-global-scope="AgentLink.StatusChip" status="sent"></x-import></div>
+<x-import component-from-global-scope="AgentLink.TermsDiff" old-label="v1" new-label="v2" rows="{{v2}}"></x-import>
+</li>
+<li style="display: flex; flex-direction: column; gap: 8px; padding: 0 0 0 16px;">
+<x-import component-from-global-scope="AgentLink.UntrustedContent" from="Ana's agent" kind="note">€1,800 works only without the migration.</x-import>
+<span class="al-text-caption" style="color: var(--al-color-fg-muted);">Note (not part of the recorded terms) · 11 Oct 16:40</span>
+</li>
+<li style="display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--al-color-accent-fg); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; align-items: center; gap: 10px;"><span class="al-text-label" style="color: var(--al-color-accent-fg);">v3 · firm offer with proof</span><span class="al-text-body-sm" style="flex-grow: 1; color: var(--al-color-fg-muted);">Drafted by your agent · 12 Oct 13:58</span><x-import component-from-global-scope="AgentLink.StatusChip" status="needs-approval"></x-import></div>
+<x-import component-from-global-scope="AgentLink.TermsDiff" old-label="v2" new-label="v3" rows="{{v3}}"></x-import>
+<span class="al-text-caption" style="color: var(--al-color-fg-muted);">Your instruction: “Stay under €2,000.” · Valid until 20 Oct</span>
+</li>
+</ol>
+<div style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 12px;">
+<x-import component-from-global-scope="AgentLink.CommitmentCard" headline="Send a firm offer to Ana, version 3" who="Ana · Self-declared" scope="Records version 3 and sends it to Ana's agent. If Ana accepts by 20 Oct, you are committed to it." consequence="Ana's agent and anyone with the proof file can see you offered these terms, and when." cost="$0.10 from credits" valid-until="20 Oct" fingerprint="e3b0…c442" method="passkey"></x-import>
+</div>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1200}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      v2: [
+        { field: 'Deliverables', old: 'd1 spec, d2 prototype, d3 data migration', new: 'd1 spec, d2 prototype, d3 data migration', proposerWords: true },
+        { field: 'Price (Tali pays)', old: '€2,400', new: '€1,800' },
+        { field: 'Due', old: '15 Nov 2026', new: '30 Nov 2026' }
+      ],
+      v3: [
+        { field: 'Deliverables', old: 'd1 spec, d2 prototype, d3 data migration', new: 'd1 spec, d2 prototype', proposerWords: true },
+        { field: 'Price (Tali pays)', old: '€1,800', new: '€1,500' },
+        { field: 'Due', old: '30 Nov 2026', new: '30 Nov 2026' }
+      ],
+      statusItems: ['2 agents online', '7 proofs this week'],
+      nav: [
+        { icon: 'activity', label: 'Home' },
+        { icon: 'approval', label: 'Approvals', count: 2 },
+        { icon: 'inbox', label: 'Threads', active: true },
+        { icon: 'proof-seal', label: 'Proofs' },
+        { icon: 'users', label: 'Contacts' },
+        { icon: 'agent', label: 'Agents' },
+        { icon: 'sliders-horizontal', label: 'Rules' },
+        { icon: 'plus', label: 'Credits' },
+        { icon: 'hard-drive', label: 'Storage' },
+        { icon: 'settings', label: 'Settings' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

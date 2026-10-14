@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cloud agent status</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}
+</style>
+</helmet>
+<div data-theme="dark" style="min-height: 800px; display: flex; flex-direction: column; background: var(--al-color-bg-canvas); color: var(--al-color-fg-default); font-family: var(--font-sans);">
+<header style="border-bottom: 1px solid var(--al-color-border-default); background: var(--al-color-bg-surface);">
+<div style="max-width: 960px; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
+<x-import component-from-global-scope="AgentLink.Lockup" size="{{s20}}"></x-import>
+<span class="al-text-label" style="color: var(--al-color-fg-muted); padding-left: 16px; border-left: 1px solid var(--al-color-border-default);">Cloud agent</span>
+</div>
+</header>
+<main style="width: 100%; max-width: 960px; box-sizing: border-box; margin: 0 auto; padding: 40px 24px; display: flex; flex-direction: column; gap: 20px;">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+<h1 class="al-text-title-1" style="margin: 0; flex-grow: 1;">Office bot (cloud)</h1>
+<x-import component-from-global-scope="AgentLink.StatusChip" status="online"></x-import>
+</div>
+<dl style="margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 16px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);"><dt class="al-text-label" style="color: var(--al-color-fg-muted);">Last sync</dt><dd class="al-text-body" style="margin: 0;">2 min ago</dd></div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 16px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);"><dt class="al-text-label" style="color: var(--al-color-fg-muted);">Autonomy</dt><dd class="al-text-body" style="margin: 0;">Off · everything asks you</dd></div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 16px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);"><dt class="al-text-label" style="color: var(--al-color-fg-muted);">Address</dt><dd class="al-text-code" style="margin: 0; overflow-wrap: anywhere;">office-bot.tali-example.workers.dev</dd></div>
+</dl>
+<section style="display: flex; flex-direction: column; gap: 10px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Connected AI apps</span>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<span class="al-text-body" style="flex-grow: 1;">“ChatGPT” · <span class="al-text-code" style="color: var(--al-color-fg-muted);">chatgpt.com</span></span>
+<span class="al-text-caption" style="color: var(--al-color-fg-muted);">since 10 Oct</span>
+<x-import component-from-global-scope="AgentLink.Button" size="sm" variant="danger">Revoke</x-import>
+</div>
+</section>
+<section style="display: flex; flex-direction: column; gap: 8px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Other states</span>
+<x-import component-from-global-scope="AgentLink.Banner" tone="offline" icon="wifi-off" compact="{{yes}}">Office bot is offline. Last seen 3 h ago. <a href="#">Check status</a></x-import>
+<x-import component-from-global-scope="AgentLink.Banner" tone="neutral" compact="{{yes}}">ChatGPT can no longer use this agent.</x-import>
+<x-import component-from-global-scope="AgentLink.Banner" tone="info" icon="clock" compact="{{yes}}">Waiting for you to approve in your console.</x-import>
+</section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return { s20: 20, yes: true }; }
+}
+</script>
+</body>
+</html>

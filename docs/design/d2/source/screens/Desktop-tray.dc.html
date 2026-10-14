@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tray and menu bar</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div data-theme="dark" style="width: 1280px; height: 720px; box-sizing: border-box; padding: 40px; display: flex; flex-direction: column; gap: 32px; background: var(--al-color-bg-canvas); color: var(--al-color-fg-default); font-family: var(--font-sans);">
+<section style="display: flex; flex-direction: column; gap: 12px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Status variants · template icons, shape not colour · shown on light and dark bars</span>
+<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px;">
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; gap: 1px;"><div style="flex: 1 1 0; display: flex; justify-content: center; padding: 10px; background: #ececec; color: #000;"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1 1.5H5V3.5H3V12.5H5V14.5H1Z M15 1.5H11V3.5H13V12.5H11V14.5H15Z M8 4.5L11.5 8L8 11.5L4.5 8Z"></path></svg></div><div style="flex: 1 1 0; display: flex; justify-content: center; padding: 10px; background: #1e1e1e; color: #fff;"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1 1.5H5V3.5H3V12.5H5V14.5H1Z M15 1.5H11V3.5H13V12.5H11V14.5H15Z M8 4.5L11.5 8L8 11.5L4.5 8Z"></path></svg></div></div>
+<figcaption class="al-text-body-sm">Connected · solid</figcaption>
+</figure>
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; gap: 1px;"><div style="flex: 1 1 0; display: flex; justify-content: center; padding: 10px; background: #ececec; color: #000;"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1 1.5H5V3.5H3V12.5H5V14.5H1Z M15 14.5H11V12.5H13V8.6A3.8 3.8 0 0 0 15 8.9Z M8 4.5L11.5 8L8 11.5L4.5 8Z"></path><circle fill="currentColor" cx="13" cy="3" r="2.6"></circle></svg></div><div style="flex: 1 1 0; display: flex; justify-content: center; padding: 10px; background: #1e1e1e; color: #fff;"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1 1.5H5V3.5H3V12.5H5V14.5H1Z M15 14.5H11V12.5H13V8.6A3.8 3.8 0 0 0 15 8.9Z M8 4.5L11.5 8L8 11.5L4.5 8Z"></path><circle fill="currentColor" cx="13" cy="3" r="2.6"></circle></svg></div></div>
+<figcaption class="al-text-body-sm">Approvals waiting · badge dot</figcaption>
+</figure>
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; gap: 1px;"><div style="flex: 1 1 0; display: flex; justify-content: center; padding: 10px; background: #ececec; color: #000;"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M1 1.5H5V3.5H3V12.5H5V14.5H1Z M15 1.5H11V3.5H13V12.5H11V14.5H15Z M8 4.5L11.5 8L8 11.5L4.5 8Z M8 6.6L6.6 8L8 9.4L9.4 8Z"></path></svg></div><div style="flex: 1 1 0; display: flex; justify-content: center; padding: 10px; background: #1e1e1e; color: #fff;"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M1 1.5H5V3.5H3V12.5H5V14.5H1Z M15 1.5H11V3.5H13V12.5H11V14.5H15Z M8 4.5L11.5 8L8 11.5L4.5 8Z M8 6.6L6.6 8L8 9.4L9.4 8Z"></path></svg></div></div>
+<figcaption class="al-text-body-sm">Paused · hollow seal</figcaption>
+</figure>
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; gap: 1px;"><div style="flex: 1 1 0; display: flex; justify-content: center; padding: 10px; background: #ececec; color: #000;"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1 1.5H5V3.5H3V12.5H5V14.5H1Z M15 1.5H11V3.5H13V12.5H11V14.5H15Z"></path><path fill="currentColor" opacity="0.35" d="M8 4.5L11.5 8L8 11.5L4.5 8Z"></path><path d="M2 14L14 2" stroke="currentColor" stroke-width="1.6"></path></svg></div><div style="flex: 1 1 0; display: flex; justify-content: center; padding: 10px; background: #1e1e1e; color: #fff;"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1 1.5H5V3.5H3V12.5H5V14.5H1Z M15 1.5H11V3.5H13V12.5H11V14.5H15Z"></path><path fill="currentColor" opacity="0.35" d="M8 4.5L11.5 8L8 11.5L4.5 8Z"></path><path d="M2 14L14 2" stroke="currentColor" stroke-width="1.6"></path></svg></div></div>
+<figcaption class="al-text-body-sm">Offline · slash</figcaption>
+</figure>
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; gap: 1px;"><div style="flex: 1 1 0; display: flex; justify-content: center; padding: 10px; background: #ececec; color: #000;"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1 1.5H5V3.5H3V12.5H5V14.5H1Z M15 1.5H11V3.5H13V7H15Z M8 4.5L11.5 8L8 11.5L4.5 8Z M12 9.5V12H10.5L13 15L15.5 12H14V9.5Z"></path></svg></div><div style="flex: 1 1 0; display: flex; justify-content: center; padding: 10px; background: #1e1e1e; color: #fff;"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1 1.5H5V3.5H3V12.5H5V14.5H1Z M15 1.5H11V3.5H13V7H15Z M8 4.5L11.5 8L8 11.5L4.5 8Z M12 9.5V12H10.5L13 15L15.5 12H14V9.5Z"></path></svg></div></div>
+<figcaption class="al-text-body-sm">Update ready · arrow</figcaption>
+</figure>
+</div>
+</section>
+<section style="display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start;">
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 10px;">
+<figcaption class="al-text-label" style="color: var(--al-color-fg-muted);">macOS menu bar</figcaption>
+<x-import component-from-global-scope="AgentLink.TrayMenu" os="macos" approvals="{{n2}}" update-ready="0.3.1"></x-import>
+</figure>
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 10px;">
+<figcaption class="al-text-label" style="color: var(--al-color-fg-muted);">Windows notification area · paused</figcaption>
+<x-import component-from-global-scope="AgentLink.TrayMenu" os="windows" status="paused"></x-import>
+</figure>
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 10px;">
+<figcaption class="al-text-label" style="color: var(--al-color-fg-muted);">Linux tray · offline</figcaption>
+<x-import component-from-global-scope="AgentLink.TrayMenu" os="linux" status="offline"></x-import>
+</figure>
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 10px; width: 300px;">
+<figcaption class="al-text-label" style="color: var(--al-color-fg-muted);">OS notification text · drawn by the OS</figcaption>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border: 1px dashed var(--al-color-border-strong); border-radius: 6px;">
+<span class="al-text-body" style="font-weight: 600;">AgentLink</span>
+<span class="al-text-body">Approval waiting: send a file to Marko · $0.10</span>
+<span class="al-text-caption" style="color: var(--al-color-fg-muted);">Opens the approval card. Never approves.</span>
+</div>
+<span class="al-text-caption" style="color: var(--al-color-fg-muted);">Unknown contact: “Approval waiting: add a contact”. Never the other side's words.</span>
+</figure>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":720}}'>
+class Component extends DCLogic {
+  renderVals() { return { n2: 2 }; }
+}
+</script>
+</body>
+</html>

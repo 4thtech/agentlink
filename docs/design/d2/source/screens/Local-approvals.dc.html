@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Local · Approvals</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
+</style>
+</helmet>
+<div data-theme="dark" style="height: 900px; background: var(--al-color-bg-canvas); font-family: var(--font-sans); color: var(--al-color-fg-default);">
+<x-import component-from-global-scope="AgentLink.AppShell" agent="Tali's Claude (laptop)" version="agentlink 0.3.0" nav="{{nav}}" status-items="{{statusItems}}" style="display: block; height: 100%;">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px;">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">2 waiting</span>
+<h1 class="al-text-title-1" style="margin: 0;">Approvals</h1>
+</div>
+<x-import component-from-global-scope="AgentLink.Segmented" label="Show" default-value="waiting" options="{{filters}}"></x-import>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+<ul style="flex: 1 1 320px; min-width: 0; margin: 0; padding: 0; list-style: none; border: 1px solid var(--al-color-border-default); border-radius: 6px; overflow: hidden; background: var(--al-color-bg-surface);">
+<li style="display: flex; gap: 12px; padding: 12px 16px; background: var(--al-color-accent-subtle); border-bottom: 1px solid var(--al-color-border-subtle); box-shadow: inset 2px 0 0 var(--al-color-accent-default);">
+<x-import component-from-global-scope="AgentLink.Icon" name="proof-seal" size="{{s16}}" style="color: var(--al-color-accent-fg); margin-top: 2px;"></x-import>
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px;"><span class="al-text-body">Send a file to Marko with proof</span><span class="al-text-body-sm" style="color: var(--al-color-fg-muted);">14:01 · $0.10 · 9 min left</span></div>
+</li>
+<li style="display: flex; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--al-color-border-subtle);">
+<x-import component-from-global-scope="AgentLink.Icon" name="commitment" size="{{s16}}" style="color: var(--al-color-commitment-fg); margin-top: 2px;"></x-import>
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px;"><span class="al-text-body">Accepting terms from Ana</span><span class="al-text-body-sm" style="color: var(--al-color-fg-muted);">13:48 · free · until 20 Oct</span></div>
+</li>
+<li class="al-text-label" style="padding: 10px 16px 6px; color: var(--al-color-fg-muted);">Earlier today</li>
+<li style="display: flex; gap: 12px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--al-color-border-subtle);">
+<span class="al-text-body-sm" style="flex-grow: 1; color: var(--al-color-fg-muted);">Add Denis as a contact</span>
+<x-import component-from-global-scope="AgentLink.StatusChip" status="approved"></x-import>
+</li>
+<li style="display: flex; gap: 12px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--al-color-border-subtle);">
+<span class="al-text-body-sm" style="flex-grow: 1; color: var(--al-color-fg-muted);">Send proposal-draft.pdf with proof</span>
+<x-import component-from-global-scope="AgentLink.StatusChip" status="denied"></x-import>
+</li>
+<li style="display: flex; gap: 12px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--al-color-border-subtle);">
+<span class="al-text-body-sm" style="flex-grow: 1; color: var(--al-color-fg-muted);">Request from Contact 2B9E·04D1</span>
+<x-import component-from-global-scope="AgentLink.StatusChip" status="expired"></x-import>
+</li>
+</ul>
+<div style="flex: 999 1 440px; min-width: 0; display: flex; flex-direction: column; gap: 12px;">
+<x-import component-from-global-scope="AgentLink.ApprovalCard" type="proof" agent="Tali's Claude (laptop)" time="14:01" expires="9 min left" headline="Send contract-signed.pdf to Marko with proof" who="Marko · Verified domain · novak-accounting.example" what="contract-signed.pdf · 1.1 MB" cost="$0.10 from credits · 47 proofs left after" why="Your rule for proofs: Ask me" consequence="A public record shows this exact file was sent at this time. It doesn't prove its content is true." details="Record ID appears after recording" method="passkey"></x-import>
+<p class="al-text-caption" style="margin: 0; color: var(--al-color-fg-muted);">Approve opens your browser's passkey dialog for <span class="al-text-code">localhost</span>. The desktop app protects approvals more strongly.</p>
+</div>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      s16: 16,
+      filters: [{ value: 'waiting', label: 'Waiting' }, { value: 'all', label: 'All' }],
+      statusItems: ['127.0.0.1:4317', 'Encrypted drop 212 MB / 1 GB', '48 proofs left'],
+      nav: [
+        { icon: 'approval', label: 'Approvals', count: 2, active: true },
+        { icon: 'activity', label: 'Activity' },
+        { icon: 'users', label: 'Contacts', count: 1 },
+        { icon: 'folder', label: 'Files' },
+        { icon: 'hard-drive', label: 'Storage' },
+        { icon: 'proof-seal', label: 'Proofs & credits' },
+        { icon: 'sliders-horizontal', label: 'Rules' },
+        { icon: 'life-buoy', label: 'Backup' },
+        { icon: 'terminal', label: 'Advanced' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

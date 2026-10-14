@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../../tokens/tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../../screens/lib/react.production.min.js"></script><script src="../../../screens/lib/react-dom.production.min.js"></script><script src="../bundle.js"></script><meta charset="utf-8"><title>Button</title></head>
+<body>
+<div id="root" class="al-preview"></div>
+<script>
+  var A = window.AgentLink, h = React.createElement, F = React.Fragment;
+  ReactDOM.createRoot(document.getElementById('root')).render(h(F,null,
+ h(A.Button,{variant:'primary',icon:'approval'},'Approve with Touch ID'),
+ h(A.Button,null,'Deny'),
+ h(A.Button,{variant:'ghost',icon:'copy'},'Copy'),
+ h(A.Button,{variant:'danger',icon:'ban'},'Block contact'),
+ h(A.Button,{variant:'primary',size:'lg'},'Add proof \u00B7 $0.10'),
+ h(A.Button,{size:'sm',icon:'search',kbd:'\u2318K'},'Search'),
+ h(A.Button,{disabled:true},'Disabled')));
+</script>
+</body>
+</html>

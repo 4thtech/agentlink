@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Local · Proofs and credits</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
+</style>
+</helmet>
+<div data-theme="dark" style="height: 900px; background: var(--al-color-bg-canvas); font-family: var(--font-sans); color: var(--al-color-fg-default);">
+<x-import component-from-global-scope="AgentLink.AppShell" agent="Tali's Claude (laptop)" version="agentlink 0.3.0" nav="{{nav}}" status-items="{{statusItems}}" style="display: block; height: 100%;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">7 proofs this week</span>
+<h1 class="al-text-title-1" style="margin: 0;">Proofs and credits</h1>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+<div style="flex: 999 1 520px; min-width: 0; overflow-x: auto; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<table style="width: 100%; min-width: 560px; border-collapse: collapse;">
+<thead><tr class="al-text-label" style="color: var(--al-color-fg-muted); text-align: left;">
+<th style="padding: 10px 16px; border-bottom: 1px solid var(--al-color-border-default); font-weight: 500;">What</th>
+<th style="padding: 10px 16px; border-bottom: 1px solid var(--al-color-border-default); font-weight: 500;">Contact</th>
+<th style="padding: 10px 16px; border-bottom: 1px solid var(--al-color-border-default); font-weight: 500;">Recorded</th>
+<th style="padding: 10px 16px; border-bottom: 1px solid var(--al-color-border-default); font-weight: 500;">Receipts</th>
+<th style="padding: 10px 16px; border-bottom: 1px solid var(--al-color-border-default); font-weight: 500; text-align: right;">Cost</th>
+</tr></thead>
+<tbody class="al-text-body">
+<tr><td style="padding: 12px 16px;"><span style="display: inline-flex; gap: 8px; align-items: center;"><x-import component-from-global-scope="AgentLink.Icon" name="commitment" size="{{s14}}"></x-import>Agreement · version 3</span></td><td style="padding: 12px 16px;">Ana</td><td class="al-text-code" style="padding: 12px 16px;">12 Oct 14:02</td><td style="padding: 12px 16px;"><x-import component-from-global-scope="AgentLink.StatusChip" status="accepted"></x-import></td><td class="al-text-code" style="padding: 12px 16px; text-align: right;">$0.10</td></tr>
+<tr><td style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle);"><span class="al-text-code">Invoice_September.pdf</span></td><td style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle);">Marko</td><td class="al-text-code" style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle);">12 Oct 09:14</td><td style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle);"><x-import component-from-global-scope="AgentLink.StatusChip" status="opened"></x-import></td><td class="al-text-code" style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle); text-align: right;">$0.10</td></tr>
+<tr><td style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle);"><span class="al-text-code">contract-signed.pdf</span></td><td style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle);">Marko</td><td style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle);"><x-import component-from-global-scope="AgentLink.ProofBadge" state="waiting"></x-import></td><td style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle); color: var(--al-color-fg-muted);">—</td><td class="al-text-code" style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle); text-align: right;">$0.10</td></tr>
+<tr><td style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle);">Message to Denis</td><td style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle);">Denis</td><td style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle);"><x-import component-from-global-scope="AgentLink.ProofBadge" state="failed"></x-import></td><td style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle);"><x-import component-from-global-scope="AgentLink.Button" size="sm" icon="refresh-cw">Retry</x-import></td><td class="al-text-code" style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle); text-align: right; color: var(--al-color-fg-muted);">not charged</td></tr>
+</tbody>
+</table>
+</div>
+<div style="flex: 1 1 340px; display: flex; flex-direction: column; gap: 16px;">
+<x-import component-from-global-scope="AgentLink.CreditsMeter" balance="$4.80" proofs-left="{{n48}}" spent-today="{{spent}}" budget="{{n5}}"></x-import>
+<section style="display: flex; gap: 16px; padding: 20px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div aria-label="QR code for this Agent ID" role="img" style="width: 96px; height: 96px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--al-color-border-strong); border-radius: 4px; color: var(--al-color-fg-muted);" class="al-text-label">QR</div>
+<div style="display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Agent ID</span>
+<span class="al-text-code">0x71C4…9A2E</span>
+<span class="al-text-caption" style="color: var(--al-color-fg-muted);">Credits for this agent are added to this ID.</span>
+<x-import component-from-global-scope="AgentLink.Button" size="sm" icon="copy">Copy Agent ID</x-import>
+</div>
+</section>
+<x-import component-from-global-scope="AgentLink.Button" icon="plus">Get free test credits</x-import>
+<p class="al-text-caption" style="margin: 0; color: var(--al-color-fg-muted);">A proof costs $0.10. $5 covers 50 proofs. Messages and files are always free. <a href="#">Pricing</a></p>
+</div>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      s14: 14, n48: 48, n5: 5, spent: 0.3,
+      statusItems: ['127.0.0.1:4317', 'Encrypted drop 212 MB / 1 GB', '48 proofs left'],
+      nav: [
+        { icon: 'approval', label: 'Approvals', count: 2 },
+        { icon: 'activity', label: 'Activity' },
+        { icon: 'users', label: 'Contacts', count: 1 },
+        { icon: 'folder', label: 'Files' },
+        { icon: 'hard-drive', label: 'Storage' },
+        { icon: 'proof-seal', label: 'Proofs & credits', active: true },
+        { icon: 'sliders-horizontal', label: 'Rules' },
+        { icon: 'life-buoy', label: 'Backup' },
+        { icon: 'terminal', label: 'Advanced' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

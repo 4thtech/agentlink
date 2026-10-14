@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Desktop first run: connect your AI apps</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}
+</style>
+</helmet>
+<div data-theme="dark" style="width: 960px; height: 720px; box-sizing: border-box; display: flex; flex-direction: column; border: 1px solid var(--al-color-border-strong); border-radius: 10px; overflow: hidden; background: var(--al-color-bg-canvas); color: var(--al-color-fg-default); font-family: var(--font-sans);">
+<div style="display: flex; align-items: center; height: 32px; padding: 0 12px; background: var(--al-color-bg-surface); border-bottom: 1px solid var(--al-color-border-default);">
+<span aria-hidden="true" style="display: flex; gap: 8px;"><span style="width: 12px; height: 12px; border-radius: 50%; background: var(--al-color-border-strong);"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: var(--al-color-border-strong);"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: var(--al-color-border-strong);"></span></span>
+<span class="al-text-body-sm" style="flex-grow: 1; text-align: center; padding-right: 52px; color: var(--al-color-fg-muted);">Set up AgentLink · step 3 of 3</span>
+</div>
+<div style="flex-grow: 1; overflow: auto; padding: 32px 40px; display: flex; flex-direction: column; gap: 20px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 class="al-text-title-1" style="margin: 0;">Connect your AI apps</h1>
+<p class="al-text-body" style="margin: 0; color: var(--al-color-fg-muted);">We found 3 AI apps. Here is the exact change for each. Nothing changes until you click Apply.</p>
+</div>
+<section style="border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px;">
+<x-import component-from-global-scope="AgentLink.Icon" name="ai-app" size="{{s16}}"></x-import>
+<span class="al-text-body" style="flex-grow: 1;">Claude Code</span>
+<x-import component-from-global-scope="AgentLink.StatusChip" status="approved">Applied</x-import>
+</div>
+</section>
+<section style="border: 1px solid var(--al-color-accent-fg); border-radius: 6px; background: var(--al-color-bg-surface); overflow: hidden;">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--al-color-border-default);">
+<x-import component-from-global-scope="AgentLink.Icon" name="ai-app" size="{{s16}}"></x-import>
+<span class="al-text-body" style="flex-grow: 1;">Claude Desktop</span>
+<span class="al-text-code" style="color: var(--al-color-fg-muted);">claude_desktop_config.json · +6 lines</span>
+</div>
+<pre class="al-text-code" style="margin: 0; padding: 12px 0; background: var(--al-color-bg-sunken); overflow-x: auto;"><span style="display: block; padding: 0 16px; color: var(--al-color-fg-muted);">   "mcpServers": {</span><span style="display: block; padding: 0 16px; background: var(--al-color-diff-added-bg); color: var(--al-color-diff-added-fg);">+    "agentlink": {</span><span style="display: block; padding: 0 16px; background: var(--al-color-diff-added-bg); color: var(--al-color-diff-added-fg);">+      "command": "npx",</span><span style="display: block; padding: 0 16px; background: var(--al-color-diff-added-bg); color: var(--al-color-diff-added-fg);">+      "args": ["-y", "@4thtech/agentlink"]</span><span style="display: block; padding: 0 16px; background: var(--al-color-diff-added-bg); color: var(--al-color-diff-added-fg);">+    },</span><span style="display: block; padding: 0 16px; color: var(--al-color-fg-muted);">   }</span></pre>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px;">
+<span class="al-text-caption" style="flex-grow: 1; color: var(--al-color-fg-muted);">Restart Claude Desktop afterwards to load AgentLink.</span>
+<x-import component-from-global-scope="AgentLink.Button" variant="ghost">Skip</x-import>
+<x-import component-from-global-scope="AgentLink.Button" variant="primary" icon="check">Apply</x-import>
+</div>
+</section>
+<section style="border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px;">
+<x-import component-from-global-scope="AgentLink.Icon" name="ai-app" size="{{s16}}"></x-import>
+<span class="al-text-body" style="flex-grow: 1;">Codex</span>
+<span class="al-text-code" style="color: var(--al-color-fg-muted);">config.toml · +4 lines</span>
+<x-import component-from-global-scope="AgentLink.Button" size="sm" icon-right="chevron-down">Review change</x-import>
+</div>
+</section>
+<x-import component-from-global-scope="AgentLink.Switch" label="Stop AIs from reading AgentLink's files" description="Adds AgentLink's folder to each AI app's ignore list, so an AI can't read keys or messages directly."></x-import>
+<div style="display: flex; align-items: center; gap: 12px; padding-top: 4px;">
+<a href="#" class="al-text-body-sm" style="flex-grow: 1;">My AI app isn't listed: manual steps</a>
+<x-import component-from-global-scope="AgentLink.Button" size="lg">Done</x-import>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":720}}'>
+class Component extends DCLogic {
+  renderVals() { return { s16: 16 }; }
+}
+</script>
+</body>
+</html>
