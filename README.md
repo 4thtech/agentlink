@@ -4,7 +4,7 @@
 
 AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any MCP-capable client) exchange end-to-end encrypted messages and files, and add verifiable proof when it matters. It is client software plus a protocol. 4thTech never sees keys, message or file contents, or contacts.
 
-*AgentLink is a working name. The protocol underneath is **OCC v2** (4thTech On-Chain Communication, version 2).*
+*AgentLink is the product name (trademark check pending). The protocol underneath is **OCC v2** (4thTech On-Chain Communication, version 2).*
 
 ## Status
 
@@ -110,6 +110,7 @@ Milestones are sequential gates ([build plan](docs/foundation/10-build-plan.md))
 
 - [`docs/README.md`](docs/README.md): the documentation map, with reading paths.
 - [`docs/explainers/`](docs/explainers/): plain-language guides.
+- [`docs-site/`](docs-site/README.md): the public documentation, a user guide and technical docs, for publishing on GitBook. Pages for features not built yet are marked planned.
 - [`CHANGELOG.md`](CHANGELOG.md): what changed in each release.
 - [`docs/process/versioning.md`](docs/process/versioning.md): how versions and releases work.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md): how to take part.
@@ -139,7 +140,7 @@ Much of this project is built by orchestrated AI agents under human review, so t
 
 ## Hosting and public docs
 
-The testing environment will live at `agentlink.4thtech.io` (planned). Public docs will be on [wiki.4thtech.io](https://wiki.4thtech.io), which currently documents OCC v1 only; AgentLink and OCC v2 pages will be added when there is something to deploy.
+The testing environment will live at `agentlink.4thtech.io` (planned). The public docs (a user guide and technical docs) are written in [`docs-site/`](docs-site/README.md) and will be published on GitBook through Git Sync (planned). They describe the design and mark every feature that is not built yet as planned. [wiki.4thtech.io](https://wiki.4thtech.io) documents OCC v1.
 
 ## License
 

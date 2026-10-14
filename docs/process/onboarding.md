@@ -64,7 +64,7 @@ Optional: clone the private `4thtech/agentlink-ops` next to it for docs 01 and 0
 |---|---|
 | Claude Code | Nothing. `CLAUDE.md` imports `AGENTS.md`. The project `.claude/settings.json` (no AI attribution, plus any project safety rules) applies automatically |
 | Codex, Cursor, other AGENTS.md-aware tools | Nothing. They read `AGENTS.md` |
-| Gemini CLI | Set `"contextFileName": "AGENTS.md"` in `~/.gemini/settings.json` (or the project's `.gemini/settings.json`) |
+| Gemini CLI | Nothing. The root `GEMINI.md` imports `AGENTS.md` (alternatively set `context.fileName` to `"AGENTS.md"` in `.gemini/settings.json`) |
 | Antigravity or others | Make sure `AGENTS.md` is loaded as project instructions; if not, start each session with the bootstrap prompt above |
 
 If you use The Curator yourself, keep your own private project for your notes. The sync branch stays the shared truth.
