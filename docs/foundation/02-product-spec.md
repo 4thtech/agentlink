@@ -97,7 +97,7 @@ Priority: **P0** = beta must-have · **P1** = beta should-have · **P2** = post-
 | F-44 | **Verify** | CLI and public page: check a proof pack against the chain; show who, what hash, when, which receipts | P0 (CLI) / P1 (page) |
 | F-45 | **Credits** | Prepay fees in USD stablecoins (USDC, USDT where available, xDAI on Gnosis; D-46, 12 §3); notarize without gas through any submitter; withdraw unused credits any time. Testnet beta: free faucet credits | P0 |
 | F-46 | **Gasless USDC top-up** | Send USDC to the agent address; the agent converts it into stablecoin credits with a signed authorization (EIP-3009) submitted by the 4thTech submitter. Only for tokens proven EIP-3009-capable; minimum deposit proposed $5 (12 §4.1) | P1 |
-| F-47 | **Fee quote** | Show price in USD and token before any paid action | P0 |
+| F-47 | **Fee quote** | Show the price in USD before any paid action (`agentlink_status` `prices`, D-53); the exact token and amount appear in the paid result (`ProofStatus.fee`) and on the approval, under Advanced | P0 |
 | F-48 | **Batched receipts tier** | Hash many messages into one on-chain Merkle root | P2 |
 | F-49 | **Deal records** | Offer → counter → accept → deliver → confirm state machine | P2 (J8 does not need it: it uses typed messages with `terms`, one record and the `ACCEPTED` receipt) |
 | F-50 | **Arbitrator disclosure** | Owner discloses selected content keys to a named arbitrator; disclosure recorded | P2 |
@@ -198,7 +198,7 @@ Prices are the planned beta prices (D-45), the same in USD on every chain, paid 
 
 1. Recipient opens an invite link → invite landing page.
 2. Page explains in one paragraph and offers: "I use Claude / ChatGPT / Gemini / Other" → one prompt to copy into the recipient's own agent, built in the browser from the link (D-53, 06 §7.1).
-3. One paste: the agent installs AgentLink (config diff confirmed by the user, owner setup on the local setup page) and accepts the invite, which the owner approves (`contacts.acceptInvites`). The invite data lives in the URL fragment and never reaches a server. The safety code appears on both sides once pairing completes, not on the landing page, which holds no keys. The safety code appears on both sides once pairing completes, not on the landing page, which holds no keys.
+3. One paste: the agent installs AgentLink (config diff confirmed by the user; owner setup on the local setup page, or in the user's own terminal in M1a) and accepts the invite, which the owner approves (`contacts.acceptInvites`). The invite data lives in the URL fragment and never reaches a server. The safety code appears on both sides once pairing completes, not on the landing page, which holds no keys.
 4. From M2, the recipient can instead choose **"View and accept in browser"** (F-15): no install, keys generated in the browser, recovery kit offered. The safety code is shown on the confirm-contact screen once the browser identity exists, and on both sides after the handshake.
 
 ### J8 — Negotiate and agree (flagship)
@@ -214,7 +214,7 @@ Prices are the planned beta prices (D-45), the same in USD on every chain, paid 
 ### J9 — Collaborating developers' agents sync project state (dogfood)
 
 1. Tali and Denis each run a coding agent (e.g. Claude Code and Codex) with AgentLink, paired once (J1).
-2. When Tali wraps up a session, his agent offers a handoff and, after he agrees, sends Denis's agent a status update, a question or a handoff over Talk as typed messages (`note`, `request`, `delivery`): what changed, what is blocked, what Denis should pick up.
+2. Tali has asked his agent to keep Denis's agent in sync. When he wraps up a session, his agent offers a handoff, shows him the drafted text and, after he approves that text, sends Denis's agent a status update, a question or a handoff over Talk as typed messages (`note`, `request`, `delivery`): what changed, what is blocked, what Denis should pick up.
 3. At the start of Denis's next session, his agent calls `agentlink_status` (by habit from the skill, or through an optional SessionStart hook) and says "1 new message from Tali's agent": counts and contact names only, never the text (06 §6.1, D-53). When Denis asks, the agent reads the inbox and summarizes it as information from Tali's agent, not as instructions (I-5); Denis decides what to act on.
 4. Replies and handoffs flow back the same way. Everything is free, and both owners can read everything (F-60).
 5. This is the M1a walking skeleton and the team's dogfood test: it needs only identity, pairing, Talk, the minimal policy engine and approvals (D-33). The bar is the team's own git sync branch: for the M1a gate the dogfood replaces the personal handoff part of it for Tali and Denis (backlog M1-23). AgentLink has to beat git where git cannot help: across organisations, in private, typed, visible to both owners and provable.
