@@ -14,7 +14,7 @@ All packages live in the public `agentlink` monorepo (see 09). Every package mus
 | `@agentlink/transport-nostr` | nostr-tools, crypto | `Transport` implementation: relay pool, gift wrap/unwrap, subscriptions, sync cursors |
 | `@agentlink/storage` | crypto | `StorageAdapter` interface; `inline`, `drop` (default, D-48) and `s3` adapters (P0); `gdrive`, `dropbox`, `onedrive` connectors (P1, M2, D-49); `ipfs-pinning` (P2); storage selection (§5.6) |
 | `@agentlink/core` | all above | `AgentLinkClient`: identity, contacts, envelopes, threads, files, proofs, policies, approvals; `KeyStore`, `Store`, `ApprovalChannel` interfaces |
-| `@agentlink/node` | core | Node implementations: keychain `KeyStore`, SQLite `Store`, local approval server (Node only) |
+| `@agentlink/node` | core | Node implementations: keychain `KeyStore` and the opt-in passphrase-locked file `KeyStore` for headless machines (§9, D-54), SQLite `Store`, local approval server (Node only) |
 | `@4thtech/agentlink` | node, core | CLI + MCP server (stdio) (Node only) |
 
 Integrators use `@agentlink/core` directly (with their own `KeyStore`/`Store`) and pass their `appId` to earn integrator fees.
@@ -65,7 +65,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | `policies` | key, value_json, updated_at |
 | `sync_cursors` | relay_url, last_seen |
 
-**At rest:** all sensitive columns (decrypted payloads, contact names, file names, URLs, file keys, salts, policies' parameters) are encrypted with a local **store key** (random, kept in the keychain). Non-sensitive columns (IDs, timestamps, statuses) stay in clear for indexing. Without the store key, the database reveals only activity timing and counts.
+**At rest:** all sensitive columns (decrypted payloads, contact names, file names, URLs, file keys, salts, policies' parameters) are encrypted with a local **store key** (random, kept in the keychain, or in the file KeyStore on headless machines, §9). Non-sensitive columns (IDs, timestamps, statuses) stay in clear for indexing. Without the store key, the database reveals only activity timing and counts.
 
 ---
 
@@ -271,3 +271,77 @@ Cloudflare Worker; stateless except rate-limit counters (Durable Object). It nev
   "exportedAt": "…"
 }
 ```
+
+---
+
+## 9. Node KeyStore backends (D-54)
+
+`@agentlink/node` ships two backends behind the same core `KeyStore` interface (03 §3): the **OS keychain**, which is the default (04 §2.2), and the **passphrase-locked file KeyStore** for headless machines, which is opt-in (04 §2.8). Formats, KDF parameters, the owner-key rules, the threat model and the required tests are in 04 §2.8. This section covers runtime behaviour. Neither backend weakens `OwnerKeyStore` (04 §2.5).
+
+### 9.1 Selection and the recorded backend
+
+| Situation at `init` | Result |
+|---|---|
+| The OS keychain probe succeeds | Keychain. `--keystore file` is refused: "This machine has a system keychain. AgentLink uses it." There is no flag to force file mode (04 §2.8; proposed, owner confirms at merge) |
+| The probe fails or times out | Treated as no usable keychain. The message also says how to fix the keychain, for example `security unlock-keychain` over SSH on macOS |
+| No usable keychain, no opt-in | `needs_setup` (reason `no_keychain`); nothing is written |
+| No usable keychain, `--keystore file` or "yes" to the question, in an interactive terminal with no harness marker set | File KeyStore at `~/.agentlink/keystore/<agentId>.alks`. Agent identity only; the owner step is separate (§9.3) |
+| No usable keychain, opt-in without a TTY or with a harness marker set | `needs_setup` (reason `no_keychain`), naming the command the user runs in their own terminal. This is a UX guard; a faked terminal gets past it (04 §2.8) |
+
+`init` records the backend in the agent's local config (`keyStore: "keychain" | "file"`). Every later start uses only the recorded backend: no fallback, no switch and no new identity when the other backend appears or the file is missing. Moving an agent between backends goes through `backup export` / `restore` (†, 06 §8, M1b); a dedicated move command is out of scope for now. The recorded value is not owner-signed. Changing it can only make the agent fail to start; it can never weaken the key protection.
+
+### 9.2 Unlocking a file KeyStore
+
+| Source | Where | Notes |
+|---|---|---|
+| `AGENTLINK_KEYSTORE_PASSPHRASE_FILE=<path>` | MCP server and CLI | Recommended. A secret mounted at run time (Docker or Kubernetes secret, tmpfs, host secret store), never inside the image, a committed `devcontainer.json` or the persisted home directory. Opened and checked per 04 §2.8 |
+| `AGENTLINK_KEYSTORE_PASSPHRASE=<value>` | MCP server and CLI | Allowed for Codespaces and CI-style secrets, and weaker (04 §2.8; proposed, owner confirms at merge). `init` and the harness config writers never write it, and `doctor` always warns when it is set. Deleting it from `process.env` does not remove it from `/proc/<pid>/environ`, the parent processes, `docker inspect` or config files |
+| Interactive prompt (no echo) | CLI in a terminal only | Never on the MCP stdio channel. No CLI argument takes the passphrase |
+
+- **Order.** The file source is tried before the environment variable. If both are set, the server uses the file and `doctor` warns. The server deletes both variables from `process.env` after reading.
+- **Harness config.** The harness passes the path to the MCP server in its MCP config, for example `claude mcp add agentlink -e AGENTLINK_KEYSTORE_PASSPHRASE_FILE=/run/secrets/agentlink -- npx -y @4thtech/agentlink mcp`. The path is not a secret.
+- **Async unlock.** The server answers MCP `initialize` first and then runs the KDF asynchronously. Until the unlock finishes, tools return `needs_setup` (reason `keystore_locked`, "unlocking").
+- **No working source.** Every tool returns `needs_setup` (reason `keystore_locked`), and no other tool runs.
+- **Owner passphrase.** No source exists for it. `OwnerKeyStore` reads the owner code only from an interactive prompt or uses a passkey (04 §2.5, §2.8). `AGENTLINK_OWNER_*` variables are ignored, and `doctor` warns if one is set.
+
+### 9.3 CLI surface
+
+```
+agentlink init --keystore file             # opt-in; interactive terminal only; agent identity only (06 §7)
+agentlink owner init                     † # owner key on a file-KeyStore machine: generated owner code; run it yourself (04 §2.8)
+agentlink keystore passphrase              # change the unlock code or passphrase; asks for the current one at the prompt
+agentlink doctor                           # backend, unlock source, owner-key location and their warnings
+```
+
+- **Secrets stay out of output.** The CLI and the MCP server never print, log or return a passphrase or code (I-7), with one exception below.
+- **One-time display.** A generated code is shown exactly once, on the terminal. The user re-types its last group, and the screen is then cleared. For the **agent unlock code only**, `init` also offers to write the code to a path the user names (`O_CREAT | O_EXCL | O_NOFOLLOW`, mode 0600, refused under `~/.agentlink`), for example a file their container's secret store will mount.
+- **Owner setup.** On a file-KeyStore machine the agent stays `needs_setup` (reason `owner_missing`) until `owner init` has run. `owner init` follows the rules in 04 §2.8:
+  - it refuses if an owner already exists, and never overwrites;
+  - it shows the owner fingerprint;
+  - it only displays the owner code, never writes it to a file;
+  - it states what a lost code means.
+
+  `doctor` shows the owner fingerprint and when the owner key was created. M2 default (proposed; owner confirms at merge): the owner key is linked from the owner's own device (console) instead, and `owner init` on the headless machine becomes an explicit opt-in.
+
+### 9.4 What the user is told (11 §5)
+
+No "wallet", "seed phrase", "private key" or "encryption key" in default output. Proposed strings for the design pass (string keys per 11 §5.4):
+
+| Moment | Copy |
+|---|---|
+| `needs_setup` `no_keychain` (agent relays it) | "This machine has no system keychain (common in containers, WSL and SSH sessions), so AgentLink can't protect your agent's identity here yet. To keep it in a passphrase-locked file instead, run `agentlink init --keystore file` yourself, in your own terminal." |
+| Opt-in question | "No system keychain found. Keep this agent's identity in a passphrase-locked file? It's weaker than a keychain: anyone who gets both the file and its passphrase can act as your agent. Your approvals stay protected by your owner code, as long as you set it up yourself. [y/N]" |
+| Unlock-code choice | "Use a generated unlock code (recommended) or your own passphrase?" |
+| Generated code, shown once | "Your unlock code: {code}. Put it in your password manager or your container's secret store, not in your project files. Type its last four characters to continue." After confirmation the screen is cleared |
+| Losing the code (M1a) | "If you lose this code, this agent can't be unlocked. Until backups are available, you'd set up a new agent and pair again." From M1b: "…restore this agent from your backup (`agentlink backup export`)", offered right after `init` |
+| Own passphrase too short, or equal to an owner or agent secret | "Use at least 12 characters." · "Use a different passphrase from your owner code." |
+| `owner init`, before the code | "Store this owner code off this machine, for example in your password manager. Without it, nobody can approve for this agent or remove it, and until backups are available you'd have to set up a new agent and pair again." From M1b, the last part reads: "…you'd restore it from your recovery kit." |
+| `owner init`, after the code | "Owner set up. Your owner fingerprint: {fingerprint}. Check that `agentlink doctor` shows the same one." |
+| `owner init` when an owner exists | "This agent already has an owner ({fingerprint}). AgentLink won't replace it. To use an owner from another device, link it from that device." |
+| `doctor`, owner | "Owner: {fingerprint}, set up {date}. If you never saw an owner code yourself, this owner isn't yours: replace the agent." |
+| Owner step needed (`owner_missing`, agent relays it) | "One step left, and you must do it yourself: run `agentlink owner init` in your own terminal. Don't let your AI run it or see the code it shows. It's what stops any AI, including your own, from approving its own actions." |
+| Changing the unlock code | "Changing the unlock code doesn't protect copies of the file made earlier (backups, image layers, snapshots). If the code or the file leaked, replace the agent." |
+| `needs_setup` `keystore_locked` (agent relays it) | "AgentLink can't unlock your agent's identity on this machine. Set AGENTLINK_KEYSTORE_PASSPHRASE_FILE to the file that holds your unlock code, then restart your AI app." While unlocking: "AgentLink is starting up. Try again in a few seconds." |
+| `doctor`, file backend | "Agent identity: passphrase-locked file (no system keychain). Unlocked from: secret file." |
+| `doctor` warnings | "Unlocked from an environment variable, which leaks more easily than a secret file." · "The unlock code is stored on the same disk as the file, so a copy of this disk is not protected." (shown when the passphrase file is on the same filesystem as the keystore and not on tmpfs) · "Your owner key is on this machine. Approving from your own device is safer." · "AGENTLINK_OWNER_PASSPHRASE is set and ignored: approvals always ask in your terminal." |
+| Approval needed on a headless machine (M1a) | "Approval needed. In your own terminal, run `agentlink approve {approvalId}`. Your AI can't approve for you." |
