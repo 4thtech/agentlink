@@ -16,6 +16,10 @@ export const TAGS = Object.freeze({
   envelope: 'agentlink/envelope/v1',
   /** 04 §2.5.1: owner-action `sig` is BIP-340 over taggedHash(TAGS.ownerAction, sha256(JCS(...))). */
   ownerAction: 'agentlink/owner-action/v1',
+  /** 04 §2.9: owner fingerprint over ownerEvm ‖ ownerNostr ‖ ownerEnc (display only). */
+  ownerFingerprint: 'agentlink/owner-fingerprint/v1',
+  /** 04 §2.9: agent fingerprint over the raw 20-byte agentId (display only). */
+  agentFingerprint: 'agentlink/agent-fingerprint/v1',
 } as const);
 
 /** SHA-256 (FIPS 180-4). */

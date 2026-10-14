@@ -12,6 +12,8 @@ export type CryptoInputErrorCode =
   | 'jcs_unsupported_value'
   | 'no_secure_random'
   | 'wipe_failed'
+  /** A byte string that is not a valid curve point (M1-1b: evmAddressFromPublicKey). */
+  | 'invalid_public_key'
   | 'invalid_signature'
   | 'invalid_secret_key'
   | 'invalid_typed_data'

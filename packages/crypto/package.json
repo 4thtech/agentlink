@@ -20,6 +20,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./keystore": {
+      "types": "./dist/keystore.d.ts",
+      "default": "./dist/keystore.js"
     }
   },
   "files": [

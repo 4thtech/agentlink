@@ -8,11 +8,13 @@ import {
   LIBRARIES,
   NODE_MSG,
   NODE_ZONES,
+  RESTRICTED_ENTRY_POINTS,
   WORKSPACE_NAMES,
   ZONES,
   allowedWorkspaceNames,
   layerMessage,
   libraryMessage,
+  restrictedEntryMessage,
 } from './tools/deps-check/policy.mjs';
 
 const SOURCE = '{ts,tsx,mts,cts}';
@@ -35,6 +37,11 @@ function restrictionsFor(zone) {
   for (const lib of LIBRARIES) {
     if (zone !== null && lib.zones.includes(zone)) continue;
     patterns.push({ group: lib.group, message: libraryMessage(lib) });
+  }
+  // Restricted subpaths of packages this zone may otherwise import (IR-M1-1b-1 M-1).
+  for (const entry of RESTRICTED_ENTRY_POINTS) {
+    if (zone !== null && entry.zones.includes(zone)) continue;
+    patterns.push({ group: entry.group, message: restrictedEntryMessage(entry) });
   }
   // Package layering: every workspace package this zone may not import (apps are never importable).
   const allowed = allowedWorkspaceNames(zone);

@@ -297,7 +297,7 @@ Requests and responses use the JSON form of 05 §3.1 (04 §2.4.1): `0x` + lowerc
   "recordId": "0x…",
   "record": { /* Record struct fields, JSON form of 05 §3.1 */ },
   "signature": "0x…",
-  "signer": { "evm": "0x…", "agentCard": { /* optional, signed by owner; card JSON form, 04 §2.4 */ } },
+  "signer": { "evm": "0x…", "agentCard": { /* optional, card JSON form, 04 §2.4 */ }, "cardSig": "0x…" /* with agentCard, never alone: the owner's EIP-712 signature over it */ },
   "envelopeHash": "0x…",
   "envelope": { /* optional ciphertext envelope */ },
   "recipient": { "evm": "0x…", "salt": "0x…" },          // optional disclosure
@@ -309,7 +309,7 @@ Requests and responses use the JSON form of 05 §3.1 (04 §2.4.1): `0x` + lowerc
 }
 ```
 
-Encodings follow 04 §2.4.1, and a verifier rejects a pack in any other form. `recordId`, `envelopeHash` and `recipient.salt` are `0x` + 64 lowercase hex. `recordId` and `salt` are the same strings as in the `proof` envelope body (04 §3.4), and `envelopeHash` the same as in a commitment scope (04 §3.4.2), so a value never has two spellings.
+Encodings follow 04 §2.4.1, and a verifier rejects a pack in any other form. `recordId`, `envelopeHash` and `recipient.salt` are `0x` + 64 lowercase hex. `recordId` and `salt` are the same strings as in the `proof` envelope body (04 §3.4), and `envelopeHash` the same as in a commitment scope (04 §3.4.2), so a value never has two spellings. `signer.cardSig` is `0x` + 130 lowercase hex under the canonical ECDSA rule of 04 §2.4.1. It is present exactly when `signer.agentCard` is, and a verifier rejects a pack with one and not the other. Without it the card cannot be verified (proposed, owner confirms at merge). `ProofStatus.fee.token` is `record.feeToken`; for a confirmed record `fee.amount` is the charged fee, at most `record.maxFee` (06 §2.4).
 
 ---
 
