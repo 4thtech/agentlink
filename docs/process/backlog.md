@@ -745,6 +745,11 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
     - `eip712`: `cardAgentSig` by the agent key over the same `AgentCard` digest as `cardSig`; it recovers `agentEvm`; a signature by the owner key in its place is rejected.
     - `fingerprint` (new suite): owner fingerprint from `ownerEvm`, `ownerNostr`, `ownerEnc`, and agent fingerprint from the agent ID, each as the 32-byte digest, the short form (`7F3A·19C2`) and the long form.
     - owner actions: `contact.check` signing vector, and reject vectors for a `pairingDigest` with `0x` or in upper case.
+  - G-7/G-32 vectors (06 §3, 04 §2.5.1; added once the branch `docs/G-7-G-32` merges):
+    - `policy.set` signing vectors: the 06 §3 defaults in the policy JSON form, and one policy with two `contactRules` (JCS key order inside the rules, the sorted list).
+    - Reject vectors (schema): a USD limit as a JSON number (`5`) and as `"5.0000001"`; an unsorted `autoAcceptContacts` or `contactRules`; a duplicate contact; a `ContactRule` with `proofs: {}`; a missing policy key.
+    - Encoding suite: the USD amount row of 04 §2.4.1, with accept cases (`"0"`, `"0.1"`, `"5"`, `"999999999.999999"`) and reject cases (`"0.10"`, `"5.0"`, `"5."`, `"05"`, `"1.0000001"`, `"1000000000"`, a JSON number), on a policy path, `maxFeeUsd` and `fee.usd`.
+    - Freshness is not a signing property, so its boundaries are M1-7d table tests, not vectors.
 - **Acceptance:**
   - Every case records generator, version and inputs; regeneration from the generator scripts reproduces the files byte for byte.
   - Narrow gitleaks allowlist (fingerprints, owner-reviewed) for deliberate test keys; no directory-wide allowlist.
@@ -918,15 +923,18 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 #### M1-2b · types: policy, approvals, owner actions, proof pack, tool results
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types
-- **Depends on:** M1-2a; gaps G-7, G-32 resolved
-- **Spec:** 06 §1 rule 3, §2 (`ProofStatus`), §3; 04 §2.5, §2.5.1, §3.4.1; 07 §8; 03 §3
+- **Depends on:** M1-2a; gaps G-7, G-32 resolved (branch `docs/G-7-G-32`, pending owner)
+- **Spec:** 06 §1 rule 3, §2 (`ProofStatus`), §2.5, §3 (incl. the policy JSON form and per-contact rules); 04 §2.4.1, §2.5, §2.5.1 (lifetimes, skew and nonces), §3.4.1 (approval TTL); 07 §8; 03 §3
 - **Invariants:** I-4, I-5
 - **Scope:**
-  - Policy schema with the exact 06 §3 defaults (plus per-contact overrides if G-32 adds them); signed-policy document wrapper.
+  - Policy schema in the 06 §3 policy JSON form, with its exact defaults. It is strict at every level, and every key is required. Enums; contact lists as sorted, unique agent IDs; USD amounts in the single 04 §2.4.1 spelling (`^(0|[1-9][0-9]{0,8})(\.[0-9]{0,5}[1-9])?$`, no trailing zero, no JSON numbers); `proofs.allowKeyDisclosure` only `approval | deny`; bounded integers and paths. Includes `ContactRule` (`contact`, plus `proofs` with at least one of `notarize` and `perActionMaxUSD`; at most 256, sorted) (G-32). The schema plugs into `policySetParamsSchema` in place of the M1-2a bounded JSON object, and the signed-policy wrapper is `signedPolicySetSchema`.
+  - G-7 constants: skew `S` = 300 s; `L(op)` per 04 §2.5.1; approval TTL 86 400 s; nonce retention 30 days; budget window 86 400 s. The schema keeps checking only `issuedAt < expiresAt` (and `expiresAt` = 0 for `agent.revoke`). Time-dependent checks are the core's (M1-7d), with `now` passed in.
+  - An exact-decimal helper (parse, compare, add, round up to cents, write the canonical USD spelling) with no binary floats, for every 04 §2.4.1 USD amount path (policy, `maxFeeUsd`, `fee.usd`, prices). It also compares a `terms.price.amount` of any size with a USD limit without overflow. M1-7i uses it for the budget.
   - `policy.set` params `{version, policy}` and the per-tool `action.context` schemas of `approval-request` (04 §2.5.1, §3.4.1; the `OwnerAction{v, agent, owner, op, params, nonce, issuedAt, expiresAt}` / `SignedOwnerAction{body, sig}` shape itself is M1-2a), approvals bound to the action digest, `ProofPack` v1, `ProofStatus`, the common tool-result shape `{status, summary, nextStep?, url?, approvalId?}`.
 - **Acceptance:**
   - Defaults deep-equal 06 §3 (snapshot test citing the spec); the 07 §8 example pack parses.
   - Round-trip and strictness tests for each schema.
+  - Policy rejects: a missing key, an unknown key at any level, a JSON number for a USD field, the USD amounts `"01"`, `"1."`, `"1.0"`, `"0.10"`, `"1e3"`, `"-1"`, `"1.0000001"` and `"1000000000"` (and the same strings in `fee.usd` and `maxFeeUsd`), `allowKeyDisclosure: "allow"`, an unsorted or duplicate contact list, an uppercase or checksummed agent ID, a `ContactRule` with empty `proofs`, 257 rules, and integers out of range (`maxEnvelopeKB: 25`, `defaultExpiryDays: 8`).
 
 #### M1-2c · types: run the schema tests in browsers and Workers; review follow-ups (new)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
@@ -1327,6 +1335,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests first; a table-driven test per rule and boundary (e.g. the per-contact hourly rate limit at N and N + 1).
   - A policy row edited directly in the store is ignored (I-4); a replayed or stale `SignedOwnerAction` is rejected; an older signed policy put back in the store is detected against the KeyStore high-water mark.
+  - G-7 boundaries (04 §2.5.1), per op: `issuedAt = now + 300` is accepted and `now + 301` refused; `now = expiresAt` is accepted and `expiresAt + 1` refused; a lifetime of exactly `L(op)` is accepted and `L(op) + 1` refused; an `approval.decide` whose `expiresAt` is after the request's is refused; a replay of an applied `approval.cancel` within its lifetime is refused by its nonce; two concurrent deliveries of one object apply it once (nonce check, record and apply in one transaction); a re-published `agent.revoke` is a no-op, not an error.
   - Property test: `evaluate` is deterministic and has no side effects.
 
 #### M1-7i · core: policy rules for files, proofs and receipts (new, split from M1-7d)
@@ -1336,9 +1345,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 06 §3; 07 §2; 02 F-61–F-63
 - **Invariants:** I-4
 - **Scope:**
-  - The remaining 06 §3 rules in the same pure `evaluate`: files (incl. `files.storage`, D-48), proofs incl. `dailyBudgetUSD` and `perActionMaxUSD` (budget ledger passed in as context), receipts. `ACCEPTED`/`REJECTED` receipt signing stays under `commitments` (M1-20).
+  - The remaining 06 §3 rules in the same pure `evaluate`: files (incl. `files.storage`, D-48), proofs incl. `dailyBudgetUSD` (rolling 24 h window, G-7) and `perActionMaxUSD` (budget ledger passed in as context), the per-contact proof rules (`contactRules`, G-32, the 06 §3 evaluation steps), receipts. `ACCEPTED`/`REJECTED` receipt signing stays under `commitments` (M1-20).
 - **Acceptance:**
-  - Tests first; a table-driven test per rule and boundary (e.g. $1.00 vs $1.01 for `perActionMaxUSD`; budget day boundary as fixed by G-7).
+  - Tests first; a table-driven test per rule and boundary (e.g. $1.00 vs $1.01 for `perActionMaxUSD`; an entry at `t = now − 86 400` is outside the budget window and one at `now − 86 399` inside; spent + fee equal to the budget is allowed and one cent more is not).
+  - Budget reservation (G-7, 06 §3): N concurrent paid proofs whose maximum fees together exceed the remaining budget never all pass (the check and the `maxFee` reservation are one transaction); a failed submission keeps its reservation until the Record's `deadline` passes with no record on-chain; a confirmed record settles to the charged fee; a missing or corrupted ledger, or a clock earlier than the newest entry, gives `approval` for every paid action until a new owner-signed `policy.set`.
+  - Contact rules (G-32): a rule `notarize: allow` under a global `deny` stays `deny`; a rule `perActionMaxUSD: "2"` allows $2.00 for that contact only, and $2.01 needs approval; the daily budget still applies to a contact with a rule; a rule for a blocked or revoked contact, or with no verified policy, has no effect.
   - Property test: `evaluate` stays deterministic and side-effect free.
 
 #### M1-7e · core: approvals, requests queue, idempotency
@@ -1356,6 +1367,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - An approved ID is refused for a different action and on second use; an unsigned or wrongly signed approval is rejected.
   - Idempotent repeats return identical results; expired approvals report `expired`.
+  - G-7 TTL boundaries (04 §3.4.1): `expiresAt = requestedAt + 86 400`; an `approval.decide` applied at `now = expiresAt` is accepted and at `expiresAt + 1` refused; an approved, unused non-commitment approval is `expired` at `expiresAt + 1` and the next call returns a new `pending_approval`; a commitment request whose scope expires sooner has `expiresAt` = the scope's `expiresAt`.
+  - `approval.cancel` on an approved, unused non-commitment approval voids it (the retry gets a new `pending_approval`); on a used one it changes nothing; a rule changed to `deny` after approval refuses the approved call.
   - (with M1-7f) A file changed between approval and retry is not sent; the retry returns a new `pending_approval`.
 
 #### M1-7f · core: files (send, fetch, refresh link, crypto-shredding)
@@ -1749,7 +1762,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-4, I-5
 - **Scope:**
   - First run: create the owner passkey (PRF) on `localhost`, or set the owner passphrase.
-  - Approval page: who, what, cost and the policy rule in plain words; approve/deny with presence → owner-signed approval; "Remember for this contact" (new-contact and proof-limit approvals only, 11 §8) creates an owner-signed policy change (G-32).
+  - Approval page: who, what, cost and the policy rule in plain words; approve/deny with presence → owner-signed approval; "Remember for this contact" (proof approvals raised by `notarize: approval` or the per-proof limit only, with Approve, 11 §8) signs, under the same presence gesture, a `policy.set` (version + 1) that adds the contact rule (06 §3, G-32); a refused `policy.set` is reported and leaves the approval standing.
   - Untrusted strings (contact names, file names) rendered as text only.
   - Before DESIGN-D1 lands: functional and unstyled, strings externalized, no invented visual design (`docs/design/README.md`). Styling is M1-11b.
 - **Acceptance:**
@@ -1978,6 +1991,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first; table-driven tests: default → `pending_approval`; allowlisted contact under the limit → allow (policy grant); over the limit, contact not allowlisted, or unevaluable terms → `approval`; `REJECTED` for an allowlisted contact under the limit → `approval`; direction rows (IR-D55-1 F01): under `buy`, terms where this agent delivers any item or the contact pays → `approval`; amounts `0`, `-5`, `1e3`, `1,500` → refused by the schema, never allowed; `sell` with `autoAcceptMinUSD` unset (the default) → `approval`; a firm offer within the limits → `approval`.
   - Inbound content can never produce a binding `accept` or a receipt without the owner: it cannot change policy or limits (I-4, I-5); a policy row edited in the store is ignored.
   - Defaults snapshot test cites the 06 §3 `commitments` defaults.
+  - (with M1-32, M1-7i) A commitment part with `notarize` reserves its Record's `maxFee` in the budget ledger in the same transaction as its atomic claim; two concurrent retries reserve once (06 §3 daily budget window, G-7).
 
 #### M1-21 · `terms` schema and `termsHash` vectors (D-32) (new)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -3112,7 +3126,15 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 4. **G-4 (H) Batch failure semantics.** 05 §3.2; 07 §7. Whether one failing item reverts `notarizeBatch`/`acknowledgeBatch` is unspecified; the submitter batches across signers, so one item (e.g. credits spent between simulation and inclusion) can grief the rest. *Proposed:* specify all-or-nothing with per-item pre-simulation and retry without the failing item, or skip-and-emit with per-item status; keep 05 §3.4 gas targets. *Blocks:* M1-3d, M1-10a.
 5. **G-5 (M) J1 key storage wording.** RESOLVED by 02 §5 J1 steps 2–3: `init` puts only the agent keys in the OS keychain (step 2); the owner key is created and wrapped in the setup step (step 3, 04 §2.2). *Was:* J1 step 2 stored "owner and agent keys" in the OS keychain, against 04 §2.2. *Blocked:* M1-9a, M1-12b.
 6. **G-6 (H) Policy fail-open.** 06 §3 (last paragraph); 04 §2.5. Unsigned or tampered policies fall back to defaults, which can be looser than the owner's policy (e.g. `proofs.notarize: deny` → `allow`); deleting the signed row downgrades policy. *Proposed:* once an owner-signed policy exists, fail closed (`approval` for owner-gated actions) and keep a policy version in an owner-signed object. *Blocks:* M1-7d.
-7. **G-7 (M) Lifetimes.** 04 §2.5.1 (`SignedOwnerAction` `nonce`, `issuedAt`, `expiresAt`); 06 §2.5; 06 §3 (`dailyBudgetUSD`). No freshness window, nonce retention, approval TTL or budget day boundary. *Proposed:* e.g. owner actions valid 10 minutes (`approval.decide`: until the request's `expiresAt`), nonces kept 30 days, approvals expire after 24 h, budget day in UTC. *Blocks:* M1-2b, M1-7d, M1-7e.
+7. **G-7 (M) Lifetimes.** Resolved by branch `docs/G-7-G-32` (pending owner; proposed, owner confirms at merge). The values are in 04 §2.5.1 (lifetimes, skew and nonces), 04 §3.4.1 (approval TTL) and 06 §3 (daily budget window).
+   - Skew is 300 s and applies to `issuedAt` only; expiry has no skew.
+   - Maximum lifetime per op: `approval.decide` until the request's `expiresAt`; `approval.cancel` 7 days, so a cancel from the console still reaches a sleeping agent; `policy.set` and `contact.check` 24 h, since rollback is stopped by `version`; later ops 10 minutes unless their task says otherwise, never above 7 days.
+   - Nonces are kept 30 days after they are applied. `agent.revoke` is exempt, because it is idempotent.
+   - A pending request expires after 24 h, or at the commitment scope's expiry if that is sooner. A non-commitment approval must be used by the same time.
+   - `dailyBudgetUSD` is a rolling 24-hour window, not a UTC day: a UTC day allows twice the budget around midnight and resets at an arbitrary local hour.
+   - Review IR-G732-1 fixes: the budget check and the reservation of the Record's `maxFee` run in one transaction, so paid actions are serialized per agent. A reservation is released only when the Record can no longer be charged. A broken ledger fails closed, and the residuals are in 04 §7. Nonce check, record and apply run in one transaction. `approval.cancel` also voids an approved, unused non-commitment approval. USD amounts have one spelling (04 §2.4.1).
+
+   *Was:* 04 §2.5.1 (`SignedOwnerAction` `nonce`, `issuedAt`, `expiresAt`), 06 §2.5 and 06 §3 (`dailyBudgetUSD`) had no freshness window, nonce retention, approval TTL or budget day boundary. The first proposal was a flat 10 minutes, 30-day nonces, a 24 h TTL and a UTC day. *Blocks:* M1-2b, M1-7d, M1-7e.
 8. **G-8 (H) CREATE3 salts and deployer lifecycle.** 05 §9; `release-and-deployment.md` §4.2. CreateX guarded salts bind addresses to the deployer; identical addresses for the Registry (M2) and M4 chains need the same deployer and salt scheme; proxies must be deployed and initialised atomically; testnet and mainnet deployers differ, so testnet and mainnet addresses differ. *Proposed:* specify salt layout (deployer-guarded, no cross-chain redeploy protection), deploy-and-init, and cold-storage retention of the mainnet deployer key until all planned chains are deployed. *Blocks:* M1-3g, M3-2b, M3-2c, M4-EPIC.
 9. **G-9 (M) Store schema gaps.** 07 §3 lacks the outbox (07 §4.2, 24 h retry), the ≥ 7-day seen-set (07 §4.2), idempotency results (06 §1 rule 6), budget ledger and rate counters (06 §3), and `SignedOwnerAction` nonces, the stored signed objects, the revoked-agent set and contact status `revoked` (04 §2.5.1, §3.4.1); the policy-version high-water mark lives in the KeyStore (04 §2.5.1). *Proposed:* extend 07 §3. *Blocks:* M1-5b, M1-5c, M1-7a, M1-8b.
 10. **G-10 (M) Where `@agentlink/occ-v2-abi` is published.** 05 §9; D-19. npm provenance is not generated for private source repos (verify). *Proposed* (`development-process.md` §9.2): import release artifacts into public `packages/occ-v2-abi` and publish from there. *Blocks:* M1-3f.
@@ -3137,7 +3159,13 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 29. **G-29 (M) Owner-operation payload bodies.** Resolved by PR #10 (D-58, confirmed by the owner at merge): one owner-signed object, `SignedOwnerAction` (04 §2.5.1, BIP-340 by the owner Nostr key over a tagged hash, bound to the agent's EVM address, with nonce and expiry), is produced by the local UI, the CLI and the console; `approval`, `policy` and `revoke` envelopes only carry it. Bodies for `approval-request`, `approval`, `policy`, `revoke`, `card-update` and `handshake-ack` in 04 §3.4.1, with receiver rules and the rule that no MCP tool can create them. Lifetimes stay with G-7, policy fail-closed with G-6. *Was:* 04 §3.4 listed these types without body schemas. *Blocks:* M1-2a, M2-2e.
 30. **G-30 (M) Native-coin price source.** RESOLVED for launch by D-46: fees are stablecoin-only, every fee token is valued 1:1, and 07 §6.2 needs no price endpoint. A USD price source for native coins returns with the `PRICE_UPDATER` work in M4-EPIC (12 §3.4). *Was:* 07 §6.2 "public price endpoint" unspecified (third-party egress, integrity). *Blocked:* M1-4b, M3-3.
 31. **G-31 (L) Linux without Secret Service.** RESOLVED by D-54 (04 §2.8, 07 §9): the OS keychain stays the default; without one, `needs_setup` unless the user opts in, in an interactive terminal, to a passphrase-locked file KeyStore (Argon2id + AES-256-GCM, unlocked by the MCP server from a passphrase file or an environment variable); the owner key is never unlocked non-interactively. Built in M1-8f. *Was:* 04 §2.2; 03 §6 (headless servers, containers, WSL); proposed `needs_setup` by default and a documented, weaker passphrase-wrapped file store as opt-in. *Blocked:* M1-8a.
-32. **G-32 (M) Per-contact policy overrides.** 11 §8 (approval card, "Remember for this contact") has no counterpart in 06 §3. *Blocks:* M1-2b, M1-11a.
+32. **G-32 (M) Per-contact policy overrides.** Resolved by branch `docs/G-7-G-32` (pending owner; proposed, owner confirms at merge), in 06 §3 (policy JSON form, per-contact rules) and 11 §8.
+   - The policy gains `contactRules`: up to 256 entries `{contact, proofs: {notarize?, perActionMaxUSD?}}`, sorted by agent ID. They are proofs only. The global `deny` and `dailyBudgetUSD` always win, and the rules are read only from the verified policy.
+   - "Remember for this contact" is a second signed object, a full `policy.set` (version + 1), made under the same presence gesture as the approval. It is offered only on proof approvals raised by `notarize: approval` or the per-proof limit, and only with Approve.
+   - It is removed from the new-contact card: an invite is used once and a contact is paired once, so nothing is left for a rule to remember. A per-owner rule ("connect with this owner's other agents") would widen who connects without asking, and is not proposed.
+   - The policy JSON form is fixed, because M1-2b needs it: every key is present; USD limits are decimal strings, so float money is gone; contact lists are sorted agent IDs; integers and paths have bounds. `proofs.allowKeyDisclosure` takes only `approval | deny`, because disclosure is owner-only (04 §2.5; IR-G732-1).
+
+   *Was:* 11 §8 (approval card, "Remember for this contact") had no counterpart in 06 §3. *Blocks:* M1-2b, M1-11a.
 33. **G-33 (M) DELIVERED timing for notarized messages.** 06 §2.2 records DELIVERED when `agentlink_inbox` returns a message, but the `proof` envelope (04 §3.4) arrives later. *Proposed:* sign DELIVERED when the proof envelope is processed if the message was already returned. *Blocks:* M1-7g, M1-9c.
 34. **G-34 (L) Default receipt linkability.** 05 §3.3 (a receipt links the recipient's agent address to the record) vs 06 §3 `receipts.autoDelivered: true`. *Proposed:* keep the default but state it at pairing and in settings, or default to off. *Blocks:* M1-7g, M1-11c.
 35. **G-35 (L) Web Push keys.** 08 §2.2: the owner-generated VAPID private key must reach cloud agents securely; local agents cannot push. *Blocks:* M2-2g.
