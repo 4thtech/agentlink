@@ -1,47 +1,43 @@
 # @talirezun — sync
-**Headline:** v0.0.1 live. PR #1 (D-48 to D-51 docs: encrypted drop, connectors, revenue ops, merge model) is auto-merging; next session starts M1a
-_Updated 2026-10-13T09:40Z · claude-code / claude-opus-5-5 · orchestrator_
+**Headline:** M0 nearly done: monorepo, Foundry, vector harness, guards, delivery pipeline and docs merged; M1a crypto starting (M1-1h)
+_Updated 2026-10-14 · claude-code / claude-opus-5-5 · orchestrator_
 
 ## Now
-- The repo is public from 2026-10-13 (D-44). The docs map is in `docs/README.md`, and the decisions are D-01…D-47 in `docs/foundation/00-README.md`.
-- The plan is M1a walking skeleton (pair + Talk, v0.1.0), then M1b (files, proof), then the M1 gate (v0.2.0). Details in `docs/process/backlog.md` (176 cards).
-- Design is being made in Claude Design from spec 11. Drops D1 and D2 are tracked in `docs/design/README.md`.
-- Coding starts after Tali's go-ahead.
+- main 9cac3a1. Merged 2026-10-14: monorepo skeleton (M0-2d), vector harness (M0-9), boundary guards (M0-10), Foundry skeleton (private), runbooks/lessons/onboarding, public docs (`docs-site/`, D-57), specs D-52…D-59.
+- New flow (D-52 + #17): CI runs on branch pushes; PRs open after the independent review; claims live on this board, not draft PRs. Runbooks: `docs/runbooks/`.
+- Name: **AgentLink** (D-56). Design handoff: `docs/design/claude-design-handoff.md`.
 
 ## In flight
 | Task | Branch / PR | Status | Next step |
 |---|---|---|---|
-| M0-2 repos + CI | main | in-progress | GitHub settings (rulesets, scanning, environments) |
-| DESIGN-D1 | — | in-progress (Tali) | copy sheet, tokens, local UI |
+| M1-1h crypto vectors | feat/M1-1h-vectors | building | independent review |
+| M1-2a types | feat/M1-2a-types | building | independent review |
+| M1-3a contract interfaces | occ-v2-contracts feat/M1-3a-interfaces | building | review, then Tali merges |
+| M0-8 redacting logger | #12 | fix round (review found 2 leaks) | delta review |
+| DESIGN-D1 | — | Tali in Claude Design | export to docs/design/d1 |
 
 ## Next
-1. GitHub settings and rulesets (owner).
-2. M0 skeletons (pnpm/turbo monorepo, Foundry in occ-v2-contracts) once coding is approved.
-3. M1a critical path: crypto vectors → core → node → MCP tools → e2e → J9 dogfood.
+1. M1-1a/1b/1c/1g crypto (S2, tests first) after M1-1h.
+2. M1-7 core, M1-8 node (incl. D-54 headless keystore), M1-9 MCP (15 `agentlink_` tools, D-53/D-55).
+3. M1-13 e2e, M1-23 J9 dogfood (M1a gate, v0.1.0).
 
 ## Decisions made (still relevant)
-- **D-25:** auto-merge behind gates; staging deploys automatically; production waits for Tali's approval click.
-- **D-31:** commitments (accept, ACCEPTED/REJECTED receipts) need owner approval by default.
-- **D-32:** J8 negotiate-and-agree produces a proof of agreement.
-- **D-33:** M1a / M1b split.
-- **D-36/D-41:** desktop apps for macOS, Windows and Linux in M2, as full dashboards.
-- **D-39/D-40:** UX first, with automatic chain selection.
-- **D-45/D-46:** $0.10 per proof, $5 verified registration, stablecoins only, public fee schedule (`12-economics-and-fees.md`).
-- **D-48/49/50:** encrypted drop for files (zero setup); Drive, Dropbox and OneDrive connectors in M2; revenue reporting, then a finance dashboard.
-- **D-51:** your approval is NOT required. S0/S1 auto-merge; S2 and sensitive paths merge after the independent review and Tali's "merge". Feedback through Tali is still very welcome.
+- D-52/D-57: build → independent review → CI → auto-merge; S2 and sensitive paths need Tali's "merge"; services auto-deploy; npm `latest`, desktop and template releases keep Tali's click.
+- D-53/D-55: 15 MCP tools; counterparty names only as owner alias or sanitised; one approval per agreement.
+- D-54: headless file KeyStore; the owner key never unlocks non-interactively.
+- D-58/D-59: owner-operation bodies; contract roles with 7-day delays, paused mainnet launch.
 
 ## Asks
-- [ ] @denisjazbec: start with `docs/process/onboarding.md`. Part A is for you; Part B is your agents' protocol, with a bootstrap prompt. Then set up the `../agentlink-sync` worktree. (raised 2026-10-12)
-- [ ] @denisjazbec: review spec `05-contracts-occ-v2.md` and the contract cards (M1-3*, M1-14, M2-4, M3-1/2). Key topics: AccessManager roles and delays (gap G-3), stablecoin-only fee config (D-46), and the CREATE3 deploy plan. Relayed feedback is fine. (raised 2026-10-12)
-- [ ] @denisjazbec: look over the spec gaps in `backlog.md` §8, especially G-1 (local owner key), G-3 and G-6 (policies fail open). (raised 2026-10-12)
+- [ ] @denisjazbec: start with `docs/README.md` (Start here) and `docs/process/onboarding.md`. (2026-10-12)
+- [ ] @denisjazbec: D-59 proposes you hold one of two ops pause hardware keys (not a Safe-signer device). OK? Needed before M3. (2026-10-14)
+- [ ] @denisjazbec: review spec 05 §5.1 (roles, delays) and the contract cards M1-3*. Relayed feedback is fine. (2026-10-12)
 
 ## Heads-up
-- PR #1 (D-48 to D-51) is open for your feedback: https://github.com/4thtech/agentlink/pull/1
-- OCC v2 is a clean re-implementation (D-20). No v1 code is copied.
-- S2 PRs need your GitHub approval (code owner) before they can auto-merge.
+- OCC v2 is clean-room (D-20); no v1 code is copied.
+- Your GitHub approval is not required (D-51); feedback through Tali is welcome.
 
 ## Feedback log
 _(none yet)_
 
 ## Blocked on
-- Tali's go-ahead to start coding.
+- Nothing.
