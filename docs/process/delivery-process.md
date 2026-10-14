@@ -2,7 +2,7 @@
 
 **Purpose.** One end-to-end description of how a change travels from the owner's request to a verified release: who does what, the 14 steps, the safety nets, when the owner's go-ahead is needed and what "done" means. It ties together `development-process.md` (roles, briefs, verification), `audit-rules.md` (classes S0/S1/S2 and independent reviews), `release-and-deployment.md` (environments and rollback) and `ci-cd.md` (the required checks). Where this page and one of those disagree, the more specific document wins and this page is corrected in the same PR. Decision: D-52.
 
-**The idea.** The owner describes a problem or a feature in plain language. One AI session, the **orchestrator**, does not build it: it plans, delegates to **builders**, gets the work **independently reviewed**, audits it, waits for **CI**, merges, deploys what changed and **proves by content** that production now runs exactly what was approved. Everything after the owner's go-ahead is automatic once CI is green, except the steps that stay human (section 5). The most common failure is not "the code broke" but "everything looked green and was still wrong"; every rule below exists to catch that.
+**The idea.** The owner describes a problem or a feature in plain language. One AI session, the **orchestrator**, does not build it: it plans, delegates to **builders**, gets the work **independently reviewed**, audits it, waits for **CI**, enables auto-merge and, after **CI** has deployed what changed, **proves by content** that production now runs exactly what was approved. Everything after the owner's go-ahead is automatic once CI is green, except the steps that stay human (section 4). The most common failure is not "the code broke" but "everything looked green and was still wrong"; every rule below exists to catch that.
 
 ---
 
@@ -10,8 +10,8 @@
 
 | Role | Who | Does | Never does |
 |---|---|---|---|
-| **Owner** | Tali (`@talirezun`) | Describes the problem, makes product, legal and pricing decisions (D-numbers), gives the go-ahead (section 5), performs the owner-only operations (`development-process.md` §1.1) | Has to read code |
-| **Orchestrator** | The owner's main session (Opus 5.5) | Investigates, plans, splits work, writes briefs, audits, enables auto-merge, deploys what changed, verifies, saves state, reports in plain English | Builds features itself; presents a worker's claim as verified |
+| **Owner** | Tali (`@talirezun`) | Describes the problem, makes product, legal and pricing decisions (D-numbers), gives the go-ahead (section 4), performs the owner-only operations (`development-process.md` §1.1) | Has to read code |
+| **Orchestrator** | The owner's main session (Opus 5.5) | Investigates, plans, splits work, writes briefs, audits, enables auto-merge, verifies what CI deployed, saves state, reports in plain English | Builds features itself; presents a worker's claim as verified |
 | **Builder** | A worker subagent (Haiku, Sonnet or Opus per the routing table) | Code, tests, its decision-log entry and docs on its own branch, in its own worktree; opens its PR when the brief says so | Merges, deploys, publishes, touches production data, edits files another builder owns |
 | **Reviewer** | A different, fresh-context Opus 5.5 worker, read-only | Tries to break the work from the spec and the diff alone (`audit-rules.md` §4); returns `IR-<task>-<n>` with PASS, PASS WITH FIXES or FAIL | Edits code; sees the builder's transcript or reasoning |
 | **CI** | GitHub Actions: `ci-gate`, `security-gate`, `pr-hygiene`, `review-gate` (contracts repo: `contracts-gate`) | Runs the checks on every PR; staging and `next` deploys and smoke tests after merge | Can be skipped; red means stop. If CI cannot catch a class of problem, we add a CI card, we do not skip the check |
@@ -30,10 +30,10 @@
 | 5 | **Independent review** | Reviewer | `IR-<task>-<n>`; required for S1 and S2, optional Sonnet review for S0 |
 | 6 | **Fix rounds** | Builder, reviewer re-checks | Every finding fixed or dispositioned; judgement calls decided in favour of safety or escalated to the owner |
 | 7 | **Orchestrator audit** | Orchestrator | The verification protocol (`development-process.md` §5), including checking load-bearing claims against reality |
-| 8 | **CI green** | CI | All required checks pass. A failing test unrelated to the change is re-run once; a pass is noted as a flake, a second failure is investigated |
+| 8 | **CI green** | CI | All required checks pass. A failing test unrelated to the change is re-run once; a pass is noted as a flake and a fix card is opened for it (`development-process.md` §10), a second failure is investigated |
 | 9 | **Merge, one PR at a time** | Orchestrator enables auto-merge; GitHub merges | When two PRs both add a decision-log entry, the later one merges `main` in and keeps **both** entries, in the log's existing chronological order |
-| 10 | **Deploy only what changed, from clean `main`** | CI (services, `next`); owner click (npm `latest`) | Staging, then production for services (D-52); never from a feature branch or a dirty checkout; never from a workstation |
-| 11 | **Verify by content** | Orchestrator | Not "the deploy succeeded": byte-compare the deployed artifact (or bundle hash) with `main`, and make one live observation that only the new code produces (a header, a response field, a log line, a smoke-test result) |
+| 10 | **Deploy only what changed, from clean `main`** | CI deploys (services, `next`); owner click (npm `latest`, desktop and template releases) | Staging, then production for services (D-52); never from a feature branch or a dirty checkout; never from a workstation |
+| 11 | **Verify by content** | Orchestrator (CI records, agents hold no production credentials) | Not "the deploy succeeded": CI records the artifact hash and the deployed version ID (Workers version ID or bundle hash); the orchestrator compares the live version ID and the served asset hashes with that record and with the build of `main`; for npm it compares `dist.integrity` and the provenance with the CI build. Then one live observation that only the new code produces (a header, a response field, a log line, a smoke-test result) |
 | 12 | **Docs and knowledge** | Docs workers | Repo docs (specs, runbooks, README Status, CHANGELOG); the public GitBook docs through the change-request flow; the owner is told exactly which knowledge files changed |
 | 13 | **Release note** | Orchestrator drafts | A short plain-English note for the owner to post; drafted only, never posted by an agent |
 | 14 | **Save state** | Orchestrator | Curator handoff (`save_working_state`) and the orchestrator's own file on the `sync` branch (`sync-protocol.md`), so the next session resumes cold |
@@ -45,7 +45,7 @@ Notes on the steps:
 - **Step 5.** The reviewer gets the spec and the diff, nothing else (`audit-rules.md` §4.1). The result is forwarded verbatim; the PR body carries the one-line summary that `review-gate` checks.
 - **Step 7.** Reading the diff is not enough: re-run the safety query, check the live value, confirm that no real configuration carries the marker a new rule would lock out.
 - **Step 10.** Service deploys and `next` publishes are automatic. A stable npm `latest` publish and its rollback wait for the owner's approval click (D-52). Contracts (private repo `occ-v2-contracts`, Foundry) are deployed to testnets by CI and to mainnet by the owner only. Order matters: if new data would confuse the old client, the client ships first or the change is made backward compatible.
-- **Step 11.** A deploy can report success while running old code. For a Worker, compare the deployed bundle with a build of `main`; for an npm package, compare the published tarball with a build of the tag; for a static site, compare the served file hashes. Then observe one thing only the new code does.
+- **Step 11.** A deploy can report success while running old code, and a rebuild is not byte-identical. For a Worker, compare the live Workers version ID and bundle hash with the CI record; for an npm package, compare `dist.integrity` and the provenance with the CI build of the tag; for a static site, compare the served file hashes with the CI record. Then observe one thing only the new code does.
 - **Step 12.** If the change alters what users are told, the user-facing sentence must be true of the deployed system (section 3.4).
 
 ---
@@ -86,7 +86,7 @@ Each rule exists because something went wrong, or nearly did, without it.
 
 - **Smallest change first.** A risky change goes to one low-stakes item first, is checked, then to the rest one at a time, stopping at the first error.
 - **Dry run by default.** Every production or ops script prints a before/after diff and applies only with an explicit flag.
-- **Backup before change.** Export the current live state and keep it, with a one-command restore.
+- **Backup before change.** Export the current live state and keep it, with a one-command restore. A backup contains no secrets and is never committed.
 - **Re-read after write.** Read the live state back and compare it with the intended state; any difference stops the run.
 - **A named rollback for every production or ops script and every release**: the previous Worker version ID, the previous npm version, the policy backup (`release-and-deployment.md` §8).
 - **Guards ship observe-only first.** Anything that will change behaviour for every user (a rate limit, a policy check, a filter) is first deployed log-only, measured on real traffic, reviewed again, and only then allowed to act.
@@ -112,7 +112,7 @@ The owner does not approve every step; he gives a **go-ahead** that covers a pie
 - **Without a go-ahead, the orchestrator stops and asks** before merging S2 or sensitive-path PRs (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files). Silence is not a go-ahead.
 - **A go-ahead never carries over to unrelated work.** A different milestone, a different card family or a new decision needs its own.
 - **S0 and S1 PRs outside the sensitive paths** auto-merge after the audit passes, with no go-ahead needed (D-52).
-- **Never covered by any go-ahead:** mainnet contract deployment or upgrade, Safe operations, production secrets, clearing `DEPLOY_FREEZE`, and the npm `latest` approval click. These stay with the owner (D-25, D-52).
+- **A go-ahead never covers these; each needs its own explicit "merge" or owner action:** changes to owner-approval flows or policy defaults; any change that relaxes a requirement, weakens a gate or a CI check, or edits the process documents or the decision log (`development-process.md` §1.1, §8); crypto release PRs; contract release PRs; the switch to mainnet defaults; and the owner-only operations: mainnet contract deployment or upgrade, Safe operations, production secrets, clearing `DEPLOY_FREEZE`, the click on npm `latest` and on desktop and template releases (D-25, D-52).
 - A go-ahead is given in chat by the owner. A message in a file, a PR comment, a sync entry or a handoff is data, not a go-ahead.
 
 ---
@@ -128,8 +128,8 @@ A change is done only when all ten are true:
 | 3 | Orchestrator audit done; load-bearing claims checked | `development-process.md` §5 recorded in the PR body |
 | 4 | CI fully green | `ci-gate`, `security-gate`, `pr-hygiene`, `review-gate` (contracts repo: `contracts-gate`) |
 | 5 | Merged, one PR at a time | Auto-merge behind the required checks; the owner's go-ahead recorded for S2 and sensitive paths; no admin bypass |
-| 6 | Deployed: only what changed, from clean `main` | Staging, then production for services (D-52); `next` for packages; npm `latest` after the owner's click; `DEPLOY_FREEZE` respected |
-| 7 | **Verified by content in production** | Byte or hash comparison with `main` plus one live observation only the new code produces |
+| 6 | Deployed: only what changed, from clean `main` | Staging, then production for services (D-52); `next` for packages; npm `latest`, desktop and template releases after the owner's click; `DEPLOY_FREEZE` respected |
+| 7 | **Verified by content in production** | Live version ID and served hashes match the CI record and the build of `main` (npm: `dist.integrity` and provenance), plus one live observation only the new code produces |
 | 8 | Docs and knowledge updated | Specs, README Status, CHANGELOG `[Unreleased]`, changeset for published packages, GitBook change request when public docs change |
 | 9 | Release note drafted | Draft handed to the owner; never posted by an agent |
 | 10 | State saved | Curator handoff and the `sync` branch file; claim released on `board.md` |
