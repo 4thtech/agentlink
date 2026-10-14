@@ -12,6 +12,8 @@ const SHARED = 'harness/vectors.test.ts';
 const BATCH_FORM = 'harness/batch-form.test.ts';
 // The contact.check schema cross-check (M1-2f): its card asks for every runtime too.
 const CONTACT_CHECK_FORM = 'harness/contact-check-form.test.ts';
+// The contact.check verify cases through the core (M1-7c-b) while the owner-action suite is pending.
+const CONTACT_CHECK_VERIFY = 'harness/contact-check-verify.test.ts';
 
 // Suites test the source of @agentlink/crypto, not a build of it: the vectors job does not build,
 // and a stale dist/ must never be what passes. Inline projects do not inherit a root `resolve`, so
@@ -41,6 +43,11 @@ const resolve = {
       find: /^@agentlink\/core\/safety-code$/,
       replacement: packageSource('core', 'safety-code.ts'),
     },
+    // M1-7c-b: the contact.check verification, same rule (crypto, types and the core's errors only).
+    {
+      find: /^@agentlink\/core\/contact-check$/,
+      replacement: packageSource('core', 'contact-check.ts'),
+    },
   ],
 };
 
@@ -59,6 +66,7 @@ export default defineConfig({
             'harness/policy-form.test.ts',
             BATCH_FORM,
             CONTACT_CHECK_FORM,
+            CONTACT_CHECK_VERIFY,
           ],
           provide: { vectorsRuntime: 'node' },
         },
@@ -67,7 +75,7 @@ export default defineConfig({
         resolve,
         test: {
           name: 'browser',
-          include: [SHARED, BATCH_FORM, CONTACT_CHECK_FORM],
+          include: [SHARED, BATCH_FORM, CONTACT_CHECK_FORM, CONTACT_CHECK_VERIFY],
           browser: {
             enabled: true,
             provider: playwright(),
@@ -94,7 +102,7 @@ export default defineConfig({
         resolve,
         test: {
           name: 'workers',
-          include: [SHARED, BATCH_FORM, CONTACT_CHECK_FORM],
+          include: [SHARED, BATCH_FORM, CONTACT_CHECK_FORM, CONTACT_CHECK_VERIFY],
           provide: { vectorsRuntime: 'workerd' },
         },
       },
