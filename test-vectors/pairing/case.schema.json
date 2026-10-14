@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/4thtech/agentlink/test-vectors/pairing/case.schema.json",
   "title": "pairing case",
-  "description": "04 \u00a73.6 pairing proof. `hmacSha256`: RFC 4231. `pairingProof`: sha256(JCS(card)) and the base64url proof for secret, inviteId and B's card. `verifyPairingProof`: accept or reject.",
+  "description": "04 \u00a73.6 pairing proof. `hmacSha256`: RFC 4231. `pairingProof`: proofKey, sha256(JCS(card)) and the base64url proof for secret, inviteId and B's card. `verifyPairingProof`: accept or reject.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -99,10 +99,15 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
+            "proofKey",
             "cardJcsSha256",
             "proof"
           ],
           "properties": {
+            "proofKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
             "cardJcsSha256": {
               "type": "string",
               "pattern": "^[0-9a-f]{64}$"

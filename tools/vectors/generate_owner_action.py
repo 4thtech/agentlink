@@ -9,8 +9,7 @@ are synthetic test values.
 Ops: `agent.revoke` (sign and verify); `approval.decide` (sign and verify against a pending
 request); `approval.cancel` and `policy.set` (sign; `policy` is the 06 §3 defaults, until M1-2b
 builds the strict schema). `actionDigest` is 64 lowercase hex, and the card's `ownerNostr` is
-0x + 64 hex while `owner` has no prefix, compared as bytes: 04 §2.4.1 and §3.4.1 on
-docs/canonical-encodings (pending merge; regenerate if its review changes them).
+0x + 64 hex while `owner` has no prefix, compared as bytes: 04 §2.4.1 and §3.4.1. `approvalId` is exactly `apr_` + base64url of 16 bytes.
 
 `verify` cases give the receiving core's context: the agent's own EVM address, `ownerNostr` as the
 card spells it, the current time, an empty nonce store and, for `approval.decide`, the pending
@@ -187,7 +186,7 @@ def build():
     changed["params"]["reason"] = "retired"
     reject("reject-body-changed", "body changed after signing", {"body": changed, "sig": good_sig})
 
-    # approval.decide, approval.cancel and policy.set (04 §2.5.1, §3.4.1; docs/canonical-encodings).
+    # approval.decide, approval.cancel and policy.set (04 §2.5.1, §3.4.1, §2.4.1).
     approval_id = "apr_" + v.b64u(v.det("owner-action/approval-id", 16))
     action = {"tool": "agentlink_respond_to_terms", "args": {"contact": other_agent, "decision": "accept"}, "context": {}}
     digest = v.hx(v.sha256(v.jcs(action)))
@@ -224,7 +223,7 @@ def build():
         cases.append(
             v.case(
                 case_id,
-                f"{SPEC} SignedOwnerAction, {why} (docs/canonical-encodings, pending merge)",
+                f"{SPEC} SignedOwnerAction, {why}",
                 {"op": "sign", "body": b, "secretKey": v.hx(owner), "auxRand": v.hx(aux)},
                 {
                     "jcs": jcs_lenient(b).decode("utf-8"),
@@ -244,7 +243,7 @@ def build():
     cases.append(
         v.case(
             "verify-approval-approve",
-            f"{SPEC}: approval.decide for the pending request verifies (docs/canonical-encodings, pending merge)",
+            f"{SPEC}: approval.decide for the pending request verifies",
             {"op": "verify", "signed": signed_body(approve), "context": decide_ctx},
             {"outcome": "accept"},
         )

@@ -1203,7 +1203,7 @@
     },
     {
       "id": "sign-approval-approve",
-      "source": "04 \u00a72.5.1 SignedOwnerAction, approval.decide, approve (docs/canonical-encodings, pending merge)",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, approval.decide, approve",
       "input": {
         "op": "sign",
         "body": {
@@ -1232,7 +1232,7 @@
     },
     {
       "id": "sign-approval-deny",
-      "source": "04 \u00a72.5.1 SignedOwnerAction, approval.decide, deny (a deny is signed too) (docs/canonical-encodings, pending merge)",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, approval.decide, deny (a deny is signed too)",
       "input": {
         "op": "sign",
         "body": {
@@ -1261,7 +1261,7 @@
     },
     {
       "id": "sign-approval-cancel",
-      "source": "04 \u00a72.5.1 SignedOwnerAction, approval.cancel (D-55) (docs/canonical-encodings, pending merge)",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, approval.cancel (D-55)",
       "input": {
         "op": "sign",
         "body": {
@@ -1288,7 +1288,7 @@
     },
     {
       "id": "sign-policy-set",
-      "source": "04 \u00a72.5.1 SignedOwnerAction, policy.set with the 06 \u00a73 defaults as policy (proposed until M1-2b) (docs/canonical-encodings, pending merge)",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, policy.set with the 06 \u00a73 defaults as policy (proposed until M1-2b)",
       "input": {
         "op": "sign",
         "body": {
@@ -1355,7 +1355,7 @@
     },
     {
       "id": "verify-approval-approve",
-      "source": "04 \u00a72.5.1: approval.decide for the pending request verifies (docs/canonical-encodings, pending merge)",
+      "source": "04 \u00a72.5.1: approval.decide for the pending request verifies",
       "input": {
         "op": "verify",
         "signed": {

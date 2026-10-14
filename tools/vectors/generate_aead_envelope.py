@@ -32,7 +32,7 @@ VERSION = 1
 ENVELOPE_TAG = "agentlink/envelope/v1"
 OWNER_ACTION_TAG = "agentlink/owner-action/v1"
 HEADER_FIELDS = ["v", "id", "thread", "from", "createdAt", "recipients"]
-STRUCTURE = "04 §3.1 envelope v1 structure, §2.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a)"
+STRUCTURE = "04 §3.1 envelope v1 structure, §2.4.1 encodings, strict schema (M1-2a)"
 DELETE = object()
 
 
@@ -56,7 +56,7 @@ def b64u_len(text, n=None, minimum=None):
 
 
 def validate(envelope):
-    """Envelope v1 structure and encodings (04 §3.1; §2.4.1 on docs/canonical-encodings; strict
+    """Envelope v1 structure and encodings (04 §3.1, §2.4.1; strict
     schema, unknown keys rejected, M1-2a), then the signature. Returns True only if all hold."""
     try:
         if set(envelope) != {"v", "id", "thread", "from", "createdAt", "recipients", "aead", "sig"}:

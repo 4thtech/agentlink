@@ -750,7 +750,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Spec:** 04 §2.5.1, §2.4.1; RFC 7493; RFC 8785 §3.1
 - **Invariants:** I-4, I-8
 - **Scope:**
-  - Decide in 04 §2.5.1 whether a `SignedOwnerAction` is verified on its received JSON text, and whether duplicate keys and non-canonical number spellings (`1.0`, `1e9`, `-0`, escaped key spellings) are refused there. After `JSON.parse` they cannot be told apart from canonical input, so the parsed-object vectors of M1-1h cannot express them.
+  - 04 §2.4.1 (#22) already refuses non-canonical integer tokens (`1.0`, `1e3`, `-0`) on the token text; M1-1h vectors that rule (`encodings` `parseInteger`, `eip712` `agentCardJson`). Still open: decide in 04 §2.5.1 that a `SignedOwnerAction` and an envelope are verified from their received JSON text, with duplicate keys and escaped key spellings refused there.
   - Then add `verifyText` vectors (input: the raw text) for `owner-action` and the envelope, with one rejection per form.
 - **Acceptance:**
   - The spec line lands first. Vectors come from the M1-1h generators, and the suites stay pending until their modules land.

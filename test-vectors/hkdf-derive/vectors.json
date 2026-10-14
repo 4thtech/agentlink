@@ -654,7 +654,7 @@
     },
     {
       "id": "key-evm-e0-seed-a",
-      "source": "04 \u00a72.1 secp256k1 EVM address: canonical 0x + lowercase hex (04 \u00a72.4.1, docs/canonical-encodings, pending merge) and its EIP-55 display form",
+      "source": "04 \u00a72.1 secp256k1 EVM address: canonical 0x + lowercase hex (04 \u00a72.4.1) and its EIP-55 display form",
       "input": {
         "op": "key",
         "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
@@ -788,7 +788,7 @@
     },
     {
       "id": "key-evm-e0-seed-b",
-      "source": "04 \u00a72.1 secp256k1 EVM address: canonical 0x + lowercase hex (04 \u00a72.4.1, docs/canonical-encodings, pending merge) and its EIP-55 display form",
+      "source": "04 \u00a72.1 secp256k1 EVM address: canonical 0x + lowercase hex (04 \u00a72.4.1) and its EIP-55 display form",
       "input": {
         "op": "key",
         "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/4thtech/agentlink/test-vectors/keystore-file/case.schema.json",
   "title": "keystore-file case",
-  "description": "04 \u00a72.8 ALKS v1 and ALKO v1. `password`: the Argon2id password bytes for a secret, its kind and its source (file input loses one trailing newline), or a rejection. `kek`: the key-encryption key for `format` ALKS or ALKO. `seal` / `sealAlko`: the whole blob as hex. `open`: entry names (comma-separated, in file order) and each value as `entry:<name>` hex, or a rejection. `openAlko`: the 32-byte owner seed, or a rejection.",
+  "description": "04 \u00a72.8 ALKS v1 and ALKO v1. `password` / `passwordBytes`: the Argon2id password bytes for a secret (text or raw bytes), its kind and its source (file input loses one trailing newline), or a rejection. `kek`: the key-encryption key for `format` ALKS or ALKO. `seal` / `sealAlko`: the whole blob as hex. `open`: entry names (comma-separated, in file order) and each value as `entry:<name>` hex, or a rejection. `openAlko`: the 32-byte owner seed, or a rejection.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -47,6 +47,68 @@
             },
             "secret": {
               "type": "string"
+            },
+            "source": {
+              "enum": [
+                "prompt",
+                "file"
+              ]
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "password"
+              ],
+              "properties": {
+                "password": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "secretKind",
+            "secretBytes",
+            "source"
+          ],
+          "properties": {
+            "op": {
+              "const": "passwordBytes"
+            },
+            "secretKind": {
+              "type": "integer"
+            },
+            "secretBytes": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
             },
             "source": {
               "enum": [

@@ -13,8 +13,8 @@ AgentCard (04 §2.4; M1-1e): chain-agnostic domain {name: "OCC AgentCard", versi
 chainId and no verifyingContract, and the struct with the field order of 04 §2.4. nameHash =
 keccak256(utf8(name)); relaysHash = keccak256(JCS(relays)) (RFC 8785, `rfc8785`). Cards are in
 the card JSON form and `cardSig` is 0x + 130 lowercase hex (r || s || v, v in {27, 28}, low s),
-per 04 §2.4 and §2.4.1 on docs/canonical-encodings (pending merge; regenerate if its review
-changes them). Keys are synthetic test values (the Mail key is the EIP's keccak256("cow")).
+per 04 §2.4 and §2.4.1 (canonical ECDSA: r and s in [1, n - 1], s <= n/2, v in {27, 28}). The card
+is I-JSON with integer tokens matching 0|[1-9][0-9]*, so `agentCardJson` cases give raw JSON text. Keys are synthetic test values (the Mail key is the EIP's keccak256("cow")).
 
 Negative cases: non-canonical cards (encodings, integer ranges, unknown or missing fields); a card
 signature that does not verify for the card's ownerEvm after a field changes, under a domain that
@@ -25,6 +25,7 @@ Usage: python3 -I tools/vectors/generate_eip712.py --check [FILE] | --write
 """
 
 import copy
+import json
 import re
 import sys
 from pathlib import Path
@@ -180,7 +181,7 @@ BYTES32_FIELDS = ("agentNostr", "agentEnc", "ownerNostr", "ownerEnc", "nameHash"
 
 
 def parse_card(card):
-    """The card JSON form (04 §2.4, §2.4.1; docs/canonical-encodings, pending merge): exactly the
+    """The card JSON form (04 §2.4, §2.4.1): exactly the
     twelve fields; addresses 0x + 40 lowercase hex; bytes32 0x + 64 lowercase hex; integers JSON
     integers in [0, 2^53 - 1] and within their uint type. Anything else is rejected."""
     if not isinstance(card, dict) or set(card) != {f["name"] for f in AGENT_CARD_TYPES["AgentCard"]}:
@@ -196,6 +197,27 @@ def parse_card(card):
         if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= min(2**53 - 1, 2**bits - 1):
             raise ValueError(f"{name} is out of range")
     return card
+
+
+def parse_card_text(text):
+    """Strict parse of a card's JSON text: duplicate keys refused, and every number token must match
+    0|[1-9][0-9]* (04 §2.4.1), checked on the token, not the parsed value."""
+
+    def pairs(items):
+        names = [k for k, _ in items]
+        if len(set(names)) != len(names):
+            raise ValueError("duplicate key")
+        return dict(items)
+
+    def integer(token):
+        if not re.fullmatch(r"0|[1-9][0-9]*", token):
+            raise ValueError("non-canonical integer token")
+        return int(token)
+
+    def no_float(token):
+        raise ValueError("non-integer number token")
+
+    return parse_card(json.loads(text, object_pairs_hook=pairs, parse_int=integer, parse_float=no_float, parse_constant=no_float))
 
 
 def card_digest(card, domain=AGENT_CARD_DOMAIN, domain_fields=None):
@@ -227,7 +249,7 @@ def verify_card_sig(card, sig):
     if not isinstance(sig, str) or not re.fullmatch(r"0x[0-9a-f]{130}", sig):
         return False
     r, s, v_byte = sig[2:66], sig[66:130], int(sig[130:132], 16)
-    if v_byte not in (27, 28) or int(s, 16) > v.SECP256K1_N // 2:
+    if v_byte not in (27, 28) or not 1 <= int(r, 16) < v.SECP256K1_N or not 1 <= int(s, 16) <= v.SECP256K1_N // 2:
         return False
     signer = recover(card_digest(card), r, s, v_byte - 27)
     return signer is not None and bytes.fromhex(signer[2:]) == bytes.fromhex(card["ownerEvm"][2:])
@@ -251,7 +273,7 @@ def make_card(label, name, relays, issued_at, expires_at, key_epoch):
     }
 
 
-CARD_FORM = "04 §2.4 card JSON form, §2.4.1 (docs/canonical-encodings, pending merge)"
+CARD_FORM = "04 §2.4 card JSON form, §2.4.1"
 
 
 def build():
@@ -367,7 +389,7 @@ def build():
     cases.append(
         v.case(
             "card-sign",
-            "04 §2.4 cardSig: owner EVM key, EIP-712, RFC 6979, low s, 0x + 130 hex with v in {27, 28} (docs/canonical-encodings, pending merge)",
+            "04 §2.4 cardSig: owner EVM key, EIP-712, RFC 6979, low s, 0x + 130 hex with v in {27, 28} (04 §2.4.1)",
             {"op": "signAgentCard", "card": card, "secretKey": owner_secret.hex()},
             {"cardSig": sig},
         )
@@ -403,6 +425,38 @@ def build():
     verify_case("card-verify-reject-64-bytes", "r || s without v (64 bytes)", card, sig[:130], False)
     verify_case("card-verify-reject-uppercase", "cardSig in upper-case hex", card, "0x" + sig[2:].upper(), False)
     verify_case("card-verify-reject-no-prefix", "cardSig without 0x", card, sig[2:], False)
+    n_hex = format(v.SECP256K1_N, "064x")
+    verify_case("card-verify-reject-r-zero", "r = 0 (r must be in [1, n - 1])", card, "0x" + "00" * 32 + s_hex + format(v_byte, "02x"), False)
+    verify_case("card-verify-reject-s-zero", "s = 0 (s must be in [1, n - 1])", card, "0x" + r_hex + "00" * 32 + format(v_byte, "02x"), False)
+    verify_case("card-verify-reject-r-n", "r = n (r must be in [1, n - 1])", card, "0x" + n_hex + s_hex + format(v_byte, "02x"), False)
+    verify_case("card-verify-reject-v-29", "v = 29", card, sig[:130] + "1d", False)
+
+    # Raw JSON text of a card (04 §2.4: I-JSON; §2.4.1: integer tokens match 0|[1-9][0-9]*).
+    canonical_text = json.dumps(card)
+    cases.append(
+        v.case(
+            "card-json-canonical",
+            f"{CARD_FORM}: the card as JSON text parses and hashes like the object",
+            {"op": "agentCardJson", "json": canonical_text},
+            {"digest": card_digest(parse_card_text(canonical_text)).hex()},
+        )
+    )
+    for case_id, why, text in [
+        ("duplicate-key", "a duplicate key (I-JSON)", canonical_text[:-1] + ', "keyEpoch": 0}'),
+        ("version-1-0", "version spelled 1.0", canonical_text.replace('"version": 1,', '"version": 1.0,')),
+        ("issued-at-exponent", "issuedAt spelled 1.76e9", canonical_text.replace('"issuedAt": 1760000000', '"issuedAt": 1.76e9')),
+        ("expires-at-fraction", "expiresAt spelled 1791536000.0", canonical_text.replace('"expiresAt": 1791536000', '"expiresAt": 1791536000.0')),
+        ("key-epoch-minus-zero", "keyEpoch spelled -0", canonical_text.replace('"keyEpoch": 0', '"keyEpoch": -0')),
+        ("issued-at-near-integer", "issuedAt spelled 9007199254740991.4", canonical_text.replace('"issuedAt": 1760000000', '"issuedAt": 9007199254740991.4')),
+    ]:
+        if text == canonical_text:
+            v.fail(f"{case_id}: substitution did not apply")
+        try:
+            parse_card_text(text)
+            v.fail(f"{case_id} parses")
+        except ValueError:
+            pass
+        cases.append(v.case(f"card-json-reject-{case_id}", f"{CARD_FORM}: {why}; rejected on the token, never normalised", {"op": "agentCardJson", "json": text}, {"outcome": "reject"}))
     return cases
 
 
@@ -415,7 +469,8 @@ SCHEMA = v.case_schema(
     "`agentCard`: typeHash, domain separator, struct hash and digest of a card in the card JSON "
     "form under the chain-agnostic domain, or a rejection of a non-canonical card. `cardHashes`: "
     "nameHash and relaysHash. `verifyAgentCard`: whether `cardSig` is the card owner's. Hashes are "
-    "32-byte hex without 0x.",
+    "32-byte hex without 0x. `agentCardJson`: the digest of a card given as JSON text, or a "
+    "rejection of a duplicate key or a non-canonical integer token.",
     {
         "typedData": ({"typedData": v.OBJECT}, [{"domainSeparator": v.hexn(32), "structHash": v.hexn(32), "digest": v.hexn(32)}]),
         "signTypedData": ({"typedData": v.OBJECT, "secretKey": v.hexn(32)}, [{"signature": SIGNATURE_0X}]),
@@ -423,6 +478,7 @@ SCHEMA = v.case_schema(
             {"card": v.OBJECT},
             [{"typeHash": v.hexn(32), "domainSeparator": v.hexn(32), "structHash": v.hexn(32), "digest": v.hexn(32)}, v.REJECT],
         ),
+        "agentCardJson": ({"json": v.STRING}, [{"digest": v.hexn(32)}, v.REJECT]),
         "cardHashes": ({"name": v.STRING, "relays": {"type": "array", "items": v.STRING}}, [{"nameHash": BYTES32, "relaysHash": BYTES32}]),
         "signAgentCard": ({"card": v.OBJECT, "secretKey": v.hexn(32)}, [{"cardSig": SIGNATURE_0X}]),
         "verifyAgentCard": ({"card": v.OBJECT, "cardSig": v.STRING}, [v.ACCEPT, v.REJECT]),

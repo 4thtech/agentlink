@@ -1143,7 +1143,7 @@
     },
     {
       "id": "validate",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): the reference envelope",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): the reference envelope",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1188,7 +1188,7 @@
     },
     {
       "id": "validate-reject-v-2",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): v other than 1; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): v other than 1; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1233,7 +1233,7 @@
     },
     {
       "id": "validate-reject-unknown-top-level-key",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): an unknown top-level key; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): an unknown top-level key; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1279,7 +1279,7 @@
     },
     {
       "id": "validate-reject-unknown-aead-key",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): an unknown key in aead; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): an unknown key in aead; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1325,7 +1325,7 @@
     },
     {
       "id": "validate-reject-unknown-recipient-key",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): an unknown key in a recipient; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): an unknown key in a recipient; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1371,7 +1371,7 @@
     },
     {
       "id": "validate-reject-missing-thread",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): thread missing; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): thread missing; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1415,7 +1415,7 @@
     },
     {
       "id": "validate-reject-id-15-bytes",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): id of 15 bytes; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): id of 15 bytes; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1460,7 +1460,7 @@
     },
     {
       "id": "validate-reject-id-padded",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): id as padded base64url; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): id as padded base64url; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1505,7 +1505,7 @@
     },
     {
       "id": "validate-reject-thread-17-bytes",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): thread of 17 bytes; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): thread of 17 bytes; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1550,7 +1550,7 @@
     },
     {
       "id": "validate-reject-from-uppercase",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): from in upper-case hex; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): from in upper-case hex; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1595,7 +1595,7 @@
     },
     {
       "id": "validate-reject-from-0x-prefix",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): from with 0x (Nostr-native: bare hex); rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): from with 0x (Nostr-native: bare hex); rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1640,7 +1640,7 @@
     },
     {
       "id": "validate-reject-created-at-2-pow-53",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): createdAt = 2^53; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): createdAt = 2^53; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1685,7 +1685,7 @@
     },
     {
       "id": "validate-reject-created-at-string",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): createdAt as a string; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): createdAt as a string; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1730,7 +1730,7 @@
     },
     {
       "id": "validate-reject-recipients-empty",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): no recipients; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): no recipients; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1754,7 +1754,7 @@
     },
     {
       "id": "validate-reject-kid-15-bytes",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): kid of 15 bytes; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): kid of 15 bytes; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1799,7 +1799,7 @@
     },
     {
       "id": "validate-reject-wk-standard-alphabet",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): wk with + and / (standard base64); rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): wk with + and / (standard base64); rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1844,7 +1844,7 @@
     },
     {
       "id": "validate-reject-alg-a128gcm",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): alg other than A256GCM; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): alg other than A256GCM; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1889,7 +1889,7 @@
     },
     {
       "id": "validate-reject-iv-11-bytes",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): iv of 11 bytes; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): iv of 11 bytes; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1934,7 +1934,7 @@
     },
     {
       "id": "validate-reject-iv-padded",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): iv as padded base64url; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): iv as padded base64url; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1979,7 +1979,7 @@
     },
     {
       "id": "validate-reject-ct-15-bytes",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): ct shorter than the 16-byte tag; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): ct shorter than the 16-byte tag; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -2024,7 +2024,7 @@
     },
     {
       "id": "validate-reject-sig-uppercase",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): sig in upper-case hex (the signature is otherwise valid); rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): sig in upper-case hex (the signature is otherwise valid); rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -2069,7 +2069,7 @@
     },
     {
       "id": "validate-reject-sig-0x-prefix",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): sig with 0x; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): sig with 0x; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {

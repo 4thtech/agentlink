@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Independent generator for the `keystore-file` suite: ALKS v1 and ALKO v1 (M1-1h).
 
-04 §2.8 (D-54), with the password rule and the ALKO layout of docs/canonical-encodings (pending
-merge; regenerate if its review changes them):
+04 §2.8 (D-54), exactly:
   ALKS header = "ALKS" | u8 version=1 | u8 secretKind | u8 kdf=1 | u32be m (KiB) | u8 t | u8 p |
                 salt (16) | u8 aead=1 | nonce (12) | u8 idLen (1..64) | agentId ([A-Za-z0-9_-])
   ALKO header = "ALKO" | u8 version=1 | u8 secretKind | u8 kdf=1 | u32be m | u8 t | u8 p |
@@ -14,7 +13,9 @@ merge; regenerate if its review changes them):
   ALKO plaintext = exactly the 32-byte owner seed.
   password: a secret read from a file first loses one trailing \\n or \\r\\n. Kind 1 (generated
   code): refuse non-ASCII, remove spaces and dashes, ASCII upper case, map 0/1/8 to O/I/B, require
-  24 base32 characters, password = the 15 decoded bytes. Kind 2: UTF-8 of NFKC, spaces kept.
+  24 base32 characters, password = the 15 decoded bytes. Kind 2: fatal UTF-8 decoding (invalid
+  sequences, overlong forms and lone surrogates refused), C0 and C1 control characters refused,
+  then the UTF-8 of NFKC, spaces kept.
 Argon2id (v1.3), HKDF and AES-GCM are `cryptography` (Argon2id checked against RFC 9106 in
 `owner-wrap`, HKDF against RFC 5869 in `hkdf-derive`); owner keys come from the 04 §2.1 derivation
 of `generate_hkdf_derive.py`. Secrets, salts, nonces and entries are synthetic test values.
@@ -39,8 +40,8 @@ import vectorlib as v  # noqa: E402
 SUITE = "keystore-file"
 VERSION = 1
 SPEC = "04 §2.8 ALKS v1"
-SPEC_ALKO = "04 §2.8 ALKO v1 (docs/canonical-encodings, pending merge)"
-SPEC_PASSWORD = "04 §2.8 password() (docs/canonical-encodings, pending merge)"
+SPEC_ALKO = "04 §2.8 ALKO v1"
+SPEC_PASSWORD = "04 §2.8 password()"
 ALKS_INFO = b"agentlink/v1/keystore-file"
 ALKO_INFO = b"agentlink/v1/owner-passphrase-wrap"
 FLOOR = (19456, 2, 1)
@@ -52,6 +53,10 @@ BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 
 
 def password(secret, kind, source="prompt"):
+    if isinstance(secret, bytes):
+        secret = secret.decode("utf-8", errors="strict")  # fatal: invalid, overlong, surrogates refused
+    if any(0xD800 <= ord(c) <= 0xDFFF for c in secret):
+        raise ValueError("lone surrogate")
     if source == "file":
         if secret.endswith("\r\n"):
             secret = secret[:-2]
@@ -66,6 +71,8 @@ def password(secret, kind, source="prompt"):
             raise ValueError("not a 24-character code")
         return base64.b32decode(code)
     if kind == 2:
+        if any(ord(c) <= 0x1F or 0x7F <= ord(c) <= 0x9F for c in secret):
+            raise ValueError("control character")
         return unicodedata.normalize("NFKC", secret).encode("utf-8")
     raise ValueError("unknown secretKind")
 
@@ -383,13 +390,46 @@ def build():
         ("ascii", passphrase, "prompt"),
         ("fullwidth-and-ligature", unicode_passphrase, "prompt"),
         ("spaces-kept", "  two  spaces  inside  ", "prompt"),
-        ("combining-accent", "Café passphrase", "prompt"),
+        ("combining-accent", "Cafe\u0301 passphrase", "prompt"),
+        ("no-break-space", "two\u00a0words passphrase", "prompt"),
         ("file-lf", passphrase + "\n", "file"),
         ("file-crlf", passphrase + "\r\n", "file"),
-        ("file-two-newlines", passphrase + "\n\n", "file"),
-        ("prompt-trailing-newline", passphrase + "\n", "prompt"),
     ]:
         cases.append(v.case(f"password-passphrase-{case_id}", f"{SPEC_PASSWORD}, kind 2: UTF-8 of NFKC", {"op": "password", "secretKind": 2, "secret": raw, "source": source}, {"password": v.hx(password(raw, 2, source))}))
+    for case_id, raw, source in [
+        ("prompt-trailing-newline", passphrase + "\n", "prompt"),
+        ("file-two-newlines", passphrase + "\n\n", "file"),
+        ("file-cr-only", passphrase + "\r", "file"),
+        ("tab", "correct\thorse battery staple", "prompt"),
+        ("nul", "correct horse\u0000battery staple", "prompt"),
+        ("escape", "correct horse \u001b[0mbattery staple", "prompt"),
+        ("delete", "correct horse battery staple\u007f", "prompt"),
+        ("c1-next-line", "correct horse\u0085battery staple", "prompt"),
+        ("c1-last", "correct horse battery staple\u009f", "prompt"),
+    ]:
+        if not refused(password, raw, 2, source):
+            v.fail(f"passphrase {case_id} accepted")
+        cases.append(v.case(f"password-passphrase-reject-{case_id}", f"{SPEC_PASSWORD}, kind 2: a C0 or C1 control character is refused", {"op": "password", "secretKind": 2, "secret": raw, "source": source}, {"outcome": "reject"}))
+    # Fatal UTF-8 (kind 2 step 1), and kind 1's ASCII-only rule, on raw input bytes.
+    for case_id, kind, raw, source in [
+        ("utf8-valid", 2, "Caf\u00e9 passphrase".encode("utf-8"), "prompt"),
+        ("utf8-file-crlf", 2, b"correct horse battery staple\r\n", "file"),
+        ("code-ascii", 1, canonical.lower().encode("ascii"), "prompt"),
+    ]:
+        cases.append(v.case(f"password-bytes-{case_id}", f"{SPEC_PASSWORD}: input given as bytes", {"op": "passwordBytes", "secretKind": kind, "secretBytes": v.hx(raw), "source": source}, {"password": v.hx(password(raw, kind, source))}))
+    for case_id, kind, raw, why in [
+        ("invalid-continuation", 2, b"pass\xc3\x28word phrase", "an invalid UTF-8 sequence"),
+        ("lone-continuation", 2, b"pass\x80word phrase", "a stray continuation byte"),
+        ("overlong-slash", 2, b"pass\xc0\xafword phrase", "an overlong form"),
+        ("overlong-nul", 2, b"pass\xc0\x80word phrase", "an overlong NUL"),
+        ("encoded-surrogate", 2, b"pass\xed\xa0\x80word phrase", "a UTF-8-encoded lone surrogate"),
+        ("truncated", 2, b"passphrase \xe2\x82", "a truncated sequence"),
+        ("ff-byte", 2, b"passphrase \xff", "the byte FF"),
+        ("code-non-ascii", 1, canonical[:-1].encode("ascii") + b"\xc3\x84", "a non-ASCII byte in a generated code"),
+    ]:
+        if not refused(password, raw, kind, "prompt"):
+            v.fail(f"bytes {case_id} accepted")
+        cases.append(v.case(f"password-bytes-reject-{case_id}", f"{SPEC_PASSWORD}: {why} is refused, never replaced", {"op": "passwordBytes", "secretKind": kind, "secretBytes": v.hx(raw), "source": "prompt"}, {"outcome": "reject"}))
     cases.append(v.case("password-reject-kind-3", f"{SPEC_PASSWORD}: unknown secretKind", {"op": "password", "secretKind": 3, "secret": passphrase, "source": "prompt"}, {"outcome": "reject"}))
 
     # ALKO v1: the owner seed under an owner code (kind 1) or passphrase (kind 2).
@@ -456,13 +496,15 @@ OPEN_OK = {"type": "object", "required": ["entryNames"], "properties": {"entryNa
 KDF_FIELDS = {"secretKind": v.INTEGER, "secret": v.STRING, "source": SECRET_SOURCE, "salt": v.hexn(16), "memoryKiB": v.INTEGER, "iterations": v.INTEGER, "parallelism": v.INTEGER}
 SCHEMA = v.case_schema(
     SUITE,
-    "04 §2.8 ALKS v1 and ALKO v1. `password`: the Argon2id password bytes for a secret, its kind "
-    "and its source (file input loses one trailing newline), or a rejection. `kek`: the key-"
+    "04 §2.8 ALKS v1 and ALKO v1. `password` / `passwordBytes`: the Argon2id password bytes for a "
+    "secret (text or raw bytes), its kind and its source (file input loses one trailing newline), "
+    "or a rejection. `kek`: the key-"
     "encryption key for `format` ALKS or ALKO. `seal` / `sealAlko`: the whole blob as hex. `open`: "
     "entry names (comma-separated, in file order) and each value as `entry:<name>` hex, or a "
     "rejection. `openAlko`: the 32-byte owner seed, or a rejection.",
     {
         "password": ({"secretKind": v.INTEGER, "secret": v.STRING, "source": SECRET_SOURCE}, [{"password": v.HEX}, v.REJECT]),
+        "passwordBytes": ({"secretKind": v.INTEGER, "secretBytes": v.HEX, "source": SECRET_SOURCE}, [{"password": v.HEX}, v.REJECT]),
         "kek": ({"format": {"enum": ["ALKS", "ALKO"]}, **KDF_FIELDS}, [{"kek": v.hexn(32)}]),
         "seal": ({**KDF_FIELDS, "nonce": v.hexn(12), "agentId": v.STRING, "entries": {"type": "array", "items": ENTRY}}, [{"file": v.HEX}]),
         "open": ({"file": v.HEX, "secret": v.STRING, "source": SECRET_SOURCE, "expectedAgentId": v.STRING}, [v.REJECT]),
@@ -474,7 +516,7 @@ SCHEMA = v.case_schema(
     },
 )
 # `open` succeeds with a variable set of entry fields, which strict_object cannot express.
-SCHEMA["oneOf"][3]["properties"]["expected"] = {"oneOf": [OPEN_OK, v.strict_object(v.REJECT)]}
+SCHEMA["oneOf"][4]["properties"]["expected"] = {"oneOf": [OPEN_OK, v.strict_object(v.REJECT)]}
 
 if __name__ == "__main__":
     v.main(

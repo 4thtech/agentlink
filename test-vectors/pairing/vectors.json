@@ -82,7 +82,7 @@
     },
     {
       "id": "proof",
-      "source": "04 \u00a73.6 pairing proof (docs/canonical-encodings, pending merge)",
+      "source": "04 \u00a73.6 pairing proof",
       "input": {
         "op": "pairingProof",
         "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
@@ -103,13 +103,14 @@
         }
       },
       "expected": {
+        "proofKey": "3ec8c555753cbddd6c1c1ace2b44c6911aa829f0a7c5bdb9ab303b7dc0892721",
         "cardJcsSha256": "cb525ddf84b2a3bd7e6e04f0c1cf3a6c422783e80056a31609881b0019e2ee65",
-        "proof": "wko67W24-mO86Uz4ef0K0REO_Npe_h28nZCl80Wlyco"
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo"
       }
     },
     {
       "id": "proof-card-key-order",
-      "source": "04 \u00a73.6 pairing proof (docs/canonical-encodings, pending merge): the same card with its keys in another order gives the same proof (JCS)",
+      "source": "04 \u00a73.6 pairing proof: the same card with its keys in another order gives the same proof (JCS)",
       "input": {
         "op": "pairingProof",
         "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
@@ -130,13 +131,14 @@
         }
       },
       "expected": {
+        "proofKey": "3ec8c555753cbddd6c1c1ace2b44c6911aa829f0a7c5bdb9ab303b7dc0892721",
         "cardJcsSha256": "cb525ddf84b2a3bd7e6e04f0c1cf3a6c422783e80056a31609881b0019e2ee65",
-        "proof": "wko67W24-mO86Uz4ef0K0REO_Npe_h28nZCl80Wlyco"
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo"
       }
     },
     {
       "id": "verify",
-      "source": "04 \u00a73.6 pairing proof (docs/canonical-encodings, pending merge): the proof matches",
+      "source": "04 \u00a73.6 pairing proof: the proof matches",
       "input": {
         "op": "verifyPairingProof",
         "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
@@ -155,7 +157,7 @@
           "expiresAt": 1791536000,
           "keyEpoch": 0
         },
-        "proof": "wko67W24-mO86Uz4ef0K0REO_Npe_h28nZCl80Wlyco"
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo"
       },
       "expected": {
         "outcome": "accept"
@@ -163,7 +165,7 @@
     },
     {
       "id": "verify-reject-wrong-secret",
-      "source": "04 \u00a73.6 pairing proof (docs/canonical-encodings, pending merge): another invite secret",
+      "source": "04 \u00a73.6 pairing proof: another invite secret",
       "input": {
         "op": "verifyPairingProof",
         "secret": "q2Yhff8P19Ccqb8O9UA8BTjmtpS0tn-gplx9NRbHWrk",
@@ -182,7 +184,7 @@
           "expiresAt": 1791536000,
           "keyEpoch": 0
         },
-        "proof": "wko67W24-mO86Uz4ef0K0REO_Npe_h28nZCl80Wlyco"
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo"
       },
       "expected": {
         "outcome": "reject"
@@ -190,7 +192,7 @@
     },
     {
       "id": "verify-reject-other-invite",
-      "source": "04 \u00a73.6 pairing proof (docs/canonical-encodings, pending merge): another inviteId",
+      "source": "04 \u00a73.6 pairing proof: another inviteId",
       "input": {
         "op": "verifyPairingProof",
         "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
@@ -209,7 +211,7 @@
           "expiresAt": 1791536000,
           "keyEpoch": 0
         },
-        "proof": "wko67W24-mO86Uz4ef0K0REO_Npe_h28nZCl80Wlyco"
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo"
       },
       "expected": {
         "outcome": "reject"
@@ -217,7 +219,7 @@
     },
     {
       "id": "verify-reject-card-changed",
-      "source": "04 \u00a73.6 pairing proof (docs/canonical-encodings, pending merge): B's card changed (keyEpoch)",
+      "source": "04 \u00a73.6 pairing proof: B's card changed (keyEpoch)",
       "input": {
         "op": "verifyPairingProof",
         "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
@@ -236,6 +238,33 @@
           "expiresAt": 1791536000,
           "keyEpoch": 1
         },
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-raw-secret-key",
+      "source": "04 \u00a73.6 pairing proof: the proof was keyed with the raw secret instead of proofKey",
+      "input": {
+        "op": "verifyPairingProof",
+        "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
+        "inviteId": "KdWh9qy33-31vfdSrLKusg",
+        "card": {
+          "version": 1,
+          "agentEvm": "0xf4c632bd3cf6a0fd8f9c66eeb7f0311c8f9723da",
+          "agentNostr": "0x19c23ecacc91455a7cd570129257fbc690420a43332c2583a6290698e1a76043",
+          "agentEnc": "0xd72ea8de6bb4185bd43f3beced1eb47470d57f54883e06ff2ed7f3439c949068",
+          "ownerEvm": "0x531d01fe61bc699831e61e212e178c0c8a9b9683",
+          "ownerNostr": "0xbd36452b127735a5cf548e344fd1b37339a1c0fcc67cd9b2887336c412b09cbf",
+          "ownerEnc": "0x6902edf623763549883b30ce7c676f7c9cad949f1c948a5c2257b327dc8a4213",
+          "nameHash": "0xd3d2dc24e37a6cb2cfd267b484ff2fec94e29f0e019ce31e69208a2cf6f94e96",
+          "relaysHash": "0x75eb592ec8abdaf14bd4649714b9f0359d6d4a6a58e2298e574fdc3d5a8beb21",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
         "proof": "wko67W24-mO86Uz4ef0K0REO_Npe_h28nZCl80Wlyco"
       },
       "expected": {
@@ -244,7 +273,7 @@
     },
     {
       "id": "verify-reject-invite-id-as-text",
-      "source": "04 \u00a73.6 pairing proof (docs/canonical-encodings, pending merge): the proof was built over the base64url text of inviteId",
+      "source": "04 \u00a73.6 pairing proof: the proof was built over the base64url text of inviteId",
       "input": {
         "op": "verifyPairingProof",
         "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
@@ -263,7 +292,7 @@
           "expiresAt": 1791536000,
           "keyEpoch": 0
         },
-        "proof": "zGQm7DPbe2Ojh2iGApThIVh3K9Q9xnOnxdY-ofeAfnc"
+        "proof": "7Xg7u1AxdwCH-B_e2abRbIiYvnehgJPN50Lt7qtt3vQ"
       },
       "expected": {
         "outcome": "reject"
@@ -271,7 +300,7 @@
     },
     {
       "id": "verify-reject-card-not-jcs",
-      "source": "04 \u00a73.6 pairing proof (docs/canonical-encodings, pending merge): the proof was built over a non-JCS serialisation of the card",
+      "source": "04 \u00a73.6 pairing proof: the proof was built over a non-JCS serialisation of the card",
       "input": {
         "op": "verifyPairingProof",
         "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
@@ -290,7 +319,7 @@
           "expiresAt": 1791536000,
           "keyEpoch": 0
         },
-        "proof": "p-8XfNbI4jWiD-WEd7QpSfjXEQvIiuToCKeplyJ7l2E"
+        "proof": "ulYNuCd-023npvhDpsl7Fjq2tV23x1fEB8HlEjfIUGc"
       },
       "expected": {
         "outcome": "reject"
@@ -298,7 +327,7 @@
     },
     {
       "id": "verify-reject-proof-padded",
-      "source": "04 \u00a73.6 pairing proof (docs/canonical-encodings, pending merge): proof as padded base64url",
+      "source": "04 \u00a73.6 pairing proof: proof as padded base64url",
       "input": {
         "op": "verifyPairingProof",
         "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
@@ -317,7 +346,7 @@
           "expiresAt": 1791536000,
           "keyEpoch": 0
         },
-        "proof": "wko67W24-mO86Uz4ef0K0REO_Npe_h28nZCl80Wlyco="
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo="
       },
       "expected": {
         "outcome": "reject"
@@ -325,7 +354,7 @@
     },
     {
       "id": "verify-reject-proof-31-bytes",
-      "source": "04 \u00a73.6 pairing proof (docs/canonical-encodings, pending merge): a 31-byte proof",
+      "source": "04 \u00a73.6 pairing proof: a 31-byte proof",
       "input": {
         "op": "verifyPairingProof",
         "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
@@ -344,7 +373,7 @@
           "expiresAt": 1791536000,
           "keyEpoch": 0
         },
-        "proof": "wko67W24-mO86Uz4ef0K0REO_Npe_h28nZCl80WlyQ"
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fA"
       },
       "expected": {
         "outcome": "reject"
@@ -352,7 +381,7 @@
     },
     {
       "id": "verify-reject-secret-padded",
-      "source": "04 \u00a73.6 pairing proof (docs/canonical-encodings, pending merge): secret as padded base64url",
+      "source": "04 \u00a73.6 pairing proof: secret as padded base64url",
       "input": {
         "op": "verifyPairingProof",
         "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg=",
@@ -371,7 +400,7 @@
           "expiresAt": 1791536000,
           "keyEpoch": 0
         },
-        "proof": "wko67W24-mO86Uz4ef0K0REO_Npe_h28nZCl80Wlyco"
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo"
       },
       "expected": {
         "outcome": "reject"
@@ -379,7 +408,7 @@
     },
     {
       "id": "verify-reject-card-non-canonical",
-      "source": "04 \u00a73.6 pairing proof (docs/canonical-encodings, pending merge): a card field in upper-case hex",
+      "source": "04 \u00a73.6 pairing proof: a card field in upper-case hex",
       "input": {
         "op": "verifyPairingProof",
         "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
@@ -398,7 +427,7 @@
           "expiresAt": 1791536000,
           "keyEpoch": 0
         },
-        "proof": "wko67W24-mO86Uz4ef0K0REO_Npe_h28nZCl80Wlyco"
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo"
       },
       "expected": {
         "outcome": "reject"

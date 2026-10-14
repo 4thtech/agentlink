@@ -150,8 +150,8 @@ def build():
                     address = v.evm_address(secp_secret(seed, label, epoch))
                     expected = {"address": address, "addressChecksummed": v.eip55(address)}
                     source = (
-                        "04 §2.1 secp256k1 EVM address: canonical 0x + lowercase hex (04 §2.4.1, "
-                        "docs/canonical-encodings, pending merge) and its EIP-55 display form"
+                        "04 §2.1 secp256k1 EVM address: canonical 0x + lowercase hex (04 §2.4.1) "
+                        "and its EIP-55 display form"
                     )
                 else:
                     expected = {"publicKey": v.hx(v.xonly_public_key(secp_secret(seed, label, epoch)))}
