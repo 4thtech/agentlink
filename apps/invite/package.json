@@ -10,9 +10,6 @@
     "url": "git+https://github.com/4thtech/agentlink.git",
     "directory": "apps/invite"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,7 +20,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/tsconfig.tsbuildinfo"
   ],
   "scripts": {
     "build": "tsc -b",

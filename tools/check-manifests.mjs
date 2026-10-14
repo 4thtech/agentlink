@@ -2,7 +2,9 @@
 //
 // For every package.json in the repository (the root, every workspace package, anything nested):
 //   1. "license" is exactly "MIT" (D-12).
-//   2. No "preinstall", "install" or "postinstall" script (AGENTS.md, ci-cd.md: no install scripts).
+//   2. No install-time lifecycle script: preinstall, install, postinstall, and also preprepare, prepare and
+//      postprepare (a plain `pnpm install` runs those in the root and in workspace projects)
+//      (AGENTS.md, ci-cd.md: no install scripts).
 // For every package that is not private (it can be published):
 //   3. publishConfig.access is "public", publishConfig.registry and publishConfig.tag are absent,
 //      and a "repository" field exists (the release jobs refuse to publish otherwise).
@@ -11,8 +13,16 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const INSTALL_SCRIPTS = ['preinstall', 'install', 'postinstall'];
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.turbo', 'coverage']);
+const INSTALL_SCRIPTS = [
+  'preinstall',
+  'install',
+  'postinstall',
+  'preprepare',
+  'prepare',
+  'postprepare',
+];
+// .claude holds agent worktrees (other branches, untracked); they are not part of this tree.
+const SKIP_DIRS = new Set(['node_modules', '.git', '.claude', 'dist', '.turbo', 'coverage']);
 
 /** Returns a list of human-readable problems for one parsed package.json. */
 export function checkManifest(manifest) {

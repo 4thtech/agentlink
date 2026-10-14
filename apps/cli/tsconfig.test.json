@@ -4,7 +4,6 @@
     "composite": false,
     "noEmit": true,
     "declaration": false,
-    "declarationMap": false,
     "rootDir": "."
   },
   "include": ["src", "test"],

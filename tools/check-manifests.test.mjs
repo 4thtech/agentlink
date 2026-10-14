@@ -13,10 +13,13 @@ describe('checkManifest', () => {
     expect(checkManifest({ ...ok, license: 'Apache-2.0' })).toHaveLength(1);
   });
 
-  it.each(['preinstall', 'install', 'postinstall'])('rejects a %s script', (name) => {
-    const problems = checkManifest({ ...ok, scripts: { [name]: 'node evil.js' } });
-    expect(problems).toEqual([`must not declare a "${name}" script`]);
-  });
+  it.each(['preinstall', 'install', 'postinstall', 'preprepare', 'prepare', 'postprepare'])(
+    'rejects a %s script',
+    (name) => {
+      const problems = checkManifest({ ...ok, scripts: { [name]: 'node evil.js' } });
+      expect(problems).toEqual([`must not declare a "${name}" script`]);
+    },
+  );
 
   it('requires publish settings on a package that is not private', () => {
     const open = { license: 'MIT' };
