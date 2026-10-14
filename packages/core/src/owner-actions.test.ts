@@ -605,7 +605,17 @@ describe('loading the signed policy (G-6, 06 §3)', () => {
   it('an edited version column is ignored: a mismatch fails closed', async () => {
     await failClosedAfter(async (t) => {
       await t.store.transaction((tx) => tx.update('policies', {}, { version: 7 }));
-    }, 'mark_mismatch');
+    }, 'tampered');
+  });
+
+  it('an edited policy_hash column is ignored: a mismatch fails closed', async () => {
+    await failClosedAfter(async (t) => {
+      const sealed = await t.cipher.seal(
+        { table: 'policies', column: 'policy_hash', rowKey: rowKeyOf(['current']) },
+        '00'.repeat(32),
+      );
+      await t.store.transaction((tx) => tx.update('policies', {}, { policy_hash: sealed }));
+    }, 'tampered');
   });
 
   it('an older signed policy put back in the store is detected against the mark', async () => {

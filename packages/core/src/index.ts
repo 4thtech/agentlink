@@ -45,6 +45,40 @@ export {
   type ReceiveResult,
   type ReceiveStatus,
 } from './envelopes.js';
+export {
+  computeActionDigest,
+  ownerActionHash,
+  ownerActionSigningParts,
+  parseOwnerActionText,
+  verifyOwnerAction,
+  verifyOwnerActionText,
+  verifyStoredOwnerAction,
+  type ApprovalRequestView,
+  type ItemRefusal,
+  type ItemRefusalReport,
+  type OwnerActionCheckContext,
+  type OwnerActionRefusal,
+  type OwnerActionVerdict,
+} from './owner-action.js';
+export {
+  OwnerActions,
+  type ApprovalCheck,
+  type OwnerActionOutcome,
+  type PolicyVersionMark,
+} from './owner-actions.js';
+export {
+  FAIL_CLOSED_LIMITS,
+  POLICY_DEFAULTS_EFFECTIVE,
+  evaluate,
+  policyLimits,
+  type EffectivePolicy,
+  type PolicyAction,
+  type PolicyContext,
+  type PolicyDecision,
+  type PolicyDocument,
+  type PolicyLimits,
+  type PolicyProblem,
+} from './policy-engine.js';
 export { CoreError, StoreConstraintError, StoreUsageError, type CoreErrorCode } from './errors.js';
 export * from './constants.js';
 export {

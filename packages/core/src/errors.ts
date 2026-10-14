@@ -37,7 +37,9 @@ export type CoreErrorCode =
   | 'type_not_sendable'
   | 'payload_invalid'
   | 'thread_invalid'
-  | 'envelope_too_large';
+  | 'envelope_too_large'
+  // Policy (06 §3; M1-7d)
+  | 'policy_context_invalid';
 
 export class CoreError extends Error {
   readonly code: CoreErrorCode;

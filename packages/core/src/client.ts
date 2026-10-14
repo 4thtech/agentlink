@@ -13,6 +13,7 @@ import { EnvelopeService } from './envelopes.js';
 import type { CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import { IdentityService, finishPendingRotation } from './identity.js';
+import { OwnerActions, type PolicyVersionMark } from './owner-actions.js';
 import type { Store, StoreCipher } from './store/store.js';
 
 export interface AgentLinkClientOptions {
@@ -26,6 +27,11 @@ export interface AgentLinkClientOptions {
   readonly clock?: () => number;
   /** Default: the redacting logger (04 §8 rule 4, I-7). */
   readonly logger?: Logger;
+  /**
+   * The policy-version high-water mark, a KeyStore item (04 §2.5.1; M1-7d). Without it no policy.set
+   * applies and a loaded policy always fails closed (G-6).
+   */
+  readonly policyMark?: PolicyVersionMark;
 }
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
@@ -38,13 +44,21 @@ export class AgentLinkClient {
   /** Envelope build, receive and processing (M1-7b; 04 §3.1.1). */
   readonly envelopes: EnvelopeService;
   readonly approvals: ApprovalChannel;
+  /** Owner-signed actions and the signed policy (M1-7d; 04 §2.5.1). Authority is the signature. */
+  readonly ownerActions: OwnerActions;
 
-  private constructor(agentId: string, ctx: CoreContext, approvals: ApprovalChannel) {
+  private constructor(
+    agentId: string,
+    ctx: CoreContext,
+    approvals: ApprovalChannel,
+    policyMark: PolicyVersionMark | undefined,
+  ) {
     this.agentId = agentId;
     this.identity = new IdentityService(ctx);
     this.contacts = new ContactBook(ctx);
     this.envelopes = new EnvelopeService(ctx, this.identity, this.contacts);
     this.approvals = approvals;
+    this.ownerActions = new OwnerActions(ctx, this.identity, policyMark);
   }
 
   /**
@@ -91,6 +105,6 @@ export class AgentLinkClient {
       log: options.logger ?? createLogger({ name: 'core' }),
     };
     if (row !== undefined) await finishPendingRotation(ctx);
-    return new AgentLinkClient(bundle.agentId, ctx, approvals);
+    return new AgentLinkClient(bundle.agentId, ctx, approvals, options.policyMark);
   }
 }
