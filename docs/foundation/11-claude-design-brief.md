@@ -669,7 +669,7 @@ Show amounts only in dollars; never mention tokens or networks outside Advanced.
 ### 6.15 Marketing site (D3)
 
 **Purpose.** The public face on the production domain (M3-13).
-- **Pages:** Home · How it works · Pricing (§6.8) · Security and privacy (what leaves your machine, what 4thTech can and can't see) · Download (desktop apps per OS) · Docs (link to `wiki.4thtech.io`) · Verify (link) · About ("by 4thTech") · Legal (terms and privacy, from M3-7) · Changelog.
+- **Pages:** Home · How it works · Pricing (§6.8) · Security and privacy (what leaves your machine, what 4thTech can and can't see) · Download (desktop apps per OS) · Docs (link to the public docs site, D-57) · Verify (link) · About ("by 4thTech") · Legal (terms and privacy, from M3-7) · Changelog.
 - **Rules:** every feature shown as available must exist; mark planned items "planned". No third-party scripts, fonts or analytics; static pages; same tokens as the app.
 - **Sizes:** 360, 768, 1280, 1440; social images per §2.4.
 
