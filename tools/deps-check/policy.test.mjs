@@ -90,7 +90,10 @@ describe('policy data', () => {
 });
 
 describe('the repository itself', () => {
-  it('passes every boundary check', () => {
+  // A full scan parses every source file with TypeScript: about 0.5 s locally, but 4.4 s on a busy
+  // CI runner on main (6f6d840) and 5.06 s once this branch added test files, past the 5 s default.
+  // Same assertions, an explicit timeout.
+  it('passes every boundary check', { timeout: 60_000 }, () => {
     const { problems, packages } = runChecks(REPO);
     expect(problems).toEqual([]);
     expect(packages).toBeGreaterThan(10);
