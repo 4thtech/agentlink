@@ -726,6 +726,18 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Every case records generator, version and inputs; regeneration from the generator scripts reproduces the files byte for byte.
   - Narrow gitleaks allowlist (fingerprints, owner-reviewed) for deliberate test keys; no directory-wide allowlist.
 
+#### M1-1h-b · Raw-text vectors for signed JSON objects (new, split from M1-1h, IR-M1-1h-1 F3)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Repo/path:** agentlink · test-vectors/, tools/vectors/
+- **Depends on:** M1-1h; a spec decision in 04 §2.5.1 (below)
+- **Spec:** 04 §2.5.1, §2.4.1; RFC 7493; RFC 8785 §3.1
+- **Invariants:** I-4, I-8
+- **Scope:**
+  - Decide in 04 §2.5.1 whether a `SignedOwnerAction` is verified on its received JSON text, and whether duplicate keys and non-canonical number spellings (`1.0`, `1e9`, `-0`, escaped key spellings) are refused there. After `JSON.parse` they cannot be told apart from canonical input, so the parsed-object vectors of M1-1h cannot express them.
+  - Then add `verifyText` vectors (input: the raw text) for `owner-action` and the envelope, with one rejection per form.
+- **Acceptance:**
+  - The spec line lands first. Vectors come from the M1-1h generators, and the suites stay pending until their modules land.
+
 #### M1-1i · Independent test vectors for the proof-layer suites (new, split from M1-1h)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/generators/
@@ -750,6 +762,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - JCS (RFC 8785) canonicalisation; library choice per gap G-12 (dependency justification in PR).
   - `randomBytes` from `globalThis.crypto.getRandomValues`; `wipe()` (`fill(0)`) helpers.
 - **Acceptance:**
+  - Vector suites `jcs` and `tagged-hash`: their harness modules are registered and the suites are removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - RFC 8785 examples and number-serialisation edge cases pass in Node, browsers and Workers (M0-9).
   - Tagged-hash vectors for `agentlink/envelope/v1` from M1-1h pass.
   - Strict base64url tests (padded, `+`/`/`, trailing bits) rejected.
@@ -767,6 +780,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Drop key (`agentlink/v1/drop`, secp256k1/BIP-340, current `keyEpoch`; D-48): signs only encrypted-drop requests and is never part of the public bundle or agent card, so it stays unlinkable to the agent's public identity.
   - Intermediate secrets wiped.
 - **Acceptance:**
+  - Vector suites `hkdf-derive` and `bip340`: their harness modules are registered and the suites are removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - M1-1h derivation vectors pass in all runtimes.
   - Rejection loop covered by a unit test that injects an out-of-range okm (a natural vector is infeasible).
   - Requesting the EVM key with epoch ≠ 0 is rejected by the API (test).
@@ -784,6 +798,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - `envelopeHash = SHA-256(JCS(envelope without sig))`; signature input = taggedHash("agentlink/envelope/v1", envelopeHash).
   - Deterministic test seam for randomness (never exported in production builds).
 - **Acceptance:**
+  - Vector suites `hpke` and `aead-envelope`: their harness modules are registered and the suites are removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - RFC 9180 vectors for suite (KEM 0x0020, KDF 0x0001, AEAD 0x0002, mode 0) and M1-1h envelope vectors pass in all runtimes.
   - Changing any covered field (incl. recipient order or `createdAt`) changes the hash and fails verification; wrong-recipient open and tampered `ct`/AAD fail.
 
@@ -811,6 +826,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - EIP-712 typed-data hashing via viem; `AgentCard` definition (domain `{name: "OCC AgentCard", version: "1"}`, no chainId/verifyingContract), which pairing and contacts need in M1a.
   - `Record`, `Receipt`, `Registration`, commitments and EIP-3009 are M1-1j (M1b).
 - **Acceptance:**
+  - Vector suite `eip712`: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - `AgentCard` EIP-712 vectors from M1-1h pass in all runtimes.
 
 #### M1-1j · crypto: EIP-712 proof types and commitment helpers (new, split from M1-1e)
@@ -839,6 +855,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Owner passphrase wrap pins HKDF label `agentlink/v1/owner-passphrase-wrap` and file magic `ALKO` (D-54, 04 §2.8), with a `secretKind` header byte (1 = generated owner code, 2 = chosen passphrase) covered by the AAD and the same normalisation by kind as `ALKS` (04 §2.8); vectors for both kinds (M1-1h).
   - File KeyStore seal/open for `ALKS` v1 (D-54, 04 §2.8): Argon2id with the header's parameters (floor and cap checked before the KDF runs), HKDF label `agentlink/v1/keystore-file`, AES-256-GCM with the whole header (including `secretKind` and `agentId`) as AAD; entry parser with the 04 §2.8 refusals; entries as `Uint8Array`; 120-bit code generation (15 CSPRNG bytes, RFC 4648 base32) and normalisation by `secretKind`.
 - **Acceptance:**
+  - Vector suites `keystore-file`, `owner-wrap` and `pairing`: their harness modules are registered and the suites are removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - M1-1h vectors for Argon2id (plus RFC 9106 vectors), HMAC proof and safety code pass in all runtimes.
   - Property test: both sides compute the same safety code regardless of argument order.
   - The API refuses passphrase wrapping for blobs flagged for relay publication (test).
@@ -868,6 +885,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - `MemoryKeyStore` from a seed (tests, base for the Worker implementation).
   - NIP-44 v2 and gift-wrap ephemeral key generation wrapped from `nostr-tools`; ephemeral secrets never leave the module.
 - **Acceptance:**
+  - Vector suite `nip44`: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - Official NIP-44 v2 vectors pass in all runtimes.
   - Type-level test: no interface method returns private key or seed bytes.
   - Owner operations fail when locked; handles expire (fake-timer test).
@@ -887,6 +905,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Field validation: base64url without padding, byte lengths (id/thread/kid 16 B, keys 32 B), hex formats.
   - Security S2 because envelope/payload schema changes are S2 (`audit-rules.md` §2.2).
 - **Acceptance:**
+  - Vector suite `encodings`: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - Round-trip tests for every schema; property-based fuzzing never throws anything but a validation error.
   - Wrong lengths, padded base64, oversized fields rejected (tests); schemas run in all three runtimes.
 
@@ -1251,6 +1270,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Signed policy documents verified against the owner key in the agent card on every load; behaviour on missing or invalid signatures per G-6.
   - `SignedOwnerAction` verification (04 §2.5.1): canonical encoding, owner signature, `agent` and `owner` binding, single-use nonce, freshness window (G-7); `policy.set` version must increase; the highest applied version kept as a KeyStore item and checked on every load; stored `approval.decide` re-verified and the digest recomputed when an `approvalId` is presented; refused owner actions reported to the owner.
 - **Acceptance:**
+  - Vector suite `owner-action`: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - Tests first; a table-driven test per rule and boundary (e.g. the per-contact hourly rate limit at N and N + 1).
   - A policy row edited directly in the store is ignored (I-4); a replayed or stale `SignedOwnerAction` is rejected; an older signed policy put back in the store is detected against the KeyStore high-water mark.
   - Property test: `evaluate` is deterministic and has no side effects.
@@ -1950,6 +1970,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Pair the two agents through one invite link (Tali creates it; Denis pastes the invite page's install-and-accept prompt, D-53) and compare safety codes; the J9 session habit from the skill file (M1-12a: status at session start, handoff offer at session end; optional SessionStart hook, M1-29) used in daily work; a J8 negotiation over Talk with owner approval of the binding `accept`.
   - No milestone audit at M1a; the per-card S1/S2 reviews are the control.
 - **Acceptance:**
+  - No M1a vector suite is pending: `node tools/vectors/check-pending.mjs --gate M1a` passes, and `release.yml` runs the same gate, so no release ships while one is (M1-1h, IR-M1-1h-1 F2).
   - M1a gate: both agents paired and syncing project status through AgentLink; a J8 negotiation completed over Talk without on-chain proof.
   - For at least two weeks the dogfood replaces the **personal handoff** part of the git sync branch for Tali and Denis (their own `<login>.md` handoff notes; `board.md` stays on git, `docs/process/sync-protocol.md`). The dogfood log records, per week, where AgentLink beat git and where it lost (for example missed messages, the session-start check skipped, or content that belonged on the board) (D-53).
   - No wallet, extension, gas or chain choice appeared in either setup (D-39); dogfood log (dates, harnesses, versions, issues filed) and owner sign-off recorded.

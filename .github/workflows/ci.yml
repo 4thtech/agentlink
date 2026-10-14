@@ -216,6 +216,15 @@ jobs:
       - name: Check committed vectors against their independent generators
         run: node tools/vectors/check-generators.mjs
 
+      # Pending suites (vectors before their code, M1-1h) may only shrink against main: a suite
+      # that was implemented on main can never become pending again (IR-M1-1h-1 F2).
+      - name: Check that pending vector suites only shrink against main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+          node tools/vectors/check-pending.mjs --base origin/main
+
       # Crypto + EIP-712 vectors across Node, browsers (Playwright) and Workers (workerd).
       - name: Check test vectors across runtimes
         run: pnpm vectors:check

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/4thtech/agentlink/test-vectors/aead-envelope/case.schema.json",
   "title": "aead-envelope case",
-  "description": "04 \u00a73.1 envelope. `envelopeHash`, `aad`: hashes of the given envelope. `encryptPayload`: AAD and base64url ct||tag for header, CEK, IV and plaintext. `decryptPayload`: plaintext or rejection. `sign`: envelopeHash, tagged signature input and sig. `verify`: accept or reject.",
+  "description": "04 \u00a73.1 envelope. `envelopeHash`, `aad`: hashes of the given envelope. `encryptPayload`: AAD and base64url ct||tag for header, CEK, IV and plaintext. `decryptPayload`: plaintext or rejection. `sign`: envelopeHash, tagged signature input and sig. `verify`: accept or reject. `validate`: structure, encodings and signature together (strict).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -270,6 +270,55 @@
           "properties": {
             "op": {
               "const": "verify"
+            },
+            "envelope": {
+              "type": "object"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "envelope"
+          ],
+          "properties": {
+            "op": {
+              "const": "validate"
             },
             "envelope": {
               "type": "object"

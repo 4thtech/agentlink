@@ -297,14 +297,476 @@
       }
     },
     {
-      "id": "unwrap-reject-zero-shared-secret",
-      "source": "04 \u00a73.3 CEK unwrap fails: enc is the all-zero X25519 point (RFC 9180 \u00a77.1.4)",
+      "id": "unwrap-reject-small-order-enc-zero",
+      "source": "RFC 9180 \u00a77.1.4: enc is a small-order X25519 point, so the DH output is all zero; wk is sealed under the all-zero key schedule and opens unless the all-zero check rejects it",
       "input": {
         "op": "unwrapCek",
         "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "enc": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWwxk"
+        "wk": "tcNOOsFbYU1fvEPwRDRNd0sT2C3yeuf6W5hAZARdTI51oBIT56eWh4GKfwSMXszC"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-small-order-recipient-zero",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "0000000000000000000000000000000000000000000000000000000000000000",
+        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-small-order-enc-one",
+      "source": "RFC 9180 \u00a77.1.4: enc is a small-order X25519 point, so the DH output is all zero; wk is sealed under the all-zero key schedule and opens unless the all-zero check rejects it",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "wk": "anysIJhpCrsKmVSjOuAE7eV85-eq-nHQMM_5bINvmCt0gA_OCwhoa12m9sx7kBOP"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-small-order-recipient-one",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "0100000000000000000000000000000000000000000000000000000000000000",
+        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-small-order-enc-order-8-a",
+      "source": "RFC 9180 \u00a77.1.4: enc is a small-order X25519 point, so the DH output is all zero; wk is sealed under the all-zero key schedule and opens unless the all-zero check rejects it",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "4Ot6fDtBuK4WVuP68Z_EatoJjeucMrH9hmIFFl9JuAA",
+        "wk": "krfz4T-e9F5Uq2fGbwEKRyll34V9IceVCDsF9h6wOvuXrAnJ9IUFDgSSx1xIdo6V"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-small-order-recipient-order-8-a",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800",
+        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-small-order-enc-order-8-b",
+      "source": "RFC 9180 \u00a77.1.4: enc is a small-order X25519 point, so the DH output is all zero; wk is sealed under the all-zero key schedule and opens unless the all-zero check rejects it",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "X5yVvKNQjCSx0LFVnIPvWwREXMRYHI6G2CJO3dCfEVc",
+        "wk": "QIpbWoNXPijXEJucBogQFUMMSxeaMqEIk1ghF0zzWUr3VP1EvzA1s-pgbwqkNT8T"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-small-order-recipient-order-8-b",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157",
+        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-small-order-enc-p-minus-1",
+      "source": "RFC 9180 \u00a77.1.4: enc is a small-order X25519 point, so the DH output is all zero; wk is sealed under the all-zero key schedule and opens unless the all-zero check rejects it",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "7P_______________________________________38",
+        "wk": "3c8W5SH3cSHCoansntBoscl6y5LA1hDrf3VbjuluINT0IziEkhr3vKT65YUtpdjk"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-small-order-recipient-p-minus-1",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-small-order-enc-p",
+      "source": "RFC 9180 \u00a77.1.4: enc is a small-order X25519 point, so the DH output is all zero; wk is sealed under the all-zero key schedule and opens unless the all-zero check rejects it",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "7f_______________________________________38",
+        "wk": "uCrvu_6I59lSV4hhM-mG-U-fXluUOg4UJCZ_yTOl4dxYH6e9ZcIiIFfzo56F1gj6"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-small-order-recipient-p",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-small-order-enc-p-plus-1",
+      "source": "RFC 9180 \u00a77.1.4: enc is a small-order X25519 point, so the DH output is all zero; wk is sealed under the all-zero key schedule and opens unless the all-zero check rejects it",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "7v_______________________________________38",
+        "wk": "NHtIIvXqImJSTAIns3TE3ENyklwPwnkcfGBAx3xHshgMeeQkZHzdmH0g3piZhEMN"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-small-order-recipient-p-plus-1",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-small-order-enc-zero-high-bit",
+      "source": "RFC 9180 \u00a77.1.4: enc is a small-order X25519 point, so the DH output is all zero; wk is sealed under the all-zero key schedule and opens unless the all-zero check rejects it",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA",
+        "wk": "7O6N_ZY3KwjLN0u7y4gawV1Y8mHHsRPj1wuJLuOdt3yKmsP9pfBBB1WE9NZWu4UV"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-small-order-recipient-zero-high-bit",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "0000000000000000000000000000000000000000000000000000000000000080",
+        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-small-order-enc-one-high-bit",
+      "source": "RFC 9180 \u00a77.1.4: enc is a small-order X25519 point, so the DH output is all zero; wk is sealed under the all-zero key schedule and opens unless the all-zero check rejects it",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA",
+        "wk": "KPh_XVP2OaEU8gMScReOpEoTD7flHNWgZrOHznRoURXgYCBZC2nDat7pkdSw-9O5"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-small-order-recipient-one-high-bit",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "0100000000000000000000000000000000000000000000000000000000000080",
+        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-small-order-enc-order-8-a-high-bit",
+      "source": "RFC 9180 \u00a77.1.4: enc is a small-order X25519 point, so the DH output is all zero; wk is sealed under the all-zero key schedule and opens unless the all-zero check rejects it",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "4Ot6fDtBuK4WVuP68Z_EatoJjeucMrH9hmIFFl9JuIA",
+        "wk": "waxz-ZnwnggsHzcSBIh84ZwOqewMGt8CIckAG2992n7sTQK9fv0guOPt53-_kYpj"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-small-order-recipient-order-8-a-high-bit",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b880",
+        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-small-order-enc-order-8-b-high-bit",
+      "source": "RFC 9180 \u00a77.1.4: enc is a small-order X25519 point, so the DH output is all zero; wk is sealed under the all-zero key schedule and opens unless the all-zero check rejects it",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "X5yVvKNQjCSx0LFVnIPvWwREXMRYHI6G2CJO3dCfEdc",
+        "wk": "6L4Pf0ZLpE3tUWvzNLSD3PHqLdYuX19BvbbtAYZGTQ57r9GhVMrZoT2b4yJUH2xv"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-small-order-recipient-order-8-b-high-bit",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f11d7",
+        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-small-order-enc-p-minus-1-high-bit",
+      "source": "RFC 9180 \u00a77.1.4: enc is a small-order X25519 point, so the DH output is all zero; wk is sealed under the all-zero key schedule and opens unless the all-zero check rejects it",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "7P________________________________________8",
+        "wk": "Q22VyFDPBrjBE1cC4q5-AJbv_orq34dyqPtUh17_0xL_9eaO_N-i2lttzMrOCvXC"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-small-order-recipient-p-minus-1-high-bit",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-small-order-enc-p-high-bit",
+      "source": "RFC 9180 \u00a77.1.4: enc is a small-order X25519 point, so the DH output is all zero; wk is sealed under the all-zero key schedule and opens unless the all-zero check rejects it",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "7f________________________________________8",
+        "wk": "z6V-X4YvuxkB4lrkYvmcBjdVIHhTTjJWja1DdfAvGoAVv9i6lzGllLB-evXQTckL"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-small-order-recipient-p-high-bit",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-small-order-enc-p-plus-1-high-bit",
+      "source": "RFC 9180 \u00a77.1.4: enc is a small-order X25519 point, so the DH output is all zero; wk is sealed under the all-zero key schedule and opens unless the all-zero check rejects it",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "7v________________________________________8",
+        "wk": "RUim6XWZwG_Zk-32X4hqU6ZeUsru6VmepN43vNGrpU49P1Kpokm04qCKsA88YLzj"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-small-order-recipient-p-plus-1-high-bit",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-id-15-bytes",
+      "source": "04 \u00a73.1, \u00a73.3: an envelope id of 15 bytes",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
+        "ephemeralSecretKey": "86913a7ed271c14cb35dee75ffe31735845ae7d49203b5dbf8ea8f30b9742742",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrq",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-id-17-bytes",
+      "source": "04 \u00a73.1, \u00a73.3: an envelope id of 17 bytes",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
+        "ephemeralSecretKey": "86913a7ed271c14cb35dee75ffe31735845ae7d49203b5dbf8ea8f30b9742742",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqugA",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-cek-31-bytes",
+      "source": "04 \u00a73.1, \u00a73.3: a CEK of 31 bytes",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
+        "ephemeralSecretKey": "86913a7ed271c14cb35dee75ffe31735845ae7d49203b5dbf8ea8f30b9742742",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae21"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-reject-cek-33-bytes",
+      "source": "04 \u00a73.1, \u00a73.3: a CEK of 33 bytes",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
+        "ephemeralSecretKey": "86913a7ed271c14cb35dee75ffe31735845ae7d49203b5dbf8ea8f30b9742742",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c00"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-id-15-bytes",
+      "source": "04 \u00a73.1, \u00a73.3: an envelope id of 15 bytes (wk sealed with that id); HPKE itself succeeds, so only the length check refuses it",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrq",
+        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
+        "wk": "-7HzBZ9PhOPIdj384N-tAUiwMB1x4g8PZX5IfaHSldRey7sT9u6CPQpcWFCZD4im"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-cek-31-bytes",
+      "source": "04 \u00a73.1, \u00a73.3: wk opens to a 31-byte CEK; HPKE itself succeeds, so only the length check refuses it",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
+        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRGX8QCCkS-XU2tQOpSXqggk"
       },
       "expected": {
         "outcome": "reject"

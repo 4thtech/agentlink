@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { checkCoverage, diffSnapshots, pendingSuites, REQUIRED_RUNTIMES } from './rules.mjs';
+import {
+  checkCoverage,
+  checkPendingGate,
+  checkPendingShrinks,
+  diffSnapshots,
+  pendingSuites,
+  REQUIRED_RUNTIMES,
+} from './rules.mjs';
 
 const suites = [{ suite: 'placeholder-sha256', caseIds: ['a', 'b'] }];
 
@@ -150,6 +157,97 @@ describe('pending suites (M1-1h)', () => {
     expect(checkCoverage(report, withPending)).toEqual([
       'firefox: placeholder-sha256: no passing result for a',
     ]);
+  });
+});
+
+describe('declared runtimes (IR-M1-1h-1 Q7)', () => {
+  const nodeOnly = [...suites, { suite: 'keystore-file', caseIds: ['k'], runtimes: ['node'] }];
+
+  it('requires the cases only in the declared runtimes', () => {
+    const report = fullReport();
+    report.testResults[0].assertionResults.push(
+      assertion({ kind: 'case', runtime: 'node', suite: 'keystore-file', caseId: 'k' }),
+    );
+    expect(checkCoverage(report, nodeOnly)).toEqual([]);
+  });
+
+  it('still requires them in a declared runtime', () => {
+    expect(checkCoverage(fullReport(), nodeOnly)).toEqual([
+      'node: keystore-file: no passing result for k',
+    ]);
+  });
+
+  it('rejects a result from a runtime the suite did not declare', () => {
+    const report = fullReport();
+    report.testResults[0].assertionResults.push(
+      assertion({ kind: 'case', runtime: 'node', suite: 'keystore-file', caseId: 'k' }),
+    );
+    report.testResults[4].assertionResults.push(
+      assertion({ kind: 'case', runtime: 'workerd', suite: 'keystore-file', caseId: 'k' }),
+    );
+    expect(checkCoverage(report, nodeOnly)).toEqual([
+      'workerd: keystore-file: ran outside its declared runtimes',
+    ]);
+  });
+
+  it('lists a node-only pending suite as pending', () => {
+    const report = fullReport();
+    report.testResults[0].assertionResults.push(
+      assertion({ kind: 'pending', runtime: 'node', suite: 'keystore-file', detail: 'M1-1f' }),
+    );
+    expect(checkCoverage(report, nodeOnly)).toEqual([]);
+    expect(pendingSuites(report, nodeOnly)).toEqual(new Map([['keystore-file', 'M1-1f']]));
+  });
+});
+
+describe('checkPendingShrinks (IR-M1-1h-1 F2)', () => {
+  const entry = { card: 'M1-1a', phase: 'M1a' };
+  const head = (names) => ({ pending: new Map(names.map((n) => [n, entry])) });
+
+  it('accepts a list that shrank, and new suites that arrive pending with their vectors', () => {
+    const base = {
+      pending: new Map([
+        ['jcs', entry],
+        ['hpke', entry],
+      ]),
+      suites: new Set(['jcs', 'hpke']),
+    };
+    expect(checkPendingShrinks(head(['jcs', 'stream']), base)).toEqual([]);
+  });
+
+  it('rejects a suite that was implemented on the base becoming pending again', () => {
+    const base = { pending: new Map([['jcs', entry]]), suites: new Set(['jcs', 'hpke']) };
+    expect(checkPendingShrinks(head(['jcs', 'hpke']), base)).toEqual([
+      'hpke: has vectors on the base branch and was not pending there; pending suites only shrink',
+    ]);
+  });
+
+  it('rejects an entry without a card or a phase', () => {
+    const base = { pending: new Map(), suites: new Set() };
+    expect(checkPendingShrinks({ pending: new Map([['x', { card: 'soon' }]]) }, base)).toEqual([
+      'x: a pending entry needs a card (e.g. M1-1a) and a phase (e.g. M1a)',
+    ]);
+  });
+});
+
+describe('checkPendingGate (IR-M1-1h-1 F2)', () => {
+  const head = {
+    pending: new Map([
+      ['jcs', { card: 'M1-1a', phase: 'M1a' }],
+      ['stream', { card: 'M1-1d', phase: 'M1b' }],
+    ]),
+  };
+
+  it('fails a release while a suite of the gated phase is pending', () => {
+    expect(checkPendingGate(head, ['M1a'])).toEqual([
+      'jcs is still pending (M1-1a, phase M1a): every M1a suite must be implemented before a release',
+    ]);
+  });
+
+  it('passes when no pending suite belongs to a gated phase', () => {
+    expect(
+      checkPendingGate({ pending: new Map([['stream', head.pending.get('stream')]]) }, ['M1a']),
+    ).toEqual([]);
   });
 });
 

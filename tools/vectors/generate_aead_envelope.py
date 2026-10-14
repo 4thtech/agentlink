@@ -19,6 +19,7 @@ Usage: python3 -I tools/vectors/generate_aead_envelope.py --check [FILE] | --wri
 """
 
 import copy
+import re
 import sys
 from pathlib import Path
 
@@ -31,6 +32,8 @@ VERSION = 1
 ENVELOPE_TAG = "agentlink/envelope/v1"
 OWNER_ACTION_TAG = "agentlink/owner-action/v1"
 HEADER_FIELDS = ["v", "id", "thread", "from", "createdAt", "recipients"]
+STRUCTURE = "04 §3.1 envelope v1 structure, §2.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a)"
+DELETE = object()
 
 
 def header(envelope):
@@ -42,7 +45,50 @@ def aad_of(envelope):
 
 
 def envelope_hash(envelope):
-    return v.sha256(v.jcs({k: val for k, val in envelope.items() if k != "sig"}))
+    return v.sha256(v.jcs_lenient({k: val for k, val in envelope.items() if k != "sig"}))
+
+
+def b64u_len(text, n=None, minimum=None):
+    data = v.unb64u(text)
+    if (n is not None and len(data) != n) or (minimum is not None and len(data) < minimum):
+        raise ValueError("wrong length")
+    return data
+
+
+def validate(envelope):
+    """Envelope v1 structure and encodings (04 §3.1; §2.4.1 on docs/canonical-encodings; strict
+    schema, unknown keys rejected, M1-2a), then the signature. Returns True only if all hold."""
+    try:
+        if set(envelope) != {"v", "id", "thread", "from", "createdAt", "recipients", "aead", "sig"}:
+            return False
+        if envelope["v"] != 1 or isinstance(envelope["v"], bool):
+            return False
+        b64u_len(envelope["id"], 16)
+        b64u_len(envelope["thread"], 16)
+        if not isinstance(envelope["from"], str) or not re.fullmatch(r"[0-9a-f]{64}", envelope["from"]):
+            return False
+        t = envelope["createdAt"]
+        if isinstance(t, bool) or not isinstance(t, int) or not 0 <= t <= 2**53 - 1:
+            return False
+        recipients = envelope["recipients"]
+        if not isinstance(recipients, list) or not recipients:
+            return False
+        for r in recipients:
+            if set(r) != {"kid", "enc", "wk"}:
+                return False
+            b64u_len(r["kid"], 16)
+            b64u_len(r["enc"], 32)
+            b64u_len(r["wk"], 48)
+        a = envelope["aead"]
+        if set(a) != {"alg", "iv", "ct"} or a["alg"] != "A256GCM":
+            return False
+        b64u_len(a["iv"], 12)
+        b64u_len(a["ct"], minimum=16)
+        if not isinstance(envelope["sig"], str) or not re.fullmatch(r"[0-9a-f]{128}", envelope["sig"]):
+            return False
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return False
+    return verify(envelope)
 
 
 def sign(envelope, secret, aux, tag=ENVELOPE_TAG, tagged=True):
@@ -203,6 +249,63 @@ def build():
         if verify(m):
             v.fail(f"{case_id} verifies")
         cases.append(v.case(case_id, f"04 §3.1: {why}", {"op": "verify", "envelope": m}, {"outcome": "reject"}))
+
+    # Structure and encodings (IR-M1-1h-1 F4). Each variant is re-signed by `from`, so the
+    # signature is valid and only the structure or encoding check can refuse it.
+    if not validate(env):
+        v.fail("the reference envelope does not validate")
+    cases.append(v.case("validate", f"{STRUCTURE}: the reference envelope", {"op": "validate", "envelope": env}, {"outcome": "accept"}))
+
+    def variant(change, resign=True):
+        m = copy.deepcopy(env)
+        change(m)
+        if resign:
+            m["sig"] = v.hx(sign(m, sender, aux))
+        return m
+
+    def set_path(*path_and_value):
+        *path, value = path_and_value
+
+        def change(m):
+            target = m
+            for key in path[:-1]:
+                target = target[key]
+            if value is DELETE:
+                del target[path[-1]]
+            else:
+                target[path[-1]] = value
+
+        return change
+
+    first_with_url_chars = next(i for i, r in enumerate(env["recipients"]) if "-" in r["wk"] or "_" in r["wk"])
+    standard_alphabet = env["recipients"][first_with_url_chars]["wk"].replace("-", "+").replace("_", "/")
+    id_bytes = v.unb64u(env["id"])
+    for case_id, why, m in [
+        ("v-2", "v other than 1", variant(set_path("v", 2))),
+        ("unknown-top-level-key", "an unknown top-level key", variant(set_path("note", "x"))),
+        ("unknown-aead-key", "an unknown key in aead", variant(set_path("aead", "tag", "x"))),
+        ("unknown-recipient-key", "an unknown key in a recipient", variant(set_path("recipients", 0, "note", "x"))),
+        ("missing-thread", "thread missing", variant(set_path("thread", DELETE))),
+        ("id-15-bytes", "id of 15 bytes", variant(set_path("id", v.b64u(id_bytes[:15])))),
+        ("id-padded", "id as padded base64url", variant(set_path("id", env["id"] + "=="))),
+        ("thread-17-bytes", "thread of 17 bytes", variant(set_path("thread", v.b64u(v.unb64u(env["thread"]) + bytes(1))))),
+        ("from-uppercase", "from in upper-case hex", variant(set_path("from", env["from"].upper()))),
+        ("from-0x-prefix", "from with 0x (Nostr-native: bare hex)", variant(set_path("from", "0x" + env["from"]))),
+        ("created-at-2-pow-53", "createdAt = 2^53", variant(set_path("createdAt", 2**53))),
+        ("created-at-string", "createdAt as a string", variant(set_path("createdAt", str(env["createdAt"])))),
+        ("recipients-empty", "no recipients", variant(set_path("recipients", []))),
+        ("kid-15-bytes", "kid of 15 bytes", variant(set_path("recipients", 0, "kid", v.b64u(v.unb64u(env["recipients"][0]["kid"])[:15])))),
+        ("wk-standard-alphabet", "wk with + and / (standard base64)", variant(set_path("recipients", first_with_url_chars, "wk", standard_alphabet))),
+        ("alg-a128gcm", "alg other than A256GCM", variant(set_path("aead", "alg", "A128GCM"))),
+        ("iv-11-bytes", "iv of 11 bytes", variant(set_path("aead", "iv", v.b64u(v.unb64u(env["aead"]["iv"])[:11])))),
+        ("iv-padded", "iv as padded base64url", variant(set_path("aead", "iv", env["aead"]["iv"] + "="))),
+        ("ct-15-bytes", "ct shorter than the 16-byte tag", variant(set_path("aead", "ct", v.b64u(v.unb64u(env["aead"]["ct"])[:15])))),
+        ("sig-uppercase", "sig in upper-case hex (the signature is otherwise valid)", variant(set_path("sig", env["sig"].upper()), resign=False)),
+        ("sig-0x-prefix", "sig with 0x", variant(set_path("sig", "0x" + env["sig"]), resign=False)),
+    ]:
+        if validate(m):
+            v.fail(f"validate-reject-{case_id} validates")
+        cases.append(v.case(f"validate-reject-{case_id}", f"{STRUCTURE}: {why}; rejected, never normalised", {"op": "validate", "envelope": m}, {"outcome": "reject"}))
     return cases
 
 
@@ -210,7 +313,8 @@ SCHEMA = v.case_schema(
     SUITE,
     "04 §3.1 envelope. `envelopeHash`, `aad`: hashes of the given envelope. `encryptPayload`: AAD "
     "and base64url ct||tag for header, CEK, IV and plaintext. `decryptPayload`: plaintext or "
-    "rejection. `sign`: envelopeHash, tagged signature input and sig. `verify`: accept or reject.",
+    "rejection. `sign`: envelopeHash, tagged signature input and sig. `verify`: accept or reject. "
+    "`validate`: structure, encodings and signature together (strict).",
     {
         "envelopeHash": ({"envelope": v.OBJECT}, [{"envelopeHash": v.hexn(32)}]),
         "aad": ({"envelope": v.OBJECT}, [{"aad": v.hexn(32)}]),
@@ -224,6 +328,7 @@ SCHEMA = v.case_schema(
             [{"envelopeHash": v.hexn(32), "signatureInput": v.hexn(32), "sig": v.hexn(64)}],
         ),
         "verify": ({"envelope": v.OBJECT}, [v.ACCEPT, v.REJECT]),
+        "validate": ({"envelope": v.OBJECT}, [v.ACCEPT, v.REJECT]),
     },
 )
 

@@ -2,23 +2,45 @@
 """Independent generator for the `pairing` suite: HMAC-SHA256 for the pairing proof (M1-1h).
 
 04 §3.6: proof = HMAC-SHA256(secret, utf8("agentlink-handshake") || inviteId || sha256(JCS(B card))).
-This file holds the RFC 4231 HMAC-SHA256 test cases 1-4, 6 and 7 (case 5 is a truncated output),
-recomputed with CPython's hmac/hashlib. The AgentLink construction itself is not yet included:
-the byte form of `inviteId` inside the HMAC input (raw 16 bytes or its base64url text) and the
-JSON form of the AgentCard that JCS is applied to are not fixed by the spec (questions in the
-M1-1h PR). The safety code waits for G-28.
+First the RFC 4231 HMAC-SHA256 test cases 1-4, 6 and 7 (case 5 is a truncated output), recomputed
+with CPython's hmac/hashlib. Then the AgentLink proof with the byte-exact input of
+docs/canonical-encodings (pending merge; regenerate if its review changes it): key = the 32 raw
+bytes of `secret`; message = utf8("agentlink-handshake") || the 16 raw bytes of `inviteId` ||
+sha256(JCS(card)) with B's card in the card JSON form (04 §2.4); `proof` = base64url of the 32-byte
+MAC. `secret`, `inviteId` and `proof` are base64url without padding (§2.4.1). JCS is `rfc8785`;
+the card comes from the `eip712` generator. The safety code waits for G-28.
 
 Usage: python3 -I tools/vectors/generate_pairing.py --check [FILE] | --write
 """
 
+import copy
+import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import generate_eip712 as eip712  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "pairing"
 VERSION = 1
+SPEC = "04 §3.6 pairing proof (docs/canonical-encodings, pending merge)"
+LABEL = b"agentlink-handshake"
+
+
+def proof_of(secret, invite_id, card):
+    return v.hmac_sha256(secret, LABEL + invite_id + v.sha256(v.jcs(card)))
+
+
+def verify(secret_b64u, invite_b64u, card, proof_b64u):
+    try:
+        secret, invite_id, proof = v.unb64u(secret_b64u), v.unb64u(invite_b64u), v.unb64u(proof_b64u)
+        eip712.parse_card(card)
+    except ValueError:
+        return False
+    if len(secret) != 32 or len(invite_id) != 16 or len(proof) != 32:
+        return False
+    return v._hmac.compare_digest(proof, proof_of(secret, invite_id, card))
 
 # RFC 4231 section 4: (case, key hex, data hex, published HMAC-SHA-256).
 RFC4231 = [
@@ -50,13 +72,76 @@ def build():
                 {"mac": published},
             )
         )
+
+    card = eip712.make_card("pairing-b", "Denis's Codex", ["wss://relay.example.com"], 1760000000, 1791536000, 0)
+    secret = v.det("pairing/secret", 32)
+    invite_id = v.det("pairing/invite-id", 16)
+    proof = proof_of(secret, invite_id, card)
+    jcs_card = v.jcs(card)
+    cases.append(
+        v.case(
+            "proof",
+            SPEC,
+            {"op": "pairingProof", "secret": v.b64u(secret), "inviteId": v.b64u(invite_id), "card": card},
+            {"cardJcsSha256": v.hx(v.sha256(jcs_card)), "proof": v.b64u(proof)},
+        )
+    )
+    unordered = dict(reversed(list(card.items())))
+    cases.append(
+        v.case(
+            "proof-card-key-order",
+            f"{SPEC}: the same card with its keys in another order gives the same proof (JCS)",
+            {"op": "pairingProof", "secret": v.b64u(secret), "inviteId": v.b64u(invite_id), "card": unordered},
+            {"cardJcsSha256": v.hx(v.sha256(jcs_card)), "proof": v.b64u(proof)},
+        )
+    )
+
+    def verify_case(case_id, why, accept, secret_=None, invite_=None, card_=None, proof_=None):
+        args = (
+            v.b64u(secret) if secret_ is None else secret_,
+            v.b64u(invite_id) if invite_ is None else invite_,
+            card if card_ is None else card_,
+            v.b64u(proof) if proof_ is None else proof_,
+        )
+        if verify(*args) != accept:
+            v.fail(f"{case_id}: unexpected result")
+        cases.append(
+            v.case(
+                case_id,
+                f"{SPEC}: {why}",
+                {"op": "verifyPairingProof", "secret": args[0], "inviteId": args[1], "card": args[2], "proof": args[3]},
+                {"outcome": "accept" if accept else "reject"},
+            )
+        )
+
+    other_card = copy.deepcopy(card)
+    other_card["keyEpoch"] = 1
+    text_id = v.hmac_sha256(secret, LABEL + v.b64u(invite_id).encode() + v.sha256(jcs_card))
+    plain_json = v.hmac_sha256(secret, LABEL + invite_id + v.sha256(json.dumps(card).encode()))
+    bad_card = copy.deepcopy(card)
+    bad_card["agentNostr"] = "0x" + card["agentNostr"][2:].upper()
+    verify_case("verify", "the proof matches", True)
+    verify_case("verify-reject-wrong-secret", "another invite secret", False, secret_=v.b64u(v.det("pairing/other-secret", 32)))
+    verify_case("verify-reject-other-invite", "another inviteId", False, invite_=v.b64u(v.det("pairing/other-invite", 16)))
+    verify_case("verify-reject-card-changed", "B's card changed (keyEpoch)", False, card_=other_card)
+    verify_case("verify-reject-invite-id-as-text", "the proof was built over the base64url text of inviteId", False, proof_=v.b64u(text_id))
+    verify_case("verify-reject-card-not-jcs", "the proof was built over a non-JCS serialisation of the card", False, proof_=v.b64u(plain_json))
+    verify_case("verify-reject-proof-padded", "proof as padded base64url", False, proof_=v.b64u(proof) + "=")
+    verify_case("verify-reject-proof-31-bytes", "a 31-byte proof", False, proof_=v.b64u(proof[:31]))
+    verify_case("verify-reject-secret-padded", "secret as padded base64url", False, secret_=v.b64u(secret) + "=")
+    verify_case("verify-reject-card-non-canonical", "a card field in upper-case hex", False, card_=bad_card)
     return cases
 
 
 SCHEMA = v.case_schema(
     SUITE,
-    "HMAC-SHA256 (the pairing proof primitive, 04 §3.6): key and data hex to the 32-byte MAC.",
-    {"hmacSha256": ({"key": v.HEX, "data": v.HEX}, [{"mac": v.hexn(32)}])},
+    "04 §3.6 pairing proof. `hmacSha256`: RFC 4231. `pairingProof`: sha256(JCS(card)) and the "
+    "base64url proof for secret, inviteId and B's card. `verifyPairingProof`: accept or reject.",
+    {
+        "hmacSha256": ({"key": v.HEX, "data": v.HEX}, [{"mac": v.hexn(32)}]),
+        "pairingProof": ({"secret": v.B64U, "inviteId": v.B64U, "card": v.OBJECT}, [{"cardJcsSha256": v.hexn(32), "proof": v.B64U}]),
+        "verifyPairingProof": ({"secret": v.STRING, "inviteId": v.STRING, "card": v.OBJECT, "proof": v.STRING}, [v.ACCEPT, v.REJECT]),
+    },
 )
 
 if __name__ == "__main__":
@@ -64,7 +149,7 @@ if __name__ == "__main__":
         suite=SUITE,
         version=VERSION,
         script="tools/vectors/generate_pairing.py",
-        libraries=[],
+        libraries=["cryptography", "coincurve", "pycryptodome", "rfc8785"],
         build=build,
         schema=SCHEMA,
         doc=__doc__,

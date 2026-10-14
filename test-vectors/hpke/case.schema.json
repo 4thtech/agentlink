@@ -210,27 +210,43 @@
             },
             "cek": {
               "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
+              "pattern": "^([0-9a-f]{2})*$"
             }
           }
         },
         "expected": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "enc",
-            "wk"
-          ],
-          "properties": {
-            "enc": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9_-]*$"
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "enc",
+                "wk"
+              ],
+              "properties": {
+                "enc": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]*$"
+                },
+                "wk": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]*$"
+                }
+              }
             },
-            "wk": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9_-]*$"
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
             }
-          }
+          ]
         }
       }
     },

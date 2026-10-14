@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/4thtech/agentlink/test-vectors/eip712/case.schema.json",
   "title": "eip712 case",
-  "description": "EIP-712. `typedData`: domain separator, hashStruct(message) and digest of full typed data. `signTypedData`, `signAgentCard`: deterministic ECDSA r, s, yParity. `agentCard`: typeHash, domain separator, struct hash and digest of an AgentCard under the chain-agnostic domain. `cardHashes`: nameHash and relaysHash. `verifyAgentCard`: whether the signature is the card owner's. Hashes are 32-byte hex without 0x.",
+  "description": "EIP-712. `typedData`: domain separator, hashStruct(message) and digest of full typed data. `signTypedData`, `signAgentCard`: deterministic ECDSA as 0x + r || s || v (v 27 or 28). `agentCard`: typeHash, domain separator, struct hash and digest of a card in the card JSON form under the chain-agnostic domain, or a rejection of a non-canonical card. `cardHashes`: nameHash and relaysHash. `verifyAgentCard`: whether `cardSig` is the card owner's. Hashes are 32-byte hex without 0x.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -98,24 +98,12 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "r",
-            "s",
-            "yParity"
+            "signature"
           ],
           "properties": {
-            "r": {
+            "signature": {
               "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
-            },
-            "s": {
-              "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
-            },
-            "yParity": {
-              "enum": [
-                "0",
-                "1"
-              ]
+              "pattern": "^0x[0-9a-f]{130}$"
             }
           }
         }
@@ -136,102 +124,53 @@
               "const": "agentCard"
             },
             "card": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "version",
-                "agentEvm",
-                "agentNostr",
-                "agentEnc",
-                "ownerEvm",
-                "ownerNostr",
-                "ownerEnc",
-                "nameHash",
-                "relaysHash",
-                "issuedAt",
-                "expiresAt",
-                "keyEpoch"
-              ],
-              "properties": {
-                "version": {
-                  "type": "string",
-                  "pattern": "^(0|[1-9][0-9]*)$"
-                },
-                "agentEvm": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{40}$"
-                },
-                "agentNostr": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "agentEnc": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "ownerEvm": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{40}$"
-                },
-                "ownerNostr": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "ownerEnc": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "nameHash": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "relaysHash": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "issuedAt": {
-                  "type": "string",
-                  "pattern": "^(0|[1-9][0-9]*)$"
-                },
-                "expiresAt": {
-                  "type": "string",
-                  "pattern": "^(0|[1-9][0-9]*)$"
-                },
-                "keyEpoch": {
-                  "type": "string",
-                  "pattern": "^(0|[1-9][0-9]*)$"
-                }
-              }
+              "type": "object"
             }
           }
         },
         "expected": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "typeHash",
-            "domainSeparator",
-            "structHash",
-            "digest"
-          ],
-          "properties": {
-            "typeHash": {
-              "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "typeHash",
+                "domainSeparator",
+                "structHash",
+                "digest"
+              ],
+              "properties": {
+                "typeHash": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "domainSeparator": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "structHash": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
             },
-            "domainSeparator": {
-              "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
-            },
-            "structHash": {
-              "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
-            },
-            "digest": {
-              "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
             }
-          }
+          ]
         }
       }
     },
@@ -297,72 +236,7 @@
               "const": "signAgentCard"
             },
             "card": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "version",
-                "agentEvm",
-                "agentNostr",
-                "agentEnc",
-                "ownerEvm",
-                "ownerNostr",
-                "ownerEnc",
-                "nameHash",
-                "relaysHash",
-                "issuedAt",
-                "expiresAt",
-                "keyEpoch"
-              ],
-              "properties": {
-                "version": {
-                  "type": "string",
-                  "pattern": "^(0|[1-9][0-9]*)$"
-                },
-                "agentEvm": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{40}$"
-                },
-                "agentNostr": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "agentEnc": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "ownerEvm": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{40}$"
-                },
-                "ownerNostr": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "ownerEnc": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "nameHash": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "relaysHash": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "issuedAt": {
-                  "type": "string",
-                  "pattern": "^(0|[1-9][0-9]*)$"
-                },
-                "expiresAt": {
-                  "type": "string",
-                  "pattern": "^(0|[1-9][0-9]*)$"
-                },
-                "keyEpoch": {
-                  "type": "string",
-                  "pattern": "^(0|[1-9][0-9]*)$"
-                }
-              }
+              "type": "object"
             },
             "secretKey": {
               "type": "string",
@@ -374,24 +248,12 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "r",
-            "s",
-            "yParity"
+            "cardSig"
           ],
           "properties": {
-            "r": {
+            "cardSig": {
               "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
-            },
-            "s": {
-              "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
-            },
-            "yParity": {
-              "enum": [
-                "0",
-                "1"
-              ]
+              "pattern": "^0x[0-9a-f]{130}$"
             }
           }
         }
@@ -406,92 +268,17 @@
           "required": [
             "op",
             "card",
-            "r",
-            "s",
-            "yParity"
+            "cardSig"
           ],
           "properties": {
             "op": {
               "const": "verifyAgentCard"
             },
             "card": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "version",
-                "agentEvm",
-                "agentNostr",
-                "agentEnc",
-                "ownerEvm",
-                "ownerNostr",
-                "ownerEnc",
-                "nameHash",
-                "relaysHash",
-                "issuedAt",
-                "expiresAt",
-                "keyEpoch"
-              ],
-              "properties": {
-                "version": {
-                  "type": "string",
-                  "pattern": "^(0|[1-9][0-9]*)$"
-                },
-                "agentEvm": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{40}$"
-                },
-                "agentNostr": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "agentEnc": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "ownerEvm": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{40}$"
-                },
-                "ownerNostr": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "ownerEnc": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "nameHash": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "relaysHash": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-f]{64}$"
-                },
-                "issuedAt": {
-                  "type": "string",
-                  "pattern": "^(0|[1-9][0-9]*)$"
-                },
-                "expiresAt": {
-                  "type": "string",
-                  "pattern": "^(0|[1-9][0-9]*)$"
-                },
-                "keyEpoch": {
-                  "type": "string",
-                  "pattern": "^(0|[1-9][0-9]*)$"
-                }
-              }
+              "type": "object"
             },
-            "r": {
-              "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
-            },
-            "s": {
-              "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
-            },
-            "yParity": {
-              "type": "integer"
+            "cardSig": {
+              "type": "string"
             }
           }
         },

@@ -6,12 +6,15 @@
 JCS is Trail of Bits' `rfc8785`, BIP-340 is libsecp256k1 (coincurve). Keys, nonces and aux_rand
 are synthetic test values.
 
-Only `agent.revoke` is used: its `params` ({reason}) and its expiry rule (expiresAt = 0) are fully
-fixed by 04 §2.5.1. `approval.decide` waits for the encoding of `actionDigest` and `policy.set`
-for the 06 §3 policy schema (M1-2b); see the M1-1h PR.
+Ops: `agent.revoke` (sign and verify); `approval.decide` (sign and verify against a pending
+request); `approval.cancel` and `policy.set` (sign; `policy` is the 06 §3 defaults, until M1-2b
+builds the strict schema). `actionDigest` is 64 lowercase hex, and the card's `ownerNostr` is
+0x + 64 hex while `owner` has no prefix, compared as bytes: 04 §2.4.1 and §3.4.1 on
+docs/canonical-encodings (pending merge; regenerate if its review changes them).
 
-`verify` cases give the receiving core's context: the agent's own EVM address, `ownerNostr` from
-its card, the current time and an empty nonce store. Every rejection vector for a non-canonical
+`verify` cases give the receiving core's context: the agent's own EVM address, `ownerNostr` as the
+card spells it, the current time, an empty nonce store and, for `approval.decide`, the pending
+request. Every rejection vector for a non-canonical
 form carries a signature that is VALID over the JCS of that non-canonical body, so it can only be
 refused by the encoding check (04 §2.5.1: "rejected, never normalised"). The forms are those the
 card lists: checksummed or uppercase address, uppercase hex, padded base64url, out-of-range
@@ -76,7 +79,7 @@ def build():
     nonce = v.b64u(nonce_bytes)
     if "-" not in nonce or "_" not in nonce:
         v.fail("pick a nonce whose base64url uses '-' and '_'")
-    context = {"agent": agent, "ownerNostr": owner_pub, "now": ISSUED_AT + 60}
+    context = {"agent": agent, "ownerNostr": "0x" + owner_pub, "now": ISSUED_AT + 60}
 
     def body(reason="compromised", **overrides):
         b = {
@@ -141,9 +144,10 @@ def build():
     reject("reject-agent-no-prefix", "`agent` without 0x", signed_body(body(agent=agent[2:])))
     reject("reject-agent-short", "`agent` with 39 hex digits", signed_body(body(agent=agent[:-1])))
     reject("reject-owner-uppercase-hex", "`owner` hex digits in upper case", signed_body(body(owner=owner_pub.upper())))
-    reject("reject-owner-0x-prefix", "`owner` with a 0x prefix", signed_body(body(owner="0x" + owner_pub)))
+    reject("reject-owner-0x-prefix", "`owner` with a 0x prefix, i.e. spelled as the card spells ownerNostr (§2.4.1)",signed_body(body(owner="0x" + owner_pub)))
     reject("reject-sig-uppercase-hex", "`sig` hex digits in upper case (the signature is otherwise valid)", {"body": good, "sig": good_sig.upper()})
     reject("reject-sig-short", "`sig` of 127 hex digits", {"body": good, "sig": good_sig[:-1]})
+    reject("reject-sig-0x-prefix", "`sig` with a 0x prefix (Nostr-native, §2.4.1)", {"body": good, "sig": "0x" + good_sig})
     reject("reject-nonce-padded", "`nonce` base64url with padding", signed_body(body(nonce=nonce + "==")))
     reject("reject-nonce-standard-alphabet", "`nonce` in the standard base64 alphabet ('+', '/')", signed_body(body(nonce=nonce.replace("-", "+").replace("_", "/"))))
     last = nonce[-1]
@@ -182,6 +186,84 @@ def build():
     changed = copy.deepcopy(good)
     changed["params"]["reason"] = "retired"
     reject("reject-body-changed", "body changed after signing", {"body": changed, "sig": good_sig})
+
+    # approval.decide, approval.cancel and policy.set (04 §2.5.1, §3.4.1; docs/canonical-encodings).
+    approval_id = "apr_" + v.b64u(v.det("owner-action/approval-id", 16))
+    action = {"tool": "agentlink_respond_to_terms", "args": {"contact": other_agent, "decision": "accept"}, "context": {}}
+    digest = v.hx(v.sha256(v.jcs(action)))
+    request_expires = ISSUED_AT + 86400
+    pending = {"approvalId": approval_id, "actionDigest": digest, "expiresAt": request_expires}
+    decide_ctx = {**context, "pendingApproval": pending}
+
+    def op_body(op, params, expires_at=ISSUED_AT + 600, **overrides):
+        return body(op=op, params=params, expiresAt=expires_at, **overrides)
+
+    policy = {
+        "contacts": {"acceptInvites": "approval", "unknownSenders": "queue", "allowed": "paired", "rateLimitPerContactPerHour": 120},
+        "files": {
+            "allowedFolders": [],
+            "inboxFolder": "~/AgentLink/Inbox",
+            "maxSendSizeMB": 100,
+            "maxReceiveSizeMB": 200,
+            "storage": "auto",
+            "defaultExpiryDays": 7,
+            "deleteAfter": "expiry",
+            "ownerArchive": False,
+        },
+        "envelopes": {"maxEnvelopeKB": 24},
+        "proofs": {"notarize": "allow", "dailyBudgetUSD": 5, "perActionMaxUSD": 1, "allowKeyDisclosure": "approval", "exportFolder": "~/AgentLink/Proofs", "defaultChain": "base"},
+        "receipts": {"autoDelivered": True, "autoOpened": False},
+        "commitments": {"accept": "approval", "autoAcceptContacts": [], "autoAcceptMaxUSD": 0, "autoAcceptDirection": "buy", "autoAcceptMinUSD": None},
+    }
+    for case_id, why, b in [
+        ("sign-approval-approve", "approval.decide, approve", op_body("approval.decide", {"approvalId": approval_id, "actionDigest": digest, "decision": "approve"})),
+        ("sign-approval-deny", "approval.decide, deny (a deny is signed too)", op_body("approval.decide", {"approvalId": approval_id, "actionDigest": digest, "decision": "deny"})),
+        ("sign-approval-cancel", "approval.cancel (D-55)", op_body("approval.cancel", {"approvalId": approval_id})),
+        ("sign-policy-set", "policy.set with the 06 §3 defaults as policy (proposed until M1-2b)", op_body("policy.set", {"version": 1, "policy": policy})),
+    ]:
+        cases.append(
+            v.case(
+                case_id,
+                f"{SPEC} SignedOwnerAction, {why} (docs/canonical-encodings, pending merge)",
+                {"op": "sign", "body": b, "secretKey": v.hx(owner), "auxRand": v.hx(aux)},
+                {
+                    "jcs": jcs_lenient(b).decode("utf-8"),
+                    "bodyHash": v.hx(body_hash(b)),
+                    "signatureInput": v.hx(v.tagged_hash(TAG, body_hash(b))),
+                    "sig": sign(b, owner, aux),
+                },
+            )
+        )
+
+    def decide(**params):
+        p_ = {"approvalId": approval_id, "actionDigest": digest, "decision": "approve"}
+        p_.update(params)
+        return p_
+
+    approve = op_body("approval.decide", decide())
+    cases.append(
+        v.case(
+            "verify-approval-approve",
+            f"{SPEC}: approval.decide for the pending request verifies (docs/canonical-encodings, pending merge)",
+            {"op": "verify", "signed": signed_body(approve), "context": decide_ctx},
+            {"outcome": "accept"},
+        )
+    )
+    for case_id, why, b in [
+        ("reject-digest-0x-prefix", "`actionDigest` with a 0x prefix (bare hex, §2.4.1)", op_body("approval.decide", decide(actionDigest="0x" + digest))),
+        ("reject-digest-uppercase", "`actionDigest` in upper-case hex", op_body("approval.decide", decide(actionDigest=digest.upper()))),
+        ("reject-digest-base64url", "`actionDigest` as base64url", op_body("approval.decide", decide(actionDigest=v.b64u(bytes.fromhex(digest))))),
+        ("reject-digest-mismatch", "`actionDigest` of another action", op_body("approval.decide", decide(actionDigest=v.hx(v.sha256(b"other"))))),
+        ("reject-approval-id-unknown", "an approvalId that is not pending", op_body("approval.decide", decide(approvalId="apr_" + v.b64u(v.det("owner-action/other-approval", 16))))),
+        ("reject-approval-id-no-prefix", "approvalId without apr_", op_body("approval.decide", decide(approvalId=approval_id[4:]))),
+        ("reject-approval-id-padded", "approvalId with padded base64url", op_body("approval.decide", decide(approvalId=approval_id + "=="))),
+        ("reject-decision-free-text", "`decision` outside approve | deny", op_body("approval.decide", decide(decision="maybe"))),
+        ("reject-decide-unknown-param", "unknown key in approval.decide params", op_body("approval.decide", {**decide(), "note": "x"})),
+        ("reject-decide-expiry-zero", "expiresAt = 0 is allowed only for agent.revoke", op_body("approval.decide", decide(), expires_at=0)),
+        ("reject-decide-beyond-request", "expiresAt after the request's expiresAt (its maximum lifetime)", op_body("approval.decide", decide(), expires_at=request_expires + 1)),
+        ("reject-decide-expired", "now is after expiresAt", op_body("approval.decide", decide(), expires_at=ISSUED_AT + 30)),
+    ]:
+        reject(case_id, why, signed_body(b), decide_ctx)
     return cases
 
 
@@ -189,7 +271,12 @@ CONTEXT = {
     "type": "object",
     "additionalProperties": False,
     "required": ["agent", "ownerNostr", "now"],
-    "properties": {"agent": v.ADDRESS, "ownerNostr": v.hexn(32), "now": v.INTEGER},
+    "properties": {
+        "agent": v.ADDRESS,
+        "ownerNostr": {"type": "string", "pattern": "^0x[0-9a-f]{64}$"},
+        "now": v.INTEGER,
+        "pendingApproval": v.strict_object({"approvalId": v.STRING, "actionDigest": v.hexn(32), "expiresAt": v.INTEGER}),
+    },
 }
 SCHEMA = v.case_schema(
     SUITE,

@@ -481,6 +481,50 @@
       "expected": {
         "outcome": "reject"
       }
+    },
+    {
+      "id": "duplicate-key",
+      "source": "RFC 8785 \u00a73.1 / RFC 7493 \u00a72.3: duplicate property names MUST be rejected",
+      "input": {
+        "op": "canonicalize",
+        "json": "{\"a\":1,\"a\":2}"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "duplicate-key-same-value",
+      "source": "RFC 8785 \u00a73.1 / RFC 7493 \u00a72.3: duplicate property names MUST be rejected",
+      "input": {
+        "op": "canonicalize",
+        "json": "{\"a\":1,\"b\":2,\"a\":1}"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "duplicate-key-nested",
+      "source": "RFC 8785 \u00a73.1 / RFC 7493 \u00a72.3: duplicate property names MUST be rejected",
+      "input": {
+        "op": "canonicalize",
+        "json": "{\"x\":[{\"k\":true,\"k\":false}]}"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "duplicate-key-escaped",
+      "source": "RFC 8785 \u00a73.1 / RFC 7493 \u00a72.3: duplicate property names MUST be rejected",
+      "input": {
+        "op": "canonicalize",
+        "json": "{\"a\":1,\"\\u0061\":2}"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
     }
   ]
 }

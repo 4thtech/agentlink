@@ -81,6 +81,48 @@ def read_source(name, sha256_hex):
     return data
 
 
+def committed_cases(suite):
+    path = ROOT / "test-vectors" / suite / "vectors.json"
+    if not path.exists():
+        fail(f"{path.relative_to(ROOT)} is missing; it holds the published secret values")
+    return {c["id"]: c for c in json.loads(path.read_text(encoding="utf-8"))["cases"]}
+
+
+def read_redacted_source(name, suite, upstream_sha256):
+    """A published vector file whose key material is kept only in the committed vectors.json.
+
+    tools/vectors/sources/<name> is the upstream file with every secret value replaced by a token
+    `@<case id>/<input|expected>/<field>[/upper]`. The tokens are filled from the committed
+    test-vectors/<suite>/vectors.json and the result must hash to the upstream file's published
+    SHA-256, so the committed secrets are exactly the published ones and nothing else is."""
+    text = (SOURCES / name).read_bytes().decode("utf-8")  # bytes: keep CRLF line ends exactly
+    cases = committed_cases(suite)
+
+    def fill(match):
+        case_id, part, field, upper = match.group(1), match.group(2), match.group(3), match.group(4)
+        try:
+            value = cases[case_id][part][field]
+        except KeyError:
+            fail(f"{name}: token {match.group(0)} has no value in test-vectors/{suite}/vectors.json")
+        return value.upper() if upper else value
+
+    restored = re.sub(r"@([a-z0-9-]+)/(input|expected)/([A-Za-z0-9]+)(/upper)?", fill, text)
+    digest = hashlib.sha256(restored.encode("utf-8")).hexdigest()
+    if digest != upstream_sha256:
+        fail(f"{name} with the committed secrets has SHA-256 {digest}, the upstream file {upstream_sha256}")
+    return restored.encode("utf-8")
+
+
+def committed_inputs(suite):
+    """Case id -> input of the committed test-vectors/<suite>/vectors.json.
+
+    Key material of published vectors is kept only in committed vectors.json files, the one place
+    the secret scan allowlists. Generators read it back from there and check it against published
+    values: the upstream file's SHA-256 (read_redacted_source) or published public outputs (the
+    CFRG HPKE keys against pkEm, enc and the ciphertexts), so a changed value still fails --check."""
+    return {case_id: c["input"] for case_id, c in committed_cases(suite).items()}
+
+
 # --- encodings -----------------------------------------------------------------------------------
 
 
@@ -170,6 +212,25 @@ def jcs(value):
     import rfc8785
 
     return rfc8785.dumps(value)
+
+
+def jcs_lenient(value):
+    """JCS for objects that deliberately break the integer rules. `rfc8785` refuses integers beyond
+    2^53 - 1; RFC 8785 serialises numbers as IEEE 754 doubles, which is what a JavaScript verifier
+    sees, so such integers are canonicalised as doubles here."""
+
+    def fix(x):
+        if isinstance(x, bool):
+            return x
+        if isinstance(x, int):
+            return float(x) if abs(x) > 2**53 - 1 else x
+        if isinstance(x, dict):
+            return {k: fix(val) for k, val in x.items()}
+        if isinstance(x, list):
+            return [fix(val) for val in x]
+        return x
+
+    return jcs(fix(value))
 
 
 def argon2id(password, salt, m_kib, t, p, length=32, secret=None, ad=None):
@@ -270,16 +331,6 @@ def x25519_public_key(secret_key):
     )
 
 
-# RFC 7748 section 6.1 (Alice's key pair).
-_RFC7748_ALICE = (
-    "77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a",
-    "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a",
-)
-
-
-def check_x25519():
-    if x25519_public_key(unhex(_RFC7748_ALICE[0])).hex() != _RFC7748_ALICE[1]:
-        fail("X25519 public key disagrees with RFC 7748 section 6.1")
 
 
 # --- case schema helpers -------------------------------------------------------------------------
@@ -355,7 +406,9 @@ def render(document):
     return json.dumps(document, indent=2, ensure_ascii=True) + "\n"
 
 
-def main(*, suite, version, script, libraries, build, schema, doc):
+def main(*, suite, version, script, libraries, build, schema, doc, runtimes=None):
+    """`runtimes`: optional (list, spec source) when a spec runtime table limits the suite (e.g. the
+    file KeyStore is Node only, 04 §2.8); the harness then requires exactly those runtimes."""
     parser = argparse.ArgumentParser(description=doc.strip().splitlines()[0])
     mode = parser.add_mutually_exclusive_group(required=True)
     out = ROOT / "test-vectors" / suite / "vectors.json"
@@ -387,6 +440,13 @@ def main(*, suite, version, script, libraries, build, schema, doc):
         },
         "cases": cases,
     }
+    if runtimes is not None:
+        only, source = runtimes
+        if not only or not set(only) <= {"node", "chromium", "firefox", "webkit", "workerd"} or not source:
+            fail(f"{suite}: runtimes must name known runtimes and cite a spec source")
+        cases_value = document.pop("cases")
+        document["runtimes"] = {"only": list(only), "source": source}
+        document["cases"] = cases_value
     schema_text = json.dumps(schema, indent=2, ensure_ascii=True) + "\n"
 
     if args.write:

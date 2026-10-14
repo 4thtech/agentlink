@@ -1,0 +1,756 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "encodings",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib, coincurve 21.0.0, pycryptodome 3.23.0)",
+    "version": "cpython 3.12.13",
+    "script": "tools/vectors/generate_encodings.py"
+  },
+  "cases": [
+    {
+      "id": "decode-address",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): agent",
+      "input": {
+        "op": "decode",
+        "field": "agent",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-address-owner-evm",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): ownerEvm",
+      "input": {
+        "op": "decode",
+        "field": "ownerEvm",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-reject-address-eip55",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): agent in EIP-55 mixed case; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "agent",
+        "value": "0x0180EC93Ae3effd2535292DD293f5E4bB3Ea2876"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-address-uppercase",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): agent in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "agent",
+        "value": "0x0180EC93AE3EFFD2535292DD293F5E4BB3EA2876"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-address-no-prefix",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): agent without 0x; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "agent",
+        "value": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-address-capital-prefix",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): agent with 0X; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "agent",
+        "value": "0X0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-address-39-hex",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): agent with 39 hex digits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "agent",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea287"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-address-41-hex",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): agent with 41 hex digits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "agent",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea28760"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-address-whitespace",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): agent with leading whitespace; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "agent",
+        "value": " 0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-bytes32",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): recordId",
+      "input": {
+        "op": "decode",
+        "field": "recordId",
+        "value": "0x33fb6206910f4d42922c6fd38972c6a3a0ff394c22b077779c2e507286652110"
+      },
+      "expected": {
+        "bytes": "33fb6206910f4d42922c6fd38972c6a3a0ff394c22b077779c2e507286652110"
+      }
+    },
+    {
+      "id": "decode-bytes32-envelope-hash",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): envelopeHash",
+      "input": {
+        "op": "decode",
+        "field": "envelopeHash",
+        "value": "0x33fb6206910f4d42922c6fd38972c6a3a0ff394c22b077779c2e507286652110"
+      },
+      "expected": {
+        "bytes": "33fb6206910f4d42922c6fd38972c6a3a0ff394c22b077779c2e507286652110"
+      }
+    },
+    {
+      "id": "decode-reject-bytes32-uppercase",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): recordId in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "recordId",
+        "value": "0x33FB6206910F4D42922C6FD38972C6A3A0FF394C22B077779C2E507286652110"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-bytes32-no-prefix",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): recordId without 0x; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "recordId",
+        "value": "33fb6206910f4d42922c6fd38972c6a3a0ff394c22b077779c2e507286652110"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-bytes32-63-hex",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): recordId with 63 hex digits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "recordId",
+        "value": "0x33fb6206910f4d42922c6fd38972c6a3a0ff394c22b077779c2e50728665211"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-salt-base64url",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): salt as base64url (a proof body's salt is EVM-native); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "salt",
+        "value": "M_tiBpEPTUKSLG_TiXLGo6D_OUwisHd3nC5QcoZlIRA"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-record-id-base64url",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): recordId as base64url; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "recordId",
+        "value": "M_tiBpEPTUKSLG_TiXLGo6D_OUwisHd3nC5QcoZlIRA"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-ecdsa",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): cardSig",
+      "input": {
+        "op": "decode",
+        "field": "cardSig",
+        "value": "0x046361e09fd7bc7d18bd166d45a7b0c045368301f3f0c878d4cc3f65319cbcefd6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f6178231b"
+      },
+      "expected": {
+        "bytes": "046361e09fd7bc7d18bd166d45a7b0c045368301f3f0c878d4cc3f65319cbcefd6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f6178231b"
+      }
+    },
+    {
+      "id": "decode-reject-ecdsa-64-bytes",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): cardSig of 64 bytes; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "cardSig",
+        "value": "0x046361e09fd7bc7d18bd166d45a7b0c045368301f3f0c878d4cc3f65319cbcefd6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f617823"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-ecdsa-uppercase",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): cardSig in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "cardSig",
+        "value": "0x046361E09FD7BC7D18BD166D45A7B0C045368301F3F0C878D4CC3F65319CBCEFD6B71D9BF7A0DE65AC066AF9DEF7B935A01EEA9D44BCC3FF10D84CF82F6178231B"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-ecdsa-no-prefix",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): cardSig without 0x; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "cardSig",
+        "value": "046361e09fd7bc7d18bd166d45a7b0c045368301f3f0c878d4cc3f65319cbcefd6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f6178231b"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-uint256-zero",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee",
+      "input": {
+        "op": "decode",
+        "field": "maxFee",
+        "value": "0"
+      },
+      "expected": {
+        "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "id": "decode-uint256",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee",
+      "input": {
+        "op": "decode",
+        "field": "maxFee",
+        "value": "1500000"
+      },
+      "expected": {
+        "bytes": "000000000000000000000000000000000000000000000000000000000016e360"
+      }
+    },
+    {
+      "id": "decode-uint256-max",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee",
+      "input": {
+        "op": "decode",
+        "field": "maxFee",
+        "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "expected": {
+        "bytes": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    {
+      "id": "decode-reject-uint256-leading-zero",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee with a leading zero; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "maxFee",
+        "value": "01500"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-uint256-plus",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee with a sign; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "maxFee",
+        "value": "+1500"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-uint256-minus",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee negative; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "maxFee",
+        "value": "-1"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-uint256-overflow",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee of 2^256; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "maxFee",
+        "value": "115792089237316195423570985008687907853269984665640564039457584007913129639936"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-uint256-fraction",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee with a fraction; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "maxFee",
+        "value": "1500.0"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-uint256-exponent",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee in exponent form; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "maxFee",
+        "value": "1e3"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-uint256-hex",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee in hex; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "maxFee",
+        "value": "0x5dc"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-uint256-whitespace",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee with trailing whitespace; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "maxFee",
+        "value": "1500 "
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-uint256-empty",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee empty; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "maxFee",
+        "value": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-nostr-key",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): from",
+      "input": {
+        "op": "decode",
+        "field": "from",
+        "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      },
+      "expected": {
+        "bytes": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      }
+    },
+    {
+      "id": "decode-nostr-key-owner",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): owner",
+      "input": {
+        "op": "decode",
+        "field": "owner",
+        "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      },
+      "expected": {
+        "bytes": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      }
+    },
+    {
+      "id": "decode-reject-nostr-key-0x",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): owner with 0x (Nostr-native); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "owner",
+        "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-nostr-key-uppercase",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): from in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "from",
+        "value": "CFCA2D0D611CBFC149A2002FFA5056F9FF133238F5A4A47AA0AC910A443682EB"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-nostr-key-63-hex",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): from with 63 hex digits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "from",
+        "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682e"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-card-owner-nostr",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): ownerNostr (the card's spelling of a Nostr key)",
+      "input": {
+        "op": "decode",
+        "field": "ownerNostr",
+        "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      },
+      "expected": {
+        "bytes": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      }
+    },
+    {
+      "id": "decode-reject-card-owner-nostr-no-prefix",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): ownerNostr without 0x (the card spells it 0x + 64 hex); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "ownerNostr",
+        "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-bip340-sig",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): sig",
+      "input": {
+        "op": "decode",
+        "field": "sig",
+        "value": "b1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760177ccd17dcd6b30fd1bf4d90b2800981609933a1c7aec7a694ac2ad5e1b4aeb1"
+      },
+      "expected": {
+        "bytes": "b1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760177ccd17dcd6b30fd1bf4d90b2800981609933a1c7aec7a694ac2ad5e1b4aeb1"
+      }
+    },
+    {
+      "id": "decode-reject-bip340-sig-0x",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): sig with 0x; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "sig",
+        "value": "0xb1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760177ccd17dcd6b30fd1bf4d90b2800981609933a1c7aec7a694ac2ad5e1b4aeb1"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-bip340-sig-uppercase",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): sig in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "sig",
+        "value": "B1531B72291DB274F4590D179878FCF39434DDF96B14D9198B132E91E9A7D760177CCD17DCD6B30FD1BF4D90B2800981609933A1C7AEC7A694AC2AD5E1B4AEB1"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-digest",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): actionDigest",
+      "input": {
+        "op": "decode",
+        "field": "actionDigest",
+        "value": "52e4d0ea92879db89c839c14f171c454e6ceb8408e6c7a4ada8cd4c655a98f08"
+      },
+      "expected": {
+        "bytes": "52e4d0ea92879db89c839c14f171c454e6ceb8408e6c7a4ada8cd4c655a98f08"
+      }
+    },
+    {
+      "id": "decode-digest-terms",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): termsHash",
+      "input": {
+        "op": "decode",
+        "field": "termsHash",
+        "value": "52e4d0ea92879db89c839c14f171c454e6ceb8408e6c7a4ada8cd4c655a98f08"
+      },
+      "expected": {
+        "bytes": "52e4d0ea92879db89c839c14f171c454e6ceb8408e6c7a4ada8cd4c655a98f08"
+      }
+    },
+    {
+      "id": "decode-reject-digest-0x",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): actionDigest with 0x (signed only under a Nostr key); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "actionDigest",
+        "value": "0x52e4d0ea92879db89c839c14f171c454e6ceb8408e6c7a4ada8cd4c655a98f08"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-digest-base64url",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): termsHash as base64url; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "termsHash",
+        "value": "UuTQ6pKHnbicg5wU8XHEVObOuECObHpK2ozUxlWpjwg"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-base64url",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): id",
+      "input": {
+        "op": "decode",
+        "field": "id",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-base64url-invite-id",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): inviteId",
+      "input": {
+        "op": "decode",
+        "field": "inviteId",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-reject-base64url-padded",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): id with padding; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "id",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g=="
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-base64url-standard-alphabet",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): id with + and /; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "id",
+        "value": "+/8+DwD/EOD4/n08GwqZ7g"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-base64url-trailing-bits",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): id with non-zero trailing bits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "id",
+        "value": "-_8-DwD_EOD4_n08GwqZ7h"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-base64url-whitespace",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): kid with whitespace; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "kid",
+        "value": "-_8-DwD_EOD 4_n08GwqZ7g"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-reject-base64url-impossible-length",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): nonce with an impossible length (4n + 1 characters); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "field": "nonce",
+        "value": "-_8-DwD_EOD4_n08GwqZ7gAAA"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "equal-owner-and-card-owner-nostr",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): an OwnerAction owner and the card's ownerNostr for the same key are equal as bytes",
+      "input": {
+        "op": "equalBytes",
+        "a": {
+          "field": "owner",
+          "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        },
+        "b": {
+          "field": "ownerNostr",
+          "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "equal-from-and-card-agent-nostr",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): an envelope from and a card bytes32 key compare as bytes",
+      "input": {
+        "op": "equalBytes",
+        "a": {
+          "field": "from",
+          "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        },
+        "b": {
+          "field": "ownerNostr",
+          "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "equal-owner-other-key",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): different keys are not equal",
+      "input": {
+        "op": "equalBytes",
+        "a": {
+          "field": "owner",
+          "value": "a4a9db7a44d5371e6470c4ff6d582d13232248518ed59b617101bb6a947bc6fb"
+        },
+        "b": {
+          "field": "ownerNostr",
+          "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "equal-owner-with-0x",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): a string-equal but non-canonical owner fails its parse first",
+      "input": {
+        "op": "equalBytes",
+        "a": {
+          "field": "owner",
+          "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        },
+        "b": {
+          "field": "ownerNostr",
+          "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "equal-card-without-0x",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): a card key without 0x fails its parse first",
+      "input": {
+        "op": "equalBytes",
+        "a": {
+          "field": "owner",
+          "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        },
+        "b": {
+          "field": "ownerNostr",
+          "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "equal-address-checksummed",
+      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): an EIP-55 address fails its parse; nothing lower-cases it",
+      "input": {
+        "op": "equalBytes",
+        "a": {
+          "field": "agent",
+          "value": "0x0180EC93Ae3effd2535292DD293f5E4bB3Ea2876"
+        },
+        "b": {
+          "field": "agentEvm",
+          "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    }
+  ]
+}

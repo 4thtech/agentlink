@@ -7,7 +7,7 @@
 HKDF is `cryptography`'s (OpenSSL), checked first against RFC 5869 test cases 1-3. secp256k1
 public keys come from libsecp256k1 (coincurve), EVM addresses from Keccak-256 (pycryptodome) with
 EIP-55 checksums checked against the published EIP-55 examples, X25519 public keys from
-`cryptography`, checked against RFC 7748 §6.1. `kid` = first 16 bytes of SHA-256(encPub)
+`cryptography` (checked against the CFRG HPKE key pairs in the `hpke` suite). `kid` = first 16 bytes of SHA-256(encPub)
 (04 §3.1), base64url without padding as it appears in an envelope.
 
 Ops:
@@ -92,7 +92,6 @@ def secp_secret(seed, label, epoch):
 
 def build():
     v.check_eip55()
-    v.check_x25519()
     cases = []
     for case_id, source, ikm, salt, info_hex, length, published in RFC5869:
         okm = v.hkdf_sha256(v.unhex(ikm), v.unhex(salt), v.unhex(info_hex), length)
@@ -148,8 +147,12 @@ def build():
                     expected = {"publicKey": v.hx(public), "kid": v.b64u(v.sha256(public)[:16])}
                     source = "04 §2.1 X25519 (RFC 7748 clamping by the library), §3.1 kid"
                 elif label == EVM:
-                    expected = {"address": v.eip55(v.evm_address(secp_secret(seed, label, epoch)))}
-                    source = "04 §2.1 secp256k1, EVM address with EIP-55 checksum"
+                    address = v.evm_address(secp_secret(seed, label, epoch))
+                    expected = {"address": address, "addressChecksummed": v.eip55(address)}
+                    source = (
+                        "04 §2.1 secp256k1 EVM address: canonical 0x + lowercase hex (04 §2.4.1, "
+                        "docs/canonical-encodings, pending merge) and its EIP-55 display form"
+                    )
                 else:
                     expected = {"publicKey": v.hx(v.xonly_public_key(secp_secret(seed, label, epoch)))}
                     source = "04 §2.1 secp256k1, BIP-340 x-only public key"
@@ -170,6 +173,15 @@ def build():
                 {"outcome": "reject"},
             )
         )
+    for case_id, label in [("key-reject-unknown-label", "agentlink/v1/unknown"), ("key-reject-label-v2", "agentlink/v2/nostr")]:
+        cases.append(
+            v.case(
+                case_id,
+                "04 §2.1: only the four labels of the table derive keys",
+                {"op": "key", "masterSeed": v.hx(seed_a), "label": label, "epoch": 0},
+                {"outcome": "reject"},
+            )
+        )
     return cases
 
 
@@ -178,7 +190,7 @@ SCHEMA = v.case_schema(
     SUITE,
     "04 §2.1 key derivation. `hkdf`: RFC 5869 HKDF-SHA256. `derive`: okm for (masterSeed, label, "
     "epoch, counter), or a rejection. `key`: the public identity for (label, epoch): EIP-55 "
-    "address (evm), x-only public key (nostr, drop), X25519 public key and kid (enc), or a "
+    "address and its EIP-55 display form (evm), x-only public key (nostr, drop), X25519 public key and kid (enc), or a "
     "rejection.",
     {
         "hkdf": (
@@ -190,9 +202,9 @@ SCHEMA = v.case_schema(
             [{"okm": v.hexn(32)}, v.REJECT],
         ),
         "key": (
-            {"masterSeed": v.hexn(32), "label": LABEL, "epoch": v.INTEGER},
+            {"masterSeed": v.hexn(32), "label": v.STRING, "epoch": v.INTEGER},
             [
-                {"address": v.CHECKSUM_ADDRESS},
+                {"address": v.ADDRESS, "addressChecksummed": v.CHECKSUM_ADDRESS},
                 {"publicKey": v.hexn(32)},
                 {"publicKey": v.hexn(32), "kid": v.B64U},
                 v.REJECT,

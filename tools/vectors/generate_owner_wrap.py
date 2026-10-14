@@ -5,16 +5,18 @@ Argon2id v1.3 (RFC 9106) from `cryptography` (OpenSSL), checked first against th
 Argon2id test vector (with secret and associated data). The AgentLink cases run Argon2id at the
 parameters the spec fixes: the owner passphrase wrap and recovery code, m = 64 MiB, t = 3, p = 1
 (04 §2.3, §2.8, M1-1f), and the file KeyStore floor, m = 19 MiB, t = 2, p = 1 (04 §2.8), with
-32-byte output, no secret and no associated data. Passwords are the UTF-8 bytes of NFKC-normalised
-test passphrases (04 §2.8, secretKind 2). Salts are synthetic test values.
+32-byte output, no secret and no associated data. Passwords follow 04 §2.8 password() on
+docs/canonical-encodings (pending merge): the UTF-8 bytes of an NFKC-normalised passphrase (kind 2)
+or the 15 decoded bytes of a generated code (kind 1). Salts are synthetic test values.
 
-Not included yet: the `ALKO` blob itself (its byte layout is not specified; M1-1f "versioned
-wrapped-blob format"), the owner key-encryption key on top of Argon2id, and secretKind 1 (whether
-Argon2id receives the 24-character code or its 15 decoded bytes). Questions in the M1-1h PR.
+These cases run in every runtime: Argon2id also protects the recovery code in the browser console
+(04 §2.3). The ALKO blob, its kek and the cross-type cases are in the Node-only `keystore-file`
+suite with ALKS (IR-M1-1h-1 Q7).
 
 Usage: python3 -I tools/vectors/generate_owner_wrap.py --check [FILE] | --write
 """
 
+import base64
 import sys
 import unicodedata
 from pathlib import Path
@@ -51,6 +53,17 @@ def build():
             {"tag": r["tag"]},
         )
     ]
+    code = base64.b32encode(v.det("owner-wrap/owner-code", 15)).decode("ascii")
+    code_bytes = base64.b32decode(code)
+    salt = v.det("owner-wrap/owner-code/salt", 16)
+    cases.append(
+        v.case(
+            "owner-params-code",
+            "Argon2id v1.3, owner wrap parameters; secretKind 1: the password is the 15 decoded code bytes (docs/canonical-encodings, pending merge)",
+            {"op": "argon2id", "password": v.hx(code_bytes), "salt": v.hx(salt), "secret": "", "ad": "", "memoryKiB": 65536, "iterations": 3, "parallelism": 1, "length": 32},
+            {"tag": v.hx(v.argon2id(code_bytes, salt, 65536, 3, 1, 32))},
+        )
+    )
     for case_id, why, passphrase, m, t in [
         ("owner-params-ascii", "owner passphrase wrap parameters (m = 64 MiB, t = 3, p = 1)", "correct horse battery staple", 65536, 3),
         ("owner-params-unicode", "owner passphrase wrap parameters; NFKC-normalised UTF-8 password", "Ｐａｓｓ ﬁle Café ✓", 65536, 3),

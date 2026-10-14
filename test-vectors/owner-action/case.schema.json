@@ -117,10 +117,31 @@
                 },
                 "ownerNostr": {
                   "type": "string",
-                  "pattern": "^[0-9a-f]{64}$"
+                  "pattern": "^0x[0-9a-f]{64}$"
                 },
                 "now": {
                   "type": "integer"
+                },
+                "pendingApproval": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "approvalId",
+                    "actionDigest",
+                    "expiresAt"
+                  ],
+                  "properties": {
+                    "approvalId": {
+                      "type": "string"
+                    },
+                    "actionDigest": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "expiresAt": {
+                      "type": "integer"
+                    }
+                  }
                 }
               }
             }

@@ -21,7 +21,10 @@ An Opus builder: `test-vectors/**` is S2 (`audit-rules.md` §2.2). Vectors chang
    python3 -I tools/vectors/generate_<suite>.py --write
    ```
 3. **Suite module.** Add `test-vectors/harness/suites/<suite>.ts` and register it in `harness/suites/index.ts`. It returns `{ field, actual }` for every field of the case's `expected`. It never returns expected values; `harness/compare.ts` reads them from the vector. It calls `@agentlink/crypto`, never a crypto library or `crypto.subtle` directly.
-4. **Tests first (S2).** Vectors that land before their code (M1-1h) are listed in `pendingSuites` (`harness/suites/index.ts`) with the implementing card, so CI stays green and reports them as pending. The implementing card removes the entry and adds the module; run it red locally first and record the evidence (commit SHA, command, output excerpt) in the PR body. Never push a failing state. Then implement.
+4. **Tests first (S2).** Vectors that land before their code (M1-1h) are listed in `test-vectors/pending-suites.json` with the implementing card and its phase. CI stays green and warns for each pending suite. The implementing card removes the entry and adds the module. Run it red locally first and record the evidence (commit SHA, command, output excerpt) in the PR body. Never push a failing state. Then implement.
+   - The list only shrinks: `node tools/vectors/check-pending.mjs --base origin/main` (in CI) fails if a suite that is implemented on `main` becomes pending again.
+   - **Release gate.** `release.yml` runs `node tools/vectors/check-pending.mjs --gate M1a` before it builds, so no release ships while an M1a suite is pending. That is the M1a gate (M1-23). At the M1b gate (M1-GATE), add `M1b` to that step in the same PR that removes the last M1b pending suite.
+   - Test keys stay inside `vectors.json` files only (the secret scan allowlists exactly those). A generator that needs a published secret key reads it back from its committed `vectors.json`.
 5. **Run the checks:**
    ```bash
    VECTORS_PYTHON=.venv-vectors/bin/python node tools/vectors/check-generators.mjs   # every vectors.json equals its generator's output

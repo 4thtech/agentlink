@@ -90,6 +90,46 @@
           "additionalProperties": false,
           "required": [
             "op",
+            "sec1",
+            "sec2"
+          ],
+          "properties": {
+            "op": {
+              "const": "conversationKeyPair"
+            },
+            "sec1": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "sec2": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "conversationKey"
+          ],
+          "properties": {
+            "conversationKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
             "conversationKey",
             "nonce"
           ],

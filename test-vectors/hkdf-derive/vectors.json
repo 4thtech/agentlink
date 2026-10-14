@@ -654,7 +654,7 @@
     },
     {
       "id": "key-evm-e0-seed-a",
-      "source": "04 \u00a72.1 secp256k1, EVM address with EIP-55 checksum",
+      "source": "04 \u00a72.1 secp256k1 EVM address: canonical 0x + lowercase hex (04 \u00a72.4.1, docs/canonical-encodings, pending merge) and its EIP-55 display form",
       "input": {
         "op": "key",
         "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
@@ -662,7 +662,8 @@
         "epoch": 0
       },
       "expected": {
-        "address": "0xE8118B7407afbd4A12C0df832C67CE0E2Eb20Cd6"
+        "address": "0xe8118b7407afbd4a12c0df832c67ce0e2eb20cd6",
+        "addressChecksummed": "0xE8118B7407afbd4A12C0df832C67CE0E2Eb20Cd6"
       }
     },
     {
@@ -787,7 +788,7 @@
     },
     {
       "id": "key-evm-e0-seed-b",
-      "source": "04 \u00a72.1 secp256k1, EVM address with EIP-55 checksum",
+      "source": "04 \u00a72.1 secp256k1 EVM address: canonical 0x + lowercase hex (04 \u00a72.4.1, docs/canonical-encodings, pending merge) and its EIP-55 display form",
       "input": {
         "op": "key",
         "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
@@ -795,7 +796,8 @@
         "epoch": 0
       },
       "expected": {
-        "address": "0x441e5fe96aFAE9130411dAbD2304E4bCc77E78bC"
+        "address": "0x441e5fe96afae9130411dabd2304e4bcc77e78bc",
+        "addressChecksummed": "0x441e5fe96aFAE9130411dAbD2304E4bCc77E78bC"
       }
     },
     {
@@ -939,6 +941,32 @@
         "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
         "label": "agentlink/v1/evm",
         "epoch": 2
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "key-reject-unknown-label",
+      "source": "04 \u00a72.1: only the four labels of the table derive keys",
+      "input": {
+        "op": "key",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/unknown",
+        "epoch": 0
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "key-reject-label-v2",
+      "source": "04 \u00a72.1: only the four labels of the table derive keys",
+      "input": {
+        "op": "key",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v2/nostr",
+        "epoch": 0
       },
       "expected": {
         "outcome": "reject"

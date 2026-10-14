@@ -150,6 +150,13 @@ REJECT_TEXTS = [
     ("reversed-surrogate-pair", '"\\ude00\\ud83d"'),
 ]
 
+DUPLICATE_TEXTS = [
+    ("duplicate-key", '{"a":1,"a":2}'),
+    ("duplicate-key-same-value", '{"a":1,"b":2,"a":1}'),
+    ("duplicate-key-nested", '{"x":[{"k":true,"k":false}]}'),
+    ("duplicate-key-escaped", '{"a":1,"\\u0061":2}'),
+]
+
 
 def double_from_hex(bits):
     return struct.unpack(">d", bytes.fromhex(bits))[0]
@@ -165,7 +172,18 @@ def canonical_or_none(value):
 def parse(text):
     # Python's json keeps lone surrogates as str code points, which rfc8785 then rejects. Large
     # integers become floats first, as in ECMAScript (the RFC's data model is IEEE 754 doubles).
-    return json.loads(text, parse_int=lambda s: float(int(s)) if abs(int(s)) > 2**53 - 1 else int(s))
+    # Duplicate property names are refused (I-JSON, RFC 7493 §2.3), after escapes are decoded.
+    def no_duplicates(pairs):
+        names = [name for name, _ in pairs]
+        if len(set(names)) != len(names):
+            raise ValueError("duplicate property name")
+        return dict(pairs)
+
+    return json.loads(
+        text,
+        object_pairs_hook=no_duplicates,
+        parse_int=lambda s: float(int(s)) if abs(int(s)) > 2**53 - 1 else int(s),
+    )
 
 
 def build():
@@ -241,6 +259,24 @@ def build():
             v.case(
                 case_id,
                 f"{RFC} §3.2.2.2: lone surrogates MUST cause an error",
+                {"op": "canonicalize", "json": text},
+                {"outcome": "reject"},
+            )
+        )
+
+    # RFC 8785 §3.1: the input MUST be I-JSON, and JSON objects MUST NOT have duplicate property
+    # names (RFC 7493 §2.3). A parser that silently keeps the last value (JSON.parse) cannot meet
+    # this, so these cases need a strict parser in front of the canonicaliser (IR-M1-1h-1 F3).
+    for case_id, text in DUPLICATE_TEXTS:
+        try:
+            parse(text)
+            v.fail(f"{case_id} parses")
+        except ValueError:
+            pass
+        cases.append(
+            v.case(
+                case_id,
+                f"{RFC} §3.1 / RFC 7493 §2.3: duplicate property names MUST be rejected",
                 {"op": "canonicalize", "json": text},
                 {"outcome": "reject"},
             )

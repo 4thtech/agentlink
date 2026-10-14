@@ -2,12 +2,14 @@
 // Chromium, Firefox, WebKit (Playwright) and workerd (Workers pool). Each test records the runtime
 // it observed in `task.meta`, and tools/vectors/check.mjs requires a passing result for every
 // (runtime, suite, case) triple, so a project that silently runs somewhere else, or not at all,
-// fails `pnpm vectors:check`.
+// fails `pnpm vectors:check`. A suite may declare fewer runtimes (`runtimes.only`, citing a spec
+// runtime table, written by its generator), and then needs exactly those.
 import { describe, expect, inject, test } from 'vitest';
+import pending from '../pending-suites.json';
 import { compareToVector } from './compare';
 import { vectorFiles, type VectorCase } from './registry';
 import { observeRuntime, type RuntimeId } from './runtime';
-import { pendingSuites, suiteModules } from './suites/index';
+import { suiteModules } from './suites/index';
 
 declare module 'vitest' {
   interface ProvidedContext {
@@ -26,6 +28,8 @@ declare module 'vitest' {
 }
 
 const expectedRuntime = inject('vectorsRuntime');
+const pendingSuites: ReadonlyMap<string, { readonly card: string; readonly phase: string }> =
+  new Map(Object.entries(pending.suites));
 
 test('runtime identity', ({ task }) => {
   const observed = observeRuntime();
@@ -48,19 +52,19 @@ for (const { directory, file } of vectorFiles) {
   describe(`${directory} v${String(file.version)}`, () => {
     const suite = suiteModules.get(file.suite);
     const cases: readonly VectorCase[] = Array.isArray(file.cases) ? file.cases : [];
-
-    const pendingCard = pendingSuites.get(file.suite);
+    const pendingEntry = pendingSuites.get(file.suite);
+    const runsHere = file.runtimes === undefined || file.runtimes.only.includes(expectedRuntime);
 
     // A suite is either implemented (a module runs every case) or pending (no module yet, M1-1h).
     // Both at once fails, so the pending entry goes away when the module lands (fail closed).
     test('has a suite module and a matching directory', () => {
       expect(file.suite).toBe(directory);
-      if (pendingCard === undefined) {
+      if (pendingEntry === undefined) {
         expect(suite, `no suite module registered for "${file.suite}"`).toBeDefined();
       } else {
         expect(
           suite,
-          `"${file.suite}" has a module: remove its pendingSuites entry`,
+          `"${file.suite}" has a module: remove it from test-vectors/pending-suites.json`,
         ).toBeUndefined();
       }
     });
@@ -70,14 +74,17 @@ for (const { directory, file } of vectorFiles) {
       expect(cases.length).toBeGreaterThan(0);
     });
 
-    if (pendingCard !== undefined) {
+    // Outside its declared runtimes a suite records nothing; check.mjs requires nothing there.
+    if (!runsHere) return;
+
+    if (pendingEntry !== undefined) {
       // Recorded per runtime; tools/vectors/check.mjs reports the suite as pending, not passed.
-      test(`pending: not yet implemented (${pendingCard})`, ({ task }) => {
+      test(`pending: not yet implemented (${pendingEntry.card})`, ({ task }) => {
         task.meta.vectors = {
           kind: 'pending',
           runtime: observeRuntime().id,
           suite: file.suite,
-          detail: pendingCard,
+          detail: pendingEntry.card,
         };
         expect(suite).toBeUndefined();
         expect(cases.length).toBeGreaterThan(0);

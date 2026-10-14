@@ -1,28 +1,27 @@
 #!/usr/bin/env python3
-"""Independent generator for the `keystore-file` suite: the headless file KeyStore ALKS v1 (M1-1h).
+"""Independent generator for the `keystore-file` suite: ALKS v1 and ALKO v1 (M1-1h).
 
-04 §2.8 (D-54), exactly:
-  header = "ALKS" | u8 version=1 | u8 secretKind | u8 kdf=1 | u32be m (KiB) | u8 t | u8 p |
-           salt (16) | u8 aead=1 | nonce (12) | u8 idLen (1..64) | agentId ([A-Za-z0-9_-])
-  kek    = HKDF-SHA256(ikm = Argon2id(normalise(secret, secretKind), salt, m, t, p, L = 32),
-                       salt = "", info = utf8("agentlink/v1/keystore-file"), L = 32)
-  file   = header || AES-256-GCM(kek, nonce, plaintext, AAD = header)   (ciphertext || 16-byte tag)
-  plaintext = entries `u16be nameLen | name (UTF-8) | u32be valueLen | value`
-Argon2id (v1.3), HKDF and AES-GCM are `cryptography` (Argon2id checked against RFC 9106 in the
-`owner-wrap` suite, HKDF against RFC 5869 in `hkdf-derive`). Passphrases, salts, nonces and entry
-values are synthetic test values.
+04 §2.8 (D-54), with the password rule and the ALKO layout of docs/canonical-encodings (pending
+merge; regenerate if its review changes them):
+  ALKS header = "ALKS" | u8 version=1 | u8 secretKind | u8 kdf=1 | u32be m (KiB) | u8 t | u8 p |
+                salt (16) | u8 aead=1 | nonce (12) | u8 idLen (1..64) | agentId ([A-Za-z0-9_-])
+  ALKO header = "ALKO" | u8 version=1 | u8 secretKind | u8 kdf=1 | u32be m | u8 t | u8 p |
+                salt (16) | u8 aead=1 | nonce (12)                       (42 bytes; blob 90 bytes)
+  kek  = HKDF-SHA256(ikm = Argon2id(password(secret, kind), salt, m, t, p, L = 32), salt = "",
+                     info = "agentlink/v1/keystore-file" (ALKS) | "agentlink/v1/owner-passphrase-wrap" (ALKO))
+  blob = header || AES-256-GCM(kek, nonce, plaintext, AAD = header)
+  ALKS plaintext = entries `u16be nameLen | name (UTF-8) | u32be valueLen | value`;
+  ALKO plaintext = exactly the 32-byte owner seed.
+  password: a secret read from a file first loses one trailing \\n or \\r\\n. Kind 1 (generated
+  code): refuse non-ASCII, remove spaces and dashes, ASCII upper case, map 0/1/8 to O/I/B, require
+  24 base32 characters, password = the 15 decoded bytes. Kind 2: UTF-8 of NFKC, spaces kept.
+Argon2id (v1.3), HKDF and AES-GCM are `cryptography` (Argon2id checked against RFC 9106 in
+`owner-wrap`, HKDF against RFC 5869 in `hkdf-derive`); owner keys come from the 04 §2.1 derivation
+of `generate_hkdf_derive.py`. Secrets, salts, nonces and entries are synthetic test values.
 
-File vectors use secretKind 2 (chosen passphrase: UTF-8 of Unicode NFKC, otherwise unchanged).
-For secretKind 1 (generated code) only the normalisation is covered: the spec does not say
-whether Argon2id then receives the 24 canonical characters or the 15 decoded bytes (question in
-the M1-1h PR). The second, seed-derived agent-ID check after decryption needs `agentId` (G-23)
-and is not covered.
+Runtimes: Node only, as 04 §2.8 states for the file KeyStore (IR-M1-1h-1 Q7).
 
-Rejections (04 §2.8 "Required tests"): wrong passphrase; a flipped byte in every header field, the
-ciphertext and the tag; truncation; unknown version, kdf, aead and secretKind; KDF parameters
-outside the floor and cap (sealed validly, so only the bounds check can refuse them); idLen 0 or
-above 64 and an invalid agentId charset; another agent's file (same passphrase); duplicate entry
-names, length overflows, trailing bytes and plaintext above 64 KiB (all sealed validly).
+Not covered: the second, seed-derived agent-ID check of ALKS (needs `agentId`, G-23).
 
 Usage: python3 -I tools/vectors/generate_keystore_file.py --check [FILE] | --write
 """
@@ -34,58 +33,73 @@ import unicodedata
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import generate_hkdf_derive as hkdf  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "keystore-file"
 VERSION = 1
 SPEC = "04 §2.8 ALKS v1"
-INFO = b"agentlink/v1/keystore-file"
+SPEC_ALKO = "04 §2.8 ALKO v1 (docs/canonical-encodings, pending merge)"
+SPEC_PASSWORD = "04 §2.8 password() (docs/canonical-encodings, pending merge)"
+ALKS_INFO = b"agentlink/v1/keystore-file"
+ALKO_INFO = b"agentlink/v1/owner-passphrase-wrap"
 FLOOR = (19456, 2, 1)
 DEFAULT = (65536, 3, 1)
 BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 
 
-# --- reference implementation of the format ------------------------------------------------------
+# --- reference implementation of the formats -----------------------------------------------------
 
 
-def normalise(secret, kind):
+def password(secret, kind, source="prompt"):
+    if source == "file":
+        if secret.endswith("\r\n"):
+            secret = secret[:-2]
+        elif secret.endswith("\n"):
+            secret = secret[:-1]
     if kind == 1:
-        code = secret.upper().replace(" ", "").replace("-", "")
+        if any(ord(c) > 0x7F for c in secret):
+            raise ValueError("non-ASCII in a generated code")
+        code = secret.replace(" ", "").replace("-", "").upper()
         code = code.replace("0", "O").replace("1", "I").replace("8", "B")
         if len(code) != 24 or any(c not in BASE32 for c in code):
             raise ValueError("not a 24-character code")
-        return code
+        return base64.b32decode(code)
     if kind == 2:
-        return unicodedata.normalize("NFKC", secret)
+        return unicodedata.normalize("NFKC", secret).encode("utf-8")
     raise ValueError("unknown secretKind")
 
 
-def kek(secret, kind, salt, m, t, p):
-    if kind != 2:
-        v.fail("file vectors use secretKind 2 only")
-    ikm = v.argon2id(normalise(secret, kind).encode("utf-8"), salt, m, t, p, 32)
-    return v.hkdf_sha256(ikm, b"", INFO, 32)
+def kek(secret, kind, salt, m, t, p, info=ALKS_INFO, source="prompt"):
+    return v.hkdf_sha256(v.argon2id(password(secret, kind, source), salt, m, t, p, 32), b"", info, 32)
 
 
-def header(kind, m, t, p, salt, nonce, agent_id, version=1, kdf=1, aead=1, id_len=None):
+def header(kind, m, t, p, salt, nonce, agent_id, version=1, kdf=1, aead=1, id_len=None, magic=b"ALKS"):
     raw_id = agent_id.encode("utf-8")
-    return (
-        b"ALKS" + v.u8(version) + v.u8(kind) + v.u8(kdf) + v.u32be(m) + v.u8(t) + v.u8(p)
-        + salt + v.u8(aead) + nonce + v.u8(len(raw_id) if id_len is None else id_len) + raw_id
-    )
+    h = magic + v.u8(version) + v.u8(kind) + v.u8(kdf) + v.u32be(m) + v.u8(t) + v.u8(p) + salt + v.u8(aead) + nonce
+    if magic == b"ALKO":
+        return h
+    return h + v.u8(len(raw_id) if id_len is None else id_len) + raw_id
 
 
 def entries_bytes(entries):
     out = b""
     for name, value in entries:
-        raw = name.encode("utf-8")
+        raw = name.encode("utf-8") if isinstance(name, str) else name
         out += v.u16be(len(raw)) + raw + v.u32be(len(value)) + value
     return out
 
 
-def seal(secret, kind, m, t, p, salt, nonce, agent_id, plaintext, **header_overrides):
+def seal(secret, kind, m, t, p, salt, nonce, agent_id, plaintext, info=ALKS_INFO, **header_overrides):
     h = header(kind, m, t, p, salt, nonce, agent_id, **header_overrides)
-    return h + v.aes256gcm_encrypt(kek(secret, kind, salt, m, t, p), nonce, plaintext, h)
+    return h + v.aes256gcm_encrypt(kek(secret, kind, salt, m, t, p, info), nonce, plaintext, h)
+
+
+def check_params(kind, m, t, p):
+    if kind not in (1, 2):
+        raise ValueError("unknown secretKind")
+    if m < 19456 or m > 262144 or t < 2 or t > 8 or p < 1 or p > 4:
+        raise ValueError("KDF parameters out of bounds")
 
 
 def parse_entries(plaintext):
@@ -99,7 +113,7 @@ def parse_entries(plaintext):
         i += 2
         if i + n + 4 > len(plaintext):
             raise ValueError("name length overflow")
-        name = plaintext[i : i + n].decode("utf-8")
+        name = plaintext[i : i + n].decode("utf-8")  # invalid UTF-8 is refused
         i += n
         size = int.from_bytes(plaintext[i : i + 4], "big")
         i += 4
@@ -112,36 +126,60 @@ def parse_entries(plaintext):
     return entries
 
 
-def open_file(data, secret, expected_agent_id):
-    """Every refusal of 04 §2.8 that applies without an agentId derivation (G-23)."""
-    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", expected_agent_id):
+AGENT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+
+
+def open_alks(data, secret, expected_agent_id, source="prompt"):
+    """Every ALKS refusal of 04 §2.8 that applies without an agentId derivation (G-23)."""
+    if not AGENT_ID.fullmatch(expected_agent_id):
         raise ValueError("invalid expected agentId")
     if len(data) < 60 or data[:4] != b"ALKS" or data[4] != 1 or data[6] != 1 or data[29] != 1:
         raise ValueError("bad header")
-    kind = data[5]
-    m = int.from_bytes(data[7:11], "big")
-    t, p = data[11], data[12]
-    salt, nonce = data[13:29], data[30:42]
-    if kind not in (1, 2):
-        raise ValueError("unknown secretKind")
-    if m < 19456 or m > 262144 or t < 2 or t > 8 or p < 1 or p > 4:
-        raise ValueError("KDF parameters out of bounds")
+    kind, m, t, p = data[5], int.from_bytes(data[7:11], "big"), data[11], data[12]
+    check_params(kind, m, t, p)
     id_len = data[42]
     if not 1 <= id_len <= 64 or len(data) < 43 + id_len + 16:
         raise ValueError("bad idLen")
     agent_id = data[43 : 43 + id_len].decode("ascii", "replace")
-    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", agent_id) or agent_id != expected_agent_id:
+    if not AGENT_ID.fullmatch(agent_id) or agent_id != expected_agent_id:
         raise ValueError("agentId mismatch")
     h = data[: 43 + id_len]
-    norm = normalise(secret, kind)  # refuses before the KDF runs
-    ikm = v.argon2id(norm.encode("utf-8"), salt, m, t, p, 32)
-    plaintext = v.aes256gcm_decrypt(v.hkdf_sha256(ikm, b"", INFO, 32), nonce, data[len(h) :], h)
-    return parse_entries(plaintext)
+    pw = password(secret, kind, source)  # refuses before the KDF runs
+    key = v.hkdf_sha256(v.argon2id(pw, data[13:29], m, t, p, 32), b"", ALKS_INFO, 32)
+    return parse_entries(v.aes256gcm_decrypt(key, data[30:42], data[len(h) :], h))
 
 
-def refused(*args):
+def owner_keys(seed):
+    """The owner keys a card names: ownerEvm and ownerNostr, at epoch 0 (04 §2.1; owner-key
+    rotation is P2, 04 §2.6)."""
+    evm = v.evm_address(hkdf.secp_secret(seed, hkdf.EVM, 0))
+    nostr = "0x" + v.hx(v.xonly_public_key(hkdf.secp_secret(seed, hkdf.NOSTR, 0)))
+    return {"ownerEvm": evm, "ownerNostr": nostr}
+
+
+def open_alko(data, secret, expected_owner, file_keystore_machine, source="prompt"):
+    if len(data) != 90:
+        raise ValueError("an ALKO blob is exactly 90 bytes")
+    if data[:4] != b"ALKO" or data[4] != 1 or data[6] != 1 or data[29] != 1:
+        raise ValueError("bad header")
+    kind, m, t, p = data[5], int.from_bytes(data[7:11], "big"), data[11], data[12]
+    check_params(kind, m, t, p)
+    if file_keystore_machine and kind != 1:
+        raise ValueError("file-KeyStore machines require a generated owner code")
+    pw = password(secret, kind, source)
+    key = v.hkdf_sha256(v.argon2id(pw, data[13:29], m, t, p, 32), b"", ALKO_INFO, 32)
+    seed = v.aes256gcm_decrypt(key, data[30:42], data[42:], data[:42])
+    keys = owner_keys(seed)
+    if bytes.fromhex(keys["ownerEvm"][2:]) != bytes.fromhex(expected_owner["ownerEvm"][2:]) or bytes.fromhex(
+        keys["ownerNostr"][2:]
+    ) != bytes.fromhex(expected_owner["ownerNostr"][2:]):
+        raise ValueError("seed does not derive the expected owner")
+    return seed
+
+
+def refused(fn, *args):
     try:
-        open_file(*args)
+        fn(*args)
     except Exception:
         return True
     return False
@@ -154,6 +192,8 @@ def build():
     cases = []
     passphrase = "correct horse battery staple"
     unicode_passphrase = "Ｐａｓｓ ﬁle Café ✓ keystore"
+    code = base64.b32encode(v.det("keystore-file/agent-code", 15)).decode("ascii")
+    code_spelled = "-".join(code[i : i + 4] for i in range(0, 24, 4)).lower()
     seed = v.det("keystore-file/seed", 32)
     store_key = v.det("keystore-file/store-key", 32)
     s3 = b'{"accessKeyId":"TESTONLY","secret":"' + base64.b64encode(v.det("keystore-file/s3", 30)) + b'"}'
@@ -167,15 +207,15 @@ def build():
 
     files = {}
 
-    def file_case(case_id, why, secret, params, agent_id, entries, salt_label, nonce_label):
+    def file_case(case_id, why, secret, kind, params, agent_id, entries, salt_label, nonce_label):
         salt, nonce = v.det(f"keystore-file/{salt_label}", 16), v.det(f"keystore-file/{nonce_label}", 12)
-        data = seal(secret, 2, *params, salt, nonce, agent_id, entries_bytes(entries))
-        if open_file(data, secret, agent_id) != entries:
+        data = seal(secret, kind, *params, salt, nonce, agent_id, entries_bytes(entries))
+        if open_alks(data, secret, agent_id) != entries:
             v.fail(f"{case_id} does not open")
         files[case_id] = data
         m, t, p = params
-        common = {"secretKind": 2, "secret": secret, "salt": v.hx(salt), "memoryKiB": m, "iterations": t, "parallelism": p}
-        cases.append(v.case(f"kek-{case_id}", f"{SPEC} kek ({why})", {"op": "kek", **common}, {"kek": v.hx(kek(secret, 2, salt, *params))}))
+        common = {"secretKind": kind, "secret": secret, "source": "prompt", "salt": v.hx(salt), "memoryKiB": m, "iterations": t, "parallelism": p}
+        cases.append(v.case(f"kek-{case_id}", f"{SPEC} kek ({why})", {"op": "kek", "format": "ALKS", **common}, {"kek": v.hx(kek(secret, kind, salt, *params))}))
         cases.append(
             v.case(
                 f"seal-{case_id}",
@@ -184,36 +224,62 @@ def build():
                 {"file": v.hx(data)},
             )
         )
-        cases.append(v.case(f"open-{case_id}", f"{SPEC} open ({why})", {"op": "open", "file": v.hx(data), "secret": secret, "expectedAgentId": agent_id}, entry_fields(entries)))
+        cases.append(v.case(f"open-{case_id}", f"{SPEC} open ({why})", open_input(data, secret, agent_id), entry_fields(entries)))
         return data
 
-    f1 = file_case("floor", "KDF floor m = 19 MiB, t = 2, p = 1", passphrase, FLOOR, "agent_01", entries1, "salt-1", "nonce-1")
-    file_case("default", "default m = 64 MiB, t = 3, p = 1; storage credential entry", unicode_passphrase, DEFAULT, "Agent-XYZ_123", entries2, "salt-2", "nonce-2")
+    def open_input(data, secret, expected, source="prompt"):
+        return {"op": "open", "file": v.hx(data), "secret": secret, "source": source, "expectedAgentId": expected}
+
+    f1 = file_case("floor", "KDF floor m = 19 MiB, t = 2, p = 1", passphrase, 2, FLOOR, "agent_01", entries1, "salt-1", "nonce-1")
+    file_case("default", "default m = 64 MiB, t = 3, p = 1; storage credential entry", unicode_passphrase, 2, DEFAULT, "Agent-XYZ_123", entries2, "salt-2", "nonce-2")
     cases.append(
         v.case(
             "open-default-nfkc-equivalent",
-            f"{SPEC} open with the NFKC-equivalent spelling of the passphrase (normalisation applies)",
-            {"op": "open", "file": v.hx(files["default"]), "secret": unicodedata.normalize("NFKC", unicode_passphrase), "expectedAgentId": "Agent-XYZ_123"},
+            f"{SPEC} open with the NFKC-equivalent spelling of the passphrase",
+            open_input(files["default"], unicodedata.normalize("NFKC", unicode_passphrase), "Agent-XYZ_123"),
             entry_fields(entries2),
         )
     )
-    other_agent = file_case("other-agent", "a second agent with the same passphrase", passphrase, FLOOR, "agent_02", entries1, "salt-3", "nonce-3")
+    other_agent = file_case("other-agent", "a second agent with the same passphrase", passphrase, 2, FLOOR, "agent_02", entries1, "salt-3", "nonce-3")
+    code_file = file_case("code", f"secretKind 1, generated unlock code; {SPEC_PASSWORD}", code, 1, DEFAULT, "agent_03", entries1, "salt-4", "nonce-4")
+    cases.append(
+        v.case(
+            "open-code-other-spelling",
+            f"{SPEC} open with the code in lower case with dashes ({SPEC_PASSWORD})",
+            open_input(code_file, code_spelled, "agent_03"),
+            entry_fields(entries1),
+        )
+    )
+    cases.append(
+        v.case(
+            "open-code-from-file",
+            f"{SPEC} open with the code read from a file with a trailing CRLF ({SPEC_PASSWORD})",
+            open_input(code_file, code + "\r\n", "agent_03", "file"),
+            entry_fields(entries1),
+        )
+    )
+    for case_id, m, t, p in [("cap-memory", 262144, 2, 1), ("cap-iterations", 19456, 8, 1), ("cap-parallelism", 19456, 2, 4)]:
+        salt = v.det(f"keystore-file/{case_id}/salt", 16)
+        nonce = v.det(f"keystore-file/{case_id}/nonce", 12)
+        data = seal(passphrase, 2, m, t, p, salt, nonce, "agent_01", entries_bytes(entries1))
+        if open_alks(data, passphrase, "agent_01") != entries1:
+            v.fail(f"{case_id} does not open")
+        cases.append(v.case(f"open-{case_id}", f"{SPEC}: KDF parameters at the cap (m = {m} KiB, t = {t}, p = {p}) are accepted", open_input(data, passphrase, "agent_01"), entry_fields(entries1)))
 
     # 64 KiB boundary: exactly 65536 bytes of plaintext opens; one more byte is refused.
-    big_value = v.det("keystore-file/blob", 65536 - 2 - 4 - 4)
-    big = [("blob", big_value)]
+    big = [("blob", v.det("keystore-file/blob", 65536 - 2 - 4 - 4))]
     if len(entries_bytes(big)) != 65536:
         v.fail("boundary plaintext is not 64 KiB")
     salt1, nonce1 = v.det("keystore-file/salt-1", 16), v.det("keystore-file/nonce-1", 12)
     big_file = seal(passphrase, 2, *FLOOR, salt1, nonce1, "agent_01", entries_bytes(big))
-    if open_file(big_file, passphrase, "agent_01") != big:
+    if open_alks(big_file, passphrase, "agent_01") != big:
         v.fail("64 KiB plaintext does not open")
-    cases.append(v.case("open-plaintext-64-kib", f"{SPEC}: plaintext of exactly 64 KiB is accepted", {"op": "open", "file": v.hx(big_file), "secret": passphrase, "expectedAgentId": "agent_01"}, entry_fields(big)))
+    cases.append(v.case("open-plaintext-64-kib", f"{SPEC}: plaintext of exactly 64 KiB is accepted", open_input(big_file, passphrase, "agent_01"), entry_fields(big)))
 
-    def reject(case_id, why, data, secret=passphrase, expected="agent_01"):
-        if not refused(data, secret, expected):
+    def reject(case_id, why, data, secret=passphrase, expected="agent_01", source="prompt"):
+        if not refused(open_alks, data, secret, expected, source):
             v.fail(f"{case_id} opens")
-        cases.append(v.case(case_id, f"{SPEC}: {why}", {"op": "open", "file": v.hx(data), "secret": secret, "expectedAgentId": expected}, {"outcome": "reject"}))
+        cases.append(v.case(case_id, f"{SPEC}: {why}", open_input(data, secret, expected, source), {"outcome": "reject"}))
 
     def flipped(data, offset, mask=0x01):
         out = bytearray(data)
@@ -221,7 +287,8 @@ def build():
         return bytes(out)
 
     reject("open-reject-wrong-passphrase", "wrong passphrase", f1, secret="correct horse battery stapler")
-    reject("open-reject-passphrase-trailing-newline", "a trailing newline is part of the passphrase (only a passphrase file loses one)", f1, secret=passphrase + "\n")
+    reject("open-reject-passphrase-trailing-newline", "a trailing newline typed at a prompt is part of the passphrase", f1, secret=passphrase + "\n")
+    reject("open-reject-code-wrong", "another code", code_file, secret=base64.b32encode(v.det("keystore-file/other-code", 15)).decode(), expected="agent_03")
     for field, offset in [
         ("magic", 0), ("version", 4), ("secret-kind", 5), ("kdf", 6), ("memory", 10), ("iterations", 11),
         ("parallelism", 12), ("salt", 13), ("aead", 29), ("nonce", 30), ("id-len", 42), ("agent-id", 43),
@@ -244,17 +311,16 @@ def build():
         header_args = {k: params.pop(k) for k in ["version", "kdf", "aead", "id_len"] if k in params}
         return seal(passphrase, params["kind"], params["m"], params["t"], params["p"], salt, nonce, params["agent_id"], params["plaintext"], **header_args)
 
-    def crafted(**fields):
+    def crafted(kind=2, **fields):
         """A header with values the format forbids, sealed under the otherwise valid kek."""
-        h = header(2, FLOOR[0], FLOOR[1], FLOOR[2], salt, nonce, "agent_01", **fields)
+        h = header(kind, *FLOOR, salt, nonce, "agent_01", **fields)
         return h + v.aes256gcm_encrypt(kek(passphrase, 2, salt, *FLOOR), nonce, plain1, h)
 
     reject("open-reject-version-2", "unknown version", crafted(version=2))
     reject("open-reject-kdf-2", "unknown kdf", crafted(kdf=2))
     reject("open-reject-aead-2", "unknown aead", crafted(aead=2))
     for kind in (0, 3):
-        h = header(kind, *FLOOR, salt, nonce, "agent_01")
-        reject(f"open-reject-secret-kind-{kind}", "unknown secretKind", h + v.aes256gcm_encrypt(kek(passphrase, 2, salt, *FLOOR), nonce, plain1, h))
+        reject(f"open-reject-secret-kind-{kind}", "unknown secretKind", crafted(kind=kind))
     for case_id, why, m, t, p in [
         ("memory-below-floor", "m below 19 MiB", 19455, 2, 1),
         ("iterations-below-floor", "t below 2", 19456, 1, 1),
@@ -266,9 +332,9 @@ def build():
     h = header(2, FLOOR[0], FLOOR[1], 0, salt, nonce, "agent_01")
     reject("open-reject-parallelism-zero", "KDF parameters out of bounds (p = 0), refused before the KDF runs", h + bytes(len(plain1) + 16))
     reject("open-reject-id-len-zero", "idLen = 0 (no agentId)", sealed(agent_id=""))
-    long_id = "a" * 65
-    reject("open-reject-id-len-65", "idLen above 64", sealed(agent_id=long_id), expected="a" * 64)
+    reject("open-reject-id-len-65", "idLen above 64", sealed(agent_id="a" * 65), expected="a" * 64)
     reject("open-reject-agent-id-charset", "agentId outside [A-Za-z0-9_-]", sealed(agent_id="agent.01"), expected="agent_01")
+    reject("open-reject-expected-id-path", "an expected agentId of ../owner is refused before any path is built", f1, expected="../owner")
     reject("open-reject-other-agent", "another agent's file with the same passphrase (header agentId differs)", other_agent)
     reject("open-reject-expected-id-mismatch", "the file's agentId differs from the agent being opened", f1, expected="agent_02")
 
@@ -277,86 +343,147 @@ def build():
     reject("open-reject-name-length-overflow", "entry name length past the end", sealed(plaintext=v.u16be(200) + b"seed"))
     reject("open-reject-value-length-overflow", "entry value length past the end", sealed(plaintext=v.u16be(4) + b"seed" + v.u32be(33) + seed))
     reject("open-reject-trailing-byte", "trailing bytes after the last entry", sealed(plaintext=plain1 + b"\x00"))
+    reject("open-reject-invalid-utf8-name", "an entry name that is not UTF-8", sealed(plaintext=entries_bytes([(b"se\xffd", seed)])))
     too_big = [("blob", v.det("keystore-file/blob", 65536 - 2 - 4 - 4 + 1))]
     reject("open-reject-plaintext-above-64-kib", "plaintext above 64 KiB", sealed(plaintext=entries_bytes(too_big)))
 
-    # secretKind 1 normalisation (generated code): case-insensitive; spaces and dashes removed;
-    # 0, 1 and 8 read as O, I and B; anything but 24 base32 characters refused before the KDF.
-    canonical = "OBIA7Q2MKXW4RT5ZLDNE3H6C"
-    for case_id, raw in [
-        ("canonical", canonical),
-        ("lowercase-dashes", "obia-7q2m-kxw4-rt5z-ldne-3h6c"),
-        ("groups-of-four", "OBIA 7Q2M KXW4 RT5Z LDNE 3H6C"),
-        ("digits-for-letters", "0B1A 7Q2M KXW4 RT5Z LDNE 3H6C"),
-        ("eight-for-b", "o8ia7q2mkxw4rt5zldne3h6c"),
+    # password(): file and prompt input, both kinds.
+    canonical = "OBIS7Q2MKXW4RT5ZLDNE3H6C"
+    canonical_bytes = base64.b32decode(canonical)
+    for case_id, raw, source in [
+        ("canonical", canonical, "prompt"),
+        ("lowercase-dashes", "obis-7q2m-kxw4-rt5z-ldne-3h6c", "prompt"),
+        ("groups-of-four", "OBIS 7Q2M KXW4 RT5Z LDNE 3H6C", "prompt"),
+        ("digits-for-letters", "0B1S 7Q2M KXW4 RT5Z LDNE 3H6C", "prompt"),
+        ("eight-for-b", "o8is7q2mkxw4rt5zldne3h6c", "prompt"),
+        ("file-lf", canonical + "\n", "file"),
+        ("file-crlf", canonical + "\r\n", "file"),
     ]:
-        if normalise(raw, 1) != canonical:
-            v.fail(f"normalisation of {raw}")
-        cases.append(v.case(f"normalise-code-{case_id}", f"{SPEC} generated-code normalisation", {"op": "normalise", "secretKind": 1, "secret": raw}, {"normalised": canonical}))
-    for case_id, raw in [
-        ("23-chars", canonical[:-1]),
-        ("25-chars", canonical + "A"),
-        ("digit-9", canonical[:-1] + "9"),
-        ("padding", canonical[:-1] + "="),
-        ("dot-separator", "OBIA.7Q2M.KXW4.RT5Z.LDNE.3H6C"),
-        ("non-ascii", canonical[:-1] + "Ä"),
+        if password(raw, 1, source) != canonical_bytes:
+            v.fail(f"password of {raw!r}")
+        cases.append(v.case(f"password-code-{case_id}", f"{SPEC_PASSWORD}, kind 1: the 15 decoded bytes", {"op": "password", "secretKind": 1, "secret": raw, "source": source}, {"password": v.hx(canonical_bytes)}))
+    for case_id, raw, source in [
+        ("23-chars", canonical[:-1], "prompt"),
+        ("25-chars", canonical + "A", "prompt"),
+        ("digit-9", canonical[:-1] + "9", "prompt"),
+        ("padding", canonical[:-1] + "=", "prompt"),
+        ("dot-separator", "OBIS.7Q2M.KXW4.RT5Z.LDNE.3H6C", "prompt"),
+        ("tab", "OBIS\t7Q2M KXW4 RT5Z LDNE 3H6C", "prompt"),
+        ("non-ascii-letter", canonical[:-1] + "Ä", "prompt"),
+        ("long-s", "OBIſ7Q2MKXW4RT5ZLDNE3H6C", "prompt"),
+        ("dotless-i", "OBıS7Q2MKXW4RT5ZLDNE3H6C", "prompt"),
+        ("fullwidth", "ＯBIS7Q2MKXW4RT5ZLDNE3H6C", "prompt"),
+        ("prompt-trailing-newline", canonical + "\n", "prompt"),
+        ("file-two-newlines", canonical + "\n\n", "file"),
     ]:
-        try:
-            normalise(raw, 1)
-            v.fail(f"code {raw} accepted")
-        except ValueError:
-            pass
-        cases.append(v.case(f"normalise-code-reject-{case_id}", f"{SPEC}: anything other than 24 valid characters is refused before the KDF", {"op": "normalise", "secretKind": 1, "secret": raw}, {"outcome": "reject"}))
-    for case_id, raw in [
-        ("ascii", passphrase),
-        ("fullwidth-and-ligature", unicode_passphrase),
-        ("spaces-kept", "  two  spaces  inside  "),
-        ("combining-accent", "Café passphrase"),
+        if not refused(password, raw, 1, source):
+            v.fail(f"code {raw!r} accepted")
+        cases.append(v.case(f"password-code-reject-{case_id}", f"{SPEC_PASSWORD}, kind 1: refused before the KDF", {"op": "password", "secretKind": 1, "secret": raw, "source": source}, {"outcome": "reject"}))
+    for case_id, raw, source in [
+        ("ascii", passphrase, "prompt"),
+        ("fullwidth-and-ligature", unicode_passphrase, "prompt"),
+        ("spaces-kept", "  two  spaces  inside  ", "prompt"),
+        ("combining-accent", "Café passphrase", "prompt"),
+        ("file-lf", passphrase + "\n", "file"),
+        ("file-crlf", passphrase + "\r\n", "file"),
+        ("file-two-newlines", passphrase + "\n\n", "file"),
+        ("prompt-trailing-newline", passphrase + "\n", "prompt"),
     ]:
-        cases.append(v.case(f"normalise-passphrase-{case_id}", f"{SPEC} chosen passphrase: Unicode NFKC, otherwise unchanged", {"op": "normalise", "secretKind": 2, "secret": raw}, {"normalised": normalise(raw, 2)}))
+        cases.append(v.case(f"password-passphrase-{case_id}", f"{SPEC_PASSWORD}, kind 2: UTF-8 of NFKC", {"op": "password", "secretKind": 2, "secret": raw, "source": source}, {"password": v.hx(password(raw, 2, source))}))
+    cases.append(v.case("password-reject-kind-3", f"{SPEC_PASSWORD}: unknown secretKind", {"op": "password", "secretKind": 3, "secret": passphrase, "source": "prompt"}, {"outcome": "reject"}))
+
+    # ALKO v1: the owner seed under an owner code (kind 1) or passphrase (kind 2).
+    owner_seed = v.det("keystore-file/owner-seed", 32)
+    owner = owner_keys(owner_seed)
+    other_owner = owner_keys(v.det("keystore-file/other-owner-seed", 32))
+    owner_code = base64.b32encode(v.det("keystore-file/owner-code", 15)).decode("ascii")
+    alko = {}
+
+    def alko_seal(secret, kind, params, salt_label, nonce_label, plaintext=owner_seed, info=ALKO_INFO, **overrides):
+        salt_, nonce_ = v.det(f"keystore-file/{salt_label}", 16), v.det(f"keystore-file/{nonce_label}", 12)
+        h = header(kind, *params, salt_, nonce_, "", magic=b"ALKO", **overrides)
+        return h + v.aes256gcm_encrypt(kek(secret, kind, salt_, *params, info), nonce_, plaintext, h)
+
+    def alko_input(data, secret, expected=owner, file_machine=True, source="prompt"):
+        return {"op": "openAlko", "file": v.hx(data), "secret": secret, "source": source, "expectedOwner": expected, "fileKeystoreMachine": file_machine}
+
+    for case_id, why, secret, kind, params, file_machine in [
+        ("alko-code", "kind 1, generated owner code, default parameters", owner_code, 1, DEFAULT, True),
+        ("alko-passphrase", "kind 2, chosen owner passphrase (machines with a keychain)", passphrase, 2, FLOOR, False),
+    ]:
+        salt_, nonce_ = v.det(f"keystore-file/{case_id}/salt", 16), v.det(f"keystore-file/{case_id}/nonce", 12)
+        data = alko_seal(secret, kind, params, f"{case_id}/salt", f"{case_id}/nonce")
+        if len(data) != 90 or open_alko(data, secret, owner, file_machine) != owner_seed:
+            v.fail(f"{case_id} does not open")
+        alko[case_id] = data
+        m, t, p = params
+        common = {"secretKind": kind, "secret": secret, "source": "prompt", "salt": v.hx(salt_), "memoryKiB": m, "iterations": t, "parallelism": p}
+        cases.append(v.case(f"kek-{case_id}", f"{SPEC_ALKO} kek ({why})", {"op": "kek", "format": "ALKO", **common}, {"kek": v.hx(kek(secret, kind, salt_, *params, ALKO_INFO))}))
+        cases.append(v.case(f"seal-{case_id}", f"{SPEC_ALKO} seal ({why})", {"op": "sealAlko", **common, "nonce": v.hx(nonce_), "seed": v.hx(owner_seed)}, {"file": v.hx(data)}))
+        cases.append(v.case(f"open-{case_id}", f"{SPEC_ALKO} open ({why}); the seed derives the card's ownerEvm and ownerNostr", alko_input(data, secret, file_machine=file_machine), {"seed": v.hx(owner_seed)}))
+    cases.append(v.case("open-alko-code-spelled", f"{SPEC_ALKO} open with the owner code in lower case with dashes", alko_input(alko["alko-code"], "-".join(owner_code[i : i + 4] for i in range(0, 24, 4)).lower()), {"seed": v.hx(owner_seed)}))
+
+    def alko_reject(case_id, why, data, secret=owner_code, expected=owner, file_machine=True):
+        if not refused(open_alko, data, secret, expected, file_machine):
+            v.fail(f"{case_id} opens")
+        cases.append(v.case(case_id, f"{SPEC_ALKO}: {why}", alko_input(data, secret, expected, file_machine), {"outcome": "reject"}))
+
+    a1 = alko["alko-code"]
+    alko_reject("open-alko-reject-wrong-code", "another owner code", a1, secret=base64.b32encode(v.det("keystore-file/other-code", 15)).decode())
+    alko_reject("open-alko-reject-other-owner", "the seed does not derive the expected owner", a1, expected=other_owner)
+    alko_reject("open-alko-reject-passphrase-on-file-machine", "secretKind 2 on a file-KeyStore machine, refused before the KDF", alko["alko-passphrase"], secret=passphrase, file_machine=True)
+    alko_reject("open-alko-reject-89-bytes", "89 bytes, refused before the KDF", a1[:-1])
+    alko_reject("open-alko-reject-91-bytes", "91 bytes, refused before the KDF", a1 + b"\x00")
+    alko_reject("open-alko-reject-seed-31-bytes", "a 31-byte seed (blob of 89 bytes, sealed validly)", alko_seal(owner_code, 1, DEFAULT, "alko-code/salt", "alko-code/nonce", plaintext=owner_seed[:31]))
+    alko_reject("open-alko-reject-seed-33-bytes", "a 33-byte seed (blob of 91 bytes, sealed validly)", alko_seal(owner_code, 1, DEFAULT, "alko-code/salt", "alko-code/nonce", plaintext=owner_seed + b"\x00"))
+    for field, offset in [("magic", 0), ("version", 4), ("kdf", 6), ("memory", 10), ("salt", 13), ("aead", 29), ("nonce", 30)]:
+        alko_reject(f"open-alko-reject-flip-{field}", f"header byte flipped ({field})", flipped(a1, offset))
+    alko_reject("open-alko-reject-flip-tag", "tag byte flipped", flipped(a1, 89))
+    alko_reject("open-alko-reject-alks-label", "an ALKO blob sealed under the ALKS label (agentlink/v1/keystore-file)", alko_seal(owner_code, 1, DEFAULT, "alko-code/salt", "alko-code/nonce", info=ALKS_INFO))
+    alko_reject("open-alko-reject-alks-magic", "an ALKS file given to the ALKO reader", code_file, secret=code)
+    # The reverse: ALKS readers refuse ALKO bytes and ALKS files sealed under the ALKO label.
+    reject("open-reject-alko-blob", "an ALKO blob given to the ALKS reader", a1, secret=owner_code)
+    reject("open-reject-alko-label", "an ALKS file sealed under the ALKO label (agentlink/v1/owner-passphrase-wrap)", seal(passphrase, 2, *FLOOR, salt, nonce, "agent_01", plain1, info=ALKO_INFO))
+    patched = b"ALKS" + a1[4:]
+    alko_reject("open-alko-reject-magic-patched", "ALKS magic on an ALKO blob", patched)
     return cases
 
 
+SECRET_SOURCE = {"enum": ["prompt", "file"]}
+OWNER = v.strict_object({"ownerEvm": v.ADDRESS, "ownerNostr": {"type": "string", "pattern": "^0x[0-9a-f]{64}$"}})
 ENTRY = v.strict_object({"name": v.STRING, "value": v.HEX})
 OPEN_OK = {"type": "object", "required": ["entryNames"], "properties": {"entryNames": v.STRING}, "patternProperties": {"^entry:": v.HEX}, "additionalProperties": False}
+KDF_FIELDS = {"secretKind": v.INTEGER, "secret": v.STRING, "source": SECRET_SOURCE, "salt": v.hexn(16), "memoryKiB": v.INTEGER, "iterations": v.INTEGER, "parallelism": v.INTEGER}
 SCHEMA = v.case_schema(
     SUITE,
-    "04 §2.8 ALKS v1. `kek`: key-encryption key. `seal`: the whole file as hex. `open`: entry "
-    "names (comma-separated, in file order) and each value as `entry:<name>` hex, or a rejection. "
-    "`normalise`: the normalised secret for its secretKind, or a rejection.",
+    "04 §2.8 ALKS v1 and ALKO v1. `password`: the Argon2id password bytes for a secret, its kind "
+    "and its source (file input loses one trailing newline), or a rejection. `kek`: the key-"
+    "encryption key for `format` ALKS or ALKO. `seal` / `sealAlko`: the whole blob as hex. `open`: "
+    "entry names (comma-separated, in file order) and each value as `entry:<name>` hex, or a "
+    "rejection. `openAlko`: the 32-byte owner seed, or a rejection.",
     {
-        "kek": (
-            {"secretKind": v.INTEGER, "secret": v.STRING, "salt": v.hexn(16), "memoryKiB": v.INTEGER, "iterations": v.INTEGER, "parallelism": v.INTEGER},
-            [{"kek": v.hexn(32)}],
+        "password": ({"secretKind": v.INTEGER, "secret": v.STRING, "source": SECRET_SOURCE}, [{"password": v.HEX}, v.REJECT]),
+        "kek": ({"format": {"enum": ["ALKS", "ALKO"]}, **KDF_FIELDS}, [{"kek": v.hexn(32)}]),
+        "seal": ({**KDF_FIELDS, "nonce": v.hexn(12), "agentId": v.STRING, "entries": {"type": "array", "items": ENTRY}}, [{"file": v.HEX}]),
+        "open": ({"file": v.HEX, "secret": v.STRING, "source": SECRET_SOURCE, "expectedAgentId": v.STRING}, [v.REJECT]),
+        "sealAlko": ({**KDF_FIELDS, "nonce": v.hexn(12), "seed": v.hexn(32)}, [{"file": v.HEX}]),
+        "openAlko": (
+            {"file": v.HEX, "secret": v.STRING, "source": SECRET_SOURCE, "expectedOwner": OWNER, "fileKeystoreMachine": {"type": "boolean"}},
+            [{"seed": v.hexn(32)}, v.REJECT],
         ),
-        "seal": (
-            {
-                "secretKind": v.INTEGER,
-                "secret": v.STRING,
-                "salt": v.hexn(16),
-                "memoryKiB": v.INTEGER,
-                "iterations": v.INTEGER,
-                "parallelism": v.INTEGER,
-                "nonce": v.hexn(12),
-                "agentId": v.STRING,
-                "entries": {"type": "array", "items": ENTRY},
-            },
-            [{"file": v.HEX}],
-        ),
-        "open": ({"file": v.HEX, "secret": v.STRING, "expectedAgentId": v.STRING}, [v.REJECT]),
-        "normalise": ({"secretKind": v.INTEGER, "secret": v.STRING}, [{"normalised": v.STRING}, v.REJECT]),
     },
 )
 # `open` succeeds with a variable set of entry fields, which strict_object cannot express.
-SCHEMA["oneOf"][2]["properties"]["expected"] = {"oneOf": [OPEN_OK, v.strict_object(v.REJECT)]}
+SCHEMA["oneOf"][3]["properties"]["expected"] = {"oneOf": [OPEN_OK, v.strict_object(v.REJECT)]}
 
 if __name__ == "__main__":
     v.main(
         suite=SUITE,
         version=VERSION,
         script="tools/vectors/generate_keystore_file.py",
-        libraries=["cryptography"],
+        libraries=["cryptography", "coincurve", "pycryptodome"],
         build=build,
         schema=SCHEMA,
         doc=__doc__,
+        runtimes=(["node"], "04 §2.8: the file KeyStore runs in Node only (browsers use the passkey PRF, Workers use Worker secrets)"),
     )

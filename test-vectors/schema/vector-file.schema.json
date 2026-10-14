@@ -41,6 +41,24 @@
         }
       }
     },
+    "runtimes": {
+      "description": "Optional. The suite runs only in these runtimes (default: all five). Written by the generator and justified by `source`, a spec runtime table (M1-1h, IR-M1-1h-1 Q7).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["only", "source"],
+      "properties": {
+        "only": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["node", "chromium", "firefox", "webkit", "workerd"] }
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "cases": {
       "type": "array",
       "minItems": 1,

@@ -2,8 +2,13 @@
 """Independent generator for the `nip44` suite: NIP-44 v2 encryption (M1-1h; used by M1-1g).
 
 Every case is from the official NIP-44 v2 test vectors (paulmillr/nip44, nip44.vectors.json,
-commit 1f8dba1707d065b39329b75012a13a6d1d8124f5, SHA-256 below), committed under
-tools/vectors/sources/. The generator recomputes every valid case with its own NIP-44 v2
+commit 1f8dba1707d065b39329b75012a13a6d1d8124f5, upstream SHA-256
+269ed0f69e4c192512cc779e78c555090cebc7c785b609e338a62afc3ce25040, the checksum NIP-44 publishes).
+Its key material (secret keys and symmetric keys) is kept only in the committed vectors.json
+(secret-scan policy): the copy under tools/vectors/sources/ has each such value replaced by a token
+naming the case field that holds it, and `vectorlib.read_redacted_source` refills the tokens and
+requires the upstream SHA-256 above, so the committed keys are exactly the published ones. The
+generator recomputes every valid case with its own NIP-44 v2
 composition (secp256k1 ECDH from libsecp256k1 via coincurve; HKDF, HMAC-SHA256 and ChaCha20 from
 `cryptography`) and confirms that every invalid case is refused, so two independent sources agree
 on each value. NIP-44 is the transport encryption of 04 §3.5 (NIP-59 seal and gift wrap).
@@ -24,8 +29,8 @@ import vectorlib as v  # noqa: E402
 
 SUITE = "nip44"
 VERSION = 1
-SOURCE_FILE = "nip44.vectors.json"
-SOURCE_SHA256 = "269ed0f69e4c192512cc779e78c555090cebc7c785b609e338a62afc3ce25040"
+SOURCE_FILE = "nip44.vectors.redacted.json"
+UPSTREAM_SHA256 = "269ed0f69e4c192512cc779e78c555090cebc7c785b609e338a62afc3ce25040"
 SOURCE = "NIP-44 v2 official vectors (paulmillr/nip44@1f8dba17)"
 
 
@@ -102,7 +107,7 @@ def refused(fn, *args):
 
 
 def build():
-    data = json.loads(v.read_source(SOURCE_FILE, SOURCE_SHA256))["v2"]
+    data = json.loads(v.read_redacted_source(SOURCE_FILE, SUITE, UPSTREAM_SHA256))["v2"]
     valid, invalid = data["valid"], data["invalid"]
     cases = []
 
@@ -133,12 +138,12 @@ def build():
 
     for i, c in enumerate(valid["encrypt_decrypt"]):
         conv = v.unhex(c["conversation_key"])
-        pub2 = v.xonly_public_key(v.unhex(c["sec2"]))
-        if conversation_key(v.unhex(c["sec1"]), pub2) != conv:
+        if conversation_key(v.unhex(c["sec1"]), v.xonly_public_key(v.unhex(c["sec2"]))) != conv:
             v.fail(f"encrypt_decrypt {i}: conversation key differs")
         if encrypt(conv, v.unhex(c["nonce"]), c["plaintext"]) != c["payload"] or decrypt(conv, c["payload"]) != c["plaintext"]:
             v.fail(f"encrypt_decrypt {i} differs")
         source = f"{SOURCE} valid.encrypt_decrypt[{i}]"
+        cases.append(v.case(f"conversation-key-pair-{i}", source, {"op": "conversationKeyPair", "sec1": c["sec1"], "sec2": c["sec2"]}, {"conversationKey": c["conversation_key"]}))
         cases.append(v.case(f"encrypt-{i}", source, {"op": "encrypt", "conversationKey": c["conversation_key"], "nonce": c["nonce"], "plaintext": c["plaintext"]}, {"payload": c["payload"]}))
         cases.append(v.case(f"decrypt-{i}", source, {"op": "decrypt", "conversationKey": c["conversation_key"], "payload": c["payload"]}, {"plaintext": c["plaintext"]}))
 
@@ -178,6 +183,7 @@ SCHEMA = v.case_schema(
     "NIP-44 v2, official vectors. Keys and nonces hex; plaintexts UTF-8 text; payloads base64.",
     {
         "conversationKey": ({"sec1": v.HEX, "pub2": v.HEX}, [{"conversationKey": v.hexn(32)}, v.REJECT]),
+        "conversationKeyPair": ({"sec1": v.hexn(32), "sec2": v.hexn(32)}, [{"conversationKey": v.hexn(32)}]),
         "messageKeys": ({"conversationKey": v.hexn(32), "nonce": v.hexn(32)}, [{"chachaKey": v.hexn(32), "chachaNonce": v.hexn(12), "hmacKey": v.hexn(32)}]),
         "paddedLength": ({"length": v.INTEGER}, [{"paddedLength": v.STRING}]),
         "encrypt": ({"conversationKey": v.hexn(32), "nonce": v.hexn(32), "plaintext": v.STRING}, [{"payload": v.STRING}]),

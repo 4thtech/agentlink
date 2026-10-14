@@ -1141,6 +1141,18 @@
       }
     },
     {
+      "id": "conversation-key-pair-0",
+      "source": "NIP-44 v2 official vectors (paulmillr/nip44@1f8dba17) valid.encrypt_decrypt[0]",
+      "input": {
+        "op": "conversationKeyPair",
+        "sec1": "0000000000000000000000000000000000000000000000000000000000000001",
+        "sec2": "0000000000000000000000000000000000000000000000000000000000000002"
+      },
+      "expected": {
+        "conversationKey": "c41c775356fd92eadc63ff5a0dc1da211b268cbea22316767095b2871ea1412d"
+      }
+    },
+    {
       "id": "encrypt-0",
       "source": "NIP-44 v2 official vectors (paulmillr/nip44@1f8dba17) valid.encrypt_decrypt[0]",
       "input": {
@@ -1163,6 +1175,18 @@
       },
       "expected": {
         "plaintext": "a"
+      }
+    },
+    {
+      "id": "conversation-key-pair-1",
+      "source": "NIP-44 v2 official vectors (paulmillr/nip44@1f8dba17) valid.encrypt_decrypt[1]",
+      "input": {
+        "op": "conversationKeyPair",
+        "sec1": "0000000000000000000000000000000000000000000000000000000000000002",
+        "sec2": "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "expected": {
+        "conversationKey": "c41c775356fd92eadc63ff5a0dc1da211b268cbea22316767095b2871ea1412d"
       }
     },
     {
@@ -1191,6 +1215,18 @@
       }
     },
     {
+      "id": "conversation-key-pair-2",
+      "source": "NIP-44 v2 official vectors (paulmillr/nip44@1f8dba17) valid.encrypt_decrypt[2]",
+      "input": {
+        "op": "conversationKeyPair",
+        "sec1": "5c0c523f52a5b6fad39ed2403092df8cebc36318b39383bca6c00808626fab3a",
+        "sec2": "4b22aa260e4acb7021e32f38a6cdf4b673c6a277755bfce287e370c924dc936d"
+      },
+      "expected": {
+        "conversationKey": "3e2b52a63be47d34fe0a80e34e73d436d6963bc8f39827f327057a9986c20a45"
+      }
+    },
+    {
       "id": "encrypt-2",
       "source": "NIP-44 v2 official vectors (paulmillr/nip44@1f8dba17) valid.encrypt_decrypt[2]",
       "input": {
@@ -1213,6 +1249,18 @@
       },
       "expected": {
         "plaintext": "\u8868\u30dd\u3042A\u9dd7\u0152\u00e9\uff22\u900d\u00dc\u00df\u00aa\u0105\u00f1\u4e02\u3400\ud840\udc00"
+      }
+    },
+    {
+      "id": "conversation-key-pair-3",
+      "source": "NIP-44 v2 official vectors (paulmillr/nip44@1f8dba17) valid.encrypt_decrypt[3]",
+      "input": {
+        "op": "conversationKeyPair",
+        "sec1": "8f40e50a84a7462e2b8d24c28898ef1f23359fff50d8c509e6fb7ce06e142f9c",
+        "sec2": "b9b0a1e9cc20100c5faa3bbe2777303d25950616c4c6a3fa2e3e046f936ec2ba"
+      },
+      "expected": {
+        "conversationKey": "d5a2f879123145a4b291d767428870f5a8d9e5007193321795b40183d4ab8c2b"
       }
     },
     {
@@ -1241,6 +1289,18 @@
       }
     },
     {
+      "id": "conversation-key-pair-4",
+      "source": "NIP-44 v2 official vectors (paulmillr/nip44@1f8dba17) valid.encrypt_decrypt[4]",
+      "input": {
+        "op": "conversationKeyPair",
+        "sec1": "875adb475056aec0b4809bd2db9aa00cff53a649e7b59d8edcbf4e6330b0995c",
+        "sec2": "9c05781112d5b0a2a7148a222e50e0bd891d6b60c5483f03456e982185944aae"
+      },
+      "expected": {
+        "conversationKey": "3b15c977e20bfe4b8482991274635edd94f366595b1a3d2993515705ca3cedb8"
+      }
+    },
+    {
       "id": "encrypt-4",
       "source": "NIP-44 v2 official vectors (paulmillr/nip44@1f8dba17) valid.encrypt_decrypt[4]",
       "input": {
@@ -1263,6 +1323,18 @@
       },
       "expected": {
         "plaintext": "pepper\ud83d\udc40\u0457\u0436\u0430\u043a"
+      }
+    },
+    {
+      "id": "conversation-key-pair-5",
+      "source": "NIP-44 v2 official vectors (paulmillr/nip44@1f8dba17) valid.encrypt_decrypt[5]",
+      "input": {
+        "op": "conversationKeyPair",
+        "sec1": "eba1687cab6a3101bfc68fd70f214aa4cc059e9ec1b79fdb9ad0a0a4e259829f",
+        "sec2": "dff20d262bef9dfd94666548f556393085e6ea421c8af86e9d333fa8747e94b3"
+      },
+      "expected": {
+        "conversationKey": "4f1538411098cf11c8af216836444787c462d47f97287f46cf7edb2c4915b8a5"
       }
     },
     {
@@ -1291,6 +1363,18 @@
       }
     },
     {
+      "id": "conversation-key-pair-6",
+      "source": "NIP-44 v2 official vectors (paulmillr/nip44@1f8dba17) valid.encrypt_decrypt[6]",
+      "input": {
+        "op": "conversationKeyPair",
+        "sec1": "d5633530f5bcfebceb5584cfbbf718a30df0751b729dd9a789b9f30c0587d74e",
+        "sec2": "b74e6a341fb134127272b795a08b59250e5fa45a82a2eb4095e4ce9ed5f5e214"
+      },
+      "expected": {
+        "conversationKey": "75fe686d21a035f0c7cd70da64ba307936e5ca0b20710496a6b6b5f573377bdd"
+      }
+    },
+    {
       "id": "encrypt-6",
       "source": "NIP-44 v2 official vectors (paulmillr/nip44@1f8dba17) valid.encrypt_decrypt[6]",
       "input": {
@@ -1313,6 +1397,18 @@
       },
       "expected": {
         "plaintext": "\u0645\u064f\u0646\u064e\u0627\u0642\u064e\u0634\u064e\u0629\u064f \u0633\u064f\u0628\u064f\u0644\u0650 \u0627\u0650\u0633\u0652\u062a\u0650\u062e\u0652\u062f\u064e\u0627\u0645\u0650 \u0627\u0644\u0644\u064f\u0651\u063a\u064e\u0629\u0650 \u0641\u0650\u064a \u0627\u0644\u0646\u064f\u0651\u0638\u064f\u0645\u0650 \u0627\u0644\u0652\u0642\u064e\u0627\u0626\u0650\u0645\u064e\u0629\u0650 \u0648\u064e\u0641\u0650\u064a\u0645 \u064a\u064e\u062e\u064f\u0635\u064e\u0651 \u0627\u0644\u062a\u064e\u0651\u0637\u0652\u0628\u0650\u064a\u0642\u064e\u0627\u062a\u064f \u0627\u0644\u0652\u062d\u0627\u0633\u064f\u0648\u0628\u0650\u064a\u064e\u0651\u0629\u064f\u060c"
+      }
+    },
+    {
+      "id": "conversation-key-pair-7",
+      "source": "NIP-44 v2 official vectors (paulmillr/nip44@1f8dba17) valid.encrypt_decrypt[7]",
+      "input": {
+        "op": "conversationKeyPair",
+        "sec1": "d5633530f5bcfebceb5584cfbbf718a30df0751b729dd9a789b9f30c0587d74e",
+        "sec2": "b74e6a341fb134127272b795a08b59250e5fa45a82a2eb4095e4ce9ed5f5e214"
+      },
+      "expected": {
+        "conversationKey": "75fe686d21a035f0c7cd70da64ba307936e5ca0b20710496a6b6b5f573377bdd"
       }
     },
     {
@@ -1341,6 +1437,18 @@
       }
     },
     {
+      "id": "conversation-key-pair-8",
+      "source": "NIP-44 v2 official vectors (paulmillr/nip44@1f8dba17) valid.encrypt_decrypt[8]",
+      "input": {
+        "op": "conversationKeyPair",
+        "sec1": "d5633530f5bcfebceb5584cfbbf718a30df0751b729dd9a789b9f30c0587d74e",
+        "sec2": "b74e6a341fb134127272b795a08b59250e5fa45a82a2eb4095e4ce9ed5f5e214"
+      },
+      "expected": {
+        "conversationKey": "75fe686d21a035f0c7cd70da64ba307936e5ca0b20710496a6b6b5f573377bdd"
+      }
+    },
+    {
       "id": "encrypt-8",
       "source": "NIP-44 v2 official vectors (paulmillr/nip44@1f8dba17) valid.encrypt_decrypt[8]",
       "input": {
@@ -1363,6 +1471,18 @@
       },
       "expected": {
         "plaintext": "\ud835\udd91\ud835\udd86\ud835\udd9f\ud835\udd9e \u793e\u6703\u79d1\u5b78\u9662\u8a9e\u5b78\u7814\u7a76\u6240"
+      }
+    },
+    {
+      "id": "conversation-key-pair-9",
+      "source": "NIP-44 v2 official vectors (paulmillr/nip44@1f8dba17) valid.encrypt_decrypt[9]",
+      "input": {
+        "op": "conversationKeyPair",
+        "sec1": "d5633530f5bcfebceb5584cfbbf718a30df0751b729dd9a789b9f30c0587d74e",
+        "sec2": "b74e6a341fb134127272b795a08b59250e5fa45a82a2eb4095e4ce9ed5f5e214"
+      },
+      "expected": {
+        "conversationKey": "75fe686d21a035f0c7cd70da64ba307936e5ca0b20710496a6b6b5f573377bdd"
       }
     },
     {

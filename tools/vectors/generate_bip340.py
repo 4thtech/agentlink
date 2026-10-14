@@ -2,10 +2,14 @@
 """Independent generator for the `bip340` suite: BIP-340 Schnorr signatures (M1-1h).
 
 Every case is from the official BIP-340 test vectors (bitcoin/bips, bip-0340/test-vectors.csv,
-commit 200f9b26fe0a2f235a2af8b30c4be9f12f6bc9cb, SHA-256 below), committed under
-tools/vectors/sources/. Cases with a 32-byte message are recomputed with libsecp256k1 (coincurve):
-signatures must be byte-identical and every verification result must agree with the published
-one, or nothing is written. coincurve only signs 32-byte messages, so the four variable-length
+commit 200f9b26fe0a2f235a2af8b30c4be9f12f6bc9cb, upstream SHA-256
+34c9d1d9c3a88d524bc80778540dc43f8306ec249a7485293063c376db851c2d). The published secret keys are
+kept only in the committed vectors.json (secret-scan policy): the copy under tools/vectors/sources/
+has each one replaced by a token naming the `sign-*` input that holds it, and
+`vectorlib.read_redacted_source` refills the tokens and requires the upstream SHA-256. Each secret
+key must give the published public key, and with a 32-byte message libsecp256k1 (coincurve) must
+reproduce the published signature byte for byte; every verification result must agree with the
+published one. Otherwise nothing is written. coincurve only signs 32-byte messages, so the four variable-length
 cases (15-18) are taken as published. AgentLink's own uses of BIP-340 (envelope and owner-action
 signatures over tagged hashes) are in the `aead-envelope` and `owner-action` suites.
 
@@ -22,13 +26,13 @@ import vectorlib as v  # noqa: E402
 
 SUITE = "bip340"
 VERSION = 1
-SOURCE_FILE = "bip340-test-vectors.csv"
-SOURCE_SHA256 = "34c9d1d9c3a88d524bc80778540dc43f8306ec249a7485293063c376db851c2d"
+SOURCE_FILE = "bip340-test-vectors.redacted.csv"
+UPSTREAM_SHA256 = "34c9d1d9c3a88d524bc80778540dc43f8306ec249a7485293063c376db851c2d"
 SOURCE = "BIP-340 test-vectors.csv (bitcoin/bips@200f9b26)"
 
 
 def build():
-    rows = list(csv.DictReader(io.StringIO(v.read_source(SOURCE_FILE, SOURCE_SHA256).decode("ascii"))))
+    rows = list(csv.DictReader(io.StringIO(v.read_redacted_source(SOURCE_FILE, SUITE, UPSTREAM_SHA256).decode("ascii"))))
     if len(rows) != 19:
         v.fail("expected 19 BIP-340 vectors")
     sign_cases, verify_cases = [], []
@@ -47,9 +51,9 @@ def build():
             if v.schnorr_verify(bytes.fromhex(public), bytes.fromhex(message), bytes.fromhex(signature)) != accepted:
                 v.fail(f"libsecp256k1 disagrees with BIP-340 vector {index}")
         if secret:
+            if v.xonly_public_key(bytes.fromhex(secret)).hex() != public:
+                v.fail(f"public key of BIP-340 vector {index} differs")
             if recomputed:
-                if v.xonly_public_key(bytes.fromhex(secret)).hex() != public:
-                    v.fail(f"public key of BIP-340 vector {index} differs")
                 if v.schnorr_sign(bytes.fromhex(secret), bytes.fromhex(message), bytes.fromhex(aux)).hex() != signature:
                     v.fail(f"signature of BIP-340 vector {index} differs")
             how = "recomputed with libsecp256k1" if recomputed else "published value (variable-length message)"

@@ -1140,6 +1140,977 @@
       "expected": {
         "outcome": "reject"
       }
+    },
+    {
+      "id": "validate",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): the reference envelope",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "validate-reject-v-2",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): v other than 1; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 2,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "dccebf394ed931edb42b9b20f184d50146b9bb6cd2c049024be56755307366202b16abf05f471036307a1eb7c631aa81d49ea32203b9e3882ca94337cf54ef4b"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-unknown-top-level-key",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): an unknown top-level key; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "f38a85cca264f67cf8e068daaffef75772815d62ad2f2436c8f7335ec560c0940a7782d0965378cf1b363aff0346071e0e3eaefe241c00417209d4e9f7601444",
+          "note": "x"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-unknown-aead-key",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): an unknown key in aead; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA",
+            "tag": "x"
+          },
+          "sig": "04daea70af9317fda15eba0ca10572325cc6ff6e04cac5a8bfe2b32ae021b18806e25115a8940163767926d053310ea6c2854484989d96b6b98d10951c2d681d"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-unknown-recipient-key",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): an unknown key in a recipient; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d",
+              "note": "x"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "d07c5fa6cc4cff764b9902565b9af77d6be1c745a97fb0aedf94dd396c45b840343fae9cd1f4457eb3f6430e0e78bddf0049b49f95e561f10f3a4572185d0139"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-missing-thread",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): thread missing; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "e8ba35746329a4dc464d3b4d9f04aa59675134f0e207c8e675397cb41fb0914d81d70c44f87483baba5a9720a672e81786024069fe9f72dc2fb6ee92997ecadb"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-id-15-bytes",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): id of 15 bytes; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDz",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "326467ff299cd700c3e20cf33c8b8bf8856bba58eb9d4e9bc7aa1cc0ef51ad28a75f5055855a74de0738e367279e25a1e74a895a0caa3766df9d72d075b6868a"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-id-padded",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): id as padded base64url; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ==",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "de5779dc7a2132fe298611424b140bd7f9bca3dd25e0dd447ea01d8a2155e2e1c11a27651e6c726959efacc3ffde52abfc286bfb362e0152bf96cd7b3a55cb82"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-thread-17-bytes",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): thread of 17 bytes; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtwA",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "bd3af56a4fa9f03aa3fa32841dd096d1b54e5f14e4644101de59cd6f44c62597f39f97e3530496aa00ce76aeea5a714da175a14f2582f808ea944b0a718123f1"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-from-uppercase",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): from in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "A3E7F43667D462E884D2F8B9E5C8CB3333B9CE3011AD4140C51761B42805B8EC",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "20ba6f3a87bc07eb38b4212e1d5d3a2b3c4348cdac0bd7a761019cf1770ad620ccb0fcba7c737ff62c66884a3a3678f80705bd36c91eec6426f8816a56b1b8db"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-from-0x-prefix",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): from with 0x (Nostr-native: bare hex); rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "0xa3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "fce429a7258f170e43793c3cffee5429edeecd6ecf8e2f884c6d5185ef23bc070322c119b4a92c930bef87df1516338b56fd64b443b20912f9864b87d874f756"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-created-at-2-pow-53",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): createdAt = 2^53; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 9007199254740992,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "274a750c64c8bc4e907abb9fc707ff97497a6dff4496e50a1d1649ff1841a435663b96a53a8a4a733370c2e269766f18f384ba86a0fa495f3e07fc4f40db74b1"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-created-at-string",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): createdAt as a string; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": "1760000000",
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "690ab440f1fd80ae9d1ce793d7efa0be06de2b12829baff80f5179855e7a04cb2ddabc3c53d77c1329695ade7f88f38d7a988978dcadec861c92a1fd391805ff"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-recipients-empty",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): no recipients; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "e56439bd1c91c7868a38b5f852ec00cfd2f1aa6df7d45b9ce5e7ec1ddee9f813204f0f7221bc5dca6e2ab218fd4739b3f720db982502803f981fe6caf438e2de"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-kid-15-bytes",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): kid of 15 bytes; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRq",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "2775b645ff014b0e711e97e2f1e3b41349a5544480549ad5d7ec80a643980b4e8d512ff0bdcddf10054a280919a503e762444a8bdb7b0b7e76e3aeb9d96c4e7c"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-wk-standard-alphabet",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): wk with + and / (standard base64); rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW+5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "b2e5877eb5786a2b0d0aa4aa1db628f03b72c90cb616975b5a7fdc03ee3661d368c91ae1ea5c364eb24934e03e3225432ecabf04e07110c9a22e4a1e0321a317"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-alg-a128gcm",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): alg other than A256GCM; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A128GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "883eee64a9a211cd8bf91396d8d6290c8c5c15a80323521eaaa3bd8cdb60f0ba7e885262491dee2b8b94d2c4aadedfbc057c6903d396eea64be02af007705b00"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-iv-11-bytes",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): iv of 11 bytes; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9o",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "bccc07e70426bb83bc77fed861991bb96a73fc0ce9f49cd512a000605f0f9b8ba21fe0fce7e86f1f1dd0ede188c658da53a74484af02fef4c429f8b9cc0d7a5f"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-iv-padded",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): iv as padded base64url; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC=",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "5dac1c6a6145df24b76ea5ea3b0db8f857307a70736cb6305f04292b0b7df16d8f3fccb5127bd3a40ec065c6da438199e19ad17d5febeec8d4036aa75b3e2c7a"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-ct-15-bytes",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): ct shorter than the 16-byte tag; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf"
+          },
+          "sig": "0d65c708a5e54d556480dabec2bb4f9e3af7ba9af4822471a45a656028e54b1fdaebc7c1ee53c180ceb1a824b2583086ba501bb78d8e9ff73c983a9f9115db84"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-sig-uppercase",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): sig in upper-case hex (the signature is otherwise valid); rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "BB1D06D649864A43F999D2828DAC10477A5B81EB7E1355B40455677772A6AA18C9636FACA956168C3FF272331922B0DFE26EAC3EA51C019EC374FBAEC3C02693"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-sig-0x-prefix",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings (docs/canonical-encodings, pending merge), strict schema (M1-2a): sig with 0x; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
+              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
+              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
+              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
+              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+          },
+          "sig": "0xbb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
     }
   ]
 }

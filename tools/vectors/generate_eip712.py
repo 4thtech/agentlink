@@ -11,14 +11,15 @@ encodeData, hashStruct, the domain separator, the digest and the signature by ke
 
 AgentCard (04 §2.4; M1-1e): chain-agnostic domain {name: "OCC AgentCard", version: "1"} with no
 chainId and no verifyingContract, and the struct with the field order of 04 §2.4. nameHash =
-keccak256(utf8(name)); relaysHash = keccak256(JCS(relays)) (RFC 8785, `rfc8785`). In the case
-inputs, uint fields are decimal strings (uint64 does not fit a JSON number) and bytes32 fields are
-0x-prefixed lowercase hex; this is the vector input convention, not a card wire format.
-Signatures are given as r, s (32-byte hex) and yParity (0 or 1). Keys are synthetic test values.
+keccak256(utf8(name)); relaysHash = keccak256(JCS(relays)) (RFC 8785, `rfc8785`). Cards are in
+the card JSON form and `cardSig` is 0x + 130 lowercase hex (r || s || v, v in {27, 28}, low s),
+per 04 §2.4 and §2.4.1 on docs/canonical-encodings (pending merge; regenerate if its review
+changes them). Keys are synthetic test values (the Mail key is the EIP's keccak256("cow")).
 
-Negative cases: a card signature does not verify for the card's ownerEvm after any field changes,
-under a domain that adds chainId, under another domain name or version, by another key, or when
-it is the agent's own signature (cardAgentSig, 05 §4).
+Negative cases: non-canonical cards (encodings, integer ranges, unknown or missing fields); a card
+signature that does not verify for the card's ownerEvm after a field changes, under a domain that
+adds chainId, under another domain, by another key, as the agent's own signature (cardAgentSig,
+05 §4), in its malleated high-s form, with v as 0/1, without v, in upper case or without 0x.
 
 Usage: python3 -I tools/vectors/generate_eip712.py --check [FILE] | --write
 """
@@ -173,6 +174,29 @@ def recover(message32, r, s, y_parity):
 
 # --- AgentCard -----------------------------------------------------------------------------------
 
+UINT_BITS = {"version": 8, "issuedAt": 64, "expiresAt": 64, "keyEpoch": 32}
+ADDRESS_FIELDS = ("agentEvm", "ownerEvm")
+BYTES32_FIELDS = ("agentNostr", "agentEnc", "ownerNostr", "ownerEnc", "nameHash", "relaysHash")
+
+
+def parse_card(card):
+    """The card JSON form (04 §2.4, §2.4.1; docs/canonical-encodings, pending merge): exactly the
+    twelve fields; addresses 0x + 40 lowercase hex; bytes32 0x + 64 lowercase hex; integers JSON
+    integers in [0, 2^53 - 1] and within their uint type. Anything else is rejected."""
+    if not isinstance(card, dict) or set(card) != {f["name"] for f in AGENT_CARD_TYPES["AgentCard"]}:
+        raise ValueError("not exactly the twelve card fields")
+    for name in ADDRESS_FIELDS:
+        if not isinstance(card[name], str) or not re.fullmatch(r"0x[0-9a-f]{40}", card[name]):
+            raise ValueError(f"{name} is not canonical")
+    for name in BYTES32_FIELDS:
+        if not isinstance(card[name], str) or not re.fullmatch(r"0x[0-9a-f]{64}", card[name]):
+            raise ValueError(f"{name} is not canonical")
+    for name, bits in UINT_BITS.items():
+        value = card[name]
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= min(2**53 - 1, 2**bits - 1):
+            raise ValueError(f"{name} is out of range")
+    return card
+
 
 def card_digest(card, domain=AGENT_CARD_DOMAIN, domain_fields=None):
     types = dict(AGENT_CARD_TYPES)
@@ -189,10 +213,30 @@ def b32(data):
     return "0x" + bytes(data).hex()
 
 
+def card_sig(secret, message32):
+    """cardSig: 0x + 130 lowercase hex, r || s || v with v in {27, 28} and low s (EIP-2)."""
+    r, s, y = ecdsa_sign(secret, message32)
+    return "0x" + r + s + format(27 + y, "02x")
+
+
+def verify_card_sig(card, sig):
+    try:
+        parse_card(card)
+    except ValueError:
+        return False
+    if not isinstance(sig, str) or not re.fullmatch(r"0x[0-9a-f]{130}", sig):
+        return False
+    r, s, v_byte = sig[2:66], sig[66:130], int(sig[130:132], 16)
+    if v_byte not in (27, 28) or int(s, 16) > v.SECP256K1_N // 2:
+        return False
+    signer = recover(card_digest(card), r, s, v_byte - 27)
+    return signer is not None and bytes.fromhex(signer[2:]) == bytes.fromhex(card["ownerEvm"][2:])
+
+
 def make_card(label, name, relays, issued_at, expires_at, key_epoch):
     name_hash, relays_hash = card_hashes(name, relays)
     return {
-        "version": "1",
+        "version": 1,
         "agentEvm": v.evm_address(v.det(f"eip712/{label}/agent/evm", 32)),
         "agentNostr": b32(v.xonly_public_key(v.det(f"eip712/{label}/agent/nostr", 32))),
         "agentEnc": b32(v.x25519_public_key(v.det(f"eip712/{label}/agent/enc", 32))),
@@ -201,10 +245,13 @@ def make_card(label, name, relays, issued_at, expires_at, key_epoch):
         "ownerEnc": b32(v.x25519_public_key(v.det(f"eip712/{label}/owner/enc", 32))),
         "nameHash": name_hash,
         "relaysHash": relays_hash,
-        "issuedAt": str(issued_at),
-        "expiresAt": str(expires_at),
-        "keyEpoch": str(key_epoch),
+        "issuedAt": issued_at,
+        "expiresAt": expires_at,
+        "keyEpoch": key_epoch,
     }
+
+
+CARD_FORM = "04 §2.4 card JSON form, §2.4.1 (docs/canonical-encodings, pending merge)"
 
 
 def build():
@@ -237,22 +284,23 @@ def build():
         ),
         v.case(
             "mail-sign",
-            f"{EXAMPLE}: signature by keccak256(\"cow\"), v = 28 (published)",
+            f"{EXAMPLE}: signature by keccak256(\"cow\"), r || s || v with v = 28 (published)",
             {"op": "signTypedData", "typedData": MAIL, "secretKey": cow.hex()},
-            {"r": p["r"], "s": p["s"], "yParity": str(p["v"] - 27)},
+            {"signature": "0x" + p["r"] + p["s"] + format(p["v"], "02x")},
         ),
     ]
 
     cards = [
         ("card-basic", make_card("basic", "Tali's Claude", ["wss://relay.example.com", "wss://nos.example.org"], 1760000000, 1791536000, 0)),
         ("card-no-expiry", make_card("no-expiry", "Research agent", ["wss://relay.example.com"], 1760000000, 0, 3)),
-        ("card-limits", make_card("limits", "Ågent \U0001f916", [], 2**64 - 1, 2**64 - 1, 2**32 - 1)),
+        ("card-limits", make_card("limits", "Ågent \U0001f916", [], 2**53 - 1, 2**53 - 1, 2**32 - 1)),
     ]
     for case_id, card in cards:
+        parse_card(card)
         cases.append(
             v.case(
                 f"{case_id}-hashes",
-                "04 §2.4 AgentCard, chain-agnostic domain {name: \"OCC AgentCard\", version: \"1\"}",
+                "04 §2.4 AgentCard, chain-agnostic domain {name: \"OCC AgentCard\", version: \"1\"}; " + CARD_FORM,
                 {"op": "agentCard", "card": card},
                 {
                     "typeHash": type_hash(AGENT_CARD_TYPES, "AgentCard").hex(),
@@ -262,6 +310,38 @@ def build():
                 },
             )
         )
+
+    card = cards[0][1]
+
+    def card_variant(**changes):
+        c = copy.deepcopy(card)
+        for key, value in changes.items():
+            if value is None:
+                del c[key]
+            else:
+                c[key] = value
+        return c
+
+    for case_id, why, bad in [
+        ("issued-at-2-pow-53", "issuedAt = 2^53 (uint64 above 2^53 - 1)", card_variant(issuedAt=2**53)),
+        ("key-epoch-2-pow-32", "keyEpoch = 2^32 (outside uint32)", card_variant(keyEpoch=2**32)),
+        ("version-256", "version = 256 (outside uint8)", card_variant(version=256)),
+        ("issued-at-string", "issuedAt as a decimal string", card_variant(issuedAt="1760000000")),
+        ("issued-at-negative", "issuedAt = -1", card_variant(issuedAt=-1)),
+        ("agent-evm-checksummed", "agentEvm in EIP-55 mixed case", card_variant(agentEvm=v.eip55(card["agentEvm"]))),
+        ("agent-nostr-uppercase", "agentNostr in upper-case hex", card_variant(agentNostr="0x" + card["agentNostr"][2:].upper())),
+        ("owner-enc-no-prefix", "ownerEnc without 0x", card_variant(ownerEnc=card["ownerEnc"][2:])),
+        ("owner-nostr-capital-prefix", "ownerNostr with 0X", card_variant(ownerNostr="0X" + card["ownerNostr"][2:])),
+        ("name-hash-31-bytes", "nameHash of 31 bytes", card_variant(nameHash=card["nameHash"][:-2])),
+        ("unknown-field", "a thirteenth field", card_variant(note="x")),
+        ("missing-field", "relaysHash missing", card_variant(relaysHash=None)),
+    ]:
+        try:
+            parse_card(bad)
+            v.fail(f"card {case_id} parses")
+        except ValueError:
+            pass
+        cases.append(v.case(f"card-reject-{case_id}", f"{CARD_FORM}: {why}; rejected, never normalised", {"op": "agentCard", "card": bad}, {"outcome": "reject"}))
 
     for case_id, name, relays in [
         ("card-fields-basic", "Tali's Claude", ["wss://relay.example.com", "wss://nos.example.org"]),
@@ -279,97 +359,73 @@ def build():
             )
         )
 
-    card = cards[0][1]
     owner_secret = v.det("eip712/basic/owner/evm", 32)
     agent_secret = v.det("eip712/basic/agent/evm", 32)
-    r, s, y = ecdsa_sign(owner_secret, card_digest(card))
-    if recover(card_digest(card), r, s, y) != card["ownerEvm"]:
-        v.fail("the card signature does not recover the owner")
+    sig = card_sig(owner_secret, card_digest(card))
+    if not verify_card_sig(card, sig):
+        v.fail("the card signature does not verify")
     cases.append(
         v.case(
             "card-sign",
-            "04 §2.4 cardSig: owner EVM key, EIP-712 (RFC 6979, low s)",
+            "04 §2.4 cardSig: owner EVM key, EIP-712, RFC 6979, low s, 0x + 130 hex with v in {27, 28} (docs/canonical-encodings, pending merge)",
             {"op": "signAgentCard", "card": card, "secretKey": owner_secret.hex()},
-            {"r": r, "s": s, "yParity": str(y)},
+            {"cardSig": sig},
         )
     )
 
-    def verify_case(case_id, why, the_card, sig, accept):
-        if (recover(card_digest(the_card), *sig) == the_card["ownerEvm"]) != accept:
+    def verify_case(case_id, why, the_card, the_sig, accept):
+        if verify_card_sig(the_card, the_sig) != accept:
             v.fail(f"{case_id}: unexpected verification result")
         cases.append(
             v.case(
                 case_id,
                 f"04 §2.4: {why}",
-                {"op": "verifyAgentCard", "card": the_card, "r": sig[0], "s": sig[1], "yParity": sig[2]},
+                {"op": "verifyAgentCard", "card": the_card, "cardSig": the_sig},
                 {"outcome": "accept" if accept else "reject"},
             )
         )
 
-    verify_case("card-verify", "the owner's signature verifies for card.ownerEvm", card, (r, s, y), True)
-    bumped = copy.deepcopy(card)
-    bumped["keyEpoch"] = "1"
-    verify_case("card-verify-reject-field-changed", "keyEpoch changed after signing", bumped, (r, s, y), False)
+    verify_case("card-verify", "the owner's signature verifies for card.ownerEvm", card, sig, True)
+    verify_case("card-verify-reject-field-changed", "keyEpoch changed after signing", card_variant(keyEpoch=1), sig, False)
     with_chain = {"name": "OCC AgentCard", "version": "1", "chainId": 1}
     chain_fields = [*AGENT_CARD_TYPES["EIP712Domain"], {"name": "chainId", "type": "uint256"}]
-    verify_case(
-        "card-verify-reject-chain-domain",
-        "signed under a domain that adds chainId 1 (the card domain is chain-agnostic)",
-        card,
-        ecdsa_sign(owner_secret, card_digest(card, with_chain, chain_fields)),
-        False,
-    )
-    verify_case(
-        "card-verify-reject-occ-domain",
-        "signed under {name: \"OCC\", version: \"2\"}",
-        card,
-        ecdsa_sign(owner_secret, card_digest(card, {"name": "OCC", "version": "2"})),
-        False,
-    )
-    verify_case("card-verify-reject-other-key", "signed by another key", card, ecdsa_sign(v.det("eip712/other/evm", 32), card_digest(card)), False)
-    verify_case("card-verify-reject-agent-sig", "the agent's own signature (cardAgentSig) is not the owner's", card, ecdsa_sign(agent_secret, card_digest(card)), False)
+    verify_case("card-verify-reject-chain-domain", "signed under a domain that adds chainId 1 (the card domain is chain-agnostic)", card, card_sig(owner_secret, card_digest(card, with_chain, chain_fields)), False)
+    verify_case("card-verify-reject-occ-domain", "signed under {name: \"OCC\", version: \"2\"}", card, card_sig(owner_secret, card_digest(card, {"name": "OCC", "version": "2"})), False)
+    verify_case("card-verify-reject-other-key", "signed by another key", card, card_sig(v.det("eip712/other/evm", 32), card_digest(card)), False)
+    verify_case("card-verify-reject-agent-sig", "the agent's own signature (cardAgentSig) is not the owner's", card, card_sig(agent_secret, card_digest(card)), False)
+    r_hex, s_hex, v_byte = sig[2:66], sig[66:130], int(sig[130:132], 16)
+    high_s = format(v.SECP256K1_N - int(s_hex, 16), "064x")
+    high_s_sig = "0x" + r_hex + high_s + format(55 - v_byte, "02x")  # the same signer, malleated
+    if recover(card_digest(card), r_hex, high_s, 55 - v_byte - 27) != card["ownerEvm"]:
+        v.fail("the malleated signature does not recover the owner")
+    verify_case("card-verify-reject-high-s", "the malleated high-s form of a valid signature (EIP-2)", card, high_s_sig, False)
+    verify_case("card-verify-reject-v-0-1", "v as a recovery id (0 or 1) instead of 27 or 28", card, sig[:130] + format(v_byte - 27, "02x"), False)
+    verify_case("card-verify-reject-64-bytes", "r || s without v (64 bytes)", card, sig[:130], False)
+    verify_case("card-verify-reject-uppercase", "cardSig in upper-case hex", card, "0x" + sig[2:].upper(), False)
+    verify_case("card-verify-reject-no-prefix", "cardSig without 0x", card, sig[2:], False)
     return cases
 
 
-UINT_STRING = {"type": "string", "pattern": "^(0|[1-9][0-9]*)$"}
 BYTES32 = {"type": "string", "pattern": "^0x[0-9a-f]{64}$"}
-CARD = v.strict_object(
-    {
-        "version": UINT_STRING,
-        "agentEvm": v.ADDRESS,
-        "agentNostr": BYTES32,
-        "agentEnc": BYTES32,
-        "ownerEvm": v.ADDRESS,
-        "ownerNostr": BYTES32,
-        "ownerEnc": BYTES32,
-        "nameHash": BYTES32,
-        "relaysHash": BYTES32,
-        "issuedAt": UINT_STRING,
-        "expiresAt": UINT_STRING,
-        "keyEpoch": UINT_STRING,
-    }
-)
-SIGNATURE = {"r": v.hexn(32), "s": v.hexn(32), "yParity": {"enum": ["0", "1"]}}
+SIGNATURE_0X = {"type": "string", "pattern": "^0x[0-9a-f]{130}$"}
 SCHEMA = v.case_schema(
     SUITE,
     "EIP-712. `typedData`: domain separator, hashStruct(message) and digest of full typed data. "
-    "`signTypedData`, `signAgentCard`: deterministic ECDSA r, s, yParity. `agentCard`: typeHash, "
-    "domain separator, struct hash and digest of an AgentCard under the chain-agnostic domain. "
-    "`cardHashes`: nameHash and relaysHash. `verifyAgentCard`: whether the signature is the "
-    "card owner's. Hashes are 32-byte hex without 0x.",
+    "`signTypedData`, `signAgentCard`: deterministic ECDSA as 0x + r || s || v (v 27 or 28). "
+    "`agentCard`: typeHash, domain separator, struct hash and digest of a card in the card JSON "
+    "form under the chain-agnostic domain, or a rejection of a non-canonical card. `cardHashes`: "
+    "nameHash and relaysHash. `verifyAgentCard`: whether `cardSig` is the card owner's. Hashes are "
+    "32-byte hex without 0x.",
     {
         "typedData": ({"typedData": v.OBJECT}, [{"domainSeparator": v.hexn(32), "structHash": v.hexn(32), "digest": v.hexn(32)}]),
-        "signTypedData": ({"typedData": v.OBJECT, "secretKey": v.hexn(32)}, [SIGNATURE]),
+        "signTypedData": ({"typedData": v.OBJECT, "secretKey": v.hexn(32)}, [{"signature": SIGNATURE_0X}]),
         "agentCard": (
-            {"card": CARD},
-            [{"typeHash": v.hexn(32), "domainSeparator": v.hexn(32), "structHash": v.hexn(32), "digest": v.hexn(32)}],
+            {"card": v.OBJECT},
+            [{"typeHash": v.hexn(32), "domainSeparator": v.hexn(32), "structHash": v.hexn(32), "digest": v.hexn(32)}, v.REJECT],
         ),
         "cardHashes": ({"name": v.STRING, "relays": {"type": "array", "items": v.STRING}}, [{"nameHash": BYTES32, "relaysHash": BYTES32}]),
-        "signAgentCard": ({"card": CARD, "secretKey": v.hexn(32)}, [SIGNATURE]),
-        "verifyAgentCard": (
-            {"card": CARD, "r": v.hexn(32), "s": v.hexn(32), "yParity": v.INTEGER},
-            [v.ACCEPT, v.REJECT],
-        ),
+        "signAgentCard": ({"card": v.OBJECT, "secretKey": v.hexn(32)}, [{"cardSig": SIGNATURE_0X}]),
+        "verifyAgentCard": ({"card": v.OBJECT, "cardSig": v.STRING}, [v.ACCEPT, v.REJECT]),
     },
 )
 

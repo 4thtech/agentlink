@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/4thtech/agentlink/test-vectors/hkdf-derive/case.schema.json",
   "title": "hkdf-derive case",
-  "description": "04 \u00a72.1 key derivation. `hkdf`: RFC 5869 HKDF-SHA256. `derive`: okm for (masterSeed, label, epoch, counter), or a rejection. `key`: the public identity for (label, epoch): EIP-55 address (evm), x-only public key (nostr, drop), X25519 public key and kid (enc), or a rejection.",
+  "description": "04 \u00a72.1 key derivation. `hkdf`: RFC 5869 HKDF-SHA256. `derive`: okm for (masterSeed, label, epoch, counter), or a rejection. `key`: the public identity for (label, epoch): EIP-55 address and its EIP-55 display form (evm), x-only public key (nostr, drop), X25519 public key and kid (enc), or a rejection.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -164,12 +164,7 @@
               "pattern": "^[0-9a-f]{64}$"
             },
             "label": {
-              "enum": [
-                "agentlink/v1/evm",
-                "agentlink/v1/nostr",
-                "agentlink/v1/enc",
-                "agentlink/v1/drop"
-              ]
+              "type": "string"
             },
             "epoch": {
               "type": "integer"
@@ -182,10 +177,15 @@
               "type": "object",
               "additionalProperties": false,
               "required": [
-                "address"
+                "address",
+                "addressChecksummed"
               ],
               "properties": {
                 "address": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{40}$"
+                },
+                "addressChecksummed": {
                   "type": "string",
                   "pattern": "^0x[0-9a-fA-F]{40}$"
                 }

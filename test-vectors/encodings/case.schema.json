@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/encodings/case.schema.json",
+  "title": "encodings case",
+  "description": "04 \u00a72.4.1 canonical encodings. `decode`: the value of a field, decoded by the field's class, as hex bytes (uint256 as 32 big-endian bytes), or a rejection. `equalBytes`: accept when both values parse and decode to the same bytes, otherwise reject.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "field",
+            "value"
+          ],
+          "properties": {
+            "op": {
+              "const": "decode"
+            },
+            "field": {
+              "enum": [
+                "actionDigest",
+                "agent",
+                "agentEvm",
+                "cardSig",
+                "envelopeHash",
+                "from",
+                "id",
+                "inviteId",
+                "kid",
+                "maxFee",
+                "nonce",
+                "nonceUint256",
+                "owner",
+                "ownerEvm",
+                "ownerNostr",
+                "recordId",
+                "salt",
+                "sig",
+                "termsHash"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "bytes"
+              ],
+              "properties": {
+                "bytes": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "a",
+            "b"
+          ],
+          "properties": {
+            "op": {
+              "const": "equalBytes"
+            },
+            "a": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "field",
+                "value"
+              ],
+              "properties": {
+                "field": {
+                  "enum": [
+                    "actionDigest",
+                    "agent",
+                    "agentEvm",
+                    "cardSig",
+                    "envelopeHash",
+                    "from",
+                    "id",
+                    "inviteId",
+                    "kid",
+                    "maxFee",
+                    "nonce",
+                    "nonceUint256",
+                    "owner",
+                    "ownerEvm",
+                    "ownerNostr",
+                    "recordId",
+                    "salt",
+                    "sig",
+                    "termsHash"
+                  ]
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            },
+            "b": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "field",
+                "value"
+              ],
+              "properties": {
+                "field": {
+                  "enum": [
+                    "actionDigest",
+                    "agent",
+                    "agentEvm",
+                    "cardSig",
+                    "envelopeHash",
+                    "from",
+                    "id",
+                    "inviteId",
+                    "kid",
+                    "maxFee",
+                    "nonce",
+                    "nonceUint256",
+                    "owner",
+                    "ownerEvm",
+                    "ownerNostr",
+                    "recordId",
+                    "salt",
+                    "sig",
+                    "termsHash"
+                  ]
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
