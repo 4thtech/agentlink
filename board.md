@@ -1,5 +1,5 @@
 # AgentLink — sync board
-_Updated 2026-10-12T16:00Z by @talirezun_
+_Updated 2026-10-14 by @talirezun_
 
 ## Area ownership
 | Area | Repo / paths | Lead | Review |
@@ -12,6 +12,8 @@ _Updated 2026-10-12T16:00Z by @talirezun_
 | M0-2 Repos, CI, branch protection | @talirezun | in-progress | main pushed; settings pending | 2026-10-12 |
 | M0-3 Docs + agent instructions in repo | @talirezun | done | v0.0.1 | 2026-10-12 |
 | M0-4 Decide D-11, D-12, D-14 | @talirezun | in-progress | — | 2026-10-12 |
+| M0-2d Monorepo skeleton + CI strict | @talirezun (agents) | in-progress | chore/M0-2d-monorepo-skeleton | 2026-10-14 |
+| M0-2f Foundry skeleton (occ-v2-contracts) | @talirezun (agents) | in-progress | chore/M0-2f-foundry-skeleton | 2026-10-14 |
 
 ## Waiting on a decision
 | # | Question | Decider | Raised by / when |
@@ -23,4 +25,4 @@ _Updated 2026-10-12T16:00Z by @talirezun_
 ## Blockers
 | Task | Blocked on | Since |
 |---|---|---|
-| All build tasks (M1+) | Owner's go-ahead to start coding (details pending) | 2026-10-12 |
+| S2 PRs (incl. PR #1, all M1-1 crypto) | review-gate (d) requires a non-author approval, impossible under D-51; owner edits the workflow | 2026-10-14 |
