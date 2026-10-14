@@ -102,7 +102,7 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 | Task | Package | Acceptance |
 |---|---|---|
 | M1-1 `@agentlink/crypto` (rest) | crypto | Test vectors for STREAM file encryption, EIP-712 (`Record`, `Receipt`, `Registration`) with commitments, passkey PRF wrapping and the recovery code pass in all three runtimes |
-| M1-3 Contracts: OCCFeeVault + OCCNotary | contracts | Full unit/fuzz/invariant suite (incl. ERC-1271 signers); gas targets met; Slither/Aderyn clean; deployed to Base Sepolia via CreateX (CREATE3) at the addresses predicted by the fork dry-run; Gnosis Chiado follows later at the same addresses, checked when it deploys (D-63, build-plan deviation announced by the owner; salts per 05 §9.1) |
+| M1-3 Contracts: OCCFeeVault + OCCNotary | contracts | Full unit/fuzz/invariant suite (incl. ERC-1271 signers); gas targets met; Slither/Aderyn clean; deployed to Base Sepolia via CreateX (CREATE3) at the addresses predicted by the fork dry-run; Gnosis Chiado follows later at the same addresses (D-63 (1), build-plan deviation announced by the owner). Proposed (D-63 (2); salts per 05 §9.1): the Chiado run is card M1-3j, checked against the published Base Sepolia addresses |
 | M1-4 `@agentlink/chain` | chain | EIP-712 parity with contract test vectors; quote, notarize (direct + submitter), acknowledge, verifyProofPack against testnets; zero-config chain selection (D-40): the client ships the chain list, picks the default chain if funded, otherwise the cheapest funded one, and never asks for a chain outside Advanced |
 | M1-6 `@agentlink/storage` (inline + encrypted drop + S3 via aws4fetch) | storage | Upload/presign/download/delete against R2 and MinIO; streaming 1 GB file without loading into memory; `drop` adapter against the drop Worker (signed upload, signed GET, signed delete); storage selection per 07 §5.6 (D-48) |
 | M1-27 Encrypted drop Worker + R2 (D-48) | apps/drop | Signed uploads verified against test vectors; random 128-bit object keys; size cap and weekly quota per drop key, rate limits per drop key and per IP; hard 7-day expiry (Worker check plus R2 lifecycle rule); DELETE only by the uploading drop key; objects served only as attachments; no request URLs, signed URLs, object keys or upload signatures in any log (asserted in tests); deployed to `drop.agentlink.4thtech.io` |
@@ -115,6 +115,8 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 | M1-13 E2E suite (rest) | e2e | 5 MB file with zero storage setup (encrypted drop), notarize, DELIVERED/OPENED, export + verify pack; J8 with on-chain proof of agreement; prompt-injection suite on file and proof tools (06 §9) |
 
 **Gate M1:** 10 internal testers on ≥ 3 harness combinations complete J1, J2, J4, J5 on testnets, and J3 using faucet credits; J8 completed with on-chain proof of agreement. In J1 a file over 12 KB (5 MB in the e2e suite) is sent with zero storage setup through the encrypted drop (D-48). UX (D-39, D-40): no wallet, browser extension, gas or chain choice appears in any J1–J9 default flow, and install → first message stays under 5 minutes.
+
+*Gate residual (proposed, D-63; owner confirms at merge):* M1-GATE may pass with OCC v2 on a single testnet chain (Base Sepolia). The Chiado deployment (M1-3j) is a hard prerequisite of the M2 Registry (M2-4) and of the mainnet deployment (M3-2c), not of this gate.
 
 ## M2 — Owner console, desktop apps, self-host, design (≈ 4–6 weeks; desktop apps add scope, re-estimated in M2-11)
 
