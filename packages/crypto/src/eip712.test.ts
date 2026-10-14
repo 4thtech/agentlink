@@ -367,7 +367,7 @@ describe('hashTypedData refuses malformed typed data', () => {
 
   it('names no input value in its errors', () => {
     const td = mail();
-    (td.message.to as Record<string, unknown>).wallet = '0x' + 'ab'.repeat(19) + 'cd';
+    (td.message.to as Record<string, unknown>).wallet = '0x' + 'ab'.repeat(21);
     const error = expectInputError(() => hashTypedData(td as TypedData));
     expect(error.message).not.toContain('abab');
   });

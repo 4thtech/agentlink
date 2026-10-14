@@ -45,6 +45,7 @@ const unsupported = (message: string): CryptoInputError =>
 // --- parse ---------------------------------------------------------------------------------------
 
 const NUMBER = /-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?/y;
+const INTEGER_TOKEN = /^(?:0|[1-9][0-9]*)$/;
 
 /** Value of one hex digit of a \u escape (either case, as RFC 8259 allows), or -1. */
 function hexDigit(code: number): number {
@@ -57,7 +58,10 @@ function hexDigit(code: number): number {
 class Parser {
   private index = 0;
 
-  constructor(private readonly text: string) {}
+  constructor(
+    private readonly text: string,
+    private readonly integersOnly: boolean,
+  ) {}
 
   parseDocument(): JsonValue {
     this.skipWhitespace();
@@ -218,6 +222,10 @@ class Parser {
     this.index += match[0].length;
     // ECMAScript StringToNumber rounds correctly in every runtime.
     const value = Number(match[0]);
+    // On the token, not the value: `1.0`, `1e3` and `-0` parse to integers (04 §2.4.1).
+    if (this.integersOnly && (!INTEGER_TOKEN.test(match[0]) || !Number.isSafeInteger(value))) {
+      throw invalidJson('JSON number must be an integer token in [0, 2^53 - 1]');
+    }
     // I-JSON: a number that overflows to Infinity cannot be represented, so it is refused.
     if (!Number.isFinite(value)) throw invalidJson('JSON number is outside the double range');
     return value;
@@ -239,8 +247,7 @@ export function parseJson(text: string, options?: ParseJsonOptions): JsonValue {
   if (typeof text !== 'string') {
     throw new CryptoInputError('invalid_argument', 'parseJson: text must be a string');
   }
-  void options; // RED stub (M1-1e): the option is not applied yet
-  return new Parser(text).parseDocument();
+  return new Parser(text, options?.integersOnly === true).parseDocument();
 }
 
 // --- canonicalize --------------------------------------------------------------------------------
