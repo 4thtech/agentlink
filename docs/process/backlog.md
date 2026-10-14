@@ -1295,12 +1295,12 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-5b · transport-nostr: relay pool, publish, NIP-11, NIP-42, outbox
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/transport-nostr
-- **Depends on:** M1-5a; gaps G-9, G-24 resolved
-- **Spec:** 07 §4.2 (relays, reliability, size, NIP-42); 04 §3.5; 06 §6
+- **Depends on:** M1-5a; gap G-24 resolved; gap G-9 resolved (branch `docs/G-9-store-schema`, pending owner)
+- **Spec:** 07 §4.2 (relays, reliability, size, NIP-42), §3.2 (`outbox`); 04 §3.5; 06 §6
 - **Invariants:** I-3, I-7
 - **Scope:**
   - WebSocket relay pool for Node, browsers and Workers; publish to the recipient's relays and the sender's own relays (owner copies per G-24); "sent" when ≥ 2 relays return `OK`.
-  - Outbox retry with backoff for up to 24 h through an injected persistence interface (implemented by core/node).
+  - Outbox retry with backoff for up to 24 h through an injected persistence interface (implemented by core/node) over the `outbox` table (07 §3.2): the stored gift wrap is republished, never re-wrapped.
   - NIP-11 fetch and cache; skip relays whose `max_message_length` is below the wrap size. NIP-42 AUTH signed via `EnvelopeKeys.signNostr`.
   - Inbound relay frames above 131 072 bytes are dropped before `JSON.parse` (04 §3.1.1, G-2).
   - Event contents never logged; per-relay health and timeouts.
@@ -1313,12 +1313,12 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-5c · transport-nostr: subscribe and sync with cursors and dedup
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/transport-nostr
-- **Depends on:** M1-5b
-- **Spec:** 07 §4.2 (sync); 04 §3.5; 06 §6 (48 h look-back, 3 s budget)
+- **Depends on:** M1-5b; gap G-9 resolved (branch `docs/G-9-store-schema`, pending owner)
+- **Spec:** 07 §4.2 (sync), §3.2 (`seen`); 04 §3.5; 06 §6 (48 h look-back, 3 s budget)
 - **Invariants:** I-5
 - **Scope:**
   - `REQ {kinds: [1059], "#p": [own pubkeys]}` with `since = lastSync − 48 h`, per-relay cursors; live subscriptions.
-  - Dedup by gift-wrap event ID, then by envelope ID, with a seen-set kept ≥ 7 days (injected persistence, G-9).
+  - Dedup by gift-wrap event ID, then by envelope ID, with a seen-set kept ≥ 7 days (injected persistence, `seen` in 07 §3.2): an ID is marked seen only with its processed outcome.
   - Time-budgeted sync (3 s for `agentlink_inbox` and `agentlink_status`) returning partial results flagged as partial; malformed events dropped without logging content.
 - **Acceptance:**
   - An event with `created_at` 47 h in the past is found after a restart; the same envelope from 3 relays is delivered once.
@@ -1380,11 +1380,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-7a · core: client skeleton, Store and ApprovalChannel interfaces, identity, contacts
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
-- **Depends on:** M1-1g, M1-1e, M1-2b; gaps G-9, G-23 resolved
-- **Spec:** 03 §3; 07 §2, §3; 04 §2.4, §2.6; 02 F-02, F-03, F-05, F-06, F-13, F-14
+- **Depends on:** M1-1g, M1-1e, M1-2b; gap G-23 resolved; gap G-9 resolved (branch `docs/G-9-store-schema`, pending owner)
+- **Spec:** 03 §3; 07 §2, §3 (with §3.1–§3.7); 04 §2.4, §2.6; 02 F-02, F-03, F-05, F-06, F-13, F-14
 - **Invariants:** I-1, I-4, I-9
 - **Scope:**
-  - `AgentLinkClient.create(...)` wiring; `Store` interface covering 07 §3 plus the tables from G-9 (outbox, seen-set, owner-action nonces, fee-budget ledger, rate counters, idempotency results); `ApprovalChannel`; in-memory Store for tests.
+  - `AgentLinkClient.create(...)` wiring; `Store` interface covering 07 §3 with the G-9 tables and rules of 07 §3.1–§3.7 (outbox, seen-set, held envelopes, rate counters, idempotency results, owner-action nonces, revoked agents, budget ledger and state, commitment parts) and the §3.7 transaction contract; `ApprovalChannel`; in-memory Store for tests.
   - Identity: agent card build (04 §2.4) signed via `OwnerKeyStore`, plus `cardAgentSig` by the agent key (04 §2.9); key rotation to `keyEpoch + 1` with a new card; `agentId` = the agent's EVM address, derived from the seed and recorded with a random `storagePrefix` (04 §2.9, G-23).
   - Contacts keyed by `agentId`: at most one per `agentId`, never the own one; re-pair only with unchanged owner keys and a `keyEpoch` that is not lower; refused for a revoked `agentId` (04 §2.9).
   - Contacts: add from a verified card, list, block/remove (F-14: later envelopes dropped); display names marked self-declared.
@@ -1489,7 +1489,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (hand-off from M1-2c, IR-M1-2b-1 F-3) The core builds `fee.amount` and `fee.usd` of an approval `context` from one fee quote, because the types cannot check them against each other (token decimals are unknown there). Owner surfaces render from `context`, never from `args`.
   - Requests queue for unknown senders with owner accept/ignore; `clientRequestId` idempotency (repeats return the original result).
   - Action digests for actions with a file (`agentlink_send` with `path`, implemented with M1-7f) include the resolved realpath and `plaintextSha256`; the core re-hashes the file when the approved action runs, and a mismatch needs a new approval (D-53, 06 §2.5).
-  - Approval rows can carry a commitment scope, its source (owner approval or policy grant) and a ledger of used parts (07 §3, D-55). For commitments, "proceeds once" applies per part of the scope; M1-32 implements the scope and its rules.
+  - Approval rows can carry a commitment scope, its source (owner approval or policy grant) and its parts (`commitment_parts`, 07 §3.5, D-55). For commitments, "proceeds once" applies per part of the scope; M1-32 implements the scope and its rules.
 - **Acceptance:**
   - An approved ID is refused for a different action and on second use; an unsigned or wrongly signed approval is rejected.
   - Idempotent repeats return identical results; expired approvals report `expired`.
@@ -1566,11 +1566,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-8b · node: SQLite Store with encrypted sensitive columns
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/node
-- **Depends on:** M1-7a, M1-8a
-- **Spec:** 07 §3 (schema, at-rest encryption); 06 §6 (WAL + file lock, shared agent)
+- **Depends on:** M1-7a, M1-8a; gap G-9 resolved (branch `docs/G-9-store-schema`, pending owner)
+- **Spec:** 07 §3 (schema, at-rest encryption), §3.1–§3.7 (G-9 tables, `enc` columns, transactions); 06 §6 (WAL + file lock, shared agent)
 - **Invariants:** I-2, I-7
 - **Scope:**
-  - `better-sqlite3` Store implementing the full `Store` interface (07 §3 + G-9 tables) with forward migrations; schema reusable by the Durable Object (M2-3a). Native build allowlisted explicitly in CI (`ci-cd.md`).
+  - `better-sqlite3` Store implementing the full `Store` interface (07 §3 with §3.1–§3.7) with forward migrations; schema reusable by the Durable Object (M2-3a). Native build allowlisted explicitly in CI (`ci-cd.md`).
   - Sensitive columns (decrypted payloads, contact names, file names, URLs, file keys, salts, policy parameters) encrypted with the store key via `@agentlink/crypto` (AES-GCM, AAD bound to table/column/row ID); IDs, timestamps and statuses in clear.
   - WAL + inter-process lock so several harnesses share one agent.
 - **Acceptance:**
@@ -3295,7 +3295,16 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 
    *Was:* 04 §2.5.1 (`SignedOwnerAction` `nonce`, `issuedAt`, `expiresAt`), 06 §2.5 and 06 §3 (`dailyBudgetUSD`) had no freshness window, nonce retention, approval TTL or budget day boundary. The first proposal was a flat 10 minutes, 30-day nonces, a 24 h TTL and a UTC day. *Blocks:* M1-2b, M1-7d, M1-7e.
 8. **G-8 (H) CREATE3 salts and deployer lifecycle.** 05 §9; `release-and-deployment.md` §4.2. CreateX guarded salts bind addresses to the deployer; identical addresses for the Registry (M2) and M4 chains need the same deployer and salt scheme; proxies must be deployed and initialised atomically; testnet and mainnet deployers differ, so testnet and mainnet addresses differ. *Proposed:* specify salt layout (deployer-guarded, no cross-chain redeploy protection), deploy-and-init, and cold-storage retention of the mainnet deployer key until all planned chains are deployed. *Blocks:* M1-3g, M3-2b, M3-2c, M4-EPIC.
-9. **G-9 (M) Store schema gaps.** 07 §3 lacks the outbox (07 §4.2, 24 h retry), the ≥ 7-day seen-set (07 §4.2), idempotency results (06 §1 rule 6), budget ledger and rate counters (06 §3), and `SignedOwnerAction` nonces, the stored signed objects, the revoked-agent set and contact status `revoked` (04 §2.5.1, §3.4.1); the policy-version high-water mark lives in the KeyStore (04 §2.5.1). *Proposed:* extend 07 §3. *Blocks:* M1-5b, M1-5c, M1-7a, M1-8b.
+9. **G-9 (M) Store schema gaps.** Resolved by branch `docs/G-9-store-schema` (pending owner; proposed, owner confirms at merge), in 07 §3.1–§3.7.
+   - **Delivery (§3.2).** `outbox`: one row per gift wrap, stored with the envelope before the first publish, retried for 24 h with the same stored event. `seen`: kept at least 7 days and written only with the item's outcome. `held_envelopes`: at most 100 per owner `kid` (cap, count and oldest-drop in one store transaction), released by a `card-update` or after 48 h. Requests are `envelopes` rows with `state = request`, and held rows count against the same limit. `rate_counters`: a sliding hour in one-minute buckets, incremented with the stored envelope.
+   - **Idempotency (§3.3).** Keyed by tool, `clientRequestId` and `approvalId`, with the request digest, the durable effects (so a retry after a crash resumes and never sends twice) and the original result, encrypted at rest, kept 7 days.
+   - **Owner authority (§3.4).** `owner_action_nonces` (30 days; check, record and apply in one store transaction). The stored signed objects: one `policies` row with the signed `policy.set`, where the store commits first and then the KeyStore high-water mark is raised, so a failure between them fails closed; `approvals` with the signed decision and cancel; `contacts.safety_check`. `revoked_agents` is permanent: a row or contact status `revoked` each count as revoked, and an unreadable set stops all processing.
+   - **Money and commitments (§3.5).** `budget_ledger` and `budget_state` (an epoch that a new `policy.set` raises after a broken ledger, and the newest `t` for the clock check). Check and reserve in one store transaction; a replacement releases and reserves in one store transaction (04 §5). `commitment_parts` replaces `parts_used_json`: the claim compare-and-set stores the signed item with its envelope and outbox rows or its ledger reservation.
+   - **Owner surfaces (§3.6).** `owner_copies` keyed by envelope ID and hash, where a conflict marks both rows, and the highest policy echo per agent.
+   - **Store interface (§3.7).** Synchronous, serializable transactions (`better-sqlite3` `BEGIN IMMEDIATE`; Durable Object `transactionSync`), compare-and-set by changed-row count, `now` passed in, forward-only migrations.
+   - **Open (owner):** the requests-queue limit; whether an envelope over the per-contact rate is dropped or deferred; what a repeated `clientRequestId` with a different request returns.
+
+   *Was:* 07 §3 lacked the outbox (07 §4.2, 24 h retry), the ≥ 7-day seen-set (07 §4.2), idempotency results (06 §1 rule 6), budget ledger and rate counters (06 §3), and `SignedOwnerAction` nonces, the stored signed objects, the revoked-agent set and contact status `revoked` (04 §2.5.1, §3.4.1); the policy-version high-water mark lives in the KeyStore (04 §2.5.1). *Blocks:* M1-5b, M1-5c, M1-7a, M1-8b.
 10. **G-10 (M) Where `@agentlink/occ-v2-abi` is published.** 05 §9; D-19. npm provenance is not generated for private source repos (verify). *Proposed* (`development-process.md` §9.2): import release artifacts into public `packages/occ-v2-abi` and publish from there. *Blocks:* M1-3f.
 11. **G-11 (L) Logger package missing from the package map.** RESOLVED by M0-8: `@agentlink/log` (zero dependencies) is in the 07 §1 package map and `repo-reference.md`. *Was:* 04 §8.4 vs 07 §1. *Blocked:* M0-8.
 12. **G-12 (M) JCS and invite compression.** 04 §3.1, §3.6; `AGENTS.md` dependency allowlist. No JCS implementation is allowlisted although `envelopeHash` depends on it; "deflate" does not say raw DEFLATE or zlib. *Proposed:* approve a vetted RFC 8785 implementation (or in-repo code with RFC vectors); specify `deflate-raw` via `CompressionStream`. *Blocks:* M1-1a, M1-7c.
