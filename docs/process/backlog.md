@@ -618,7 +618,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Spec:** 11 §6.1, §6.2, §8, §9, §11, §13; 10 "Design deliveries"; D-30
 - **Invariants:** —
 - **Scope:**
-  - In-chat copy sheet (11 §6.1, highest priority: it feeds the M1a tool summaries through M1-9g); design tokens (§11.7) and core components (§8); local settings and approvals app (§6.2) with its states (§9); simple "how to install" invite placeholder page.
+  - Brand core (11 §2, D-56: mark, wordmark, lockups, favicon, AI-app listing icon); in-chat copy sheet (11 §6.1, highest priority: it feeds the M1a tool summaries through M1-9g) and terminal copy (§6.10); design tokens (§11.7) and core components (§8); local settings and approvals app (§6.2.1) with its states (§9); simple "how to install" invite placeholder page. Exports per `docs/design/README.md`; paste-ready package `docs/design/claude-design-handoff.md`.
 - **Acceptance:**
   - Drop recorded in `docs/design/README.md` (date, links/files, delivered or partial); intake cards M1-9g, M1-11b and the M1-19 restyle become `ready`.
 
@@ -629,7 +629,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Spec:** 11 §6.3–§6.8, §8, §13; 08 §7 (browser counterparty, D-35), §8 (desktop dashboard, D-41); 02 F-15; D-30
 - **Invariants:** —
 - **Scope:**
-  - Complete component library; owner console (§6.3, desktop and mobile); verify page (§6.4); invite landing (§6.5); browser counterparty view-and-accept (D-35); onboarding (§6.6); pay page (§6.7) and pricing (§6.8); clickable prototypes J1, J2, J4, J5, J8; rationale notes (§13). The console screens are also the desktop dashboard (D-41).
+  - Complete component library; OS app, tray and PWA icons (§2.4); desktop apps for macOS, Windows and Linux (§6.2.2); cloud agent pages (§6.9); storage, proofs and printed records, registration and domain verification (§6.11–§6.13); owner console (§6.3, desktop and mobile); verify page (§6.4); invite landing (§6.5); browser counterparty view-and-accept (D-35); onboarding (§6.6); pay page (§6.7) and pricing (§6.8); clickable prototypes J1, J2, J4, J5, J8; rationale notes (§13). The console screens are also the desktop dashboard (D-41).
 - **Acceptance:**
   - Drop recorded in `docs/design/README.md`; M2-1a becomes `ready`. Arriving after M1-GATE delays the start of M2 by the same amount.
 
@@ -640,7 +640,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Spec:** 11 §2 (brand), §13 (D3 deliverables), §15 (marketing site out of scope for beta); D-28, D-30
 - **Invariants:** —
 - **Scope:**
-  - Production-domain brand and marketing site.
+  - Brand final after the trademark check (M1-24), marketing site (§6.15) and social images on the production domain.
 - **Acceptance:**
   - Drop recorded in `docs/design/README.md`; M3-13 becomes `ready`.
 
