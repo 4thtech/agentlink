@@ -1,28 +1,29 @@
 #!/usr/bin/env python3
 """Independent generator for the `encodings` suite: canonical binary encodings (M1-1h).
 
-04 §2.4.1 on docs/canonical-encodings (pending merge; regenerate if its review changes it): every
-binary value has exactly one spelling, decided by its field name. The rows:
-  0x + 40 lowercase hex (address)          e.g. agent, agentEvm, ownerEvm
-  0x + 64 lowercase hex (bytes32)          e.g. recordId, salt, envelopeHash, card ownerNostr
-  0x + 130 lowercase hex (EOA signature)   e.g. cardSig
-  decimal string (uint256)                 maxFee, nonce: no sign, no leading zero, in range
-  64 lowercase hex (Nostr key)             e.g. envelope from, OwnerAction owner
-  128 lowercase hex (BIP-340 signature)    envelope sig, SignedOwnerAction sig
-  64 lowercase hex (digest)                e.g. actionDigest, termsHash
-  base64url without padding                e.g. id, kid, inviteId, nonce
+04 §2.4.1: every binary value has exactly one spelling, chosen by schema and path (never by field
+name alone: `nonce`, `sig`/`signature`, `id`, `agentId` and `signer` are overloaded). The table's
+rows, each with the paths it lists:
+  0x + 40 lowercase hex (address); 0x + 64 lowercase hex (bytes32); 0x + hex (ECDSA signature);
+  decimal string (uint256); 64 lowercase hex (Nostr key); 128 lowercase hex (BIP-340);
+  64 lowercase hex (digest under a Nostr key only); base64url without padding; the prefixed
+  `approvalId` (apr_ + base64url of 16 bytes, 26 characters); tool results (the row they mirror).
 Non-canonical forms are rejected, never normalised: upper or mixed case (EIP-55 included), a
 missing or extra 0x, 0X, a wrong length, whitespace; padded base64url, + or /, non-zero trailing
-bits; a signed, zero-led or out-of-range decimal. Equality compares decoded bytes, so the card's
+bits; a decimal not matching ^(0|[1-9][0-9]*)$ or above the type's maximum. ECDSA (EOA, 65 bytes):
+r and s in [1, n - 1], s <= n/2, v in {27, 28}. JSON integer tokens must match 0|[1-9][0-9]* and
+stay within [0, 2^53 - 1], checked on the token text. Equality compares decoded bytes, so a card's
 `ownerNostr` (0x + 64 hex) and an OwnerAction `owner` (64 hex) for the same key are equal.
 
-The reference decoder below is this generator's own reading of the table, written with Python's
-`re` and `base64` only. Values are synthetic test values (public keys, hashes), not secrets.
+Cases: `decode` gives the canonical form of every path in the table, and each non-canonical form
+applied to a path of each row; `parseInteger` gives JSON number tokens as text; `equalBytes` gives the
+cross-class comparisons. Path names are written `<schema>.<path>` as the table names them. The
+reference decoder is this generator's own reading of the table (Python `re` and `base64`). Values
+are synthetic (public keys, hashes, made-up signatures); no secret.
 
 Usage: python3 -I tools/vectors/generate_encodings.py --check [FILE] | --write
 """
 
-import base64
 import re
 import sys
 from pathlib import Path
@@ -32,150 +33,268 @@ import vectorlib as v  # noqa: E402
 
 SUITE = "encodings"
 VERSION = 1
-SPEC = "04 §2.4.1 (docs/canonical-encodings, pending merge)"
+SPEC = "04 §2.4.1"
+N = v.SECP256K1_N
 
-CLASSES = {
-    "address": ("0x", 20),
-    "bytes32": ("0x", 32),
-    "ecdsa": ("0x", 65),
-    "nostr-key": ("", 32),
-    "bip340-sig": ("", 64),
-    "digest": ("", 32),
+ROWS = {
+    "address": [
+        "OwnerAction.agent", "approval-request.agent", "terms.parties[]", "terms.deliverables[].by",
+        "terms.price.payer", "CommitmentScope.agentId", "CommitmentScope.counterparty.agentId",
+        "AgentCard.agentEvm", "AgentCard.ownerEvm", "ProofPack.notary", "ProofPack.signer.evm",
+        "ProofPack.recipient.evm", "ProofPack.receipts[].signer", "Record.signer", "Receipt.signer",
+        "Record.feeToken", "EIP3009.auth.from", "EIP3009.auth.to", "ProofStatus.signer",
+    ],
+    "bytes32": [
+        "proof.recordId", "ProofPack.recordId", "proof.salt", "ProofPack.recipient.salt",
+        "CommitmentScope.answers.envelopeHash", "ProofPack.envelopeHash", "Record.envelopeHash",
+        "Record.recipientCommitment", "Record.parentRecordId", "Record.appId", "Receipt.recordId",
+        "Receipt.salt", "recordStructHash", "txHash", "AgentCard.agentNostr", "AgentCard.agentEnc",
+        "AgentCard.ownerNostr", "AgentCard.ownerEnc", "AgentCard.nameHash", "AgentCard.relaysHash",
+        "DomainClaim.ownerNostr", "EIP3009.auth.nonce", "EIP3009.auth.r", "EIP3009.auth.s",
+        "ProofStatus.recordId", "ProofStatus.txHash", "verify_proof_pack.recordId", "verify_proof_pack.envelopeHash",
+    ],
+    "ecdsa": [
+        "invite.cardSig", "handshake.cardSig", "card-update.cardSig", "ProofPack.signature",
+        "submitter.records[].signature", "submitter.receipts[].signature",
+    ],
+    "uint256": ["Record.maxFee", "Record.nonce", "EIP3009.auth.value", "EIP3009.auth.validAfter", "EIP3009.auth.validBefore"],
+    "nostr-key": ["envelope.from", "OwnerAction.owner", "CommitmentScope.counterparty.ownerKey", "nostr.eventId"],
+    "bip340-sig": ["envelope.sig", "SignedOwnerAction.sig"],
+    "digest": [
+        "approval-request.actionDigest", "approval.decide.params.actionDigest", "terms-body.termsHash",
+        "terms.previousTermsHash", "CommitmentScope.termsHash", "payload.files[].plaintextSha256",
+        "terms.deliverables[].plaintextSha256", "payload.files[].ciphertextSha256",
+        "drop-commit.ciphertextSha256", "ProofPack.ownerApproval.policyHash", "tool.termsHash",
+    ],
+    "base64url": [
+        "envelope.id", "envelope.thread", "envelope.recipients[].kid", "envelope.recipients[].enc",
+        "envelope.recipients[].wk", "envelope.aead.iv", "envelope.aead.ct", "payload.replyTo",
+        "payload.files[].inline", "payload.files[].fileKey", "proof.envelopeId",
+        "CommitmentScope.answers.envelopeId", "CommitmentScope.thread", "CommitmentScope.termsId",
+        "terms.termsId", "invite.inviteId", "invite.secret", "handshake.inviteId", "handshake.proof",
+        "handshake-ack.inviteId", "handshake-ack.handshakeId", "OwnerAction.nonce", "drop-request.nonce",
+        "ProofPack.disclosure.contentKey", "tool.envelopeId",
+    ],
+    "approval-id": ["approvalId"],
 }
-FIELD_CLASS = {
-    "agent": "address",
-    "agentEvm": "address",
-    "ownerEvm": "address",
-    "recordId": "bytes32",
-    "salt": "bytes32",
-    "envelopeHash": "bytes32",
-    "ownerNostr": "bytes32",
-    "cardSig": "ecdsa",
-    "maxFee": "uint256",
-    "nonceUint256": "uint256",
-    "from": "nostr-key",
-    "owner": "nostr-key",
-    "sig": "bip340-sig",
-    "actionDigest": "digest",
-    "termsHash": "digest",
-    "id": "base64url",
-    "kid": "base64url",
-    "inviteId": "base64url",
-    "nonce": "base64url",
-}
+PATH_CLASS = {path: row for row, paths in ROWS.items() for path in paths}
+HEX_CLASSES = {"address": ("0x", 20), "bytes32": ("0x", 32), "nostr-key": ("", 32), "bip340-sig": ("", 64), "digest": ("", 32)}
+EOA_ONLY = {"invite.cardSig", "handshake.cardSig", "card-update.cardSig"}
 
 
-def decode(field, value):
-    kind = FIELD_CLASS[field]
+def decode(path, value):
+    kind = PATH_CLASS[path]
     if not isinstance(value, str):
         raise ValueError("not a string")
     if kind == "uint256":
-        if not re.fullmatch(r"0|[1-9][0-9]*", value) or int(value) >= 2**256:
+        if not re.fullmatch(r"0|[1-9][0-9]*", value) or int(value) > 2**256 - 1:
             raise ValueError("not a canonical uint256")
         return int(value).to_bytes(32, "big")
     if kind == "base64url":
         return v.unb64u(value)
-    prefix, size = CLASSES[kind]
+    if kind == "approval-id":
+        if len(value) != 26 or not value.startswith("apr_"):
+            raise ValueError("not an approvalId")
+        raw = v.unb64u(value[4:])
+        if len(raw) != 16:
+            raise ValueError("not 16 bytes")
+        return raw
+    if kind == "ecdsa":
+        if not re.fullmatch(r"0x([0-9a-f]{2})+", value):
+            raise ValueError("not canonical hex")
+        raw = bytes.fromhex(value[2:])
+        if len(raw) == 65 or path in EOA_ONLY:
+            r, s, v_byte = int.from_bytes(raw[:32], "big"), int.from_bytes(raw[32:64], "big"), raw[64:]
+            if len(raw) != 65 or not 1 <= r < N or not 1 <= s <= N // 2 or v_byte not in (b"\x1b", b"\x1c"):
+                raise ValueError("not a canonical ECDSA signature")
+        return raw
+    prefix, size = HEX_CLASSES[kind]
     if not value.startswith(prefix) or not re.fullmatch(r"[0-9a-f]{%d}" % (2 * size), value[len(prefix) :]):
         raise ValueError("not canonical hex")
     return bytes.fromhex(value[len(prefix) :])
 
 
+def parse_integer(token):
+    if not re.fullmatch(r"0|[1-9][0-9]*", token) or int(token) > 2**53 - 1:
+        raise ValueError("not a canonical JSON integer")
+    return int(token)
+
+
 def build():
     cases = []
-
-    def ok(case_id, field, value, why=""):
-        cases.append(v.case(f"decode-{case_id}", f"{SPEC}: {field}{why}", {"op": "decode", "field": field, "value": value}, {"bytes": v.hx(decode(field, value))}))
-
-    def bad(case_id, field, value, why):
-        try:
-            decode(field, value)
-            v.fail(f"{case_id} decodes")
-        except ValueError:
-            pass
-        cases.append(v.case(f"decode-reject-{case_id}", f"{SPEC}: {field} {why}; rejected, never normalised", {"op": "decode", "field": field, "value": value}, {"outcome": "reject"}))
-
     address = v.evm_address(v.det("encodings/agent/evm", 32))
     checksummed = v.eip55(address)
     if checksummed == address or checksummed == "0x" + address[2:].upper():
         v.fail("pick an address whose EIP-55 form is mixed case")
-    ok("address", "agent", address)
-    ok("address-owner-evm", "ownerEvm", address)
-    bad("address-eip55", "agent", checksummed, "in EIP-55 mixed case")
-    bad("address-uppercase", "agent", "0x" + address[2:].upper(), "in upper-case hex")
-    bad("address-no-prefix", "agent", address[2:], "without 0x")
-    bad("address-capital-prefix", "agent", "0X" + address[2:], "with 0X")
-    bad("address-39-hex", "agent", address[:-1], "with 39 hex digits")
-    bad("address-41-hex", "agent", address + "0", "with 41 hex digits")
-    bad("address-whitespace", "agent", " " + address, "with leading whitespace")
-
-    b32 = v.sha256(b"encodings/record")
-    ok("bytes32", "recordId", "0x" + b32.hex())
-    ok("bytes32-envelope-hash", "envelopeHash", "0x" + b32.hex())
-    bad("bytes32-uppercase", "recordId", "0x" + b32.hex().upper(), "in upper-case hex")
-    bad("bytes32-no-prefix", "recordId", b32.hex(), "without 0x")
-    bad("bytes32-63-hex", "recordId", "0x" + b32.hex()[:-1], "with 63 hex digits")
-    bad("salt-base64url", "salt", v.b64u(b32), "as base64url (a proof body's salt is EVM-native)")
-    bad("record-id-base64url", "recordId", v.b64u(b32), "as base64url")
-
-    sig65 = v.sha256(b"encodings/r") + v.sha256(b"encodings/s") + b"\x1b"
-    ok("ecdsa", "cardSig", "0x" + sig65.hex())
-    bad("ecdsa-64-bytes", "cardSig", "0x" + sig65[:64].hex(), "of 64 bytes")
-    bad("ecdsa-uppercase", "cardSig", "0x" + sig65.hex().upper(), "in upper-case hex")
-    bad("ecdsa-no-prefix", "cardSig", sig65.hex(), "without 0x")
-
-    for case_id, value in [("uint256-zero", "0"), ("uint256", "1500000"), ("uint256-max", str(2**256 - 1))]:
-        ok(case_id, "maxFee", value)
-    for case_id, value, why in [
-        ("uint256-leading-zero", "01500", "with a leading zero"),
-        ("uint256-plus", "+1500", "with a sign"),
-        ("uint256-minus", "-1", "negative"),
-        ("uint256-overflow", str(2**256), "of 2^256"),
-        ("uint256-fraction", "1500.0", "with a fraction"),
-        ("uint256-exponent", "1e3", "in exponent form"),
-        ("uint256-hex", "0x5dc", "in hex"),
-        ("uint256-whitespace", "1500 ", "with trailing whitespace"),
-        ("uint256-empty", "", "empty"),
-    ]:
-        bad(case_id, "maxFee", value, why)
-
+    b32 = v.sha256(b"encodings/bytes32")
     key = v.xonly_public_key(v.det("encodings/owner/nostr", 32))
-    ok("nostr-key", "from", key.hex())
-    ok("nostr-key-owner", "owner", key.hex())
-    bad("nostr-key-0x", "owner", "0x" + key.hex(), "with 0x (Nostr-native)")
-    bad("nostr-key-uppercase", "from", key.hex().upper(), "in upper-case hex")
-    bad("nostr-key-63-hex", "from", key.hex()[:-1], "with 63 hex digits")
-    ok("card-owner-nostr", "ownerNostr", "0x" + key.hex(), " (the card's spelling of a Nostr key)")
-    bad("card-owner-nostr-no-prefix", "ownerNostr", key.hex(), "without 0x (the card spells it 0x + 64 hex)")
-
-    bip340 = v.sha256(b"encodings/R") + v.sha256(b"encodings/s2")
-    ok("bip340-sig", "sig", bip340.hex())
-    bad("bip340-sig-0x", "sig", "0x" + bip340.hex(), "with 0x")
-    bad("bip340-sig-uppercase", "sig", bip340.hex().upper(), "in upper-case hex")
-
-    digest = v.sha256(b"encodings/action")
-    ok("digest", "actionDigest", digest.hex())
-    ok("digest-terms", "termsHash", digest.hex())
-    bad("digest-0x", "actionDigest", "0x" + digest.hex(), "with 0x (signed only under a Nostr key)")
-    bad("digest-base64url", "termsHash", v.b64u(digest), "as base64url")
-
+    bip340 = v.sha256(b"encodings/R") + v.sha256(b"encodings/s")
+    digest = v.sha256(b"encodings/digest")
+    r = v.sha256(b"encodings/ecdsa-r")
+    s_low = (int.from_bytes(v.sha256(b"encodings/ecdsa-s"), "big") % (N // 2)) + 1
+    ecdsa = r + s_low.to_bytes(32, "big") + b"\x1b"
     raw16 = bytes.fromhex("fbff3e0f00ff10e0f8fe7d3c1b0a99ee")
-    text = v.b64u(raw16)
-    ok("base64url", "id", text)
-    ok("base64url-invite-id", "inviteId", text)
-    bad("base64url-padded", "id", text + "==", "with padding")
-    bad("base64url-standard-alphabet", "id", text.replace("-", "+").replace("_", "/"), "with + and /")
-    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-    bad("base64url-trailing-bits", "id", text[:-1] + alphabet[alphabet.index(text[-1]) | 1], "with non-zero trailing bits")
-    bad("base64url-whitespace", "kid", text[:11] + " " + text[11:], "with whitespace")
-    bad("base64url-impossible-length", "nonce", text + "AAA", "with an impossible length (4n + 1 characters)")
-    if base64.urlsafe_b64decode(text + "==") != raw16:
-        v.fail("base64url round trip")
+    canonical = {
+        "address": address,
+        "bytes32": "0x" + b32.hex(),
+        "ecdsa": "0x" + ecdsa.hex(),
+        "uint256": "1500000",
+        "nostr-key": key.hex(),
+        "bip340-sig": bip340.hex(),
+        "digest": digest.hex(),
+        "base64url": v.b64u(raw16),
+        "approval-id": "apr_" + v.b64u(raw16),
+    }
 
-    # Cross-class equality: decode both sides, compare bytes (§2.4.1 "Compare bytes, never strings").
-    def eq(case_id, a, b, accept, why):
+    def slug(path):
+        return re.sub(r"[^a-z0-9]+", "-", re.sub(r"([a-z0-9])([A-Z])", r"\1-\2", path).lower()).strip("-")
+
+    def case(case_id, why, path, value, accept):
         try:
-            result = decode(*a) == decode(*b)
+            result = decode(path, value)
+        except ValueError:
+            result = None
+        if (result is not None) != accept:
+            v.fail(f"{case_id}: unexpected decode result")
+        cases.append(
+            v.case(
+                case_id,
+                f"{SPEC}: {path} {why}" + ("" if accept else "; rejected, never normalised"),
+                {"op": "decode", "path": path, "value": value},
+                {"bytes": v.hx(result)} if accept else {"outcome": "reject"},
+            )
+        )
+
+    # The canonical form of every path in the table.
+    for row, paths in ROWS.items():
+        for path in paths:
+            case(f"decode-{slug(path)}", "in its canonical form", path, canonical[row], True)
+
+    # Each non-canonical form, applied to a path of each row.
+    a = canonical["address"]
+    for case_id, value, why in [
+        ("eip55", checksummed, "in EIP-55 mixed case"),
+        ("uppercase", "0x" + a[2:].upper(), "in upper-case hex"),
+        ("no-prefix", a[2:], "without 0x"),
+        ("capital-prefix", "0X" + a[2:], "with 0X"),
+        ("39-hex", a[:-1], "with 39 hex digits"),
+        ("41-hex", a + "0", "with 41 hex digits"),
+        ("whitespace", " " + a, "with leading whitespace"),
+    ]:
+        case(f"reject-address-{case_id}", why, "OwnerAction.agent", value, False)
+    h = canonical["bytes32"]
+    for case_id, path, value, why in [
+        ("uppercase", "Record.envelopeHash", "0x" + h[2:].upper(), "in upper-case hex"),
+        ("no-prefix", "AgentCard.ownerNostr", h[2:], "without 0x"),
+        ("capital-prefix", "proof.recordId", "0X" + h[2:], "with 0X"),
+        ("63-hex", "proof.recordId", h[:-1], "with 63 hex digits"),
+        ("trailing-space", "txHash", h + " ", "with trailing whitespace"),
+        ("base64url-record-id", "proof.recordId", v.b64u(b32), "as base64url"),
+        ("base64url-salt", "proof.salt", v.b64u(b32), "as base64url"),
+    ]:
+        case(f"reject-bytes32-{case_id}", why, path, value, False)
+    e = canonical["ecdsa"]
+    s_high = (N - s_low).to_bytes(32, "big")
+    for case_id, value, why in [
+        ("high-s", "0x" + (r + s_high + b"\x1c").hex(), "with a high s (EIP-2)"),
+        ("v-0", "0x" + (ecdsa[:64] + b"\x00").hex(), "with v = 0"),
+        ("v-1", "0x" + (ecdsa[:64] + b"\x01").hex(), "with v = 1"),
+        ("64-bytes", "0x" + ecdsa[:64].hex(), "of 64 bytes"),
+        ("r-zero", "0x" + (bytes(32) + ecdsa[32:]).hex(), "with r = 0"),
+        ("s-zero", "0x" + (r + bytes(32) + b"\x1b").hex(), "with s = 0"),
+        ("r-n", "0x" + (N.to_bytes(32, "big") + ecdsa[32:]).hex(), "with r = n"),
+        ("uppercase", "0x" + e[2:].upper(), "in upper-case hex"),
+        ("no-prefix", e[2:], "without 0x"),
+    ]:
+        case(f"reject-ecdsa-{case_id}", why, "invite.cardSig", value, False)
+    case("decode-proof-pack-signature-erc1271", "as an ERC-1271 signature of another length (0x + even hex)", "ProofPack.signature", "0x" + (v.sha256(b"encodings/erc1271") * 3).hex(), True)
+    case("reject-proof-pack-signature-odd-hex", "with an odd number of hex digits", "ProofPack.signature", e[:-1], False)
+    case("reject-proof-pack-signature-empty", "empty after 0x", "ProofPack.signature", "0x", False)
+    case("reject-proof-pack-signature-high-s", "as a 65-byte signature with a high s", "ProofPack.signature", "0x" + (r + s_high + b"\x1c").hex(), False)
+    for case_id, value in [("zero", "0"), ("max", str(2**256 - 1))]:
+        case(f"decode-uint256-{case_id}", f"= {case_id}", "Record.maxFee", value, True)
+    for case_id, value, why in [
+        ("leading-zero", "01500", "with a leading zero"),
+        ("plus", "+1500", "with a sign"),
+        ("minus", "-1", "negative"),
+        ("overflow", str(2**256), "of 2^256"),
+        ("fraction", "1500.0", "with a fraction"),
+        ("exponent", "1e3", "in exponent form"),
+        ("hex", "0x5dc", "in hex"),
+        ("whitespace", "1500 ", "with trailing whitespace"),
+        ("empty", "", "empty"),
+    ]:
+        case(f"reject-uint256-{case_id}", why, "Record.nonce", value, False)
+    k = canonical["nostr-key"]
+    for case_id, path, value, why in [
+        ("0x", "OwnerAction.owner", "0x" + k, "with 0x (Nostr-native)"),
+        ("uppercase", "envelope.from", k.upper(), "in upper-case hex"),
+        ("63-hex", "envelope.from", k[:-1], "with 63 hex digits"),
+    ]:
+        case(f"reject-nostr-key-{case_id}", why, path, value, False)
+    b = canonical["bip340-sig"]
+    case("reject-bip340-0x", "with 0x", "SignedOwnerAction.sig", "0x" + b, False)
+    case("reject-bip340-uppercase", "in upper-case hex", "envelope.sig", b.upper(), False)
+    case("reject-bip340-127-hex", "with 127 hex digits", "envelope.sig", b[:-1], False)
+    d = canonical["digest"]
+    case("reject-digest-0x", "with 0x (signed only under a Nostr key)", "approval.decide.params.actionDigest", "0x" + d, False)
+    case("reject-digest-uppercase", "in upper-case hex", "terms-body.termsHash", d.upper(), False)
+    case("reject-digest-base64url", "as base64url", "payload.files[].plaintextSha256", v.b64u(digest), False)
+    t = canonical["base64url"]
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+    for case_id, path, value, why in [
+        ("padded", "envelope.id", t + "==", "with padding"),
+        ("standard-alphabet", "OwnerAction.nonce", t.replace("-", "+").replace("_", "/"), "with + and /"),
+        ("trailing-bits", "invite.inviteId", t[:-1] + alphabet[alphabet.index(t[-1]) | 1], "with non-zero trailing bits"),
+        ("whitespace", "envelope.recipients[].kid", t[:11] + " " + t[11:], "with whitespace"),
+        ("impossible-length", "handshake.proof", t + "AAA", "with an impossible length (4n + 1 characters)"),
+    ]:
+        case(f"reject-base64url-{case_id}", why, path, value, False)
+    ap = canonical["approval-id"]
+    for case_id, value, why in [
+        ("no-prefix", ap[4:], "without apr_"),
+        ("uppercase-prefix", "APR_" + ap[4:], "with APR_"),
+        ("padded", ap + "==", "with padding (28 characters)"),
+        ("15-bytes", "apr_" + v.b64u(raw16[:15]), "of 15 bytes"),
+        ("17-bytes", "apr_" + v.b64u(raw16 + b"\x00"), "of 17 bytes"),
+        ("trailing-bits", ap[:-1] + alphabet[alphabet.index(ap[-1]) | 1], "with non-zero trailing bits"),
+    ]:
+        case(f"reject-approval-id-{case_id}", why, "approvalId", value, False)
+
+    # JSON integer tokens (all non-uint256 integers), checked on the token text.
+    for token, accept, why in [
+        ("0", True, "zero"),
+        ("1760000000", True, "a timestamp"),
+        ("9007199254740991", True, "2^53 - 1"),
+        ("1.0", False, "spelled with a fraction"),
+        ("1e3", False, "in exponent form"),
+        ("1E3", False, "in exponent form"),
+        ("-0", False, "negative zero"),
+        ("-1", False, "negative"),
+        ("01", False, "with a leading zero"),
+        ("9007199254740991.4", False, "a near-integer fraction"),
+        ("9007199254740992", False, "2^53"),
+        ("18446744073709551615", False, "2^64 - 1 (a uint64 above 2^53 - 1)"),
+    ]:
+        try:
+            value = parse_integer(token)
+        except ValueError:
+            value = None
+        if (value is not None) != accept:
+            v.fail(f"integer token {token}")
+        cases.append(
+            v.case(
+                f"integer-{'accept' if accept else 'reject'}-{slug(token.replace('.', 'p').replace('-', 'minus'))}",
+                f"{SPEC}: JSON integer token {token} ({why})",
+                {"op": "parseInteger", "json": token},
+                {"value": str(value)} if accept else {"outcome": "reject"},
+            )
+        )
+
+    # Cross-class equality: decode both sides, compare bytes.
+    def eq(case_id, left, right, accept, why):
+        try:
+            result = decode(*left) == decode(*right)
         except ValueError:
             result = False
         if result != accept:
@@ -184,30 +303,33 @@ def build():
             v.case(
                 f"equal-{case_id}",
                 f"{SPEC}: {why}",
-                {"op": "equalBytes", "a": {"field": a[0], "value": a[1]}, "b": {"field": b[0], "value": b[1]}},
+                {"op": "equalBytes", "a": {"path": left[0], "value": left[1]}, "b": {"path": right[0], "value": right[1]}},
                 {"outcome": "accept" if accept else "reject"},
             )
         )
 
     other = v.xonly_public_key(v.det("encodings/other/nostr", 32))
-    eq("owner-and-card-owner-nostr", ("owner", key.hex()), ("ownerNostr", "0x" + key.hex()), True, "an OwnerAction owner and the card's ownerNostr for the same key are equal as bytes")
-    eq("from-and-card-agent-nostr", ("from", key.hex()), ("ownerNostr", "0x" + key.hex()), True, "an envelope from and a card bytes32 key compare as bytes")
-    eq("owner-other-key", ("owner", other.hex()), ("ownerNostr", "0x" + key.hex()), False, "different keys are not equal")
-    eq("owner-with-0x", ("owner", "0x" + key.hex()), ("ownerNostr", "0x" + key.hex()), False, "a string-equal but non-canonical owner fails its parse first")
-    eq("card-without-0x", ("owner", key.hex()), ("ownerNostr", key.hex()), False, "a card key without 0x fails its parse first")
-    eq("address-checksummed", ("agent", checksummed), ("agentEvm", address), False, "an EIP-55 address fails its parse; nothing lower-cases it")
+    eq("owner-and-card-owner-nostr", ("OwnerAction.owner", key.hex()), ("AgentCard.ownerNostr", "0x" + key.hex()), True, "an OwnerAction owner and the card's ownerNostr for the same key are equal as bytes")
+    eq("from-and-card-agent-nostr", ("envelope.from", key.hex()), ("AgentCard.agentNostr", "0x" + key.hex()), True, "an envelope from and the card's agentNostr compare as bytes")
+    eq("owner-key-and-card", ("CommitmentScope.counterparty.ownerKey", key.hex()), ("AgentCard.ownerNostr", "0x" + key.hex()), True, "a CommitmentScope ownerKey and a card key compare as bytes")
+    eq("owner-other-key", ("OwnerAction.owner", other.hex()), ("AgentCard.ownerNostr", "0x" + key.hex()), False, "different keys are not equal")
+    eq("owner-with-0x", ("OwnerAction.owner", "0x" + key.hex()), ("AgentCard.ownerNostr", "0x" + key.hex()), False, "an owner with 0x fails its parse first, though the strings are equal")
+    eq("card-without-0x", ("OwnerAction.owner", key.hex()), ("AgentCard.ownerNostr", key.hex()), False, "a card key without 0x fails its parse first")
+    eq("address-checksummed", ("OwnerAction.agent", checksummed), ("AgentCard.agentEvm", address), False, "an EIP-55 address fails its parse; nothing lower-cases it")
     return cases
 
 
-FIELD = {"enum": sorted(FIELD_CLASS)}
-OPERAND = v.strict_object({"field": FIELD, "value": v.STRING})
+PATH = {"enum": sorted(PATH_CLASS)}
+OPERAND = v.strict_object({"path": PATH, "value": v.STRING})
 SCHEMA = v.case_schema(
     SUITE,
-    "04 §2.4.1 canonical encodings. `decode`: the value of a field, decoded by the field's class, as "
-    "hex bytes (uint256 as 32 big-endian bytes), or a rejection. `equalBytes`: accept when both "
-    "values parse and decode to the same bytes, otherwise reject.",
+    "04 §2.4.1 canonical encodings. `decode`: the value at a schema path, decoded by that path's row, "
+    "as hex bytes (uint256 as 32 big-endian bytes, approvalId as its 16 bytes), or a rejection. "
+    "`parseInteger`: a JSON number token as text, its value as a decimal string, or a rejection. "
+    "`equalBytes`: accept when both values parse and decode to the same bytes, otherwise reject.",
     {
-        "decode": ({"field": FIELD, "value": v.STRING}, [{"bytes": v.HEX}, v.REJECT]),
+        "decode": ({"path": PATH, "value": v.STRING}, [{"bytes": v.HEX}, v.REJECT]),
+        "parseInteger": ({"json": v.STRING}, [{"value": v.STRING}, v.REJECT]),
         "equalBytes": ({"a": OPERAND, "b": OPERAND}, [v.ACCEPT, v.REJECT]),
     },
 )

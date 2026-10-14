@@ -9,11 +9,11 @@
   },
   "cases": [
     {
-      "id": "decode-address",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): agent",
+      "id": "decode-owner-action-agent",
+      "source": "04 \u00a72.4.1: OwnerAction.agent in its canonical form",
       "input": {
         "op": "decode",
-        "field": "agent",
+        "path": "OwnerAction.agent",
         "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
@@ -21,11 +21,11 @@
       }
     },
     {
-      "id": "decode-address-owner-evm",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): ownerEvm",
+      "id": "decode-approval-request-agent",
+      "source": "04 \u00a72.4.1: approval-request.agent in its canonical form",
       "input": {
         "op": "decode",
-        "field": "ownerEvm",
+        "path": "approval-request.agent",
         "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
@@ -33,239 +33,623 @@
       }
     },
     {
-      "id": "decode-reject-address-eip55",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): agent in EIP-55 mixed case; rejected, never normalised",
+      "id": "decode-terms-parties",
+      "source": "04 \u00a72.4.1: terms.parties[] in its canonical form",
       "input": {
         "op": "decode",
-        "field": "agent",
-        "value": "0x0180EC93Ae3effd2535292DD293f5E4bB3Ea2876"
+        "path": "terms.parties[]",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "outcome": "reject"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-reject-address-uppercase",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): agent in upper-case hex; rejected, never normalised",
+      "id": "decode-terms-deliverables-by",
+      "source": "04 \u00a72.4.1: terms.deliverables[].by in its canonical form",
       "input": {
         "op": "decode",
-        "field": "agent",
-        "value": "0x0180EC93AE3EFFD2535292DD293F5E4BB3EA2876"
+        "path": "terms.deliverables[].by",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "outcome": "reject"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-reject-address-no-prefix",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): agent without 0x; rejected, never normalised",
+      "id": "decode-terms-price-payer",
+      "source": "04 \u00a72.4.1: terms.price.payer in its canonical form",
       "input": {
         "op": "decode",
-        "field": "agent",
-        "value": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+        "path": "terms.price.payer",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "outcome": "reject"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-reject-address-capital-prefix",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): agent with 0X; rejected, never normalised",
+      "id": "decode-commitment-scope-agent-id",
+      "source": "04 \u00a72.4.1: CommitmentScope.agentId in its canonical form",
       "input": {
         "op": "decode",
-        "field": "agent",
-        "value": "0X0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+        "path": "CommitmentScope.agentId",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "outcome": "reject"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-reject-address-39-hex",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): agent with 39 hex digits; rejected, never normalised",
+      "id": "decode-commitment-scope-counterparty-agent-id",
+      "source": "04 \u00a72.4.1: CommitmentScope.counterparty.agentId in its canonical form",
       "input": {
         "op": "decode",
-        "field": "agent",
-        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea287"
+        "path": "CommitmentScope.counterparty.agentId",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "outcome": "reject"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-reject-address-41-hex",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): agent with 41 hex digits; rejected, never normalised",
+      "id": "decode-agent-card-agent-evm",
+      "source": "04 \u00a72.4.1: AgentCard.agentEvm in its canonical form",
       "input": {
         "op": "decode",
-        "field": "agent",
-        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea28760"
+        "path": "AgentCard.agentEvm",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "outcome": "reject"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-reject-address-whitespace",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): agent with leading whitespace; rejected, never normalised",
+      "id": "decode-agent-card-owner-evm",
+      "source": "04 \u00a72.4.1: AgentCard.ownerEvm in its canonical form",
       "input": {
         "op": "decode",
-        "field": "agent",
-        "value": " 0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+        "path": "AgentCard.ownerEvm",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "outcome": "reject"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-bytes32",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): recordId",
+      "id": "decode-proof-pack-notary",
+      "source": "04 \u00a72.4.1: ProofPack.notary in its canonical form",
       "input": {
         "op": "decode",
-        "field": "recordId",
-        "value": "0x33fb6206910f4d42922c6fd38972c6a3a0ff394c22b077779c2e507286652110"
+        "path": "ProofPack.notary",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "bytes": "33fb6206910f4d42922c6fd38972c6a3a0ff394c22b077779c2e507286652110"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-bytes32-envelope-hash",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): envelopeHash",
+      "id": "decode-proof-pack-signer-evm",
+      "source": "04 \u00a72.4.1: ProofPack.signer.evm in its canonical form",
       "input": {
         "op": "decode",
-        "field": "envelopeHash",
-        "value": "0x33fb6206910f4d42922c6fd38972c6a3a0ff394c22b077779c2e507286652110"
+        "path": "ProofPack.signer.evm",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "bytes": "33fb6206910f4d42922c6fd38972c6a3a0ff394c22b077779c2e507286652110"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-reject-bytes32-uppercase",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): recordId in upper-case hex; rejected, never normalised",
+      "id": "decode-proof-pack-recipient-evm",
+      "source": "04 \u00a72.4.1: ProofPack.recipient.evm in its canonical form",
       "input": {
         "op": "decode",
-        "field": "recordId",
-        "value": "0x33FB6206910F4D42922C6FD38972C6A3A0FF394C22B077779C2E507286652110"
+        "path": "ProofPack.recipient.evm",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "outcome": "reject"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-reject-bytes32-no-prefix",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): recordId without 0x; rejected, never normalised",
+      "id": "decode-proof-pack-receipts-signer",
+      "source": "04 \u00a72.4.1: ProofPack.receipts[].signer in its canonical form",
       "input": {
         "op": "decode",
-        "field": "recordId",
-        "value": "33fb6206910f4d42922c6fd38972c6a3a0ff394c22b077779c2e507286652110"
+        "path": "ProofPack.receipts[].signer",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "outcome": "reject"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-reject-bytes32-63-hex",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): recordId with 63 hex digits; rejected, never normalised",
+      "id": "decode-record-signer",
+      "source": "04 \u00a72.4.1: Record.signer in its canonical form",
       "input": {
         "op": "decode",
-        "field": "recordId",
-        "value": "0x33fb6206910f4d42922c6fd38972c6a3a0ff394c22b077779c2e50728665211"
+        "path": "Record.signer",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "outcome": "reject"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-reject-salt-base64url",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): salt as base64url (a proof body's salt is EVM-native); rejected, never normalised",
+      "id": "decode-receipt-signer",
+      "source": "04 \u00a72.4.1: Receipt.signer in its canonical form",
       "input": {
         "op": "decode",
-        "field": "salt",
-        "value": "M_tiBpEPTUKSLG_TiXLGo6D_OUwisHd3nC5QcoZlIRA"
+        "path": "Receipt.signer",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "outcome": "reject"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-reject-record-id-base64url",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): recordId as base64url; rejected, never normalised",
+      "id": "decode-record-fee-token",
+      "source": "04 \u00a72.4.1: Record.feeToken in its canonical form",
       "input": {
         "op": "decode",
-        "field": "recordId",
-        "value": "M_tiBpEPTUKSLG_TiXLGo6D_OUwisHd3nC5QcoZlIRA"
+        "path": "Record.feeToken",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "outcome": "reject"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-ecdsa",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): cardSig",
+      "id": "decode-eip3009-auth-from",
+      "source": "04 \u00a72.4.1: EIP3009.auth.from in its canonical form",
       "input": {
         "op": "decode",
-        "field": "cardSig",
-        "value": "0x046361e09fd7bc7d18bd166d45a7b0c045368301f3f0c878d4cc3f65319cbcefd6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f6178231b"
+        "path": "EIP3009.auth.from",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "bytes": "046361e09fd7bc7d18bd166d45a7b0c045368301f3f0c878d4cc3f65319cbcefd6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f6178231b"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-reject-ecdsa-64-bytes",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): cardSig of 64 bytes; rejected, never normalised",
+      "id": "decode-eip3009-auth-to",
+      "source": "04 \u00a72.4.1: EIP3009.auth.to in its canonical form",
       "input": {
         "op": "decode",
-        "field": "cardSig",
-        "value": "0x046361e09fd7bc7d18bd166d45a7b0c045368301f3f0c878d4cc3f65319cbcefd6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f617823"
+        "path": "EIP3009.auth.to",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "outcome": "reject"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-reject-ecdsa-uppercase",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): cardSig in upper-case hex; rejected, never normalised",
+      "id": "decode-proof-status-signer",
+      "source": "04 \u00a72.4.1: ProofStatus.signer in its canonical form",
       "input": {
         "op": "decode",
-        "field": "cardSig",
-        "value": "0x046361E09FD7BC7D18BD166D45A7B0C045368301F3F0C878D4CC3F65319CBCEFD6B71D9BF7A0DE65AC066AF9DEF7B935A01EEA9D44BCC3FF10D84CF82F6178231B"
+        "path": "ProofStatus.signer",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       },
       "expected": {
-        "outcome": "reject"
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
       }
     },
     {
-      "id": "decode-reject-ecdsa-no-prefix",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): cardSig without 0x; rejected, never normalised",
+      "id": "decode-proof-record-id",
+      "source": "04 \u00a72.4.1: proof.recordId in its canonical form",
       "input": {
         "op": "decode",
-        "field": "cardSig",
-        "value": "046361e09fd7bc7d18bd166d45a7b0c045368301f3f0c878d4cc3f65319cbcefd6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f6178231b"
+        "path": "proof.recordId",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
       },
       "expected": {
-        "outcome": "reject"
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
       }
     },
     {
-      "id": "decode-uint256-zero",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee",
+      "id": "decode-proof-pack-record-id",
+      "source": "04 \u00a72.4.1: ProofPack.recordId in its canonical form",
       "input": {
         "op": "decode",
-        "field": "maxFee",
-        "value": "0"
+        "path": "ProofPack.recordId",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
       },
       "expected": {
-        "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
       }
     },
     {
-      "id": "decode-uint256",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee",
+      "id": "decode-proof-salt",
+      "source": "04 \u00a72.4.1: proof.salt in its canonical form",
       "input": {
         "op": "decode",
-        "field": "maxFee",
+        "path": "proof.salt",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-proof-pack-recipient-salt",
+      "source": "04 \u00a72.4.1: ProofPack.recipient.salt in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.recipient.salt",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-commitment-scope-answers-envelope-hash",
+      "source": "04 \u00a72.4.1: CommitmentScope.answers.envelopeHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.answers.envelopeHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-proof-pack-envelope-hash",
+      "source": "04 \u00a72.4.1: ProofPack.envelopeHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.envelopeHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-record-envelope-hash",
+      "source": "04 \u00a72.4.1: Record.envelopeHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Record.envelopeHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-record-recipient-commitment",
+      "source": "04 \u00a72.4.1: Record.recipientCommitment in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Record.recipientCommitment",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-record-parent-record-id",
+      "source": "04 \u00a72.4.1: Record.parentRecordId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Record.parentRecordId",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-record-app-id",
+      "source": "04 \u00a72.4.1: Record.appId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Record.appId",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-receipt-record-id",
+      "source": "04 \u00a72.4.1: Receipt.recordId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Receipt.recordId",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-receipt-salt",
+      "source": "04 \u00a72.4.1: Receipt.salt in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Receipt.salt",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-record-struct-hash",
+      "source": "04 \u00a72.4.1: recordStructHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "recordStructHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-tx-hash",
+      "source": "04 \u00a72.4.1: txHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "txHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-agent-card-agent-nostr",
+      "source": "04 \u00a72.4.1: AgentCard.agentNostr in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "AgentCard.agentNostr",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-agent-card-agent-enc",
+      "source": "04 \u00a72.4.1: AgentCard.agentEnc in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "AgentCard.agentEnc",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-agent-card-owner-nostr",
+      "source": "04 \u00a72.4.1: AgentCard.ownerNostr in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "AgentCard.ownerNostr",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-agent-card-owner-enc",
+      "source": "04 \u00a72.4.1: AgentCard.ownerEnc in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "AgentCard.ownerEnc",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-agent-card-name-hash",
+      "source": "04 \u00a72.4.1: AgentCard.nameHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "AgentCard.nameHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-agent-card-relays-hash",
+      "source": "04 \u00a72.4.1: AgentCard.relaysHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "AgentCard.relaysHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-domain-claim-owner-nostr",
+      "source": "04 \u00a72.4.1: DomainClaim.ownerNostr in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "DomainClaim.ownerNostr",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-eip3009-auth-nonce",
+      "source": "04 \u00a72.4.1: EIP3009.auth.nonce in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "EIP3009.auth.nonce",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-eip3009-auth-r",
+      "source": "04 \u00a72.4.1: EIP3009.auth.r in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "EIP3009.auth.r",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-eip3009-auth-s",
+      "source": "04 \u00a72.4.1: EIP3009.auth.s in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "EIP3009.auth.s",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-proof-status-record-id",
+      "source": "04 \u00a72.4.1: ProofStatus.recordId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofStatus.recordId",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-proof-status-tx-hash",
+      "source": "04 \u00a72.4.1: ProofStatus.txHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofStatus.txHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-verify-proof-pack-record-id",
+      "source": "04 \u00a72.4.1: verify_proof_pack.recordId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "verify_proof_pack.recordId",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-verify-proof-pack-envelope-hash",
+      "source": "04 \u00a72.4.1: verify_proof_pack.envelopeHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "verify_proof_pack.envelopeHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-invite-card-sig",
+      "source": "04 \u00a72.4.1: invite.cardSig in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "bytes": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      }
+    },
+    {
+      "id": "decode-handshake-card-sig",
+      "source": "04 \u00a72.4.1: handshake.cardSig in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "bytes": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      }
+    },
+    {
+      "id": "decode-card-update-card-sig",
+      "source": "04 \u00a72.4.1: card-update.cardSig in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "card-update.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "bytes": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      }
+    },
+    {
+      "id": "decode-proof-pack-signature",
+      "source": "04 \u00a72.4.1: ProofPack.signature in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.signature",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "bytes": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      }
+    },
+    {
+      "id": "decode-submitter-records-signature",
+      "source": "04 \u00a72.4.1: submitter.records[].signature in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "submitter.records[].signature",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "bytes": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      }
+    },
+    {
+      "id": "decode-submitter-receipts-signature",
+      "source": "04 \u00a72.4.1: submitter.receipts[].signature in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "submitter.receipts[].signature",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "bytes": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      }
+    },
+    {
+      "id": "decode-record-max-fee",
+      "source": "04 \u00a72.4.1: Record.maxFee in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Record.maxFee",
         "value": "1500000"
       },
       "expected": {
@@ -273,11 +657,911 @@
       }
     },
     {
-      "id": "decode-uint256-max",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee",
+      "id": "decode-record-nonce",
+      "source": "04 \u00a72.4.1: Record.nonce in its canonical form",
       "input": {
         "op": "decode",
-        "field": "maxFee",
+        "path": "Record.nonce",
+        "value": "1500000"
+      },
+      "expected": {
+        "bytes": "000000000000000000000000000000000000000000000000000000000016e360"
+      }
+    },
+    {
+      "id": "decode-eip3009-auth-value",
+      "source": "04 \u00a72.4.1: EIP3009.auth.value in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "EIP3009.auth.value",
+        "value": "1500000"
+      },
+      "expected": {
+        "bytes": "000000000000000000000000000000000000000000000000000000000016e360"
+      }
+    },
+    {
+      "id": "decode-eip3009-auth-valid-after",
+      "source": "04 \u00a72.4.1: EIP3009.auth.validAfter in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "EIP3009.auth.validAfter",
+        "value": "1500000"
+      },
+      "expected": {
+        "bytes": "000000000000000000000000000000000000000000000000000000000016e360"
+      }
+    },
+    {
+      "id": "decode-eip3009-auth-valid-before",
+      "source": "04 \u00a72.4.1: EIP3009.auth.validBefore in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "EIP3009.auth.validBefore",
+        "value": "1500000"
+      },
+      "expected": {
+        "bytes": "000000000000000000000000000000000000000000000000000000000016e360"
+      }
+    },
+    {
+      "id": "decode-envelope-from",
+      "source": "04 \u00a72.4.1: envelope.from in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.from",
+        "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      },
+      "expected": {
+        "bytes": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      }
+    },
+    {
+      "id": "decode-owner-action-owner",
+      "source": "04 \u00a72.4.1: OwnerAction.owner in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.owner",
+        "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      },
+      "expected": {
+        "bytes": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      }
+    },
+    {
+      "id": "decode-commitment-scope-counterparty-owner-key",
+      "source": "04 \u00a72.4.1: CommitmentScope.counterparty.ownerKey in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.counterparty.ownerKey",
+        "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      },
+      "expected": {
+        "bytes": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      }
+    },
+    {
+      "id": "decode-nostr-event-id",
+      "source": "04 \u00a72.4.1: nostr.eventId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "nostr.eventId",
+        "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      },
+      "expected": {
+        "bytes": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      }
+    },
+    {
+      "id": "decode-envelope-sig",
+      "source": "04 \u00a72.4.1: envelope.sig in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.sig",
+        "value": "b1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760d6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f617823"
+      },
+      "expected": {
+        "bytes": "b1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760d6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f617823"
+      }
+    },
+    {
+      "id": "decode-signed-owner-action-sig",
+      "source": "04 \u00a72.4.1: SignedOwnerAction.sig in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "SignedOwnerAction.sig",
+        "value": "b1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760d6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f617823"
+      },
+      "expected": {
+        "bytes": "b1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760d6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f617823"
+      }
+    },
+    {
+      "id": "decode-approval-request-action-digest",
+      "source": "04 \u00a72.4.1: approval-request.actionDigest in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "approval-request.actionDigest",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-approval-decide-params-action-digest",
+      "source": "04 \u00a72.4.1: approval.decide.params.actionDigest in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "approval.decide.params.actionDigest",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-terms-body-terms-hash",
+      "source": "04 \u00a72.4.1: terms-body.termsHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "terms-body.termsHash",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-terms-previous-terms-hash",
+      "source": "04 \u00a72.4.1: terms.previousTermsHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "terms.previousTermsHash",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-commitment-scope-terms-hash",
+      "source": "04 \u00a72.4.1: CommitmentScope.termsHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.termsHash",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-payload-files-plaintext-sha256",
+      "source": "04 \u00a72.4.1: payload.files[].plaintextSha256 in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "payload.files[].plaintextSha256",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-terms-deliverables-plaintext-sha256",
+      "source": "04 \u00a72.4.1: terms.deliverables[].plaintextSha256 in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "terms.deliverables[].plaintextSha256",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-payload-files-ciphertext-sha256",
+      "source": "04 \u00a72.4.1: payload.files[].ciphertextSha256 in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "payload.files[].ciphertextSha256",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-drop-commit-ciphertext-sha256",
+      "source": "04 \u00a72.4.1: drop-commit.ciphertextSha256 in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "drop-commit.ciphertextSha256",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-proof-pack-owner-approval-policy-hash",
+      "source": "04 \u00a72.4.1: ProofPack.ownerApproval.policyHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.ownerApproval.policyHash",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-tool-terms-hash",
+      "source": "04 \u00a72.4.1: tool.termsHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "tool.termsHash",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-envelope-id",
+      "source": "04 \u00a72.4.1: envelope.id in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.id",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-envelope-thread",
+      "source": "04 \u00a72.4.1: envelope.thread in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.thread",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-envelope-recipients-kid",
+      "source": "04 \u00a72.4.1: envelope.recipients[].kid in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.recipients[].kid",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-envelope-recipients-enc",
+      "source": "04 \u00a72.4.1: envelope.recipients[].enc in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.recipients[].enc",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-envelope-recipients-wk",
+      "source": "04 \u00a72.4.1: envelope.recipients[].wk in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.recipients[].wk",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-envelope-aead-iv",
+      "source": "04 \u00a72.4.1: envelope.aead.iv in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.aead.iv",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-envelope-aead-ct",
+      "source": "04 \u00a72.4.1: envelope.aead.ct in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.aead.ct",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-payload-reply-to",
+      "source": "04 \u00a72.4.1: payload.replyTo in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "payload.replyTo",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-payload-files-inline",
+      "source": "04 \u00a72.4.1: payload.files[].inline in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "payload.files[].inline",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-payload-files-file-key",
+      "source": "04 \u00a72.4.1: payload.files[].fileKey in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "payload.files[].fileKey",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-proof-envelope-id",
+      "source": "04 \u00a72.4.1: proof.envelopeId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "proof.envelopeId",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-commitment-scope-answers-envelope-id",
+      "source": "04 \u00a72.4.1: CommitmentScope.answers.envelopeId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.answers.envelopeId",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-commitment-scope-thread",
+      "source": "04 \u00a72.4.1: CommitmentScope.thread in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.thread",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-commitment-scope-terms-id",
+      "source": "04 \u00a72.4.1: CommitmentScope.termsId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.termsId",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-terms-terms-id",
+      "source": "04 \u00a72.4.1: terms.termsId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "terms.termsId",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-invite-invite-id",
+      "source": "04 \u00a72.4.1: invite.inviteId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "invite.inviteId",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-invite-secret",
+      "source": "04 \u00a72.4.1: invite.secret in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "invite.secret",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-handshake-invite-id",
+      "source": "04 \u00a72.4.1: handshake.inviteId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake.inviteId",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-handshake-proof",
+      "source": "04 \u00a72.4.1: handshake.proof in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake.proof",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-handshake-ack-invite-id",
+      "source": "04 \u00a72.4.1: handshake-ack.inviteId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake-ack.inviteId",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-handshake-ack-handshake-id",
+      "source": "04 \u00a72.4.1: handshake-ack.handshakeId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake-ack.handshakeId",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-owner-action-nonce",
+      "source": "04 \u00a72.4.1: OwnerAction.nonce in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.nonce",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-drop-request-nonce",
+      "source": "04 \u00a72.4.1: drop-request.nonce in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "drop-request.nonce",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-proof-pack-disclosure-content-key",
+      "source": "04 \u00a72.4.1: ProofPack.disclosure.contentKey in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.disclosure.contentKey",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-tool-envelope-id",
+      "source": "04 \u00a72.4.1: tool.envelopeId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "tool.envelopeId",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "decode-approval-id",
+      "source": "04 \u00a72.4.1: approvalId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "approvalId",
+        "value": "apr_-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "reject-address-eip55",
+      "source": "04 \u00a72.4.1: OwnerAction.agent in EIP-55 mixed case; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.agent",
+        "value": "0x0180EC93Ae3effd2535292DD293f5E4bB3Ea2876"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-address-uppercase",
+      "source": "04 \u00a72.4.1: OwnerAction.agent in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.agent",
+        "value": "0x0180EC93AE3EFFD2535292DD293F5E4BB3EA2876"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-address-no-prefix",
+      "source": "04 \u00a72.4.1: OwnerAction.agent without 0x; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.agent",
+        "value": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-address-capital-prefix",
+      "source": "04 \u00a72.4.1: OwnerAction.agent with 0X; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.agent",
+        "value": "0X0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-address-39-hex",
+      "source": "04 \u00a72.4.1: OwnerAction.agent with 39 hex digits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.agent",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea287"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-address-41-hex",
+      "source": "04 \u00a72.4.1: OwnerAction.agent with 41 hex digits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.agent",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea28760"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-address-whitespace",
+      "source": "04 \u00a72.4.1: OwnerAction.agent with leading whitespace; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.agent",
+        "value": " 0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bytes32-uppercase",
+      "source": "04 \u00a72.4.1: Record.envelopeHash in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "Record.envelopeHash",
+        "value": "0xB7E140215F66966B2B7E24383B62A0D3C561024C091438266970A33D4AC366B8"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bytes32-no-prefix",
+      "source": "04 \u00a72.4.1: AgentCard.ownerNostr without 0x; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "AgentCard.ownerNostr",
+        "value": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bytes32-capital-prefix",
+      "source": "04 \u00a72.4.1: proof.recordId with 0X; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "proof.recordId",
+        "value": "0Xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bytes32-63-hex",
+      "source": "04 \u00a72.4.1: proof.recordId with 63 hex digits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "proof.recordId",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bytes32-trailing-space",
+      "source": "04 \u00a72.4.1: txHash with trailing whitespace; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "txHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8 "
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bytes32-base64url-record-id",
+      "source": "04 \u00a72.4.1: proof.recordId as base64url; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "proof.recordId",
+        "value": "t-FAIV9mlmsrfiQ4O2Kg08VhAkwJFDgmaXCjPUrDZrg"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bytes32-base64url-salt",
+      "source": "04 \u00a72.4.1: proof.salt as base64url; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "proof.salt",
+        "value": "t-FAIV9mlmsrfiQ4O2Kg08VhAkwJFDgmaXCjPUrDZrg"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-high-s",
+      "source": "04 \u00a72.4.1: invite.cardSig with a high s (EIP-2); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d1b03ed2030d6656ad2c65e7650dc443d932cd8183e7571b47492f371a863bdda51c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-v-0",
+      "source": "04 \u00a72.4.1: invite.cardSig with v = 0; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c00"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-v-1",
+      "source": "04 \u00a72.4.1: invite.cardSig with v = 1; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c01"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-64-bytes",
+      "source": "04 \u00a72.4.1: invite.cardSig of 64 bytes; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-r-zero",
+      "source": "04 \u00a72.4.1: invite.cardSig with r = 0; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0x00000000000000000000000000000000000000000000000000000000000000004fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-s-zero",
+      "source": "04 \u00a72.4.1: invite.cardSig with s = 0; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d100000000000000000000000000000000000000000000000000000000000000001b"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-r-n",
+      "source": "04 \u00a72.4.1: invite.cardSig with r = n; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd03641414fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-uppercase",
+      "source": "04 \u00a72.4.1: invite.cardSig in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0x7F06AD46921912A062AE94EA3729D7936ECED9807EE1B28288F1E72B77AC25D14FC12DFCF299A952D39A189AF23BBC2587E15B62C7F184F476A3277249FA639C1B"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-no-prefix",
+      "source": "04 \u00a72.4.1: invite.cardSig without 0x; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-proof-pack-signature-erc1271",
+      "source": "04 \u00a72.4.1: ProofPack.signature as an ERC-1271 signature of another length (0x + even hex)",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.signature",
+        "value": "0xa8659bfd6c0fee5861883c8a53dce9786626de892943c3c507a521122f14aadba8659bfd6c0fee5861883c8a53dce9786626de892943c3c507a521122f14aadba8659bfd6c0fee5861883c8a53dce9786626de892943c3c507a521122f14aadb"
+      },
+      "expected": {
+        "bytes": "a8659bfd6c0fee5861883c8a53dce9786626de892943c3c507a521122f14aadba8659bfd6c0fee5861883c8a53dce9786626de892943c3c507a521122f14aadba8659bfd6c0fee5861883c8a53dce9786626de892943c3c507a521122f14aadb"
+      }
+    },
+    {
+      "id": "reject-proof-pack-signature-odd-hex",
+      "source": "04 \u00a72.4.1: ProofPack.signature with an odd number of hex digits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.signature",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-proof-pack-signature-empty",
+      "source": "04 \u00a72.4.1: ProofPack.signature empty after 0x; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.signature",
+        "value": "0x"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-proof-pack-signature-high-s",
+      "source": "04 \u00a72.4.1: ProofPack.signature as a 65-byte signature with a high s; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.signature",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d1b03ed2030d6656ad2c65e7650dc443d932cd8183e7571b47492f371a863bdda51c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-uint256-zero",
+      "source": "04 \u00a72.4.1: Record.maxFee = zero",
+      "input": {
+        "op": "decode",
+        "path": "Record.maxFee",
+        "value": "0"
+      },
+      "expected": {
+        "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "id": "decode-uint256-max",
+      "source": "04 \u00a72.4.1: Record.maxFee = max",
+      "input": {
+        "op": "decode",
+        "path": "Record.maxFee",
         "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
       },
       "expected": {
@@ -285,11 +1569,11 @@
       }
     },
     {
-      "id": "decode-reject-uint256-leading-zero",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee with a leading zero; rejected, never normalised",
+      "id": "reject-uint256-leading-zero",
+      "source": "04 \u00a72.4.1: Record.nonce with a leading zero; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "maxFee",
+        "path": "Record.nonce",
         "value": "01500"
       },
       "expected": {
@@ -297,11 +1581,11 @@
       }
     },
     {
-      "id": "decode-reject-uint256-plus",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee with a sign; rejected, never normalised",
+      "id": "reject-uint256-plus",
+      "source": "04 \u00a72.4.1: Record.nonce with a sign; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "maxFee",
+        "path": "Record.nonce",
         "value": "+1500"
       },
       "expected": {
@@ -309,11 +1593,11 @@
       }
     },
     {
-      "id": "decode-reject-uint256-minus",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee negative; rejected, never normalised",
+      "id": "reject-uint256-minus",
+      "source": "04 \u00a72.4.1: Record.nonce negative; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "maxFee",
+        "path": "Record.nonce",
         "value": "-1"
       },
       "expected": {
@@ -321,11 +1605,11 @@
       }
     },
     {
-      "id": "decode-reject-uint256-overflow",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee of 2^256; rejected, never normalised",
+      "id": "reject-uint256-overflow",
+      "source": "04 \u00a72.4.1: Record.nonce of 2^256; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "maxFee",
+        "path": "Record.nonce",
         "value": "115792089237316195423570985008687907853269984665640564039457584007913129639936"
       },
       "expected": {
@@ -333,11 +1617,11 @@
       }
     },
     {
-      "id": "decode-reject-uint256-fraction",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee with a fraction; rejected, never normalised",
+      "id": "reject-uint256-fraction",
+      "source": "04 \u00a72.4.1: Record.nonce with a fraction; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "maxFee",
+        "path": "Record.nonce",
         "value": "1500.0"
       },
       "expected": {
@@ -345,11 +1629,11 @@
       }
     },
     {
-      "id": "decode-reject-uint256-exponent",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee in exponent form; rejected, never normalised",
+      "id": "reject-uint256-exponent",
+      "source": "04 \u00a72.4.1: Record.nonce in exponent form; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "maxFee",
+        "path": "Record.nonce",
         "value": "1e3"
       },
       "expected": {
@@ -357,11 +1641,11 @@
       }
     },
     {
-      "id": "decode-reject-uint256-hex",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee in hex; rejected, never normalised",
+      "id": "reject-uint256-hex",
+      "source": "04 \u00a72.4.1: Record.nonce in hex; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "maxFee",
+        "path": "Record.nonce",
         "value": "0x5dc"
       },
       "expected": {
@@ -369,11 +1653,11 @@
       }
     },
     {
-      "id": "decode-reject-uint256-whitespace",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee with trailing whitespace; rejected, never normalised",
+      "id": "reject-uint256-whitespace",
+      "source": "04 \u00a72.4.1: Record.nonce with trailing whitespace; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "maxFee",
+        "path": "Record.nonce",
         "value": "1500 "
       },
       "expected": {
@@ -381,11 +1665,11 @@
       }
     },
     {
-      "id": "decode-reject-uint256-empty",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): maxFee empty; rejected, never normalised",
+      "id": "reject-uint256-empty",
+      "source": "04 \u00a72.4.1: Record.nonce empty; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "maxFee",
+        "path": "Record.nonce",
         "value": ""
       },
       "expected": {
@@ -393,35 +1677,11 @@
       }
     },
     {
-      "id": "decode-nostr-key",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): from",
+      "id": "reject-nostr-key-0x",
+      "source": "04 \u00a72.4.1: OwnerAction.owner with 0x (Nostr-native); rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "from",
-        "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
-      },
-      "expected": {
-        "bytes": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
-      }
-    },
-    {
-      "id": "decode-nostr-key-owner",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): owner",
-      "input": {
-        "op": "decode",
-        "field": "owner",
-        "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
-      },
-      "expected": {
-        "bytes": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
-      }
-    },
-    {
-      "id": "decode-reject-nostr-key-0x",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): owner with 0x (Nostr-native); rejected, never normalised",
-      "input": {
-        "op": "decode",
-        "field": "owner",
+        "path": "OwnerAction.owner",
         "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
       },
       "expected": {
@@ -429,11 +1689,11 @@
       }
     },
     {
-      "id": "decode-reject-nostr-key-uppercase",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): from in upper-case hex; rejected, never normalised",
+      "id": "reject-nostr-key-uppercase",
+      "source": "04 \u00a72.4.1: envelope.from in upper-case hex; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "from",
+        "path": "envelope.from",
         "value": "CFCA2D0D611CBFC149A2002FFA5056F9FF133238F5A4A47AA0AC910A443682EB"
       },
       "expected": {
@@ -441,11 +1701,11 @@
       }
     },
     {
-      "id": "decode-reject-nostr-key-63-hex",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): from with 63 hex digits; rejected, never normalised",
+      "id": "reject-nostr-key-63-hex",
+      "source": "04 \u00a72.4.1: envelope.from with 63 hex digits; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "from",
+        "path": "envelope.from",
         "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682e"
       },
       "expected": {
@@ -453,143 +1713,83 @@
       }
     },
     {
-      "id": "decode-card-owner-nostr",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): ownerNostr (the card's spelling of a Nostr key)",
+      "id": "reject-bip340-0x",
+      "source": "04 \u00a72.4.1: SignedOwnerAction.sig with 0x; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "ownerNostr",
-        "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
-      },
-      "expected": {
-        "bytes": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
-      }
-    },
-    {
-      "id": "decode-reject-card-owner-nostr-no-prefix",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): ownerNostr without 0x (the card spells it 0x + 64 hex); rejected, never normalised",
-      "input": {
-        "op": "decode",
-        "field": "ownerNostr",
-        "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        "path": "SignedOwnerAction.sig",
+        "value": "0xb1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760d6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f617823"
       },
       "expected": {
         "outcome": "reject"
       }
     },
     {
-      "id": "decode-bip340-sig",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): sig",
+      "id": "reject-bip340-uppercase",
+      "source": "04 \u00a72.4.1: envelope.sig in upper-case hex; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "sig",
-        "value": "b1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760177ccd17dcd6b30fd1bf4d90b2800981609933a1c7aec7a694ac2ad5e1b4aeb1"
-      },
-      "expected": {
-        "bytes": "b1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760177ccd17dcd6b30fd1bf4d90b2800981609933a1c7aec7a694ac2ad5e1b4aeb1"
-      }
-    },
-    {
-      "id": "decode-reject-bip340-sig-0x",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): sig with 0x; rejected, never normalised",
-      "input": {
-        "op": "decode",
-        "field": "sig",
-        "value": "0xb1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760177ccd17dcd6b30fd1bf4d90b2800981609933a1c7aec7a694ac2ad5e1b4aeb1"
+        "path": "envelope.sig",
+        "value": "B1531B72291DB274F4590D179878FCF39434DDF96B14D9198B132E91E9A7D760D6B71D9BF7A0DE65AC066AF9DEF7B935A01EEA9D44BCC3FF10D84CF82F617823"
       },
       "expected": {
         "outcome": "reject"
       }
     },
     {
-      "id": "decode-reject-bip340-sig-uppercase",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): sig in upper-case hex; rejected, never normalised",
+      "id": "reject-bip340-127-hex",
+      "source": "04 \u00a72.4.1: envelope.sig with 127 hex digits; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "sig",
-        "value": "B1531B72291DB274F4590D179878FCF39434DDF96B14D9198B132E91E9A7D760177CCD17DCD6B30FD1BF4D90B2800981609933A1C7AEC7A694AC2AD5E1B4AEB1"
+        "path": "envelope.sig",
+        "value": "b1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760d6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f61782"
       },
       "expected": {
         "outcome": "reject"
       }
     },
     {
-      "id": "decode-digest",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): actionDigest",
+      "id": "reject-digest-0x",
+      "source": "04 \u00a72.4.1: approval.decide.params.actionDigest with 0x (signed only under a Nostr key); rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "actionDigest",
-        "value": "52e4d0ea92879db89c839c14f171c454e6ceb8408e6c7a4ada8cd4c655a98f08"
-      },
-      "expected": {
-        "bytes": "52e4d0ea92879db89c839c14f171c454e6ceb8408e6c7a4ada8cd4c655a98f08"
-      }
-    },
-    {
-      "id": "decode-digest-terms",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): termsHash",
-      "input": {
-        "op": "decode",
-        "field": "termsHash",
-        "value": "52e4d0ea92879db89c839c14f171c454e6ceb8408e6c7a4ada8cd4c655a98f08"
-      },
-      "expected": {
-        "bytes": "52e4d0ea92879db89c839c14f171c454e6ceb8408e6c7a4ada8cd4c655a98f08"
-      }
-    },
-    {
-      "id": "decode-reject-digest-0x",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): actionDigest with 0x (signed only under a Nostr key); rejected, never normalised",
-      "input": {
-        "op": "decode",
-        "field": "actionDigest",
-        "value": "0x52e4d0ea92879db89c839c14f171c454e6ceb8408e6c7a4ada8cd4c655a98f08"
+        "path": "approval.decide.params.actionDigest",
+        "value": "0x9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
       },
       "expected": {
         "outcome": "reject"
       }
     },
     {
-      "id": "decode-reject-digest-base64url",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): termsHash as base64url; rejected, never normalised",
+      "id": "reject-digest-uppercase",
+      "source": "04 \u00a72.4.1: terms-body.termsHash in upper-case hex; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "termsHash",
-        "value": "UuTQ6pKHnbicg5wU8XHEVObOuECObHpK2ozUxlWpjwg"
+        "path": "terms-body.termsHash",
+        "value": "9FD764EBB50143ECFB8D732F75864134131EC98DF6E872E56FEF45331BFDA6D9"
       },
       "expected": {
         "outcome": "reject"
       }
     },
     {
-      "id": "decode-base64url",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): id",
+      "id": "reject-digest-base64url",
+      "source": "04 \u00a72.4.1: payload.files[].plaintextSha256 as base64url; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "id",
-        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+        "path": "payload.files[].plaintextSha256",
+        "value": "n9dk67UBQ-z7jXMvdYZBNBMeyY326HLlb-9FMxv9ptk"
       },
       "expected": {
-        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+        "outcome": "reject"
       }
     },
     {
-      "id": "decode-base64url-invite-id",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): inviteId",
+      "id": "reject-base64url-padded",
+      "source": "04 \u00a72.4.1: envelope.id with padding; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "inviteId",
-        "value": "-_8-DwD_EOD4_n08GwqZ7g"
-      },
-      "expected": {
-        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
-      }
-    },
-    {
-      "id": "decode-reject-base64url-padded",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): id with padding; rejected, never normalised",
-      "input": {
-        "op": "decode",
-        "field": "id",
+        "path": "envelope.id",
         "value": "-_8-DwD_EOD4_n08GwqZ7g=="
       },
       "expected": {
@@ -597,11 +1797,11 @@
       }
     },
     {
-      "id": "decode-reject-base64url-standard-alphabet",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): id with + and /; rejected, never normalised",
+      "id": "reject-base64url-standard-alphabet",
+      "source": "04 \u00a72.4.1: OwnerAction.nonce with + and /; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "id",
+        "path": "OwnerAction.nonce",
         "value": "+/8+DwD/EOD4/n08GwqZ7g"
       },
       "expected": {
@@ -609,11 +1809,11 @@
       }
     },
     {
-      "id": "decode-reject-base64url-trailing-bits",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): id with non-zero trailing bits; rejected, never normalised",
+      "id": "reject-base64url-trailing-bits",
+      "source": "04 \u00a72.4.1: invite.inviteId with non-zero trailing bits; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "id",
+        "path": "invite.inviteId",
         "value": "-_8-DwD_EOD4_n08GwqZ7h"
       },
       "expected": {
@@ -621,11 +1821,11 @@
       }
     },
     {
-      "id": "decode-reject-base64url-whitespace",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): kid with whitespace; rejected, never normalised",
+      "id": "reject-base64url-whitespace",
+      "source": "04 \u00a72.4.1: envelope.recipients[].kid with whitespace; rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "kid",
+        "path": "envelope.recipients[].kid",
         "value": "-_8-DwD_EOD 4_n08GwqZ7g"
       },
       "expected": {
@@ -633,11 +1833,11 @@
       }
     },
     {
-      "id": "decode-reject-base64url-impossible-length",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): nonce with an impossible length (4n + 1 characters); rejected, never normalised",
+      "id": "reject-base64url-impossible-length",
+      "source": "04 \u00a72.4.1: handshake.proof with an impossible length (4n + 1 characters); rejected, never normalised",
       "input": {
         "op": "decode",
-        "field": "nonce",
+        "path": "handshake.proof",
         "value": "-_8-DwD_EOD4_n08GwqZ7gAAA"
       },
       "expected": {
@@ -645,16 +1845,220 @@
       }
     },
     {
+      "id": "reject-approval-id-no-prefix",
+      "source": "04 \u00a72.4.1: approvalId without apr_; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "approvalId",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-approval-id-uppercase-prefix",
+      "source": "04 \u00a72.4.1: approvalId with APR_; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "approvalId",
+        "value": "APR_-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-approval-id-padded",
+      "source": "04 \u00a72.4.1: approvalId with padding (28 characters); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "approvalId",
+        "value": "apr_-_8-DwD_EOD4_n08GwqZ7g=="
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-approval-id-15-bytes",
+      "source": "04 \u00a72.4.1: approvalId of 15 bytes; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "approvalId",
+        "value": "apr_-_8-DwD_EOD4_n08GwqZ"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-approval-id-17-bytes",
+      "source": "04 \u00a72.4.1: approvalId of 17 bytes; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "approvalId",
+        "value": "apr_-_8-DwD_EOD4_n08GwqZ7gA"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-approval-id-trailing-bits",
+      "source": "04 \u00a72.4.1: approvalId with non-zero trailing bits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "approvalId",
+        "value": "apr_-_8-DwD_EOD4_n08GwqZ7h"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-accept-0",
+      "source": "04 \u00a72.4.1: JSON integer token 0 (zero)",
+      "input": {
+        "op": "parseInteger",
+        "json": "0"
+      },
+      "expected": {
+        "value": "0"
+      }
+    },
+    {
+      "id": "integer-accept-1760000000",
+      "source": "04 \u00a72.4.1: JSON integer token 1760000000 (a timestamp)",
+      "input": {
+        "op": "parseInteger",
+        "json": "1760000000"
+      },
+      "expected": {
+        "value": "1760000000"
+      }
+    },
+    {
+      "id": "integer-accept-9007199254740991",
+      "source": "04 \u00a72.4.1: JSON integer token 9007199254740991 (2^53 - 1)",
+      "input": {
+        "op": "parseInteger",
+        "json": "9007199254740991"
+      },
+      "expected": {
+        "value": "9007199254740991"
+      }
+    },
+    {
+      "id": "integer-reject-1p0",
+      "source": "04 \u00a72.4.1: JSON integer token 1.0 (spelled with a fraction)",
+      "input": {
+        "op": "parseInteger",
+        "json": "1.0"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-reject-1e3",
+      "source": "04 \u00a72.4.1: JSON integer token 1e3 (in exponent form)",
+      "input": {
+        "op": "parseInteger",
+        "json": "1e3"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-reject-1-e3",
+      "source": "04 \u00a72.4.1: JSON integer token 1E3 (in exponent form)",
+      "input": {
+        "op": "parseInteger",
+        "json": "1E3"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-reject-minus0",
+      "source": "04 \u00a72.4.1: JSON integer token -0 (negative zero)",
+      "input": {
+        "op": "parseInteger",
+        "json": "-0"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-reject-minus1",
+      "source": "04 \u00a72.4.1: JSON integer token -1 (negative)",
+      "input": {
+        "op": "parseInteger",
+        "json": "-1"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-reject-01",
+      "source": "04 \u00a72.4.1: JSON integer token 01 (with a leading zero)",
+      "input": {
+        "op": "parseInteger",
+        "json": "01"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-reject-9007199254740991p4",
+      "source": "04 \u00a72.4.1: JSON integer token 9007199254740991.4 (a near-integer fraction)",
+      "input": {
+        "op": "parseInteger",
+        "json": "9007199254740991.4"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-reject-9007199254740992",
+      "source": "04 \u00a72.4.1: JSON integer token 9007199254740992 (2^53)",
+      "input": {
+        "op": "parseInteger",
+        "json": "9007199254740992"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-reject-18446744073709551615",
+      "source": "04 \u00a72.4.1: JSON integer token 18446744073709551615 (2^64 - 1 (a uint64 above 2^53 - 1))",
+      "input": {
+        "op": "parseInteger",
+        "json": "18446744073709551615"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
       "id": "equal-owner-and-card-owner-nostr",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): an OwnerAction owner and the card's ownerNostr for the same key are equal as bytes",
+      "source": "04 \u00a72.4.1: an OwnerAction owner and the card's ownerNostr for the same key are equal as bytes",
       "input": {
         "op": "equalBytes",
         "a": {
-          "field": "owner",
+          "path": "OwnerAction.owner",
           "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
         },
         "b": {
-          "field": "ownerNostr",
+          "path": "AgentCard.ownerNostr",
           "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
         }
       },
@@ -664,15 +2068,33 @@
     },
     {
       "id": "equal-from-and-card-agent-nostr",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): an envelope from and a card bytes32 key compare as bytes",
+      "source": "04 \u00a72.4.1: an envelope from and the card's agentNostr compare as bytes",
       "input": {
         "op": "equalBytes",
         "a": {
-          "field": "from",
+          "path": "envelope.from",
           "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
         },
         "b": {
-          "field": "ownerNostr",
+          "path": "AgentCard.agentNostr",
+          "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "equal-owner-key-and-card",
+      "source": "04 \u00a72.4.1: a CommitmentScope ownerKey and a card key compare as bytes",
+      "input": {
+        "op": "equalBytes",
+        "a": {
+          "path": "CommitmentScope.counterparty.ownerKey",
+          "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        },
+        "b": {
+          "path": "AgentCard.ownerNostr",
           "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
         }
       },
@@ -682,15 +2104,15 @@
     },
     {
       "id": "equal-owner-other-key",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): different keys are not equal",
+      "source": "04 \u00a72.4.1: different keys are not equal",
       "input": {
         "op": "equalBytes",
         "a": {
-          "field": "owner",
+          "path": "OwnerAction.owner",
           "value": "a4a9db7a44d5371e6470c4ff6d582d13232248518ed59b617101bb6a947bc6fb"
         },
         "b": {
-          "field": "ownerNostr",
+          "path": "AgentCard.ownerNostr",
           "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
         }
       },
@@ -700,15 +2122,15 @@
     },
     {
       "id": "equal-owner-with-0x",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): a string-equal but non-canonical owner fails its parse first",
+      "source": "04 \u00a72.4.1: an owner with 0x fails its parse first, though the strings are equal",
       "input": {
         "op": "equalBytes",
         "a": {
-          "field": "owner",
+          "path": "OwnerAction.owner",
           "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
         },
         "b": {
-          "field": "ownerNostr",
+          "path": "AgentCard.ownerNostr",
           "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
         }
       },
@@ -718,15 +2140,15 @@
     },
     {
       "id": "equal-card-without-0x",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): a card key without 0x fails its parse first",
+      "source": "04 \u00a72.4.1: a card key without 0x fails its parse first",
       "input": {
         "op": "equalBytes",
         "a": {
-          "field": "owner",
+          "path": "OwnerAction.owner",
           "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
         },
         "b": {
-          "field": "ownerNostr",
+          "path": "AgentCard.ownerNostr",
           "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
         }
       },
@@ -736,15 +2158,15 @@
     },
     {
       "id": "equal-address-checksummed",
-      "source": "04 \u00a72.4.1 (docs/canonical-encodings, pending merge): an EIP-55 address fails its parse; nothing lower-cases it",
+      "source": "04 \u00a72.4.1: an EIP-55 address fails its parse; nothing lower-cases it",
       "input": {
         "op": "equalBytes",
         "a": {
-          "field": "agent",
+          "path": "OwnerAction.agent",
           "value": "0x0180EC93Ae3effd2535292DD293f5E4bB3Ea2876"
         },
         "b": {
-          "field": "agentEvm",
+          "path": "AgentCard.agentEvm",
           "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
         }
       },

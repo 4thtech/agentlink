@@ -28,7 +28,7 @@
     },
     {
       "id": "owner-params-code",
-      "source": "Argon2id v1.3, owner wrap parameters; secretKind 1: the password is the 15 decoded code bytes (docs/canonical-encodings, pending merge)",
+      "source": "Argon2id v1.3, owner wrap parameters; secretKind 1: the password is the 15 decoded code bytes (04 \u00a72.8)",
       "input": {
         "op": "argon2id",
         "password": "0305546b6d90025ecf24eba11673aa",

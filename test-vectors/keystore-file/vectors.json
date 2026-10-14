@@ -227,7 +227,7 @@
     },
     {
       "id": "kek-code",
-      "source": "04 \u00a72.8 ALKS v1 kek (secretKind 1, generated unlock code; 04 \u00a72.8 password() (docs/canonical-encodings, pending merge))",
+      "source": "04 \u00a72.8 ALKS v1 kek (secretKind 1, generated unlock code; 04 \u00a72.8 password())",
       "input": {
         "op": "kek",
         "format": "ALKS",
@@ -245,7 +245,7 @@
     },
     {
       "id": "seal-code",
-      "source": "04 \u00a72.8 ALKS v1 seal (secretKind 1, generated unlock code; 04 \u00a72.8 password() (docs/canonical-encodings, pending merge))",
+      "source": "04 \u00a72.8 ALKS v1 seal (secretKind 1, generated unlock code; 04 \u00a72.8 password())",
       "input": {
         "op": "seal",
         "secretKind": 1,
@@ -274,7 +274,7 @@
     },
     {
       "id": "open-code",
-      "source": "04 \u00a72.8 ALKS v1 open (secretKind 1, generated unlock code; 04 \u00a72.8 password() (docs/canonical-encodings, pending merge))",
+      "source": "04 \u00a72.8 ALKS v1 open (secretKind 1, generated unlock code; 04 \u00a72.8 password())",
       "input": {
         "op": "open",
         "file": "414c4b53010101000100000301ef6fa649397ee594b8dff1be07fd2ff701b408ab31210eecd5047d0185086167656e745f303323b5513375406f62cda10bd56fc7d3521b5f8e199ed0e8574dfa4ac37258c7bee558348a2e1424f2373948d6cfbb23317f21db59961baaf23e74b113da0ca8b81ae0d1eba78361a8886acd0f245a05afc0b4f4b22d7d07e1f5dce720397ac5f7187ab8b13dc65499cb",
@@ -290,7 +290,7 @@
     },
     {
       "id": "open-code-other-spelling",
-      "source": "04 \u00a72.8 ALKS v1 open with the code in lower case with dashes (04 \u00a72.8 password() (docs/canonical-encodings, pending merge))",
+      "source": "04 \u00a72.8 ALKS v1 open with the code in lower case with dashes (04 \u00a72.8 password())",
       "input": {
         "op": "open",
         "file": "414c4b53010101000100000301ef6fa649397ee594b8dff1be07fd2ff701b408ab31210eecd5047d0185086167656e745f303323b5513375406f62cda10bd56fc7d3521b5f8e199ed0e8574dfa4ac37258c7bee558348a2e1424f2373948d6cfbb23317f21db59961baaf23e74b113da0ca8b81ae0d1eba78361a8886acd0f245a05afc0b4f4b22d7d07e1f5dce720397ac5f7187ab8b13dc65499cb",
@@ -306,7 +306,7 @@
     },
     {
       "id": "open-code-from-file",
-      "source": "04 \u00a72.8 ALKS v1 open with the code read from a file with a trailing CRLF (04 \u00a72.8 password() (docs/canonical-encodings, pending merge))",
+      "source": "04 \u00a72.8 ALKS v1 open with the code read from a file with a trailing CRLF (04 \u00a72.8 password())",
       "input": {
         "op": "open",
         "file": "414c4b53010101000100000301ef6fa649397ee594b8dff1be07fd2ff701b408ab31210eecd5047d0185086167656e745f303323b5513375406f62cda10bd56fc7d3521b5f8e199ed0e8574dfa4ac37258c7bee558348a2e1424f2373948d6cfbb23317f21db59961baaf23e74b113da0ca8b81ae0d1eba78361a8886acd0f245a05afc0b4f4b22d7d07e1f5dce720397ac5f7187ab8b13dc65499cb",
@@ -1001,7 +1001,7 @@
     },
     {
       "id": "password-code-canonical",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: the 15 decoded bytes",
+      "source": "04 \u00a72.8 password(), kind 1: the 15 decoded bytes",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1014,7 +1014,7 @@
     },
     {
       "id": "password-code-lowercase-dashes",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: the 15 decoded bytes",
+      "source": "04 \u00a72.8 password(), kind 1: the 15 decoded bytes",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1027,7 +1027,7 @@
     },
     {
       "id": "password-code-groups-of-four",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: the 15 decoded bytes",
+      "source": "04 \u00a72.8 password(), kind 1: the 15 decoded bytes",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1040,7 +1040,7 @@
     },
     {
       "id": "password-code-digits-for-letters",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: the 15 decoded bytes",
+      "source": "04 \u00a72.8 password(), kind 1: the 15 decoded bytes",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1053,7 +1053,7 @@
     },
     {
       "id": "password-code-eight-for-b",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: the 15 decoded bytes",
+      "source": "04 \u00a72.8 password(), kind 1: the 15 decoded bytes",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1066,7 +1066,7 @@
     },
     {
       "id": "password-code-file-lf",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: the 15 decoded bytes",
+      "source": "04 \u00a72.8 password(), kind 1: the 15 decoded bytes",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1079,7 +1079,7 @@
     },
     {
       "id": "password-code-file-crlf",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: the 15 decoded bytes",
+      "source": "04 \u00a72.8 password(), kind 1: the 15 decoded bytes",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1092,7 +1092,7 @@
     },
     {
       "id": "password-code-reject-23-chars",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: refused before the KDF",
+      "source": "04 \u00a72.8 password(), kind 1: refused before the KDF",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1105,7 +1105,7 @@
     },
     {
       "id": "password-code-reject-25-chars",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: refused before the KDF",
+      "source": "04 \u00a72.8 password(), kind 1: refused before the KDF",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1118,7 +1118,7 @@
     },
     {
       "id": "password-code-reject-digit-9",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: refused before the KDF",
+      "source": "04 \u00a72.8 password(), kind 1: refused before the KDF",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1131,7 +1131,7 @@
     },
     {
       "id": "password-code-reject-padding",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: refused before the KDF",
+      "source": "04 \u00a72.8 password(), kind 1: refused before the KDF",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1144,7 +1144,7 @@
     },
     {
       "id": "password-code-reject-dot-separator",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: refused before the KDF",
+      "source": "04 \u00a72.8 password(), kind 1: refused before the KDF",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1157,7 +1157,7 @@
     },
     {
       "id": "password-code-reject-tab",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: refused before the KDF",
+      "source": "04 \u00a72.8 password(), kind 1: refused before the KDF",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1170,7 +1170,7 @@
     },
     {
       "id": "password-code-reject-non-ascii-letter",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: refused before the KDF",
+      "source": "04 \u00a72.8 password(), kind 1: refused before the KDF",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1183,7 +1183,7 @@
     },
     {
       "id": "password-code-reject-long-s",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: refused before the KDF",
+      "source": "04 \u00a72.8 password(), kind 1: refused before the KDF",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1196,7 +1196,7 @@
     },
     {
       "id": "password-code-reject-dotless-i",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: refused before the KDF",
+      "source": "04 \u00a72.8 password(), kind 1: refused before the KDF",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1209,7 +1209,7 @@
     },
     {
       "id": "password-code-reject-fullwidth",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: refused before the KDF",
+      "source": "04 \u00a72.8 password(), kind 1: refused before the KDF",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1222,7 +1222,7 @@
     },
     {
       "id": "password-code-reject-prompt-trailing-newline",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: refused before the KDF",
+      "source": "04 \u00a72.8 password(), kind 1: refused before the KDF",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1235,7 +1235,7 @@
     },
     {
       "id": "password-code-reject-file-two-newlines",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 1: refused before the KDF",
+      "source": "04 \u00a72.8 password(), kind 1: refused before the KDF",
       "input": {
         "op": "password",
         "secretKind": 1,
@@ -1248,7 +1248,7 @@
     },
     {
       "id": "password-passphrase-ascii",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 2: UTF-8 of NFKC",
+      "source": "04 \u00a72.8 password(), kind 2: UTF-8 of NFKC",
       "input": {
         "op": "password",
         "secretKind": 2,
@@ -1261,7 +1261,7 @@
     },
     {
       "id": "password-passphrase-fullwidth-and-ligature",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 2: UTF-8 of NFKC",
+      "source": "04 \u00a72.8 password(), kind 2: UTF-8 of NFKC",
       "input": {
         "op": "password",
         "secretKind": 2,
@@ -1274,7 +1274,7 @@
     },
     {
       "id": "password-passphrase-spaces-kept",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 2: UTF-8 of NFKC",
+      "source": "04 \u00a72.8 password(), kind 2: UTF-8 of NFKC",
       "input": {
         "op": "password",
         "secretKind": 2,
@@ -1287,7 +1287,7 @@
     },
     {
       "id": "password-passphrase-combining-accent",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 2: UTF-8 of NFKC",
+      "source": "04 \u00a72.8 password(), kind 2: UTF-8 of NFKC",
       "input": {
         "op": "password",
         "secretKind": 2,
@@ -1299,8 +1299,21 @@
       }
     },
     {
+      "id": "password-passphrase-no-break-space",
+      "source": "04 \u00a72.8 password(), kind 2: UTF-8 of NFKC",
+      "input": {
+        "op": "password",
+        "secretKind": 2,
+        "secret": "two\u00a0words passphrase",
+        "source": "prompt"
+      },
+      "expected": {
+        "password": "74776f20776f7264732070617373706872617365"
+      }
+    },
+    {
       "id": "password-passphrase-file-lf",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 2: UTF-8 of NFKC",
+      "source": "04 \u00a72.8 password(), kind 2: UTF-8 of NFKC",
       "input": {
         "op": "password",
         "secretKind": 2,
@@ -1313,7 +1326,7 @@
     },
     {
       "id": "password-passphrase-file-crlf",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 2: UTF-8 of NFKC",
+      "source": "04 \u00a72.8 password(), kind 2: UTF-8 of NFKC",
       "input": {
         "op": "password",
         "secretKind": 2,
@@ -1325,21 +1338,8 @@
       }
     },
     {
-      "id": "password-passphrase-file-two-newlines",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 2: UTF-8 of NFKC",
-      "input": {
-        "op": "password",
-        "secretKind": 2,
-        "secret": "correct horse battery staple\n\n",
-        "source": "file"
-      },
-      "expected": {
-        "password": "636f727265637420686f727365206261747465727920737461706c650a"
-      }
-    },
-    {
-      "id": "password-passphrase-prompt-trailing-newline",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge), kind 2: UTF-8 of NFKC",
+      "id": "password-passphrase-reject-prompt-trailing-newline",
+      "source": "04 \u00a72.8 password(), kind 2: a C0 or C1 control character is refused",
       "input": {
         "op": "password",
         "secretKind": 2,
@@ -1347,12 +1347,259 @@
         "source": "prompt"
       },
       "expected": {
-        "password": "636f727265637420686f727365206261747465727920737461706c650a"
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "password-passphrase-reject-file-two-newlines",
+      "source": "04 \u00a72.8 password(), kind 2: a C0 or C1 control character is refused",
+      "input": {
+        "op": "password",
+        "secretKind": 2,
+        "secret": "correct horse battery staple\n\n",
+        "source": "file"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "password-passphrase-reject-file-cr-only",
+      "source": "04 \u00a72.8 password(), kind 2: a C0 or C1 control character is refused",
+      "input": {
+        "op": "password",
+        "secretKind": 2,
+        "secret": "correct horse battery staple\r",
+        "source": "file"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "password-passphrase-reject-tab",
+      "source": "04 \u00a72.8 password(), kind 2: a C0 or C1 control character is refused",
+      "input": {
+        "op": "password",
+        "secretKind": 2,
+        "secret": "correct\thorse battery staple",
+        "source": "prompt"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "password-passphrase-reject-nul",
+      "source": "04 \u00a72.8 password(), kind 2: a C0 or C1 control character is refused",
+      "input": {
+        "op": "password",
+        "secretKind": 2,
+        "secret": "correct horse\u0000battery staple",
+        "source": "prompt"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "password-passphrase-reject-escape",
+      "source": "04 \u00a72.8 password(), kind 2: a C0 or C1 control character is refused",
+      "input": {
+        "op": "password",
+        "secretKind": 2,
+        "secret": "correct horse \u001b[0mbattery staple",
+        "source": "prompt"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "password-passphrase-reject-delete",
+      "source": "04 \u00a72.8 password(), kind 2: a C0 or C1 control character is refused",
+      "input": {
+        "op": "password",
+        "secretKind": 2,
+        "secret": "correct horse battery staple\u007f",
+        "source": "prompt"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "password-passphrase-reject-c1-next-line",
+      "source": "04 \u00a72.8 password(), kind 2: a C0 or C1 control character is refused",
+      "input": {
+        "op": "password",
+        "secretKind": 2,
+        "secret": "correct horse\u0085battery staple",
+        "source": "prompt"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "password-passphrase-reject-c1-last",
+      "source": "04 \u00a72.8 password(), kind 2: a C0 or C1 control character is refused",
+      "input": {
+        "op": "password",
+        "secretKind": 2,
+        "secret": "correct horse battery staple\u009f",
+        "source": "prompt"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "password-bytes-utf8-valid",
+      "source": "04 \u00a72.8 password(): input given as bytes",
+      "input": {
+        "op": "passwordBytes",
+        "secretKind": 2,
+        "secretBytes": "436166c3a92070617373706872617365",
+        "source": "prompt"
+      },
+      "expected": {
+        "password": "436166c3a92070617373706872617365"
+      }
+    },
+    {
+      "id": "password-bytes-utf8-file-crlf",
+      "source": "04 \u00a72.8 password(): input given as bytes",
+      "input": {
+        "op": "passwordBytes",
+        "secretKind": 2,
+        "secretBytes": "636f727265637420686f727365206261747465727920737461706c650d0a",
+        "source": "file"
+      },
+      "expected": {
+        "password": "636f727265637420686f727365206261747465727920737461706c65"
+      }
+    },
+    {
+      "id": "password-bytes-code-ascii",
+      "source": "04 \u00a72.8 password(): input given as bytes",
+      "input": {
+        "op": "passwordBytes",
+        "secretKind": 1,
+        "secretBytes": "6f6269733771326d6b7877347274357a6c646e6533683663",
+        "source": "prompt"
+      },
+      "expected": {
+        "password": "70512fc34c55edc8cfb958da4d9fc2"
+      }
+    },
+    {
+      "id": "password-bytes-reject-invalid-continuation",
+      "source": "04 \u00a72.8 password(): an invalid UTF-8 sequence is refused, never replaced",
+      "input": {
+        "op": "passwordBytes",
+        "secretKind": 2,
+        "secretBytes": "70617373c328776f726420706872617365",
+        "source": "prompt"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "password-bytes-reject-lone-continuation",
+      "source": "04 \u00a72.8 password(): a stray continuation byte is refused, never replaced",
+      "input": {
+        "op": "passwordBytes",
+        "secretKind": 2,
+        "secretBytes": "7061737380776f726420706872617365",
+        "source": "prompt"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "password-bytes-reject-overlong-slash",
+      "source": "04 \u00a72.8 password(): an overlong form is refused, never replaced",
+      "input": {
+        "op": "passwordBytes",
+        "secretKind": 2,
+        "secretBytes": "70617373c0af776f726420706872617365",
+        "source": "prompt"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "password-bytes-reject-overlong-nul",
+      "source": "04 \u00a72.8 password(): an overlong NUL is refused, never replaced",
+      "input": {
+        "op": "passwordBytes",
+        "secretKind": 2,
+        "secretBytes": "70617373c080776f726420706872617365",
+        "source": "prompt"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "password-bytes-reject-encoded-surrogate",
+      "source": "04 \u00a72.8 password(): a UTF-8-encoded lone surrogate is refused, never replaced",
+      "input": {
+        "op": "passwordBytes",
+        "secretKind": 2,
+        "secretBytes": "70617373eda080776f726420706872617365",
+        "source": "prompt"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "password-bytes-reject-truncated",
+      "source": "04 \u00a72.8 password(): a truncated sequence is refused, never replaced",
+      "input": {
+        "op": "passwordBytes",
+        "secretKind": 2,
+        "secretBytes": "7061737370687261736520e282",
+        "source": "prompt"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "password-bytes-reject-ff-byte",
+      "source": "04 \u00a72.8 password(): the byte FF is refused, never replaced",
+      "input": {
+        "op": "passwordBytes",
+        "secretKind": 2,
+        "secretBytes": "7061737370687261736520ff",
+        "source": "prompt"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "password-bytes-reject-code-non-ascii",
+      "source": "04 \u00a72.8 password(): a non-ASCII byte in a generated code is refused, never replaced",
+      "input": {
+        "op": "passwordBytes",
+        "secretKind": 1,
+        "secretBytes": "4f4249533751324d4b5857345254355a4c444e45334836c384",
+        "source": "prompt"
+      },
+      "expected": {
+        "outcome": "reject"
       }
     },
     {
       "id": "password-reject-kind-3",
-      "source": "04 \u00a72.8 password() (docs/canonical-encodings, pending merge): unknown secretKind",
+      "source": "04 \u00a72.8 password(): unknown secretKind",
       "input": {
         "op": "password",
         "secretKind": 3,
@@ -1365,7 +1612,7 @@
     },
     {
       "id": "kek-alko-code",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge) kek (kind 1, generated owner code, default parameters)",
+      "source": "04 \u00a72.8 ALKO v1 kek (kind 1, generated owner code, default parameters)",
       "input": {
         "op": "kek",
         "format": "ALKO",
@@ -1383,7 +1630,7 @@
     },
     {
       "id": "seal-alko-code",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge) seal (kind 1, generated owner code, default parameters)",
+      "source": "04 \u00a72.8 ALKO v1 seal (kind 1, generated owner code, default parameters)",
       "input": {
         "op": "sealAlko",
         "secretKind": 1,
@@ -1402,7 +1649,7 @@
     },
     {
       "id": "open-alko-code",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge) open (kind 1, generated owner code, default parameters); the seed derives the card's ownerEvm and ownerNostr",
+      "source": "04 \u00a72.8 ALKO v1 open (kind 1, generated owner code, default parameters); the seed derives the card's ownerEvm and ownerNostr",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f010101000100000301e8167bf82c701a14961bd95cd86e97ef0137bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2b0db5e720ad9a7505c013b68fd8169244f5",
@@ -1420,7 +1667,7 @@
     },
     {
       "id": "kek-alko-passphrase",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge) kek (kind 2, chosen owner passphrase (machines with a keychain))",
+      "source": "04 \u00a72.8 ALKO v1 kek (kind 2, chosen owner passphrase (machines with a keychain))",
       "input": {
         "op": "kek",
         "format": "ALKO",
@@ -1438,7 +1685,7 @@
     },
     {
       "id": "seal-alko-passphrase",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge) seal (kind 2, chosen owner passphrase (machines with a keychain))",
+      "source": "04 \u00a72.8 ALKO v1 seal (kind 2, chosen owner passphrase (machines with a keychain))",
       "input": {
         "op": "sealAlko",
         "secretKind": 2,
@@ -1457,7 +1704,7 @@
     },
     {
       "id": "open-alko-passphrase",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge) open (kind 2, chosen owner passphrase (machines with a keychain)); the seed derives the card's ownerEvm and ownerNostr",
+      "source": "04 \u00a72.8 ALKO v1 open (kind 2, chosen owner passphrase (machines with a keychain)); the seed derives the card's ownerEvm and ownerNostr",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f01020100004c000201578f675b38d30a21d15b913a50cf151d0182b99240efd360b3b00747a4a7e89b08f5fd8fbef9ccf6de1bb94f3879291fbdb0e767550ad6962ff0017812c5e93f5168a776bc9b4ffa16aab4152c",
@@ -1475,7 +1722,7 @@
     },
     {
       "id": "open-alko-code-spelled",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge) open with the owner code in lower case with dashes",
+      "source": "04 \u00a72.8 ALKO v1 open with the owner code in lower case with dashes",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f010101000100000301e8167bf82c701a14961bd95cd86e97ef0137bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2b0db5e720ad9a7505c013b68fd8169244f5",
@@ -1493,7 +1740,7 @@
     },
     {
       "id": "open-alko-reject-wrong-code",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): another owner code",
+      "source": "04 \u00a72.8 ALKO v1: another owner code",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f010101000100000301e8167bf82c701a14961bd95cd86e97ef0137bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2b0db5e720ad9a7505c013b68fd8169244f5",
@@ -1511,7 +1758,7 @@
     },
     {
       "id": "open-alko-reject-other-owner",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): the seed does not derive the expected owner",
+      "source": "04 \u00a72.8 ALKO v1: the seed does not derive the expected owner",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f010101000100000301e8167bf82c701a14961bd95cd86e97ef0137bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2b0db5e720ad9a7505c013b68fd8169244f5",
@@ -1529,7 +1776,7 @@
     },
     {
       "id": "open-alko-reject-passphrase-on-file-machine",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): secretKind 2 on a file-KeyStore machine, refused before the KDF",
+      "source": "04 \u00a72.8 ALKO v1: secretKind 2 on a file-KeyStore machine, refused before the KDF",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f01020100004c000201578f675b38d30a21d15b913a50cf151d0182b99240efd360b3b00747a4a7e89b08f5fd8fbef9ccf6de1bb94f3879291fbdb0e767550ad6962ff0017812c5e93f5168a776bc9b4ffa16aab4152c",
@@ -1547,7 +1794,7 @@
     },
     {
       "id": "open-alko-reject-89-bytes",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): 89 bytes, refused before the KDF",
+      "source": "04 \u00a72.8 ALKO v1: 89 bytes, refused before the KDF",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f010101000100000301e8167bf82c701a14961bd95cd86e97ef0137bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2b0db5e720ad9a7505c013b68fd8169244",
@@ -1565,7 +1812,7 @@
     },
     {
       "id": "open-alko-reject-91-bytes",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): 91 bytes, refused before the KDF",
+      "source": "04 \u00a72.8 ALKO v1: 91 bytes, refused before the KDF",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f010101000100000301e8167bf82c701a14961bd95cd86e97ef0137bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2b0db5e720ad9a7505c013b68fd8169244f500",
@@ -1583,7 +1830,7 @@
     },
     {
       "id": "open-alko-reject-seed-31-bytes",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): a 31-byte seed (blob of 89 bytes, sealed validly)",
+      "source": "04 \u00a72.8 ALKO v1: a 31-byte seed (blob of 89 bytes, sealed validly)",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f010101000100000301e8167bf82c701a14961bd95cd86e97ef0137bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2bf86db72a224c1d92a35a311e8a5b87e9",
@@ -1601,7 +1848,7 @@
     },
     {
       "id": "open-alko-reject-seed-33-bytes",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): a 33-byte seed (blob of 91 bytes, sealed validly)",
+      "source": "04 \u00a72.8 ALKO v1: a 33-byte seed (blob of 91 bytes, sealed validly)",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f010101000100000301e8167bf82c701a14961bd95cd86e97ef0137bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2b0d058f05dce4818f24342ff9e677974f2864",
@@ -1619,7 +1866,7 @@
     },
     {
       "id": "open-alko-reject-flip-magic",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): header byte flipped (magic)",
+      "source": "04 \u00a72.8 ALKO v1: header byte flipped (magic)",
       "input": {
         "op": "openAlko",
         "file": "404c4b4f010101000100000301e8167bf82c701a14961bd95cd86e97ef0137bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2b0db5e720ad9a7505c013b68fd8169244f5",
@@ -1637,7 +1884,7 @@
     },
     {
       "id": "open-alko-reject-flip-version",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): header byte flipped (version)",
+      "source": "04 \u00a72.8 ALKO v1: header byte flipped (version)",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f000101000100000301e8167bf82c701a14961bd95cd86e97ef0137bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2b0db5e720ad9a7505c013b68fd8169244f5",
@@ -1655,7 +1902,7 @@
     },
     {
       "id": "open-alko-reject-flip-kdf",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): header byte flipped (kdf)",
+      "source": "04 \u00a72.8 ALKO v1: header byte flipped (kdf)",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f010100000100000301e8167bf82c701a14961bd95cd86e97ef0137bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2b0db5e720ad9a7505c013b68fd8169244f5",
@@ -1673,7 +1920,7 @@
     },
     {
       "id": "open-alko-reject-flip-memory",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): header byte flipped (memory)",
+      "source": "04 \u00a72.8 ALKO v1: header byte flipped (memory)",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f010101000100010301e8167bf82c701a14961bd95cd86e97ef0137bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2b0db5e720ad9a7505c013b68fd8169244f5",
@@ -1691,7 +1938,7 @@
     },
     {
       "id": "open-alko-reject-flip-salt",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): header byte flipped (salt)",
+      "source": "04 \u00a72.8 ALKO v1: header byte flipped (salt)",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f010101000100000301e9167bf82c701a14961bd95cd86e97ef0137bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2b0db5e720ad9a7505c013b68fd8169244f5",
@@ -1709,7 +1956,7 @@
     },
     {
       "id": "open-alko-reject-flip-aead",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): header byte flipped (aead)",
+      "source": "04 \u00a72.8 ALKO v1: header byte flipped (aead)",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f010101000100000301e8167bf82c701a14961bd95cd86e97ef0037bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2b0db5e720ad9a7505c013b68fd8169244f5",
@@ -1727,7 +1974,7 @@
     },
     {
       "id": "open-alko-reject-flip-nonce",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): header byte flipped (nonce)",
+      "source": "04 \u00a72.8 ALKO v1: header byte flipped (nonce)",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f010101000100000301e8167bf82c701a14961bd95cd86e97ef0136bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2b0db5e720ad9a7505c013b68fd8169244f5",
@@ -1745,7 +1992,7 @@
     },
     {
       "id": "open-alko-reject-flip-tag",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): tag byte flipped",
+      "source": "04 \u00a72.8 ALKO v1: tag byte flipped",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f010101000100000301e8167bf82c701a14961bd95cd86e97ef0137bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2b0db5e720ad9a7505c013b68fd8169244f4",
@@ -1763,7 +2010,7 @@
     },
     {
       "id": "open-alko-reject-alks-label",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): an ALKO blob sealed under the ALKS label (agentlink/v1/keystore-file)",
+      "source": "04 \u00a72.8 ALKO v1: an ALKO blob sealed under the ALKS label (agentlink/v1/keystore-file)",
       "input": {
         "op": "openAlko",
         "file": "414c4b4f010101000100000301e8167bf82c701a14961bd95cd86e97ef0137bb6e34ee7aa3922a5a2d5ba70404a99fe020466d5420315bca80f137fa0670c5cbe30ac733d17ed2e4dd30ac56bc3abcf049c323f8931de6882c1c",
@@ -1781,7 +2028,7 @@
     },
     {
       "id": "open-alko-reject-alks-magic",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): an ALKS file given to the ALKO reader",
+      "source": "04 \u00a72.8 ALKO v1: an ALKS file given to the ALKO reader",
       "input": {
         "op": "openAlko",
         "file": "414c4b53010101000100000301ef6fa649397ee594b8dff1be07fd2ff701b408ab31210eecd5047d0185086167656e745f303323b5513375406f62cda10bd56fc7d3521b5f8e199ed0e8574dfa4ac37258c7bee558348a2e1424f2373948d6cfbb23317f21db59961baaf23e74b113da0ca8b81ae0d1eba78361a8886acd0f245a05afc0b4f4b22d7d07e1f5dce720397ac5f7187ab8b13dc65499cb",
@@ -1827,7 +2074,7 @@
     },
     {
       "id": "open-alko-reject-magic-patched",
-      "source": "04 \u00a72.8 ALKO v1 (docs/canonical-encodings, pending merge): ALKS magic on an ALKO blob",
+      "source": "04 \u00a72.8 ALKO v1: ALKS magic on an ALKO blob",
       "input": {
         "op": "openAlko",
         "file": "414c4b53010101000100000301e8167bf82c701a14961bd95cd86e97ef0137bb6e34ee7aa3922a5a2d5b26a1231dc43c2d4301e951517ccb9b8ebc62faefcfab905eb9a63262d76f2b0db5e720ad9a7505c013b68fd8169244f5",

@@ -161,7 +161,7 @@
     },
     {
       "id": "card-basic-hashes",
-      "source": "04 \u00a72.4 AgentCard, chain-agnostic domain {name: \"OCC AgentCard\", version: \"1\"}; 04 \u00a72.4 card JSON form, \u00a72.4.1 (docs/canonical-encodings, pending merge)",
+      "source": "04 \u00a72.4 AgentCard, chain-agnostic domain {name: \"OCC AgentCard\", version: \"1\"}; 04 \u00a72.4 card JSON form, \u00a72.4.1",
       "input": {
         "op": "agentCard",
         "card": {
@@ -188,7 +188,7 @@
     },
     {
       "id": "card-no-expiry-hashes",
-      "source": "04 \u00a72.4 AgentCard, chain-agnostic domain {name: \"OCC AgentCard\", version: \"1\"}; 04 \u00a72.4 card JSON form, \u00a72.4.1 (docs/canonical-encodings, pending merge)",
+      "source": "04 \u00a72.4 AgentCard, chain-agnostic domain {name: \"OCC AgentCard\", version: \"1\"}; 04 \u00a72.4 card JSON form, \u00a72.4.1",
       "input": {
         "op": "agentCard",
         "card": {
@@ -215,7 +215,7 @@
     },
     {
       "id": "card-limits-hashes",
-      "source": "04 \u00a72.4 AgentCard, chain-agnostic domain {name: \"OCC AgentCard\", version: \"1\"}; 04 \u00a72.4 card JSON form, \u00a72.4.1 (docs/canonical-encodings, pending merge)",
+      "source": "04 \u00a72.4 AgentCard, chain-agnostic domain {name: \"OCC AgentCard\", version: \"1\"}; 04 \u00a72.4 card JSON form, \u00a72.4.1",
       "input": {
         "op": "agentCard",
         "card": {
@@ -242,7 +242,7 @@
     },
     {
       "id": "card-reject-issued-at-2-pow-53",
-      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1 (docs/canonical-encodings, pending merge): issuedAt = 2^53 (uint64 above 2^53 - 1); rejected, never normalised",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: issuedAt = 2^53 (uint64 above 2^53 - 1); rejected, never normalised",
       "input": {
         "op": "agentCard",
         "card": {
@@ -266,7 +266,7 @@
     },
     {
       "id": "card-reject-key-epoch-2-pow-32",
-      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1 (docs/canonical-encodings, pending merge): keyEpoch = 2^32 (outside uint32); rejected, never normalised",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: keyEpoch = 2^32 (outside uint32); rejected, never normalised",
       "input": {
         "op": "agentCard",
         "card": {
@@ -290,7 +290,7 @@
     },
     {
       "id": "card-reject-version-256",
-      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1 (docs/canonical-encodings, pending merge): version = 256 (outside uint8); rejected, never normalised",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: version = 256 (outside uint8); rejected, never normalised",
       "input": {
         "op": "agentCard",
         "card": {
@@ -314,7 +314,7 @@
     },
     {
       "id": "card-reject-issued-at-string",
-      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1 (docs/canonical-encodings, pending merge): issuedAt as a decimal string; rejected, never normalised",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: issuedAt as a decimal string; rejected, never normalised",
       "input": {
         "op": "agentCard",
         "card": {
@@ -338,7 +338,7 @@
     },
     {
       "id": "card-reject-issued-at-negative",
-      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1 (docs/canonical-encodings, pending merge): issuedAt = -1; rejected, never normalised",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: issuedAt = -1; rejected, never normalised",
       "input": {
         "op": "agentCard",
         "card": {
@@ -362,7 +362,7 @@
     },
     {
       "id": "card-reject-agent-evm-checksummed",
-      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1 (docs/canonical-encodings, pending merge): agentEvm in EIP-55 mixed case; rejected, never normalised",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: agentEvm in EIP-55 mixed case; rejected, never normalised",
       "input": {
         "op": "agentCard",
         "card": {
@@ -386,7 +386,7 @@
     },
     {
       "id": "card-reject-agent-nostr-uppercase",
-      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1 (docs/canonical-encodings, pending merge): agentNostr in upper-case hex; rejected, never normalised",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: agentNostr in upper-case hex; rejected, never normalised",
       "input": {
         "op": "agentCard",
         "card": {
@@ -410,7 +410,7 @@
     },
     {
       "id": "card-reject-owner-enc-no-prefix",
-      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1 (docs/canonical-encodings, pending merge): ownerEnc without 0x; rejected, never normalised",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: ownerEnc without 0x; rejected, never normalised",
       "input": {
         "op": "agentCard",
         "card": {
@@ -434,7 +434,7 @@
     },
     {
       "id": "card-reject-owner-nostr-capital-prefix",
-      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1 (docs/canonical-encodings, pending merge): ownerNostr with 0X; rejected, never normalised",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: ownerNostr with 0X; rejected, never normalised",
       "input": {
         "op": "agentCard",
         "card": {
@@ -458,7 +458,7 @@
     },
     {
       "id": "card-reject-name-hash-31-bytes",
-      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1 (docs/canonical-encodings, pending merge): nameHash of 31 bytes; rejected, never normalised",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: nameHash of 31 bytes; rejected, never normalised",
       "input": {
         "op": "agentCard",
         "card": {
@@ -482,7 +482,7 @@
     },
     {
       "id": "card-reject-unknown-field",
-      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1 (docs/canonical-encodings, pending merge): a thirteenth field; rejected, never normalised",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: a thirteenth field; rejected, never normalised",
       "input": {
         "op": "agentCard",
         "card": {
@@ -507,7 +507,7 @@
     },
     {
       "id": "card-reject-missing-field",
-      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1 (docs/canonical-encodings, pending merge): relaysHash missing; rejected, never normalised",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: relaysHash missing; rejected, never normalised",
       "input": {
         "op": "agentCard",
         "card": {
@@ -590,7 +590,7 @@
     },
     {
       "id": "card-sign",
-      "source": "04 \u00a72.4 cardSig: owner EVM key, EIP-712, RFC 6979, low s, 0x + 130 hex with v in {27, 28} (docs/canonical-encodings, pending merge)",
+      "source": "04 \u00a72.4 cardSig: owner EVM key, EIP-712, RFC 6979, low s, 0x + 130 hex with v in {27, 28} (04 \u00a72.4.1)",
       "input": {
         "op": "signAgentCard",
         "card": {
@@ -883,6 +883,183 @@
           "keyEpoch": 0
         },
         "cardSig": "e3361c63c8fb9a53a0396e3633cb5ff30bbe517581d7810df718f82ef20996b5391ec4d48e7ba8798e3d26fc5f7f757463db32b47d1f503c49c4dd57f70f3f5f1c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-verify-reject-r-zero",
+      "source": "04 \u00a72.4: r = 0 (r must be in [1, n - 1])",
+      "input": {
+        "op": "verifyAgentCard",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x18d675d5e86616dd150eb7f5bf5d91f3493a6094",
+          "agentNostr": "0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369",
+          "agentEnc": "0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c",
+          "ownerEvm": "0x974fdeb6d126f79e6c89dd2442aa52d934df8499",
+          "ownerNostr": "0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055",
+          "ownerEnc": "0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34",
+          "nameHash": "0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160",
+          "relaysHash": "0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "cardSig": "0x0000000000000000000000000000000000000000000000000000000000000000391ec4d48e7ba8798e3d26fc5f7f757463db32b47d1f503c49c4dd57f70f3f5f1c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-verify-reject-s-zero",
+      "source": "04 \u00a72.4: s = 0 (s must be in [1, n - 1])",
+      "input": {
+        "op": "verifyAgentCard",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x18d675d5e86616dd150eb7f5bf5d91f3493a6094",
+          "agentNostr": "0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369",
+          "agentEnc": "0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c",
+          "ownerEvm": "0x974fdeb6d126f79e6c89dd2442aa52d934df8499",
+          "ownerNostr": "0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055",
+          "ownerEnc": "0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34",
+          "nameHash": "0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160",
+          "relaysHash": "0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "cardSig": "0xe3361c63c8fb9a53a0396e3633cb5ff30bbe517581d7810df718f82ef20996b500000000000000000000000000000000000000000000000000000000000000001c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-verify-reject-r-n",
+      "source": "04 \u00a72.4: r = n (r must be in [1, n - 1])",
+      "input": {
+        "op": "verifyAgentCard",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x18d675d5e86616dd150eb7f5bf5d91f3493a6094",
+          "agentNostr": "0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369",
+          "agentEnc": "0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c",
+          "ownerEvm": "0x974fdeb6d126f79e6c89dd2442aa52d934df8499",
+          "ownerNostr": "0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055",
+          "ownerEnc": "0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34",
+          "nameHash": "0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160",
+          "relaysHash": "0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "cardSig": "0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141391ec4d48e7ba8798e3d26fc5f7f757463db32b47d1f503c49c4dd57f70f3f5f1c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-verify-reject-v-29",
+      "source": "04 \u00a72.4: v = 29",
+      "input": {
+        "op": "verifyAgentCard",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x18d675d5e86616dd150eb7f5bf5d91f3493a6094",
+          "agentNostr": "0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369",
+          "agentEnc": "0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c",
+          "ownerEvm": "0x974fdeb6d126f79e6c89dd2442aa52d934df8499",
+          "ownerNostr": "0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055",
+          "ownerEnc": "0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34",
+          "nameHash": "0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160",
+          "relaysHash": "0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "cardSig": "0xe3361c63c8fb9a53a0396e3633cb5ff30bbe517581d7810df718f82ef20996b5391ec4d48e7ba8798e3d26fc5f7f757463db32b47d1f503c49c4dd57f70f3f5f1d"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-json-canonical",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: the card as JSON text parses and hashes like the object",
+      "input": {
+        "op": "agentCardJson",
+        "json": "{\"version\": 1, \"agentEvm\": \"0x18d675d5e86616dd150eb7f5bf5d91f3493a6094\", \"agentNostr\": \"0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369\", \"agentEnc\": \"0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c\", \"ownerEvm\": \"0x974fdeb6d126f79e6c89dd2442aa52d934df8499\", \"ownerNostr\": \"0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055\", \"ownerEnc\": \"0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34\", \"nameHash\": \"0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160\", \"relaysHash\": \"0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f\", \"issuedAt\": 1760000000, \"expiresAt\": 1791536000, \"keyEpoch\": 0}"
+      },
+      "expected": {
+        "digest": "7abb5ab9667f7ee4d86adea395f4feea44a34df00a0937ac623fb3502642a711"
+      }
+    },
+    {
+      "id": "card-json-reject-duplicate-key",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: a duplicate key (I-JSON); rejected on the token, never normalised",
+      "input": {
+        "op": "agentCardJson",
+        "json": "{\"version\": 1, \"agentEvm\": \"0x18d675d5e86616dd150eb7f5bf5d91f3493a6094\", \"agentNostr\": \"0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369\", \"agentEnc\": \"0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c\", \"ownerEvm\": \"0x974fdeb6d126f79e6c89dd2442aa52d934df8499\", \"ownerNostr\": \"0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055\", \"ownerEnc\": \"0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34\", \"nameHash\": \"0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160\", \"relaysHash\": \"0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f\", \"issuedAt\": 1760000000, \"expiresAt\": 1791536000, \"keyEpoch\": 0, \"keyEpoch\": 0}"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-json-reject-version-1-0",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: version spelled 1.0; rejected on the token, never normalised",
+      "input": {
+        "op": "agentCardJson",
+        "json": "{\"version\": 1.0, \"agentEvm\": \"0x18d675d5e86616dd150eb7f5bf5d91f3493a6094\", \"agentNostr\": \"0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369\", \"agentEnc\": \"0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c\", \"ownerEvm\": \"0x974fdeb6d126f79e6c89dd2442aa52d934df8499\", \"ownerNostr\": \"0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055\", \"ownerEnc\": \"0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34\", \"nameHash\": \"0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160\", \"relaysHash\": \"0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f\", \"issuedAt\": 1760000000, \"expiresAt\": 1791536000, \"keyEpoch\": 0}"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-json-reject-issued-at-exponent",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: issuedAt spelled 1.76e9; rejected on the token, never normalised",
+      "input": {
+        "op": "agentCardJson",
+        "json": "{\"version\": 1, \"agentEvm\": \"0x18d675d5e86616dd150eb7f5bf5d91f3493a6094\", \"agentNostr\": \"0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369\", \"agentEnc\": \"0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c\", \"ownerEvm\": \"0x974fdeb6d126f79e6c89dd2442aa52d934df8499\", \"ownerNostr\": \"0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055\", \"ownerEnc\": \"0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34\", \"nameHash\": \"0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160\", \"relaysHash\": \"0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f\", \"issuedAt\": 1.76e9, \"expiresAt\": 1791536000, \"keyEpoch\": 0}"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-json-reject-expires-at-fraction",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: expiresAt spelled 1791536000.0; rejected on the token, never normalised",
+      "input": {
+        "op": "agentCardJson",
+        "json": "{\"version\": 1, \"agentEvm\": \"0x18d675d5e86616dd150eb7f5bf5d91f3493a6094\", \"agentNostr\": \"0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369\", \"agentEnc\": \"0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c\", \"ownerEvm\": \"0x974fdeb6d126f79e6c89dd2442aa52d934df8499\", \"ownerNostr\": \"0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055\", \"ownerEnc\": \"0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34\", \"nameHash\": \"0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160\", \"relaysHash\": \"0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f\", \"issuedAt\": 1760000000, \"expiresAt\": 1791536000.0, \"keyEpoch\": 0}"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-json-reject-key-epoch-minus-zero",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: keyEpoch spelled -0; rejected on the token, never normalised",
+      "input": {
+        "op": "agentCardJson",
+        "json": "{\"version\": 1, \"agentEvm\": \"0x18d675d5e86616dd150eb7f5bf5d91f3493a6094\", \"agentNostr\": \"0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369\", \"agentEnc\": \"0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c\", \"ownerEvm\": \"0x974fdeb6d126f79e6c89dd2442aa52d934df8499\", \"ownerNostr\": \"0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055\", \"ownerEnc\": \"0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34\", \"nameHash\": \"0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160\", \"relaysHash\": \"0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f\", \"issuedAt\": 1760000000, \"expiresAt\": 1791536000, \"keyEpoch\": -0}"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-json-reject-issued-at-near-integer",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1: issuedAt spelled 9007199254740991.4; rejected on the token, never normalised",
+      "input": {
+        "op": "agentCardJson",
+        "json": "{\"version\": 1, \"agentEvm\": \"0x18d675d5e86616dd150eb7f5bf5d91f3493a6094\", \"agentNostr\": \"0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369\", \"agentEnc\": \"0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c\", \"ownerEvm\": \"0x974fdeb6d126f79e6c89dd2442aa52d934df8499\", \"ownerNostr\": \"0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055\", \"ownerEnc\": \"0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34\", \"nameHash\": \"0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160\", \"relaysHash\": \"0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f\", \"issuedAt\": 9007199254740991.4, \"expiresAt\": 1791536000, \"keyEpoch\": 0}"
       },
       "expected": {
         "outcome": "reject"
