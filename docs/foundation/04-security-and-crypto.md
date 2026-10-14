@@ -106,14 +106,15 @@ An object embedded in another one keeps its own bytes. For example, a proof pack
 
 | Encoding | Schema paths |
 |---|---|
-| `0x` + 40 hex (address) | OwnerAction `agent`; `approval-request.agent`; `terms.parties[]`, `terms.deliverables[].by`, `terms.price.payer`; CommitmentScope `agentId` and `counterparty.agentId`; AgentCard `agentEvm`, `ownerEvm`; proof pack `notary`, `signer.evm`, `recipient.evm`, `receipts[].signer`; Record and Receipt `signer`, Record `feeToken`; EIP-3009 `auth` addresses (07 §7) |
-| `0x` + 64 hex (`bytes32`) | `proof` body and proof pack `recordId`; `proof` body `salt` and proof pack `recipient.salt`; CommitmentScope `answers.envelopeHash`, proof pack `envelopeHash`; Record `envelopeHash`, `recipientCommitment`, `parentRecordId`, `appId`; Receipt `recordId`, `salt`; `recordStructHash`; `txHash` everywhere; AgentCard `agentNostr`, `agentEnc`, `ownerNostr`, `ownerEnc`, `nameHash`, `relaysHash`; `DomainClaim` `ownerNostr` (§2.7); EIP-712 digests and struct hashes; EIP-3009 `auth.nonce`, `auth.r` and `auth.s` (07 §7) |
-| `0x` + hex (ECDSA signature) | invite, `handshake` and `card-update` `cardSig`; proof pack `signature`; submitter `records[].signature` and `receipts[].signature` (07 §7) |
+| `0x` + 40 hex (address) | OwnerAction `agent`; `contact.check` `params.contact`; tool-result contact and agent `id` (06 §2.1); `approval-request.agent`; `terms.parties[]`, `terms.deliverables[].by`, `terms.price.payer`; CommitmentScope `agentId` and `counterparty.agentId`; policy `contacts.allowed[]`, `commitments.autoAcceptContacts[]` and `contactRules[].contact` (06 §3, G-32); AgentCard `agentEvm`, `ownerEvm`; proof pack `notary`, `signer.evm`, `recipient.evm`, `receipts[].signer`; Record and Receipt `signer`, Record `feeToken`; EIP-3009 `auth` addresses (07 §7) |
+| `0x` + 64 hex (`bytes32`) | `proof` body and proof pack `recordId`; `handshake-ack` `handshakeHash` (an `envelopeHash`, rule 1); `proof` body `salt` and proof pack `recipient.salt`; CommitmentScope `answers.envelopeHash`, proof pack `envelopeHash`; Record `envelopeHash`, `recipientCommitment`, `parentRecordId`, `appId`; Receipt `recordId`, `salt`; `recordStructHash`; `txHash` everywhere; AgentCard `agentNostr`, `agentEnc`, `ownerNostr`, `ownerEnc`, `nameHash`, `relaysHash`; `DomainClaim` `ownerNostr` (§2.7); EIP-712 digests and struct hashes; EIP-3009 `auth.nonce`, `auth.r` and `auth.s` (07 §7) |
+| `0x` + hex (ECDSA signature) | invite, `handshake`, `handshake-ack` and `card-update` `cardSig`; invite and `handshake` `cardAgentSig` (§2.9); proof pack `signature`; submitter `records[].signature` and `receipts[].signature` (07 §7) |
 | Decimal string (`uint256`) | Record `maxFee`, Record `nonce`, EIP-3009 `auth` amounts and times |
+| USD amount (decimal string; G-7, G-32; proposed, owner confirms at merge) | policy `proofs.dailyBudgetUSD`, `proofs.perActionMaxUSD`, `commitments.autoAcceptMaxUSD`, `commitments.autoAcceptMinUSD`, `contactRules[].proofs.perActionMaxUSD` (06 §3); CommitmentScope `maxFeeUsd`; `approval-request` `action.context.fee.usd`; `ProofStatus.fee` `usd`, `protocolUsd` and `integratorUsd`; `agentlink_status` `prices[]` `usd`, `protocolUsd` and `integratorUsd`; the budget ledger's amounts. Exactly one spelling: `^(0\|[1-9][0-9]{0,8})(\.[0-9]{0,5}[1-9])?$`, so there is no trailing zero after the point and no bare point (`"0.1"`, `"5"`, `"1.000001"`; never `"0.10"`, `"5.0"` or `"5."`), at most 6 decimals (USD stablecoin precision) and at most 999 999 999.999999. A JSON number is rejected. Values are compared and added as exact decimals (for example integer micro-dollars), never as binary floats. Producers convert from exact values: a fee from token base units at 1:1 (D-46), a rounded-up value (such as "Remember for this contact", 06 §3) after rounding |
 | Bare hex, 64 (Nostr key) | envelope `from`; OwnerAction `owner`; CommitmentScope `counterparty.ownerKey`; Nostr event ids |
 | Bare hex, 128 (BIP-340) | envelope `sig`; `SignedOwnerAction` `sig` |
-| Bare hex, 64 (digest under a Nostr key only) | `approval-request.actionDigest` and `approval.decide` `params.actionDigest`; `terms` bodies' `termsHash` and `terms.previousTermsHash`; CommitmentScope `termsHash`; `files[].plaintextSha256`, `terms.deliverables[].plaintextSha256`, `files[].ciphertextSha256`, drop commit `ciphertextSha256`; proof pack `ownerApproval.policyHash` |
-| base64url | envelope `id`, `thread`, `recipients[].kid`, `.enc`, `.wk`, `aead.iv`, `aead.ct`; payload `replyTo`, `files[].inline`, `files[].fileKey`; `proof` body `envelopeId`; CommitmentScope `answers.envelopeId`, `thread`, `termsId`; `terms.termsId`; invite `inviteId`, `secret`; `handshake` `inviteId`, `proof`; `handshake-ack` `inviteId`, `handshakeId`; OwnerAction `nonce`; drop request `nonce`; proof pack `disclosure.contentKey` |
+| Bare hex, 64 (digest under a Nostr key only) | `approval-request.actionDigest` and `approval.decide` `params.actionDigest`; `terms` bodies' `termsHash` and `terms.previousTermsHash`; CommitmentScope `termsHash`; `files[].plaintextSha256`, `terms.deliverables[].plaintextSha256`, `files[].ciphertextSha256`, drop commit `ciphertextSha256`; proof pack `ownerApproval.policyHash`; `handshake` `inviterCardHash`; `contact.check` `params.pairingDigest` (§3.6.1) |
+| base64url | envelope `id`, `thread`, `recipients[].kid`, `.enc`, `.wk`, `aead.iv`, `aead.ct`; payload `replyTo`, `files[].inline`, `files[].fileKey`; `proof` body `envelopeId`; CommitmentScope `answers.envelopeId`, `thread`, `termsId`; `terms.termsId`; invite `inviteId`, `secret`; `handshake` `inviteId`, `proof`, `codeNonce`, `codeCommit`; invite `codeCommit`; `handshake-ack` `inviteId`, `handshakeId`, `codeReveal`; OwnerAction `nonce`; drop request `nonce`; proof pack `disclosure.contentKey` |
 | Prefixed string (not binary) | `approvalId` everywhere (`approval-request`, `approval.decide` and `approval.cancel` `params`, tool inputs and results): exactly `apr_` followed by the base64url (no padding) of 16 random bytes, 26 characters in total, matched exactly |
 | Tool results (06 §2) | Use the row of the protocol path they mirror: `ProofStatus.recordId` and `txHash`, and `agentlink_verify_proof_pack` `recordId` and `envelopeHash`, are `0x` + 64 hex; `signer` there is a `0x` address; `termsHash` is bare hex; `envelopeId` is base64url |
 
@@ -121,7 +122,7 @@ An object embedded in another one keeps its own bytes. For example, a proof pack
 - `nonce`: base64url in an OwnerAction or a drop request, a decimal string in a Record, and `0x` `bytes32` in an EIP-3009 `auth`.
 - `sig` / `signature`: `sig` is a BIP-340 signature in bare hex on an envelope and a `SignedOwnerAction`. `signature` is an ECDSA signature in `0x` form in a proof pack and in the submitter bodies (07 §7).
 - `id`: an envelope `id` is base64url, while `terms.deliverables[].id` is a short free string (`"d1"`), not binary.
-- `agentId`: in protocol JSON (`terms`, CommitmentScope, tool results) it is the agent's EVM address. The local handle of G-23 (`[A-Za-z0-9_-]{1,64}`, in `.alks` headers, file names and keychain accounts) is never a JSON `agentId`.
+- `agentId`: the agent's EVM address on every path (`terms`, CommitmentScope, tool results), and the same address as text in the keychain account, the `.alks` file name and its header (§2.9, G-23). There is no separate local handle.
 - `signer`: an address in a Record, a Receipt and a proof pack's `receipts[]`, but an object `{evm, agentCard}` at the top of a proof pack.
 
 **Canonical ECDSA signatures** (proposed; owner confirms at merge). Every 65-byte secp256k1 ECDSA signature (`cardSig`, a proof pack `signature`, and Record and Receipt signatures from an EOA) is `r || s || v`, with:
@@ -130,6 +131,8 @@ An object embedded in another one keeps its own bytes. For example, a proof pack
 - `v` ∈ {27, 28}.
 
 Any other form is rejected, for example `v` ∈ {0, 1}, a high `s`, or a length other than 65 bytes. An ERC-1271 signature has the length its account returns: `0x` followed by a non-empty, even number of hex characters.
+
+**Other decimal amounts.** `terms.price.amount` (§3.4) is an amount in the terms' own currency, written by a party and hashed as written. It keeps its D-55 grammar (`^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$`, greater than zero), which allows trailing zeros such as `"1500.00"` and has no fixed upper bound beyond the M1-21 size limits. Comparing it with a USD limit (auto-accept, §3.4.2) uses the same exact-decimal helper, which must handle an amount far above any limit without overflow or rejection: such an amount is simply above the limit.
 
 **Hashes that reach a Record.** The Record and Receipt commit only `envelopeHash`, `recipientCommitment` (from `salt`), `parentRecordId` and `appId`. Files and terms reach the chain only through `envelopeHash`. `termsHash`, `plaintextSha256` and `ciphertextSha256` are never Record fields, so they stay bare hex on every path, including inside a disclosed envelope in a proof pack.
 
@@ -141,7 +144,7 @@ Any other form is rejected, for example `v` ∈ {0, 1}, a high `s`, or a length 
   - a missing `0x` on a `0x` field, a `0x` on a bare-hex field, and `0X`;
   - a wrong length, or whitespace anywhere;
   - base64url with padding, `+` or `/`, or non-zero trailing bits;
-  - for decimal strings, anything that does not match `^(0|[1-9][0-9]*)$` (so `"0"` is valid; signs, leading zeros, fractions, exponents and whitespace are not), or a value above the type's maximum.
+  - for `uint256` decimal strings, anything that does not match `^(0|[1-9][0-9]*)$` (so `"0"` is valid; signs, leading zeros, fractions, exponents and whitespace are not), or a value above the type's maximum.
 - **Integers** other than `uint256` are JSON integers in [0, 2^53 − 1], including the card's `uint8`, `uint32` and `uint64` fields. A `uint64` value above 2^53 − 1 is rejected.
   - The JSON token itself must match `0|[1-9][0-9]*`, so `1.0`, `1e3`, `-0` and `9007199254740991.4` are rejected in every runtime.
   - Parsers check the token with `JSON.parse` source-text access or a strict tokenizer, not only the parsed value, which differs across runtimes for such tokens.
@@ -153,7 +156,7 @@ Any other form is rejected, for example `v` ∈ {0, 1}, a high `s`, or a length 
 
 ### 2.5 Owner operations and user presence
 
-Owner-only operations: approve/deny, change policies, add/remove allowed folders, add storage credentials, export keys, revoke agents, disclose content keys.
+Owner-only operations: approve/deny, change policies, add/remove allowed folders, add storage credentials, export keys, revoke agents, disclose content keys, mark a contact's safety code as checked (§3.6.1).
 
 - Each is expressed as an **owner-signed object** (`SignedOwnerAction`, §2.5.1, signed by the owner Nostr key). The local UI, the CLI and the console produce the same object. The console carries it inside an `approval`, `policy` or `revoke` envelope (§3.4.1); the envelope is only transport, and authority comes from the object's owner signature, never from the envelope signature.
 - The agent's core **verifies the owner signature** against the owner key in its agent card before applying the action. Policies are stored as signed documents and re-verified on load, so editing the database directly has no effect.
@@ -190,7 +193,7 @@ Owner-only operations: approve/deny, change policies, add/remove allowed folders
   - An object in any other form is **rejected, never normalised**.
   - The same lowercase address form applies wherever an agent address appears in a signed or hashed object: `terms.parties` (§3.4) and `approval-request.agent` (§3.4.1).
   - M1-1h carries signing vectors and rejection vectors for every non-canonical form (checksummed or uppercase address, uppercase hex, a `0x` on `owner` or `sig`, padded base64url, out-of-range integer, unknown key), plus the §2.4.1 cross-class cases.
-- **Binding.** `agent` binds the action to one agent by its canonical EVM address (decided, D-58). The address is stable across epochs and covered by the agent card signature and the Registry. `agentId` (G-23) is only a local handle and never a second binding. An action signed for one agent is refused by every other agent of the same owner.
+- **Binding.** `agent` binds the action to one agent by its canonical EVM address (decided, D-58). The address is stable across epochs and covered by the agent card signature and the Registry. `agentId` (G-23, §2.9) is this same address, so it is never a second binding. An action signed for one agent is refused by every other agent of the same owner.
 - **Verification** (core, before applying). "The agent" means the receiving core's own agent, or, for `agent.revoke` at a contact, that contact's stored card (§3.4.1). Checks, in order:
   - the encoding above is exact;
   - `agent` is that agent's EVM address;
@@ -201,7 +204,21 @@ Owner-only operations: approve/deny, change policies, add/remove allowed folders
   - `nonce` is unused;
   - `params` match the op's schema.
 
-  Any failure drops the object (fail closed). `expiresAt` = 0 is required for `agent.revoke` and allowed only there; that op skips the expiry and lifetime checks. Nonces are retained for at least the maximum lifetime plus skew. Skew, lifetimes and retention are fixed by G-7.
+  Any failure drops the object (fail closed). `expiresAt` = 0 is required for `agent.revoke` and allowed only there; that op skips the expiry and lifetime checks. Nonces are retained for at least the maximum lifetime plus skew. Skew, lifetimes and retention are fixed below (G-7).
+- **Lifetimes, skew and nonces (G-7; proposed, owner confirms at merge).** All times are unix seconds, as JSON integers (§2.4.1). "Now" is the verifying core's own system clock; no 4thTech time service is used.
+  - **Clock skew `S` = 300 s.** It applies only to `issuedAt`: the core refuses `issuedAt > now + S`. Expiry has no skew: the core refuses `now > expiresAt`. The schema requires `issuedAt < expiresAt` for every op except `agent.revoke`.
+  - **Maximum lifetime `L(op)`.** The core refuses `expiresAt − issuedAt > L(op)`. A signing surface sets `expiresAt` at most `issuedAt + L(op)` and may choose less. The local UI and the CLI apply an action within seconds. The long values exist for the console, whose `approval`, `policy` and `contact.check` objects reach a local agent over relays, possibly after the machine wakes up.
+
+    | `op` | `L(op)` | Why |
+    |---|---|---|
+    | `approval.decide` | `expiresAt` must also be ≤ the pending request's `expiresAt` (§3.4.1), which is at most 24 h after `requestedAt`; so `L` = 86 400 s | A decision is useless after its request expires |
+    | `approval.cancel` | 604 800 s (7 days) | It only voids. It must still reach an offline agent before the scope it cancels expires (at most 7 days, §3.4.2) |
+    | `policy.set` | 86 400 s (24 h) | Rollback is stopped by `version`, not by freshness. 24 h bounds how long an unapplied policy, signed on the console, can still surprise the owner. After that the console says "not applied, sign again" |
+    | `contact.check` | 86 400 s (24 h) | As for `policy.set` (console from M2) |
+    | `agent.revoke` | none (`expiresAt` = 0) | Permanent and idempotent |
+    | any later op (storage credentials, key export, content-key disclosure) | 600 s (10 min) unless the task that defines it sets another value | Short by default (fail closed). No op may exceed 604 800 s |
+  - **Nonces.** The core records an action's `nonce` when it applies the action, per agent, in the store (G-9). It keeps the nonce for at least 30 days after applying it; 30 days exceeds the longest `L(op)` plus `S`. A nonce that is already recorded refuses the object. Checking the nonce, recording it and applying the action happen in one store transaction (SQLite, or Durable Object storage), so two concurrent deliveries of one object apply it at most once. `agent.revoke` is exempt: revocation is permanent, and a contact applies a re-published copy as a no-op (§3.4.1), so a repeat is never an error. Residual: a same-OS-user process that deletes nonce rows can replay an unexpired action (G-1). That replay is bounded by `L(op)`, by single use of each `approvalId`, and by `version` for `policy.set`.
+  - **Constants.** `@agentlink/types` exports `S` and each `L(op)`. Verification lives in the core (M1-7d) and is pure, with `now` passed in, so the boundaries can be tested exactly.
 - **Refusals are reported.** An owner action the core refuses (expired, superseded version, unknown approval) is reported to the owner: a local UI notice, or on the console "not applied, sign again". It never fails silently.
 - **Stored objects are re-verified, not trusted.**
   - Freshness and nonce checks apply once, when an action is first applied.
@@ -212,9 +229,10 @@ Owner-only operations: approve/deny, change policies, add/remove allowed folders
 | `op` | `params` | Produced by | Rules |
 |---|---|---|---|
 | `approval.decide` | `{approvalId, actionDigest, decision: "approve" \| "deny"}` | Local UI, CLI, console (`approval` envelope) | Applies only to a pending request with the same `approvalId` and `actionDigest` (§3.4.1); single use. Its maximum lifetime is the request's `expiresAt`. A deny is signed too, so a forged deny cannot cancel a request |
-| `approval.cancel` (D-55) | `{approvalId}` | Local UI, CLI (`agentlink cancel`), console (`approval` envelope), desktop app | Voids the unused parts of an approved commitment scope (§3.4.2), for example a receipt still waiting for the offer's record; single use. It can only void: it never approves, revives or widens anything |
-| `policy.set` | `{version, policy}` | Local UI, CLI, console (`policy` envelope) | `policy` is the complete 06 §3 document, never a partial patch. Its JSON form has the keys and value types of the 06 §3 listing. The strict schema is built in M1-2b (`@agentlink/types`), and until then signing vectors use the 06 §3 defaults as `policy` (proposed; owner confirms at merge). `version` must be greater than the highest applied version, so an older signed policy cannot be replayed to roll back. After applying, the core echoes the signed object to its owner on the owner channel (§3.4.1), so the console always knows the current version, including one set from the local UI or the CLI. Fail-closed behaviour on a missing or invalid policy stays with G-6 |
+| `approval.cancel` (D-55) | `{approvalId}` | Local UI, CLI (`agentlink cancel`), console (`approval` envelope), desktop app | Voids the unused parts of an approved commitment scope (§3.4.2), for example a receipt still waiting for the offer's record. It also voids any other approved approval that has not been used yet (G-7; proposed, owner confirms at merge); a used one has nothing left to void, and a pending one is denied instead. Single use. It can only void: it never approves, revives or widens anything |
+| `policy.set` | `{version, policy}` | Local UI, CLI, console (`policy` envelope) | `policy` is the complete 06 §3 document, never a partial patch, in the policy JSON form of 06 §3 (G-32; proposed, owner confirms at merge). Every key is present, unknown keys are rejected, USD limits are decimal strings and contact IDs are agent IDs. The strict schema is built in M1-2b (`@agentlink/types`). Signing vectors use the 06 §3 defaults in that JSON form as `policy`, and one vector also carries a non-empty `contactRules`. `version` must be greater than the highest applied version, so an older signed policy cannot be replayed to roll back. After applying, the core echoes the signed object to its owner on the owner channel (§3.4.1), so the console always knows the current version, including one set from the local UI or the CLI. Fail-closed behaviour on a missing or invalid policy stays with G-6 |
 | `agent.revoke` | `{reason: "compromised" \| "retired" \| "other"}` | Console (any reason); CLI only on an uncompromised machine (`revoke` envelope) | Permanent per `agent` EVM address, for every epoch, with no un-revoke (decided, D-58). A revoked agent returns only as a new identity (new seed) with new pairings, and the UI asks for explicit confirmation. `reason` is a fixed value, never free text. Delivery to contacts: §3.4.1 |
+| `contact.check` (G-28; proposed, owner confirms at merge) | `{contact, pairingDigest}` | Local UI, desktop app, CLI (`agentlink contacts --verify <id>`, †, interactive terminal only); console from M2 (M2-2e) | Marks the contact "Safety code checked" (11 §5.2) after the owner compared the code (§3.6.1). `contact` is the contact's `agentId` (§2.9). `pairingDigest` is the transcript digest of its current pairing, which the signing surface has just recomputed from the signed `handshake` and `handshake-ack` (§3.6.1), as 64 lowercase hex. Applied only if both match a completed pairing, recomputed the same way. The core stores the signed object and re-verifies it on every load against a fresh recomputation, never against a stored digest, so a database edit can neither set the label nor change the code behind it. A completed re-pair (new digest) clears it. Idempotent. Maximum lifetime 24 h, as for `policy.set` (G-7) |
 
 ### 2.6 Key rotation
 
@@ -257,7 +275,7 @@ An agent that drives the setup itself learns the agent unlock code. That costs n
 
 The spec claims nothing more.
 
-**File format `ALKS` v1.** One file per agent, `~/.agentlink/keystore/<agentId>.alks`. `agentId` must match `[A-Za-z0-9_-]{1,64}`, checked before any path is built.
+**File format `ALKS` v1.** One file per agent, `~/.agentlink/keystore/<agentId>.alks`. `agentId` is the agent ID of §2.9 (`0x` + 40 lowercase hex). Before any path is built, it must match `[A-Za-z0-9_-]{1,64}` (the format's general rule, kept for future identifiers) and the exact §2.9 form, so a checksummed or upper-case spelling is refused.
 
 ```
 magic       "ALKS"              4 B
@@ -293,7 +311,7 @@ ct          ciphertext || 16-byte tag
     3. `password` is the UTF-8 bytes of the NFKC form. Nothing else changes, and spaces are kept.
 - The owner passphrase wrap pins its own label, `agentlink/v1/owner-passphrase-wrap`, and its own magic, `ALKO` (M1-1f). The two blob types are therefore never interchangeable in either direction, and a test covers both directions. The `ALKO` layout is below.
 - **AAD = every header byte** from `magic` through `agentId`. A changed parameter, secret kind, salt, nonce or agent ID, a truncated file or a changed ciphertext all fail authentication.
-- **Expected agent ID.** Before the KDF runs, the reader refuses a file whose header `agentId` differs from the agent being opened, that is, the file name and the recorded config. After decryption, the `seed` entry must derive the expected agent ID. A file copied over another agent's file therefore fails **even when both agents use the same passphrase**.
+- **Expected agent ID.** Before the KDF runs, the reader refuses a file whose header `agentId` differs from the agent being opened, that is, the file name and the recorded config. After decryption, the `seed` entry must derive the expected agent ID: its `agentlink/v1/evm` key at epoch 0 must have that address, compared as bytes (§2.9). A file copied over another agent's file therefore fails **even when both agents use the same passphrase**.
 - **Plaintext:** a list of entries `u16be nameLen | name (UTF-8) | u32be valueLen | value`, one per keychain item that the keychain backend would hold for this agent. Names are the keychain account suffixes, for example `seed`, `store-key`, `s3:<id>`. Duplicate names, length overflows, trailing bytes and plaintext above 64 KiB are refused. Values stay in `Uint8Array` and never become JS strings.
 - **Generated unlock code:** 15 CSPRNG bytes, exactly 120 bits, encoded as 24 RFC 4648 base32 characters with no bias, shown in groups of four. Input follows `password` kind 1 above.
 - **Chosen passphrase:** follows `password` kind 2 above. The header's `secretKind` tells the reader which rule to apply.
@@ -440,7 +458,7 @@ The user is told the trade-off once, in plain words, at opt-in, and `doctor` rep
   - a truncated file fails;
   - unknown `version`, `kdf`, `aead` or `secretKind` values are refused;
   - out-of-bounds KDF parameters are refused before the KDF runs.
-- **Agent binding:** two agents with the **same** passphrase; swapping their files fails both before the KDF (header `agentId`) and after decryption (seed-derived ID). An `agentId` outside `[A-Za-z0-9_-]{1,64}` is refused before any path is built.
+- **Agent binding:** two agents with the **same** passphrase; swapping their files fails both before the KDF (header `agentId`) and after decryption (seed-derived ID). An `agentId` outside `[A-Za-z0-9_-]{1,64}`, or not in the exact §2.9 form (checksummed, upper-case, without `0x`, wrong length), is refused before any path is built.
 - **Parser:** duplicate entry names, length overflow, trailing bytes, plaintext above 64 KiB, `idLen = 0` and an invalid `agentId` charset are all refused.
 - **Normalisation:** a generated code is accepted in lower case, with spaces and dashes, and with `0`/`1`/`8`; a wrong length is refused before the KDF. A chosen passphrase is NFKC-normalised and its spaces are kept. There are vectors for both secret kinds (M1-1h).
 - **Permissions:**
@@ -470,6 +488,40 @@ The user is told the trade-off once, in plain words, at opt-in, and `doctor` rep
 - **Environment:** both variables are removed from `process.env` after reading, and child processes started later do not inherit them. `init` never writes the value variable into a harness config.
 - **Unlock timing:** the async unlock answers MCP `initialize` before the KDF finishes, and tools return `keystore_locked` until it does.
 - **Vectors:** `ALKS` v1 vectors (fixed secret, kind, salt, nonce and entries) from M1-1h, checked in CI. The CI job on Ubuntu without D-Bus or Secret Service runs the file backend end to end.
+
+### 2.9 Agent ID and fingerprints (G-23; proposed, owner confirms at merge)
+
+**Definition.** `agentId` is the agent's EVM address: the last 20 bytes of `keccak256` over the uncompressed public key (without the `0x04` prefix) of the `agentlink/v1/evm` key at epoch 0 (§2.1). It is the same value as the card's `agentEvm`, the `agent` of a `SignedOwnerAction` (§2.5.1, D-58), the entries of `terms.parties` (§3.4), a commitment scope's `agentId` (§3.4.2) and a Record's `signer` (05 §3.1). There is one agent identifier, so `agentId` can never become a second binding.
+
+- **Text form:** `0x` followed by 40 lowercase hex characters everywhere: JSON (§2.4.1), the keychain account (§2.2), `ALKS` file names and headers (§2.8) and configs. An EIP-55 checksummed form is for display only and is refused as input.
+- **Why the address.** It is the only identity key that never rotates. The Nostr and encryption keys change with `keyEpoch` (§2.6), so an ID built from them, or a hash over both key families, would change on rotation, or would need a second, frozen derivation for the same identity. Credits, Records, Receipts, the Registry and owner actions are already tied to the address.
+
+**Derivation and checks.** `agentId` is always computed from the agent seed, never chosen. `init` derives it and records it in the agent's local config, next to the local agent name (`--agent <name>`, 06 §6), and in the `identity` table (07 §3). Each backend checks it whenever the seed is loaded:
+- the file KeyStore before the KDF (header) and after decryption (the `seed` entry must derive the header's `agentId`, §2.8);
+- the keychain backend after reading the `seed` item under account `<agentId>`.
+
+A mismatch is an error with a fix, never a new identity.
+
+**Uniqueness.**
+- **Global.** The address is 160 bits of a key from a 256-bit random seed. Honest agents collide with negligible probability. Matching a given agent's address costs about 2^160 work; a birthday search for any two equal addresses costs about 2^80 and only gives an attacker two agents of its own.
+- **A claim needs the agent key.** The card is signed by the owner (§2.4), so an owner could otherwise put someone else's `agentEvm` in its own card. Two things stop that:
+  - `cardAgentSig`: the invite and the `handshake` carry the agent EVM key's EIP-712 signature over the same `AgentCard`, under the same chain-agnostic domain. It is the signature the Registry calls `cardAgentSig` (05 §4), so one signature serves both. It is `0x` + 130 lowercase hex under the canonical ECDSA rule (§2.4.1). The receiver recovers the signer and requires it to equal `card.agentEvm`, compared as bytes. This shows that the agent key endorsed this owner binding. It does **not** show liveness: card and signatures are public and can be replayed.
+  - **Liveness** comes from the messages themselves. A `handshake` is accepted only from `card.agentNostr` (envelope `from` and seal key, §3.6), over a body that names `inviteId`, `nonceB` and the inviter (`inviterCardHash`). A pairing that starts from an invite completes only on a `handshake-ack` from the invite card's `agentNostr` (§3.4.1). A replayed card therefore completes nothing.
+  - A `card-update` needs neither, because `agentEvm` cannot change in it (§3.4.1). A card whose `agentEvm` equals its `ownerEvm` is refused, because owner and agent signatures would then coincide.
+- **Per store.** A store holds at most one contact per `agentId`, and never its own `agentId` as a contact. The contact `id` in tool results and CLI commands (06 §2.1, `agentlink contacts --verify <id>`) is the contact's `agentId`. Its privacy cost is small: the address already appears in `terms.parties` and Records, and the drop key stays unlinkable (D-48).
+- **Re-pair.** A pairing for an `agentId` that is already a contact is a re-pair. It is allowed when `ownerEvm`, `ownerNostr` and `ownerEnc` are unchanged and `keyEpoch` is not lower. Otherwise, and always for a revoked `agentId` (§3.4.1), it is refused and shown in the activity feed.
+  - **Nothing changes until it completes:** for A, when it accepts the `handshake` (§3.6); for B, when the `handshake-ack` verifies. Until then the existing contact, its card, its pairing and its "Safety code checked" state stay as they are. A pairing that never completes (an unanswered or replayed invite, a missing ack) changes nothing and lapses with the invite's expiry.
+  - On completion the stored card and pairing are replaced, and the new pairing has a new safety code (§3.6.1).
+  - **Concurrent pairings** between the same two agents (for example, crossed invites) can both complete. Each side then keeps the completed pairing whose `handshake` has the later `createdAt`, with ties broken by the larger `envelopeHash` compared as bytes. Both sides hold both handshakes, so they choose the same pairing. If one side never completed the other pairing, the owners see different codes and pair again.
+
+**Storage object keys.** Objects in the owner's storage (07 §5.2) are keyed `agentlink/<storagePrefix>/<random 128-bit>`, never by `agentId`. `storagePrefix` is 16 random bytes (base64url), generated at `init`, recorded in the agent's config and the `identity` table, and not derived from any key. A presigned URL therefore never carries the agent's address, which links to its Records and credits. The prefix still lets one bucket serve several agents with prefix-scoped credentials. It does not hide that two links point into the same bucket; the URL's host shows that anyway.
+
+**Fingerprints (display only).**
+- **Owner fingerprint** = `taggedHash("agentlink/owner-fingerprint/v1", ownerEvm ‖ ownerNostr ‖ ownerEnc)` over the raw 20, 32 and 32 bytes from the card. It covers `ownerEvm`, the key that signs cards, so a card that copies another owner's `ownerNostr` does not get that owner's fingerprint.
+- **Agent fingerprint** = `taggedHash("agentlink/agent-fingerprint/v1", agentId)` over the raw 20 bytes. Advanced only (11 §5.2).
+- **Short form** (default views; the "Contact" fallback of 06 §2.1): the first 4 bytes as 8 upper-case hex digits in two groups joined by `·` (U+00B7), e.g. `7F3A·19C2`. **Long form** (Advanced): all 32 bytes as 64 hex digits. The domain claim's `fp` (§2.7) is the long owner fingerprint in lower case.
+- **Identify, not authenticate.** 32 bits only tell contacts apart. Matching a chosen short fingerprint costs about 2^32 hashes, seconds on one GPU, because an attacker may vary any key in its own card. Only the safety code (§3.6.1), a Registry registration and a verified domain authenticate. When two entries in one store share a short fingerprint but differ in the long one, both are shown with the first 8 bytes (`7F3A·19C2·5D0E·88B1`), and the activity feed flags the newer one.
+- Fingerprints are display strings, not protocol values: no input field accepts them, and §2.4.1 does not apply to them.
 
 ---
 
@@ -585,7 +637,7 @@ All binary values are base64url **without padding** in JSON unless §2.4.1 puts 
 | `policy` | Owner → own agent; echo agent → own owner | `{signed: SignedOwnerAction}` with `policy.set` | Owner → agent: as for `approval`; the core stores the signed object, not the envelope. Echo: after applying a `policy.set` from any path, the core sends the same signed object to its owner. The console accepts it only from one of its own agents that is not revoked, only if `body.agent` equals that agent's `agentEvm` and only if the owner's own signature verifies. It keeps the highest `version` seen per agent, so an older or foreign echo cannot lower it |
 | `revoke` | Owner → the revoked agent and each of its contacts | `{signed: SignedOwnerAction}` with `agent.revoke` | Recipients per §3.2, with the owner as sender. **A contact applies it only if `signed` verifies per §2.5.1 with the contact's stored card in place of the agent's own**: `op` is `agent.revoke`; `agent` equals a stored contact's `agentEvm`; `owner` equals `ownerNostr` in that stored card, as bytes (§2.4.1); `sig` is valid; `v` = 1; `expiresAt` = 0; `issuedAt` is not in the future beyond skew; `params` are strict. Otherwise it is dropped (fail closed). This holds whatever the envelope's `from`: like `handshake`, a verified revoke is an exception to the requests queue, accepted directly from the owner key (decided, D-58). Once applied, the contact drops every envelope from that `agentEvm` processed afterwards, whatever its `createdAt`, and refuses later `card-update` and `handshake` for it. The contact status becomes `revoked` (distinct from `blocked`, not reversible); history stays readable. The revoked agent's own core stops sending and signing (best effort: a compromised agent ignores it, which is why contacts are told) |
 | `card-update` | Agent → each contact | `{card, cardSig, name, relays}` (the `handshake` shapes, §3.6) | `cardSig` valid; `card.agentEvm` equals the stored contact's; `ownerEvm`, `ownerNostr` and `ownerEnc` unchanged (owner-key rotation is P2); `keyEpoch` strictly greater; `nameHash` and `relaysHash` match `name` and `relays`; every URL in `relays` passes the relay URL rule (§4). The envelope may come from the old or the new epoch key: authority comes from `cardSig` only. A changed name is shown as a change and stays self-declared (§2.4) |
-| `handshake-ack` | Inviter A → B | `{inviteId, handshakeId}` (`handshakeId` = B's `handshake` envelope `id`) | B accepts it only from A's `agentNostr` in the invite card (or a later card from the same owner) and only for a handshake B sent with that `inviteId`; B then marks the pairing complete. A key change since the invite follows as a `card-update` |
+| `handshake-ack` | Inviter A → B | `{inviteId, handshakeId, handshakeHash, codeReveal, card, cardSig}`: `handshakeId` = B's `handshake` envelope `id`; `handshakeHash` = its `envelopeHash` (§3.1), `0x` + 64 lowercase hex like every `envelopeHash` (§2.4.1); `codeReveal` = `nonceA` (§3.6.1); `card` and `cardSig` = A's card exactly as in the invite | B accepts it only if the envelope `from` and the seal pubkey equal `card.agentNostr`; `sha256(JCS(card))` equals that of the invite card; `inviteId` and `handshakeHash` match a handshake B sent; and `codeReveal` opens the invite's `codeCommit` (§3.6.1). B then marks the pairing complete (§2.9). Otherwise it drops the ack, and the pairing stays pending. A key change since the invite follows as a `card-update` |
 
 **Revoke delivery (decided, D-58).**
 - **Who is told.** The console builds the recipient list from the owner's own copies of the agent's `handshake`, `handshake-ack` and `card-update` envelopes (I-9), never from the agent's store.
@@ -598,7 +650,7 @@ All binary values are base64url **without padding** in JSON unless §2.4.1 puts 
 - `action`: the exact action the owner approves, `{tool, args, context}`. `tool` is the MCP tool name (06 §2.0). `args` is the tool input after defaults are applied, without `approvalId` and `clientRequestId`, with paths resolved by `realpath`. `context` holds the facts the core bound when it evaluated policy (for example the contact's agent EVM address, the file's `plaintextSha256`, and for paid actions the fee `{token, amount, usd}`), so the digest covers them. Its per-tool fields are fixed in M1-2b.
 - `actionDigest` = `sha256(JCS(action))` (M1-7e). The console recomputes it and refuses a mismatch, and the owner's `approval.decide` signs this digest. An approval therefore cannot be reused for any other action, even one the agent describes the same way.
 - `summary`: core-generated template text (≤ 200 characters) naming the contact (under the contact-name rule, 06 §2.1) and the action, never inbound text (06 §4). The console treats it as a label only and renders the approval card from `action`.
-- `requestedAt`, `expiresAt`: unix seconds; the approval TTL is fixed by G-7.
+- `requestedAt`, `expiresAt`: unix seconds. **Approval TTL (G-7; proposed, owner confirms at merge):** `expiresAt = requestedAt + 86 400` (24 h). For a commitment, it is `min(requestedAt + 86 400, context.scope.expiresAt)`, so a request never outlives its scope. An `approval.decide` is applied only if it arrives by `expiresAt` (§2.5.1). An approved, unused approval for an action other than a commitment lets that action proceed once, until the same `expiresAt`. After that, `agentlink_get_approval` reports `expired`, and the agent's next call returns a new `pending_approval`. Until it is used, the owner can void it with `approval.cancel` (§2.5.1). When it is used, the core evaluates policy again, and if the rule is now `deny` the call is refused, as void rule 4 does for commitments (§3.4.2). For a commitment, the approved parts then run until the scope's own `expiresAt` (§3.4.2).
 
 **Rendering (I-5).** `action` can contain another agent's content, such as `terms` on an `accept`. The console shows every string in `action` as data: escaped, with no links or markup. It marks fields that carry another party's content as theirs (11 §8). It never derives anything to execute from them.
 
@@ -624,7 +676,7 @@ A commitment (D-31) is approved once per agreement and per owner. The approval b
   "termsHash": "<64 lowercase hex>",
   "answers": { "envelopeId": "<id>", "envelopeHash": "0x<64 lowercase hex>" },  // the counterparty envelope answered; null for a firm offer; envelopeHash is EVM-native (§2.4.1)
   "notarize": false,
-  "maxFeeUsd": "0.10",                                         // null when nothing is paid
+  "maxFeeUsd": "0.1",                                          // USD amount (§2.4.1); null when nothing is paid
   "createdAt": 1760000000,
   "expiresAt": 1760600000                                      // min(terms.validUntil, createdAt + 7 days)
 }
@@ -651,7 +703,7 @@ A commitment (D-31) is approved once per agreement and per owner. The approval b
 - The core claims a part atomically: in one store transaction (SQLite, or Durable Object storage) it checks that the part is unused, marks it used and stores the signed item, before it publishes anything (07 §2.1). Two concurrent retries therefore cannot both run a part. A used part is never authorised again. The record's single-use nonce and the on-chain one-time receipt flag (I-6, 05 §3.3) are the second line of defence.
 - A repeat with the same `clientRequestId` returns the original result. A repeat call with the same `approvalId` after every part has run or is waiting for its record returns `rejected` with `APPROVAL_USED` and the state of the original response (for example `waiting_for_record`). It never sends or signs a part twice.
 
-**Expiry (proposed; owner confirms at merge).** `expiresAt = min(terms.validUntil, createdAt + 7 days)`, where `createdAt` is when the core created the pending request or the grant. Both values are set then and are part of the signed digest. The pending request itself expires sooner, per G-7 (proposed 24 h); an approval arriving after that is refused. After `expiresAt`, unused parts are void. If the offerer records the offer after that, the accepter's `ACCEPTED` receipt is not signed. The accept message then stands without on-chain evidence. A new `accept` call on the same offer asks the owner again; because the accept was already sent, its scope covers only the receipt.
+**Expiry (proposed; owner confirms at merge).** `expiresAt = min(terms.validUntil, createdAt + 7 days)`, where `createdAt` is when the core created the pending request or the grant. Both values are set then and are part of the signed digest. The pending request itself expires sooner: 24 h after it was created, or at the scope's `expiresAt` if that comes first (§3.4.1, G-7). An approval that arrives after that is refused. After `expiresAt`, unused parts are void. If the offerer records the offer after that, the accepter's `ACCEPTED` receipt is not signed. The accept message then stands without on-chain evidence. A new `accept` call on the same offer asks the owner again; because the accept was already sent, its scope covers only the receipt.
 
 **Void on any change.** The approval is void when any of the following holds. Then nothing is sent or signed, and the call returns `status: "rejected"` with the code shown (06 §2.2a):
 1. For an `accept` or `offer` scope, before its envelope is sent: a newer version of the same negotiation (same negotiation key, higher `version`, from either side), or a conflict on that version (§3.4, no forks), is in the store (`TERMS_SUPERSEDED`). After the accept is sent, a later version does not void the receipt for the accepted version.
@@ -699,19 +751,21 @@ The terms fingerprint is under Advanced. Tool summaries name only the contact, t
 
 ```jsonc
 { "v": 1, "inviteId": "<16 bytes>", "secret": "<32 bytes>", "card": { /* A's AgentCard */ },
-  "cardSig": "0x<130 lowercase hex: owner EIP-712 sig>", "name": "Tali's Claude", "relays": ["wss://…"], "expiresAt": 1760600000 }
+  "cardSig": "0x<130 lowercase hex: owner EIP-712 sig>", "cardAgentSig": "0x<130 lowercase hex: agent EIP-712 sig>",
+  "codeCommit": "<32 bytes>", "name": "Tali's Claude", "relays": ["wss://…"], "expiresAt": 1760600000 }
 ```
 
-- `card` is in the card JSON form and `cardSig` is `0x` hex (§2.4, §2.4.1). `inviteId` and `secret` are base64url.
+- `card` is in the card JSON form, and `cardSig` and `cardAgentSig` (§2.9) are `0x` hex (§2.4, §2.4.1). `inviteId` (exactly 16 bytes), `secret` (exactly 32) and `codeCommit` (exactly 32, §3.6.1) are base64url. Any other length is rejected on parse.
 - `relays` (here, in `handshake` and in `card-update`) is inbound content: every URL must pass the relay URL rule (§4) at parse, or the whole body is rejected.
 - Encoded as base64url(deflate(JSON)). Shared as `https://<invite-host>/i#<payload>` (the fragment is never sent to a server) and accepted by the CLI/MCP from the full URL or the bare payload. Until the invite landing page ships (M2), the host serves a static "how to install" page.
-- A stores `{inviteId, proofKey, expiresAt, used=false}`, where `proofKey = HKDF-SHA256(ikm = secret (its 32 raw bytes), salt = "", info = utf8("agentlink/v1/pairing-proof"), L = 32)` (proposed; owner confirms at merge). A derives `proofKey` when it creates the invite, keeps it only as an encrypted store column (07 §3), and never stores the raw `secret`. Anyone who reads `proofKey` can answer that one invite, just as with `secret`. The derivation adds key separation and keeps the secret that travels in the link out of the store, but it does not make the stored value safe to disclose. Single use; default expiry 7 days.
+- A stores `{inviteId, proofKey, nonceA, expiresAt, used=false}`, where `proofKey = HKDF-SHA256(ikm = secret (its 32 raw bytes), salt = "", info = utf8("agentlink/v1/pairing-proof"), L = 32)` (proposed; owner confirms at merge) and `nonceA` is the committed nonce of §3.6.1. A derives `proofKey` when it creates the invite, keeps it and `nonceA` only as encrypted store columns (07 §3), and never stores the raw `secret`. Anyone who reads `proofKey` can answer that one invite, just as with `secret`. The derivation adds key separation and keeps the secret that travels in the link out of the store, but it does not make the stored value safe to disclose. Single use; default expiry 7 days.
+- Whoever holds the link can answer it once, first come first served. The invite copy says so (11 §6.1), and a second answer is reported (Complete, below).
 
 **Accept** (agent B):
 
-1. Verify `cardSig` and expiry.
-2. Apply policy `contacts.acceptInvites` (default `approval`: owner confirms in local UI or console, seeing name, owner fingerprint and safety code).
-3. Send a `handshake` envelope to A (recipients: A agent, A owner, B owner, B agent) with body `{inviteId, card: B's AgentCard, cardSig, name, relays, proof}`, where `proof = HMAC-SHA256(proofKey, utf8("agentlink-handshake") || inviteId || sha256(JCS(B card)))`. Byte-exact input (proposed; owner confirms at merge):
+1. Verify the strict schema, expiry, `cardSig`, and `cardAgentSig`, which must recover `card.agentEvm`. A card whose `agentEvm` equals its `ownerEvm` is refused (§2.9).
+2. Apply policy `contacts.acceptInvites` (default `approval`: owner confirms in local UI or console, seeing name, label and owner fingerprint). There is no safety code yet: it exists only once pairing completes (§3.6.1).
+3. Send a `handshake` envelope to A (recipients: A agent, A owner, B owner, B agent) from B's own `agentNostr`, the key in the card it sends, with body `{inviteId, card: B's AgentCard, cardSig, cardAgentSig, name, relays, proof, codeNonce, codeCommit, inviterCardHash}`. `codeNonce` is `nonceB` (§3.6.1), `codeCommit` is copied from the invite, and `inviterCardHash` is `sha256(JCS(A's invite card))`, bare hex 64, naming whom B answers. The envelope signature covers all of them. `proof = HMAC-SHA256(proofKey, utf8("agentlink-handshake") || inviteId || sha256(JCS(B card)))`. Byte-exact input (proposed; owner confirms at merge):
    - The HMAC key is `proofKey` (32 bytes): B derives it from the invite's `secret` (decoded from base64url) with the HKDF above, and A reads it from its store. The raw `secret` is never an HMAC key.
    - The message is the concatenation, with no separators and no length prefixes, of:
      - `utf8("agentlink-handshake")` (19 bytes);
@@ -721,9 +775,89 @@ The terms fingerprint is under Advanced. Tool summaries name only the contact, t
 
 **Complete** (agent A):
 
-- Unknown senders normally go to the requests queue. A `handshake` is the one exception: it is accepted if `proof` matches an unused, unexpired invite. A recomputes the HMAC with the stored `proofKey` and compares in constant time. A then marks the invite used, adds B, and replies `handshake-ack`.
+- Unknown senders normally go to the requests queue. A `handshake` is the one exception. A accepts it only if all of these hold:
+  - `proof` matches an unused, unexpired invite: A recomputes the HMAC with the stored `proofKey` and compares in constant time;
+  - **the sender is the card's agent:** the envelope `from` and the seal pubkey (§3.5) both equal `card.agentNostr`, compared as bytes, so a replayed card with its signatures is useless to anyone without that key;
+  - `cardSig` and `cardAgentSig` verify (§2.9), and `agentEvm` ≠ `ownerEvm`;
+  - `inviterCardHash` equals `sha256(JCS(card))` of the card A put in this invite, and `codeCommit` equals that invite's;
+  - the §2.9 per-store rules allow it.
+- A then marks the invite used, completes the pairing (a re-pair replaces the old one only now, §2.9), and replies `handshake-ack` (§3.4.1). A signs the ack with the `agentNostr` of its invite card (old epoch keys are re-derivable, §2.6). A newer card follows as a `card-update`.
+- **A second answer.** A `handshake` with a valid `proof` for an invite that is already used means the link leaked or someone raced the intended contact. It is refused, and the activity feed tells A's owner: "Someone else also answered your invite. Compare the safety code with {contact} before you trust this contact." Only the owner alias is used, never inbound text.
 
-**Safety code:** `sha256(sortBytes(A.agentNostr, B.agentNostr) || sortBytes(A.ownerNostr, B.ownerNostr))` over the raw 32-byte keys (decoded per §2.4.1), first 40 bits shown as 12 decimal digits in three groups of four. Both sides show the same code. It needs both sides' keys, so it cannot exist when the invite is created: `create_invite` returns only the inviter's owner fingerprint. B can compute it at accept time, because it already holds A's card, so B's owner confirmation (Accept step 2) shows it; A learns it when B's handshake arrives. After the handshake both sides show it, to be compared through another channel.
+**Complete** (agent B): B completes the pairing when a `handshake-ack` passes §3.4.1 and the commitment check of §3.6.1. Until then the pairing is pending, and any existing contact for that `agentId` is untouched (§2.9).
+
+#### 3.6.1 Safety code (G-28; proposed, owner confirms at merge)
+
+**What it protects.** The invite travels over a channel AgentLink does not control, such as chat or email. Whoever controls that channel, or copies the invite, can swap A's card for its own towards B, use the copied invite towards A, and sit in the middle. A relay cannot do this. Every pairing message must come from the agent key in its own card (§3.6 Complete, §3.4.1), and that card is signed by its owner, so a relay can only drop or delay messages: a dropped message leaves a pairing pending, never with a wrong code. The two owners detect a swapped invite by comparing the code through another channel, by phone or in person.
+
+**Commit, then reveal.** All three values are exactly 32 bytes, base64url.
+- `nonceA`: 32 random bytes drawn by A for each invite. The invite carries `codeCommit = taggedHash("agentlink/safety-commit/v1", inviteId ‖ nonceA)`.
+- `nonceB`: 32 random bytes drawn by B for each answer, after B holds the invite. The `handshake` carries it as `codeNonce`, together with the copied `codeCommit` and `inviterCardHash` (§3.6).
+- The `handshake-ack` reveals `nonceA` as `codeReveal`, only after A accepted the handshake. B, and every surface that recomputes the code, checks `taggedHash("agentlink/safety-commit/v1", inviteId ‖ codeReveal) = codeCommit`. On a mismatch B drops the ack: the pairing stays pending, no code is shown, and the activity feed reports a failed pairing.
+
+**Construction.**
+
+```
+T      = sha256(JCS(cardA)) ‖ sha256(JCS(cardB)) ‖ inviteId ‖ nonceA ‖ nonceB   // 32 + 32 + 16 + 32 + 32 = 144 bytes
+digest = taggedHash("agentlink/safety-code/v1", T)                                // pairingDigest
+code   = u64be(digest[0..8]) mod 10^12                                           // 12 decimal digits with leading zeros
+shown  = "dddd dddd dddd"                                                         // three groups of four, e.g. "0482 1093 7551"
+```
+
+- `cardA` is the card in the invite and `cardB` the card in the handshake, each in its JSON form (§2.4), hashed exactly as for the pairing `proof`. `inviteId` and the nonces enter as raw bytes. Every part has a fixed length, which the parsers enforce (§3.6), so the concatenation is unambiguous.
+- Order is by role, inviter first, and never sorted: each side knows its role from whether it created the invite. Swapping the roles gives a different code.
+- `taggedHash` is the BIP-340 tagged hash (§3.1). The two labels differ from each other and from every other label in this document.
+- 2^64 is not a multiple of 10^12, so some codes are more likely than others by a factor of at most 1 + 5.5 × 10^-8. That is negligible.
+
+**Where the code comes from: two signed messages, never a stored value.** No surface displays a stored code or digest; an agent with shell access could edit one. Every surface (the core, the local app, the desktop app, the console, the browser counterparty page) computes the code from the pairing's `handshake` H and `handshake-ack` K, as signed envelopes, each time it shows the code or signs `contact.check`:
+1. H's envelope signature is valid, and its `from` equals `H.card.agentNostr`. `H.card` passes `cardSig` and `cardAgentSig` (§2.9).
+2. K's envelope signature is valid, and its `from` equals `K.card.agentNostr`. `K.card` passes `cardSig`. `sha256(JCS(K.card)) = H.inviterCardHash`, `K.handshakeHash` = the `envelopeHash` of H (§3.1), and `K.inviteId = H.inviteId`.
+3. `K.codeReveal` opens `H.codeCommit` (above).
+4. Roles: one of `K.card.agentEvm` (inviter) and `H.card.agentEvm` (invitee) is the surface's own agent. The core takes its own `agentId` from its seed; the console takes it from the cards its owner signed. The other card's `agentEvm` and owner keys equal the contact's current card's.
+5. `T = sha256(JCS(K.card)) ‖ sha256(JCS(H.card)) ‖ H.inviteId ‖ K.codeReveal ‖ H.codeNonce`. Any failed check shows "Can't show the safety code" instead of a code.
+
+Every input is covered by the peer's signature, directly or through a hash:
+- **The inviter** relies on H, which the invitee signed. H pins its own card (`inviterCardHash`) and `nonceA` (`codeCommit`).
+- **The invitee** relies on K, which the inviter signed. K pins all of H (`handshakeHash`).
+
+A local edit of the store therefore cannot change a displayed code without the peer's key. The owner is a recipient of both H and K (§3.2, I-9), so the console recomputes the code from its own copies, not from anything the agent's store reports. This is not full independence from the agent's machine: the agent key on that machine can sign a different H (invitee side) or K (inviter side) of its own. So the console rejects conflicting messages: if it holds two different handshakes, or two different acks, for the same `inviteId`, it shows no code for that pairing and warns the owner to pair again. **Residual:** an agent with shell access as the same OS user can still alter the AgentLink installation on that machine, and with it what its screens show (§2.5). For a contact that matters, the owner compares on the console, on their own device.
+
+The stores keep H, K and the pending `nonceA` or `nonceB` (07 §3). Nothing in them is secret once pairing completes, and none of them is ever the source of a displayed code.
+
+**Why commit first, and why 12 digits.**
+- **Keys alone are not enough.** A code over keys alone, like the earlier `sortBytes` formula, can be computed by anyone who knows the cards. A MITM on both legs must make the code of the A leg equal the code of the B leg.
+  - If it knows B's card before it sends its invite to B (from the Registry, a published card or an earlier pairing), it grinds key sets for both legs offline and looks for a collision: a birthday search of about 2^(t/2) keys per leg for a t-bit code. That is 2^20 for 40 bits and 2^30 for 60 bits.
+  - Otherwise its invite to B is fixed blind, and after B's handshake it grinds the A-leg card against that one target: about 2^t keys. That is 2^40 for 40 bits and 2^60 for 60 bits, and the invite's 7 days leave time for it.
+  - Each candidate key costs about one point addition. Either way, a 40-bit keys-only code falls, and no keys-only code short enough to read aloud is safe against a funded attacker.
+- **A transcript or fresh nonces alone are not enough either.** The MITM sees `inviteId` and `secret` on one leg and chooses them on the other. With fresh nonces but no commitment, whoever sends last tries nonces until the two codes match, at one hash per try. 2^40 tries take minutes on one GPU; 2^60 take over a thousand GPU-days, within reach of a funded attacker.
+- **With the commitment, offline work does not help.** On each leg the code depends on a 256-bit nonce from the honest party, which the MITM cannot see before it has fixed all its own inputs on that leg. Towards B, the MITM's invite (with its commitment) is fixed before `nonceB` arrives. Towards A, A reveals `nonceA` only after the MITM's handshake. The two codes are then independent and uniform, and they match by chance with probability 10^-12 ≈ 2^-39.9 **per attempt**. This is the standard commit-then-reveal bound for short authentication strings, as in ZRTP's hash commitment and Bluetooth numeric comparison. Each attempt costs a pairing that the owners see, because invites are single use and a second answer is reported.
+- **Forwarding the honest commitment fails.** A MITM that copies A's `inviteId` and `codeCommit` into its own invite to B still has its own card in T, so the codes differ.
+- **A malicious counterparty cannot pick a code** either, for example one its victim already compared with someone else: the other side's nonce is unknown when it commits. Codes are per pairing, so two contacts share a code only by chance.
+- The commitment hides `nonceA` (256 random bits) and binds it through SHA-256 collision resistance.
+- **12 digits** keeps the format of 11 §5.5. Per attempt, 6 digits (10^-6) would already do; the extra digits keep the bound comfortable over many attempts.
+
+**Comparison: on owner surfaces, never through the agent alone.** "The agent" here means the AI model and any text it writes, not the AgentLink core.
+- The code is shown only by AgentLink's own owner surfaces: the local app (contact detail and safety-code compare), the desktop app, the console, the browser counterparty page (08 §7), and `agentlink contacts --verify <id>`. The CLI shows the digits only in an interactive terminal with no harness marker set (the UX guard of §2.8 and 07 §9.1), and the owner runs it in their own terminal.
+- **MCP tool results never carry the digits** (06 §2.1). A MITM is the counterparty on both legs, so it can send content to both agents. If owners compared codes that their AIs repeated, an injected agent on each side could repeat one shared fake code. Tools return `pairing` and `safetyCodeChecked`, plus a fixed `nextStep` that names the owner surface.
+- **"They match"** is an owner operation: `contact.check` (§2.5.1), with owner presence. It binds the contact's `agentId` and the `pairingDigest` that the signing surface has just recomputed from H and K. Only then does the label become "Safety code checked" (11 §5.2). The core re-verifies it on every load against a fresh recomputation. No MCP tool can produce it (I-4).
+- **"They don't match"** only lowers trust, so it needs no signature. From an owner surface only, the contact is blocked (02 F-14) and its pairing marked `mismatch`, and the owner is told to pair again with a new invite sent through another channel.
+- Nothing compares codes automatically. A code that arrives as inbound content is never compared with anything (I-5).
+
+**When it is shown.**
+- **Pairing (02 J1, J7).** Never in the invite, and never on B's new-contact approval. A shows the code once it has accepted B's handshake and sent the ack; B shows it once the ack verifies. While A's agent is offline, B's side shows the pairing as waiting for the other agent.
+- **Re-pair (§2.9).** Always a new code, once the new pairing completes. The contact then loses "Safety code checked" until the owners compare again; before completion nothing changes.
+- **Key change.** A `card-update` (new agent keys, §2.6) keeps the code and the label. The code attested the owner keys, which a `card-update` cannot change (§3.4.1), and the new card carries their signature. Step 4 above compares owner keys and `agentEvm`, so it still holds. The activity feed says the contact updated its keys with the same owner, without asking to compare again. A change of owner keys (P2) or a new identity comes only through a new pairing, and so with a new code.
+
+**Test vectors (M1-1h, `safety-code` suite).**
+- The commitment from `inviteId` and `nonceA`.
+- `T`, `digest`, the integer and the shown code from two cards, `inviteId` and both nonces.
+- Leading-zero and reduction-edge cases.
+- A role swap gives a different code.
+- A `codeReveal` that does not open `codeCommit` is refused.
+- The same input under the two labels gives different digests.
+- A full H and K pair whose recomputation succeeds, plus one failing case per step 1–4.
+
+The §2.9 values go to other suites: the agent ID to `hkdf-derive`, `cardAgentSig` to `eip712`, `contact.check` to the owner-action vectors, and fingerprints to a new `fingerprint` suite.
 
 ---
 
@@ -797,6 +931,7 @@ Static recipient keys mean a stolen encryption key decrypts past envelopes addre
 | **Drop abuse / free storage misuse** (hosting malware or illegal content, quota farming with fresh drop keys) | Per-file size cap and weekly quota per drop key, backed by per-IP rate limits and a global cap (residual sybil risk, §4 Limits); hard 7-day expiry; per-object download limit; objects served only as `attachment` octet-stream from a dedicated host (no web pages); a report path that deletes the object (blocking a key needs human review); contents cannot be inspected (ciphertext). `DECISION NEEDED (owner)`: terms of service and takedown process (counsel) |
 | **Consumer storage account compromise or over-broad OAuth scope** (D-49) | Minimal scopes (app folder or app-created files), so a stolen token reaches only AgentLink ciphertext; tokens only in the OS keychain (bound to the signed desktop app where the OS allows), never sent to 4thTech or logged; a compromised account can read only ciphertext and can delete or replace it, which the hash checks detect; the owner can revoke the app at the provider. A provider whose sharing API needs a broader scope ships only after an owner decision (07 §5.5) |
 | **Malicious submitter** | Cannot alter signed records; can only censor → client fails over to another submitter or direct mode |
+| **Budget ledger tampering or clock moves** (same OS user; G-7) | The budget check and the reservation of the Record's `maxFee` run in one transaction (06 §3). A missing or unreadable ledger, or a clock earlier than the newest ledger entry, makes every paid action need approval (fail closed). Residual: unlike the policy version, the ledger has no KeyStore high-water mark, so deleting ledger rows (G-1) resets the daily budget; moving the clock forward repeatedly (root or `CAP_SYS_TIME`) empties the window. Mitigations: `perActionMaxUSD` still applies per action, small credit balances, and the on-chain charges remain visible in the vault |
 | **Network observer** | TLS everywhere; content already E2E-encrypted |
 | **Compromised 4thTech web host serving malicious console JS** | Open source, reproducible builds, published hashes, SRI, CSP; self-hostable console; local packaging avoids the web entirely. Residual risk documented |
 | **Shell-capable harness agent (same OS user)** | Owner key never on disk unwrapped; owner operations need passkey/passphrase (§2.5); signed policies; harness permission guidance; small credit balances |
@@ -806,7 +941,10 @@ Static recipient keys mean a stolen encryption key decrypts past envelopes addre
 | **Malicious files / symlink tricks** | Never executed; sanitized names; realpath checks; size limits |
 | **Stolen laptop** | Keychain protection (OS login); owner key needs passkey/passphrase; owner can revoke the agent (revocation envelope + on-chain revoke if registered) |
 | **Leaked file KeyStore on a headless machine** (D-54: home directory, volume, image layer or backup copied; passphrase in an environment variable or config) | Opt-in only, after a plain-words warning; Argon2id + AES-256-GCM with authenticated header; generated 120-bit unlock code by default; passphrase file from a run-time secret mount recommended over environment variables; 0700/0600 modes, symlink and `realpath` checks; `doctor` warnings; a copied `owner.alko` is protected by a required 120-bit owner code, and the owner key is never unlocked non-interactively, so a leak exposes the agent key only (revoke and replace the agent; changing the code does not protect earlier copies). Residual: a passphrase stored on the same disk gives no at-rest protection beyond disk encryption; an agent that fakes a terminal and runs the owner step itself voids owner presence on that machine (§2.8) |
-| **Phishing invites** | Invites show name, owner fingerprint and safety code; expire; single use; owner approval by default |
+| **Phishing invites** | Invites show the name under the name rule, the label, the owner fingerprint and the expiry; the safety code follows pairing (§3.6.1); expire; single use; owner approval by default |
+| **Swapped or copied invite (MITM at pairing)** | Commit-then-reveal safety code, 12 digits, compared by the owners on their own surfaces and never relayed by an AI (§3.6.1); "Safety code checked" only through an owner-signed `contact.check`; single-use invites, a second answer reported to the inviter's owner (§3.6) |
+| **Agent ID claimed by another owner's card, or a replayed card** | `cardAgentSig` binds the agent key to the owner binding; a `handshake` only from `card.agentNostr` and an ack only from the invite card's key; one contact per `agentId`; a re-pair takes effect only on completion and only with unchanged owner keys (§2.9) |
+| **Local edit of the displayed safety code** (a steered AI with shell access) | The code is recomputed on every display from the signed `handshake` and `handshake-ack`, each input covered by the peer's signature, never read from a stored digest; `contact.check` signs the recomputed digest (§3.6.1). Residual: an agent that alters the AgentLink installation itself controls what that machine shows (§2.5), so important contacts are compared on the console |
 | **Replay of records / receipts / authorizations** | EIP-712 domain, nonces, deadlines, one-time receipt flags; EIP-3009 nonces |
 | **Abuse of a public agent card** (e.g. registering it with attacker fees) | Registration requires a separate owner signature over fee parameters (05 §4) |
 | **Submitter gas griefing** | Simulate before submit; require on-chain credits; per-signer rate limits; minimum deposit for gasless top-ups |

@@ -192,6 +192,8 @@ def parse_card(card):
     for name in BYTES32_FIELDS:
         if not isinstance(card[name], str) or not re.fullmatch(r"0x[0-9a-f]{64}", card[name]):
             raise ValueError(f"{name} is not canonical")
+    if card["agentEvm"] == card["ownerEvm"]:
+        raise ValueError("agentEvm equals ownerEvm (04 §2.9)")
     for name, bits in UINT_BITS.items():
         value = card[name]
         if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= min(2**53 - 1, 2**bits - 1):
@@ -241,7 +243,7 @@ def card_sig(secret, message32):
     return "0x" + r + s + format(27 + y, "02x")
 
 
-def verify_card_sig(card, sig):
+def verify_card_sig(card, sig, signer_field="ownerEvm"):
     try:
         parse_card(card)
     except ValueError:
@@ -252,7 +254,7 @@ def verify_card_sig(card, sig):
     if v_byte not in (27, 28) or not 1 <= int(r, 16) < v.SECP256K1_N or not 1 <= int(s, 16) <= v.SECP256K1_N // 2:
         return False
     signer = recover(card_digest(card), r, s, v_byte - 27)
-    return signer is not None and bytes.fromhex(signer[2:]) == bytes.fromhex(card["ownerEvm"][2:])
+    return signer is not None and bytes.fromhex(signer[2:]) == bytes.fromhex(card[signer_field][2:])
 
 
 def make_card(label, name, relays, issued_at, expires_at, key_epoch):
@@ -357,6 +359,7 @@ def build():
         ("name-hash-31-bytes", "nameHash of 31 bytes", card_variant(nameHash=card["nameHash"][:-2])),
         ("unknown-field", "a thirteenth field", card_variant(note="x")),
         ("missing-field", "relaysHash missing", card_variant(relaysHash=None)),
+        ("agent-evm-equals-owner-evm", "agentEvm equal to ownerEvm (04 §2.9)", card_variant(agentEvm=card["ownerEvm"])),
     ]:
         try:
             parse_card(bad)
@@ -431,6 +434,39 @@ def build():
     verify_case("card-verify-reject-r-n", "r = n (r must be in [1, n - 1])", card, "0x" + n_hex + s_hex + format(v_byte, "02x"), False)
     verify_case("card-verify-reject-v-29", "v = 29", card, sig[:130] + "1d", False)
 
+    # cardAgentSig (04 §2.9): the agent EVM key's signature over the same card digest; it must recover
+    # card.agentEvm. A signature by the owner key in its place is rejected.
+    agent_sig = card_sig(agent_secret, card_digest(card))
+    if not verify_card_sig(card, agent_sig, "agentEvm"):
+        v.fail("cardAgentSig does not verify")
+    cases.append(
+        v.case(
+            "card-agent-sign",
+            "04 §2.9 cardAgentSig: the agent EVM key over the same AgentCard digest as cardSig (canonical ECDSA, 04 §2.4.1)",
+            {"op": "signCardAgent", "card": card, "secretKey": agent_secret.hex()},
+            {"cardAgentSig": agent_sig},
+        )
+    )
+
+    def agent_case(case_id, why, the_card, the_sig, accept):
+        if verify_card_sig(the_card, the_sig, "agentEvm") != accept:
+            v.fail(f"{case_id}: unexpected verification result")
+        cases.append(
+            v.case(
+                case_id,
+                f"04 §2.9: {why}",
+                {"op": "verifyCardAgentSig", "card": the_card, "cardAgentSig": the_sig},
+                {"outcome": "accept" if accept else "reject"},
+            )
+        )
+
+    agent_case("card-agent-verify", "cardAgentSig recovers card.agentEvm", card, agent_sig, True)
+    agent_case("card-agent-verify-reject-owner-sig", "the owner's cardSig in place of cardAgentSig", card, sig, False)
+    agent_case("card-agent-verify-reject-other-card", "a cardAgentSig over another card (keyEpoch changed)", card_variant(keyEpoch=1), agent_sig, False)
+    agent_r, agent_s, agent_v = agent_sig[2:66], agent_sig[66:130], int(agent_sig[130:132], 16)
+    agent_high = "0x" + agent_r + format(v.SECP256K1_N - int(agent_s, 16), "064x") + format(55 - agent_v, "02x")
+    agent_case("card-agent-verify-reject-high-s", "the malleated high-s form (EIP-2)", card, agent_high, False)
+
     # Raw JSON text of a card (04 §2.4: I-JSON; §2.4.1: integer tokens match 0|[1-9][0-9]*).
     canonical_text = json.dumps(card)
     cases.append(
@@ -468,7 +504,8 @@ SCHEMA = v.case_schema(
     "`signTypedData`, `signAgentCard`: deterministic ECDSA as 0x + r || s || v (v 27 or 28). "
     "`agentCard`: typeHash, domain separator, struct hash and digest of a card in the card JSON "
     "form under the chain-agnostic domain, or a rejection of a non-canonical card. `cardHashes`: "
-    "nameHash and relaysHash. `verifyAgentCard`: whether `cardSig` is the card owner's. Hashes are "
+    "nameHash and relaysHash. `verifyAgentCard`: whether `cardSig` is the card owner's. `signCardAgent` / "
+    "`verifyCardAgentSig`: the agent key's cardAgentSig and whether it recovers agentEvm. Hashes are "
     "32-byte hex without 0x. `agentCardJson`: the digest of a card given as JSON text, or a "
     "rejection of a duplicate key or a non-canonical integer token.",
     {
@@ -479,6 +516,8 @@ SCHEMA = v.case_schema(
             [{"typeHash": v.hexn(32), "domainSeparator": v.hexn(32), "structHash": v.hexn(32), "digest": v.hexn(32)}, v.REJECT],
         ),
         "agentCardJson": ({"json": v.STRING}, [{"digest": v.hexn(32)}, v.REJECT]),
+        "signCardAgent": ({"card": v.OBJECT, "secretKey": v.hexn(32)}, [{"cardAgentSig": SIGNATURE_0X}]),
+        "verifyCardAgentSig": ({"card": v.OBJECT, "cardAgentSig": v.STRING}, [v.ACCEPT, v.REJECT]),
         "cardHashes": ({"name": v.STRING, "relays": {"type": "array", "items": v.STRING}}, [{"nameHash": BYTES32, "relaysHash": BYTES32}]),
         "signAgentCard": ({"card": v.OBJECT, "secretKey": v.hexn(32)}, [{"cardSig": SIGNATURE_0X}]),
         "verifyAgentCard": ({"card": v.OBJECT, "cardSig": v.STRING}, [v.ACCEPT, v.REJECT]),

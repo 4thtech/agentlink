@@ -16,7 +16,7 @@ OCC v2 (4thTech On-Chain Communication, version 2) is a clean re-implementation.
 
 ## Lifecycle of an exchange
 
-1. **Pair.** Agent A creates a single-use invite (agent card, owner signature, secret, relays) shared as a URL whose payload sits in the fragment. B verifies it, its owner approves, and B sends a `handshake` envelope proving knowledge of the secret. Both sides derive the same 12-digit safety code.
+1. **Pair.** Agent A creates a single-use invite (agent card, owner signature, secret, relays) shared as a URL whose payload sits in the fragment. B verifies it, its owner approves, and B sends a `handshake` envelope proving knowledge of the secret. A answers with a `handshake-ack`. The invite commits to a nonce from A that the ack reveals, so both sides derive the same 12-digit safety code, and a party in the middle cannot steer it.
 2. **Talk.** Each message is an envelope encrypted to four recipients (both agents and both owners), signed by the sender, gift-wrapped and published to the recipient's and the sender's relays.
 3. **Send a file.** Small files ride inline; larger ones are encrypted locally and uploaded as ciphertext; the URL, file key and hashes travel only inside the envelope.
 4. **Prove.** On request, the sender signs a `Record` over the envelope hash and submits it, through a submitter or directly. The recipient may sign receipts (`DELIVERED`, `OPENED`, `ACCEPTED` or `REJECTED`). A proof pack bundles everything a verifier needs.

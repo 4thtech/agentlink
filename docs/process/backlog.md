@@ -739,6 +739,17 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Proof-layer suites (STREAM, PRF wrap, `Record`, `Receipt`, `Registration`) are M1-1i (M1b).
   - These are the **canonical** vectors; the contracts repo checks parity against a pinned commit (D-19).
   - Vectors that depend on open gap G-28 are added only after it is resolved.
+  - G-23/G-28 vectors (04 §2.9, §3.6.1; added once the branch `docs/G-23-G-28-agentid-safety-code` merges):
+    - `safety-code`: `codeCommit` from `inviteId` and `nonceA`; `T`, `digest`, the 64-bit integer and the shown code from two cards (JCS form), `inviteId`, `nonceA` and `nonceB`; cases whose code has leading zeros, an integer at the top of the 2^64 range, and a role swap (different code); reject vectors for a `codeReveal` that does not open `codeCommit`; the same `T` under the commit and the code labels gives different digests; a full signed `handshake` and `handshake-ack` pair whose recomputation (04 §3.6.1 steps 1–5) gives the code, plus one failing pair per step.
+    - `hkdf-derive`: the agent ID (`0x` + 40 lowercase hex) for each seed's `agentlink/v1/evm` key at epoch 0.
+    - `eip712`: `cardAgentSig` by the agent key over the same `AgentCard` digest as `cardSig`; it recovers `agentEvm`; a signature by the owner key in its place is rejected.
+    - `fingerprint` (new suite): owner fingerprint from `ownerEvm`, `ownerNostr`, `ownerEnc`, and agent fingerprint from the agent ID, each as the 32-byte digest, the short form (`7F3A·19C2`) and the long form.
+    - owner actions: `contact.check` signing vector, and reject vectors for a `pairingDigest` with `0x` or in upper case.
+  - G-7/G-32 vectors (06 §3, 04 §2.5.1; added once the branch `docs/G-7-G-32` merges):
+    - `policy.set` signing vectors: the 06 §3 defaults in the policy JSON form, and one policy with two `contactRules` (JCS key order inside the rules, the sorted list).
+    - Reject vectors (schema): a USD limit as a JSON number (`5`) and as `"5.0000001"`; an unsorted `autoAcceptContacts` or `contactRules`; a duplicate contact; a `ContactRule` with `proofs: {}`; a missing policy key.
+    - Encoding suite: the USD amount row of 04 §2.4.1, with accept cases (`"0"`, `"0.1"`, `"5"`, `"999999999.999999"`) and reject cases (`"0.10"`, `"5.0"`, `"5."`, `"05"`, `"1.0000001"`, `"1000000000"`, a JSON number), on a policy path, `maxFeeUsd` and `fee.usd`.
+    - Freshness is not a signing property, so its boundaries are M1-7d table tests, not vectors.
 - **Acceptance:**
   - Every case records generator, version and inputs; regeneration from the generator scripts reproduces the files byte for byte.
   - Narrow gitleaks allowlist (fingerprints, owner-reviewed) for deliberate test keys; no directory-wide allowlist.
@@ -793,11 +804,11 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Scope:**
   - `deriveKey(masterSeed, label, epoch, counter)` exactly per 04 §2.1 (HKDF-SHA256, salt `agentlink-v1`, info = label ‖ 0x00 ‖ u32be(epoch) ‖ u8(counter), L = 32).
   - secp256k1 rejection loop (okm = 0 or ≥ n → counter + 1); `agentlink/v1/evm` always epoch 0; Nostr and enc keys per `keyEpoch`; X25519 from okm (library clamping).
-  - Public bundle: checksummed EVM address, Nostr x-only key, X25519 key, `kid` = first 16 bytes of SHA-256(encPub). BIP-340 sign/verify helpers for KeyStore implementations only.
+  - Public bundle: agent ID (the EVM address as `0x` + 40 lowercase hex, 04 §2.9; EIP-55 checksum for display only), Nostr x-only key, X25519 key, `kid` = first 16 bytes of SHA-256(encPub). BIP-340 sign/verify helpers for KeyStore implementations only.
   - Drop key (`agentlink/v1/drop`, secp256k1/BIP-340, current `keyEpoch`; D-48): signs only encrypted-drop requests and is never part of the public bundle or agent card, so it stays unlinkable to the agent's public identity.
   - Intermediate secrets wiped.
 - **Acceptance:**
-  - Vector suites `hkdf-derive` and `bip340`: their harness modules are registered and the suites are removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
+  - Vector suites `hkdf-derive`, `bip340` and `fingerprint`: their harness modules are registered and the suites are removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - M1-1h derivation vectors pass in all runtimes.
   - Rejection loop covered by a unit test that injects an out-of-range okm (a natural vector is infeasible).
   - Requesting the EVM key with epoch ≠ 0 is rejected by the API (test).
@@ -869,12 +880,13 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Owner passphrase wrapping of the owner seed for local storage only: Argon2id (m = 64 MiB, t = 3, p = 1), AES-256-GCM (the M1a owner-presence minimum, D-33).
   - Pairing proof HMAC-SHA256(proofKey, "agentlink-handshake" ‖ inviteId ‖ SHA-256(JCS(B card))), with `proofKey` = HKDF-SHA256(secret, "", "agentlink/v1/pairing-proof") and the byte-exact input of 04 §3.6; safety code per 04 §3.6 with the encoding fixed by G-28.
   - Versioned wrapped-blob format (alg, params, salt, nonce), shared with M1-1k.
+  - Safety code per 04 §3.6.1 (G-28; once branch `docs/G-23-G-28-agentid-safety-code` merges): `codeCommit`, the constant-time commitment check, the role-ordered digest and the 12-digit code; owner and agent fingerprints (04 §2.9, G-23).
   - Owner passphrase wrap pins HKDF label `agentlink/v1/owner-passphrase-wrap` and file magic `ALKO` (D-54, 04 §2.8), with a `secretKind` header byte (1 = generated owner code, 2 = chosen passphrase) covered by the AAD and the same normalisation by kind as `ALKS` (04 §2.8); vectors for both kinds (M1-1h).
   - File KeyStore seal/open for `ALKS` v1 (D-54, 04 §2.8): Argon2id with the header's parameters (floor and cap checked before the KDF runs), HKDF label `agentlink/v1/keystore-file`, AES-256-GCM with the whole header (including `secretKind` and `agentId`) as AAD; entry parser with the 04 §2.8 refusals; entries as `Uint8Array`; 120-bit code generation (15 CSPRNG bytes, RFC 4648 base32) and normalisation by `secretKind`.
 - **Acceptance:**
-  - Vector suites `keystore-file`, `owner-wrap` and `pairing`: their harness modules are registered and the suites are removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
+  - Vector suites `keystore-file`, `owner-wrap`, `pairing` and `safety-code`: their harness modules are registered and the suites are removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - M1-1h vectors for Argon2id (plus RFC 9106 vectors), HMAC proof and safety code pass in all runtimes.
-  - Property test: both sides compute the same safety code regardless of argument order.
+  - Property test: inviter and invitee compute the same code from the same transcript; swapping the roles changes it; a `codeReveal` that does not open `codeCommit` is refused.
   - The API refuses passphrase wrapping for blobs flagged for relay publication (test).
   - `ALKS` v1 vectors from M1-1h pass; an `ALKO` owner blob never opens as an `ALKS` file and vice versa (label and magic separation, both directions); code normalisation and parser refusal tests.
   - Argon2id timing measured in browser and Workers (Workers memory limit noted in PR).
@@ -920,6 +932,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Strict zod schemas (unknown keys rejected) for Envelope v1, Payload with per-type bodies (handshake, handshake-ack, proof, approval-request, approval, policy, card-update, revoke per 04 §3.4.1, `request` with `kind: "refresh-link"`, file entries), AgentCard, Invite.
   - `OwnerAction` / `SignedOwnerAction` shape (04 §2.5.1: `op`, `body`, byte-exact canonical encoding, non-canonical forms rejected, never normalised) with `approval.decide` and `agent.revoke` params; the `policy.set` params (the policy schema) and the per-tool `context` schemas of `approval-request` plug in from M1-2b.
   - Field validation: base64url without padding, byte lengths (id/thread/kid 16 B, keys 32 B), hex formats.
+  - G-23/G-28 (04 §2.9, §3.6, §3.6.1, §3.4.1): `agentId` (`0x` + 40 lowercase hex). Invite: `cardAgentSig` and `codeCommit`. `handshake`: `cardAgentSig`, `codeNonce`, `codeCommit` and `inviterCardHash` (bare hex 64). `handshake-ack`: `handshakeHash` (`0x` + 64 hex, an `envelopeHash`), `codeReveal`, `card` and `cardSig`. `contact.check` params: `{contact, pairingDigest}`, where `pairingDigest` is 64 lowercase hex with no prefix. The 32-byte fields are base64url of exactly 32 bytes, and `inviteId` is exactly 16 bytes. Every field is required, and non-canonical forms are rejected.
   - Security S2 because envelope/payload schema changes are S2 (`audit-rules.md` §2.2).
 - **Acceptance:**
   - Vector suite `encodings`: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
@@ -929,15 +942,47 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 #### M1-2b · types: policy, approvals, owner actions, proof pack, tool results
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types
-- **Depends on:** M1-2a; gaps G-7, G-32 resolved
-- **Spec:** 06 §1 rule 3, §2 (`ProofStatus`), §3; 04 §2.5, §2.5.1, §3.4.1; 07 §8; 03 §3
+- **Depends on:** M1-2a; gaps G-7, G-32 resolved (branch `docs/G-7-G-32`, pending owner)
+- **Spec:** 06 §1 rule 3, §2 (`ProofStatus`), §2.5, §3 (incl. the policy JSON form and per-contact rules); 04 §2.4.1, §2.5, §2.5.1 (lifetimes, skew and nonces), §3.4.1 (approval TTL); 07 §8; 03 §3
 - **Invariants:** I-4, I-5
 - **Scope:**
-  - Policy schema with the exact 06 §3 defaults (plus per-contact overrides if G-32 adds them); signed-policy document wrapper.
+  - Policy schema in the 06 §3 policy JSON form, with its exact defaults. It is strict at every level, and every key is required. Enums; contact lists as sorted, unique agent IDs; USD amounts in the single 04 §2.4.1 spelling (`^(0|[1-9][0-9]{0,8})(\.[0-9]{0,5}[1-9])?$`, no trailing zero, no JSON numbers); `proofs.allowKeyDisclosure` only `approval | deny`; bounded integers and paths. Includes `ContactRule` (`contact`, plus `proofs` with at least one of `notarize` and `perActionMaxUSD`; at most 256, sorted) (G-32). The schema plugs into `policySetParamsSchema` in place of the M1-2a bounded JSON object, and the signed-policy wrapper is `signedPolicySetSchema`.
+  - G-7 constants: skew `S` = 300 s; `L(op)` per 04 §2.5.1; approval TTL 86 400 s; nonce retention 30 days; budget window 86 400 s. The schema keeps checking only `issuedAt < expiresAt` (and `expiresAt` = 0 for `agent.revoke`). Time-dependent checks are the core's (M1-7d), with `now` passed in.
+  - An exact-decimal helper (parse, compare, add, round up to cents, write the canonical USD spelling) with no binary floats, for every 04 §2.4.1 USD amount path (policy, `maxFeeUsd`, `fee.usd`, prices). It also compares a `terms.price.amount` of any size with a USD limit without overflow. M1-7i uses it for the budget.
   - `policy.set` params `{version, policy}` and the per-tool `action.context` schemas of `approval-request` (04 §2.5.1, §3.4.1; the `OwnerAction{v, agent, owner, op, params, nonce, issuedAt, expiresAt}` / `SignedOwnerAction{body, sig}` shape itself is M1-2a), approvals bound to the action digest, `ProofPack` v1, `ProofStatus`, the common tool-result shape `{status, summary, nextStep?, url?, approvalId?}`.
 - **Acceptance:**
   - Defaults deep-equal 06 §3 (snapshot test citing the spec); the 07 §8 example pack parses.
   - Round-trip and strictness tests for each schema.
+  - Policy rejects: a missing key, an unknown key at any level, a JSON number for a USD field, the USD amounts `"01"`, `"1."`, `"1.0"`, `"0.10"`, `"1e3"`, `"-1"`, `"1.0000001"` and `"1000000000"` (and the same strings in `fee.usd` and `maxFeeUsd`), `allowKeyDisclosure: "allow"`, an unsorted or duplicate contact list, an uppercase or checksummed agent ID, a `ContactRule` with empty `proofs`, 257 rules, and integers out of range (`maxEnvelopeKB: 25`, `defaultExpiryDays: 8`).
+
+#### M1-2c · types: run the schema tests in browsers and Workers; review follow-ups (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/types (Vitest config, tests), docs/foundation (spec lines)
+- **Depends on:** M1-2a, M0-9
+- **Spec:** 07 header (Node, browsers, Workers); 04 §3.4, §3.5, §4; 07 §1; review IR-M1-2a-1
+- **Invariants:** I-5
+- **Scope:**
+  - Run the `packages/types` tests as Vitest browser projects (Chromium, Firefox, WebKit, Playwright) and a workerd project (`@cloudflare/vitest-plugin`), set up as the M0-9 harness does. Each project asserts its runtime identity, so a silent fallback to Node fails. This closes the M1-2a acceptance item "schemas run in all three runtimes" (IR-M1-2a-1 M-3). The workerd run must cover zod's code-generation fallback (`new Function` is unavailable there).
+  - Review Lows from IR-M1-2a-1. Each item is skipped if the canonical-encodings spec PR already covers it.
+    - L-1: spec line in 04 §3.4 saying `files` appear only on user message types.
+    - L-2: spec line saying message bodies are a string or a JSON object.
+    - L-4: spec lines for the bounds M1-2a added:
+      - recipients 2–5 with unique `kid`;
+      - relays 1–16, unique;
+      - card `expiresAt` after `issuedAt`;
+      - approval-request `expiresAt` after `requestedAt`;
+      - `summary` with no control or format characters;
+      - EIP-712 `uint64` capped at 2^53 − 1.
+    - L-5: 07 §1 lists `zod` as a dependency of `@agentlink/types`.
+    - L-6: `downloadUrlSchema` requires a lowercase host and a port in 1–65535, as the relay schema does.
+    - L-7: the round-trip helper uses `toStrictEqual`.
+    - L-8: payload fuzzing also covers text with files, approval-request, revoke and request fixtures.
+  - Hand-offs to the owning cards; no code in types:
+    - transport-nostr re-checks relay hosts at connect time against private, loopback, link-local, CGNAT, ULA and metadata addresses, because a DNS name can resolve to one (IR-M1-2a-1 M-1, part 2);
+    - the invite decoder caps the inflated size before parsing (deflate bomb).
+- **Acceptance:**
+  - `packages/types` tests are green in Node, three browsers and workerd, and each run reports its runtime; a deliberately failing schema test fails in all five.
+  - Each Low is fixed with a negative control, or recorded as covered by the spec PR.
 
 ### Contracts (`occ-v2-contracts`, private)
 
@@ -1198,7 +1243,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-2, I-7
 - **Scope:**
   - `StorageAdapter` per 07 §5.1; inline adapter (≤ 12 KB, base64url); S3 adapter over `aws4fetch`: PUT, `presignGet` (clamped to ≤ 7 days and to credential expiry), DELETE.
-  - Object key `agentlink/<id>/<random 128-bit>` per G-23; no file names, contact data or user metadata on objects.
+  - Object key `agentlink/<storagePrefix>/<random 128-bit>` (04 §2.9, G-23): a random per-agent prefix passed in by the caller, never the agent ID; no file names, contact data or user metadata on objects.
   - Credentials only through an injected provider; never logged; presigned URLs never logged.
 - **Acceptance:**
   - Integration tests against MinIO (Docker, every PR) and Cloudflare R2 (scheduled job using the bucket-scoped test token): upload, presign, download, delete.
@@ -1249,7 +1294,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-1, I-4, I-9
 - **Scope:**
   - `AgentLinkClient.create(...)` wiring; `Store` interface covering 07 §3 plus the tables from G-9 (outbox, seen-set, owner-action nonces, fee-budget ledger, rate counters, idempotency results); `ApprovalChannel`; in-memory Store for tests.
-  - Identity: agent card build (04 §2.4) signed via `OwnerKeyStore`; key rotation to `keyEpoch + 1` with a new card; `agentId` per G-23.
+  - Identity: agent card build (04 §2.4) signed via `OwnerKeyStore`, plus `cardAgentSig` by the agent key (04 §2.9); key rotation to `keyEpoch + 1` with a new card; `agentId` = the agent's EVM address, derived from the seed and recorded with a random `storagePrefix` (04 §2.9, G-23).
+  - Contacts keyed by `agentId`: at most one per `agentId`, never the own one; re-pair only with unchanged owner keys and a `keyEpoch` that is not lower; refused for a revoked `agentId` (04 §2.9).
   - Contacts: add from a verified card, list, block/remove (F-14: later envelopes dropped); display names marked self-declared.
 - **Acceptance:**
   - Card with a signature not from `ownerEvm` rejected; rotation yields epoch + 1 and old-epoch keys still open old envelopes.
@@ -1279,9 +1325,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Invite `{v, inviteId, secret, card, cardSig, name, relays, expiresAt}` → base64url(deflate) → `https://<invite-host>/i#<payload>`; accept from the full URL or the bare payload; default expiry 7 days.
   - A stores `{inviteId, proofKey, expiresAt, used}` (`proofKey` = HKDF of the secret, label `agentlink/v1/pairing-proof`, encrypted at rest; never the raw secret, 04 §3.6). B verifies `cardSig` and expiry, applies `contacts.acceptInvites` (default `approval` → `pending_approval`), then sends `handshake` with the HMAC proof.
   - Contact names (D-53, 06 §2.1 contact-name rule): the invite `label` is stored as A's suggested alias for B and shown restricted until A's owner confirms it (it is agent-written); B's owner types or confirms an alias on the pairing approval, prefilled with the restricted self-declared name. Only owner-set aliases are shown unrestricted. A shared `restrictName` helper exactly per 06 §2.1 (NFKC; only `[\p{L}\p{N} .'-]`; spaces collapsed; ≤ 32 code points; fallback "Contact" plus short owner fingerprint for empty, mixed-script or confusable names beyond UTS #39 moderately restrictive, or names containing a reserved label word) renders names quoted, followed by the identity label, with `nameSource`; the raw self-declared name is stored as untrusted data.
-  - A accepts a `handshake` from an unknown sender only for an unused, unexpired invite; marks it used, adds B, replies `handshake-ack`. This processing runs in the background loop or on `agentlink_inbox`, never in a read-only status call (06 §2.0, §6). Both sides compute the safety code once the handshake is done; `createInvite` returns `{inviteUrl, ownerFingerprint, expiresAt}` and no safety code (it needs both sides' keys, 04 §3.6).
+  - A accepts a `handshake` from an unknown sender only for an unused, unexpired invite; marks it used, adds B, replies `handshake-ack`. This processing runs in the background loop or on `agentlink_inbox`, never in a read-only status call (06 §2.0, §6). A completes on accepting the handshake and B on a verified ack. Each keeps the signed `handshake` and `handshake-ack` and recomputes the safety code from them on every display, never from a stored digest (04 §3.6.1). `createInvite` returns `{inviteUrl, ownerFingerprint, expiresAt}` and no safety code. No tool result carries the code; `acceptInvite` and `listContacts` return `pairing` and `safetyCodeChecked`. Contacts are keyed by `agentId`; a re-pair takes effect only on completion, and concurrent pairings converge per 04 §2.9.
+  - G-23/G-28 additions (04 §2.9, §3.6, §3.6.1, §3.4.1): the invite also carries `cardAgentSig` and `codeCommit`, and A keeps `nonceA` with it. B also verifies `cardAgentSig` and refuses `agentEvm = ownerEvm`. Its approval shows name, label and owner fingerprint, and no safety code. The `handshake` adds `cardAgentSig`, `codeNonce`, `codeCommit` (copied) and `inviterCardHash`, and A accepts it only if the envelope `from` and seal key equal `card.agentNostr`. The `handshake-ack` adds `handshakeHash`, `codeReveal`, `card` and `cardSig`, and B completes only if `codeReveal` opens `codeCommit`. A second valid answer to a used invite is refused and reported to A's owner.
 - **Acceptance:**
   - In-process two-client test over a local relay: pairing completes and both safety codes match.
+  - MITM test (a third client swaps the invite towards B and uses a copy towards A): both pairings complete, with different codes. An ack whose `codeReveal` does not open `codeCommit` leaves B's pairing pending with no code. These are refused:
+    - a card whose `cardAgentSig` does not recover `agentEvm`, or with `agentEvm = ownerEvm`;
+    - a card that claims an existing contact's `agentId` with other owner keys;
+    - a `handshake` that replays a third party's real card and signatures from another Nostr key.
+  - Re-pair test: a verified invite carrying an existing contact's real card, never acked, leaves the contact, its card and "Safety code checked" unchanged. Crossed invites that both complete converge on the same pairing on both sides.
+  - Tamper test: editing any stored pairing column or digest never changes the code a surface shows. Recomputation from the signed `handshake` and `handshake-ack` either gives the true code or shows "Can't show the safety code". Two different handshakes, or two different acks, for one `inviteId` show no code and a warning (the console applies the same rule, M2-2e).
+  - A second `handshake` for a used invite produces the activity warning (04 §3.6).
+  - No tool result, log line or `nextStep` contains the 12 digits (canary on a known pairing).
   - Replayed handshake, expired invite, wrong proof and tampered card each rejected.
   - Default policy yields `pending_approval`; the invite secret never appears in logs or in any relay-visible field (canary).
   - `restrictName` table tests: control, format, bidi and zero-width characters, `<`, `>`, `:`, `/`, `(`, `)`, `[`, `]`, `"`, newlines and a 200-character name are reduced to the allowed set and ≤ 32 code points; fullwidth and mathematical letters are folded (NFKC); a mixed-script name (`Тali`), `ǃ`/`ǀ` look-alikes and a look-alike label (`Marko Verified domain acme com`) fall back to "Contact" plus the fingerprint; an empty result falls back too; an agent-written invite `label` with the same content is shown restricted until the owner confirms it.
@@ -1300,6 +1355,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Vector suite `owner-action`: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - Tests first; a table-driven test per rule and boundary (e.g. the per-contact hourly rate limit at N and N + 1).
   - A policy row edited directly in the store is ignored (I-4); a replayed or stale `SignedOwnerAction` is rejected; an older signed policy put back in the store is detected against the KeyStore high-water mark.
+  - G-7 boundaries (04 §2.5.1), per op: `issuedAt = now + 300` is accepted and `now + 301` refused; `now = expiresAt` is accepted and `expiresAt + 1` refused; a lifetime of exactly `L(op)` is accepted and `L(op) + 1` refused; an `approval.decide` whose `expiresAt` is after the request's is refused; a replay of an applied `approval.cancel` within its lifetime is refused by its nonce; two concurrent deliveries of one object apply it once (nonce check, record and apply in one transaction); a re-published `agent.revoke` is a no-op, not an error.
   - Property test: `evaluate` is deterministic and has no side effects.
 
 #### M1-7i · core: policy rules for files, proofs and receipts (new, split from M1-7d)
@@ -1309,9 +1365,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 06 §3; 07 §2; 02 F-61–F-63
 - **Invariants:** I-4
 - **Scope:**
-  - The remaining 06 §3 rules in the same pure `evaluate`: files (incl. `files.storage`, D-48), proofs incl. `dailyBudgetUSD` and `perActionMaxUSD` (budget ledger passed in as context), receipts. `ACCEPTED`/`REJECTED` receipt signing stays under `commitments` (M1-20).
+  - The remaining 06 §3 rules in the same pure `evaluate`: files (incl. `files.storage`, D-48), proofs incl. `dailyBudgetUSD` (rolling 24 h window, G-7) and `perActionMaxUSD` (budget ledger passed in as context), the per-contact proof rules (`contactRules`, G-32, the 06 §3 evaluation steps), receipts. `ACCEPTED`/`REJECTED` receipt signing stays under `commitments` (M1-20).
 - **Acceptance:**
-  - Tests first; a table-driven test per rule and boundary (e.g. $1.00 vs $1.01 for `perActionMaxUSD`; budget day boundary as fixed by G-7).
+  - Tests first; a table-driven test per rule and boundary (e.g. $1.00 vs $1.01 for `perActionMaxUSD`; an entry at `t = now − 86 400` is outside the budget window and one at `now − 86 399` inside; spent + fee equal to the budget is allowed and one cent more is not).
+  - Budget reservation (G-7, 06 §3): N concurrent paid proofs whose maximum fees together exceed the remaining budget never all pass (the check and the `maxFee` reservation are one transaction); a failed submission keeps its reservation until the Record's `deadline` passes with no record on-chain; a confirmed record settles to the charged fee; a missing or corrupted ledger, or a clock earlier than the newest entry, gives `approval` for every paid action until a new owner-signed `policy.set`.
+  - Contact rules (G-32): a rule `notarize: allow` under a global `deny` stays `deny`; a rule `perActionMaxUSD: "2"` allows $2.00 for that contact only, and $2.01 needs approval; the daily budget still applies to a contact with a rule; a rule for a blocked or revoked contact, or with no verified policy, has no effect.
   - Property test: `evaluate` stays deterministic and side-effect free.
 
 #### M1-7e · core: approvals, requests queue, idempotency
@@ -1329,6 +1387,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - An approved ID is refused for a different action and on second use; an unsigned or wrongly signed approval is rejected.
   - Idempotent repeats return identical results; expired approvals report `expired`.
+  - G-7 TTL boundaries (04 §3.4.1): `expiresAt = requestedAt + 86 400`; an `approval.decide` applied at `now = expiresAt` is accepted and at `expiresAt + 1` refused; an approved, unused non-commitment approval is `expired` at `expiresAt + 1` and the next call returns a new `pending_approval`; a commitment request whose scope expires sooner has `expiresAt` = the scope's `expiresAt`.
+  - `approval.cancel` on an approved, unused non-commitment approval voids it (the retry gets a new `pending_approval`); on a used one it changes nothing; a rule changed to `deny` after approval refuses the approved call.
   - (with M1-7f) A file changed between approval and retry is not sent; the retry returns a new `pending_approval`.
 
 #### M1-7f · core: files (send, fetch, refresh link, crypto-shredding)
@@ -1388,7 +1448,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-1, I-7
 - **Scope:**
   - `KeyStore` backed by macOS Keychain, Windows Credential Manager and libsecret via `@napi-rs/keyring` (dependency justification; prebuilt binaries, no install script); seed held in memory only as long as needed, then wiped.
-  - Store key for encrypted SQLite columns also in the keychain; several agents per machine (`--agent <name>`).
+  - Store key for encrypted SQLite columns also in the keychain; several agents per machine (`--agent <name>`), each under account `<agentId>` (the EVM address, 04 §2.9); the loaded seed must derive that `agentId`, otherwise an error with a fix.
   - Keychain probe at `init` (write, read, delete a probe item) and the recorded backend per agent (07 §9.1). No usable keychain: `needs_setup` with explanation unless the user opted in to the file KeyStore (M1-8f, D-54).
 - **Acceptance:**
   - CI matrix on macOS, Windows and Ubuntu (gnome-keyring in a D-Bus session) runs the keychain tests.
@@ -1459,7 +1519,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 04 §2.8 (format, KDF, unlock, owner key on a headless machine, file handling, threat delta, required tests); 07 §9; 06 §7; D-54
 - **Invariants:** I-1, I-4, I-7, I-10
 - **Scope:**
-  - File `KeyStore` with the same interface as the keychain backend, holding the same items (agent seed, store key, storage credentials) in `~/.agentlink/keystore/<agentId>.alks`; `agentId` charset check; expected-agent-ID check before the KDF and seed-derived check after decryption. All crypto through `@agentlink/crypto`; this package only handles files, locking and unlock sources.
+  - File `KeyStore` with the same interface as the keychain backend, holding the same items (agent seed, store key, storage credentials) in `~/.agentlink/keystore/<agentId>.alks`; `agentId` charset check and exact 04 §2.9 form (`0x` + 40 lowercase hex); expected-agent-ID check before the KDF and seed-derived check (the seed's EVM address) after decryption. All crypto through `@agentlink/crypto`; this package only handles files, locking and unlock sources.
   - Selection per 07 §9.1: opt-in only, only when the keychain probe fails (with timeout and fix message), only from an interactive terminal with no harness marker set (UX guards, not boundaries); no forced file mode; backend recorded per agent and never switched.
   - Unlock sources per 07 §9.2: passphrase file (`O_NOFOLLOW`, `fstat` checks), environment variable (allowed with the 04 §2.8 conditions; both variables removed from `process.env`; never written by `init`), interactive prompt for CLI commands; no CLI argument takes a passphrase. Async unlock after MCP `initialize`. `kek` kept in memory with its salt and parameters; entries decrypted per operation and wiped.
   - Secrets: generated unlock code by default (pinned base32 encoding, `secretKind` in the header); chosen passphrase ≥ 12 characters. Owner key on file-KeyStore machines: separate `owner init` step, `owner.alko`, generated 120-bit owner code required. Agent ≠ owner enforced in both directions across all agents, with the owner wrap's normalisation.
@@ -1722,7 +1782,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-4, I-5
 - **Scope:**
   - First run: create the owner passkey (PRF) on `localhost`, or set the owner passphrase.
-  - Approval page: who, what, cost and the policy rule in plain words; approve/deny with presence → owner-signed approval; "Remember for this contact" (new-contact and proof-limit approvals only, 11 §8) creates an owner-signed policy change (G-32).
+  - Approval page: who, what, cost and the policy rule in plain words; approve/deny with presence → owner-signed approval; "Remember for this contact" (proof approvals raised by `notarize: approval` or the per-proof limit only, with Approve, 11 §8) signs, under the same presence gesture, a `policy.set` (version + 1) that adds the contact rule (06 §3, G-32); a refused `policy.set` is reported and leaves the approval standing.
   - Untrusted strings (contact names, file names) rendered as text only.
   - Before DESIGN-D1 lands: functional and unstyled, strings externalized, no invented visual design (`docs/design/README.md`). Styling is M1-11b.
 - **Acceptance:**
@@ -1736,7 +1796,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 08 §1 (pages); 11 §6.2; 10 M1-11
 - **Invariants:** I-4, I-10
 - **Scope:**
-  - Activity; Contacts (safety-code compare, block); Files (allowed folders with resolved paths, inbox folder, expiry); Storage (drop usage against the quota; optional own storage under Advanced: connect, test; D-48); Proofs & credits (balances, agent address QR, faucet button on testnets); Policies (plain-language rules → owner-signed, incl. `commitments` limits); Backup (recovery kit export/restore); Advanced (fingerprints, relays, RPCs, chains; the only place a chain can be chosen, D-40).
+  - Activity; Contacts (safety-code compare per 04 §3.6.1: "They match" signs `contact.check` with presence, "They don't" blocks; block); Files (allowed folders with resolved paths, inbox folder, expiry); Storage (drop usage against the quota; optional own storage under Advanced: connect, test; D-48); Proofs & credits (balances, agent address QR, faucet button on testnets); Policies (plain-language rules → owner-signed, incl. `commitments` limits); Backup (recovery kit export/restore); Advanced (fingerprints, relays, RPCs, chains; the only place a chain can be chosen, D-40).
   - All owner operations call M1-8c / M1-8e / M1-9b / M1-9i APIs; no new crypto or signing code in the UI.
   - Before DESIGN-D1 lands: functional and unstyled, strings externalized, no invented visual design. Styling is M1-11b.
 - **Acceptance:**
@@ -1951,6 +2011,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first; table-driven tests: default → `pending_approval`; allowlisted contact under the limit → allow (policy grant); over the limit, contact not allowlisted, or unevaluable terms → `approval`; `REJECTED` for an allowlisted contact under the limit → `approval`; direction rows (IR-D55-1 F01): under `buy`, terms where this agent delivers any item or the contact pays → `approval`; amounts `0`, `-5`, `1e3`, `1,500` → refused by the schema, never allowed; `sell` with `autoAcceptMinUSD` unset (the default) → `approval`; a firm offer within the limits → `approval`.
   - Inbound content can never produce a binding `accept` or a receipt without the owner: it cannot change policy or limits (I-4, I-5); a policy row edited in the store is ignored.
   - Defaults snapshot test cites the 06 §3 `commitments` defaults.
+  - (with M1-32, M1-7i) A commitment part with `notarize` reserves its Record's `maxFee` in the budget ledger in the same transaction as its atomic claim; two concurrent retries reserve once (06 §3 daily budget window, G-7).
 
 #### M1-21 · `terms` schema and `termsHash` vectors (D-32) (new)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -3036,7 +3097,7 @@ Epics are decomposed into cards (same format, same rules) when the milestone sta
 Converging M1a chains that must arrive in time:
 
 - **Policy and commitments:** M1-2a → {M1-2b, M1-21}; M1-7a + M1-2b → M1-7d → {M1-7e, M1-20 (+ M1-21)} → M1-9b → (M1-9c); M1-7b + M1-7e + M1-20 + M1-21 → M1-32 → (M1-9c, M1-22), beside M1-7c → M1-7h.
-- **Pairing and card crypto:** M1-1f (after G-28) → (M1-7c); M1-1e → (M1-7a).
+- **Pairing and card crypto:** M1-1f (after G-28, resolved by branch `docs/G-23-G-28-agentid-safety-code`, pending owner) → (M1-7c); M1-1e → (M1-7a).
 - **Transport:** M1-5a → M1-5b → M1-5c → (M1-7h); M1-18 before the dogfood.
 - **Owner presence (passphrase):** M1-8a → {M1-8b, M1-8c} → M1-9a → M1-9b. Headless (off the critical path): M1-1f + M1-8a + M1-8b + M1-8c → M1-8f → M1-9a's `--keystore file` branch.
 - **Install and dogfood:** M1-16 + M1-9a + M1-12a + M1-12b → M1-25 → (M1-23); M1-13b → (M1-23); M1-19 (+ M1-25 prompt templates) for invite links; M1-9a + M1-12a → M1-29 → (M1-23).
@@ -3086,7 +3147,15 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 4. **G-4 (H) Batch failure semantics.** 05 §3.2; 07 §7. Whether one failing item reverts `notarizeBatch`/`acknowledgeBatch` is unspecified; the submitter batches across signers, so one item (e.g. credits spent between simulation and inclusion) can grief the rest. *Proposed:* specify all-or-nothing with per-item pre-simulation and retry without the failing item, or skip-and-emit with per-item status; keep 05 §3.4 gas targets. *Blocks:* M1-3d, M1-10a.
 5. **G-5 (M) J1 key storage wording.** RESOLVED by 02 §5 J1 steps 2–3: `init` puts only the agent keys in the OS keychain (step 2); the owner key is created and wrapped in the setup step (step 3, 04 §2.2). *Was:* J1 step 2 stored "owner and agent keys" in the OS keychain, against 04 §2.2. *Blocked:* M1-9a, M1-12b.
 6. **G-6 (H) Policy fail-open.** 06 §3 (last paragraph); 04 §2.5. Unsigned or tampered policies fall back to defaults, which can be looser than the owner's policy (e.g. `proofs.notarize: deny` → `allow`); deleting the signed row downgrades policy. *Proposed:* once an owner-signed policy exists, fail closed (`approval` for owner-gated actions) and keep a policy version in an owner-signed object. *Blocks:* M1-7d.
-7. **G-7 (M) Lifetimes.** 04 §2.5.1 (`SignedOwnerAction` `nonce`, `issuedAt`, `expiresAt`); 06 §2.5; 06 §3 (`dailyBudgetUSD`). No freshness window, nonce retention, approval TTL or budget day boundary. *Proposed:* e.g. owner actions valid 10 minutes (`approval.decide`: until the request's `expiresAt`), nonces kept 30 days, approvals expire after 24 h, budget day in UTC. *Blocks:* M1-2b, M1-7d, M1-7e.
+7. **G-7 (M) Lifetimes.** Resolved by branch `docs/G-7-G-32` (pending owner; proposed, owner confirms at merge). The values are in 04 §2.5.1 (lifetimes, skew and nonces), 04 §3.4.1 (approval TTL) and 06 §3 (daily budget window).
+   - Skew is 300 s and applies to `issuedAt` only; expiry has no skew.
+   - Maximum lifetime per op: `approval.decide` until the request's `expiresAt`; `approval.cancel` 7 days, so a cancel from the console still reaches a sleeping agent; `policy.set` and `contact.check` 24 h, since rollback is stopped by `version`; later ops 10 minutes unless their task says otherwise, never above 7 days.
+   - Nonces are kept 30 days after they are applied. `agent.revoke` is exempt, because it is idempotent.
+   - A pending request expires after 24 h, or at the commitment scope's expiry if that is sooner. A non-commitment approval must be used by the same time.
+   - `dailyBudgetUSD` is a rolling 24-hour window, not a UTC day: a UTC day allows twice the budget around midnight and resets at an arbitrary local hour.
+   - Review IR-G732-1 fixes: the budget check and the reservation of the Record's `maxFee` run in one transaction, so paid actions are serialized per agent. A reservation is released only when the Record can no longer be charged. A broken ledger fails closed, and the residuals are in 04 §7. Nonce check, record and apply run in one transaction. `approval.cancel` also voids an approved, unused non-commitment approval. USD amounts have one spelling (04 §2.4.1).
+
+   *Was:* 04 §2.5.1 (`SignedOwnerAction` `nonce`, `issuedAt`, `expiresAt`), 06 §2.5 and 06 §3 (`dailyBudgetUSD`) had no freshness window, nonce retention, approval TTL or budget day boundary. The first proposal was a flat 10 minutes, 30-day nonces, a 24 h TTL and a UTC day. *Blocks:* M1-2b, M1-7d, M1-7e.
 8. **G-8 (H) CREATE3 salts and deployer lifecycle.** 05 §9; `release-and-deployment.md` §4.2. CreateX guarded salts bind addresses to the deployer; identical addresses for the Registry (M2) and M4 chains need the same deployer and salt scheme; proxies must be deployed and initialised atomically; testnet and mainnet deployers differ, so testnet and mainnet addresses differ. *Proposed:* specify salt layout (deployer-guarded, no cross-chain redeploy protection), deploy-and-init, and cold-storage retention of the mainnet deployer key until all planned chains are deployed. *Blocks:* M1-3g, M3-2b, M3-2c, M4-EPIC.
 9. **G-9 (M) Store schema gaps.** 07 §3 lacks the outbox (07 §4.2, 24 h retry), the ≥ 7-day seen-set (07 §4.2), idempotency results (06 §1 rule 6), budget ledger and rate counters (06 §3), and `SignedOwnerAction` nonces, the stored signed objects, the revoked-agent set and contact status `revoked` (04 §2.5.1, §3.4.1); the policy-version high-water mark lives in the KeyStore (04 §2.5.1). *Proposed:* extend 07 §3. *Blocks:* M1-5b, M1-5c, M1-7a, M1-8b.
 10. **G-10 (M) Where `@agentlink/occ-v2-abi` is published.** 05 §9; D-19. npm provenance is not generated for private source repos (verify). *Proposed* (`development-process.md` §9.2): import release artifacts into public `packages/occ-v2-abi` and publish from there. *Blocks:* M1-3f.
@@ -3102,16 +3171,22 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 20. **G-20 (M) Revocation typed data.** 05 §4 `revoke(agentEvm, nonce, deadline, ownerSig)` has no EIP-712 struct; nonce rules for `Registration` and revoke unspecified. *Blocks:* M1-1i (vectors), M2-4a.
 21. **G-21 (M) Measuring beta metrics without analytics.** 02 §7 and 10 gates vs 08 §2.3 and zero access. *Proposed:* moderated sessions plus opt-in, local-only timing exported by testers. *Blocks:* M1-GATE, M2-GATE.
 22. **G-22 (M) Owner archive mechanics.** 04 §4; 02 F-33; 06 §3: whose storage credentials, how the file key reaches the owner, who deletes. *Blocks:* M2-9.
-23. **G-23 (M) `agentId` undefined.** Used in 04 §2.2 (keychain account), 06 §6, 07 §3, 07 §5.2 (object key). The object-key path also gives every recipient of a presigned URL a stable per-agent identifier. *Proposed:* define `agentId`; use a random per-agent prefix in object keys. Owner actions bind the canonical EVM address, not `agentId` (G-29), and `agentId` must not become a second binding. *Blocks:* M1-6a, M1-7a, M1-8a.
+23. **G-23 (M) `agentId` undefined.** Resolved by branch `docs/G-23-G-28-agentid-safety-code` (pending owner; proposed, owner confirms at merge), with G-28: `agentId` is the agent's EVM address (`agentlink/v1/evm`, epoch 0), `0x` + 40 lowercase hex, the same value as card `agentEvm`, owner-action `agent` (D-58), `terms.parties` and the commitment scope, so never a second binding (04 §2.9). Derived from the seed and checked on every seed load (keychain and `ALKS`). Invites and handshakes carry `cardAgentSig`, and a handshake is accepted only from the card's own `agentNostr`, so an owner cannot claim another agent's address and a replayed card completes nothing. One contact per `agentId`; a re-pair needs unchanged owner keys and takes effect only on completion. Object keys use a random per-agent `storagePrefix`, never the address (07 §5.2). Owner and agent fingerprints are tagged hashes, short form `7F3A·19C2`, display only and never an authenticator. *Was:* Used in 04 §2.2 (keychain account), 06 §6, 07 §3, 07 §5.2 (object key). The object-key path also gives every recipient of a presigned URL a stable per-agent identifier. *Proposed:* define `agentId`; use a random per-agent prefix in object keys. Owner actions bind the canonical EVM address, not `agentId` (G-29), and `agentId` must not become a second binding. *Blocks:* M1-6a, M1-7a, M1-8a.
 24. **G-24 (M) Relays for owner copies.** 04 §3.5; 07 §4.2; 08 §2.2. AgentCard carries only the agent's `relaysHash`; owners have no relay list. *Proposed:* each owner copy goes to the relays of the agent it concerns; the console subscribes to all its agents' relays. *Blocks:* M1-5b, M2-2d.
 25. **G-25 (M) `agentlink_verify_proof_pack {path}`.** 06 §2.4 lets a tool read a caller-chosen file, against 06 §1 rule 4. *Proposed:* `json` only, or `path` restricted to `proofs.exportFolder`/inbox with realpath checks. *Blocks:* M1-9d.
 26. **G-26 (L) STREAM header not authenticated.** 04 §4: AAD is `u8(isFinal)` only; header fields rely on `ciphertextSha256`. *Proposed:* AAD = header ‖ isFinal, decided before vectors freeze. *Blocks:* M1-1d, M1-1i.
 27. **G-27 (L) Inline file vs envelope size.** 04 §3.5; 02 F-30; 06 §2.3. A 12 KB file, base64-encoded inside an encrypted, base64-encoded payload with four recipient wraps, is already near 24 KB before any text. *Proposed:* "inline only if the final envelope ≤ 24 KB". *Blocks:* M1-7f.
-28. **G-28 (L) Safety-code encoding.** 04 §3.6: the first 40 bits (2^40 ≈ 1.1 × 10^12) do not fit 12 decimal digits, the format 11 §1 and §8 specify. *Blocks:* M1-1f, M1-1h.
+28. **G-28 (L) Safety-code encoding.** Resolved by branch `docs/G-23-G-28-agentid-safety-code` (pending owner; proposed, owner confirms at merge), with G-23: a commit-then-reveal code (04 §3.6.1). The invite commits to A's nonce, B's handshake adds its nonce, A's ack reveals; `digest = taggedHash("agentlink/safety-code/v1", cardHashA ‖ cardHashB ‖ inviteId ‖ nonceA ‖ nonceB)`, shown as `u64(digest[0..8]) mod 10^12` in three groups of four digits. Keys-only codes can be ground offline: 2^(t/2) per leg if B's card is known in advance, otherwise 2^t, so no short keys-only code is safe. With the commitment, a MITM matches with probability 10^-12 per attempt. Surfaces recompute the code from the signed handshake and ack, never from a stored digest (IR-G2328-1). The code is shown only on owner surfaces, never in MCP results; "checked" needs an owner-signed `contact.check`; it survives a `card-update` and changes on re-pair. Rated L as an encoding gap, but the old construction was also grindable. *Was:* 04 §3.6: the first 40 bits (2^40 ≈ 1.1 × 10^12) do not fit 12 decimal digits, the format 11 §1 and §8 specify. *Blocks:* M1-1f, M1-1h.
 29. **G-29 (M) Owner-operation payload bodies.** Resolved by PR #10 (D-58, confirmed by the owner at merge): one owner-signed object, `SignedOwnerAction` (04 §2.5.1, BIP-340 by the owner Nostr key over a tagged hash, bound to the agent's EVM address, with nonce and expiry), is produced by the local UI, the CLI and the console; `approval`, `policy` and `revoke` envelopes only carry it. Bodies for `approval-request`, `approval`, `policy`, `revoke`, `card-update` and `handshake-ack` in 04 §3.4.1, with receiver rules and the rule that no MCP tool can create them. Lifetimes stay with G-7, policy fail-closed with G-6. *Was:* 04 §3.4 listed these types without body schemas. *Blocks:* M1-2a, M2-2e.
 30. **G-30 (M) Native-coin price source.** RESOLVED for launch by D-46: fees are stablecoin-only, every fee token is valued 1:1, and 07 §6.2 needs no price endpoint. A USD price source for native coins returns with the `PRICE_UPDATER` work in M4-EPIC (12 §3.4). *Was:* 07 §6.2 "public price endpoint" unspecified (third-party egress, integrity). *Blocked:* M1-4b, M3-3.
 31. **G-31 (L) Linux without Secret Service.** RESOLVED by D-54 (04 §2.8, 07 §9): the OS keychain stays the default; without one, `needs_setup` unless the user opts in, in an interactive terminal, to a passphrase-locked file KeyStore (Argon2id + AES-256-GCM, unlocked by the MCP server from a passphrase file or an environment variable); the owner key is never unlocked non-interactively. Built in M1-8f. *Was:* 04 §2.2; 03 §6 (headless servers, containers, WSL); proposed `needs_setup` by default and a documented, weaker passphrase-wrapped file store as opt-in. *Blocked:* M1-8a.
-32. **G-32 (M) Per-contact policy overrides.** 11 §8 (approval card, "Remember for this contact") has no counterpart in 06 §3. *Blocks:* M1-2b, M1-11a.
+32. **G-32 (M) Per-contact policy overrides.** Resolved by branch `docs/G-7-G-32` (pending owner; proposed, owner confirms at merge), in 06 §3 (policy JSON form, per-contact rules) and 11 §8.
+   - The policy gains `contactRules`: up to 256 entries `{contact, proofs: {notarize?, perActionMaxUSD?}}`, sorted by agent ID. They are proofs only. The global `deny` and `dailyBudgetUSD` always win, and the rules are read only from the verified policy.
+   - "Remember for this contact" is a second signed object, a full `policy.set` (version + 1), made under the same presence gesture as the approval. It is offered only on proof approvals raised by `notarize: approval` or the per-proof limit, and only with Approve.
+   - It is removed from the new-contact card: an invite is used once and a contact is paired once, so nothing is left for a rule to remember. A per-owner rule ("connect with this owner's other agents") would widen who connects without asking, and is not proposed.
+   - The policy JSON form is fixed, because M1-2b needs it: every key is present; USD limits are decimal strings, so float money is gone; contact lists are sorted agent IDs; integers and paths have bounds. `proofs.allowKeyDisclosure` takes only `approval | deny`, because disclosure is owner-only (04 §2.5; IR-G732-1).
+
+   *Was:* 11 §8 (approval card, "Remember for this contact") had no counterpart in 06 §3. *Blocks:* M1-2b, M1-11a.
 33. **G-33 (M) DELIVERED timing for notarized messages.** 06 §2.2 records DELIVERED when `agentlink_inbox` returns a message, but the `proof` envelope (04 §3.4) arrives later. *Proposed:* sign DELIVERED when the proof envelope is processed if the message was already returned. *Blocks:* M1-7g, M1-9c.
 34. **G-34 (L) Default receipt linkability.** 05 §3.3 (a receipt links the recipient's agent address to the record) vs 06 §3 `receipts.autoDelivered: true`. *Proposed:* keep the default but state it at pairing and in settings, or default to off. *Blocks:* M1-7g, M1-11c.
 35. **G-35 (L) Web Push keys.** 08 §2.2: the owner-generated VAPID private key must reach cloud agents securely; local agents cannot push. *Blocks:* M2-2g.

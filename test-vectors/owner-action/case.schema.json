@@ -142,6 +142,135 @@
                       "type": "integer"
                     }
                   }
+                },
+                "pairing": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "contact",
+                    "pairingDigest"
+                  ],
+                  "properties": {
+                    "contact": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-f]{40}$"
+                    },
+                    "pairingDigest": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "json",
+            "context"
+          ],
+          "properties": {
+            "op": {
+              "const": "verifyJson"
+            },
+            "json": {
+              "type": "string"
+            },
+            "context": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "agent",
+                "ownerNostr",
+                "now"
+              ],
+              "properties": {
+                "agent": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{40}$"
+                },
+                "ownerNostr": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{64}$"
+                },
+                "now": {
+                  "type": "integer"
+                },
+                "pendingApproval": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "approvalId",
+                    "actionDigest",
+                    "expiresAt"
+                  ],
+                  "properties": {
+                    "approvalId": {
+                      "type": "string"
+                    },
+                    "actionDigest": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "expiresAt": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "pairing": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "contact",
+                    "pairingDigest"
+                  ],
+                  "properties": {
+                    "contact": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-f]{40}$"
+                    },
+                    "pairingDigest": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
                 }
               }
             }

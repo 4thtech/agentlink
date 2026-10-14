@@ -13,6 +13,7 @@ Policies are owner-signed documents, stored locally and verified on load. They c
 - `proofs`: notarize allow, approval or deny; daily budget; per-action maximum; key disclosure; export folder
 - `receipts`: automatic `DELIVERED`; `OPENED` only on request
 - `commitments`: accepting terms (approval by default), auto-accept allowlist and maximum value
+- `contactRules`: per-contact proof rules, created by "Remember for this contact" on a proof approval
 - How a change is signed and applied
 
 **Filled in at:** M1a (v0.1.0) and M1 (v0.2.0); backlog cards DOCS-M1a and DOCS-M1b.

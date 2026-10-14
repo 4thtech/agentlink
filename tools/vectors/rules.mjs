@@ -15,6 +15,14 @@ export const REQUIRED_RUNTIMES = Object.freeze([
 ]);
 
 /**
+ * The only suites that may run in fewer than all runtimes, each with its spec reason
+ * (IR-M1-1h-1 Q7, IR-M1-1h-2 F-E). Adding one is a reviewed change to this file.
+ */
+export const RUNTIME_EXCEPTIONS = Object.freeze({
+  'keystore-file': '04 §2.8: the file KeyStore runs in Node only',
+});
+
+/**
  * Checks a Vitest JSON report against the committed suites.
  * Each vector test records `meta.vectors = { kind, runtime, suite?, caseId? }`, where `runtime` is
  * what the engine reported (test-vectors/harness/runtime.ts), not what the config asked for.
@@ -61,6 +69,23 @@ export function checkCoverage(report, suites, required = REQUIRED_RUNTIMES) {
       if (meta.kind === 'pending') pending.add(`${meta.runtime}\u0000${meta.suite}`);
       if (meta.kind === 'case')
         passed.add(`${meta.runtime}\u0000${meta.suite}\u0000${meta.caseId}`);
+    }
+  }
+
+  for (const { suite, runtimes, runtimesSource } of suites) {
+    if (runtimes === undefined) continue;
+    if (!Object.hasOwn(RUNTIME_EXCEPTIONS, suite)) {
+      problems.push(`${suite}: declares runtimes but is not in RUNTIME_EXCEPTIONS`);
+    }
+    if (
+      !Array.isArray(runtimes) ||
+      runtimes.length === 0 ||
+      runtimes.some((r) => !required.includes(r))
+    ) {
+      problems.push(`${suite}: declares unknown runtimes`);
+    }
+    if (typeof runtimesSource !== 'string' || runtimesSource.trim() === '') {
+      problems.push(`${suite}: declares runtimes without a reason`);
     }
   }
 
@@ -148,6 +173,60 @@ export function checkPendingShrinks(head, base) {
         `${suite}: has vectors on the base branch and was not pending there; pending suites only shrink`,
       );
     }
+    // An existing entry is frozen: moving its card or phase could slip it past a gate (IR-M1-1h-2 F-B).
+    const before = /** @type {{ card?: unknown, phase?: unknown } | undefined} */ (
+      base.pending.get(suite)
+    );
+    if (before !== undefined && (before.card !== entry?.card || before.phase !== entry?.phase)) {
+      problems.push(
+        `${suite}: its pending entry changed from ${String(before.card)}/${String(before.phase)} to ${String(entry?.card)}/${String(entry?.phase)}; an existing entry can only be removed`,
+      );
+    }
+  }
+  return problems;
+}
+
+/**
+ * Card -> phase, read from docs/process/backlog.md: each `#### <card> · …` heading followed by a
+ * `**Phase:** <phase>` field before the next heading.
+ *
+ * @param {string} backlog
+ * @returns {Map<string, string>}
+ */
+export function cardPhases(backlog) {
+  const phases = new Map();
+  let card;
+  for (const line of backlog.split('\n')) {
+    const heading = /^#### (\S+) · /.exec(line);
+    if (heading) {
+      card = heading[1];
+      continue;
+    }
+    if (/^#{1,4} /.test(line)) card = undefined;
+    const phase = /\*\*Phase:\*\* (M[0-9]+[a-z]?)/.exec(line);
+    if (card !== undefined && phase && !phases.has(card)) phases.set(card, phase[1]);
+  }
+  return phases;
+}
+
+/**
+ * Every pending entry names a backlog card, and its phase is that card's phase (IR-M1-1h-2 F-B).
+ *
+ * @param {{ pending: ReadonlyMap<string, { card?: unknown, phase?: unknown }> }} head
+ * @param {ReadonlyMap<string, string>} phases From cardPhases().
+ * @returns {string[]} Problems.
+ */
+export function checkPendingCards(head, phases) {
+  const problems = [];
+  for (const [suite, entry] of head.pending) {
+    const phase = phases.get(String(entry?.card));
+    if (phase === undefined) {
+      problems.push(`${suite}: card ${String(entry?.card)} has no Phase in the backlog`);
+    } else if (phase !== entry?.phase) {
+      problems.push(
+        `${suite}: phase ${String(entry?.phase)} differs from card ${String(entry?.card)}'s backlog phase ${phase}`,
+      );
+    }
   }
   return problems;
 }
@@ -158,14 +237,19 @@ export function checkPendingShrinks(head, base) {
  *
  * @param {{ pending: ReadonlyMap<string, { card?: unknown, phase?: unknown }> }} head
  * @param {readonly string[]} phases
+ * @param {ReadonlyMap<string, string>} [cards] Card -> phase from the backlog (cardPhases()).
  * @returns {string[]} Problems.
  */
-export function checkPendingGate(head, phases) {
+export function checkPendingGate(head, phases, cards = new Map()) {
   const problems = [];
   for (const [suite, entry] of head.pending) {
-    if (phases.includes(String(entry?.phase))) {
+    // The phase comes from the card in the backlog, never from the pending entry (IR-M1-1h-2 F-B).
+    const phase = cards.get(String(entry?.card));
+    if (phase === undefined) {
+      problems.push(`${suite}: card ${String(entry?.card)} has no Phase in the backlog`);
+    } else if (phases.includes(phase)) {
       problems.push(
-        `${suite} is still pending (${String(entry?.card)}, phase ${String(entry?.phase)}): every ${String(entry?.phase)} suite must be implemented before a release`,
+        `${suite} is still pending (${String(entry?.card)}, phase ${phase}): every ${phase} suite must be implemented before a release`,
       );
     }
   }

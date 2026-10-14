@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cardPhases,
   checkCoverage,
+  checkPendingCards,
   checkPendingGate,
   checkPendingShrinks,
   diffSnapshots,
@@ -161,7 +163,30 @@ describe('pending suites (M1-1h)', () => {
 });
 
 describe('declared runtimes (IR-M1-1h-1 Q7)', () => {
-  const nodeOnly = [...suites, { suite: 'keystore-file', caseIds: ['k'], runtimes: ['node'] }];
+  const nodeOnly = [
+    ...suites,
+    { suite: 'keystore-file', caseIds: ['k'], runtimes: ['node'], runtimesSource: '04 §2.8' },
+  ];
+
+  it('rejects a narrowed suite that is not an allowed exception (IR-M1-1h-2 F-E)', () => {
+    const other = [
+      ...suites,
+      { suite: 'hpke', caseIds: ['x'], runtimes: ['node'], runtimesSource: 'r' },
+    ];
+    expect(checkCoverage(fullReport(), other)).toContain(
+      'hpke: declares runtimes but is not in RUNTIME_EXCEPTIONS',
+    );
+  });
+
+  it('rejects unknown runtime names and a missing reason', () => {
+    const bad = [
+      ...suites,
+      { suite: 'keystore-file', caseIds: ['k'], runtimes: ['deno'], runtimesSource: '' },
+    ];
+    const problems = checkCoverage(fullReport(), bad);
+    expect(problems).toContain('keystore-file: declares unknown runtimes');
+    expect(problems).toContain('keystore-file: declares runtimes without a reason');
+  });
 
   it('requires the cases only in the declared runtimes', () => {
     const report = fullReport();
@@ -230,6 +255,55 @@ describe('checkPendingShrinks (IR-M1-1h-1 F2)', () => {
   });
 });
 
+describe('pending entries are frozen and tied to the backlog (IR-M1-1h-2 F-B)', () => {
+  const backlog = [
+    '#### M1-1a · crypto: encodings',
+    '- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a',
+    '#### M1-1d · crypto: STREAM',
+    '- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b',
+  ].join('\n');
+
+  it("reads each card's phase from the backlog", () => {
+    expect(cardPhases(backlog)).toEqual(
+      new Map([
+        ['M1-1a', 'M1a'],
+        ['M1-1d', 'M1b'],
+      ]),
+    );
+  });
+
+  it('refuses an existing entry whose phase or card changed', () => {
+    const base = {
+      pending: new Map([['jcs', { card: 'M1-1a', phase: 'M1a' }]]),
+      suites: new Set(['jcs']),
+    };
+    const head = { pending: new Map([['jcs', { card: 'M1-1a', phase: 'M9' }]]) };
+    expect(checkPendingShrinks(head, base)).toEqual([
+      'jcs: its pending entry changed from M1-1a/M1a to M1-1a/M9; an existing entry can only be removed',
+    ]);
+  });
+
+  it("refuses an entry whose phase differs from its card's backlog phase, or an unknown card", () => {
+    const head = {
+      pending: new Map([
+        ['jcs', { card: 'M1-1a', phase: 'M1b' }],
+        ['x', { card: 'M7-9', phase: 'M7' }],
+      ]),
+    };
+    expect(checkPendingCards(head, cardPhases(backlog))).toEqual([
+      "jcs: phase M1b differs from card M1-1a's backlog phase M1a",
+      'x: card M7-9 has no Phase in the backlog',
+    ]);
+  });
+
+  it('gates on the backlog phase even if the entry claims another', () => {
+    const head = { pending: new Map([['jcs', { card: 'M1-1a', phase: 'M9' }]]) };
+    expect(checkPendingGate(head, ['M1a'], cardPhases(backlog))).toEqual([
+      'jcs is still pending (M1-1a, phase M1a): every M1a suite must be implemented before a release',
+    ]);
+  });
+});
+
 describe('checkPendingGate (IR-M1-1h-1 F2)', () => {
   const head = {
     pending: new Map([
@@ -238,15 +312,24 @@ describe('checkPendingGate (IR-M1-1h-1 F2)', () => {
     ]),
   };
 
+  const cards = new Map([
+    ['M1-1a', 'M1a'],
+    ['M1-1d', 'M1b'],
+  ]);
+
   it('fails a release while a suite of the gated phase is pending', () => {
-    expect(checkPendingGate(head, ['M1a'])).toEqual([
+    expect(checkPendingGate(head, ['M1a'], cards)).toEqual([
       'jcs is still pending (M1-1a, phase M1a): every M1a suite must be implemented before a release',
     ]);
   });
 
   it('passes when no pending suite belongs to a gated phase', () => {
     expect(
-      checkPendingGate({ pending: new Map([['stream', head.pending.get('stream')]]) }, ['M1a']),
+      checkPendingGate(
+        { pending: new Map([['stream', head.pending.get('stream')]]) },
+        ['M1a'],
+        cards,
+      ),
     ).toEqual([]);
   });
 });
