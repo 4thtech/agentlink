@@ -79,7 +79,7 @@ function charge(address payer, FeeType t, bytes32 appId, address token, uint256 
 3. Debits `credits[payer][token]`; reverts `InsufficientCredits(payer, token, needed, available)` if short.
 4. Accrues `protocolAccrued[token]` and `integratorAccrued[appId][token]`.
 
-**Direct payment** (no credits): modules expose `payable` "direct" functions where `msg.sender` is the payer. The module forwards funds via `vault.depositFromModule{value}(payer, token, amount)`. This function is module-only and pulls ERC-20s from `payer` with `transferFrom` (payer must have approved the vault). It is followed immediately by `charge`.
+**Direct payment** (no credits): modules expose `payable` "direct" functions where `msg.sender` is the payer. The module forwards funds via `vault.depositFromModule{value}(payer, token, amount)`. This function is module-only and pulls ERC-20s from `payer` with `transferFrom` (payer must have approved the vault). It is followed immediately by `charge`. **Approvals (G-3, proposed; owner confirms at merge):** clients approve the vault for the exact amount of each direct payment and never an unlimited amount, and they prefer EIP-3009 (`depositWithAuthorization`) or permit flows that leave no standing allowance. A standing allowance is exposed to any later vault or module upgrade, which withdrawing credits does not undo.
 
 ### 2.5 Credits (non-custodial)
 
@@ -231,31 +231,46 @@ OpenZeppelin Contracts v5 `AccessManager`; the role map below is **proposed; own
 |---|---|---|---|---|---|---|---|
 | 0 | `ADMIN_ROLE` (OZ built-in) | No contract function. AccessManager administration only: grants and revocations by default, role admins, guardians, grant delays, target function roles, target admin delays, closing targets, `updateAuthority` | 4thTech Safe (≥ 2-of-3) | **7 days** | 7 days | — (OZ allows none; the Safe itself cancels) | — |
 | 1 | `FEE_ADMIN` | Set the protocol fee ≤ cap, lower the cap, (de)activate apps (vault) | Safe | 0 | 0 | — | `ADMIN_ROLE` |
-| 2 | `PAUSER` | `pause` (vault, Notary, Registry) | Ops hardware key **and** Safe | 0 | 0 | — | `PAUSE_ADMIN` |
-| 3 | `PAUSE_ADMIN` | `unpause` (vault, Notary, Registry); admin of `PAUSER` | Safe | 0 | 0 | — | `ADMIN_ROLE` |
-| 4 | `GUARDIAN` | No function; guardian of roles 10–24, so it can **cancel** their scheduled operations, never execute | Ops hardware key | 0 | 0 | — | `ADMIN_ROLE` |
+| 2 | `PAUSER` | `pause` (vault, Notary, Registry) | Two ops hardware keys **and** the Safe | 0 | 0 | — | `PAUSE_ADMIN` |
+| 3 | `PAUSE_ADMIN` | `unpause` (vault, Notary, Registry); remove a module (vault); admin of `PAUSER` and `GUARDIAN` | Safe | 0 | 0 | — | `ADMIN_ROLE` |
+| 4 | `GUARDIAN` | No function; guardian of roles 10–24, so it can **cancel** their scheduled operations, never execute | The two ops hardware keys | 0 | 0 | — | `PAUSE_ADMIN` |
 | 10 | `CONFIG_ADMIN` | Allowlist or remove a fee token, set `minDeposit` (vault) | Safe | 48 h | 48 h | `GUARDIAN` | `ADMIN_ROLE` |
 | 20 | `CAP_RAISER` | Raise the cap, set `integratorFeeCapMultiple` (vault) | Safe | 7 days | 7 days | `GUARDIAN` | `ADMIN_ROLE` |
 | 21 | `TREASURY_ADMIN` | Change the treasury (vault) | Safe | 7 days | 7 days | `GUARDIAN` | `ADMIN_ROLE` |
-| 22 | `MODULE_ADMIN` | Register or remove a module (vault) | Safe | 7 days | 7 days | `GUARDIAN` | `ADMIN_ROLE` |
+| 22 | `MODULE_ADMIN` | Register a module (vault) | Safe | 7 days | 7 days | `GUARDIAN` | `ADMIN_ROLE` |
 | 23 | `UPGRADER` | `upgradeToAndCall` (vault, Notary, Registry) | Safe | 7 days | 7 days | `GUARDIAN` | `ADMIN_ROLE` |
 | 24 | `FREEZER` | `freezeUpgrades` (Notary) | Safe | 7 days | 7 days | `GUARDIAN` | `ADMIN_ROLE` |
 
 - **Target admin delay** = 7 days on the vault, the Notary and the Registry. Remapping a function to another role, closing a target or switching its authority (`updateAuthority`) therefore takes at least 7 days.
 - **`minSetback`** stays at the OZ default (5 days, not overridden). Every change to a grant delay or a target admin delay takes effect after max(5 days, the reduction), so a delay can never be shortened faster than it protects.
-- **Why 7 days for modules and every upgrade.** A module can call `charge` for any payer. A malicious module, or a malicious upgrade of the Notary or the Registry (both are modules), could therefore drain credits in fee-sized steps to an integrator app it controls. Registering a module and upgrading any module carry the same 7-day delay as a vault upgrade, so users can withdraw first. (This replaces the earlier 48 h for Notary and Registry upgrades and for module registration.)
-- **Why `ADMIN_ROLE` is 7 days.** With every AccessManager change at 7 days, no path to a 7-day power is shorter than 7 days. Grant delays and target admin delays add a second, independent layer. The only exceptions are the 0-delay emergency and fee roles above. Execution delays of existing members can be lowered only after the reduction (OZ); a revoke-and-regrant counts as a new grant and waits for the grant delay.
+- **Why 7 days for modules and every upgrade.** A module can call `charge` for any payer. A malicious module, or a malicious upgrade of the Notary or the Registry (both are modules), could therefore drain credits in fee-sized steps to an integrator app it controls. Registering a module and upgrading any module carry the same 7-day delay as a vault upgrade, so users can withdraw first **and revoke any token approval to the vault**. A malicious upgrade could also pull a standing allowance through `depositFromModule` (§2.4). The public notice of every scheduled upgrade or module registration tells users to do both. (This replaces the earlier 48 h for Notary and Registry upgrades and for module registration; proposed, owner confirms at merge.) Removing a module only reduces power, so it is immediate (`PAUSE_ADMIN`).
+- **Why `ADMIN_ROLE` is 7 days** (proposed; owner confirms at merge). With every AccessManager change at 7 days, no path to a 7-day power is shorter than 7 days. Grant delays and target admin delays add a second, independent layer. The only exceptions are the 0-delay emergency and fee roles above. Execution delays of existing members can be lowered only after the reduction (OZ); a revoke-and-regrant counts as a new grant and waits for the grant delay.
 - **Bound (tested in M1-3a).** With the Safe compromised, every path to `UPGRADER`, `MODULE_ADMIN`, `TREASURY_ADMIN`, `CAP_RAISER` or `FREEZER` power takes at least 7 days on-chain. That covers using the role, granting it to a new account, remapping the function, switching the authority, and lowering a delay first. `CONFIG_ADMIN` power takes at least 48 h.
 - **Emergency.**
-  - `PAUSER` (ops key or Safe) pauses at once. Pause blocks charges, deposits and notarization, never withdrawals.
-  - Only the Safe unpauses (`PAUSE_ADMIN`), so a stolen ops key cannot undo a pause during an incident. It can only pause again (denial of service). The Safe revokes it at once, because `PAUSE_ADMIN` administers `PAUSER` with no delay.
-  - `GUARDIAN` or the Safe cancels any unexpected scheduled operation at once. OZ allows no guardian on `ADMIN_ROLE`, so only the Safe or the scheduler can cancel scheduled AccessManager changes.
+  - **Pause.** `PAUSER` (either ops key or the Safe) pauses at once. **Pause scope:** pause blocks charges, deposits, notarization and registration. It **never** blocks `withdraw`, `withdrawIntegrator`, `sweep` or the Registry `revoke` (resolves G-39; proposed, owner confirms at merge). A stolen ops key therefore cannot trap funds or stop the revocation of a compromised agent.
+  - **Unpause.** Only the Safe unpauses (`PAUSE_ADMIN`), so a stolen ops key cannot undo a pause during an incident. It can only pause again (denial of service), or cancel scheduled operations as `GUARDIAN`.
+  - **Stolen ops key.** The Safe revokes `PAUSER` and `GUARDIAN` from it **at once**, in the same Safe batch before unpausing, because `PAUSE_ADMIN` administers both roles with no delay. Trade-off: a compromised Safe can also remove the guardians at once, so the guardian adds no time beyond the 7-day bound against a compromised Safe. It is a fast veto for honest mistakes and for operations nobody expected.
+  - **Cancel.** `GUARDIAN` or the Safe cancels any unexpected scheduled operation at once. OZ allows no guardian on `ADMIN_ROLE`, so only the Safe or the scheduler can cancel scheduled AccessManager changes.
+  - **Ops keys (proposed; owner confirms at merge).** Two dedicated hardware keys, one held by Tali and one by Denis, each holding `PAUSER` and `GUARDIAN`, for on-call coverage. Neither is a Safe-signer device or account. They are never used on CI, agent machines or hot wallets, and are rotated on suspicion via `PAUSE_ADMIN`.
+- **New selectors and targets.** After an upgrade, any new restricted selector defaults to `ADMIN_ROLE` until the Safe maps it (7 days); the upgrade's evidence lists the mapping. Later targets (P2 modules, M4 chains) are configured by the Safe through `ADMIN_ROLE` under the same table.
 - **Deployment (§9, D-52).**
   - The deployer is the AccessManager's initial admin only inside the deploy script. The script maps every selector, sets delays, guardians and role admins, grants the roles above and renounces `ADMIN_ROLE`. The deployer holds no role afterwards (checked by script).
   - Grant delays and target admin delays configured at deployment take effect only after `minSetback` (5 days).
-  - **Mainnet** contracts are therefore initialised **paused**. The Safe unpauses after the post-deploy check reads back every grant delay and target admin delay as in effect.
+  - The 7-day bound already holds in that window, because the Safe's own 7-day `ADMIN_ROLE` execution delay applies from the grant. **Mainnet** contracts are nevertheless initialised **paused**, as defence in depth: no user deposits until the full role check passes and every configured delay is in effect (proposed; owner confirms at merge). The order per chain:
+    1. deploy (paused);
+    2. run the role check (`release-and-deployment.md` §4.3);
+    3. wait until every grant delay and target admin delay reads back as configured (deployment + 5 days);
+    4. the Safe unpauses;
+    5. run the smoke test;
+    6. publish.
+
+    The wait does not block deploying the next chain.
   - **Testnets** are unpaused at deployment (faucet funds only).
-- **Testnets** use the same role IDs, selector map, guardians and role admins, with a separate **testnet Safe** and testnet ops key (never shared with mainnet, `release-and-deployment.md` §1). Delays are scaled so upgrades can be rehearsed during the beta: 48 h → 1 h, 7 days → 4 h, for execution and grant delays and the target admin delay. The values live in the per-chain config, and the M1-3a test checks them per chain.
+  - **Mainnet floor.** The deploy script reverts if the chain is a mainnet and any configured delay is below the §5.1 table, so scaled testnet values can never reach mainnet.
+- **Testnets** (proposed; owner confirms at merge) use the same role IDs, selector map, guardians and role admins.
+  - **Holders:** a separate **2-of-3 testnet Safe** (Tali, Denis and an offline backup key; the signer addresses differ from mainnet) and a separate testnet ops key. No agent or CI signer. Nothing is shared with mainnet (`release-and-deployment.md` §1).
+  - **Delays** are scaled so upgrades can be rehearsed during the beta: 48 h → 1 h and 7 days → 4 h, for execution delays, grant delays and the target admin delay. The values live in the per-chain config, and the M1-3a test checks them per chain.
+  - **`minSetback` is not scaled.** It stays 5 days on testnets, so delays set at deployment, and rehearsals of delay changes, take effect after 5 days.
 - Mainnet configuration, upgrades and Safe operations are owner-only (D-25, D-52): agents prepare evidence; they never schedule, sign, execute or cancel (`release-and-deployment.md` §4.4).
 
 **Freeze:** the Notary has a one-way `freezeUpgrades()` (`FREEZER`, 7-day delay). After it runs, `_authorizeUpgrade` always reverts, regardless of roles. It is executed at GA so records stay permanently neutral. The vault stays upgradeable with a 7-day delay.

@@ -126,9 +126,9 @@ The multiple defaults to **4** and can never exceed **10** (a contract constant)
 | Allowlist or remove a fee token, set `minDeposit` | `CONFIG_ADMIN` (Safe) | 48 h |
 | Change the treasury | `TREASURY_ADMIN` (Safe) | 7 days |
 | Pause charging | `PAUSER` | None; **never blocks withdrawals** |
-| Register a module, upgrade a contract (proposed, G-3) | `MODULE_ADMIN`, `UPGRADER` (Safe) | **7 days** |
+| Register a module, upgrade a contract (proposed, G-3) | `MODULE_ADMIN`, `UPGRADER` (Safe) | **7 days**; the notice tells users to withdraw and revoke token approvals |
 
-**Public price policy** (a commitment, not enforced on-chain):
+**Public price policy** (D-45; a commitment, not enforced on-chain):
 
 - Every **price increase** is announced **at least 7 days** before it takes effect, in the `CHANGELOG`, a GitHub Release and these docs.
 - A **price decrease** may take effect immediately; it is announced the same way.

@@ -912,19 +912,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - `docs/roles.md` table (role, holder, selectors, execution delay, grant delay, guardian) reviewed by the owner and @denisjazbec.
   - A table-driven Foundry test enumerates every restricted selector and asserts its role and delay match `docs/roles.md`.
-  - A bound test (05 §5.1, §8): with the Safe compromised, every path to a 7-day power (use, new grant, `setRoleAdmin`, selector remap, `updateAuthority`, grant- or target-delay reduction) takes ≥ 7 days and every path to `CONFIG_ADMIN` power ≥ 48 h; a stolen ops key can pause and cancel but not unpause, and the Safe revokes it at once.
+  - A bound test (05 §5.1, §8): with the Safe compromised, every path to a 7-day power (use, new grant, `setRoleAdmin`, selector remap, `updateAuthority`, grant- or target-delay reduction) takes ≥ 7 days and every path to `CONFIG_ADMIN` power ≥ 48 h, including the first 5 days after deployment (before `minSetback`); a stolen ops key can pause and cancel but not unpause, and the Safe revokes both its roles at once; pause never blocks `withdraw`, `withdrawIntegrator`, `sweep` or Registry `revoke`; the deploy script reverts on a mainnet with any delay below 05 §5.1.
 
 #### M1-3b · contracts: OCCFeeVault (credits, fees, apps, treasury)
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · src/OCCFeeVault.sol, test/unit
-- **Depends on:** M1-3a; gap G-39 resolved
+- **Depends on:** M1-3a; gap G-39 resolved (PR #11, pending owner)
 - **Spec:** 05 §2.1–§2.6, §5, §6, §7
 - **Invariants:** I-10
 - **Scope:**
   - Credits: `deposit`, `depositFor` (native + allowlisted ERC-20 via SafeERC20, measured balance delta), `withdraw` (works while paused), `creditsOf`, `minDeposit`.
   - Fees: `protocolFee ≤ maxProtocolFee`; caps lowered immediately, raised only via the 7-day role; `integratorFeeCapMultiple` default 4, ≤ `MAX_MULTIPLE` = 10; `quote`; `charge` (modules only; integrator cap applied at charge time; `maxTotal`; `InsufficientCredits`); `depositFromModule` (modules only; `transferFrom` payer).
   - Apps: `registerApp` (appId = keccak256(abi.encode(integrator, keccak256(bytes(name))))), `setIntegratorFee`, `setIntegrator` (appId unchanged), `setAppActive`; appId 0 = no integrator.
-  - Treasury: permissionless `sweep` via `call`; `withdrawIntegrator`; treasury change with 7-day delay; pause blocks charges and deposits only (pause behaviour of `sweep`/`withdrawIntegrator` per G-39); CEI + `nonReentrant` on every value transfer.
+  - Treasury: permissionless `sweep` via `call`; `withdrawIntegrator`; treasury change with 7-day delay; pause blocks charges and deposits only, never `withdraw`, `sweep` or `withdrawIntegrator` (05 §5.1, G-39); CEI + `nonReentrant` on every value transfer.
   - Out: `depositWithAuthorization` (M1-3c).
 - **Acceptance:**
   - Tests first (failing-test commit precedes implementation); a unit test for every function and every applicable revert in 05 §7.
@@ -2607,7 +2607,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Spec:** 05 §2.6, §5; 10 M3-2; `release-and-deployment.md` §6
 - **Invariants:** I-10
 - **Scope:**
-  - ≥ 2-of-3 Safes per chain with hardware signers; PAUSER ops hardware key (plus Safe); fresh hardware-backed mainnet deployer key retained per G-8 for later chains; role-assignment plan mapping every role in `docs/roles.md` to its holder.
+  - ≥ 2-of-3 Safes per chain with hardware signers; two ops hardware keys holding `PAUSER` and `GUARDIAN` (Tali and Denis, never Safe-signer devices; 05 §5.1) plus the Safe; fresh hardware-backed mainnet deployer key retained per G-8 for later chains; role-assignment plan mapping every role in `docs/roles.md` to its holder.
 - **Acceptance:**
   - A script reads each Safe's owners and threshold on-chain and matches the plan; no seed or signer secret in any repository.
 
@@ -2946,7 +2946,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 36. **G-36 (L) Owner-backup event kind.** 04 §2.3 names the `d` tag but not the parameterised-replaceable kind. *Blocks:* M2-2b.
 37. **G-37 (L, process) PR title pattern.** `pr-hygiene.yml` accepts `OPS-<n>` and `M<n>-<n>[a-z]`, but `development-process.md` §12.2 and `audit-rules.md` §7 use `OPS-L<n>` and `M<n>-GATE`. *Blocks:* PRs for OPS-L, gate and design-drop cards (fixed by M0-15; design drops may also use the `DOCS` prefix).
 38. **G-38 (M, decision) D-25 scope.** RESOLVED: D-25 is decided (decision log, 12 Oct 2026): continuous delivery with auto-merge behind `review-gate`, automatic staging deploys, automatic rollback, and one owner approval click for production (`talirezun` required reviewer on `production` and `npm-publish`, "Prevent self-review" off; click superseded by D-52 for services, npm `latest` keeps it). `release-and-deployment.md` and `ci-cd.md` are aligned. Remaining work is owner setup: M0-17 (ruleset with auto-merge), M0-18 (environments), M0-19 (`DEPLOY_FREEZE`).
-39. **G-39 (M) Pause scope.** 05 §2.5 says pause never blocks payer withdrawals but is silent on `sweep` and `withdrawIntegrator` (also DECISION NEEDED in `audit-rules.md` §5). *Blocks:* M1-3b.
+39. **G-39 (M) Pause scope.** Resolved by PR #11 (pending owner), with G-3: pause blocks charges, deposits, notarization and registration, and never `withdraw`, `withdrawIntegrator`, `sweep` or Registry `revoke` (05 §5.1). *Was:* 05 §2.5 said pause never blocks payer withdrawals but was silent on `sweep` and `withdrawIntegrator`. *Blocks:* M1-3b.
 40. **G-40 (M, process) Beta hostnames vs environments.** D-28 puts beta services on `*.agentlink.4thtech.io` and staging on `workers.dev`; `release-and-deployment.md` §1 maps testnets to staging and production to mainnets. Which environment (and approval) serves the testnet submitter, faucet and console used by M1/M2 testers is undefined. *Proposed:* a "beta" environment (testnets, beta hostnames, owner-approved promotion). *Blocks:* M1-10c, M2-2h.
 41. **G-41 (L) D-12 propagation.** The decision log now records MIT (D-12); the private internal docs predate it. *Proposed:* align them privately; every public `package.json` and the cloud-agent template carry MIT. *Blocks:* M0-2d (check script), M2-3d (template licence).
 42. **G-42 (H, note) Desktop owner presence as the G-1 mitigation.** D-36; 04 §2.5; 08 §1. D-36's desktop model (a signed app, a native approval window, the owner key in the OS keychain gated by OS biometrics such as Touch ID or Windows Hello) is the intended mitigation for G-1: the OS, not a `localhost` web origin, shows the presence prompt, and keychain access bound to the app's signing identity is meant to stop a tampered installation or another same-user process from unlocking the owner key. It is not yet specified or proven: Linux has no equivalent OS binding, and `npx` installs keep G-1's residual risk. *Proposed:* M2-11a's threat model states exactly which G-1 paths the desktop app closes, per OS; 04 §2.5 is updated when the desktop app ships, and only then is G-1 closed for desktop installs. G-1 stays open until then. *Blocks:* M2-11a, M2-11b, M2-11c, M2-11d.
@@ -3001,7 +3001,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | M2-14, M2-11e, M2-11f | Buy and enrol: Apple Developer ID (organisation) and a Windows code-signing certificate, starting in M1b; hold signing credentials and the offline update key; approve each desktop release |
 | M3-12 | **DECISION NEEDED:** GitHub Team before mainnet (D-27) |
 | M3-1a, M3-1b | Run the audit engagements; accept final reports |
-| M3-2b | Create mainnet Safes with hardware signers; PAUSER key; mainnet deployer hardware key and its custody |
+| M3-2b | Create mainnet Safes with hardware signers; two ops keys (`PAUSER`, `GUARDIAN`); mainnet deployer hardware key and its custody |
 | M3-2c | Run the mainnet deploy with the hardware key, a second person witnessing |
 | M3-3 | Confirm the D-45 beta prices and `minDeposit`; sign the fee-configuration Safe batch |
 | M3-5 | Set and fund mainnet gas keys |
