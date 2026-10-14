@@ -55,6 +55,27 @@ function restrictionsFor(zone) {
   return { 'no-restricted-imports': ['error', { paths, patterns }] };
 }
 
+// --- Console ban (M0-8) -------------------------------------------------------------------------
+// The deliberate console channels; adding one is a reviewed change to this file (S1).
+// - packages/log/src/console.ts: the logger's console sink. It only ever receives redacted lines.
+// - apps/cli/src/output.ts: the CLI's user-output channel (command results such as `--version`).
+//   It prints only what the user asked to see and is never used for logging.
+const CONSOLE_CHANNELS = ['packages/log/src/console.ts', 'apps/cli/src/output.ts'];
+const CONSOLE_MESSAGE =
+  'No console output: log through @agentlink/log (redacting). Deliberate channels: eslint.config.mjs CONSOLE_CHANNELS.';
+const CONSOLE_SYNTAX = [
+  // globalThis.console, window.console, (globalThis as T).console
+  "MemberExpression[computed=false][property.name='console']",
+  // globalThis['console']
+  "MemberExpression[computed=true][property.value='console']",
+  // declare const console: …; const console = …
+  "VariableDeclarator[id.name='console']",
+  // const { console } = globalThis
+  "ObjectPattern > Property[key.name='console']",
+  // import console from 'node:console'
+  'ImportDeclaration[source.value=/^(node:)?console$/]',
+].map((selector) => ({ selector, message: CONSOLE_MESSAGE }));
+
 const ZONES_WITH_EXEMPTIONS = [
   ...new Set([...NODE_ZONES, ...LIBRARIES.flatMap(({ zones }) => zones)]),
 ];
@@ -64,10 +85,11 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    // Never log secrets (AGENTS.md): no stray console output. Use the redacting logger.
-    // TODO(M0-8): apps/cli needs a narrow exception for deliberate user-facing output (for example
-    // `--version`), added together with the redacting logger.
-    rules: { 'no-console': 'error' },
+    // Never log secrets (AGENTS.md, 04 §8.4): no console output; log through @agentlink/log, which
+    // redacts. Shared packages compile without DOM or Node types, so code reaches the console only
+    // through globalThis or a local `declare const console`, and no-console sees neither:
+    // CONSOLE_SYNTAX closes those routes. The only exceptions are the channels in CONSOLE_CHANNELS.
+    rules: { 'no-console': 'error', 'no-restricted-syntax': ['error', ...CONSOLE_SYNTAX] },
   },
   {
     files: [`packages/**/*.${SOURCE}`, `apps/**/*.${SOURCE}`],
@@ -84,7 +106,7 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node } },
   },
   {
-    files: ['tools/**'],
-    rules: { 'no-console': 'off' },
+    files: ['tools/**', ...CONSOLE_CHANNELS],
+    rules: { 'no-console': 'off', 'no-restricted-syntax': 'off' },
   },
 );

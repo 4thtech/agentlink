@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Added
 
 - Monorepo skeleton (M0-2d): pnpm workspace with Turborepo, strict ESM TypeScript with project references, ESLint, Prettier, Vitest and Changesets; a stub package for every directory in the repository layout; manifest checks (MIT licence, no install scripts) inside `pnpm lint`; and CI strict mode (`.github/ci-strict`), so a missing root script now fails CI. All packages are private stubs and nothing is published yet.
+- Redacting logger `@agentlink/log` (M0-8): zero-dependency structured logging for Node, browsers and Workers that redacts secrets by field name and by value shape at every level, and a secret-canary test helper that fails CI when a known fake secret reaches any log line. Console output is banned outside the logger and the CLI's user-output channel.
 - Build plan "At a glance" (building blocks, stages, external services) and plain-language explainers on messaging, files and payments under `docs/explainers/`.
 
 ### Changed
