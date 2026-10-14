@@ -380,14 +380,14 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - No assertion changes; the suite passes repeatedly, also in parallel with the crypto tests.
 
 #### M0-10d · console-ban test: deterministic cold-start timeout (new)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 (`tools/**`; S1 only if the PR also edits `docs/process/**`, as M0-10c did)
-- **Repo/path:** agentlink · tools/console-ban.test.mjs
+- **Status:** in-progress · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`tools/**` is S0; this card is S1 because it edits `docs/process/**`, as M0-10c did)
+- **Repo/path:** agentlink · tools/console-ban.test.mjs, tools/vitest.config.mjs
 - **Depends on:** M0-8, M0-10c
 - **Spec:** `audit-rules.md` §2 (`tools/**` is S0); `ci-cd.md`; same pattern as M0-10c
 - **Invariants:** I-7
 - **Scope:**
-  - Observed on push CI of 14 Oct 2026: the test "packages/chain/src/m08-probe.ts: globalThis.console is flagged" timed out at the 5 s default (cold ESLint start under CI load); a rerun passed. Do the cold start once in `beforeAll` with its own generous hook timeout, as M0-10c did for the eslint-rules test; the per-test timeout stays at the default.
-  - Card only so far; no fix has been made.
+  - Observed on push CI of 14 Oct 2026: the test "packages/chain/src/m08-probe.ts: globalThis.console is flagged" timed out at the 5 s default (cold ESLint start under CI load); a rerun passed. Do the cold start once in `beforeAll` with its own generous hook timeout, as M0-10c did for the eslint-rules test.
+  - Also a tools-wide Vitest `testTimeout` of 20 s (and `hookTimeout` 60 s) in `tools/vitest.config.mjs` (the per-test timeout is therefore 20 s for the whole tools suite, no longer the 5 s default), because the load grows with every package that adds tests. Measured locally (3 runs, 508 tests): slowest test 0.5 s (`policy` repo scan) and the cold first lint 0.37-0.47 s; with the CPU oversubscribed twofold (28 spinners plus crypto and types tests in parallel) the cold first lint took 1.8 s and the repo scan 1.4 s. After the fix the cold start sits in `beforeAll` and the slowest test under the same load is 1.5 s. CI runners were 3-10x slower than that (cold start over 5 s), so 20 s keeps about 10x headroom over the loaded local worst case. `policy.test.mjs` keeps its own explicit 30 s.
 - **Acceptance:**
   - No assertion changes; the suite passes repeatedly, also in parallel with the crypto tests, and a deliberately slow first `lintText` no longer fails the first test.
 
