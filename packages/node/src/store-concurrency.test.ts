@@ -94,12 +94,23 @@ interface Child {
 function run(script: string, args: readonly string[]): Child {
   const child = spawn(
     process.execPath,
-    [...stripFlag, '--import', join(dir, 'register.mjs'), join(dir, script), ...args],
+    // --import takes a URL: a bare Windows path (C:\...) is not one.
+    [
+      ...stripFlag,
+      '--import',
+      pathToFileURL(join(dir, 'register.mjs')).href,
+      join(dir, script),
+      ...args,
+    ],
     { cwd: SRC, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] },
   );
   let err = '';
   child.stderr?.on('data', (chunk: Buffer) => (err += chunk.toString()));
-  const ready = new Promise<void>((resolve) => child.on('message', () => resolve()));
+  // Settles on exit too, so a child that fails to start fails the test at once instead of timing out.
+  const ready = new Promise<void>((resolve) => {
+    child.on('message', () => resolve());
+    child.on('exit', () => resolve());
+  });
   const done = new Promise<number | null>((resolve) => child.on('exit', (code) => resolve(code)));
   return {
     done,
