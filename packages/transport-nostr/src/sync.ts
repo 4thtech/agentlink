@@ -1,0 +1,1047 @@
+// M1-5c: subscribe and sync (07 §4.2 "Sync", §3.2 `seen`, `sync_cursors`; 04 §3.1.1, §3.5; 06 §6).
+//
+// What it does: REQ {kinds: [1059], "#p": own keys, since} on each relay of a list, reads the stored
+// events and (live) the new ones, opens each gift wrap (unwrapGiftWrap, M1-5a) and hands the strictly
+// parsed envelope to the caller. What it does not do: choose the relays (core, per 07 §4.3), verify
+// the envelope signature or process anything (04 §3.1.1 steps 4 to 9, core M1-7b), or write the
+// store: the cursor and the seen-set are injected (SyncPersistence), implemented by core/node over
+// `sync_cursors` and `seen`.
+//
+// Properties, each with a test:
+// - Pages (IR-M1-5c-1 H-1): a relay may cap the stored events it returns per filter, newest first, and
+//   then send EOSE. So a relay is read in pages (`limit`, `until`) walking back to `since`, and the
+//   cursor moves only after the last page. A pass that stops early saves the page it reached
+//   (optional `setResume`), and the next pass continues there, so a flood of junk cannot stall it.
+// - Cursor (07 §4.2): per relay, `last_seen` is the local time the pass started, written only after
+//   the relay reached EOSE and every event of the pass was handled. The next REQ asks for
+//   `since = last_seen - 48 h - S` (NIP-59 randomises wrap times by up to 2 days; S = 300 s, 04 §2.5.1),
+//   and a relay with no cursor is read 9 days back (07 §4.3). A relay that fails, times out or has an
+//   event handled as `retry` keeps its old cursor.
+// - Dedup (04 §3.1.1, IR-M1-5a-1 L-3): wraps are skipped by gift-wrap id, never by `envelope.id`
+//   before verification (an unverified envelope's id is chosen by its sender). An envelope id is
+//   recorded only when the caller reports `verified`, and it is passed to the handler as a hint
+//   (`envelopeSeen`), never as a reason to skip. Core writes the `seen` row in its own transaction
+//   (07 §3.2); the optional `markSeen` here is called only after the handler's processed outcome,
+//   and `retry` marks nothing. The same wrap from 3 relays is
+//   delivered once, also when the copies arrive at the same time.
+// - Junk (07 §3.2): a wrap that fails to open is not recorded in the seen-set; it is remembered only
+//   in a bounded in-memory cache, keyed by id and signature, so a forged copy of a real wrap's id
+//   cannot hide the real one.
+// - Bounds on untrusted relays (I-5): the frame size limit is the pool's (128 KiB, before JSON.parse);
+//   here the number of frames and of newly opened wraps per relay pass, the queue behind a slow
+//   handler, and every in-memory cache are bounded.
+// - Time budget (06 §6): sync() returns when every relay is done or the budget (3 s by default) ends,
+//   flagged `partial`; relays that did not finish keep their cursor.
+// - I-5, I-7: relay text and event content are never logged or returned. Logs carry counts and fixed
+//   reasons, and name a relay by host only.
+import {
+  KeyStoreError,
+  encodeHex,
+  randomBytes,
+  type Envelope,
+  type EnvelopeKeys,
+} from '@agentlink/crypto';
+import type { Logger } from '@agentlink/log';
+import { isAllowedRelayUrl } from '@agentlink/types';
+import { TransportError } from './errors.js';
+import { unwrapGiftWrap } from './gift-wrap.js';
+import type { Timers } from './relay-io.js';
+import type { RelayFailure, RelayLink, RelayPool } from './relay-pool.js';
+
+/** NIP-59 randomises wrap times by up to 2 days (04 §3.5), so a cursor is read back 48 h. */
+export const SYNC_LOOKBACK_SECONDS = 172_800;
+/** Clock skew `S` (04 §2.5.1). */
+export const SYNC_SKEW_SECONDS = 300;
+/** 07 §4.3 (G-24): the first sync on a relay with no cursor looks back 9 days. */
+export const FIRST_SYNC_LOOKBACK_SECONDS = 9 * 86_400;
+/** 06 §6: `agentlink_inbox` and `agentlink_status` catch up within 3 s. */
+export const SYNC_BUDGET_MS = 3_000;
+/** 07 §3.2: a seen row lives at least 7 days. */
+export const SEEN_RETENTION_SECONDS = 604_800;
+/** 07 §3.2: a cursor older than 30 days (the longest relay retention) is ignored for pruning. */
+export const CURSOR_IGNORE_AFTER_SECONDS = 30 * 86_400;
+/** At most this many relays in one sync or subscription (the pool's connection bound, 07 §4.3). */
+export const MAX_SYNC_RELAYS = 64;
+/** At most this many own keys (agent epochs and owner keys) in one REQ. */
+export const MAX_SYNC_IDENTITIES = 64;
+/** Frames one relay may send for one pass; above this the pass for that relay ends incomplete. */
+export const MAX_FRAMES_PER_PASS = 50_000;
+/** Wraps one relay may make us open (decrypt) in one pass; above this the pass ends incomplete. */
+export const MAX_NEW_WRAPS_PER_PASS = 2_000;
+/** Live: wraps one relay may make us open in one minute. */
+export const MAX_LIVE_NEW_WRAPS_PER_MINUTE = 600;
+/** Stored events asked for per page (strfry's own default result cap is 500). */
+export const SYNC_PAGE_LIMIT = 500;
+/** Pages one relay may take in a pass (about 50 000 events at the page limit). */
+export const MAX_PAGES_PER_PASS = 100;
+/** A saved page position older than this is not resumed. */
+export const SYNC_RESUME_MAX_AGE_SECONDS = 7 * 86_400;
+/** Events waiting behind a slow handler, per relay. */
+export const MAX_QUEUED_EVENTS = 2_048;
+/** Characters of events (the whole event as JSON) waiting behind a slow handler, per relay (about 16 MiB). */
+export const MAX_QUEUED_CHARS = 16_777_216;
+/** Entries of each in-memory dedup cache (processed wraps, junk wraps). */
+export const DEDUP_CACHE_ENTRIES = 8_192;
+/** Live: the first wait before a lost relay is reached again, doubling up to the maximum. */
+export const LIVE_RETRY_BASE_MS = 5_000;
+export const LIVE_RETRY_MAX_MS = 300_000;
+/** Live: the cursor moves at most this often. */
+const LIVE_CURSOR_INTERVAL_SECONDS = 60;
+const NOSTR_KIND_GIFT_WRAP = 1059;
+const HEX_32 = /^[0-9a-f]{64}$/;
+const HEX_64 = /^[0-9a-f]{128}$/;
+const AUTH_REQUIRED = 'auth-required:';
+
+/** One of our own Nostr keys: the `p` tag of a wrap that is for us. */
+export interface SyncIdentity {
+  /** The x-only key, 64 lowercase hex. */
+  readonly pubkey: string;
+  /** The key epoch to decrypt with (04 §2.7: picked from the wrap's `p` tag). Default: current. */
+  readonly epoch?: number;
+}
+
+/** The two kinds of the `seen` table (07 §3.2). */
+export type SeenKind = 'wrap' | 'envelope';
+
+/**
+ * Persistence for cursors and the seen-set, implemented by core/node over `sync_cursors` and `seen`
+ * (07 §3.2). Every method may reject: a cursor that cannot be read means "no cursor" (a 9-day pass),
+ * a seen-set that cannot be read means "empty" for that event (07 §3.2 "On failure"), a write that
+ * fails only costs work later. Times are Unix seconds.
+ */
+export interface SyncPersistence {
+  /** `sync_cursors.last_seen` of the relay, or undefined if it has none. */
+  getCursor(relay: string): Promise<number | undefined>;
+  setCursor(relay: string, lastSeen: number): Promise<void>;
+  /**
+   * True if `(kind, id)` is in `seen`. A read only: core writes the `seen` row inside its own store
+   * transaction, together with the item it stores (07 §3.2), so two writers never disagree on
+   * `first_seen_at`.
+   */
+  isSeen(kind: SeenKind, id: string): Promise<boolean>;
+  /**
+   * Optional; the default is to write nothing. Upserts `(kind, id)` with `first_seen_at` after the
+   * handler reported the item's processed outcome. Leave it out when core writes `seen` itself (the
+   * intended setup). An `envelope` row written here is keyed on the id alone, which any sender may
+   * choose (IR-M1-5c-1 L-6): never skip on it. Pruning follows `seenPruneBefore`.
+   */
+  markSeen?(kind: SeenKind, id: string, firstSeenAt: number): Promise<void>;
+  /**
+   * Optional: where a pass that was cut short (budget, a bound, a lost connection) stopped, so the
+   * next pass continues there instead of reading the newest pages again (a flood of junk larger than
+   * a pass cannot then stall a relay for good). Without these, every pass starts from the newest.
+   */
+  getResume?(relay: string): Promise<SyncResume | undefined>;
+  /** `undefined` clears it. */
+  setResume?(relay: string, resume: SyncResume | undefined): Promise<void>;
+}
+
+/** A saved page position: events newer than `until` were read and handled in the pass that began at `startedAt`. */
+export interface SyncResume {
+  readonly until: number;
+  readonly startedAt: number;
+}
+
+/** What the handler gets for each new gift wrap. */
+export interface SyncItem {
+  /** Strictly parsed; its signature is NOT checked (04 §3.1.1 step 4 is core). */
+  readonly envelope: Envelope;
+  readonly giftWrapId: string;
+  readonly giftWrapCreatedAt: number;
+  /** The relay that served this copy. */
+  readonly relay: string;
+  /** The own key the wrap was addressed to. */
+  readonly recipient: string;
+  /**
+   * A hint: an envelope with this id was verified and processed before. Unverified, so the sender
+   * chose it: core must never skip or drop on it (IR-M1-5a-1 L-3). Core step 9 compares `envelopeHash`.
+   */
+  readonly envelopeSeen: boolean;
+}
+
+/**
+ * The handler's answer.
+ * - `processed`: the item is durably stored or its final outcome recorded. The wrap id is marked seen.
+ * - `verified`: as `processed`, and the envelope signature passed (04 §3.1.1 step 4), so its id is
+ *   marked seen too.
+ * - `retry`: not stored (for example the store was busy). Nothing is marked seen and the relay's
+ *   cursor does not move, so the item comes again.
+ */
+export type SyncDisposition = 'processed' | 'verified' | 'retry';
+
+export type EnvelopeHandler = (item: SyncItem) => Promise<SyncDisposition> | SyncDisposition;
+
+/** Why a relay's pass is not complete. A fixed set: relay text never reaches a caller. */
+export type SyncRelayReason =
+  | 'ok'
+  | RelayFailure
+  | 'budget'
+  | 'stopped'
+  | 'auth_failed'
+  | 'subscription_closed'
+  | 'connection_lost'
+  | 'too_many_events'
+  | 'overflow'
+  | 'keys_unavailable'
+  | 'handler_retry';
+
+export interface SyncRelayResult {
+  readonly relay: string;
+  /** `complete`: EOSE reached, every event handled, cursor moved. */
+  readonly status: 'complete' | 'incomplete' | 'failed';
+  readonly reason: SyncRelayReason;
+}
+
+export interface SyncResult {
+  /** True when any relay did not complete (budget, failure, retry): more may be waiting. */
+  readonly partial: boolean;
+  /** Items handed to the handler and reported processed. */
+  readonly delivered: number;
+  /** Wraps skipped because they were seen (any relay, this or an earlier pass). */
+  readonly duplicates: number;
+  /** Events dropped: not a valid gift wrap for us, or over a bound. Nothing about them is kept. */
+  readonly dropped: number;
+  /** Items the handler asked to see again. */
+  readonly deferred: number;
+  readonly relays: readonly SyncRelayResult[];
+}
+
+export interface SyncOptions {
+  /** The relays to read (chosen by core, 07 §4.3). 1 to 64 entries. */
+  readonly relays: readonly string[];
+  /** Own keys: `#p` of the REQ, and the epoch to decrypt each wrap with. */
+  readonly identities: readonly SyncIdentity[];
+  readonly onEnvelope: EnvelopeHandler;
+  /** Time budget in milliseconds (default SYNC_BUDGET_MS). */
+  readonly budgetMs?: number;
+}
+
+export interface SubscribeOptions {
+  readonly relays: readonly string[];
+  readonly identities: readonly SyncIdentity[];
+  readonly onEnvelope: EnvelopeHandler;
+}
+
+export interface SyncEngineOptions {
+  readonly pool: Pick<RelayPool, 'connect' | 'onFrame' | 'onRelayClose' | 'isClosed'>;
+  readonly persistence: SyncPersistence;
+  /** The recipient's KeyStore, or an OwnerSession on owner surfaces (owner copies). */
+  readonly keys: EnvelopeKeys;
+  readonly logger?: Logger;
+  /** Clock in Unix milliseconds (default: the wall clock). */
+  readonly now?: () => number;
+  /** Timers (default: the global ones, read at call time so fake timers apply). */
+  readonly timers?: Timers;
+  /** Entries of each in-memory dedup cache (default DEDUP_CACHE_ENTRIES); tests lower it. */
+  readonly dedupCacheEntries?: number;
+}
+
+export type Unsubscribe = () => void;
+
+/**
+ * The earliest `first_seen_at` a seen row must still keep (07 §3.2 "Retention"): rows older than this
+ * may be pruned. It is the older of 7 days ago and the earliest `since` a sync can still request, the
+ * lowest cursor of the relays in use minus 48 h and S. A cursor older than 30 days is ignored, so a
+ * relay that never answers cannot stop pruning.
+ */
+export function seenPruneBefore(nowSeconds: number, cursors: readonly number[]): number {
+  let cutoff = nowSeconds - SEEN_RETENTION_SECONDS;
+  for (const cursor of cursors) {
+    if (!Number.isSafeInteger(cursor) || nowSeconds - cursor > CURSOR_IGNORE_AFTER_SECONDS)
+      continue;
+    cutoff = Math.min(cutoff, cursor - SYNC_LOOKBACK_SECONDS - SYNC_SKEW_SECONDS);
+  }
+  return Math.max(0, cutoff);
+}
+
+/** The `since` of a REQ (07 §4.2, §4.3). `cursor` is the stored `last_seen`, if any. */
+export function syncSince(nowSeconds: number, cursor: number | undefined): number {
+  if (cursor === undefined || !Number.isSafeInteger(cursor) || cursor < 0) {
+    return Math.max(0, nowSeconds - FIRST_SYNC_LOOKBACK_SECONDS);
+  }
+  // A cursor from the future (a clock that went back, a corrupt row) is not trusted past now.
+  return Math.max(0, Math.min(cursor, nowSeconds) - SYNC_LOOKBACK_SECONDS - SYNC_SKEW_SECONDS);
+}
+
+// --- internals --------------------------------------------------------------------------------
+
+const defaultTimers: Timers = {
+  setTimeout: (callback, ms) =>
+    (globalThis as unknown as { setTimeout(cb: () => void, ms: number): unknown }).setTimeout(
+      callback,
+      ms,
+    ),
+  clearTimeout: (handle) =>
+    (globalThis as unknown as { clearTimeout(handle: unknown): void }).clearTimeout(handle),
+};
+
+/** A set that forgets its oldest entry beyond `max`: memory stays bounded whatever a relay sends. */
+class BoundedSet {
+  private readonly items = new Set<string>();
+  constructor(private readonly max: number) {}
+  has(key: string): boolean {
+    return this.items.has(key);
+  }
+  add(key: string): void {
+    if (this.items.has(key)) this.items.delete(key);
+    else if (this.items.size >= this.max)
+      this.items.delete(this.items.values().next().value as string);
+    this.items.add(key);
+  }
+  get size(): number {
+    return this.items.size;
+  }
+}
+
+type EventResult = 'delivered' | 'duplicate' | 'dropped' | 'retry' | 'bound' | 'keys_unavailable';
+
+interface Counters {
+  delivered: number;
+  duplicates: number;
+  dropped: number;
+  deferred: number;
+}
+
+/** One sync call or live subscription: what its relays share. */
+interface Run {
+  readonly identities: readonly SyncIdentity[];
+  readonly pubkeys: readonly string[];
+  readonly onEnvelope: EnvelopeHandler;
+  readonly counters: Counters;
+  readonly live: boolean;
+  stopped: boolean;
+  stopReason: 'budget' | 'stopped';
+  readonly hooks: Set<() => void>;
+}
+
+interface RelayOutcome {
+  readonly status: SyncRelayResult['status'];
+  readonly reason: SyncRelayReason;
+  /** Live: the subscription reached EOSE at least once, so the retry delay resets. */
+  readonly reachedLive: boolean;
+}
+
+function host(relay: string): string {
+  const m = /^wss:\/\/([^/:?#]*)/.exec(relay);
+  return m?.[1] ?? 'invalid';
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export class SyncEngine {
+  private readonly pool: SyncEngineOptions['pool'];
+  private readonly persistence: SyncPersistence;
+  private readonly keys: EnvelopeKeys;
+  private readonly logger: Logger | undefined;
+  private readonly now: () => number;
+  private readonly timers: Timers;
+  /** Wrap ids (key `id`) opened and reported processed. Bounded; the persisted seen-set is the record. */
+  private readonly processed: BoundedSet;
+  /** Wraps (key `id:sig`) that did not open. Not persisted (07 §3.2). Bounded. */
+  private readonly junk: BoundedSet;
+  /** Wraps being opened right now (key `id:sig`), so the same wrap from two relays is handled once. */
+  private readonly inflight = new Map<string, Promise<EventResult>>();
+
+  constructor(options: SyncEngineOptions) {
+    this.pool = options.pool;
+    this.persistence = options.persistence;
+    this.keys = options.keys;
+    this.logger = options.logger;
+    this.now = options.now ?? (() => Date.now());
+    this.timers = options.timers ?? defaultTimers;
+    const entries = options.dedupCacheEntries ?? DEDUP_CACHE_ENTRIES;
+    this.processed = new BoundedSet(entries);
+    this.junk = new BoundedSet(entries);
+  }
+
+  /** Sizes of the in-memory dedup state, for tests and `doctor`. Each cache is bounded. */
+  dedupStats(): { processed: number; junk: number; inflight: number } {
+    return { processed: this.processed.size, junk: this.junk.size, inflight: this.inflight.size };
+  }
+
+  /**
+   * One catch-up pass over `relays`, within the time budget (06 §6). Never rejects for a relay
+   * problem: each relay's outcome is in the result.
+   * @throws TransportError `invalid_relays` or `invalid_argument` for bad arguments.
+   */
+  async sync(options: SyncOptions): Promise<SyncResult> {
+    const relays = this.checkRelays(options.relays);
+    const budget = options.budgetMs ?? SYNC_BUDGET_MS;
+    if (!Number.isSafeInteger(budget) || budget <= 0) {
+      throw new TransportError('invalid_argument', 'sync: the budget must be a positive integer');
+    }
+    const run = this.newRun(options.identities, options.onEnvelope, false);
+    const timer = this.timers.setTimeout(() => this.stop(run, 'budget'), budget);
+    const stoppedFirst = new Promise<RelayOutcome>((resolve) => {
+      run.hooks.add(() =>
+        resolve({ status: 'incomplete', reason: run.stopReason, reachedLive: false }),
+      );
+    });
+    const outcomes = await Promise.all(
+      relays.map((relay) =>
+        Promise.race([this.runRelay(relay, run), stoppedFirst]).catch((): RelayOutcome => ({
+          status: 'failed',
+          reason: 'connect_failed',
+          reachedLive: false,
+        })),
+      ),
+    );
+    this.timers.clearTimeout(timer);
+    this.stop(run, 'stopped'); // ends nothing that is still running except stray subscriptions
+    const results = relays.map((relay, i) => ({
+      relay,
+      status: (outcomes[i] as RelayOutcome).status,
+      reason: (outcomes[i] as RelayOutcome).reason,
+    }));
+    const partial = results.some((r) => r.status !== 'complete');
+    this.logger?.info('sync pass', {
+      relays: results.length,
+      partial,
+      delivered: run.counters.delivered,
+      duplicates: run.counters.duplicates,
+      dropped: run.counters.dropped,
+      deferred: run.counters.deferred,
+    });
+    return { partial, ...run.counters, relays: results };
+  }
+
+  /**
+   * Live subscription: reads the backlog like sync() and then stays open. A relay that is lost or
+   * cannot be reached is tried again with a doubling delay (5 s up to 5 min). Stop it with the
+   * returned function.
+   * @throws TransportError `invalid_relays` or `invalid_argument` for bad arguments.
+   */
+  subscribe(options: SubscribeOptions): Unsubscribe {
+    const relays = this.checkRelays(options.relays);
+    const run = this.newRun(options.identities, options.onEnvelope, true);
+    for (const relay of relays) void this.liveLoop(relay, run);
+    return () => this.stop(run, 'stopped');
+  }
+
+  // --- setup -----------------------------------------------------------------------------------
+
+  private checkRelays(relays: readonly string[]): string[] {
+    if (!Array.isArray(relays) || relays.length === 0 || relays.length > MAX_SYNC_RELAYS) {
+      throw new TransportError('invalid_relays', 'sync: relay list must hold 1 to 64 relays');
+    }
+    return [...new Set(relays)];
+  }
+
+  private newRun(
+    identities: readonly SyncIdentity[],
+    onEnvelope: EnvelopeHandler,
+    live: boolean,
+  ): Run {
+    if (
+      !Array.isArray(identities) ||
+      identities.length === 0 ||
+      identities.length > MAX_SYNC_IDENTITIES
+    ) {
+      throw new TransportError('invalid_argument', 'sync: 1 to 64 own keys are required');
+    }
+    const copy: SyncIdentity[] = [];
+    for (const identity of identities) {
+      const epoch = identity?.epoch;
+      if (
+        !isRecord(identity) ||
+        typeof identity.pubkey !== 'string' ||
+        !HEX_32.test(identity.pubkey) ||
+        (epoch !== undefined && (!Number.isSafeInteger(epoch) || epoch < 0))
+      ) {
+        throw new TransportError('invalid_argument', 'sync: an own key is not valid');
+      }
+      copy.push(
+        epoch === undefined ? { pubkey: identity.pubkey } : { pubkey: identity.pubkey, epoch },
+      );
+    }
+    if (typeof onEnvelope !== 'function') {
+      throw new TransportError('invalid_argument', 'sync: a handler is required');
+    }
+    return {
+      identities: copy,
+      pubkeys: [...new Set(copy.map((i) => i.pubkey))],
+      onEnvelope,
+      counters: { delivered: 0, duplicates: 0, dropped: 0, deferred: 0 },
+      live,
+      stopped: false,
+      stopReason: 'stopped',
+      hooks: new Set(),
+    };
+  }
+
+  private stop(run: Run, reason: 'budget' | 'stopped'): void {
+    if (run.stopped) return;
+    run.stopped = true;
+    run.stopReason = reason;
+    for (const hook of [...run.hooks]) {
+      try {
+        hook();
+      } catch {
+        // a hook's fault does not stop the others
+      }
+    }
+    run.hooks.clear();
+  }
+
+  private nowSeconds(): number {
+    return Math.floor(this.now() / 1000);
+  }
+
+  // --- live ------------------------------------------------------------------------------------
+
+  private async liveLoop(relay: string, run: Run): Promise<void> {
+    let delay = LIVE_RETRY_BASE_MS;
+    while (!run.stopped && !this.pool.isClosed) {
+      let outcome: RelayOutcome;
+      try {
+        outcome = await this.runRelay(relay, run);
+      } catch {
+        outcome = { status: 'failed', reason: 'connect_failed', reachedLive: false };
+      }
+      if (run.stopped) return;
+      if (outcome.reason === 'keys_unavailable') {
+        this.logger?.warn('live relay paused', { reason: 'keys_unavailable', host: host(relay) });
+      }
+      if (outcome.reachedLive) delay = LIVE_RETRY_BASE_MS;
+      await new Promise<void>((resolve) => {
+        const handle = this.timers.setTimeout(() => {
+          run.hooks.delete(wake);
+          resolve();
+        }, delay);
+        const wake = (): void => {
+          this.timers.clearTimeout(handle);
+          resolve();
+        };
+        run.hooks.add(wake);
+      });
+      delay = Math.min(delay * 2, LIVE_RETRY_MAX_MS);
+    }
+  }
+
+  // --- one relay -------------------------------------------------------------------------------
+
+  /**
+   * One subscription on one relay. Sync mode ends at EOSE (after every event is handled); live mode
+   * ends when the connection is lost or the run is stopped. Never leaves a link pinned.
+   */
+  private async runRelay(relay: string, run: Run): Promise<RelayOutcome> {
+    if (!isAllowedRelayUrl(relay))
+      return { status: 'failed', reason: 'invalid_url', reachedLive: false };
+    const now = this.nowSeconds();
+    let cursor: number | undefined;
+    try {
+      cursor = await this.persistence.getCursor(relay);
+    } catch {
+      cursor = undefined; // an unreadable cursor: read the full first-sync window
+    }
+    // A pass that was cut short earlier continues at the page where it stopped (M-3). The window
+    // (`since`) is recomputed from that pass's start, so the cursor it will write is that start too.
+    let startedAt = now;
+    let resumeUntil: number | undefined;
+    const resume = await this.safeGetResume(relay);
+    if (
+      resume !== undefined &&
+      Number.isSafeInteger(resume.until) &&
+      Number.isSafeInteger(resume.startedAt) &&
+      resume.startedAt <= now &&
+      now - resume.startedAt <= SYNC_RESUME_MAX_AGE_SECONDS &&
+      resume.until >= syncSince(resume.startedAt, cursor)
+    ) {
+      startedAt = resume.startedAt;
+      resumeUntil = resume.until;
+    }
+    if (run.stopped) return { status: 'incomplete', reason: run.stopReason, reachedLive: false };
+    const since = syncSince(startedAt, cursor);
+    const link = await this.pool.connect(relay);
+    if (typeof link === 'string') return { status: 'failed', reason: link, reachedLive: false };
+    if (run.stopped) {
+      link.release();
+      return { status: 'incomplete', reason: run.stopReason, reachedLive: false };
+    }
+    return this.subscription(relay, run, link, startedAt, since, cursor, resumeUntil);
+  }
+
+  /**
+   * Reads one relay: pages of stored events walking back from now to `since` (H-1), then, in live
+   * mode, a live-only subscription. A relay may cap the stored events it returns per filter (newest
+   * first, then EOSE), so one EOSE does not mean "all of it". Each page asks for `limit` events up
+   * to `until` (inclusive); the walk goes on while a page holds an event older than the page before
+   * it, so a relay that caps below our limit or ignores `limit` and `until` is read correctly too.
+   * The cursor moves only after the last page is read and every event was handled.
+   */
+  private subscription(
+    relay: string,
+    run: Run,
+    link: RelayLink,
+    startedAt: number,
+    since: number,
+    cursor: number | undefined,
+    resumeUntil: number | undefined,
+  ): Promise<RelayOutcome> {
+    const newSubId = (): string => `al-${encodeHex(randomBytes(6))}`;
+    return new Promise<RelayOutcome>((resolve) => {
+      let phase: 'backlog' | 'live' = 'backlog';
+      let subId = newSubId();
+      let pageUntil = resumeUntil; // the `until` of the page being read
+      let pageOldest: number | undefined;
+      // Ids of this page's events at `pageOldest`; the next page starts at that second (inclusive),
+      // so it repeats them. They are skipped there, not counted or handled twice.
+      let pageOldestIds: string[] = [];
+      let skipIds = new Set<string>();
+      // This page, relative to its `until`: did an event sit at it, and did one lie above it (a relay
+      // that ignores `until`)?
+      let sawAtUntil = false;
+      let sawNewer = false;
+      let pages = 1;
+      let eosePending = false;
+      const pageRequest = (): string =>
+        JSON.stringify([
+          'REQ',
+          subId,
+          {
+            kinds: [NOSTR_KIND_GIFT_WRAP],
+            '#p': run.pubkeys,
+            since,
+            ...(pageUntil === undefined ? {} : { until: pageUntil }),
+            limit: SYNC_PAGE_LIMIT,
+          },
+        ]);
+      // Live: no stored events (limit 0). `since` stays, because a wrap's created_at is back-dated.
+      const liveRequest = (): string =>
+        JSON.stringify([
+          'REQ',
+          subId,
+          { kinds: [NOSTR_KIND_GIFT_WRAP], '#p': run.pubkeys, since, limit: 0 },
+        ]);
+      let reqFrame = pageRequest();
+      let finished = false;
+      let reachedLive = false;
+      let authTried = false;
+      let hold = false; // an event was handled as `retry` or dropped for a bound: the cursor stays
+      let frames = 0;
+      let newWraps = 0;
+      let windowStart = startedAt;
+      let queued = 0;
+      let queuedChars = 0;
+      let lastCursorWrite = startedAt;
+      let chain: Promise<void> = Promise.resolve();
+
+      const finish = (outcome: Omit<RelayOutcome, 'reachedLive'>): void => {
+        if (finished) return;
+        finished = true;
+        unFrame();
+        unClose();
+        run.hooks.delete(onStop);
+        if (outcome.status !== 'complete' && phase === 'backlog' && pageUntil !== undefined) {
+          // Pages above `pageUntil` were read and handled; the next pass continues here.
+          void this.safeSetResume(relay, { until: pageUntil, startedAt });
+        }
+        if (link.isOpen()) link.send(JSON.stringify(['CLOSE', subId]));
+        link.release();
+        resolve({ ...outcome, reachedLive });
+      };
+      const onStop = (): void => finish({ status: 'incomplete', reason: run.stopReason });
+      run.hooks.add(onStop);
+
+      const writeCursor = async (at: number): Promise<void> => {
+        try {
+          await this.persistence.setCursor(relay, Math.max(at, cursor ?? 0));
+          lastCursorWrite = at;
+        } catch {
+          this.logger?.warn('cursor not saved', { host: host(relay) });
+        }
+      };
+
+      const enqueue = (task: () => Promise<void>): void => {
+        chain = chain.then(task).catch(() => undefined);
+      };
+
+      /** Runs after every event of the page was handled (it is chained behind them). */
+      const afterEose = async (): Promise<void> => {
+        if (finished || phase !== 'backlog') return;
+        if (hold) {
+          finish({ status: 'incomplete', reason: 'handler_retry' });
+          return;
+        }
+        // Where the next page starts, or undefined when the window is read. A relay caps the events
+        // it returns per filter, newest first, so a second that holds at least the cap returns the
+        // same events again for `until` = that second (H-1b): step below it, giving up only the
+        // overflow of that one second. If an event lies above `until`, the relay ignores `until`:
+        // stop. Residual limit: more events than the relay's cap within one single second cannot
+        // all be fetched (Nostr has no sub-second paging).
+        const next = ((): { until: number; skip: readonly string[] } | undefined => {
+          if (sawNewer) return undefined;
+          if (pageOldest !== undefined) {
+            if (pageOldest <= since) return undefined;
+            // The first page of a walk is repeated from its oldest second (inclusive), because the
+            // cap may have cut that second in the middle.
+            if (pageUntil === undefined || pageOldest < pageUntil) {
+              return { until: pageOldest, skip: pageOldestIds };
+            }
+          } else if (!(pageUntil !== undefined && sawAtUntil)) {
+            return undefined;
+          }
+          // Nothing older than `pageUntil` came back: that second is all this page held.
+          return pageUntil !== undefined && pageUntil - 1 >= since
+            ? { until: pageUntil - 1, skip: [] }
+            : undefined;
+        })();
+        if (next !== undefined) {
+          if (pages >= MAX_PAGES_PER_PASS) {
+            finish({ status: 'incomplete', reason: 'too_many_events' });
+            return;
+          }
+          link.send(JSON.stringify(['CLOSE', subId]));
+          pageUntil = next.until;
+          skipIds = new Set(next.skip);
+          pageOldest = undefined;
+          pageOldestIds = [];
+          sawAtUntil = false;
+          sawNewer = false;
+          pages += 1;
+          eosePending = false;
+          subId = newSubId();
+          reqFrame = pageRequest();
+          if (!link.send(reqFrame)) finish({ status: 'failed', reason: 'closed' });
+          return;
+        }
+        await writeCursor(startedAt);
+        await this.safeSetResume(relay, undefined);
+        if (finished) return;
+        if (!run.live) {
+          finish({ status: 'complete', reason: 'ok' });
+          return;
+        }
+        link.send(JSON.stringify(['CLOSE', subId]));
+        phase = 'live';
+        reachedLive = true;
+        subId = newSubId();
+        reqFrame = liveRequest();
+        if (!link.send(reqFrame)) finish({ status: 'failed', reason: 'closed' });
+      };
+
+      const handle = async (event: unknown, arrivedAt: number): Promise<void> => {
+        if (finished || run.stopped) return;
+        // The bound on openings: a pass, or a minute of live traffic.
+        if (run.live && reachedLive && arrivedAt - windowStart >= 60) {
+          windowStart = arrivedAt;
+          newWraps = 0;
+        }
+        const result = await this.handleEvent(event, relay, run, () => {
+          newWraps += 1;
+          const limit =
+            run.live && reachedLive ? MAX_LIVE_NEW_WRAPS_PER_MINUTE : MAX_NEW_WRAPS_PER_PASS;
+          return newWraps <= limit;
+        });
+        if (result === 'keys_unavailable') {
+          finish({ status: 'failed', reason: 'keys_unavailable' });
+          return;
+        }
+        if (result === 'retry') hold = true;
+        if (result === 'bound') {
+          hold = true; // events were left unread: the cursor stays
+          if (!run.live || !reachedLive)
+            finish({ status: 'incomplete', reason: 'too_many_events' });
+          return;
+        }
+        if (
+          run.live &&
+          reachedLive &&
+          !hold &&
+          result === 'delivered' &&
+          arrivedAt - lastCursorWrite >= LIVE_CURSOR_INTERVAL_SECONDS
+        ) {
+          // The arrival time, not now: later frames may still sit in the queue (L-1).
+          await writeCursor(arrivedAt);
+        }
+      };
+
+      const unFrame = this.pool.onFrame((from, frame) => {
+        if (finished || from !== relay || frame[1] !== subId) return;
+        switch (frame[0]) {
+          case 'EVENT': {
+            const event = frame[2];
+            if (
+              skipIds.size > 0 &&
+              isRecord(event) &&
+              typeof event.id === 'string' &&
+              skipIds.has(event.id)
+            ) {
+              sawAtUntil = true;
+              return; // the repeat of the previous page's last second
+            }
+            frames += 1;
+            if (frames > MAX_FRAMES_PER_PASS && !(run.live && reachedLive)) {
+              finish({ status: 'incomplete', reason: 'too_many_events' });
+              return;
+            }
+            const size = eventWeight(event);
+            if (queued >= MAX_QUEUED_EVENTS || queuedChars + size > MAX_QUEUED_CHARS) {
+              // A slow handler behind a fast relay: stop reading rather than hold it all in memory.
+              this.logger?.warn('relay stopped', { reason: 'overflow', host: host(relay) });
+              finish({ status: 'incomplete', reason: 'overflow' });
+              return;
+            }
+            if (phase === 'backlog' && isRecord(event)) {
+              const at = event.created_at;
+              if (typeof at === 'number' && pageUntil !== undefined) {
+                if (at > pageUntil) sawNewer = true;
+                else if (at === pageUntil) sawAtUntil = true;
+              }
+              if (
+                typeof at === 'number' &&
+                Number.isSafeInteger(at) &&
+                at >= since &&
+                (pageUntil === undefined || at <= pageUntil) &&
+                (pageOldest === undefined || at < pageOldest)
+              ) {
+                if (pageOldest === undefined || at < pageOldest) pageOldestIds = [];
+                pageOldest = at;
+              }
+              if (
+                typeof at === 'number' &&
+                at === pageOldest &&
+                typeof event.id === 'string' &&
+                pageOldestIds.length < 2 * SYNC_PAGE_LIMIT
+              ) {
+                pageOldestIds.push(event.id);
+              }
+            }
+            queued += 1;
+            queuedChars += size;
+            const arrivedAt = this.nowSeconds();
+            enqueue(async () => {
+              try {
+                await handle(event, arrivedAt);
+              } finally {
+                queued -= 1;
+                queuedChars -= size;
+              }
+            });
+            return;
+          }
+          case 'EOSE':
+            if (phase === 'backlog' && !eosePending) {
+              eosePending = true;
+              enqueue(afterEose);
+            }
+            return;
+          case 'CLOSED': {
+            // Only a fixed prefix of the relay's text is read (NIP-01, NIP-42).
+            const text = typeof frame[2] === 'string' ? frame[2] : '';
+            if (text.startsWith(AUTH_REQUIRED) && !authTried) {
+              authTried = true;
+              void link.authenticate().then(
+                (ok) => {
+                  if (finished) return;
+                  if (ok && link.send(reqFrame)) return;
+                  finish({ status: 'failed', reason: 'auth_failed' });
+                },
+                () => finish({ status: 'failed', reason: 'auth_failed' }),
+              );
+              return;
+            }
+            finish({
+              status: 'failed',
+              reason: text.startsWith(AUTH_REQUIRED) ? 'auth_failed' : 'subscription_closed',
+            });
+            return;
+          }
+          default:
+            return;
+        }
+      });
+      const unClose = this.pool.onRelayClose((closed) => {
+        if (closed !== relay || finished) return;
+        // Events still queued are not handled after this: the cursor stays, and the loss is reported.
+        finish(
+          reachedLive || run.live
+            ? { status: 'incomplete', reason: 'connection_lost' }
+            : { status: 'failed', reason: 'connection_lost' },
+        );
+      });
+
+      if (!link.send(reqFrame)) finish({ status: 'failed', reason: 'closed' });
+    });
+  }
+
+  // --- one event -------------------------------------------------------------------------------
+
+  /**
+   * An untrusted event from a relay (I-5). `countOpening` is called when the wrap is about to be
+   * opened and returns false when the relay is over its bound.
+   */
+  private async handleEvent(
+    event: unknown,
+    relay: string,
+    run: Run,
+    countOpening: () => boolean,
+  ): Promise<EventResult> {
+    const counters = run.counters;
+    if (
+      !isRecord(event) ||
+      event.kind !== NOSTR_KIND_GIFT_WRAP ||
+      typeof event.id !== 'string' ||
+      !HEX_32.test(event.id) ||
+      typeof event.sig !== 'string' ||
+      !HEX_64.test(event.sig)
+    ) {
+      counters.dropped += 1;
+      return 'dropped';
+    }
+    const id = event.id;
+    const key = `${id}:${event.sig}`;
+    if (this.junk.has(key)) {
+      counters.dropped += 1;
+      return 'dropped';
+    }
+    if (this.processed.has(id)) {
+      counters.duplicates += 1;
+      return 'duplicate';
+    }
+    const pending = this.inflight.get(key);
+    if (pending !== undefined) {
+      // The same wrap from another relay, being handled now: take its outcome, so a `retry` also
+      // holds this relay's cursor.
+      const result = await pending;
+      if (result === 'delivered') counters.duplicates += 1;
+      return result === 'delivered' ? 'duplicate' : result;
+    }
+    const work = this.openAndDeliver(event, key, id, relay, run, countOpening);
+    this.inflight.set(key, work);
+    try {
+      return await work;
+    } finally {
+      this.inflight.delete(key);
+    }
+  }
+
+  private async openAndDeliver(
+    event: Record<string, unknown>,
+    key: string,
+    id: string,
+    relay: string,
+    run: Run,
+    countOpening: () => boolean,
+  ): Promise<EventResult> {
+    const counters = run.counters;
+    // Cheapest first: our key, then the seen-set read, then the bound on openings (which counts
+    // only wraps that are really opened, so wraps seen before do not use it up).
+    const identity = pickIdentity(event.tags, run.identities);
+    if (identity === undefined) {
+      this.junk.add(key); // a relay served a wrap that is not for us
+      counters.dropped += 1;
+      return 'dropped';
+    }
+    if (await this.safeSeen('wrap', id)) {
+      this.processed.add(id);
+      counters.duplicates += 1;
+      return 'duplicate';
+    }
+    if (!countOpening()) {
+      counters.dropped += 1; // over the relay's bound: not recorded, comes again if it is real
+      return 'bound';
+    }
+    let unwrapped: Awaited<ReturnType<typeof unwrapGiftWrap>>;
+    try {
+      unwrapped = await unwrapGiftWrap(
+        event,
+        this.keys,
+        identity.epoch === undefined ? undefined : { epoch: identity.epoch },
+      );
+    } catch (error) {
+      if (error instanceof KeyStoreError) return 'keys_unavailable';
+      this.junk.add(key); // malformed or not ours: dropped, never logged from (07 §3.2)
+      counters.dropped += 1;
+      return 'dropped';
+    }
+    const item: SyncItem = Object.freeze({
+      envelope: unwrapped.envelope,
+      giftWrapId: unwrapped.giftWrapId,
+      giftWrapCreatedAt: unwrapped.giftWrapCreatedAt,
+      relay,
+      recipient: identity.pubkey,
+      envelopeSeen: await this.safeSeen('envelope', unwrapped.envelope.id),
+    });
+    let disposition: SyncDisposition;
+    try {
+      const answer = await run.onEnvelope(item);
+      disposition = answer === 'processed' || answer === 'verified' ? answer : 'retry';
+    } catch {
+      disposition = 'retry'; // a handler fault: nothing is marked, the item comes again
+    }
+    if (disposition === 'retry') {
+      counters.deferred += 1;
+      return 'retry';
+    }
+    const mark = this.persistence.markSeen;
+    if (mark !== undefined) {
+      const at = this.nowSeconds();
+      await this.safeMark('wrap', id, at);
+      if (disposition === 'verified') await this.safeMark('envelope', unwrapped.envelope.id, at);
+    }
+    this.processed.add(id);
+    counters.delivered += 1;
+    return 'delivered';
+  }
+
+  private async safeSeen(kind: SeenKind, id: string): Promise<boolean> {
+    try {
+      return (await this.persistence.isSeen(kind, id)) === true;
+    } catch {
+      return false; // 07 §3.2: a seen-set that cannot be read is empty for this pass
+    }
+  }
+
+  private async safeGetResume(relay: string): Promise<SyncResume | undefined> {
+    try {
+      return await this.persistence.getResume?.(relay);
+    } catch {
+      return undefined; // an unreadable position: start from the newest page
+    }
+  }
+
+  private async safeSetResume(relay: string, resume: SyncResume | undefined): Promise<void> {
+    try {
+      await this.persistence.setResume?.(relay, resume);
+    } catch {
+      this.logger?.warn('page position not saved', { host: host(relay) });
+    }
+  }
+
+  private async safeMark(kind: SeenKind, id: string, at: number): Promise<void> {
+    try {
+      await this.persistence.markSeen?.(kind, id, at);
+    } catch {
+      this.logger?.warn('seen not saved', { kind });
+    }
+  }
+}
+
+/**
+ * The size of an inbound event for the queue bound: the whole event as JSON (content, tags and any
+ * other field), never less than 1. The event came out of JSON.parse, so it is plain data (IR-M1-5c-1 M-2).
+ */
+function eventWeight(event: unknown): number {
+  try {
+    return Math.max(1, JSON.stringify(event)?.length ?? 1);
+  } catch {
+    return MAX_QUEUED_CHARS; // cannot be measured: counts as the largest
+  }
+}
+
+/** The first own key named by a `p` tag of the wrap. The tags are untrusted: read defensively. */
+function pickIdentity(
+  tags: unknown,
+  identities: readonly SyncIdentity[],
+): SyncIdentity | undefined {
+  if (!Array.isArray(tags)) return undefined;
+  for (const tag of tags) {
+    if (!Array.isArray(tag) || tag[0] !== 'p' || typeof tag[1] !== 'string') continue;
+    const found = identities.find((i) => i.pubkey === tag[1]);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}

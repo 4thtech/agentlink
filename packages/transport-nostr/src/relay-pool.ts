@@ -1,7 +1,8 @@
 // M1-5b: the relay pool (07 §4.2, §4.3). It owns WebSocket connections to relays and publishes one
 // signed event to an explicit relay list. What it does not do: choose the list (core gives it, per
-// recipient key, 07 §4.3), wrap or sign (M1-5a), persist or retry (outbox.ts), or subscribe (M1-5c;
-// it only exposes the parsed inbound frames through onFrame).
+// recipient key, 07 §4.3), wrap or sign (M1-5a), persist or retry (outbox.ts), or subscribe (sync.ts,
+// M1-5c; the pool exposes the parsed inbound frames through onFrame and a pinned link per relay
+// through connect).
 //
 // Safety properties, each with a test:
 // - Relay SSRF (04 §4, 07 §4.2): every connect, and every reconnect, resolves the host, refuses the
@@ -103,6 +104,24 @@ export interface RelayHealth {
 /** A parsed inbound frame from a relay, for M1-5c. Its content is untrusted (I-5). */
 export type FrameListener = (relay: string, frame: readonly unknown[]) => void;
 
+/** Called when a pooled connection ends, for any reason (the relay URL only). */
+export type CloseListener = (relay: string) => void;
+
+/**
+ * A pinned connection to one relay for a subscription (M1-5c). While a link is held the idle timer
+ * does not close the connection and it is not evicted. Release it when the subscription ends.
+ */
+export interface RelayLink {
+  /** Sends one text frame. False if the connection is gone or the send failed. */
+  send(text: string): boolean;
+  /** NIP-42 login with the pool's `authKeys`, only on a relay `mayAuthenticate` allows. */
+  authenticate(): Promise<boolean>;
+  /** True while the underlying connection is open. */
+  isOpen(): boolean;
+  /** Unpins the connection. Safe to call more than once. */
+  release(): void;
+}
+
 export interface RelayPoolOptions {
   readonly connector: RelayConnector;
   /** How relay addresses are checked (07 §4.2). Required: skipping the check must be a named choice. */
@@ -202,6 +221,7 @@ export class RelayPool {
   private readonly health = new Map<string, Health>();
   private readonly limits = new Map<string, { limit: number | undefined; at: number }>();
   private readonly listeners = new Set<FrameListener>();
+  private readonly closeListeners = new Set<CloseListener>();
   private closed = false;
 
   constructor(options: RelayPoolOptions) {
@@ -247,6 +267,11 @@ export class RelayPool {
     }));
   }
 
+  /** True once close() has been called. */
+  get isClosed(): boolean {
+    return this.closed;
+  }
+
   /** Open or opening connections. */
   get connectionCount(): number {
     return this.conns.size;
@@ -257,6 +282,61 @@ export class RelayPool {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
+    };
+  }
+
+  /** Notified when a pooled connection ends (the relay URL only). Returns the unsubscribe. */
+  onRelayClose(listener: CloseListener): () => void {
+    this.closeListeners.add(listener);
+    return () => {
+      this.closeListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Opens (or reuses) the connection to `relay` and pins it for a subscription (07 §4.2, M1-5c).
+   * The same checks as a publish apply: URL rule, relay SSRF check on every connect, 64-connection
+   * bound, 10 s connect budget. Returns the link, or the fixed reason it is not available.
+   */
+  async connect(relay: string): Promise<RelayLink | RelayFailure> {
+    if (this.closed || !isAllowedRelayUrl(relay) || relayParts(relay) === undefined) {
+      return this.closed ? 'closed' : 'invalid_url';
+    }
+    const conn = this.acquire(relay);
+    if (typeof conn === 'string') return conn;
+    conn.inflight += 1;
+    let failure: RelayFailure | undefined;
+    try {
+      failure = await conn.ready;
+    } catch {
+      failure = 'connect_failed';
+    }
+    if (failure !== undefined || conn.state !== 'open') {
+      conn.inflight -= 1;
+      this.touch(conn);
+      this.record(relay, failure ?? 'closed');
+      return failure ?? 'closed';
+    }
+    let released = false;
+    return {
+      send: (text) => {
+        if (conn.state !== 'open' || conn.socket === undefined) return false;
+        try {
+          conn.socket.send(text);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      authenticate: () =>
+        conn.state === 'open' ? this.authenticate(conn) : Promise.resolve(false),
+      isOpen: () => conn.state === 'open',
+      release: () => {
+        if (released) return;
+        released = true;
+        conn.inflight -= 1;
+        this.touch(conn);
+      },
     };
   }
 
@@ -545,6 +625,13 @@ export class RelayPool {
     conn.onEarlyClose?.();
     for (const list of [...conn.waiters.values()]) for (const w of [...list]) w('closed');
     for (const w of conn.challengeWaiters.splice(0)) w(undefined);
+    for (const listener of [...this.closeListeners]) {
+      try {
+        listener(conn.url);
+      } catch {
+        // a subscriber's fault does not stop the pool
+      }
+    }
   }
 
   private handleClosed(conn: Connection): void {
