@@ -66,12 +66,8 @@ describe('L1: the key=value scanner handles JSON escapes and nesting', () => {
     );
   });
 
-  it('an object that never closes is redacted only up to the quoted-value limit', () => {
-    const out = redactString(`secret={${'x'.repeat(6000)}`);
-    expect(out.startsWith(`secret=${REDACTED}`)).toBe(true);
-    const left = out.length - `secret=${REDACTED}`.length;
-    expect(left).toBeGreaterThan(3000);
-    expect(left).toBeLessThan(6000);
+  it('an object that never closes is redacted to the end of the string (fails closed)', () => {
+    expect(redactString(`secret={${'x'.repeat(6000)}`)).toBe(`secret=${REDACTED}`);
   });
 
   it('a harmless key holding an object still lets inner pairs be seen', () => {
@@ -128,6 +124,10 @@ describe('L3: the cost of the pair scanner has a deterministic bound', () => {
     'escaped quotes': (n) => `password=${BS}"`.repeat(Math.floor(n / 11)),
     'unclosed quote': (n) => `token='${'x'.repeat(n - 7)}`,
     'long bare value': (n) => `token=${'x'.repeat(n - 6)}`,
+    'allowed code': (n) => 'code="ENOENT" '.repeat(Math.floor(n / 14)),
+    'code=[': (n) => 'code=['.repeat(n / 6),
+    'code="': (n) => 'code="'.repeat(n / 6),
+    escapes: (n) => `a${BS.repeat(16)}`.repeat(Math.floor(n / 17)),
   };
   const C = 3;
 

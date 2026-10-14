@@ -189,21 +189,41 @@ function isAllowedCode(value: unknown): boolean {
 // cost stays linear in the (already capped) string length.
 
 // Absolute URLs: scheme://authority, then the rest (path, query, fragment), which is never logged.
-// A backslash ends the authority too: WHATWG parsers read it as '/' (`https://host\v2\key`).
-const URL_PATTERN = /\b([a-z][a-z0-9+.-]{0,30}):\/\/([^\s/\\?#"'<>`]*)[^\s"'<>`]*/gi;
+// The separator also covers the spellings that parsers read as "//": a backslash (`https:\\host`)
+// and JSON-escaped slashes (`https:\/\/host`, PHP and some Java encoders). A backslash ends the
+// authority too: WHATWG parsers read it as '/' (`https://host\v2\key`).
+const URL_PATTERN =
+  /\b([a-z][a-z0-9+.-]{0,30})(:(?:\\{0,7}[\\/]){2})([^\s/\\?#"'<>`]*)[^\s"'<>`]*/gi;
 // A string that is exactly one absolute URL (for URL-named fields).
-const WHOLE_URL = /^\s*([a-z][a-z0-9+.-]{0,30}):\/\/([^\s/\\?#"'<>`]*)[^\s"'<>`]*\s*$/i;
+const WHOLE_URL =
+  /^\s*([a-z][a-z0-9+.-]{0,30})(:(?:\\{0,7}[\\/]){2})([^\s/\\?#"'<>`]*)[^\s"'<>`]*\s*$/i;
 // Protocol-relative URLs (`//host/path`). The character before must not be a word character, ':'
 // (that is an absolute URL), '/' or '\' (a longer run of slashes is a path). No lookbehind, for
-// older browsers. Scheme-less URLs (`host.tld/v2/key`) are an accepted residual risk.
-const PROTOCOL_RELATIVE = /(^|[^\w:/\\])\/\/([A-Za-z0-9.-]{1,253}(?::[0-9]{1,5})?)[^\s"'<>`]*/g;
+// older browsers. The authority is read like an absolute URL's, so user info is dropped and an
+// IPv6 host is kept. Scheme-less URLs (`host.tld/v2/key`) are an accepted residual risk.
+const PROTOCOL_RELATIVE = /(^|[^\w:/\\])\/\/([^\s/\\?#"'<>`]+)[^\s"'<>`]*/g;
 // Percent-encoded absolute URLs (a redirect target inside a query string), single or double encoded.
 const ENCODED_URL =
   /\b(https?|wss?)(%(?:25)?3A%(?:25)?2F%(?:25)?2F)([A-Za-z0-9.-]{1,253}(?:%(?:25)?3A[0-9]{1,5})?)[^\s"'<>`&]*/gi;
 
-function origin(scheme: string, authority: string): string {
+/** The host part of an authority: user info (everything up to the last '@') is dropped. */
+function host(authority: string): string {
   const at = authority.lastIndexOf('@');
-  return `${scheme}://${at === -1 ? authority : authority.slice(at + 1)}`;
+  return at === -1 ? authority : authority.slice(at + 1);
+}
+
+function origin(scheme: string, authority: string): string {
+  return `${scheme}://${host(authority)}`;
+}
+
+/**
+ * The backslashes a stripped URL ended with. They may be the escape of the quote that follows
+ * (`"see https://h/p\"x"`); dropping them would turn it into a real quote and end the value early.
+ */
+function trailingBackslashes(match: string): string {
+  let end = match.length;
+  while (end > 0 && match[end - 1] === '\\') end -= 1;
+  return match.slice(end);
 }
 
 interface ValuePattern {
@@ -264,12 +284,15 @@ function redactGroups(run: string, separator: '-' | ' '): string {
 
 /**
  * A name followed by `:` or `=` (quoted names too: `"name":`, and the escaped quotes of JSON that
- * was encoded once or more: `\"name\":`). Only the name and separator.
+ * is nested in a string, up to four levels: `\"name\":`, `\\\"name\\\":`). Only the name and
+ * separator. Every repeat is bounded (a test checks the source), so the engine cannot backtrack
+ * more than a constant amount per position.
  */
-const NAME_SEPARATOR = /(\b[A-Za-z][A-Za-z0-9_.-]{0,63})(\\{0,8}["']?[ \t]{0,8}[:=][ \t]{0,8})/g;
-const MAX_QUOTED_VALUE = 2048;
-const MAX_BARE_VALUE = 512;
-const MAX_ESCAPES = 8;
+const NAME_SEPARATOR = /(\b[A-Za-z][A-Za-z0-9_.-]{0,63})(\\{0,16}["']?[ \t]{0,8}[:=][ \t]{0,8})/g;
+/** The source of the regex that finds pairs, for the test that checks it has no unbounded repeat. */
+export const PAIR_FINDER_SOURCE: string = NAME_SEPARATOR.source;
+// JSON nested in a string n levels deep writes its quotes with 2^n - 1 backslashes: 1, 3, 7, 15.
+const MAX_ESCAPES = 16;
 const BARE_VALUE_END = /[\s"'&,;}]/;
 
 /** Where a value ends, and the quoting that has to be kept around its replacement. */
@@ -287,72 +310,91 @@ interface Meter {
 }
 
 /**
- * A quoted value, JSON-aware. `slashes` backslashes before the opening quote mean JSON that was
- * encoded `slashes` times (`\"x\"`). At level zero a backslash escapes the next character
- * (`"ab\"cd"`). At a deeper level a quote closes the value only when it is preceded by exactly
- * `slashes` backslashes: more is an escaped quote of the inner string. Stops at a line break, and
- * at MAX_QUOTED_VALUE characters.
+ * Whether a quote preceded by `run` backslashes is a real (unescaped) quote of JSON nested in a
+ * string with `slashes` backslashes per quote. Each level doubles the backslashes and adds one for
+ * the quote, so a real quote has `slashes + k * (2 * slashes + 2)` of them (k counts backslashes
+ * that belong to the text), and an escaped quote of the inner string has any other number.
+ * `slashes = 0` is plain JSON: an even run is a real quote, an odd run an escaped one.
+ */
+function isRealQuote(run: number, slashes: number): boolean {
+  return run % (2 * slashes + 2) === slashes;
+}
+
+/**
+ * A quoted value, JSON-aware. `slashes` backslashes before the opening quote mean JSON nested in a
+ * string (`\"x\"`). Stops at the real closing quote or at a line break; a value that never closes is
+ * redacted to the end of the line, however long (fails closed).
  */
 function quotedValueEnd(text: string, start: number, slashes: number, meter: Meter): ScannedValue {
   const quote = text[start + slashes]!;
   const bodyStart = start + slashes + 1;
   const open = text.slice(start, bodyStart);
-  const limit = Math.min(text.length, bodyStart + MAX_QUOTED_VALUE);
   let run = 0;
-  for (let at = bodyStart; at < limit; at += 1) {
+  let at = bodyStart;
+  for (; at < text.length; at += 1) {
     meter.work += 1;
     const char = text[at]!;
-    if (char === '\n' || char === '\r') return { end: at, open, close: '' };
+    if (char === '\n' || char === '\r') break;
     if (char === '\\') {
       run += 1;
       continue;
     }
-    if (char === quote && (slashes === 0 ? run % 2 === 0 : run === slashes)) {
+    if (char === quote && isRealQuote(run, slashes)) {
       return { end: at + 1, open, close: text.slice(at - slashes, at + 1) };
     }
     run = 0;
   }
-  return { end: limit, open, close: '' };
+  return { end: at, open, close: '' };
 }
 
 /**
- * An object or array: everything up to the matching bracket, skipping strings and escaped
- * characters, but at most MAX_QUOTED_VALUE characters (an unclosed one is redacted up to there).
+ * An object or array: everything up to the matching bracket, skipping the strings inside it.
+ * `level` is the backslash count of the quotes of the JSON it sits in (see isRealQuote). A value
+ * that never closes is redacted to the end of the string (fails closed).
  */
-function bracketedValueEnd(text: string, start: number, meter: Meter): ScannedValue {
-  const limit = Math.min(text.length, start + MAX_QUOTED_VALUE);
+function bracketedValueEnd(text: string, start: number, level: number, meter: Meter): ScannedValue {
   let depth = 0;
   let inString = '';
-  for (let at = start; at < limit; at += 1) {
+  let run = 0;
+  let at = start;
+  for (; at < text.length; at += 1) {
     meter.work += 1;
     const char = text[at]!;
     if (char === '\\') {
-      at += 1;
-    } else if (inString !== '') {
-      if (char === inString) inString = '';
-    } else if (char === '"' || char === "'") {
-      inString = char;
-    } else if (char === '{' || char === '[') {
-      depth += 1;
-    } else if (char === '}' || char === ']') {
-      depth -= 1;
-      if (depth <= 0) return { end: at + 1, open: '', close: '' };
+      run += 1;
+      continue;
     }
+    if (char === '"' || char === "'") {
+      if (isRealQuote(run, level)) {
+        if (inString === '') inString = char;
+        else if (char === inString) inString = '';
+      }
+    } else if (inString === '') {
+      if (char === '{' || char === '[') {
+        depth += 1;
+      } else if (char === '}' || char === ']') {
+        depth -= 1;
+        if (depth <= 0) return { end: at + 1, open: '', close: '' };
+      }
+    }
+    run = 0;
   }
-  return { end: limit, open: '', close: '' };
+  return { end: at, open: '', close: '' };
 }
 
-/** The value that starts at `start`: quoted (also JSON-escaped), an object or array, or a bare word. */
-function scanValue(text: string, start: number, meter: Meter): ScannedValue {
+/**
+ * The value that starts at `start`: quoted (also JSON-escaped), an object or array, or a bare word
+ * (up to the next separator, however long). `level` is the backslash count of the key's quotes.
+ */
+function scanValue(text: string, start: number, level: number, meter: Meter): ScannedValue {
   let slashes = 0;
   while (slashes < MAX_ESCAPES && text[start + slashes] === '\\') slashes += 1;
   const next = text[start + slashes];
   if (next === '"' || next === "'") return quotedValueEnd(text, start, slashes, meter);
   const first = text[start];
-  if (first === '{' || first === '[') return bracketedValueEnd(text, start, meter);
-  const limit = Math.min(text.length, start + MAX_BARE_VALUE);
+  if (first === '{' || first === '[') return bracketedValueEnd(text, start, level, meter);
   let at = start;
-  while (at < limit && !BARE_VALUE_END.test(text[at]!)) at += 1;
+  while (at < text.length && !BARE_VALUE_END.test(text[at]!)) at += 1;
   meter.work += at - start;
   return { end: at, open: '', close: '' };
 }
@@ -360,7 +402,8 @@ function scanValue(text: string, start: number, meter: Meter): ScannedValue {
 /**
  * `name=value`, `name: value` and `"name":"value"` pairs: the value is replaced when the name is
  * a sensitive key. One left-to-right scan; after a harmless pair the scan continues right after its
- * separator, so a pair inside its value ("failed: password=…") is still seen. Linear in the length.
+ * separator, so a pair inside its value ("failed: password=…") is still seen. After a replaced
+ * value it continues at its end, so every character is scanned a constant number of times.
  */
 function scanPairs(text: string, meter: Meter): string {
   const finder = new RegExp(NAME_SEPARATOR.source, 'g');
@@ -380,7 +423,8 @@ function scanPairs(text: string, meter: Meter): string {
     }
     if (kind === 'none' || kind === 'url') continue;
     const start = match.index + match[0].length;
-    const { end, open, close } = scanValue(text, start, meter);
+    const level = /^\\*/.exec(match[2]!)![0].length;
+    const { end, open, close } = scanValue(text, start, level, meter);
     if (end === start) continue;
     const bare = text.slice(start + open.length, end - close.length);
     if (kind === 'code' && (isAllowedCode(bare) || isAllowedCode(Number(bare)))) continue;
@@ -470,10 +514,18 @@ export const VALUE_PATTERNS: readonly ValuePattern[] = [
  */
 export function stripUrls(text: string): string {
   return text
-    .replace(URL_PATTERN, (_match, scheme: string, authority: string) => origin(scheme, authority))
-    .replace(PROTOCOL_RELATIVE, (_match, before: string, host: string) => `${before}//${host}`)
-    .replace(ENCODED_URL, (_match, scheme: string, separator: string, host: string) => {
-      return `${scheme}${separator}${host}`;
+    .replace(URL_PATTERN, (match, scheme: string, separator: string, authority: string) => {
+      // "C:\\Users": a drive letter and backslashes are a Windows path, not a URL.
+      if (scheme.length === 1 && separator !== '://') return match;
+      return origin(scheme, authority) + trailingBackslashes(match);
+    })
+    .replace(
+      PROTOCOL_RELATIVE,
+      (match, before: string, authority: string) =>
+        `${before}//${host(authority)}${trailingBackslashes(match)}`,
+    )
+    .replace(ENCODED_URL, (_match, scheme: string, separator: string, hostname: string) => {
+      return `${scheme}${separator}${hostname}`;
     });
 }
 
@@ -532,7 +584,7 @@ function urlOrigin(value: unknown): JsonValue {
     return REDACTED;
   }
   const match = WHOLE_URL.exec(text);
-  return match === null ? REDACTED : redactString(origin(match[1]!, match[2]!));
+  return match === null ? REDACTED : redactString(origin(match[1]!, match[3]!));
 }
 
 /** One named field: the key rule first, then the value (never throws). */
