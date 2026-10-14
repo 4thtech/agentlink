@@ -15,8 +15,8 @@ import {
   type OwnerPresence,
   type OwnerPublicKeys,
   type OwnerSession,
-  type WrappedCek,
 } from './keystore-api.js';
+import type { WrappedCek } from './hpke.js';
 import type { NostrEvent, UnsignedNostrEvent } from './nostr-event.js';
 
 type Fn = (...args: never[]) => unknown;

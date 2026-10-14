@@ -14,12 +14,17 @@ const SHARED = 'harness/vectors.test.ts';
 // every project repeats it.
 // The entries are exact (anchored) so the restricted subpath `@agentlink/crypto/keystore`
 // (IR-M1-1b-1 M-1) maps to its own source file instead of a path under index.ts.
-const cryptoSource = (file: string): string =>
-  decodeURIComponent(new URL(`../packages/crypto/src/${file}`, import.meta.url).pathname);
+// The Node project's policy-form check (M1-1h-c) reads @agentlink/types' source the same way.
+const packageSource = (pkg: string, file: string): string =>
+  decodeURIComponent(new URL(`../packages/${pkg}/src/${file}`, import.meta.url).pathname);
+const cryptoSource = (file: string): string => packageSource('crypto', file);
 const resolve = {
   alias: [
     { find: /^@agentlink\/crypto$/, replacement: cryptoSource('index.ts') },
     { find: /^@agentlink\/crypto\/keystore$/, replacement: cryptoSource('keystore.ts') },
+    // The deterministic test seam (M1-1c, M1-1f): source only, never built and not in the package exports.
+    { find: /^@agentlink\/crypto\/testing$/, replacement: cryptoSource('testing.ts') },
+    { find: /^@agentlink\/types$/, replacement: packageSource('types', 'index.ts') },
   ],
 };
 
@@ -31,7 +36,12 @@ export default defineConfig({
         test: {
           name: 'node',
           environment: 'node',
-          include: [SHARED, 'harness/schema.test.ts', 'harness/compare.test.ts'],
+          include: [
+            SHARED,
+            'harness/schema.test.ts',
+            'harness/compare.test.ts',
+            'harness/policy-form.test.ts',
+          ],
           provide: { vectorsRuntime: 'node' },
         },
       },

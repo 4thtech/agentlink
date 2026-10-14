@@ -19,6 +19,7 @@
 //   key material.
 // - Errors are fixed sentences that never contain an input (I-7).
 import type { TypedData } from './eip712.js';
+import type { WrappedCek } from './hpke.js';
 import type { PublicIdentity } from './keys.js';
 import type { JsonObject } from './jcs.js';
 import type { NostrEvent, UnsignedNostrEvent } from './nostr-event.js';
@@ -61,17 +62,6 @@ export class KeyStoreError extends Error {
  */
 export interface EpochOptions {
   readonly epoch?: number;
-}
-
-/**
- * One recipient entry's CEK wrap (04 §3.1 `recipients[i]`, §3.3), raw bytes: `enc` 32, `wk` 48. The
- * same name and shape as M1-1c's `wrapCek` result, so the two merge into one type (IR-M1-1g-G2-1 L-3).
- */
-export interface WrappedCek {
-  /** HPKE encapsulated key. */
-  readonly enc: Uint8Array;
-  /** HPKE ciphertext of the CEK. */
-  readonly wk: Uint8Array;
 }
 
 /**

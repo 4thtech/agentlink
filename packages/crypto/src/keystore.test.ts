@@ -23,10 +23,46 @@ const SEED_OR_SECRET = [
   nip44('MessageKeys'),
   nip44('EncryptWithKey'),
   nip44('DecryptWithKey'),
+  // M1-1c: HPKE open of a CEK with the recipient's secret key, and envelope-hash signing.
+  'unwrapCek',
+  'signEnvelopeHash',
   // M1-1e (IR-M1-1e-1 M-1): ECDSA signing with a secret key.
   'signDigestEcdsa',
   'signTypedData',
   'signAgentCard',
+  // M1-1f: Argon2id, password() normalisation and code generation, and the ALKS / ALKO seal and
+  // open functions (04 §2.8), which take or return a passphrase-derived key, a seed or the entries.
+  'argon2id',
+  'normalizeSecret',
+  'generateSecretCode',
+  'deriveKeystoreKek',
+  'newKeystoreKek',
+  'sealKeystoreFile',
+  'openKeystoreFile',
+  'openKeystoreFileWithKek',
+  'sealOwnerSeed',
+  'openOwnerSeed',
+  // IR-M1-1f-1 L-3: the agent ≠ owner probes take a candidate secret (04 §2.8).
+  'ownerSecretUnlocks',
+  'keystoreSecretUnlocks',
+];
+
+// The one deterministic test seam (@agentlink/crypto/testing, never built or exported).
+const TEST_SEAM = [
+  // M1-1c: fixed HPKE ephemeral key or AES-GCM IV, and the raw RFC 9180 suite.
+  'wrapCekWithEphemeralKey',
+  'encryptPayloadWithIv',
+  'hpkeSealSequence',
+  'hpkeOpen',
+  // M1-1f: fixed nonce for ALKS and ALKO, Argon2id with K and X.
+  'argon2idWithSecretAndAd',
+  'sealKeystoreFileWithNonce',
+  'sealOwnerSeedWithNonce',
+  // IR-M1-1f-1 L-7: pairingDigest for the labels vectors.
+  'pairingDigest',
+  // M1-1g (IR-M1-1g-G2-1 M-2): the in-memory KeyStore doubles, which hold a seed in plain memory.
+  'MemoryKeyStore',
+  'MemoryOwnerKeyStore',
 ];
 
 describe('@agentlink/crypto/keystore', () => {
@@ -71,6 +107,20 @@ describe('@agentlink/crypto/keystore', () => {
       'KeyStoreError',
       'OWNER_SESSION_DEFAULT_TTL_MS',
       'OWNER_SESSION_MAX_TTL_MS',
+      // M1-1c: envelope structure, hashes and verification, and the CEK and payload operations,
+      // which take a per-envelope CEK but no long-term secret (04 §3.1.1: unwrapCek returns the CEK).
+      'parseEnvelope',
+      'parseUnsignedEnvelope',
+      'parseEnvelopeHeader',
+      'envelopeHash',
+      'envelopeAad',
+      'envelopeSignatureInput',
+      'verifyEnvelope',
+      'cekInfo',
+      'wrapCek',
+      'generateCek',
+      'encryptPayload',
+      'decryptPayload',
       'recoverEvmAddress',
       'decodeEcdsaSignature',
       'hashTypedData',
@@ -78,6 +128,17 @@ describe('@agentlink/crypto/keystore', () => {
       'verifyAgentCard',
       'verifyCardOwnerSig',
       'verifyCardAgentSig',
+      // M1-1f: public values only (the invite secret's proofKey and the pairing transcript).
+      'derivePairingProofKey',
+      'pairingProof',
+      'verifyPairingProof',
+      'hmacSha256',
+      'safetyCodeCommit',
+      'checkSafetyCodeReveal',
+      'computeSafetyCode',
+      'safetyCodeForRole',
+      'KEYSTORE_KDF_DEFAULTS',
+      'KEYSTORE_KDF_BOUNDS',
     ]) {
       expect(Object.keys(main), name).toContain(name);
     }
@@ -87,10 +148,54 @@ describe('@agentlink/crypto/keystore', () => {
     const manifest = (await import('../package.json', { with: { type: 'json' } })).default as {
       exports: Record<string, unknown>;
     };
-    expect(Object.keys(manifest.exports).sort()).toEqual(['.', './keystore', './testing']);
+    expect(Object.keys(manifest.exports).sort()).toEqual(['.', './keystore']);
     expect(manifest.exports['./keystore']).toEqual({
       types: './dist/keystore.d.ts',
       default: './dist/keystore.js',
     });
+  });
+
+  it('exports the deterministic test seam from no entry point (M1-1c, M1-1f)', async () => {
+    const seam = await import('./testing.js');
+    expect(Object.keys(seam).sort()).toEqual([...TEST_SEAM].sort());
+    for (const name of TEST_SEAM) {
+      expect(Object.keys(main), name).not.toContain(name);
+      expect(Object.keys(keystore), name).not.toContain(name);
+    }
+  });
+
+  // IR-M1-1f-1 L-2: the fixed-nonce sealers exist in the built keystore-file module (production
+  // seals call them with a fresh nonce), so they are kept unreachable instead: no entry point exports
+  // them, package.json `exports` has no path to dist/keystore-file.js, and deps-check and ESLint
+  // refuse deep imports into a workspace package's dist/ or src/ (tools/deps-check/policy.mjs).
+  it('exports the fixed-nonce sealers from no entry point', () => {
+    for (const name of [
+      'sealKeystoreFileWithNonceUnsafe',
+      'sealOwnerSeedWithNonceUnsafe',
+      'sealKeystoreFileWithNonce',
+      'sealOwnerSeedWithNonce',
+    ]) {
+      expect(Object.keys(main), name).not.toContain(name);
+      expect(Object.keys(keystore), name).not.toContain(name);
+    }
+  });
+
+  it('does not build the test seam file: tsconfig.json excludes src/testing.ts from dist', async () => {
+    const config = (await import('../tsconfig.json', { with: { type: 'json' } })).default as {
+      exclude: string[];
+    };
+    expect(config.exclude).toContain('src/testing.ts');
+  });
+
+  // IR-M1-1f-1 L-7: the commit-checked functions are the only public route to safety-code digits
+  // (04 §3.6.1 step 3); the unchecked building blocks stay internal.
+  it('exports no unchecked safety-code building block', () => {
+    for (const name of ['safetyCodeTranscript', 'pairingDigest', 'safetyCodeFromDigest']) {
+      expect(Object.keys(main), name).not.toContain(name);
+      expect(Object.keys(keystore), name).not.toContain(name);
+    }
+    expect(Object.keys(main)).toEqual(
+      expect.arrayContaining(['computeSafetyCode', 'safetyCodeForRole', 'checkSafetyCodeReveal']),
+    );
   });
 });

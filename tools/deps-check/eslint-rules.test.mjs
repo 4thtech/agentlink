@@ -16,9 +16,13 @@ const BOUNDARY = new Set([
 ]);
 
 let eslint;
-beforeAll(() => {
+// The first lintText loads the config, the TypeScript parser and the plugins, which can take more
+// than a test's 5 s on a cold CI runner. Warm up here, under an explicit hook timeout, so every test
+// keeps its own default timeout.
+beforeAll(async () => {
   eslint = new ESLint({ cwd: REPO, overrideConfigFile: join(REPO, 'eslint.config.mjs') });
-});
+  await eslint.lintText('export {};\n', { filePath: join(REPO, 'packages/core/src/warmup.ts') });
+}, 60_000);
 
 async function lint(filePath, code) {
   const [result] = await eslint.lintText(code, { filePath: join(REPO, filePath) });
@@ -94,6 +98,15 @@ describe('boundaries/no-bypass (forms no-restricted-imports cannot see)', () => 
     expect(
       rules(await lint('packages/crypto/src/a.ts', `await import('@agentlink/core');`)),
     ).toEqual(['boundaries/no-bypass']);
+  });
+
+  it('refuses the crypto test seam source by a relative path, except in test files', async () => {
+    const code = `import { hpkeOpen } from './testing.js';\nvoid hpkeOpen;\n`;
+    expect(rules(await lint('packages/crypto/src/a.ts', code))).toEqual(['boundaries/no-bypass']);
+    expect(rules(await lint('packages/crypto/src/a.ts', `await import('./testing.js');`))).toEqual([
+      'boundaries/no-bypass',
+    ]);
+    expect(await lint('packages/crypto/src/a.test.ts', code)).toEqual([]);
   });
 
   it('rejects a relative import that leaves the package', async () => {
@@ -201,28 +214,31 @@ describe('IR-M1-1b-1 M-1: @agentlink/crypto/keystore is for KeyStore backends on
   });
 });
 
-describe('IR-M1-1g-1 M-2: @agentlink/crypto/testing is for test files only', () => {
-  const testing = `import { MemoryKeyStore } from '@agentlink/crypto/testing';\nvoid MemoryKeyStore;\n`;
+describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', () => {
+  const byName = `import { MemoryKeyStore } from '@agentlink/crypto/testing';\nvoid MemoryKeyStore;\n`;
+  const relative = `import { MemoryKeyStore } from './testing.js';\nvoid MemoryKeyStore;\n`;
 
   it.each(['packages/core/src/a.ts', 'packages/node/src/a.ts', 'apps/cli/src/a.ts'])(
-    'rejects a static import in production source %s',
+    'rejects it by name in production source %s',
     async (filePath) => {
-      const messages = await lint(filePath, testing);
+      const messages = await lint(filePath, byName);
       expect(messages.map((m) => m.message).join('\n')).toMatch(
-        /@agentlink\/crypto\/testing may be imported only in test files/,
+        /@agentlink\/crypto\/testing may be imported only in test-vectors/,
       );
     },
   );
 
-  it('rejects a dynamic import in production source', async () => {
-    const code = `const m = await import('@agentlink/crypto/testing');`;
-    expect(rules(await lint('packages/core/src/a.ts', code))).toContain('boundaries/no-bypass');
+  it('rejects it by name in a test file outside test-vectors', async () => {
+    expect(rules(await lint('packages/core/src/a.test.ts', byName))).toContain(
+      'no-restricted-imports',
+    );
   });
 
-  it('allows it in a test file of a zone that may import @agentlink/crypto', async () => {
-    expect(await lint('packages/core/src/a.test.ts', testing)).toEqual([]);
-    const dynamic = `const m = await import('@agentlink/crypto/testing');\nvoid m;\n`;
-    expect(await lint('packages/core/src/a.test.ts', dynamic)).toEqual([]);
+  it('rejects a relative import from crypto production code, allows it in crypto tests', async () => {
+    expect(rules(await lint('packages/crypto/src/keystore-api.ts', relative))).toEqual([
+      'boundaries/no-bypass',
+    ]);
+    expect(await lint('packages/crypto/src/memory-keystore.test.ts', relative)).toEqual([]);
   });
 });
 
@@ -248,5 +264,31 @@ describe('IR-M1-1e-1 L-1: viem only in packages/crypto test files', () => {
     expect(rules(await lint('packages/core/src/a.test.ts', code))).toEqual([
       'no-restricted-imports',
     ]);
+  });
+});
+
+describe('IR-M1-1f-1 L-2: no deep imports into a workspace package (dist/, src/)', () => {
+  it.each([
+    `import { sealOwnerSeedWithNonceUnsafe } from '@agentlink/crypto/dist/keystore-file.js';`,
+    `import { deriveSecretKey } from '@agentlink/crypto/dist/keystore.js';`,
+    `import * as m from '@agentlink/crypto/dist';`,
+    `import { argon2idRaw } from '@agentlink/crypto/src/argon2.js';`,
+    `import * as m from '@agentlink/crypto/src/testing';`,
+  ])('rejects %s in packages/core and packages/node', async (code) => {
+    for (const filePath of ['packages/core/src/a.ts', 'packages/node/src/a.ts']) {
+      const messages = await lint(filePath, `${code}\n`);
+      expect(rules(messages), filePath).toContain('no-restricted-imports');
+      expect(messages.map((m) => m.message).join('\n')).toMatch(/deep import/);
+    }
+  });
+
+  it('rejects a dynamic deep import', async () => {
+    const code = `const m = await import('@agentlink/crypto/dist/keystore-file.js');\n`;
+    expect(rules(await lint('packages/core/src/a.ts', code))).toContain('boundaries/no-bypass');
+  });
+
+  it('keeps the package entry points open', async () => {
+    const main = `import { bip340Verify } from '@agentlink/crypto';\nvoid bip340Verify;\n`;
+    expect(await lint('packages/core/src/a.ts', main)).toEqual([]);
   });
 });

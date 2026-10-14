@@ -24,10 +24,6 @@
     "./keystore": {
       "types": "./dist/keystore.d.ts",
       "default": "./dist/keystore.js"
-    },
-    "./testing": {
-      "types": "./dist/testing.d.ts",
-      "default": "./dist/testing.js"
     }
   },
   "files": [
@@ -41,6 +37,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@hpke/core": "1.9.0",
     "@noble/ciphers": "2.4.0",
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0"

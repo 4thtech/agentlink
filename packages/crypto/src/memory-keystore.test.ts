@@ -8,6 +8,7 @@ import { hashTypedData, type TypedData } from './eip712.js';
 import { decodeHex, encodeHex, encodeUtf8 } from './encoding.js';
 import { CryptoInputError } from './errors.js';
 import { createGiftWrap } from './gift-wrap.js';
+import { wrapCek, type WrappedCek } from './hpke.js';
 import { sha256, taggedHash, TAGS } from './hash.js';
 import { canonicalizeToBytes, type JsonObject } from './jcs.js';
 import {
@@ -83,7 +84,16 @@ const signerOf = (typedData: TypedData, sig: string): Uint8Array =>
   recoverEvmAddress(hashTypedData(typedData).digest, decodeEcdsaSignature(sig));
 
 const ENVELOPE_ID = Uint8Array.from({ length: 16 }, (_, i) => i);
+const OTHER_ID = Uint8Array.from({ length: 16 }, (_, i) => 100 + i);
+const CEK = Uint8Array.from({ length: 32 }, (_, i) => 0xc0 ^ i);
 const WRAPPED = { enc: new Uint8Array(32).fill(1), wk: new Uint8Array(48).fill(2) };
+
+/** A copy of `wrapped` with one byte of `field` flipped. */
+const tamper = (wrapped: WrappedCek, field: 'enc' | 'wk'): WrappedCek => {
+  const bytes = wrapped[field].slice();
+  bytes[5] = (bytes[5] as number) ^ 1;
+  return { ...wrapped, [field]: bytes };
+};
 
 const passphrase = (text: string): OwnerPresence => ({
   kind: 'passphrase',
@@ -241,21 +251,45 @@ describe('MemoryKeyStore', () => {
     });
   });
 
-  describe('unwrapCek (G-2)', () => {
-    it('fails closed until the HPKE CEK unwrap lands (M1-1c)', async () => {
-      expect(await codeOf(() => a.unwrapCek(WRAPPED, ENVELOPE_ID))).toBe('unsupported_operation');
-      expect(await codeOf(() => b.unwrapCek(WRAPPED, ENVELOPE_ID, { epoch: 1 }))).toBe(
-        'unsupported_operation',
-      );
+  describe('unwrapCek (G-2, M1-1c)', () => {
+    it('opens its own entry at the current epoch and at an older one on request', async () => {
+      const current = await wrapCek(derivePublicIdentity(SEED_B, 2).agentEnc, ENVELOPE_ID, CEK);
+      expect(await b.unwrapCek(current, ENVELOPE_ID)).toEqual(CEK);
+      const older = await wrapCek(derivePublicIdentity(SEED_B, 1).agentEnc, ENVELOPE_ID, CEK);
+      expect(await b.unwrapCek(older, ENVELOPE_ID, { epoch: 1 })).toEqual(CEK);
     });
 
-    it('refuses an epoch above the current one or a malformed epoch first', async () => {
+    it('fails closed with open_failed: wrong epoch, wrong envelope id, tampered wrap', async () => {
+      const older = await wrapCek(derivePublicIdentity(SEED_B, 1).agentEnc, ENVELOPE_ID, CEK);
+      expect(await codeOf(() => b.unwrapCek(older, ENVELOPE_ID))).toBe('open_failed');
+      expect(await codeOf(() => b.unwrapCek(older, ENVELOPE_ID, { epoch: 0 }))).toBe('open_failed');
+      expect(await codeOf(() => b.unwrapCek(older, OTHER_ID, { epoch: 1 }))).toBe('open_failed');
+      for (const field of ['enc', 'wk'] as const) {
+        expect(
+          await codeOf(() => b.unwrapCek(tamper(older, field), ENVELOPE_ID, { epoch: 1 })),
+        ).toBe('open_failed');
+      }
+      // Another agent's entry does not open either.
+      expect(await codeOf(() => a.unwrapCek(older, ENVELOPE_ID))).toBe('open_failed');
+    });
+
+    it('never opens an owner entry (04 §3.1.1: an agent KeyStore holds no owner key)', async () => {
+      const ownerEnc = (derivePublicKey(OWNER_SEED, KEY_LABELS.enc, 0) as { publicKey: Uint8Array })
+        .publicKey;
+      const ownerEntry = await wrapCek(ownerEnc, ENVELOPE_ID, CEK);
+      expect(await codeOf(() => a.unwrapCek(ownerEntry, ENVELOPE_ID))).toBe('open_failed');
+      expect(await codeOf(() => b.unwrapCek(ownerEntry, ENVELOPE_ID))).toBe('open_failed');
+    });
+
+    it('refuses an epoch above the current one or a malformed epoch, and malformed input', async () => {
       expect(await codeOf(() => b.unwrapCek(WRAPPED, ENVELOPE_ID, { epoch: 3 }))).toBe(
         'epoch_unavailable',
       );
       expect(await codeOf(() => b.unwrapCek(WRAPPED, ENVELOPE_ID, { epoch: -1 }))).toBe(
         'invalid_argument',
       );
+      expect(await codeOf(() => b.unwrapCek(WRAPPED, new Uint8Array(15)))).toBe('invalid_length');
+      expect(await codeOf(() => b.unwrapCek(null as never, ENVELOPE_ID))).toBe('invalid_argument');
     });
   });
 
@@ -452,7 +486,7 @@ describe('MemoryOwnerKeyStore', () => {
     }
   });
 
-  it('expiry wipes every session key (Nostr and EVM) even if the handle is never used again', async () => {
+  it('expiry wipes every session key (Nostr, EVM and enc) even if the handle is never used again', async () => {
     const filled: Uint8Array[] = [];
     const original = Uint8Array.prototype.fill;
     await owner.unlock(passphrase(CODE), { ttlMs: 1000 });
@@ -471,8 +505,8 @@ describe('MemoryOwnerKeyStore', () => {
     const wiped = new Set(
       filled.filter((buffer) => buffer.length === 32 && buffer.every((x) => x === 0)),
     );
-    // The owner Nostr key and the owner EVM key the session held, each its own buffer.
-    expect(wiped.size).toBe(2);
+    // The owner Nostr, EVM and enc keys the session held, each its own buffer.
+    expect(wiped.size).toBe(3);
   });
 
   it('lock ends every session at once', async () => {
@@ -670,11 +704,26 @@ describe('MemoryOwnerKeyStore', () => {
       );
     });
 
-    it('unwrapCek fails closed until the HPKE CEK unwrap lands (M1-1c)', async () => {
+    it('opens an owner entry (acceptance; 04 §3.1.1 owner reads, step 4)', async () => {
       const session = await owner.unlock(passphrase(CODE));
-      expect(await codeOf(() => session.unwrapCek(WRAPPED, ENVELOPE_ID))).toBe(
-        'unsupported_operation',
-      );
+      const { ownerEnc } = await owner.getPublicKeys();
+      const ownerEntry = await wrapCek(ownerEnc, ENVELOPE_ID, CEK);
+      expect(await session.unwrapCek(ownerEntry, ENVELOPE_ID)).toEqual(CEK);
+      expect(await session.unwrapCek(ownerEntry, ENVELOPE_ID, { epoch: 0 })).toEqual(CEK);
+    });
+
+    it('fails closed on an owner entry: wrong envelope id, tampered wrap, an agent entry', async () => {
+      const session = await owner.unlock(passphrase(CODE));
+      const { ownerEnc } = await owner.getPublicKeys();
+      const ownerEntry = await wrapCek(ownerEnc, ENVELOPE_ID, CEK);
+      expect(await codeOf(() => session.unwrapCek(ownerEntry, OTHER_ID))).toBe('open_failed');
+      for (const field of ['enc', 'wk'] as const) {
+        expect(await codeOf(() => session.unwrapCek(tamper(ownerEntry, field), ENVELOPE_ID))).toBe(
+          'open_failed',
+        );
+      }
+      const agentEntry = await wrapCek(derivePublicIdentity(SEED_A, 0).agentEnc, ENVELOPE_ID, CEK);
+      expect(await codeOf(() => session.unwrapCek(agentEntry, ENVELOPE_ID))).toBe('open_failed');
     });
 
     it('has no hpkeOpen (IR-M1-1c-1 F5)', async () => {
@@ -684,6 +733,7 @@ describe('MemoryOwnerKeyStore', () => {
 
     it('every session operation fails closed once the session ends', async () => {
       const session = await owner.unlock(passphrase(CODE));
+      const ownerEntry = await wrapCek((await owner.getPublicKeys()).ownerEnc, ENVELOPE_ID, CEK);
       const payload = await agent.nip44Encrypt(ownerNostr, 'x');
       const ops = [
         () => session.signOwnerAction(action()),
@@ -692,9 +742,10 @@ describe('MemoryOwnerKeyStore', () => {
         () => session.signNostr({ kind: NOSTR_KIND_SEAL, created_at: 0, tags: [], content: '' }),
         () => session.nip44Encrypt(agentNostr, 'x'),
         () => session.nip44Decrypt(agentNostr, payload),
-        () => session.unwrapCek(WRAPPED, ENVELOPE_ID),
+        () => session.unwrapCek(ownerEntry, ENVELOPE_ID),
       ];
       expect(await codeOf(ops[5] as () => Promise<unknown>)).toBe('accepted');
+      expect(await codeOf(ops[6] as () => Promise<unknown>)).toBe('accepted');
       await session.close();
       for (const op of ops) expect(await codeOf(op)).toBe('owner_locked');
     });

@@ -9,8 +9,6 @@ import {
   NODE_MSG,
   NODE_ZONES,
   RESTRICTED_ENTRY_POINTS,
-  TEST_FILE_GLOBS,
-  TEST_ONLY_ENTRY_POINTS,
   WORKSPACE_NAMES,
   ZONES,
   allowedWorkspaceNames,
@@ -18,7 +16,8 @@ import {
   libraryAllowed,
   libraryMessage,
   restrictedEntryMessage,
-  testOnlyEntryMessage,
+  deepImportGroup,
+  deepImportMessage,
 } from './tools/deps-check/policy.mjs';
 
 const SOURCE = '{ts,tsx,mts,cts}';
@@ -47,11 +46,9 @@ function restrictionsFor(zone, { test = false } = {}) {
     if (zone !== null && entry.zones.includes(zone)) continue;
     patterns.push({ group: entry.group, message: restrictedEntryMessage(entry) });
   }
-  // Test-only subpaths (IR-M1-1g-1 M-2): refused everywhere except in test files.
-  if (!test) {
-    for (const entry of TEST_ONLY_ENTRY_POINTS) {
-      patterns.push({ group: entry.group, message: testOnlyEntryMessage(entry) });
-    }
+  // Deep imports into any workspace package's dist/ or src/, in every zone (IR-M1-1f-1 L-2).
+  for (const name of WORKSPACE_NAMES) {
+    patterns.push({ group: deepImportGroup(name), message: deepImportMessage(name) });
   }
   // Package layering: every workspace package this zone may not import (apps are never importable).
   const allowed = allowedWorkspaceNames(zone);
@@ -128,11 +125,10 @@ export default tseslint.config(
     files: [`${zone}/**/*.${SOURCE}`],
     rules: restrictionsFor(zone),
   })),
-  // Test files of each zone: the same list with the zone's test-only libraries (LIBRARIES testZones,
-  // IR-M1-1e-1 L-1) allowed and without the test-only subpaths (IR-M1-1g-1 M-2). It must come after
-  // the zone blocks, because ESLint applies only the last matching no-restricted-imports block.
-  ...Object.keys(ZONES).map((zone) => ({
-    files: TEST_FILE_GLOBS.map((glob) => `${zone}/${glob}`),
+  // Test files of zones with test-only libraries (LIBRARIES testZones, IR-M1-1e-1 L-1). This block
+  // comes after the zone's own, so it is the one no-restricted-imports block that applies to them.
+  ...[...new Set(LIBRARIES.flatMap((lib) => lib.testZones ?? []))].map((zone) => ({
+    files: [`${zone}/**/*.test.${SOURCE}`],
     rules: restrictionsFor(zone, { test: true }),
   })),
   {
