@@ -283,6 +283,21 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - Unit test per redaction rule, including nested objects, arrays, errors and URLs.
   - A deliberately leaking fixture makes the canary job fail in CI (red run linked in PR).
 
+#### M0-8b · Logger hardening follow-ups (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · packages/log
+- **Depends on:** M0-8
+- **Spec:** 04 §1 I-7, §8 rule 4; review IR-M0-8-2 (findings L1–L4, all Low)
+- **Invariants:** I-7
+- **Scope:**
+  - L1: the `key=value` string scanner handles JSON escapes and nesting. `valueEnd` skips an escaped character, an optional `\` is accepted before the quotes (double-encoded JSON), and a value starting with `{` or `[` is redacted up to its matching bracket, bounded by the quoted-value limit.
+  - L2: URL paths are dropped in two more forms: backslash paths (`https://host\v2\KEY`; exclude `\` from the authority) and protocol-relative URLs (`//host/path` → `//host`). Scheme-less URLs (`host.tld/v2/KEY`) stay an accepted residual risk.
+  - L3: the per-string cost of the scanner has a deterministic CI bound: a step counter (for example `pairScanWork(text)`, finder iterations plus characters scanned) asserted at most c × length on the worst cases (`'a:'.repeat(8192)`, `'a=a='.repeat(4096)`). No wall-clock limits in CI.
+  - L4: the README documents that a Map with object keys logs their values under `"[object Object]"`, with only the value-pattern layer.
+- **Acceptance:**
+  - A regression test per item, red before the fix (negative control recorded in the PR).
+  - A quadratic mutant of the scanner turns the L3 test red.
+
 #### M0-9 · Cross-runtime test-vector harness (new)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/
