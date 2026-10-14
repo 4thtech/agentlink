@@ -90,10 +90,11 @@ describe('policy data', () => {
 });
 
 describe('the repository itself', () => {
-  // A full scan parses every source file with TypeScript: about 0.5 s locally, but 4.4 s on a busy
-  // CI runner on main (6f6d840) and 5.06 s once this branch added test files, past the 5 s default.
-  // Same assertions, an explicit timeout.
-  it('passes every boundary check', { timeout: 60_000 }, () => {
+  // The scan reads only packages/*, apps/* and test-vectors/ (git ls-files per zone, 167 source
+  // files; it never lists docs/), about 0.4 s alone: ~0.2 s in 34 git ls-files calls, ~0.1 s parsing.
+  // On the CI runner it shares the CPU with every package's tests (turbo) and took 4.0 to 5.1 s,
+  // past the 5 s default. Same assertions, a timeout with headroom over the worst seen.
+  it('passes every boundary check', { timeout: 30_000 }, () => {
     const { problems, packages } = runChecks(REPO);
     expect(problems).toEqual([]);
     expect(packages).toBeGreaterThan(10);
