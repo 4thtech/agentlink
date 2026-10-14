@@ -183,8 +183,26 @@ describe('file entries', () => {
     ['uppercase scheme', 'HTTPS://drop.example/x'],
     ['bare host', 'https://'],
     ['URL over 2048 chars', `https://drop.example/${'a'.repeat(2048)}`],
+    // IR-M1-2a-1 L-6: a lowercase host and a port of 1-65535, as in the relay URL rule (04 §4).
+    ['uppercase host', 'https://Drop.Example/x'],
+    ['uppercase host with a port', 'https://DROP.example:8443/x'],
+    ['port 0', 'https://drop.example:0/x'],
+    ['port 65536', 'https://drop.example:65536/x'],
+    ['port 99999', 'https://drop.example:99999/x'],
+    ['port with a leading zero', 'https://drop.example:0443/x'],
+    ['empty port', 'https://drop.example:/x'],
   ])('rejects %s', (_l, url) => {
     expectReject(fileEntrySchema, { ...fileEntryUrl(), url });
+  });
+
+  it.each([
+    ['https://drop.example/x'],
+    ['https://drop.example:1/x'],
+    ['https://drop.example:443/x?sig=AbC'],
+    ['https://drop.example:65535'],
+    ['https://drop.example:8443#frag'],
+  ])('accepts %s', (url) => {
+    expectRoundTrip(fileEntrySchema, { ...fileEntryUrl(), url });
   });
 
   it('accepts a URL file larger than 12 KB', () => {

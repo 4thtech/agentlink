@@ -50,13 +50,23 @@ const MIME = /^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*\/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]
 
 /**
  * A download URL (presigned GET, drop or share link). It is a secret (I-7) and comes from another
- * party, so it is bounded and must be https with a host and no user info; the SSRF rules (04 §4) are
+ * party, so it is bounded and must be https with a lower-case host, a port of 1-65535 if any, and no
+ * user info (the same host and port shape as the relay URL rule, 04 §4). The SSRF rules (04 §4) are
  * still applied when it is fetched.
  */
-const HTTPS_URL = /^https:\/\/[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:[/?#][\x21-\x7e]*)?$/;
-export const downloadUrlSchema = z.string().max(MAX_URL_LENGTH).regex(HTTPS_URL, {
-  message: 'must be an https URL without user info, whitespace or control characters',
-});
+const HTTPS_URL = /^https:\/\/[a-z0-9.-]+(?::([1-9][0-9]{0,4}))?(?:[/?#][\x21-\x7e]*)?$/;
+const hasValidPort = (url: string): boolean => {
+  const port = HTTPS_URL.exec(url)?.[1];
+  return port === undefined || Number(port) <= 65535;
+};
+export const downloadUrlSchema = z
+  .string()
+  .max(MAX_URL_LENGTH)
+  .regex(HTTPS_URL, {
+    message:
+      'must be an https URL with a lower-case host, no user info, whitespace or control characters',
+  })
+  .refine(hasValidPort, 'port must be 1-65535');
 
 export const fileEntrySchema = z
   .strictObject({
