@@ -311,6 +311,21 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
 - **Acceptance:**
   - Each rule has a failing fixture test; the guard job is part of `ci-gate`.
 
+#### M0-10b · Boundary guards: residual bypasses and wider scope (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · eslint config, tools/deps-check/
+- **Depends on:** M0-10 (and M0-9 for the test-vectors items)
+- **Spec:** 04 §8.1; `development-process.md` §11; reviews IR-M0-10-1 and IR-M0-10-2 (open items)
+- **Invariants:** I-8
+- **Scope:** (the guards catch honest mistakes; they are not a security boundary against a malicious contributor, which is code review plus the crypto/KeyStore design. Do the items that stay cheap and drop the rest.)
+  - Treat `process` and `<x>.process` as a loader receiver (`.binding`, computed access, `Reflect.get(process, 'getBuiltinModule')`); report the member names `eval` and `Function` on any receiver and `.constructor(...)` calls with a string argument (IR-M0-10-2 F03, F04).
+  - Allowlist for app devDependencies that get bundled (`bundled: true` on app zones) plus a shared, reasoned dev-tools list (vite, vitest, wrangler, typescript, `@types/*`) (IR-M0-10-1 F04).
+  - Resolve `tsconfig` `paths`, Vite aliases and `new URL(..., import.meta.url)` against the relative-escape rule when the first app configs land (IR-M0-10-1 F10, IR-M0-10-2 F05).
+  - Zones for `e2e/` (no primitive libraries) and `test-vectors/` once M0-9 has landed; a check that every `SUBTLE_EXEMPT_FILES` entry exists, and removal of the placeholder-suite exemption when the first real vector suite lands (IR-M0-10-1 F11, IR-M0-10-2).
+  - A narrow, reasoned carve-out for Node built-ins in `vite.config.ts` and `vitest.config.ts` of non-Node zones (IR-M0-10-1 F12).
+- **Acceptance:**
+  - Each item has a failing fixture test; `pnpm lint` stays green on the real tree.
+
 #### M0-11 · Curator project context (new)
 - **Status:** done (setup) · **Size:** S · **Tier:** Owner · **Security:** S0
 - **Repo/path:** owner's Curator (project `agentlink`, domain `projects`); agentlink · .curator-project
@@ -703,7 +718,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Invariants:** I-6, I-8
 - **Scope:**
   - Written by a session that does not implement the TypeScript code. Generators use independent implementations (e.g. Python `cryptography`, a reference BIP-340, RFC 9180 reference vectors, an RFC 8785 reference, `eth-account`/`eth-abi` or `cast` for EIP-712).
-  - Suites (M1a, what Talk needs): HKDF derivation per 04 §2.1 (labels × epochs 0–2), BIP-340 tagged-hash envelope signatures, HPKE CEK wrap (fixed ephemeral keys), payload AEAD + AAD, envelope hash via JCS, pairing HMAC, safety code, owner-seed wrap (Argon2id passphrase path), file KeyStore `ALKS` v1 for both secret kinds (D-54, 04 §2.8), EIP-712 domain separator / struct hash / digest for `AgentCard` (chain-agnostic domain).
+  - Suites (M1a, what Talk needs): HKDF derivation per 04 §2.1 (labels × epochs 0–2), BIP-340 tagged-hash envelope signatures, BIP-340 tagged-hash owner-action signatures (`agentlink/owner-action/v1`, 04 §2.5.1, G-29) with rejection vectors for every non-canonical form (checksummed or uppercase address, uppercase hex, padded base64url, out-of-range integer, unknown key), HPKE CEK wrap (fixed ephemeral keys), payload AEAD + AAD, envelope hash via JCS, pairing HMAC, safety code, owner-seed wrap (Argon2id passphrase path), file KeyStore `ALKS` v1 for both secret kinds (D-54, 04 §2.8), EIP-712 domain separator / struct hash / digest for `AgentCard` (chain-agnostic domain).
   - Proof-layer suites (STREAM, PRF wrap, `Record`, `Receipt`, `Registration`) are M1-1i (M1b).
   - These are the **canonical** vectors; the contracts repo checks parity against a pinned commit (D-19).
   - Vectors that depend on open gap G-28 are added only after it is resolved.
@@ -863,11 +878,12 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types
 - **Depends on:** M0-2d; gap G-29 resolved for owner-operation bodies
-- **Spec:** 04 §2.4, §3.1, §3.4, §3.6; 05 §2.1, §3.1; 07 §1
+- **Spec:** 04 §2.4, §2.5.1, §3.1, §3.4, §3.4.1, §3.6; 05 §2.1, §3.1; 07 §1
 - **Invariants:** I-5
 - **Scope:**
   - Constants: 17 payload types, record kinds, receipt types, fee types, MCP status values, size limits (24 KB envelope, 12 KB inline), policy defaults reference.
-  - Strict zod schemas (unknown keys rejected) for Envelope v1, Payload with per-type bodies (handshake, handshake-ack, proof, approval-request, approval, policy, card-update, revoke, `request` with `kind: "refresh-link"`, file entries), AgentCard, Invite.
+  - Strict zod schemas (unknown keys rejected) for Envelope v1, Payload with per-type bodies (handshake, handshake-ack, proof, approval-request, approval, policy, card-update, revoke per 04 §3.4.1, `request` with `kind: "refresh-link"`, file entries), AgentCard, Invite.
+  - `OwnerAction` / `SignedOwnerAction` shape (04 §2.5.1: `op`, `body`, byte-exact canonical encoding, non-canonical forms rejected, never normalised) with `approval.decide` and `agent.revoke` params; the `policy.set` params (the policy schema) and the per-tool `context` schemas of `approval-request` plug in from M1-2b.
   - Field validation: base64url without padding, byte lengths (id/thread/kid 16 B, keys 32 B), hex formats.
   - Security S2 because envelope/payload schema changes are S2 (`audit-rules.md` §2.2).
 - **Acceptance:**
@@ -878,11 +894,11 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types
 - **Depends on:** M1-2a; gaps G-7, G-32 resolved
-- **Spec:** 06 §1 rule 3, §2 (`ProofStatus`), §3; 04 §2.5; 07 §8; 03 §3
+- **Spec:** 06 §1 rule 3, §2 (`ProofStatus`), §3; 04 §2.5, §2.5.1, §3.4.1; 07 §8; 03 §3
 - **Invariants:** I-4, I-5
 - **Scope:**
   - Policy schema with the exact 06 §3 defaults (plus per-contact overrides if G-32 adds them); signed-policy document wrapper.
-  - `OwnerAction{agentId, action, params, nonce, issuedAt}`, `ApprovalRequest`/`Approval` bound to an action digest, `ProofPack` v1, `ProofStatus`, the common tool-result shape `{status, summary, nextStep?, url?, approvalId?}`.
+  - `policy.set` params `{version, policy}` and the per-tool `action.context` schemas of `approval-request` (04 §2.5.1, §3.4.1; the `OwnerAction{v, agent, owner, op, params, nonce, issuedAt, expiresAt}` / `SignedOwnerAction{body, sig}` shape itself is M1-2a), approvals bound to the action digest, `ProofPack` v1, `ProofStatus`, the common tool-result shape `{status, summary, nextStep?, url?, approvalId?}`.
 - **Acceptance:**
   - Defaults deep-equal 06 §3 (snapshot test citing the spec); the 07 §8 example pack parses.
   - Round-trip and strictness tests for each schema.
@@ -899,23 +915,24 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-6, I-10
 - **Scope:**
   - `IOCCFeeVault`, `IOCCNotary` with the events (05 §6) and custom errors (05 §7) verbatim; ERC-7201 namespaced storage structs; UUPS base whose `_authorizeUpgrade` is gated by `AccessManager`.
-  - AccessManager design: execution delays attach to a (role, account) grant, not to a function, so 05 §5 "per-function delays" becomes **one role per (power, delay) tier** plus a role → function-selector map, e.g. ADMIN (48 h), FEE_ADMIN (0), CAP_RAISER (7 d), TREASURY_ADMIN (7 d), PAUSER (0), UPGRADER_NOTARY (48 h), UPGRADER_VAULT (7 d), FREEZER (7 d); grant delays, guardian (cancel) roles and `minSetback` specified (G-3).
-  - Direction-dependent changes split into separate functions (e.g. lower vs raise `maxProtocolFee`) so each maps to one role (G-3).
+  - AccessManager role map exactly as 05 §5.1 (G-3): role IDs, selector → role map, execution delays, grant delays, guardians, role admins, target admin delays (7 days), OZ default `minSetback`; testnet scaled delays from the per-chain config.
+  - Direction-dependent changes split into separate functions (lower vs raise the cap; `pause` vs `unpause`) so each maps to one role (G-3); `InvalidCapChange()` (05 §7).
 - **Acceptance:**
   - `docs/roles.md` table (role, holder, selectors, execution delay, grant delay, guardian) reviewed by the owner and @denisjazbec.
   - A table-driven Foundry test enumerates every restricted selector and asserts its role and delay match `docs/roles.md`.
+  - A bound test (05 §5.1, §8): with the Safe compromised, every path to a 7-day power (use, new grant, `setRoleAdmin`, selector remap, `updateAuthority`, grant- or target-delay reduction) takes ≥ 7 days and every path to `CONFIG_ADMIN` power ≥ 48 h, including the first 5 days after deployment (before `minSetback`); a stolen ops key can pause and cancel but not unpause, and the Safe revokes both its roles at once; `removeModule` maps to `PAUSE_ADMIN` and `registerModule` to `MODULE_ADMIN`; pause never blocks `withdraw`, `withdrawIntegrator`, `sweep` or Registry `revoke`; the deploy script reverts on a mainnet with any delay below 05 §5.1.
 
 #### M1-3b · contracts: OCCFeeVault (credits, fees, apps, treasury)
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · src/OCCFeeVault.sol, test/unit
-- **Depends on:** M1-3a; gap G-39 resolved
+- **Depends on:** M1-3a; gap G-39 resolved (PR #11, pending owner)
 - **Spec:** 05 §2.1–§2.6, §5, §6, §7
 - **Invariants:** I-10
 - **Scope:**
   - Credits: `deposit`, `depositFor` (native + allowlisted ERC-20 via SafeERC20, measured balance delta), `withdraw` (works while paused), `creditsOf`, `minDeposit`.
-  - Fees: `protocolFee ≤ maxProtocolFee`; caps lowered immediately, raised only via the 7-day role; `integratorFeeCapMultiple` default 4, ≤ `MAX_MULTIPLE` = 10; `quote`; `charge` (modules only; integrator cap applied at charge time; `maxTotal`; `InsufficientCredits`); `depositFromModule` (modules only; `transferFrom` payer).
+  - Fees: `protocolFee ≤ maxProtocolFee`; caps lowered immediately, raised only via the 7-day role; `integratorFeeCapMultiple` default 4, ≤ `MAX_MULTIPLE` = 10; `quote`; `registerModule` (`MODULE_ADMIN`, 7 days) and `removeModule` (`PAUSE_ADMIN`, immediate) as two separate functions (05 §5.1; re-registering after an incident takes 7 days); `charge` (modules only; integrator cap applied at charge time; `maxTotal`; `InsufficientCredits`); `depositFromModule` (modules only; `transferFrom` payer).
   - Apps: `registerApp` (appId = keccak256(abi.encode(integrator, keccak256(bytes(name))))), `setIntegratorFee`, `setIntegrator` (appId unchanged), `setAppActive`; appId 0 = no integrator.
-  - Treasury: permissionless `sweep` via `call`; `withdrawIntegrator`; treasury change with 7-day delay; pause blocks charges and deposits only (pause behaviour of `sweep`/`withdrawIntegrator` per G-39); CEI + `nonReentrant` on every value transfer.
+  - Treasury: permissionless `sweep` via `call`; `withdrawIntegrator`; treasury change with 7-day delay; pause blocks charges and deposits only, never `withdraw`, `sweep` or `withdrawIntegrator` (05 §5.1, G-39); CEI + `nonReentrant` on every value transfer.
   - Out: `depositWithAuthorization` (M1-3c).
 - **Acceptance:**
   - Tests first (failing-test commit precedes implementation); a unit test for every function and every applicable revert in 05 §7.
@@ -989,7 +1006,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-6
 - **Scope:**
   - Foundry script: implementations and UUPS proxies via CreateX CREATE3 with deploy-and-initialise in one call; salt scheme per G-8; per-chain config (fee tokens with EIP-3009 flags, fees, caps, min deposits, treasury Safe, role holders, delays).
-  - In the same script: all roles granted to the testnet Safe (mirroring the planned mainnet layout), Notary registered as vault module, every deployer role revoked.
+  - In the same script: all roles granted to the testnet Safe and the testnet ops key per 05 §5.1 (mainnet layout, scaled delays), Notary registered as vault module, every deployer role revoked. Mainnet variant (M3-2c): contracts initialised paused until the grant and target admin delays are in effect.
   - Post-deploy check script (in CI): deployer holds no role; delays equal `docs/roles.md`; addresses identical on both chains.
   - Deploy runs from CI in the private repo, triggered manually by the owner (Free plan: no environment protection); testnet-only key, low balance. Agents never broadcast from a workstation.
   - Resolved (D-11, D-19): no explorer or Sourcify source verification on testnets; the source stays private until mainnet verification (M3-6). Testnet deploys publish ABIs and addresses only (`release-and-deployment.md` §4.2).
@@ -1232,10 +1249,10 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Pure `evaluate(policy, action, context) → allow | approval | deny`, minimal for M1a (D-33): the 06 §3 rules for contacts and envelopes (hourly per-contact rate counts passed in as context), plus the `commitments` rule from M1-20. Files, proofs and receipts rules are M1-7i (M1b).
   - Signed policy documents verified against the owner key in the agent card on every load; behaviour on missing or invalid signatures per G-6.
-  - `OwnerAction` verification: owner signature, `agentId` binding, single-use nonce, freshness window (G-7).
+  - `SignedOwnerAction` verification (04 §2.5.1): canonical encoding, owner signature, `agent` and `owner` binding, single-use nonce, freshness window (G-7); `policy.set` version must increase; the highest applied version kept as a KeyStore item and checked on every load; stored `approval.decide` re-verified and the digest recomputed when an `approvalId` is presented; refused owner actions reported to the owner.
 - **Acceptance:**
   - Tests first; a table-driven test per rule and boundary (e.g. the per-contact hourly rate limit at N and N + 1).
-  - A policy row edited directly in the store is ignored (I-4); a replayed or stale `OwnerAction` is rejected.
+  - A policy row edited directly in the store is ignored (I-4); a replayed or stale `SignedOwnerAction` is rejected; an older signed policy put back in the store is detected against the KeyStore high-water mark.
   - Property test: `evaluate` is deterministic and has no side effects.
 
 #### M1-7i · core: policy rules for files, proofs and receipts (new, split from M1-7d)
@@ -1352,7 +1369,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Owner seed stored only wrapped with the Argon2id owner passphrase (the M1a owner-presence minimum, D-33); unwrapped only inside one owner operation, then wiped. The localhost passkey (PRF) path is M1-8e (M1b).
   - CLI passphrase prompt reads from a TTY only; no reusable bearer token on disk. The same holds on headless machines with the file KeyStore (D-54, 04 §2.8): no environment variable, file, argument or piped stdin can supply the owner passphrase; `AGENTLINK_OWNER_*` variables are ignored. On file-KeyStore machines (04 §2.8): the owner seed lives in `~/.agentlink/keystore/owner.alko`, is created by the separate `owner init` step, and requires a generated 120-bit owner code (no chosen passphrase); creating or changing the owner secret refuses a candidate that opens any agent's `.alks` file. `owner init` per 04 §2.8: it refuses when an owner exists and never overwrites; it shows the owner fingerprint; the code is display-only; it states what a lost code means.
   - **Owner-blob location on keychain machines (follow-up from IR-D54-2, F03):** pin where the owner-wrapped seed lives on machines with a keychain. Either it is a keychain item, or, wherever it is a file, the generated-code rule of 04 §2.8 applies. A chosen owner passphrase protecting a file that copies of the machine carry is open to offline guessing. Record the choice in 04 §2.2 through a spec change before this card is `ready`.
-  - Produces `OwnerAction` signatures and EIP-712 card/registration signatures.
+  - Produces `SignedOwnerAction` signatures (04 §2.5.1) and EIP-712 card/registration signatures.
   - Full threat note covering G-1 (shared `localhost` RP ID; same-user installation tampering).
 - **Acceptance:**
   - Build-plan test (10 M1-8): a script running as the same OS user, with read access to `~/.agentlink`, the agent's keychain items and the DB, cannot produce a valid approval or policy change without the passphrase. The test's stated scope excludes modifying the installed package (G-1).
@@ -1559,6 +1576,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - `POST /v1/notarize`, `POST /v1/receipt`, `GET /v1/status/:txHash`, `GET /v1/health`; signature validation and `eth_call` simulation (incl. credits) before sending; batching per G-4.
   - Per-signer and per-IP rate limits and per-chain transaction-nonce serialisation in Durable Objects; gas keys only from Worker secrets.
+  - The submitter uses viem only through `@agentlink/chain` (M0-10 policy: `apps/submitter` is not in the viem zone); needs from chain (simulation, signature checks, gas-key wallet) are added to `@agentlink/chain`, not by widening the zone.
   - No request logging beyond aggregate metrics; never signatures together with IPs. `/v1/deposit-authorization` present but disabled until M3-4b.
 - **Acceptance:**
   - Miniflare tests per endpoint: invalid signature, insufficient credits (rejected before sending), rate limit, concurrent nonce handling.
@@ -2598,7 +2616,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Spec:** 05 §2.6, §5; 10 M3-2; `release-and-deployment.md` §6
 - **Invariants:** I-10
 - **Scope:**
-  - ≥ 2-of-3 Safes per chain with hardware signers; PAUSER ops hardware key (plus Safe); fresh hardware-backed mainnet deployer key retained per G-8 for later chains; role-assignment plan mapping every role in `docs/roles.md` to its holder.
+  - ≥ 2-of-3 Safes per chain with hardware signers; two ops hardware keys holding `PAUSER` and `GUARDIAN` (Tali and Denis, never Safe-signer devices; 05 §5.1) plus the Safe; fresh hardware-backed mainnet deployer key retained per G-8 for later chains; role-assignment plan mapping every role in `docs/roles.md` to its holder.
 - **Acceptance:**
   - A script reads each Safe's owners and threshold on-chain and matches the plan; no seed or signer secret in any repository.
 
@@ -2706,7 +2724,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Spec:** 05 §5 (PAUSER); 04 §7; `release-and-deployment.md` §7–§8
 - **Invariants:** I-10
 - **Scope:**
-  - Mainnet additions to the M2-7 runbooks: pause via the PAUSER hardware key and via the Safe, unpause, upgrade under the 48 h / 7-day delays, cancellation of a scheduled operation (guardian), user communication.
+  - Mainnet additions to the M2-7 runbooks: pause via the PAUSER hardware key and via the Safe, unpause, upgrade under the 7-day delay, cancellation of a scheduled operation (`GUARDIAN` or Safe), revoking a stolen ops key via `PAUSE_ADMIN`, user communication.
 - **Acceptance:**
   - Pause/unpause drill on a mainnet fork with the real role layout; withdrawals keep working while paused (verified in the drill).
 
@@ -2986,13 +3004,13 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 
 1. **G-1 (H) Local owner presence vs a same-user agent.** 04 §1 I-4, §2.5; 08 §1; 10 M1-8. The WebAuthn RP ID `localhost` is shared by every local origin, and 04 §2.5 already accepts that a shell-capable agent can tamper with the installation. Either way the next owner passkey or passphrase use on that machine can be captured and the wrapped owner seed on disk unwrapped: local presence proves presence, not intent. The same holds for creating the owner key on such a machine: a tampered installation or a same-user process that reads memory can capture or predetermine the owner seed during setup (04 §2.8, D-54). The residual-risk text lists only tampering and credit spending, and I-4's "no agent process can produce one" holds only while the installation is intact. *Proposed:* state this in 04 §2.5; scope the M1-8 test to an unmodified installation; recommend owner operations from the console on a separate device when the harness has unrestricted shell; harness deny rules for the installed package and npx cache; consider not storing the owner seed on agent machines by default. *Blocks:* M1-8c, M1-8d, M1-8e, M1-11a, M1-12b. *Status:* stays open until the D-36 desktop app ships (G-42).
 2. **G-2 (H) `KeyStore` location and methods.** 03 §3; 07 §1, §4.1; 04 §2.6, §3.1. The interface lives "in core", but `transport-nostr` depends only on `crypto` (dependency cycle). Missing: envelope-hash signing (`signNostr` signs events, the envelope signature is BIP-340 over a tagged hash) and epoch selection for decrypting with old keys. *Proposed:* define `KeyStore`/`OwnerKeyStore` in `@agentlink/crypto`; add `signEnvelopeHash` and epoch parameters. *Blocks:* M1-1g, M1-5a, M1-7b.
-3. **G-3 (H) AccessManager role mapping.** 05 §2.2, §5. Execution delays attach to (role, account) grants, so: cap lowering (immediate) and raising (7 days) need separate functions and roles; UPGRADER has two delays (48 h Notary/Registry, 7 days vault); `freezeUpgrades` is ADMIN with a 7-day delay while ADMIN is 48 h; guardian (cancel) roles, grant delays and `minSetback` are unspecified. *Proposed:* role-per-tier table with a role → selector map in 05 §5 (drafted in M1-3a). *Blocks:* M1-3a, M1-3b, M1-3g.
+3. **G-3 (H) AccessManager role mapping.** Resolved by PR #11 (pending owner): 05 §5.1 role map with role IDs, selectors, holders (mainnet Safe and ops hardware key; separate testnet Safe and key with scaled delays), execution and grant delays, `GUARDIAN` (cancel only), role admins, 7-day target admin delays and the OZ default `minSetback`. The AccessManager delays are the timelock (no `TimelockController`). `ADMIN_ROLE` moves to 7 days, and module registration and every upgrade move to 7 days, because any module can charge credits. The cap is lowered and raised through two functions (`InvalidCapChange()`). `unpause` is Safe-only. Mainnet contracts start paused until the configured delays are in effect. *Was:* per-function delays that AccessManager cannot express; two UPGRADER delays; `freezeUpgrades` under the 48 h ADMIN; guardians, grant delays and `minSetback` unspecified. *Blocks:* M1-3a, M1-3b, M1-3g.
 4. **G-4 (H) Batch failure semantics.** 05 §3.2; 07 §7. Whether one failing item reverts `notarizeBatch`/`acknowledgeBatch` is unspecified; the submitter batches across signers, so one item (e.g. credits spent between simulation and inclusion) can grief the rest. *Proposed:* specify all-or-nothing with per-item pre-simulation and retry without the failing item, or skip-and-emit with per-item status; keep 05 §3.4 gas targets. *Blocks:* M1-3d, M1-10a.
 5. **G-5 (M) J1 key storage wording.** RESOLVED by 02 §5 J1 steps 2–3: `init` puts only the agent keys in the OS keychain (step 2); the owner key is created and wrapped in the setup step (step 3, 04 §2.2). *Was:* J1 step 2 stored "owner and agent keys" in the OS keychain, against 04 §2.2. *Blocked:* M1-9a, M1-12b.
 6. **G-6 (H) Policy fail-open.** 06 §3 (last paragraph); 04 §2.5. Unsigned or tampered policies fall back to defaults, which can be looser than the owner's policy (e.g. `proofs.notarize: deny` → `allow`); deleting the signed row downgrades policy. *Proposed:* once an owner-signed policy exists, fail closed (`approval` for owner-gated actions) and keep a policy version in an owner-signed object. *Blocks:* M1-7d.
-7. **G-7 (M) Lifetimes.** 04 §2.5 (`OwnerAction{nonce, issuedAt}`); 06 §2.5; 06 §3 (`dailyBudgetUSD`). No freshness window, nonce retention, approval TTL or budget day boundary. *Proposed:* e.g. OwnerAction valid 10 minutes, nonces kept 30 days, approvals expire after 24 h, budget day in UTC. *Blocks:* M1-2b, M1-7d, M1-7e.
+7. **G-7 (M) Lifetimes.** 04 §2.5.1 (`SignedOwnerAction` `nonce`, `issuedAt`, `expiresAt`); 06 §2.5; 06 §3 (`dailyBudgetUSD`). No freshness window, nonce retention, approval TTL or budget day boundary. *Proposed:* e.g. owner actions valid 10 minutes (`approval.decide`: until the request's `expiresAt`), nonces kept 30 days, approvals expire after 24 h, budget day in UTC. *Blocks:* M1-2b, M1-7d, M1-7e.
 8. **G-8 (H) CREATE3 salts and deployer lifecycle.** 05 §9; `release-and-deployment.md` §4.2. CreateX guarded salts bind addresses to the deployer; identical addresses for the Registry (M2) and M4 chains need the same deployer and salt scheme; proxies must be deployed and initialised atomically; testnet and mainnet deployers differ, so testnet and mainnet addresses differ. *Proposed:* specify salt layout (deployer-guarded, no cross-chain redeploy protection), deploy-and-init, and cold-storage retention of the mainnet deployer key until all planned chains are deployed. *Blocks:* M1-3g, M3-2b, M3-2c, M4-EPIC.
-9. **G-9 (M) Store schema gaps.** 07 §3 lacks the outbox (07 §4.2, 24 h retry), the ≥ 7-day seen-set (07 §4.2), idempotency results (06 §1 rule 6), budget ledger and rate counters (06 §3) and OwnerAction nonces (04 §2.5). *Proposed:* extend 07 §3. *Blocks:* M1-5b, M1-5c, M1-7a, M1-8b.
+9. **G-9 (M) Store schema gaps.** 07 §3 lacks the outbox (07 §4.2, 24 h retry), the ≥ 7-day seen-set (07 §4.2), idempotency results (06 §1 rule 6), budget ledger and rate counters (06 §3), and `SignedOwnerAction` nonces, the stored signed objects, the revoked-agent set and contact status `revoked` (04 §2.5.1, §3.4.1); the policy-version high-water mark lives in the KeyStore (04 §2.5.1). *Proposed:* extend 07 §3. *Blocks:* M1-5b, M1-5c, M1-7a, M1-8b.
 10. **G-10 (M) Where `@agentlink/occ-v2-abi` is published.** 05 §9; D-19. npm provenance is not generated for private source repos (verify). *Proposed* (`development-process.md` §9.2): import release artifacts into public `packages/occ-v2-abi` and publish from there. *Blocks:* M1-3f.
 11. **G-11 (L) Logger package missing from the package map.** 04 §8.4 vs 07 §1. *Proposed:* add `@agentlink/log` (zero dependencies). *Blocks:* M0-8.
 12. **G-12 (M) JCS and invite compression.** 04 §3.1, §3.6; `AGENTS.md` dependency allowlist. No JCS implementation is allowlisted although `envelopeHash` depends on it; "deflate" does not say raw DEFLATE or zlib. *Proposed:* approve a vetted RFC 8785 implementation (or in-repo code with RFC vectors); specify `deflate-raw` via `CompressionStream`. *Blocks:* M1-1a, M1-7c.
@@ -3006,13 +3024,13 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 20. **G-20 (M) Revocation typed data.** 05 §4 `revoke(agentEvm, nonce, deadline, ownerSig)` has no EIP-712 struct; nonce rules for `Registration` and revoke unspecified. *Blocks:* M1-1i (vectors), M2-4a.
 21. **G-21 (M) Measuring beta metrics without analytics.** 02 §7 and 10 gates vs 08 §2.3 and zero access. *Proposed:* moderated sessions plus opt-in, local-only timing exported by testers. *Blocks:* M1-GATE, M2-GATE.
 22. **G-22 (M) Owner archive mechanics.** 04 §4; 02 F-33; 06 §3: whose storage credentials, how the file key reaches the owner, who deletes. *Blocks:* M2-9.
-23. **G-23 (M) `agentId` undefined.** Used in 04 §2.2 (keychain account), 04 §2.5, 06 §6, 07 §3, 07 §5.2 (object key). The object-key path also gives every recipient of a presigned URL a stable per-agent identifier. *Proposed:* define `agentId`; use a random per-agent prefix in object keys. *Blocks:* M1-6a, M1-7a, M1-8a.
+23. **G-23 (M) `agentId` undefined.** Used in 04 §2.2 (keychain account), 06 §6, 07 §3, 07 §5.2 (object key). The object-key path also gives every recipient of a presigned URL a stable per-agent identifier. *Proposed:* define `agentId`; use a random per-agent prefix in object keys. Owner actions bind the canonical EVM address, not `agentId` (G-29), and `agentId` must not become a second binding. *Blocks:* M1-6a, M1-7a, M1-8a.
 24. **G-24 (M) Relays for owner copies.** 04 §3.5; 07 §4.2; 08 §2.2. AgentCard carries only the agent's `relaysHash`; owners have no relay list. *Proposed:* each owner copy goes to the relays of the agent it concerns; the console subscribes to all its agents' relays. *Blocks:* M1-5b, M2-2d.
 25. **G-25 (M) `agentlink_verify_proof_pack {path}`.** 06 §2.4 lets a tool read a caller-chosen file, against 06 §1 rule 4. *Proposed:* `json` only, or `path` restricted to `proofs.exportFolder`/inbox with realpath checks. *Blocks:* M1-9d.
 26. **G-26 (L) STREAM header not authenticated.** 04 §4: AAD is `u8(isFinal)` only; header fields rely on `ciphertextSha256`. *Proposed:* AAD = header ‖ isFinal, decided before vectors freeze. *Blocks:* M1-1d, M1-1i.
 27. **G-27 (L) Inline file vs envelope size.** 04 §3.5; 02 F-30; 06 §2.3. A 12 KB file, base64-encoded inside an encrypted, base64-encoded payload with four recipient wraps, is already near 24 KB before any text. *Proposed:* "inline only if the final envelope ≤ 24 KB". *Blocks:* M1-7f.
 28. **G-28 (L) Safety-code encoding.** 04 §3.6: the first 40 bits (2^40 ≈ 1.1 × 10^12) do not fit 12 decimal digits, the format 11 §1 and §8 specify. *Blocks:* M1-1f, M1-1h.
-29. **G-29 (M) Owner-operation payload bodies.** 04 §3.4 lists `approval-request`, `approval`, `policy`, `card-update`, `revoke`, `handshake-ack` without body schemas. *Blocks:* M1-2a, M2-2e.
+29. **G-29 (M) Owner-operation payload bodies.** Resolved by PR #10 (pending owner): one owner-signed object, `SignedOwnerAction` (04 §2.5.1, BIP-340 by the owner Nostr key over a tagged hash, bound to the agent's EVM address, with nonce and expiry), is produced by the local UI, the CLI and the console; `approval`, `policy` and `revoke` envelopes only carry it. Bodies for `approval-request`, `approval`, `policy`, `revoke`, `card-update` and `handshake-ack` in 04 §3.4.1, with receiver rules and the rule that no MCP tool can create them. Lifetimes stay with G-7, policy fail-closed with G-6. *Was:* 04 §3.4 listed these types without body schemas. *Blocks:* M1-2a, M2-2e.
 30. **G-30 (M) Native-coin price source.** RESOLVED for launch by D-46: fees are stablecoin-only, every fee token is valued 1:1, and 07 §6.2 needs no price endpoint. A USD price source for native coins returns with the `PRICE_UPDATER` work in M4-EPIC (12 §3.4). *Was:* 07 §6.2 "public price endpoint" unspecified (third-party egress, integrity). *Blocked:* M1-4b, M3-3.
 31. **G-31 (L) Linux without Secret Service.** RESOLVED by D-54 (04 §2.8, 07 §9): the OS keychain stays the default; without one, `needs_setup` unless the user opts in, in an interactive terminal, to a passphrase-locked file KeyStore (Argon2id + AES-256-GCM, unlocked by the MCP server from a passphrase file or an environment variable); the owner key is never unlocked non-interactively. Built in M1-8f. *Was:* 04 §2.2; 03 §6 (headless servers, containers, WSL); proposed `needs_setup` by default and a documented, weaker passphrase-wrapped file store as opt-in. *Blocked:* M1-8a.
 32. **G-32 (M) Per-contact policy overrides.** 11 §8 (approval card, "Remember for this contact") has no counterpart in 06 §3. *Blocks:* M1-2b, M1-11a.
@@ -3022,7 +3040,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 36. **G-36 (L) Owner-backup event kind.** 04 §2.3 names the `d` tag but not the parameterised-replaceable kind. *Blocks:* M2-2b.
 37. **G-37 (L, process) PR title pattern.** `pr-hygiene.yml` accepts `OPS-<n>` and `M<n>-<n>[a-z]`, but `development-process.md` §12.2 and `audit-rules.md` §7 use `OPS-L<n>` and `M<n>-GATE`. *Blocks:* PRs for OPS-L, gate and design-drop cards (fixed by M0-15; design drops may also use the `DOCS` prefix).
 38. **G-38 (M, decision) D-25 scope.** RESOLVED: D-25 is decided (decision log, 12 Oct 2026): continuous delivery with auto-merge behind `review-gate`, automatic staging deploys, automatic rollback, and one owner approval click for production (`talirezun` required reviewer on `production` and `npm-publish`, "Prevent self-review" off; click superseded by D-52 for services, npm `latest` keeps it). `release-and-deployment.md` and `ci-cd.md` are aligned. Remaining work is owner setup: M0-17 (ruleset with auto-merge), M0-18 (environments), M0-19 (`DEPLOY_FREEZE`).
-39. **G-39 (M) Pause scope.** 05 §2.5 says pause never blocks payer withdrawals but is silent on `sweep` and `withdrawIntegrator` (also DECISION NEEDED in `audit-rules.md` §5). *Blocks:* M1-3b.
+39. **G-39 (M) Pause scope.** Resolved by PR #11 (pending owner), with G-3: pause blocks charges, deposits, notarization and registration, and never `withdraw`, `withdrawIntegrator`, `sweep` or Registry `revoke` (05 §5.1). *Was:* 05 §2.5 said pause never blocks payer withdrawals but was silent on `sweep` and `withdrawIntegrator`. *Blocks:* M1-3b.
 40. **G-40 (M, process) Beta hostnames vs environments.** D-28 puts beta services on `*.agentlink.4thtech.io` and staging on `workers.dev`; `release-and-deployment.md` §1 maps testnets to staging and production to mainnets. Which environment (and approval) serves the testnet submitter, faucet and console used by M1/M2 testers is undefined. *Proposed:* a "beta" environment (testnets, beta hostnames, owner-approved promotion). *Blocks:* M1-10c, M2-2h.
 41. **G-41 (L) D-12 propagation.** The decision log now records MIT (D-12); the private internal docs predate it. *Proposed:* align them privately; every public `package.json` and the cloud-agent template carry MIT. *Blocks:* M0-2d (check script), M2-3d (template licence).
 42. **G-42 (H, note) Desktop owner presence as the G-1 mitigation.** D-36; 04 §2.5; 08 §1. D-36's desktop model (a signed app, a native approval window, the owner key in the OS keychain gated by OS biometrics such as Touch ID or Windows Hello) is the intended mitigation for G-1: the OS, not a `localhost` web origin, shows the presence prompt, and keychain access bound to the app's signing identity is meant to stop a tampered installation or another same-user process from unlocking the owner key. It is not yet specified or proven: Linux has no equivalent OS binding, and `npx` installs keep G-1's residual risk. *Proposed:* M2-11a's threat model states exactly which G-1 paths the desktop app closes, per OS; 04 §2.5 is updated when the desktop app ships, and only then is G-1 closed for desktop installs. G-1 stays open until then. *Blocks:* M2-11a, M2-11b, M2-11c, M2-11d.
@@ -3077,7 +3095,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | M2-14, M2-11e, M2-11f | Buy and enrol: Apple Developer ID (organisation) and a Windows code-signing certificate, starting in M1b; hold signing credentials and the offline update key; approve each desktop release |
 | M3-12 | **DECISION NEEDED:** GitHub Team before mainnet (D-27) |
 | M3-1a, M3-1b | Run the audit engagements; accept final reports |
-| M3-2b | Create mainnet Safes with hardware signers; PAUSER key; mainnet deployer hardware key and its custody |
+| M3-2b | Create mainnet Safes with hardware signers; two ops keys (`PAUSER`, `GUARDIAN`); mainnet deployer hardware key and its custody |
 | M3-2c | Run the mainnet deploy with the hardware key, a second person witnessing |
 | M3-3 | Confirm the D-45 beta prices and `minDeposit`; sign the fee-configuration Safe batch |
 | M3-5 | Set and fund mainnet gas keys |

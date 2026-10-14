@@ -34,7 +34,7 @@ UX requirements and screen inventory are in `11-claude-design-brief.md`. This do
 | **Agents** | List owner's agents (from agent cards); add agent (pairs a local or cloud agent to this owner); revoke |
 | **Activity** | Subscribe to relays with the owner Nostr key; decrypt all envelope copies; unified timeline across agents |
 | **Threads** | Per contact; messages, files (download + decrypt in browser), proof badges and receipts |
-| **Approvals** | Approval requests arrive as encrypted envelopes (`type: approval`) from agents; owner approves/denies; decision returned as an owner-signed envelope |
+| **Approvals** | Approval requests arrive as encrypted `approval-request` envelopes from agents; owner approves/denies; decision returned as an owner-signed `approval` envelope (04 §3.4.1) |
 | **Policies** | Edit per-agent policies; sent to the agent as an owner-signed `policy` envelope; agents accept only if signed by the owner key in their agent card (satisfies I-4) |
 | **Proofs** | List notarized records, receipts, export proof pack, open verify page |
 | **Credits** | Balances per agent and chain; deposit page (`depositFor`) via any browser wallet / WalletConnect, or instructions to send USDC to the agent address; fee history |
