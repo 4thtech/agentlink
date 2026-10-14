@@ -30,7 +30,7 @@ Contents: §1 How to read a card · §2 M0 Foundations (incl. legacy OPS-L items
 | **Status** | See the legend below. |
 | **Size** | **S** ≤ 2 days · **M** 3–5 days · **L** 6–8 days of focused agent + human work. Anything larger is split. The changed-lines limits in `development-process.md` §7.4 also apply. |
 | **Tier** | Worker model routing (`development-process.md` §3): **Haiku** (mechanical, read-only, no design choices, never S1/S2) · **Sonnet** (clear-spec implementation, tests, CI, UI, docs, non-security review) · **Opus** (S2 work, architecture, protocol, contracts, signing, deploy scripts, audits). **Owner** marks a card that only the human owner can execute (accounts, settings, keys, legal, money); an agent may prepare material for it. |
-| **Security** | **S0** none · **S1** sensitive · **S2** critical (`audit-rules.md` §2). The highest applicable class wins; only the owner may lower it. S1/S2 need an independent review session; S2 also needs a non-author code-owner approval on GitHub (normally the owner's, D-51), tests-first evidence, a full threat note and an external-audit scope-register entry (`audit-rules.md` §3). |
+| **Security** | **S0** none · **S1** sensitive · **S2** critical (`audit-rules.md` §2). The highest applicable class wins; only the owner may lower it. S1/S2 need an independent review session; S2 and sensitive paths also need the owner's "merge" in chat (D-51, D-52); S2 needs tests-first evidence, a full threat note and an external-audit scope-register entry (`audit-rules.md` §3). |
 | **Phase** | M1 cards only: `M1a` (walking skeleton: pair and talk) or `M1b` (files, proof, credits), D-33. Appended to the Status line; see §3. |
 | **Repo/path** | `agentlink` = public `4thtech/agentlink`; `occ-v2-contracts` = private contracts repo (D-19); `agentlink-ops` = private ops/internal-docs repo (D-26). |
 | **Depends on** | Cards that must be `done` (or stubbed behind an agreed interface, `development-process.md` §6.2) before this one is `ready`. |
@@ -55,7 +55,7 @@ In this file a card's Status changes in only two places: `backlog → ready` (or
 
 Every deploy card (submitter, faucet, console, verify, invite, pay, onboarding/landing, marketing site, cloud-agent template) carries the block below, stated explicitly in its Acceptance:
 
-- **Deploy (D-25: continuous delivery, `release-and-deployment.md` §1, §3–§5, §8):** merge to `main` → CI deploys automatically to staging (`workers.dev` preview, testnets, npm `next`); smoke test; production (npm `latest`, production Workers and sites) waits for one approval click by the owner (`talirezun`, required reviewer of the `production` and `npm-publish` environments); post-deploy health check; automatic rollback on a failed check; deploy record (§5.2); nothing runs while `DEPLOY_FREEZE` is set (M0-19).
+- **Deploy (D-25: continuous delivery, `release-and-deployment.md` §1, §3–§5, §8):** merge to `main` → CI deploys automatically to staging (`workers.dev` preview, testnets, npm `next`); smoke test; production (npm `latest`, production Workers and sites) deploys automatically once staging and smoke tests are green (D-52; the owner removes the required reviewer from the `production` environment at M1b); post-deploy health check; automatic rollback on a failed check; deploy record (§5.2); nothing runs while `DEPLOY_FREEZE` is set (M0-19).
 
 Never automated: mainnet contract deploys, contract upgrades and configuration (hardware key, Safe, timelocks), production secrets, rulesets, CODEOWNERS and environments.
 
@@ -384,7 +384,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
 
 ### Continuous delivery (D-25, adopted)
 
-D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub auto-merge once `ci-gate`, `security-gate`, `pr-hygiene` and `review-gate` are green (S2 and code-owned paths also need a non-author code-owner approval, normally the owner's one tap on GitHub, D-51; agents work under Tali's account; D-51 simplified: S2 and sensitive paths wait for Tali's "merge" in chat); a merge to `main` deploys automatically to staging; production (npm `latest`, production Workers and sites) waits for one approval click by the owner (`talirezun`, required reviewer on the `production` and `npm-publish` environments). Mainnet contract deploys, contract upgrades, Safe operations and production secrets stay manual and owner-only. Normative: `release-and-deployment.md` §1, §3; implementation and owner checklist: `ci-cd.md`. The `review-gate` workflow exists (`done (setup)`); the cards in which the owner applies the ruleset, the environments and the `DEPLOY_FREEZE` variable stay `backlog` (owner actions). M0-20 is a separate, still open decision. See gap G-38.
+D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub auto-merge once `ci-gate`, `security-gate`, `pr-hygiene` and `review-gate` are green (agents work under Tali's account; D-51 simplified: S2 and sensitive paths wait for Tali's "merge" in chat; D-52: one pipeline for every task); a merge to `main` deploys automatically to staging; production (npm `latest`, production Workers and sites) deploys automatically once staging and smoke tests are green (amended by D-52, 14 Oct 2026; the owner removes the required reviewer from the `production` environment at M1b). Mainnet contract deploys, contract upgrades, Safe operations and production secrets stay manual and owner-only. Normative: `release-and-deployment.md` §1, §3; implementation and owner checklist: `ci-cd.md`. The `review-gate` workflow exists (`done (setup)`); the cards in which the owner applies the ruleset, the environments and the `DEPLOY_FREEZE` variable stay `backlog` (owner actions). M0-20 is a separate, still open decision. See gap G-38.
 
 #### M0-16 · `review-gate` check (new)
 - **Status:** done (setup) — the workflow exists; making it a required check is M0-17 · **Size:** S · **Tier:** Sonnet · **Security:** S1
@@ -397,7 +397,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - S1/S2: an independent-review report ID (`IR-…`) without a FAIL verdict. S2: threat-note and tests-first sections. The S2 approval check was removed by the owner (D-51, simplified); the owner's "merge" go-ahead is a process control.
   - Fails while `DEPLOY_FREEZE` is `true`; narrow bot exemptions (Renovate, Changesets version PR); reads PR text only through the API, no secrets, no checkout.
 - **Acceptance:**
-  - Fixture PRs on the first real runs: S2 without non-author approval → red; with it → green; declared class lower than derived → red; S0 docs PR with its box ticked → green.
+  - Fixture PRs on the first real runs: S2 without its Threat note or Tests-first evidence → red; with them → green; declared class lower than derived → red; S0 docs PR with its box ticked → green.
   - The path table in the workflow matches `audit-rules.md` §2.2 (diff checked at each milestone gate).
 
 #### M0-17 · `main` ruleset with auto-merge (new)
@@ -410,7 +410,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - "Allow auto-merge" on (agents enable it per PR with `gh pr merge --auto --squash`; they never approve and never bypass).
   - `main` ruleset: required checks `ci-gate`, `security-gate`, `pr-hygiene`, `review-gate`; required approvals 0 with "Require review from Code Owners" **off** (D-51, simplified); dismiss stale approvals; empty bypass list (not even the owner).
 - **Acceptance:**
-  - An S2 fixture PR without its threat note stays red on `review-gate`; an S2 fixture PR and a PR touching `AGENTS.md` stay blocked until a non-author code owner approves, and then merge; an S0 PR auto-merges once checks are green.
+  - An S2 fixture PR without its threat note stays red on `review-gate`; an S2 fixture PR and a PR touching `AGENTS.md` are not auto-merged by agents before Tali's "merge" (D-51, D-52); an S0 PR auto-merges once checks are green.
 
 #### M0-18 · GitHub Environments: `production` and `npm-publish` gated by the owner, staging open (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner · **Security:** S1
@@ -424,7 +424,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - Secrets scoped per environment; testnet and production keys never shared.
 - **Acceptance:**
   - A workflow run from a non-`main` ref cannot access any of these environments (demonstrated).
-  - A `production` or `npm-publish` job waits for `talirezun`'s approval click; a `staging` or `npm-next` job runs without waiting.
+  - A `production` or `npm-publish` job waits for `talirezun`'s approval click only while the required reviewer is configured (the owner removes it from `production` at M1b, D-52); a `staging` or `npm-next` job runs without waiting.
 
 #### M0-19 · `DEPLOY_FREEZE` repository variable (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet prepares the workflow checks) · **Security:** S1
@@ -1498,7 +1498,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - CI-only `wrangler deploy`; staging on `workers.dev` previews; beta hostname `submit.agentlink.4thtech.io` (testnets) per the environment mapping fixed in G-40.
   - Gas and faucet keys set by the owner with `wrangler secret put`; never in GitHub, logs or sync files.
 - **Acceptance:**
-  - **Deploy (D-25):** staging deploy on merge; smoke test (health + simulated notarize per chain); production after the owner's approval click (`production` environment); health check after deploy with automatic `wrangler rollback` on failure (rehearsed); deploy record written; nothing runs while `DEPLOY_FREEZE` is set.
+  - **Deploy (D-25):** staging deploy on merge; smoke test (health + simulated notarize per chain); production automatically once staging smoke is green (`production` environment, D-52); health check after deploy with automatic `wrangler rollback` on failure (rehearsed); deploy record written; nothing runs while `DEPLOY_FREEZE` is set.
 
 ### Encrypted drop (`apps/drop`) (new, D-48)
 
@@ -1536,7 +1536,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Any Worker signing secret (for GET and PUT URLs) set by the owner with `wrangler secret put`; never in GitHub, logs or sync files.
   - Adds the drop to `release-and-deployment.md`: hostname (§1.1), deployables (§2), Workers pipeline (§4.5), secrets inventory (§6) and rollback matrix (§8).
 - **Acceptance:**
-  - **Deploy (D-25):** staging deploy on merge; smoke test (signed upload, GET and DELETE with a test key; an expired GET refused); production after the owner's approval click (`production` environment); health check after deploy with automatic `wrangler rollback` on failure (rehearsed); deploy record written; nothing runs while `DEPLOY_FREEZE` is set.
+  - **Deploy (D-25):** staging deploy on merge; smoke test (signed upload, GET and DELETE with a test key; an expired GET refused); production automatically once staging smoke is green (`production` environment, D-52); health check after deploy with automatic `wrangler rollback` on failure (rehearsed); deploy record written; nothing runs while `DEPLOY_FREEZE` is set.
   - The production bucket's lifecycle rule (7 days) is read back after each deploy, and so is the drop Worker's logging config (observability and request logging, Tail Workers and Logpush off; 04 §4).
 
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
@@ -1724,13 +1724,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 04 §7 (supply chain); `release-and-deployment.md` §4.1; `ci-cd.md` §4–§5
 - **Invariants:** —
 - **Scope:**
-  - Activate the prepared `release.yml`: Changesets versioning; trusted publishing (OIDC) with provenance; prereleases to `next` automatically on merge (`publish-next`, environment `npm-next`); stable releases to `latest` only after the owner's approval click (`publish-latest`, environment `npm-publish`).
+  - Activate the prepared `release.yml`: Changesets versioning; trusted publishing (OIDC) with provenance; prereleases to `next` automatically on merge (`publish-next`, environment `npm-next`); stable releases to `latest` automatically once the `next` smoke test is green (D-52; `publish-latest`, environment `npm-publish`).
   - Tarball allowlist (`files`) and size check; SBOM attached to the GitHub release; dry-run on a throwaway package first.
 - **Acceptance:**
   - A `next` prerelease of `@agentlink/types` with provenance visible on npm.
   - A workflow run from a fork or a non-`main` ref cannot publish (demonstrated).
   - Release checklist includes "update the README Status and roadmap; never claim unimplemented features".
-  - **Deploy (D-25):** `publish-latest` waits for the owner's approval click; the post-publish health check moves `latest` back automatically on failure; nothing publishes while `DEPLOY_FREEZE` is set.
+  - **Deploy (D-25, D-52):** `publish-latest` runs automatically once the `next` smoke test is green; the post-publish health check moves `latest` back automatically on failure; nothing publishes while `DEPLOY_FREEZE` is set.
 
 #### M1-17 · External audit procurement (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet drafts the RFP) · **Security:** S0 · **Phase:** M1b
@@ -1768,7 +1768,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Functional and unstyled, strings externalized, no invented visual design until DESIGN-D1 (which includes the invite placeholder) lands; then restyled in a follow-up PR under this card.
 - **Acceptance:**
   - Playwright asserts no request carries the fragment; headers verified on staging.
-  - **Deploy (D-25):** staging deploy on merge; smoke test; production after the owner's approval click; health check with automatic rollback to the previous artifacts; deploy record; halted by `DEPLOY_FREEZE`.
+  - **Deploy (D-25):** staging deploy on merge; smoke test; production automatically once staging smoke is green (D-52); health check with automatic rollback to the previous artifacts; deploy record; halted by `DEPLOY_FREEZE`.
 
 ### Walking skeleton, negotiation and UX (D-31…D-41) (new)
 
@@ -2009,7 +2009,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
   - Beta at `console.agentlink.4thtech.io`; staging on `workers.dev`.
 - **Acceptance:**
   - Two independent CI builds are byte-identical; a script compares deployed asset hashes with the release.
-  - **Deploy (D-25):** staging deploy on merge; smoke test (load, CSP headers, hash check); production after the owner's approval click; health check with automatic rollback to the previous hash-identical artifacts; deploy record; halted by `DEPLOY_FREEZE`.
+  - **Deploy (D-25):** staging deploy on merge; smoke test (load, CSP headers, hash check); production automatically once staging smoke is green (D-52); health check with automatic rollback to the previous hash-identical artifacts; deploy record; halted by `DEPLOY_FREEZE`.
 
 ### Cloud agent template (`apps/cloud-agent`)
 
@@ -2059,7 +2059,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
   - Owner pairs the agent (owner-signed card). One-way template sync at a release tag; template pins provenance-carrying npm versions and holds no secrets.
 - **Acceptance:**
   - Both paths deploy into a test Cloudflare account and complete J6; `/setup` is unusable after first use; captured traffic from the CLI path sends the seed to no 4thTech system.
-  - **Deploy (D-25):** template publication only from a release tag, after the owner's approval click; a staging test deployment of the tagged template passes a smoke test (status, send, check inbox) first; a failed check restores the previous template tag; deploy record; halted by `DEPLOY_FREEZE`. 4thTech never deploys into users' accounts.
+  - **Deploy (D-25):** template publication only from a release tag, automatically once the staging check passes (D-52); a staging test deployment of the tagged template passes a smoke test (status, send, check inbox) first; a failed check restores the previous template tag; deploy record; halted by `DEPLOY_FREEZE`. 4thTech never deploys into users' accounts.
 
 #### M2-3e · harness connector validation (ChatGPT developer mode, claude.ai)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
@@ -2113,7 +2113,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
   - Beta at `verify.agentlink.4thtech.io`.
 - **Acceptance:**
   - Playwright asserts the fragment is never sent in any request; a testnet pack verifies in ≤ 2 s; a tampered pack shows its specific reason; print snapshot.
-  - **Deploy (D-25):** staging deploy on merge; smoke test (verify a known pack, fragment test against staging); production after the owner's approval click; health check with automatic rollback to the previous artifacts; deploy record; halted by `DEPLOY_FREEZE`.
+  - **Deploy (D-25):** staging deploy on merge; smoke test (verify a known pack, fragment test against staging); production automatically once staging smoke is green (D-52); health check with automatic rollback to the previous artifacts; deploy record; halted by `DEPLOY_FREEZE`.
 
 #### M2-5b · invite landing page
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1
@@ -2255,7 +2255,7 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
 - **Acceptance:**
   - Signed builds install without OS security warnings on clean macOS and Windows VMs; published hashes match the artifacts.
   - A fork or non-`main` ref cannot reach signing credentials (demonstrated).
-  - **Deploy (D-25):** release waits for the owner's approval click; nothing publishes while `DEPLOY_FREEZE` is set.
+  - **Deploy (D-25, D-52):** release runs automatically once staging is green; nothing publishes while `DEPLOY_FREEZE` is set.
 
 #### M2-11f · desktop: auto-update with signature verification (new)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
@@ -2496,7 +2496,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - Enable mainnet chains on the `pay.` origin; amounts in USD; token details under Advanced.
 - **Acceptance:**
   - Deposits in every allowlisted stablecoin (USDC, USDT where allowlisted, xDAI on Gnosis) credit an agent on both chains (small real amounts, recorded).
-  - **Deploy (D-25):** staging deploy on merge; smoke test; production after the owner's approval click; health check with automatic rollback to the previous artifacts; deploy record; halted by `DEPLOY_FREEZE`.
+  - **Deploy (D-25):** staging deploy on merge; smoke test; production automatically once staging smoke is green (D-52); health check with automatic rollback to the previous artifacts; deploy record; halted by `DEPLOY_FREEZE`.
 
 #### M3-4b · Gasless USDC top-up (EIP-3009)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
@@ -2520,7 +2520,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - Mainnet gas keys (set by the owner, low balances), refill procedure, alerts (balance, error rate, queue depth, failed-simulation spikes), tuned per-signer limits, key-rotation runbook.
 - **Acceptance:**
   - A low-balance alert fires in a test; a key-rotation drill is done; logs contain no IP-plus-signature pairs.
-  - **Deploy (D-25):** staging deploy on merge; smoke test; production after the owner's approval click; health check (`/v1/health` + simulated notarize per chain) with automatic rollback (rehearsed); deploy record; halted by `DEPLOY_FREEZE`.
+  - **Deploy (D-25):** staging deploy on merge; smoke test; production automatically once staging smoke is green (D-52); health check (`/v1/health` + simulated notarize per chain) with automatic rollback (rehearsed); deploy record; halted by `DEPLOY_FREEZE`.
 
 #### M3-6 · Publish verified contract source (BUSL-1.1) and addresses
 - **Status:** backlog · **Size:** S · **Tier:** Owner + Sonnet · **Security:** S1
@@ -2578,11 +2578,11 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Spec:** 07 §6.1; 06 §3 (`proofs.defaultChain: base`); 03 §7; `release-and-deployment.md` §4.1, §4.6, §5
 - **Invariants:** I-3, I-6
 - **Scope:**
-  - Mainnet chain configs; default chain Base; faucet unreachable from mainnet configs; `@4thtech/agentlink` released to `latest` after the owner's approval click; console production deploy with published hashes.
+  - Mainnet chain configs; default chain Base; faucet unreachable from mainnet configs; `@4thtech/agentlink` released to `latest` automatically after staging smoke (D-52); console production deploy with published hashes.
   - Update the README Status and roadmap; never claim unimplemented features.
 - **Acceptance:**
   - J2 completed on mainnet with real credits; deployed console hashes equal the release hashes.
-  - **Deploy (D-25):** staging deploy on merge; smoke test; production after the owner's approval click; health check with automatic rollback to the previous artifacts; deploy record; halted by `DEPLOY_FREEZE`.
+  - **Deploy (D-25):** staging deploy on merge; smoke test; production automatically once staging smoke is green (D-52); health check with automatic rollback to the previous artifacts; deploy record; halted by `DEPLOY_FREEZE`.
 
 #### M3-11 · Publish AgentLink / OCC v2 docs on GitBook (new)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S0
@@ -2608,7 +2608,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - Update the README Status and roadmap; never claim unimplemented features.
 - **Acceptance:**
   - Every feature the site presents as available maps to a `done` card; owner confirms fidelity to D3; old invite links resolve.
-  - **Deploy (D-25):** staging deploy on merge; smoke test; production after the owner's approval click; health check with automatic rollback to the previous artifacts; deploy record; halted by `DEPLOY_FREEZE`.
+  - **Deploy (D-25):** staging deploy on merge; smoke test; production automatically once staging smoke is green (D-52); health check with automatic rollback to the previous artifacts; deploy record; halted by `DEPLOY_FREEZE`.
 
 #### M3-14 · Publish the fee schedule and per-chain fee configuration at mainnet (D-45) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet + Owner · **Security:** S1
@@ -2863,4 +2863,4 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | M3-14 | Approve the published fee schedule; announce every later price increase ≥ 7 days ahead (D-45) |
 | M3-15 | **DECISION NEEDED (optional):** welcome credits, eligibility and budget |
 | M3-11 | Provide the GitBook MCP; merge the GitBook change request |
-| Releases | Approve every production promotion (npm `latest`, production Workers and sites) with one click on the waiting deployment (D-25) |
+| Releases | Production deploys automatically after staging smoke (D-52); remove the `production` Environment's required reviewer when the first deployable app exists (M1b) |

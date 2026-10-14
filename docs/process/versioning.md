@@ -70,11 +70,11 @@ Patch releases (`0.1.1`, …) fix defects in between. Work toward a milestone sh
 ## 4. Prereleases and promotion to `latest`
 
 1. **Prereleases.** In pre mode with tag `next` (`pnpm changeset pre enter next`), merging the Version packages PR publishes `x.y.z-next.N` to npm `next` automatically (job `publish-next`, environment `npm-next`, no reviewer), then the smoke test runs. A prerelease never moves `latest`.
-2. **Promotion.** `latest` is production; only the owner's approval moves it (D-25). Promotion is a new stable publish, not a dist-tag move (`release-and-deployment.md` §4.1 says why):
+2. **Promotion.** `latest` is production; only a deliberate stable release moves it (D-25, D-52). Promotion is a new stable publish, not a dist-tag move (`release-and-deployment.md` §4.1 says why):
    1. A PR runs `pnpm changeset pre exit`; between the last prerelease and it only fixes SHOULD merge.
    2. The next Version packages PR carries the stable versions and the rolled `CHANGELOG.md` (§5).
-   3. Merging it starts `publish-latest` in environment `npm-publish`, which waits for the owner's approval click.
-   4. After the click: publish with provenance, health check, GitHub Release `v<version>` (§6), smoke test. A failure rolls back and sets `DEPLOY_FREEZE`.
+   3. Merging it starts `publish-latest` in environment `npm-publish`, which runs automatically once the `next` smoke test is green (D-52).
+   4. Then: publish with provenance, health check, GitHub Release `v<version>` (§6), smoke test. A failure rolls back and sets `DEPLOY_FREEZE`.
 3. Agents never run `npm publish`, `npm dist-tag` or `npm unpublish`, or approve the deployment.
 
 ---
@@ -134,7 +134,7 @@ The PR that changes a spec adds its revision row, naming the decisions or sectio
 
 ## 9. Release checklist
 
-Linked from `release-and-deployment.md` §5.1. Agents prepare everything except the owner's click.
+Linked from `release-and-deployment.md` §5.1. Agents prepare everything; production deploys automatically (D-52).
 
 - [ ] Every PR that changed a published package has its changeset; the Version packages PR lists the expected packages at one version.
 - [ ] The bump matches §1; breaks are marked **BREAKING:**; deprecations were announced one minor earlier (§7).
@@ -142,7 +142,7 @@ Linked from `release-and-deployment.md` §5.1. Agents prepare everything except 
 - [ ] `CHANGELOG.md` rolled into `## [<version>] - <date>`, compare links correct, public/private boundary respected.
 - [ ] Spec revision row added if specs changed (§8); `README.md` Status updated (D-44).
 - [ ] Stable release: prerelease soaked on `next`, `pnpm changeset pre exit` merged, tag `v<version>` not yet used.
-- [ ] After the click: provenance and smoke test green; GitHub Release `v<version>` carries the changelog section, tag at the released commit; from M2 desktop artifacts attached.
+- [ ] After the publish: provenance and smoke test green; GitHub Release `v<version>` carries the changelog section, tag at the released commit; from M2 desktop artifacts attached.
 - [ ] If rolled back: `DEPLOY_FREEZE` set, GitHub Release edited or deleted, bad version deprecated.
 
 ---
