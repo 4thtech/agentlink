@@ -11,7 +11,9 @@ export type CryptoInputErrorCode =
   | 'invalid_json'
   | 'jcs_unsupported_value'
   | 'no_secure_random'
-  | 'wipe_failed';
+  | 'wipe_failed'
+  /** A byte string that is not a valid curve point (M1-1b: evmAddressFromPublicKey). */
+  | 'invalid_public_key';
 
 /**
  * The one error type @agentlink/crypto throws for input it refuses.

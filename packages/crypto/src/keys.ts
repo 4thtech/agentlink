@@ -164,10 +164,48 @@ export function deriveSecretKey(
   return selectSecp256k1SecretKey((counter) => deriveKey(masterSeed, label, epoch, counter));
 }
 
-/** The 20-byte EVM address of a secp256k1 secret key: keccak256(uncompressed point without 0x04). */
+/**
+ * The 20-byte EVM address of a secp256k1 public key (33-byte compressed or 65-byte uncompressed
+ * SEC 1 encoding): keccak256 of the uncompressed point without its 0x04 prefix, last 20 bytes. The
+ * one implementation: evmAddressFromPublicKey, derivePublicKey (evm) and deriveAgentId all use it.
+ */
+function evmAddressBytes(publicKey: Uint8Array): Uint8Array {
+  assertBytes(publicKey, 'evmAddressFromPublicKey: publicKey');
+  if (publicKey.length !== 33 && publicKey.length !== 65) {
+    throw new CryptoInputError(
+      'invalid_length',
+      'evmAddressFromPublicKey: a public key is 33 (compressed) or 65 (uncompressed) bytes',
+    );
+  }
+  let uncompressed: Uint8Array;
+  try {
+    // Refuses an x or y outside the field, a point off the curve, the encodings of infinity and
+    // any prefix but 0x02/0x03 (33 bytes) or 0x04 (65 bytes), hybrid 0x06/0x07 included.
+    const point = secp256k1.Point.fromBytes(publicKey);
+    point.assertValidity();
+    uncompressed = point.toBytes(false);
+  } catch {
+    throw new CryptoInputError(
+      'invalid_public_key',
+      'evmAddressFromPublicKey: not a point on secp256k1',
+    );
+  }
+  return keccak256(uncompressed.subarray(1)).slice(12);
+}
+
+/**
+ * The EVM address of a secp256k1 public key, as `0x` + 40 lowercase hex (04 §2.4.1, §2.9). Public
+ * and non-secret. Stable error codes: `invalid_argument` (not a Uint8Array), `invalid_length`
+ * (not 33 or 65 bytes), `invalid_public_key` (not a valid point). For display, pass the result to
+ * evmAddressChecksummed.
+ */
+export function evmAddressFromPublicKey(publicKey: Uint8Array): string {
+  return encodeHex0x(evmAddressBytes(publicKey));
+}
+
+/** The address of a secp256k1 secret key, through the same path as evmAddressFromPublicKey. */
 function evmAddressOf(secretKey: Uint8Array): Uint8Array {
-  const point = secp256k1.getPublicKey(secretKey, false);
-  return keccak256(point.subarray(1)).slice(12);
+  return evmAddressBytes(secp256k1.getPublicKey(secretKey, false));
 }
 
 /** 04 §3.1: `kid` = the first 16 bytes of sha256(raw 32-byte encPub). */
@@ -293,7 +331,8 @@ export function derivePublicIdentity(masterSeed: Uint8Array, keyEpoch: number): 
 /**
  * EIP-55 mixed-case form of a canonical address, for display only (04 §2.4.1, §2.9). The input
  * must be the canonical `0x` + 40 lowercase hex; a checksummed or upper-case address is refused,
- * because checksummed forms are never accepted as input.
+ * because checksummed forms are never accepted as input. Stable error codes: `invalid_argument`
+ * (not a string), `invalid_hex` (not lowercase `0x` hex), `invalid_length` (not 20 bytes).
  */
 export function evmAddressChecksummed(agentId: string): string {
   decodeHex0x(agentId, { length: 20 });

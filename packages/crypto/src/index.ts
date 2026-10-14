@@ -38,6 +38,7 @@ export {
   MASTER_SEED_LENGTH,
   MAX_KEY_EPOCH,
   evmAddressChecksummed,
+  evmAddressFromPublicKey,
   kidFromEncPublicKey,
   type DerivedPublicKey,
   type KeyLabel,
