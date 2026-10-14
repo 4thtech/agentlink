@@ -11,6 +11,9 @@ import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
 
 const INCLUDE = ['src/**/*.test.ts'];
+// Five runtimes run at once on a small CI runner next to the other packages' tests; the default 5 s
+// timed out on the largest envelope test. Same assertions, only more time.
+const TIMEOUT = 30_000;
 
 export default defineConfig({
   test: {
@@ -20,6 +23,7 @@ export default defineConfig({
           name: 'node',
           environment: 'node',
           include: INCLUDE,
+          testTimeout: TIMEOUT,
           provide: { typesRuntime: 'node' },
         },
       },
@@ -27,6 +31,7 @@ export default defineConfig({
         test: {
           name: 'browser',
           include: INCLUDE,
+          testTimeout: TIMEOUT,
           browser: {
             enabled: true,
             provider: playwright(),
@@ -55,6 +60,7 @@ export default defineConfig({
         test: {
           name: 'workers',
           include: INCLUDE,
+          testTimeout: TIMEOUT,
           provide: { typesRuntime: 'workerd' },
         },
       },
