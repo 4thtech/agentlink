@@ -729,11 +729,13 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/generators/
 - **Depends on:** M0-9
-- **Spec:** 04 §2.1, §2.3, §3.1, §3.3, §3.6, §4, §5, §8.2; 05 §3.1, §4, §8; `development-process.md` §9.1
+- **Spec:** 04 §2.1, §2.3, §2.4, §2.4.1, §2.5.1, §2.8, §3.1, §3.3, §3.6, §4, §5, §8.2; 05 §3.1, §4, §8; `development-process.md` §9.1
 - **Invariants:** I-6, I-8
 - **Scope:**
   - Written by a session that does not implement the TypeScript code. Generators use independent implementations (e.g. Python `cryptography`, a reference BIP-340, RFC 9180 reference vectors, an RFC 8785 reference, `eth-account`/`eth-abi` or `cast` for EIP-712).
-  - Suites (M1a, what Talk needs): HKDF derivation per 04 §2.1 (labels × epochs 0–2), BIP-340 tagged-hash envelope signatures, BIP-340 tagged-hash owner-action signatures (`agentlink/owner-action/v1`, 04 §2.5.1, G-29) with rejection vectors for every non-canonical form (checksummed or uppercase address, uppercase hex, padded base64url, out-of-range integer, unknown key), HPKE CEK wrap (fixed ephemeral keys), payload AEAD + AAD, envelope hash via JCS, pairing HMAC, safety code, owner-seed wrap (Argon2id passphrase path), file KeyStore `ALKS` v1 for both secret kinds (D-54, 04 §2.8), EIP-712 domain separator / struct hash / digest for `AgentCard` (chain-agnostic domain).
+  - Suites (M1a, what Talk needs): HKDF derivation per 04 §2.1 (labels × epochs 0–2), BIP-340 tagged-hash envelope signatures, BIP-340 tagged-hash owner-action signatures (`agentlink/owner-action/v1`, 04 §2.5.1, G-29) with rejection vectors for every non-canonical form (checksummed or uppercase address, uppercase hex, padded base64url, out-of-range integer, unknown key), HPKE CEK wrap (fixed ephemeral keys), payload AEAD + AAD, envelope hash via JCS, pairing HMAC (with `proofKey` = HKDF label `agentlink/v1/pairing-proof` and the byte-exact input of 04 §3.6), safety code, owner-seed wrap `ALKO` v1 for both secret kinds plus the `ALKO`/`ALKS` cross-type failures, file KeyStore `ALKS` v1 for both secret kinds (D-54, 04 §2.8), the `password()` rule (kind 1 as the 15 decoded bytes, with accepted spellings and refusals; kind 2 with fatal UTF-8 and control-character refusals), EIP-712 domain separator / struct hash / digest for `AgentCard` (chain-agnostic domain) with `cardSig` reject vectors (high `s`, `v` ∈ {0, 1}).
+  - Encoding suite (04 §2.4.1): accept and reject vectors per table row, including the integer tokens `1.0`, `1e3`, `-0` and `9007199254740991.4`; the cross-class cases (card `ownerNostr` against OwnerAction `owner`, `0x` on a bare field and the reverse); and a `proof` body with a base64url `recordId` or `salt` (rejected).
+  - Relay URL schema (04 §4): accept and reject cases for the raw-string grammar, including percent-encoding, full-width characters, U+3002, numeric labels in each base, the denied names and a trailing dot.
   - Proof-layer suites (STREAM, PRF wrap, `Record`, `Receipt`, `Registration`) are M1-1i (M1b).
   - These are the **canonical** vectors; the contracts repo checks parity against a pinned commit (D-19).
   - Vectors that depend on open gap G-28 are added only after it is resolved.
@@ -865,7 +867,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Invariants:** I-1, I-4
 - **Scope:**
   - Owner passphrase wrapping of the owner seed for local storage only: Argon2id (m = 64 MiB, t = 3, p = 1), AES-256-GCM (the M1a owner-presence minimum, D-33).
-  - Pairing proof HMAC-SHA256(secret, "agentlink-handshake" ‖ inviteId ‖ SHA-256(JCS(B card))); safety code per 04 §3.6 with the encoding fixed by G-28.
+  - Pairing proof HMAC-SHA256(proofKey, "agentlink-handshake" ‖ inviteId ‖ SHA-256(JCS(B card))), with `proofKey` = HKDF-SHA256(secret, "", "agentlink/v1/pairing-proof") and the byte-exact input of 04 §3.6; safety code per 04 §3.6 with the encoding fixed by G-28.
   - Versioned wrapped-blob format (alg, params, salt, nonce), shared with M1-1k.
   - Owner passphrase wrap pins HKDF label `agentlink/v1/owner-passphrase-wrap` and file magic `ALKO` (D-54, 04 §2.8), with a `secretKind` header byte (1 = generated owner code, 2 = chosen passphrase) covered by the AAD and the same normalisation by kind as `ALKS` (04 §2.8); vectors for both kinds (M1-1h).
   - File KeyStore seal/open for `ALKS` v1 (D-54, 04 §2.8): Argon2id with the header's parameters (floor and cap checked before the KDF runs), HKDF label `agentlink/v1/keystore-file`, AES-256-GCM with the whole header (including `secretKind` and `agentId`) as AAD; entry parser with the 04 §2.8 refusals; entries as `Uint8Array`; 120-bit code generation (15 CSPRNG bytes, RFC 4648 base32) and normalisation by `secretKind`.
@@ -960,7 +962,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · src/OCCFeeVault.sol, test/unit
 - **Depends on:** M1-3a; gap G-39 resolved (PR #11, pending owner)
-- **Spec:** 05 §2.1–§2.6, §5, §6, §7
+- **Spec:** 05 §2.1–§2.6, §5, §5.2, §6, §7
 - **Invariants:** I-10
 - **Scope:**
   - Credits: `deposit`, `depositFor` (native + allowlisted ERC-20 via SafeERC20, measured balance delta), `withdraw` (works while paused), `creditsOf`, `minDeposit`.
@@ -968,8 +970,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Apps: `registerApp` (appId = keccak256(abi.encode(integrator, keccak256(bytes(name))))), `setIntegratorFee`, `setIntegrator` (appId unchanged), `setAppActive`; appId 0 = no integrator.
   - Treasury: permissionless `sweep` via `call`; `withdrawIntegrator`; treasury change with 7-day delay; pause blocks charges and deposits only, never `withdraw`, `sweep` or `withdrawIntegrator` (05 §5.1, G-39); CEI + `nonReentrant` on every value transfer.
   - Out: `depositWithAuthorization` (M1-3c).
+  - Initial configuration in the initializer (IR-M1-3a-1 M-1): the vault initializer takes the treasury, allowed tokens, fees and caps, `minDeposit`, the integrator multiple and the initial modules (the Notary at its CREATE3-predicted address), so the configuration is atomic with the proxy deployment. The deployer never needs a role, and no later transaction has to run inside a window where it still holds `ADMIN_ROLE` (M1-3g).
+  - Events and names as in 05 §5.2 and §6 (proposed, IR-M1-3a-1): add `Paused`/`Unpaused` to the shared base, rename the error `Paused()` to `EnforcedPause()` in the interfaces (it also reverts `pause` while paused; `unpause` while not paused reverts the new `ExpectedPause()`, with no event on a revert), add `MultipleAboveMax()` for `setIntegratorFeeCapMultiple` above `MAX_MULTIPLE`, and add `TreasuryChanged`, `MinDepositSet`, `IntegratorFeeCapMultipleSet`, `IntegratorChanged` and `IntegratorWithdrawn`. If M1-3a has not merged yet, this is a fix-up commit to it.
+  - Open Low (IR-M1-3a-1 L-3): make `_authorizeUpgrade` non-virtual in `OCCManaged` and offer an empty `_beforeUpgrade` hook, so a derived contract cannot drop the role check by not calling `super`. Skip if M1-3a already fixed it.
 - **Acceptance:**
   - Tests first (failing-test commit precedes implementation); a unit test for every function and every applicable revert in 05 §7.
+  - Role tests run against the real contract (IR-M1-3a-1 M-2): switch `RoleFixture._deploy` from the `VaultHarness` stub to `OCCFeeVault`, so the `RoleMap` end-to-end check (outsiders refused) and `RoleBound` cover shipping code. Add a test that every non-view selector in the concrete ABI is either in `docs/roles.md` or callable by an outsider without `AccessManagedUnauthorized`.
+  - A test per event in 05 §6 checks its name, indexed fields and emitting function, including `TreasuryChanged` on `setTreasury` and `IntegratorWithdrawn` on `withdrawIntegrator`.
   - No restricted selector can reduce `credits[payer][token]` (test enumerates all selectors).
   - Withdraw succeeds while paused; fee-on-transfer and reentrant token/receiver mocks cannot over-credit or re-enter.
   - Withdraw of credits in a token that was removed from the allowlist succeeds (05 §2.2, 12 §3.2).
@@ -990,15 +997,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · src/OCCNotary.sol, test/unit
 - **Depends on:** M1-3a (uses `IOCCFeeVault` with a mock until M1-3b lands), M1-1i; gap G-4 resolved
-- **Spec:** 05 §3.1–§3.4, §5 (freeze), §6, §7; 04 §5
+- **Spec:** 05 §3.1–§3.4, §5 (freeze), §5.2, §6, §7; 04 §5
 - **Invariants:** I-6
 - **Scope:**
   - EIP-712 `Record`/`Receipt`; `notarize`, `notarizeBatch` (semantics per G-4), `notarizeDirect` (payable; `msg.sender == r.signer`; `depositFromModule` then `charge`), `acknowledge`, `acknowledgeBatch`, `getRecord`, `computeRecordId`.
   - recordId = keccak256(abi.encode(block.chainid, address(this), signer, nonce)) (also the single-use nonce); `RecordState` packed into 5 slots incl. `recordStructHash`; receipt flags; ACCEPTED/REJECTED exclusive; commitment check `keccak256(abi.encode(rc.signer, rc.salt)) == recipientCommitment`.
   - `SignatureChecker.isValidSignatureNow` (EOA + ERC-1271); deadlines; pause; one-way `freezeUpgrades()`.
   - CI parity job: EIP-712 hashes equal the canonical public vectors at the pinned commit.
+  - Open Low (IR-M1-3a-1 L-3): the Notary's freeze goes through a `_beforeUpgrade` hook, not an override of `_authorizeUpgrade` (see M1-3b), so the role check stays in the base.
 - **Acceptance:**
-  - Tests first; unit test for every function and revert (`Expired`, `InvalidSignature`, `RecordExists`, `RecordNotFound`, `ReceiptExists`, `ConflictingReceipt`, `NotRecipient`, `NotSigner`, `FeeAboveMax`, `Paused`, `UpgradesAreFrozen`).
+  - Tests first; unit test for every function and revert (`Expired`, `InvalidSignature`, `RecordExists`, `RecordNotFound`, `ReceiptExists`, `ConflictingReceipt`, `NotRecipient`, `NotSigner`, `FeeAboveMax`, `EnforcedPause`, `ExpectedPause`, `UpgradesAreFrozen`).
+  - Role tests run against the real contract (IR-M1-3a-1 M-2): switch `RoleFixture._deploy` from the `NotaryHarness` stub to `OCCNotary`, so `RoleMap` and `RoleBound` (including `freezeUpgrades` → `FREEZER`, `pause`/`unpause`, `upgradeToAndCall`) cover shipping code; the "every non-view selector is in `docs/roles.md` or callable by an outsider" test from M1-3b covers the Notary too.
   - Gas snapshots meet 05 §3.4: `notarize` (credits, EOA) ≤ 160k, `acknowledge` ≤ 75k, `notarizeBatch` per item (n = 20) ≤ 120k; CI fails on regression.
   - A test recomputes `recordStructHash` from a full `Record` and matches `getRecord` (verification without logs).
   - Cross-chain, cross-contract and high-s signature replays rejected.
@@ -1014,6 +1023,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Fuzz: signatures, fee/cap/multiple arithmetic, credits.
   - ERC-1271 signers: Safe-style (threshold owners) and passkey-style (P-256/WebAuthn) smart-account mocks, including invalid and reverting `isValidSignature`.
   - Slither and Aderyn: clean, or each finding justified in `audits/static-analysis.md`.
+  - Open Low and Info (IR-M1-3a-1 L-4, I-1): `OCCRoleSetup` is S2 and contains assembly but is skipped by Slither (`--skip ./script/**`) and Aderyn (`src/` only), so move it to `src/libraries/` (scripts can still import it). Anchor the CI path filter as `(^|/)(lib|test|script)/`, so a future `src/lib/` is not hidden.
 - **Acceptance:**
   - Invariant suite runs in `contracts-gate` with the CI fuzz profile and nightly with a deep profile (runs/depth recorded).
   - ERC-1271 record and receipt paths pass; every static-analysis finding has a disposition.
@@ -1041,7 +1051,9 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Foundry script: implementations and UUPS proxies via CreateX CREATE3 with deploy-and-initialise in one call; salt scheme per G-8; per-chain config (fee tokens with EIP-3009 flags, fees, caps, min deposits, treasury Safe, role holders, delays).
   - In the same script: all roles granted to the testnet Safe and the testnet ops key per 05 §5.1 (mainnet layout, scaled delays), Notary registered as vault module, every deployer role revoked. Mainnet variant (M3-2c): contracts initialised paused until the grant and target admin delays are in effect.
-  - Post-deploy check script (in CI): deployer holds no role; delays equal `docs/roles.md`; addresses identical on both chains.
+  - No deployer-only window (IR-M1-3a-1 M-1). Until `OCCRoleSetup.configure` runs, every selector is unmapped and defaults to `ADMIN_ROLE`, so the deployer would hold 0-delay `upgradeToAndCall`, `setTreasury` and `registerModule` on live proxies. The vault's initial configuration therefore goes in its initializer (M1-3b), and the script either (a) does manager deployment, proxies, initialisation and `OCCRoleSetup` in one transaction through a one-shot deployer contract, or (b) calls `configure` against the CREATE3-predicted proxy addresses before deploying the proxies. The Notary is registered as a module through the initializer, not by a later call.
+  - Post-deploy check script (in CI): deployer holds no role; delays equal `docs/roles.md`; addresses identical on both chains; the ERC-1967 implementation slot of each proxy equals the expected implementation; `authority()`, `paused()` and the vault configuration read back as configured.
+  - Open Lows (IR-M1-3a-1 L-1, L-2, I-2): `OCCRoleSetup.calls` checks the mainnet delay floor itself (make it `view` and call `checkDelays` first), not only `configure`; on a mainnet `configure` reverts unless the vault, the Notary (and the Registry, if set) report `paused()` true, with a test; on a mainnet it requires exactly two ops keys (05 §5.1).
   - Deploy runs from CI in the private repo, triggered manually by the owner (Free plan: no environment protection); testnet-only key, low balance. Agents never broadcast from a workstation.
   - Resolved (D-11, D-19): no explorer or Sourcify source verification on testnets; the source stays private until mainnet verification (M3-6). Testnet deploys publish ABIs and addresses only (`release-and-deployment.md` §4.2).
 - **Acceptance:**
@@ -1265,7 +1277,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-1, I-4, I-5
 - **Scope:**
   - Invite `{v, inviteId, secret, card, cardSig, name, relays, expiresAt}` → base64url(deflate) → `https://<invite-host>/i#<payload>`; accept from the full URL or the bare payload; default expiry 7 days.
-  - A stores `{inviteId, sha256(secret), expiresAt, used}`. B verifies `cardSig` and expiry, applies `contacts.acceptInvites` (default `approval` → `pending_approval`), then sends `handshake` with the HMAC proof.
+  - A stores `{inviteId, proofKey, expiresAt, used}` (`proofKey` = HKDF of the secret, label `agentlink/v1/pairing-proof`, encrypted at rest; never the raw secret, 04 §3.6). B verifies `cardSig` and expiry, applies `contacts.acceptInvites` (default `approval` → `pending_approval`), then sends `handshake` with the HMAC proof.
   - Contact names (D-53, 06 §2.1 contact-name rule): the invite `label` is stored as A's suggested alias for B and shown restricted until A's owner confirms it (it is agent-written); B's owner types or confirms an alias on the pairing approval, prefilled with the restricted self-declared name. Only owner-set aliases are shown unrestricted. A shared `restrictName` helper exactly per 06 §2.1 (NFKC; only `[\p{L}\p{N} .'-]`; spaces collapsed; ≤ 32 code points; fallback "Contact" plus short owner fingerprint for empty, mixed-script or confusable names beyond UTS #39 moderately restrictive, or names containing a reserved label word) renders names quoted, followed by the identity label, with `nameSource`; the raw self-declared name is stored as untrusted data.
   - A accepts a `handshake` from an unknown sender only for an unused, unexpired invite; marks it used, adds B, replies `handshake-ack`. This processing runs in the background loop or on `agentlink_inbox`, never in a read-only status call (06 §2.0, §6). Both sides compute the safety code once the handshake is done; `createInvite` returns `{inviteUrl, ownerFingerprint, expiresAt}` and no safety code (it needs both sides' keys, 04 §3.6).
 - **Acceptance:**
