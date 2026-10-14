@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/bip340/case.schema.json",
+  "title": "bip340 case",
+  "description": "BIP-340. `sign`: secret key, aux_rand and message (hex) to the x-only public key and the 64-byte signature. `verify`: public key, message and signature (hex) to accept or reject; public keys that are not on the curve or not below the field size are rejected.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "secretKey",
+            "auxRand",
+            "message"
+          ],
+          "properties": {
+            "op": {
+              "const": "sign"
+            },
+            "secretKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "auxRand": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "message": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "publicKey",
+            "signature"
+          ],
+          "properties": {
+            "publicKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "signature": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{128}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "publicKey",
+            "message",
+            "signature"
+          ],
+          "properties": {
+            "op": {
+              "const": "verify"
+            },
+            "publicKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "message": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "signature": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{128}$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

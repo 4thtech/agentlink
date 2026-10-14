@@ -12,7 +12,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkCoverage, diffSnapshots, REQUIRED_RUNTIMES } from './rules.mjs';
+import { checkCoverage, diffSnapshots, pendingSuites, REQUIRED_RUNTIMES } from './rules.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const vectorsDir = join(root, 'test-vectors');
@@ -98,9 +98,28 @@ for (const runtime of REQUIRED_RUNTIMES) {
 const total = suites.reduce((n, s) => n + (s.caseIds?.length ?? 0), 0);
 console.log(`  ${String(suites.length)} suite(s), ${String(total)} case(s) per runtime`);
 
+// Suites whose vectors are committed before their code (M1-1h). Reported, never counted as passed.
+const pending = pendingSuites(report);
+if (pending.size > 0) {
+  console.log('\nvectors:check pending suites (vectors committed, code not yet implemented)');
+  for (const [suite, card] of pending) {
+    const count = suites.find((s) => s.suite === suite)?.caseIds?.length ?? 0;
+    console.log(`  ${suite.padEnd(16)} ${String(count)} case(s), not run: ${card}`);
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      console.log(
+        `::notice title=vectors pending::${suite} (${String(count)} cases) waits for ${card}`,
+      );
+    }
+  }
+}
+
 if (problems.length > 0) {
   console.error('\nvectors:check FAILED');
   for (const problem of problems) console.error(`  - ${problem}`);
   process.exit(1);
 }
-console.log('\nvectors:check passed in every runtime; test-vectors/ unchanged.');
+console.log(
+  pending.size > 0
+    ? `\nvectors:check passed in every runtime (${String(pending.size)} suite(s) pending); test-vectors/ unchanged.`
+    : '\nvectors:check passed in every runtime; test-vectors/ unchanged.',
+);

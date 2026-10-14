@@ -1,0 +1,352 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/nip44/case.schema.json",
+  "title": "nip44 case",
+  "description": "NIP-44 v2, official vectors. Keys and nonces hex; plaintexts UTF-8 text; payloads base64.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "sec1",
+            "pub2"
+          ],
+          "properties": {
+            "op": {
+              "const": "conversationKey"
+            },
+            "sec1": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "pub2": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "conversationKey"
+              ],
+              "properties": {
+                "conversationKey": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "conversationKey",
+            "nonce"
+          ],
+          "properties": {
+            "op": {
+              "const": "messageKeys"
+            },
+            "conversationKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "nonce": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chachaKey",
+            "chachaNonce",
+            "hmacKey"
+          ],
+          "properties": {
+            "chachaKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "chachaNonce": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{24}$"
+            },
+            "hmacKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "length"
+          ],
+          "properties": {
+            "op": {
+              "const": "paddedLength"
+            },
+            "length": {
+              "type": "integer"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "paddedLength"
+          ],
+          "properties": {
+            "paddedLength": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "conversationKey",
+            "nonce",
+            "plaintext"
+          ],
+          "properties": {
+            "op": {
+              "const": "encrypt"
+            },
+            "conversationKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "nonce": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "plaintext": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "payload"
+          ],
+          "properties": {
+            "payload": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "conversationKey",
+            "payload"
+          ],
+          "properties": {
+            "op": {
+              "const": "decrypt"
+            },
+            "conversationKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "payload": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "plaintext"
+              ],
+              "properties": {
+                "plaintext": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "conversationKey",
+            "nonce",
+            "pattern",
+            "repeat"
+          ],
+          "properties": {
+            "op": {
+              "const": "encryptLong"
+            },
+            "conversationKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "nonce": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "pattern": {
+              "type": "string"
+            },
+            "repeat": {
+              "type": "integer"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "plaintextSha256",
+            "payloadSha256"
+          ],
+          "properties": {
+            "plaintextSha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "payloadSha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "length"
+          ],
+          "properties": {
+            "op": {
+              "const": "encryptLength"
+            },
+            "length": {
+              "type": "integer"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "outcome"
+          ],
+          "properties": {
+            "outcome": {
+              "const": "reject"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

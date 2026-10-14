@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkCoverage, diffSnapshots, REQUIRED_RUNTIMES } from './rules.mjs';
+import { checkCoverage, diffSnapshots, pendingSuites, REQUIRED_RUNTIMES } from './rules.mjs';
 
 const suites = [{ suite: 'placeholder-sha256', caseIds: ['a', 'b'] }];
 
@@ -96,6 +96,60 @@ describe('checkCoverage', () => {
     const problems = checkCoverage(fullReport(), more);
     expect(problems).toHaveLength(REQUIRED_RUNTIMES.length);
     expect(problems[0]).toBe('node: placeholder-sha256: no passing result for c');
+  });
+});
+
+describe('pending suites (M1-1h)', () => {
+  const withPending = [...suites, { suite: 'hpke', caseIds: ['x', 'y'] }];
+
+  /** fullReport plus a pending marker for `hpke` in the given runtimes. */
+  function pendingReport(runtimes = REQUIRED_RUNTIMES, status = 'passed') {
+    const report = fullReport();
+    for (const file of report.testResults) {
+      const runtime = file.assertionResults[0].meta.vectors.runtime;
+      if (!runtimes.includes(runtime)) continue;
+      file.assertionResults.push(
+        assertion({ kind: 'pending', runtime, suite: 'hpke', detail: 'M1-1c' }, status),
+      );
+    }
+    return report;
+  }
+
+  it('accepts a suite that every runtime reported as pending, and lists it', () => {
+    const report = pendingReport();
+    expect(checkCoverage(report, withPending)).toEqual([]);
+    expect(pendingSuites(report)).toEqual(new Map([['hpke', 'M1-1c']]));
+  });
+
+  it('requires every case in a runtime that did not report the suite as pending', () => {
+    const report = pendingReport(['node', 'chromium', 'firefox', 'webkit']);
+    expect(checkCoverage(report, withPending)).toEqual([
+      'workerd: hpke: no passing result for x, y',
+    ]);
+    expect(pendingSuites(report)).toEqual(new Map());
+  });
+
+  it('fails closed when the pending marker failed (the suite has a module)', () => {
+    const report = pendingReport(REQUIRED_RUNTIMES, 'failed');
+    const problems = checkCoverage(report, withPending);
+    expect(problems).toHaveLength(REQUIRED_RUNTIMES.length);
+    expect(problems[0]).toBe('node: hpke: no passing result for x, y');
+  });
+
+  it('fails a suite that reports pending and also ran cases', () => {
+    const report = pendingReport();
+    report.testResults[0].assertionResults.push(
+      assertion({ kind: 'case', runtime: 'node', suite: 'hpke', caseId: 'x' }),
+    );
+    expect(checkCoverage(report, withPending)).toEqual(['hpke: reported as pending but ran cases']);
+  });
+
+  it('does not let a pending marker for one suite excuse another', () => {
+    const report = pendingReport();
+    report.testResults[2].assertionResults.splice(1, 1);
+    expect(checkCoverage(report, withPending)).toEqual([
+      'firefox: placeholder-sha256: no passing result for a',
+    ]);
   });
 });
 

@@ -1,0 +1,240 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "tagged-hash",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib)",
+    "version": "cpython 3.12.13",
+    "script": "tools/vectors/generate_tagged_hash.py"
+  },
+  "cases": [
+    {
+      "id": "envelope-empty",
+      "source": "BIP-340 tagged hash; 04 \u00a73.1 envelope signature tag",
+      "input": {
+        "op": "taggedHash",
+        "tag": "agentlink/envelope/v1",
+        "message": ""
+      },
+      "expected": {
+        "hash": "798332f059dbbf7a6e4844d5da0ea85b761323505daa505a65ada2811deeb236"
+      }
+    },
+    {
+      "id": "envelope-zero32",
+      "source": "BIP-340 tagged hash; 04 \u00a73.1 envelope signature tag",
+      "input": {
+        "op": "taggedHash",
+        "tag": "agentlink/envelope/v1",
+        "message": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "expected": {
+        "hash": "d2961dec780d66fe7fe9e45ee110a42e8ec700a2f1e7350a7e9ec7893011f5ca"
+      }
+    },
+    {
+      "id": "envelope-hash32",
+      "source": "BIP-340 tagged hash; 04 \u00a73.1 envelope signature tag",
+      "input": {
+        "op": "taggedHash",
+        "tag": "agentlink/envelope/v1",
+        "message": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+      },
+      "expected": {
+        "hash": "e81b98dd0ebe8945f7f5ecda128c830edd2b35fcd68dc7f28d58300ee2a88e65"
+      }
+    },
+    {
+      "id": "envelope-bytes33",
+      "source": "BIP-340 tagged hash; 04 \u00a73.1 envelope signature tag",
+      "input": {
+        "op": "taggedHash",
+        "tag": "agentlink/envelope/v1",
+        "message": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+      },
+      "expected": {
+        "hash": "42b7834bc5af472c1c96985c8974e82a7e6c58e89b2194968f11919f68799c57"
+      }
+    },
+    {
+      "id": "owner-action-empty",
+      "source": "BIP-340 tagged hash; 04 \u00a72.5.1 owner-action signature tag",
+      "input": {
+        "op": "taggedHash",
+        "tag": "agentlink/owner-action/v1",
+        "message": ""
+      },
+      "expected": {
+        "hash": "952f45bc8584bc315372c52e07919438ea37c62343d4beb0b47010ad6a532f82"
+      }
+    },
+    {
+      "id": "owner-action-zero32",
+      "source": "BIP-340 tagged hash; 04 \u00a72.5.1 owner-action signature tag",
+      "input": {
+        "op": "taggedHash",
+        "tag": "agentlink/owner-action/v1",
+        "message": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "expected": {
+        "hash": "6997f54dc963e8abf79f243f83035969677ba280bc4eaee9b2e4a3c380d16d6c"
+      }
+    },
+    {
+      "id": "owner-action-hash32",
+      "source": "BIP-340 tagged hash; 04 \u00a72.5.1 owner-action signature tag",
+      "input": {
+        "op": "taggedHash",
+        "tag": "agentlink/owner-action/v1",
+        "message": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+      },
+      "expected": {
+        "hash": "b4c4e21aa0be148556dd3578616f7f10f34ad1c5628a1c53118a95e186174520"
+      }
+    },
+    {
+      "id": "owner-action-bytes33",
+      "source": "BIP-340 tagged hash; 04 \u00a72.5.1 owner-action signature tag",
+      "input": {
+        "op": "taggedHash",
+        "tag": "agentlink/owner-action/v1",
+        "message": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+      },
+      "expected": {
+        "hash": "3dffeb5de5d6852ae127804237601e8a30bbcc25609066e1ea368cd4636b8b8f"
+      }
+    },
+    {
+      "id": "bip340-challenge-empty",
+      "source": "BIP-340 tagged hash; BIP-340 challenge tag",
+      "input": {
+        "op": "taggedHash",
+        "tag": "BIP0340/challenge",
+        "message": ""
+      },
+      "expected": {
+        "hash": "c216d352f5818b7b4beacd4ae0a26fe888080823d2a598856661bcd54f1b3713"
+      }
+    },
+    {
+      "id": "bip340-challenge-zero32",
+      "source": "BIP-340 tagged hash; BIP-340 challenge tag",
+      "input": {
+        "op": "taggedHash",
+        "tag": "BIP0340/challenge",
+        "message": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "expected": {
+        "hash": "a50885aadef94ee57e5537e27ef82d4db7c756193539d3d8d0bb6ee5f3a7ad46"
+      }
+    },
+    {
+      "id": "bip340-challenge-hash32",
+      "source": "BIP-340 tagged hash; BIP-340 challenge tag",
+      "input": {
+        "op": "taggedHash",
+        "tag": "BIP0340/challenge",
+        "message": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+      },
+      "expected": {
+        "hash": "2822a3645e9b35f1931b43777563fa9777cd14a0546c20a642cdeb565c2d3b3e"
+      }
+    },
+    {
+      "id": "bip340-challenge-bytes33",
+      "source": "BIP-340 tagged hash; BIP-340 challenge tag",
+      "input": {
+        "op": "taggedHash",
+        "tag": "BIP0340/challenge",
+        "message": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+      },
+      "expected": {
+        "hash": "321c222665c6f706d17d202a27b4c6b1a4b9bea5c80ab8dd3d61d6873c367390"
+      }
+    },
+    {
+      "id": "bip340-aux-empty",
+      "source": "BIP-340 tagged hash; BIP-340 aux tag",
+      "input": {
+        "op": "taggedHash",
+        "tag": "BIP0340/aux",
+        "message": ""
+      },
+      "expected": {
+        "hash": "07fab5f97e680abb8389d1fa164281e124439468f5bd699fcbd1ae86e6405d69"
+      }
+    },
+    {
+      "id": "bip340-aux-zero32",
+      "source": "BIP-340 tagged hash; BIP-340 aux tag",
+      "input": {
+        "op": "taggedHash",
+        "tag": "BIP0340/aux",
+        "message": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "expected": {
+        "hash": "54f169cfc9e2e5727480441f90ba25c488f461c70b5ea5dcaaf7af69270aa514"
+      }
+    },
+    {
+      "id": "bip340-aux-hash32",
+      "source": "BIP-340 tagged hash; BIP-340 aux tag",
+      "input": {
+        "op": "taggedHash",
+        "tag": "BIP0340/aux",
+        "message": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+      },
+      "expected": {
+        "hash": "224cfe62e6100b5e10c7645a2723a9355c35e6365d624501999636b6b64ae335"
+      }
+    },
+    {
+      "id": "bip340-aux-bytes33",
+      "source": "BIP-340 tagged hash; BIP-340 aux tag",
+      "input": {
+        "op": "taggedHash",
+        "tag": "BIP0340/aux",
+        "message": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+      },
+      "expected": {
+        "hash": "f826e75a1d41fb738b9735713c02202b9b82df9f424c16b28209b60807a1470a"
+      }
+    },
+    {
+      "id": "envelope-tag-uppercase",
+      "source": "BIP-340 tagged hash; the tag is hashed as UTF-8 bytes exactly",
+      "input": {
+        "op": "taggedHash",
+        "tag": "AGENTLINK/ENVELOPE/V1",
+        "message": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+      },
+      "expected": {
+        "hash": "4161ac26337dca78e38590ad88827080ccc7b98611d24149233703df01c9466f"
+      }
+    },
+    {
+      "id": "envelope-tag-v2",
+      "source": "BIP-340 tagged hash; the tag is hashed as UTF-8 bytes exactly",
+      "input": {
+        "op": "taggedHash",
+        "tag": "agentlink/envelope/v2",
+        "message": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+      },
+      "expected": {
+        "hash": "f105441bdd736104f44dc41b983bb89bb54ac7ea4b765575f6cb99155e08196c"
+      }
+    },
+    {
+      "id": "non-ascii-tag",
+      "source": "BIP-340 tagged hash; the tag is hashed as UTF-8 bytes exactly",
+      "input": {
+        "op": "taggedHash",
+        "tag": "agentlink/\u00e9/v1",
+        "message": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+      },
+      "expected": {
+        "hash": "e26fd08a3c063bb23d9176558977a026751c55dc896777f203c812efe23456ff"
+      }
+    }
+  ]
+}

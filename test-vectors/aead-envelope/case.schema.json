@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/aead-envelope/case.schema.json",
+  "title": "aead-envelope case",
+  "description": "04 \u00a73.1 envelope. `envelopeHash`, `aad`: hashes of the given envelope. `encryptPayload`: AAD and base64url ct||tag for header, CEK, IV and plaintext. `decryptPayload`: plaintext or rejection. `sign`: envelopeHash, tagged signature input and sig. `verify`: accept or reject.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "envelope"
+          ],
+          "properties": {
+            "op": {
+              "const": "envelopeHash"
+            },
+            "envelope": {
+              "type": "object"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "envelopeHash"
+          ],
+          "properties": {
+            "envelopeHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "envelope"
+          ],
+          "properties": {
+            "op": {
+              "const": "aad"
+            },
+            "envelope": {
+              "type": "object"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "aad"
+          ],
+          "properties": {
+            "aad": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "header",
+            "cek",
+            "iv",
+            "plaintext"
+          ],
+          "properties": {
+            "op": {
+              "const": "encryptPayload"
+            },
+            "header": {
+              "type": "object"
+            },
+            "cek": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "iv": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "plaintext": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "aad",
+            "ct"
+          ],
+          "properties": {
+            "aad": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "ct": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "envelope",
+            "cek"
+          ],
+          "properties": {
+            "op": {
+              "const": "decryptPayload"
+            },
+            "envelope": {
+              "type": "object"
+            },
+            "cek": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "plaintext"
+              ],
+              "properties": {
+                "plaintext": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "envelope",
+            "secretKey",
+            "auxRand"
+          ],
+          "properties": {
+            "op": {
+              "const": "sign"
+            },
+            "envelope": {
+              "type": "object"
+            },
+            "secretKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "auxRand": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "envelopeHash",
+            "signatureInput",
+            "sig"
+          ],
+          "properties": {
+            "envelopeHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "signatureInput": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "sig": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{128}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "envelope"
+          ],
+          "properties": {
+            "op": {
+              "const": "verify"
+            },
+            "envelope": {
+              "type": "object"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

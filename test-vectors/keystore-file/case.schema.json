@@ -1,0 +1,287 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/keystore-file/case.schema.json",
+  "title": "keystore-file case",
+  "description": "04 \u00a72.8 ALKS v1. `kek`: key-encryption key. `seal`: the whole file as hex. `open`: entry names (comma-separated, in file order) and each value as `entry:<name>` hex, or a rejection. `normalise`: the normalised secret for its secretKind, or a rejection.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "secretKind",
+            "secret",
+            "salt",
+            "memoryKiB",
+            "iterations",
+            "parallelism"
+          ],
+          "properties": {
+            "op": {
+              "const": "kek"
+            },
+            "secretKind": {
+              "type": "integer"
+            },
+            "secret": {
+              "type": "string"
+            },
+            "salt": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "memoryKiB": {
+              "type": "integer"
+            },
+            "iterations": {
+              "type": "integer"
+            },
+            "parallelism": {
+              "type": "integer"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kek"
+          ],
+          "properties": {
+            "kek": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "secretKind",
+            "secret",
+            "salt",
+            "memoryKiB",
+            "iterations",
+            "parallelism",
+            "nonce",
+            "agentId",
+            "entries"
+          ],
+          "properties": {
+            "op": {
+              "const": "seal"
+            },
+            "secretKind": {
+              "type": "integer"
+            },
+            "secret": {
+              "type": "string"
+            },
+            "salt": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "memoryKiB": {
+              "type": "integer"
+            },
+            "iterations": {
+              "type": "integer"
+            },
+            "parallelism": {
+              "type": "integer"
+            },
+            "nonce": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{24}$"
+            },
+            "agentId": {
+              "type": "string"
+            },
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "value"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string",
+                    "pattern": "^([0-9a-f]{2})*$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "file"
+          ],
+          "properties": {
+            "file": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "file",
+            "secret",
+            "expectedAgentId"
+          ],
+          "properties": {
+            "op": {
+              "const": "open"
+            },
+            "file": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "secret": {
+              "type": "string"
+            },
+            "expectedAgentId": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "entryNames"
+              ],
+              "properties": {
+                "entryNames": {
+                  "type": "string"
+                }
+              },
+              "patternProperties": {
+                "^entry:": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "secretKind",
+            "secret"
+          ],
+          "properties": {
+            "op": {
+              "const": "normalise"
+            },
+            "secretKind": {
+              "type": "integer"
+            },
+            "secret": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "normalised"
+              ],
+              "properties": {
+                "normalised": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

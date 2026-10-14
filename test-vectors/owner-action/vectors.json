@@ -1,0 +1,1175 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "owner-action",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib, coincurve 21.0.0, pycryptodome 3.23.0, rfc8785 0.1.4)",
+    "version": "cpython 3.12.13",
+    "script": "tools/vectors/generate_owner_action.py"
+  },
+  "cases": [
+    {
+      "id": "sign-revoke-compromised",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, op agent.revoke",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "agent.revoke",
+          "params": {
+            "reason": "compromised"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 0
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":0,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"agent.revoke\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"reason\":\"compromised\"},\"v\":1}",
+        "bodyHash": "6c3b48e83d962245da9bb7ed5626ffa2f6253f9c0f49a8c4da8b39fab5c09b66",
+        "signatureInput": "157d8cd88d834cf95f619ae9ed7beba38417c0147b8df75bb02558835b0a0573",
+        "sig": "eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a"
+      }
+    },
+    {
+      "id": "verify-revoke-compromised",
+      "source": "04 \u00a72.5.1 verification passes (agent.revoke skips expiry and lifetime checks)",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "sign-revoke-retired",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, op agent.revoke",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "agent.revoke",
+          "params": {
+            "reason": "retired"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 0
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":0,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"agent.revoke\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"reason\":\"retired\"},\"v\":1}",
+        "bodyHash": "34e12103b251686fec20359b5a3d38e60c8f8f01de3eb8064a5052868de4141d",
+        "signatureInput": "314b5a8e09380f5eaa6e939a762223d4a9035b1a0875f1f970a0f76f12a8ac4e",
+        "sig": "c9ccb83a82a307b0b08c112a3f12164aa2b6f812adcaadc357b71b7d9dc272d118cf07b5f652aec5e35f914c52a5ff74372567498d5a06654417b0fa0f75b3e6"
+      }
+    },
+    {
+      "id": "verify-revoke-retired",
+      "source": "04 \u00a72.5.1 verification passes (agent.revoke skips expiry and lifetime checks)",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "retired"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "c9ccb83a82a307b0b08c112a3f12164aa2b6f812adcaadc357b71b7d9dc272d118cf07b5f652aec5e35f914c52a5ff74372567498d5a06654417b0fa0f75b3e6"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "sign-revoke-other",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, op agent.revoke",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "agent.revoke",
+          "params": {
+            "reason": "other"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 0
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":0,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"agent.revoke\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"reason\":\"other\"},\"v\":1}",
+        "bodyHash": "15344c194c11e8f1553a06ccb4605fb24ea4f783621d54aeb44ceccca6aed729",
+        "signatureInput": "704d68a269c43c7ad4c7ff5c738dc9536ea532d759d3ee773d738c204508ee9b",
+        "sig": "573301c2ae87d00e12cbb71d82c6e5f916f9002fc054634634e6658db9acb820fcaf63b1a7c8edc266be03d41b31440e986205da415f27c938c9cd8ea6544e02"
+      }
+    },
+    {
+      "id": "verify-revoke-other",
+      "source": "04 \u00a72.5.1 verification passes (agent.revoke skips expiry and lifetime checks)",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "other"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "573301c2ae87d00e12cbb71d82c6e5f916f9002fc054634634e6658db9acb820fcaf63b1a7c8edc266be03d41b31440e986205da415f27c938c9cd8ea6544e02"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "reject-agent-checksummed",
+      "source": "04 \u00a72.5.1: `agent` in EIP-55 mixed case; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701A34563f0EE406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "f607ea724ba63c5a5468f13eb8553fe2215c229d3e5f8a1ecfe8bfd14bbe342b6ec369646856fd7e274a3cd5addeaafba38943f8e556269a1d9168e375fed9db"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-agent-uppercase-hex",
+      "source": "04 \u00a72.5.1: `agent` hex digits in upper case; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7B92AFB3701A34563F0EE406F285FA7731E8F415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "569f7b0a348b42cecf96a00c1942cc89b5bdb005cb929581210d921b0a3bfab90af472d15828ac3580f03ec7a72ab06ca132f6a4dca802999a407d06e9392696"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-agent-uppercase-prefix",
+      "source": "04 \u00a72.5.1: `agent` with a 0X prefix; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0X7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "839bef4af0db9babb0c7b6db12f3987688dff5cb6d7c05dc11f4c45b05ea806ca3f09eb651619a909f6d375d0152153f0cd5e1bd8c2cb93f7de671c0ae33a0ca"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-agent-no-prefix",
+      "source": "04 \u00a72.5.1: `agent` without 0x; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "2e2400e22c25992b64aa887765c41acdd17b616e3c921c8a083180167a27633195abd0a11f40194b0067fad9885b0eb9e728e419bbe0b9928964491562393b14"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-agent-short",
+      "source": "04 \u00a72.5.1: `agent` with 39 hex digits; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f41",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "982d0bbf88c6de6f3f100e541ffd44886d8040edc80e95525ac621885be11466c21b8d43d264bc416354ef3842adad5fade7e10bb0ae69c703f57bd2048f27d8"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-owner-uppercase-hex",
+      "source": "04 \u00a72.5.1: `owner` hex digits in upper case; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241D788931FF6CA35F3F03DE0AADDF05044016ED3B4DF91E626DD537A6352FC0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "708e4048667de84305e931921a44fb359fc4f9da0295a71be41737685aa38fe5f5e7afc2c31fcb925b8887e4358cb82eef4356226c66343c22da81efcf718a13"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-owner-0x-prefix",
+      "source": "04 \u00a72.5.1: `owner` with a 0x prefix; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "a5109b1fca8a9b5ef60d556c5654ce2cf95b23aa982d03104d41164174c547439e9b5c2d80319879bc1b66fcf3ec40baac351a218844d57dfbc520b61de058ba"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-sig-uppercase-hex",
+      "source": "04 \u00a72.5.1: `sig` hex digits in upper case (the signature is otherwise valid); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "EEEAE1616990A86F96C65F64A0950393E59526B087DCD653D046E8DA3FF290D89C78A8F25050C8E8121A8B4A420391BFF3190E3A913AFC1B39A1F4A8EF63698A"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-sig-short",
+      "source": "04 \u00a72.5.1: `sig` of 127 hex digits; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-nonce-padded",
+      "source": "04 \u00a72.5.1: `nonce` base64url with padding; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g==",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "0e921edbfe0f151f1208d0de0b0c27a818ad820a0f002156a0efb82ddffa16e865d069e25e4f264da3b922cd2f4325e40859cc8783c1c1ba51bba3d77351b7f7"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-nonce-standard-alphabet",
+      "source": "04 \u00a72.5.1: `nonce` in the standard base64 alphabet ('+', '/'); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "+/8+DwD/EOD4/n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "96d590cf5ad43a378171e0e22a273a4100fd827bf3ff237536e5b3f0101904adb87aea1437e77a36ccc3affc2dbbb096f3723ea6d5de42f1249f00bac9d1a8a8"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-nonce-nonzero-trailing-bits",
+      "source": "04 \u00a72.5.1: `nonce` with non-zero trailing bits (decodes to the same 16 bytes); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7h",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "43807bf3312b6246efa695d0911dc74ecbda4407f26654490a11aa1c82cc085976fe64afd80ec6ccf293cd367d156c89e1dfe4f858cd705b5dbf603a59733784"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-nonce-15-bytes",
+      "source": "04 \u00a72.5.1: `nonce` of 15 bytes; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "c4339cdf28b97e0fb83bdf50f62e7a931452059d506378249e4009627c065a4b13f7b345f6b6a4ff0370871afa2f5a1101b0a1ed27010602af52f38db32ca95d"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-nonce-17-bytes",
+      "source": "04 \u00a72.5.1: `nonce` of 17 bytes; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7gA",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "b516b82a447cea51106e08ce9a2006efda47ff989dcafe92d8f5287f290ffab6342755f5b0fb6a834a7f92ee1138c6a154c87ccfd54b927946f3b70644e09261"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-issued-at-2-pow-53",
+      "source": "04 \u00a72.5.1: `issuedAt` = 2^53, outside [0, 2^53 - 1]; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 9007199254740992,
+            "expiresAt": 0
+          },
+          "sig": "66c1753a20fe794eecf5f2250dca5fbe8899a189f5505e2ce37499583e7385a720f79635438d0f2b7794ffb9dcfed1faeb5c1989d75b6e265e78c5f905b5aebf"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-issued-at-negative",
+      "source": "04 \u00a72.5.1: `issuedAt` = -1, outside [0, 2^53 - 1]; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": -1,
+            "expiresAt": 0
+          },
+          "sig": "1e887e6d3fa1fb1c0e21daf1b10aaf1da7dca0fdd0ba80317eee1131d7f44cbcfb267965df66c7ef3a3d98df5ba33677e37203de29ec3ba5b689b5477108a6b1"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-issued-at-fraction",
+      "source": "04 \u00a72.5.1: `issuedAt` not an integer; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000.5,
+            "expiresAt": 0
+          },
+          "sig": "1f155c11a8e775656ac69458e57a7a9780b7ac04d01fd44fcb4df042414bb7c1bbaa35e03d5705c699f8a6c71c436e46122d947cb317b8df3c968717a5ce8e35"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-issued-at-string",
+      "source": "04 \u00a72.5.1: `issuedAt` as a string; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": "1760000000",
+            "expiresAt": 0
+          },
+          "sig": "b7e4feeeaf8f29a99c6471ae05d66497684a13603976980ea9795b291db468361aa5744c5fe1888081de46a6f9a8117390e87c7147c9368ea46ebc4877148a9f"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-v-string",
+      "source": "04 \u00a72.5.1: `v` as a string; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": "1",
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "dd6a9855385a718a57565ff7263867e66b305e722da43b9649941776711cb962f872a3af8ea9f484ce3919d2aba2f7aec54a80938434f45c30fa94285a4a2926"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-v-2",
+      "source": "04 \u00a72.5.1: `v` other than 1; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 2,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "9da6bffd0e682ed9b04fe9fe8d66f21c3070ff5a807e8cf6cc2ef8188b4536519ac231e5b289385e15798162e0c25423af62e145c56a3b2956a4373099415d72"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-unknown-key-signed-owner-action",
+      "source": "04 \u00a72.5.1: unknown key in SignedOwnerAction; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a",
+          "note": "x"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-unknown-key-owner-action",
+      "source": "04 \u00a72.5.1: unknown key in OwnerAction; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "memo": "x"
+          },
+          "sig": "41091fccd78010e242edcae098d9fba28d1e514de6bd4d17e90bb06854c4263145a58df52b44fe7d27ec068bf478d81fa47570ec151e04df01f993023055d831"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-unknown-key-params",
+      "source": "04 \u00a72.5.1: unknown key in params; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised",
+              "detail": "x"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "ab602392b12c538aaa7d0eafb5596ab7618b0390afe4a27fe9fc3bc6450a55232c95160e397831ec1fbc70431582a952df48b1e408203ed2fd618904e3e012ac"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-missing-nonce",
+      "source": "04 \u00a72.5.1: required key `nonce` missing; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "8483a5bc9b36681d88347eb76a16ea69cfb7b80e3c8dec079b0acd2dd22b931521b03eda4954ae2cdeb5fc5193f50522c4eede3cfc0bff50278a17f5ef681e04"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-reason-free-text",
+      "source": "04 \u00a72.5.1: `reason` outside the fixed values; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "hacked"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "349c577556fecdd0d76d01765a95e5b8ad088bd5bb96f7accccab93a36b369afa5b9ba924e72a43a089281d9632bfd7338e681a7f774a43c892d4245bf824644"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-revoke-expiry-nonzero",
+      "source": "04 \u00a72.5.1: agent.revoke requires expiresAt = 0; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "2d932803115228851059ae80d09b60809b3323174ea7edaa1c3ca76496c780e226653c857238a3f5372ebd76142a061f99acbee485db501f4d3b6f4fe8d0e810"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-unknown-op",
+      "source": "04 \u00a72.5.1: unknown `op`; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.unrevoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "4df7975dc43dd31e5ea3d79c1a57a68cc4a3b4105ae096137e4f1d782b96b8f82c154d4cf54dc4de9366d6060cea18e283dddf221c768e5eedb3f342a8306b8f"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-wrong-agent",
+      "source": "04 \u00a72.5.1: `agent` is not this agent's EVM address; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "d76eae847ddcd02b169e402ef91a48d28c721677b88eff1c939bf61e4bd69d831e56105fd3258e9a13abf76261b4ca40f67e34042b4bdd56f5a1c299df3238ab"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-wrong-owner",
+      "source": "04 \u00a72.5.1: `owner` differs from ownerNostr in the agent's card; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "09644e38ef0c3834a05198194d892b26d988fd74d497be2f11a261975317acec",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "bb1c6a33fc897f3c04ffa85144f04ecdfc25991d23fd7e54fd19591f2a2551bb04cd2d41649a1cf596f23d1ec6cef4a19839676aa6b8ec574ad05cdb2fb89dde"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-other-signer",
+      "source": "04 \u00a72.5.1: signed by another key than `owner`; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "d0ba797e78d1ec6aa61f9c1daf2c2245971d4948701c479b953bdae316b992c407024c712911727ac6e910de76626efcacd53dec77bb16e9093137c1d96f95e0"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-envelope-tag",
+      "source": "04 \u00a72.5.1: signed under agentlink/envelope/v1; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "dc8cf5f7500d997240c6222b0ca5824dc80bac11e1ec4358f425afeec1a6d1c5a5878544c4695e560068969da915d737b4e0421abad9c0451f163148d30a8138"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-untagged",
+      "source": "04 \u00a72.5.1: signed over sha256(JCS(body)) without the tag; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "3c1f5443399c99ed382b283524214bfc3cb2a985fad25ea38df573dcdf49f2134560c9ad010117df5ba68523794531547fd4ee6b3e6e6e20d4a574eaba416697"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-body-changed",
+      "source": "04 \u00a72.5.1: body changed after signing; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "retired"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    }
+  ]
+}

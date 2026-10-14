@@ -1,6 +1,8 @@
 // CI provenance check (IR-M0-9-1 F02): re-runs the independent generator of every committed
 // test-vectors/<suite>/vectors.json in `--check FILE` mode. Writes nothing. Needs python3.
 // Usage (from anywhere): node tools/vectors/check-generators.mjs
+// The generators need the pinned packages of tools/vectors/requirements.txt. Set VECTORS_PYTHON to
+// the interpreter of a virtual environment that has them (test-vectors/README.md); default python3.
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -16,6 +18,7 @@ const files = readdirSync(vectorsDir, { withFileTypes: true })
   )
   .map((entry) => `test-vectors/${entry.name}/vectors.json`);
 
+const python = process.env.VECTORS_PYTHON || 'python3';
 const problems = files.length === 0 ? ['no vector files found under test-vectors/'] : [];
 for (const path of files) {
   let file;
@@ -25,7 +28,7 @@ for (const path of files) {
     problems.push(`${path}: not valid JSON`);
     continue;
   }
-  const check = generatorCheck(path, file, (script) => existsSync(join(root, script)));
+  const check = generatorCheck(path, file, (script) => existsSync(join(root, script)), python);
   problems.push(...check.problems);
   if (check.argv === null) continue;
   const [command, ...args] = check.argv;

@@ -19,6 +19,12 @@ export const REQUIRED_RUNTIMES = Object.freeze([
  * Each vector test records `meta.vectors = { kind, runtime, suite?, caseId? }`, where `runtime` is
  * what the engine reported (test-vectors/harness/runtime.ts), not what the config asked for.
  *
+ * A suite whose vectors are committed before its code (M1-1h) records a passing `kind: 'pending'`
+ * marker instead of case results. For such a (runtime, suite) pair no case result is required.
+ * Fail closed: the marker only passes while the suite has no module (harness/vectors.test.ts), a
+ * runtime without the marker still needs every case, and a suite with both a marker and any case
+ * result is a problem.
+ *
  * @param {unknown} report Parsed Vitest JSON report.
  * @param {ReadonlyArray<{ suite: string, caseIds: readonly string[] | null }>} suites From the vector
  *   files; `caseIds` is null when a file has no `cases` array.
@@ -32,6 +38,8 @@ export function checkCoverage(report, suites, required = REQUIRED_RUNTIMES) {
   if (suites.length === 0) problems.push('no vector suites found under test-vectors/');
 
   const passed = new Set();
+  const pending = new Set();
+  const ranCases = new Set();
   for (const file of results) {
     for (const assertion of file?.assertionResults ?? []) {
       const meta = assertion?.meta?.vectors;
@@ -40,8 +48,10 @@ export function checkCoverage(report, suites, required = REQUIRED_RUNTIMES) {
         problems.push(`a vector test ran in an unexpected runtime "${String(meta.runtime)}"`);
         continue;
       }
+      if (meta.kind === 'case') ranCases.add(meta.suite);
       if (assertion.status !== 'passed') continue;
       if (meta.kind === 'identity') passed.add(`${meta.runtime}\u0000identity`);
+      if (meta.kind === 'pending') pending.add(`${meta.runtime}\u0000${meta.suite}`);
       if (meta.kind === 'case')
         passed.add(`${meta.runtime}\u0000${meta.suite}\u0000${meta.caseId}`);
     }
@@ -58,6 +68,10 @@ export function checkCoverage(report, suites, required = REQUIRED_RUNTIMES) {
     }
     for (const { suite, caseIds } of suites) {
       if (!Array.isArray(caseIds)) continue;
+      if (pending.has(`${runtime}\u0000${suite}`)) {
+        if (ranCases.has(suite)) problems.push(`${suite}: reported as pending but ran cases`);
+        continue;
+      }
       const missing = caseIds.filter((id) => !passed.has(`${runtime}\u0000${suite}\u0000${id}`));
       if (missing.length > 0) {
         problems.push(`${runtime}: ${suite}: no passing result for ${missing.join(', ')}`);
@@ -65,6 +79,33 @@ export function checkCoverage(report, suites, required = REQUIRED_RUNTIMES) {
     }
   }
   return [...new Set(problems)];
+}
+
+/**
+ * The suites reported as pending in every required runtime, with the card that implements them.
+ * For display only; checkCoverage decides pass or fail.
+ *
+ * @param {unknown} report Parsed Vitest JSON report.
+ * @param {readonly string[]} [required]
+ * @returns {Map<string, string>} suite -> card
+ */
+export function pendingSuites(report, required = REQUIRED_RUNTIMES) {
+  const seen = new Map();
+  const results = /** @type {{ testResults?: unknown }} */ (report ?? {}).testResults;
+  for (const file of Array.isArray(results) ? results : []) {
+    for (const assertion of file?.assertionResults ?? []) {
+      const meta = assertion?.meta?.vectors;
+      if (meta?.kind !== 'pending' || assertion.status !== 'passed') continue;
+      const entry = seen.get(meta.suite) ?? { card: String(meta.detail), runtimes: new Set() };
+      entry.runtimes.add(meta.runtime);
+      seen.set(meta.suite, entry);
+    }
+  }
+  const out = new Map();
+  for (const [suite, { card, runtimes }] of seen) {
+    if (required.every((runtime) => runtimes.has(runtime))) out.set(suite, card);
+  }
+  return out;
 }
 
 /**

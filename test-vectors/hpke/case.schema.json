@@ -1,0 +1,304 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/hpke/case.schema.json",
+  "title": "hpke case",
+  "description": "RFC 9180 HPKE, mode Base, X25519/HKDF-SHA256/AES-256-GCM. `sealSequence`: one sender context with a fixed ephemeral key, messages sealed in order. `open`: single-shot open. `wrapCek` / `unwrapCek`: 04 \u00a73.3 CEK wrap, info = utf8(\"agentlink/v1/cek\") || raw 16-byte id, empty AAD; enc and wk base64url without padding.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "recipientPublicKey",
+            "ephemeralSecretKey",
+            "info",
+            "messages"
+          ],
+          "properties": {
+            "op": {
+              "const": "sealSequence"
+            },
+            "recipientPublicKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "ephemeralSecretKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "info": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "messages": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "aad",
+                  "plaintext"
+                ],
+                "properties": {
+                  "aad": {
+                    "type": "string",
+                    "pattern": "^([0-9a-f]{2})*$"
+                  },
+                  "plaintext": {
+                    "type": "string",
+                    "pattern": "^([0-9a-f]{2})*$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enc",
+            "ciphertext0",
+            "ciphertext1",
+            "ciphertext2"
+          ],
+          "properties": {
+            "enc": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "ciphertext0": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "ciphertext1": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "ciphertext2": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "recipientSecretKey",
+            "enc",
+            "info",
+            "aad",
+            "ciphertext"
+          ],
+          "properties": {
+            "op": {
+              "const": "open"
+            },
+            "recipientSecretKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "enc": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "info": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "aad": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "ciphertext": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "plaintext"
+              ],
+              "properties": {
+                "plaintext": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "recipientPublicKey",
+            "ephemeralSecretKey",
+            "envelopeId",
+            "cek"
+          ],
+          "properties": {
+            "op": {
+              "const": "wrapCek"
+            },
+            "recipientPublicKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "ephemeralSecretKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "envelopeId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "cek": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enc",
+            "wk"
+          ],
+          "properties": {
+            "enc": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "wk": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "recipientSecretKey",
+            "envelopeId",
+            "enc",
+            "wk"
+          ],
+          "properties": {
+            "op": {
+              "const": "unwrapCek"
+            },
+            "recipientSecretKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "envelopeId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "enc": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "wk": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cek"
+              ],
+              "properties": {
+                "cek": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

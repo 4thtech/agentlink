@@ -1,0 +1,486 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "jcs",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib, rfc8785 0.1.4)",
+    "version": "cpython 3.12.13",
+    "script": "tools/vectors/generate_jcs.py"
+  },
+  "cases": [
+    {
+      "id": "rfc8785-3-2-4-sample",
+      "source": "RFC 8785 \u00a73.2.2 input, \u00a73.2.3 canonical form, \u00a73.2.4 UTF-8 bytes (published)",
+      "input": {
+        "op": "canonicalize",
+        "json": "{\n  \"numbers\": [333333333.33333329, 1E30, 4.50,\n              2e-3, 0.000000000000000000000000001],\n  \"string\": \"\\u20ac$\\u000F\\u000aA'\\u0042\\u0022\\u005c\\\\\\\"\\/\",\n  \"literals\": [null, true, false]\n}"
+      },
+      "expected": {
+        "utf8": "7b226c69746572616c73223a5b6e756c6c2c747275652c66616c73655d2c226e756d62657273223a5b3333333333333333332e333333333333332c31652b33302c342e352c302e3030322c31652d32375d2c22737472696e67223a22e282ac245c75303030665c6e4127425c225c5c5c5c5c222f227d",
+        "sha256": "2d5e01a318d0f0879ab568c4be289c8b1f64ef8921a53c6277d5e069978baacb"
+      }
+    },
+    {
+      "id": "rfc8785-3-2-3-sorting",
+      "source": "RFC 8785 \u00a73.2.3 sorting sample (published property order)",
+      "input": {
+        "op": "canonicalize",
+        "json": "{\n  \"\\u20ac\": \"Euro Sign\",\n  \"\\r\": \"Carriage Return\",\n  \"\\ufb33\": \"Hebrew Letter Dalet With Dagesh\",\n  \"1\": \"One\",\n  \"\\ud83d\\ude00\": \"Emoji: Grinning Face\",\n  \"\\u0080\": \"Control\",\n  \"\\u00f6\": \"Latin Small Letter O With Diaeresis\"\n}"
+      },
+      "expected": {
+        "utf8": "7b225c72223a2243617272696167652052657475726e222c2231223a224f6e65222c22c280223a22436f6e74726f6c222c22c3b6223a224c6174696e20536d616c6c204c6574746572204f205769746820446961657265736973222c22e282ac223a224575726f205369676e222c22f09f9880223a22456d6f6a693a204772696e6e696e672046616365222c22efacb3223a22486562726577204c65747465722044616c6574205769746820446167657368227d",
+        "sha256": "5e321556d22018a9656991a9e94f77ec175fa193e52a2429d312f8419ec8b08c"
+      }
+    },
+    {
+      "id": "rfc8785-b-zero",
+      "source": "RFC 8785 Appendix B (0000000000000000) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "0000000000000000"
+      },
+      "expected": {
+        "json": "0"
+      }
+    },
+    {
+      "id": "rfc8785-b-minus-zero",
+      "source": "RFC 8785 Appendix B (8000000000000000) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "8000000000000000"
+      },
+      "expected": {
+        "json": "0"
+      }
+    },
+    {
+      "id": "rfc8785-b-min-pos",
+      "source": "RFC 8785 Appendix B (0000000000000001) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "0000000000000001"
+      },
+      "expected": {
+        "json": "5e-324"
+      }
+    },
+    {
+      "id": "rfc8785-b-min-neg",
+      "source": "RFC 8785 Appendix B (8000000000000001) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "8000000000000001"
+      },
+      "expected": {
+        "json": "-5e-324"
+      }
+    },
+    {
+      "id": "rfc8785-b-max-pos",
+      "source": "RFC 8785 Appendix B (7fefffffffffffff) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "7fefffffffffffff"
+      },
+      "expected": {
+        "json": "1.7976931348623157e+308"
+      }
+    },
+    {
+      "id": "rfc8785-b-max-neg",
+      "source": "RFC 8785 Appendix B (ffefffffffffffff) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "ffefffffffffffff"
+      },
+      "expected": {
+        "json": "-1.7976931348623157e+308"
+      }
+    },
+    {
+      "id": "rfc8785-b-max-pos-int",
+      "source": "RFC 8785 Appendix B (4340000000000000) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "4340000000000000"
+      },
+      "expected": {
+        "json": "9007199254740992"
+      }
+    },
+    {
+      "id": "rfc8785-b-max-neg-int",
+      "source": "RFC 8785 Appendix B (c340000000000000) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "c340000000000000"
+      },
+      "expected": {
+        "json": "-9007199254740992"
+      }
+    },
+    {
+      "id": "rfc8785-b-approx-2-pow-68",
+      "source": "RFC 8785 Appendix B (4430000000000000) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "4430000000000000"
+      },
+      "expected": {
+        "json": "295147905179352830000"
+      }
+    },
+    {
+      "id": "rfc8785-b-nan",
+      "source": "RFC 8785 Appendix B (7fffffffffffffff): NaN and Infinity MUST cause an error (\u00a73.2.2.3)",
+      "input": {
+        "op": "number",
+        "ieee754": "7fffffffffffffff"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "rfc8785-b-infinity",
+      "source": "RFC 8785 Appendix B (7ff0000000000000): NaN and Infinity MUST cause an error (\u00a73.2.2.3)",
+      "input": {
+        "op": "number",
+        "ieee754": "7ff0000000000000"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "rfc8785-b-44b52d02c7e14af5",
+      "source": "RFC 8785 Appendix B (44b52d02c7e14af5) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "44b52d02c7e14af5"
+      },
+      "expected": {
+        "json": "9.999999999999997e+22"
+      }
+    },
+    {
+      "id": "rfc8785-b-44b52d02c7e14af6",
+      "source": "RFC 8785 Appendix B (44b52d02c7e14af6) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "44b52d02c7e14af6"
+      },
+      "expected": {
+        "json": "1e+23"
+      }
+    },
+    {
+      "id": "rfc8785-b-44b52d02c7e14af7",
+      "source": "RFC 8785 Appendix B (44b52d02c7e14af7) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "44b52d02c7e14af7"
+      },
+      "expected": {
+        "json": "1.0000000000000001e+23"
+      }
+    },
+    {
+      "id": "rfc8785-b-444b1ae4d6e2ef4e",
+      "source": "RFC 8785 Appendix B (444b1ae4d6e2ef4e) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "444b1ae4d6e2ef4e"
+      },
+      "expected": {
+        "json": "999999999999999700000"
+      }
+    },
+    {
+      "id": "rfc8785-b-444b1ae4d6e2ef4f",
+      "source": "RFC 8785 Appendix B (444b1ae4d6e2ef4f) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "444b1ae4d6e2ef4f"
+      },
+      "expected": {
+        "json": "999999999999999900000"
+      }
+    },
+    {
+      "id": "rfc8785-b-444b1ae4d6e2ef50",
+      "source": "RFC 8785 Appendix B (444b1ae4d6e2ef50) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "444b1ae4d6e2ef50"
+      },
+      "expected": {
+        "json": "1e+21"
+      }
+    },
+    {
+      "id": "rfc8785-b-3eb0c6f7a0b5ed8c",
+      "source": "RFC 8785 Appendix B (3eb0c6f7a0b5ed8c) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "3eb0c6f7a0b5ed8c"
+      },
+      "expected": {
+        "json": "9.999999999999997e-7"
+      }
+    },
+    {
+      "id": "rfc8785-b-3eb0c6f7a0b5ed8d",
+      "source": "RFC 8785 Appendix B (3eb0c6f7a0b5ed8d) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "3eb0c6f7a0b5ed8d"
+      },
+      "expected": {
+        "json": "0.000001"
+      }
+    },
+    {
+      "id": "rfc8785-b-41b3de4355555553",
+      "source": "RFC 8785 Appendix B (41b3de4355555553) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "41b3de4355555553"
+      },
+      "expected": {
+        "json": "333333333.3333332"
+      }
+    },
+    {
+      "id": "rfc8785-b-41b3de4355555554",
+      "source": "RFC 8785 Appendix B (41b3de4355555554) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "41b3de4355555554"
+      },
+      "expected": {
+        "json": "333333333.33333325"
+      }
+    },
+    {
+      "id": "rfc8785-b-41b3de4355555555",
+      "source": "RFC 8785 Appendix B (41b3de4355555555) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "41b3de4355555555"
+      },
+      "expected": {
+        "json": "333333333.3333333"
+      }
+    },
+    {
+      "id": "rfc8785-b-41b3de4355555556",
+      "source": "RFC 8785 Appendix B (41b3de4355555556) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "41b3de4355555556"
+      },
+      "expected": {
+        "json": "333333333.3333334"
+      }
+    },
+    {
+      "id": "rfc8785-b-41b3de4355555557",
+      "source": "RFC 8785 Appendix B (41b3de4355555557) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "41b3de4355555557"
+      },
+      "expected": {
+        "json": "333333333.33333343"
+      }
+    },
+    {
+      "id": "rfc8785-b-becbf647612f3696",
+      "source": "RFC 8785 Appendix B (becbf647612f3696) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "becbf647612f3696"
+      },
+      "expected": {
+        "json": "-0.0000033333333333333333"
+      }
+    },
+    {
+      "id": "rfc8785-b-round-to-even",
+      "source": "RFC 8785 Appendix B (43143ff3c1cb0959) (published)",
+      "input": {
+        "op": "number",
+        "ieee754": "43143ff3c1cb0959"
+      },
+      "expected": {
+        "json": "1424953923781206.2"
+      }
+    },
+    {
+      "id": "agentlink-envelope-header",
+      "source": "04 \u00a73.1 AEAD additional-data object {v, id, thread, from, createdAt, recipients}",
+      "input": {
+        "op": "canonicalize",
+        "json": "{\"v\":1,\"thread\":\"dGhyZWFkLXRocmVhZC0wMQ\",\"id\":\"aWQtaWQtaWQtaWQtMDAxMQ\",\"from\":\"d1d6e1b2e0f1c3a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9a0b1c2\",\"createdAt\":1760000000,\"recipients\":[{\"wk\":\"d2s\",\"kid\":\"a2lk\",\"enc\":\"ZW5j\"},{\"kid\":\"a2lkMg\",\"enc\":\"ZW5jMg\",\"wk\":\"d2sy\"}]}"
+      },
+      "expected": {
+        "utf8": "7b22637265617465644174223a313736303030303030302c2266726f6d223a2264316436653162326530663163336134623563366437653866393061316232633364346535663630373138323933613462356336643765386639613062316332222c226964223a22615751746157517461575174615751744d4441784d51222c22726563697069656e7473223a5b7b22656e63223a225a57356a222c226b6964223a2261326c6b222c22776b223a22643273227d2c7b22656e63223a225a57356a4d67222c226b6964223a2261326c6b4d67222c22776b223a2264327379227d5d2c22746872656164223a22644768795a57466b4c58526f636d56685a4330774d51222c2276223a317d",
+        "sha256": "34f998659b3008cdd01ca9a5e40829cf48eca01a92263233957cf3a370101dbd"
+      }
+    },
+    {
+      "id": "agentlink-owner-action",
+      "source": "04 \u00a72.5.1 OwnerAction shape (agent.revoke)",
+      "input": {
+        "op": "canonicalize",
+        "json": "{\"v\":1,\"agent\":\"0x00000000000000000000000000000000000000aa\",\"owner\":\"abababababababababababababababababababababababababababababababab\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"retired\"},\"nonce\":\"AAAAAAAAAAAAAAAAAAAAAA\",\"issuedAt\":1760000000,\"expiresAt\":0}"
+      },
+      "expected": {
+        "utf8": "7b226167656e74223a22307830303030303030303030303030303030303030303030303030303030303030303030303030306161222c22657870697265734174223a302c226973737565644174223a313736303030303030302c226e6f6e6365223a2241414141414141414141414141414141414141414141222c226f70223a226167656e742e7265766f6b65222c226f776e6572223a2261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162222c22706172616d73223a7b22726561736f6e223a2272657469726564227d2c2276223a317d",
+        "sha256": "e7f7f09f4b2568e5b17e6acd35742dca240757d9991d242de94f8c54e9b61b93"
+      }
+    },
+    {
+      "id": "empty-object",
+      "source": "RFC 8785 \u00a73.2.1 (no whitespace)",
+      "input": {
+        "op": "canonicalize",
+        "json": " { } "
+      },
+      "expected": {
+        "utf8": "7b7d",
+        "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+      }
+    },
+    {
+      "id": "empty-array",
+      "source": "RFC 8785 \u00a73.2.1 (no whitespace)",
+      "input": {
+        "op": "canonicalize",
+        "json": "[ ]"
+      },
+      "expected": {
+        "utf8": "5b5d",
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "id": "nested-sort",
+      "source": "RFC 8785 \u00a73.2.3 (recursive sort; arrays keep their order)",
+      "input": {
+        "op": "canonicalize",
+        "json": "{\"b\":[{\"z\":1,\"a\":2},{\"y\":[3,{\"d\":4,\"c\":5}]}],\"a\":{\"c\":{\"b\":1,\"a\":2},\"b\":null}}"
+      },
+      "expected": {
+        "utf8": "7b2261223a7b2262223a6e756c6c2c2263223a7b2261223a322c2262223a317d7d2c2262223a5b7b2261223a322c227a223a317d2c7b2279223a5b332c7b2263223a352c2264223a347d5d7d5d7d",
+        "sha256": "0b605691eb477c841a4d6b133510fda795cbad0a413c3f694c8a5ca54e4316b8"
+      }
+    },
+    {
+      "id": "string-escapes",
+      "source": "RFC 8785 \u00a73.2.2.2 (control characters, quote, backslash, solidus kept as is)",
+      "input": {
+        "op": "canonicalize",
+        "json": "{\"s\":\"\\u0000\\u0007\\b\\t\\n\\u000b\\f\\r\\u001f \\\"\\\\/\\u007f\\u00e9\\u2028\"}"
+      },
+      "expected": {
+        "utf8": "7b2273223a225c75303030305c75303030375c625c745c6e5c75303030625c665c725c7530303166205c225c5c2f7fc3a9e280a8227d",
+        "sha256": "8f3b3a13509c4f11d0fd8326107223449a4ea5ef8624c173f4b198048e5fd157"
+      }
+    },
+    {
+      "id": "non-bmp-key-sort",
+      "source": "RFC 8785 \u00a73.2.3 (UTF-16 code-unit order: U+FFFF sorts after a surrogate pair)",
+      "input": {
+        "op": "canonicalize",
+        "json": "{\"\\uffff\":1,\"\\ud83d\\ude00\":2,\"\\ue000\":3}"
+      },
+      "expected": {
+        "utf8": "7b22f09f9880223a322c22ee8080223a332c22efbfbf223a317d",
+        "sha256": "b1431810e3f4b54d4d871678e248ae11e9e03d0c47085ed8604ed6296a8d3ded"
+      }
+    },
+    {
+      "id": "integers",
+      "source": "RFC 8785 \u00a73.2.2.3 (integer-valued numbers, exponent forms)",
+      "input": {
+        "op": "canonicalize",
+        "json": "[0,-0,1,-1,9007199254740991,-9007199254740991,1E2,1e-2,100e-2,0.1e1,12345678901234567890]"
+      },
+      "expected": {
+        "utf8": "5b302c302c312c2d312c393030373139393235343734303939312c2d393030373139393235343734303939312c3130302c302e30312c312c312c31323334353637383930313233343536373030305d",
+        "sha256": "dd0603b08d0cda1996334c5a2011eed614305cc5fbcb876179a3d840064a6e46"
+      }
+    },
+    {
+      "id": "literals",
+      "source": "RFC 8785 \u00a73.2.2.1",
+      "input": {
+        "op": "canonicalize",
+        "json": "[true,false,null]"
+      },
+      "expected": {
+        "utf8": "5b747275652c66616c73652c6e756c6c5d",
+        "sha256": "4d0f18de2133118249c26acc481838d4f6bb6bc1de882d99abbd19ae9397e8df"
+      }
+    },
+    {
+      "id": "unicode-as-is",
+      "source": "RFC 8785 \u00a73.2.2.2 (non-ASCII kept as UTF-8, not escaped)",
+      "input": {
+        "op": "canonicalize",
+        "json": "\"\\u00f6\\u20ac\\ud83d\\ude00\""
+      },
+      "expected": {
+        "utf8": "22c3b6e282acf09f988022",
+        "sha256": "ecca4ef1d8ef4762d0abaaae4193c7f01c0067d33c734631519a4712274b0318"
+      }
+    },
+    {
+      "id": "lone-high-surrogate-value",
+      "source": "RFC 8785 \u00a73.2.2.2: lone surrogates MUST cause an error",
+      "input": {
+        "op": "canonicalize",
+        "json": "{\"a\":\"\\ud800\"}"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "lone-low-surrogate-value",
+      "source": "RFC 8785 \u00a73.2.2.2: lone surrogates MUST cause an error",
+      "input": {
+        "op": "canonicalize",
+        "json": "[\"\\udc00x\"]"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "lone-surrogate-key",
+      "source": "RFC 8785 \u00a73.2.2.2: lone surrogates MUST cause an error",
+      "input": {
+        "op": "canonicalize",
+        "json": "{\"\\udbff\":1}"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reversed-surrogate-pair",
+      "source": "RFC 8785 \u00a73.2.2.2: lone surrogates MUST cause an error",
+      "input": {
+        "op": "canonicalize",
+        "json": "\"\\ude00\\ud83d\""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    }
+  ]
+}

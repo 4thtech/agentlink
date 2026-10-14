@@ -7,7 +7,7 @@ import { describe, expect, inject, test } from 'vitest';
 import { compareToVector } from './compare';
 import { vectorFiles, type VectorCase } from './registry';
 import { observeRuntime, type RuntimeId } from './runtime';
-import { suiteModules } from './suites/index';
+import { pendingSuites, suiteModules } from './suites/index';
 
 declare module 'vitest' {
   interface ProvidedContext {
@@ -16,7 +16,7 @@ declare module 'vitest' {
   }
   interface TaskMeta {
     vectors?: {
-      readonly kind: 'identity' | 'case';
+      readonly kind: 'identity' | 'case' | 'pending';
       readonly runtime: string;
       readonly detail?: string;
       readonly suite?: string;
@@ -38,20 +38,52 @@ test('at least one vector suite is committed', () => {
   expect(vectorFiles.length).toBeGreaterThan(0);
 });
 
+// A pending entry with no vector file is stale; it must not linger once a suite is renamed or gone.
+test('every pending suite has a committed vector file', () => {
+  const committed = new Set(vectorFiles.map(({ file }) => file.suite));
+  expect([...pendingSuites.keys()].filter((suite) => !committed.has(suite))).toEqual([]);
+});
+
 for (const { directory, file } of vectorFiles) {
   describe(`${directory} v${String(file.version)}`, () => {
     const suite = suiteModules.get(file.suite);
     const cases: readonly VectorCase[] = Array.isArray(file.cases) ? file.cases : [];
 
+    const pendingCard = pendingSuites.get(file.suite);
+
+    // A suite is either implemented (a module runs every case) or pending (no module yet, M1-1h).
+    // Both at once fails, so the pending entry goes away when the module lands (fail closed).
     test('has a suite module and a matching directory', () => {
       expect(file.suite).toBe(directory);
-      expect(suite, `no suite module registered for "${file.suite}"`).toBeDefined();
+      if (pendingCard === undefined) {
+        expect(suite, `no suite module registered for "${file.suite}"`).toBeDefined();
+      } else {
+        expect(
+          suite,
+          `"${file.suite}" has a module: remove its pendingSuites entry`,
+        ).toBeUndefined();
+      }
     });
 
     // A suite with no cases proves nothing (IR-M0-9-1 F04).
     test('has at least one case', () => {
       expect(cases.length).toBeGreaterThan(0);
     });
+
+    if (pendingCard !== undefined) {
+      // Recorded per runtime; tools/vectors/check.mjs reports the suite as pending, not passed.
+      test(`pending: not yet implemented (${pendingCard})`, ({ task }) => {
+        task.meta.vectors = {
+          kind: 'pending',
+          runtime: observeRuntime().id,
+          suite: file.suite,
+          detail: pendingCard,
+        };
+        expect(suite).toBeUndefined();
+        expect(cases.length).toBeGreaterThan(0);
+      });
+      return;
+    }
 
     for (const testCase of cases) {
       test(testCase.id, async ({ task }) => {

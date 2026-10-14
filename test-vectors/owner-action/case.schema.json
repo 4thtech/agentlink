@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/owner-action/case.schema.json",
+  "title": "owner-action case",
+  "description": "04 \u00a72.5.1 SignedOwnerAction. `sign`: JCS text, sha256 body hash, tagged signature input and sig for a body. `verify`: accept or reject a SignedOwnerAction for a receiving core whose agent address, card ownerNostr and clock are given in `context` (nonce store empty).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "body",
+            "secretKey",
+            "auxRand"
+          ],
+          "properties": {
+            "op": {
+              "const": "sign"
+            },
+            "body": {
+              "type": "object"
+            },
+            "secretKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "auxRand": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "jcs",
+            "bodyHash",
+            "signatureInput",
+            "sig"
+          ],
+          "properties": {
+            "jcs": {
+              "type": "string"
+            },
+            "bodyHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "signatureInput": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "sig": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{128}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "signed",
+            "context"
+          ],
+          "properties": {
+            "op": {
+              "const": "verify"
+            },
+            "signed": {
+              "type": "object"
+            },
+            "context": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "agent",
+                "ownerNostr",
+                "now"
+              ],
+              "properties": {
+                "agent": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{40}$"
+                },
+                "ownerNostr": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "now": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+# Independent vector generators (M1-1h). Direct dependencies only; requirements.txt pins every
+# package, transitive ones included, with hashes. Regenerate with uv, excluding releases younger
+# than about two weeks so that a freshly published compromised release is never picked up:
+#   uv pip compile --universal --python-version 3.12 --exclude-newer <date> --generate-hashes \
+#     tools/vectors/requirements.in -o tools/vectors/requirements.txt
+cryptography   # HKDF, HMAC, AES-256-GCM, ChaCha20, X25519, Argon2id (OpenSSL)
+coincurve      # secp256k1: BIP-340 Schnorr, ECDSA, ECDH (libsecp256k1)
+pycryptodome   # Keccak-256 (EIP-712, EVM addresses)
+pyhpke         # RFC 9180 HPKE
+rfc8785        # RFC 8785 JSON Canonicalization Scheme (Trail of Bits)

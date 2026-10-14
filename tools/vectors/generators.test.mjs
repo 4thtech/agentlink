@@ -13,6 +13,14 @@ describe('generatorCheck', () => {
     });
   });
 
+  it('runs the generator with the given interpreter (the pinned virtual environment)', () => {
+    const python = '/tmp/vectors-py/bin/python';
+    expect(generatorCheck(path, file('tools/vectors/generate_hpke.py'), present, python)).toEqual({
+      problems: [],
+      argv: [python, '-I', 'tools/vectors/generate_hpke.py', '--check', path],
+    });
+  });
+
   it.each([[undefined], [null], [{}], [{ generator: {} }], [file('')], [file(7)]])(
     'rejects a file without generator.script (%j)',
     (content) => {

@@ -1,0 +1,314 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "hpke",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib, cryptography 50.0.2, pyhpke 0.6.5)",
+    "version": "cpython 3.12.13",
+    "script": "tools/vectors/generate_hpke.py"
+  },
+  "cases": [
+    {
+      "id": "rfc9180-base-seal-sequence",
+      "source": "RFC 9180 / CFRG test-vectors.json (mode 0, kem 0x20, kdf 1, aead 2): setup with skEm, encryptions 0-2 (published)",
+      "input": {
+        "op": "sealSequence",
+        "recipientPublicKey": "430f4b9859665145a6b1ba274024487bd66f03a2dd577d7753c68d7d7d00c00c",
+        "ephemeralSecretKey": "179d4b53b6365c45b600c4163b61d95cbc2f4d9e36f1695558dce265ab8bab11",
+        "info": "4f6465206f6e2061204772656369616e2055726e",
+        "messages": [
+          {
+            "aad": "436f756e742d30",
+            "plaintext": "4265617574792069732074727574682c20747275746820626561757479"
+          },
+          {
+            "aad": "436f756e742d31",
+            "plaintext": "4265617574792069732074727574682c20747275746820626561757479"
+          },
+          {
+            "aad": "436f756e742d32",
+            "plaintext": "4265617574792069732074727574682c20747275746820626561757479"
+          }
+        ]
+      },
+      "expected": {
+        "enc": "6c93e09869df3402d7bf231bf540fadd35cd56be14f97178f0954db94b7fc256",
+        "ciphertext0": "e5d84cd531cfb583096e7cfa9641bd3079cf3a91cda813c52deb5f512be9931980a41de125a925cdad859d5b7a",
+        "ciphertext1": "2c43aff25343fdbff864506f0818b9d87df84ea01b1a2144d23b4d40c26bf655fdf197fe40297a8aebeed5cc2d",
+        "ciphertext2": "e0a8f2cf92ff61215edbb8c55dc31fe9e2eb42a5685867bb6854211542099f9e940c4b41c192bc390835b1a5f7"
+      }
+    },
+    {
+      "id": "rfc9180-base-open-0",
+      "source": "RFC 9180 / CFRG test-vectors.json (mode 0, kem 0x20, kdf 1, aead 2): recipient opens encryption 0 (published)",
+      "input": {
+        "op": "open",
+        "recipientSecretKey": "497b4502664cfea5d5af0b39934dac72242a74f8480451e1aee7d6a53320333d",
+        "enc": "6c93e09869df3402d7bf231bf540fadd35cd56be14f97178f0954db94b7fc256",
+        "info": "4f6465206f6e2061204772656369616e2055726e",
+        "aad": "436f756e742d30",
+        "ciphertext": "e5d84cd531cfb583096e7cfa9641bd3079cf3a91cda813c52deb5f512be9931980a41de125a925cdad859d5b7a"
+      },
+      "expected": {
+        "plaintext": "4265617574792069732074727574682c20747275746820626561757479"
+      }
+    },
+    {
+      "id": "rfc9180-base-open-wrong-aad",
+      "source": "RFC 9180 / CFRG test-vectors.json (mode 0, kem 0x20, kdf 1, aead 2): encryption 0 opened with the AAD of encryption 1",
+      "input": {
+        "op": "open",
+        "recipientSecretKey": "497b4502664cfea5d5af0b39934dac72242a74f8480451e1aee7d6a53320333d",
+        "enc": "6c93e09869df3402d7bf231bf540fadd35cd56be14f97178f0954db94b7fc256",
+        "info": "4f6465206f6e2061204772656369616e2055726e",
+        "aad": "436f756e742d31",
+        "ciphertext": "e5d84cd531cfb583096e7cfa9641bd3079cf3a91cda813c52deb5f512be9931980a41de125a925cdad859d5b7a"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "wrap-cek-recipient-agent",
+      "source": "04 \u00a73.3 CEK wrap (fixed ephemeral key)",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
+        "ephemeralSecretKey": "86913a7ed271c14cb35dee75ffe31735845ae7d49203b5dbf8ea8f30b9742742",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
+        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWwxk"
+      }
+    },
+    {
+      "id": "unwrap-cek-recipient-agent",
+      "source": "04 \u00a73.3 CEK unwrap",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
+        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWwxk"
+      },
+      "expected": {
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      }
+    },
+    {
+      "id": "wrap-cek-recipient-owner",
+      "source": "04 \u00a73.3 CEK wrap (fixed ephemeral key)",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "701d72225989369105bd567b8b037ac58c4fcfa4b48a9a182824d77014d78e55",
+        "ephemeralSecretKey": "dcc61cc8f518cb2d02c943c316700d5a89720056d2280a2c6f86403900c7eba0",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "enc": "RMCEq9DzRbxXXXToNf133o0O-hW7C2gua4kGlbupmUk",
+        "wk": "Ksy-i-4q2xoTU_7sdfUKtOI2ZP2bKtE-XuMZ2pS-2oj-aRwXFF3RTDQkgCHDpTHR"
+      }
+    },
+    {
+      "id": "unwrap-cek-recipient-owner",
+      "source": "04 \u00a73.3 CEK unwrap",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "f07b4d6be5dffcb9d19cce6aef2ae53cb207e805ec824ddfad375fa6aafacb4e",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "RMCEq9DzRbxXXXToNf133o0O-hW7C2gua4kGlbupmUk",
+        "wk": "Ksy-i-4q2xoTU_7sdfUKtOI2ZP2bKtE-XuMZ2pS-2oj-aRwXFF3RTDQkgCHDpTHR"
+      },
+      "expected": {
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      }
+    },
+    {
+      "id": "wrap-cek-sender-owner",
+      "source": "04 \u00a73.3 CEK wrap (fixed ephemeral key)",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "7dde838c25a616c9715022120040e2bbb3c3196a896ecdca598c26cea6bb8a6c",
+        "ephemeralSecretKey": "859467a7a9c246e5ef112e9856d938225893e46a34566c00a00a225ffb08822b",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "enc": "x8Lu1z-ay1fQtLO5KrQek9_8iCdFNzgmgWYRCKUQvSs",
+        "wk": "QTW5LgpWXDzH_h8A9E6OBQ379vTWv3VtcTgOUNPWO5evZik7ZyOUywtagXyHOxxe"
+      }
+    },
+    {
+      "id": "unwrap-cek-sender-owner",
+      "source": "04 \u00a73.3 CEK unwrap",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "e91a7040920e5c94769a40c993edd672a3656465467a00b7e004e3a36a25e395",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "x8Lu1z-ay1fQtLO5KrQek9_8iCdFNzgmgWYRCKUQvSs",
+        "wk": "QTW5LgpWXDzH_h8A9E6OBQ379vTWv3VtcTgOUNPWO5evZik7ZyOUywtagXyHOxxe"
+      },
+      "expected": {
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      }
+    },
+    {
+      "id": "wrap-cek-sender-agent",
+      "source": "04 \u00a73.3 CEK wrap (fixed ephemeral key)",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "8cd8207e1c744ef984b91d22395a3416edfac7baae77d1db87d4ed95fe6d8005",
+        "ephemeralSecretKey": "aafc591b3c92eb8a707ccfcd23253388806bd8f2e23f76a731894b05ed034f8f",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "enc": "Lc0x2k2ATZB_0KsDQXZ4IiBXNjh1LrooOhzH2MCpzkg",
+        "wk": "gul3ntUVnfCqvTyJLeLpDlZrXE2ikX8QUtY4Od-v_PQpmcVcYf1Mzuxl9um0KsYK"
+      }
+    },
+    {
+      "id": "unwrap-cek-sender-agent",
+      "source": "04 \u00a73.3 CEK unwrap",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "92869ba1cdbf27971ab89eb824a5e9102c91b59fdf67b14461223c6abf80756b",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "Lc0x2k2ATZB_0KsDQXZ4IiBXNjh1LrooOhzH2MCpzkg",
+        "wk": "gul3ntUVnfCqvTyJLeLpDlZrXE2ikX8QUtY4Od-v_PQpmcVcYf1Mzuxl9um0KsYK"
+      },
+      "expected": {
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      }
+    },
+    {
+      "id": "unwrap-reject-wrong-recipient",
+      "source": "04 \u00a73.3 CEK unwrap fails: another recipient's key",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "f07b4d6be5dffcb9d19cce6aef2ae53cb207e805ec824ddfad375fa6aafacb4e",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
+        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWwxk"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-other-envelope-id",
+      "source": "04 \u00a73.3 CEK unwrap fails: the CEK is bound to the envelope id through info",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "8H4hcfHEGtCG8wNSR8rkmg",
+        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
+        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWwxk"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-wk-tag-flipped",
+      "source": "04 \u00a73.3 CEK unwrap fails: tampered wk (last tag byte)",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
+        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWwxl"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-wk-ciphertext-flipped",
+      "source": "04 \u00a73.3 CEK unwrap fails: tampered wk (first byte)",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
+        "wk": "Q8wHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWwxk"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-wk-truncated",
+      "source": "04 \u00a73.3 CEK unwrap fails: wk one byte short",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
+        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWww"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-enc-flipped",
+      "source": "04 \u00a73.3 CEK unwrap fails: tampered enc",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "HjOr9Qs0ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
+        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWwxk"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-id-as-text",
+      "source": "04 \u00a73.3 CEK unwrap fails: sealed with the id as base64url text in info, not its raw 16 bytes",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
+        "wk": "kP6KxPSdwlmqclgwOZv7bnI1sYxwK9DuUih8_RF5wYAowWQ4P6H4o4kR_Ia9Zhdk"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-nonempty-aad",
+      "source": "04 \u00a73.3 CEK unwrap fails: sealed with a non-empty AAD; the CEK wrap uses an empty AAD",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
+        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBVa5L4a8Byyt7o5xBaGIqq_"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "unwrap-reject-zero-shared-secret",
+      "source": "04 \u00a73.3 CEK unwrap fails: enc is the all-zero X25519 point (RFC 9180 \u00a77.1.4)",
+      "input": {
+        "op": "unwrapCek",
+        "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "enc": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWwxk"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    }
+  ]
+}
