@@ -29,6 +29,7 @@ import {
   agentCard,
   approvalActions,
   approvalDecideAction,
+  approvalDecideBatchAction,
   approvalRequestFor,
   commitmentScope,
   envelope,
@@ -69,6 +70,12 @@ const SCHEMAS = [
   ['proofPack', proofPackSchema, proofPack],
   ['proofStatus', proofStatusSchema, proofStatus],
   ['toolResult', toolResultSchema, pendingApprovalResult],
+  // M1-2e: the batch order check must stay total when an item is replaced by anything.
+  [
+    'signedOwnerAction (approval.decideBatch)',
+    signedOwnerActionSchema,
+    () => signed(approvalDecideBatchAction(20)),
+  ],
 ] as const;
 
 const RUNS = { numRuns: 300, seed: 0x4a11 } as const;
