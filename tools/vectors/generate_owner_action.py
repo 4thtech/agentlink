@@ -36,6 +36,19 @@ an item or in params, an upper-case or `0x` item `actionDigest`, and a batch bod
 `approval.decide` params and the reverse. The verify context's `pendingApprovals` holds every
 request the batches name, each expiring after the batch.
 
+`contact.check` (G-28; 04 §2.5.1, §3.6.1; 07 §3 `contacts.safety_check`), version 4: the verify
+context's `pairings` holds each completed pairing as the core stores it: the contact's agent ID,
+its current card, and the signed `handshake` H and `handshake-ack` K as envelopes with their CEKs.
+The verifier recomputes `pairingDigest` from H and K (04 §3.6.1 steps 1-5, the
+`safety-code-recompute` reference) and never reads a stored digest. The agent under test is the
+inviter: its card is built here from the context's own agent and owner keys, and it signed K. Accept
+cases: a valid check, and one verified exactly at `expiresAt`. Rejections (each validly signed by
+the owner unless stated): `contact` in upper case; a `pairingDigest` that is not the recomputed one
+(the role-swapped digest); another signer; expired by one second; a lifetime of 86 401 s (L = 86 400,
+G-7); an unknown contact; a stored pair whose K signature no longer verifies; and, as in version 3,
+the encoding rejections. `reference_verify_contact_check` is this generator's own reading of the
+04 §2.5.1 checks, and every contact.check verify case is asserted against it.
+
 Usage: python3 -I tools/vectors/generate_owner_action.py --check [FILE] | --write
 """
 
@@ -45,10 +58,15 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import generate_aead_envelope as env  # noqa: E402
+import generate_eip712 as eip712  # noqa: E402
+import generate_pairing as pairing  # noqa: E402
+import generate_pairing_bodies as bodies  # noqa: E402
+import generate_safety_code as safety  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "owner-action"
-VERSION = 3
+VERSION = 4
 TAG = "agentlink/owner-action/v1"
 ENVELOPE_TAG = "agentlink/envelope/v1"
 SPEC = "04 §2.5.1"
@@ -464,30 +482,85 @@ def build():
             )
         )
 
-    # contact.check (04 §2.5.1, §3.6.1; G-28): {contact, pairingDigest}. Its maximum lifetime is
-    # G-7's, so only signing and encoding rejections are vectored (no positive verify yet).
-    pairing_digest = v.hx(v.sha256(b"owner-action/pairing-digest"))
-    pairing_ctx = {**context, "pairing": {"contact": other_agent, "pairingDigest": pairing_digest}}
+    # contact.check (04 §2.5.1, §3.6.1; G-28; 07 §3 contacts.safety_check): {contact, pairingDigest}.
+    # The pairing behind it: the agent under test (A, the inviter) and the contact (B, other_agent),
+    # with H (B -> A) and K (A -> B) as signed envelopes. pairingDigest is recomputed from them.
+    a = keyed_party(
+        "Agent A",
+        {"agentEvm": "owner-action/agent/evm", "agentNostr": "owner-action/agent/nostr", "agentEnc": "owner-action/agent/enc",
+         "ownerEvm": "owner-action/owner/evm", "ownerNostr": "owner-action/owner/nostr", "ownerEnc": "owner-action/owner/enc"},
+        bodies.RELAYS_A,
+    )
+    b = keyed_party(
+        "Contact B",
+        {"agentEvm": "owner-action/other-agent/evm", "agentNostr": "owner-action/other-agent/nostr", "agentEnc": "owner-action/other-agent/enc",
+         "ownerEvm": "owner-action/other-owner/evm", "ownerNostr": "owner-action/other-owner/nostr", "ownerEnc": "owner-action/other-owner/enc"},
+        bodies.RELAYS_B,
+    )
+    if a["card"]["agentEvm"] != agent or a["card"]["ownerNostr"] != "0x" + owner_pub or b["card"]["agentEvm"] != other_agent:
+        v.fail("the pairing cards do not match the owner-action keys")
+    invite_id = v.det("owner-action/pairing/invite-id", 16)
+    secret = v.det("owner-action/pairing/secret", 32)
+    nonce_a = v.det("owner-action/pairing/nonce-a", 32)
+    nonce_b = v.det("owner-action/pairing/nonce-b", 32)
+    recipients = [v.x25519_public_key(x) for x in (a["enc"][0], a["enc"][1], b["enc"][1], b["enc"][0])]
+    h_item = safety.envelope(b["nostr"], recipients, "handshake", bodies.handshake_of(a, b, invite_id, secret, nonce_a, nonce_b), "owner-action-h")
+    h_env = h_item["envelope"]
+    k_item = safety.envelope(a["nostr"], recipients, "handshake-ack", bodies.ack_of(a, invite_id, v.unb64u(h_env["id"]), env.envelope_hash(h_env), nonce_a), "owner-action-k")
+    digest_bytes, _ = safety.recompute(agent, b["card"], h_item, k_item)
+    pairing_digest = digest_bytes.hex()
+    swapped = safety.code_of(safety.transcript(b["card"], a["card"], invite_id, nonce_a, nonce_b))[0].hex()
+    if swapped == pairing_digest:
+        v.fail("role swap gives the same digest")
+    stored = {"contact": other_agent, "contactCard": b["card"], "handshake": h_item, "ack": k_item}
+    pairing_ctx = {**context, "pairings": [stored]}
 
     def check(**params):
         p_ = {"contact": other_agent, "pairingDigest": pairing_digest}
         p_.update(params)
         return op_body("contact.check", p_)
 
-    b = check()
+    b_ = check()
     cases.append(
         v.case(
             "sign-contact-check",
             f"{SPEC} SignedOwnerAction, contact.check (04 §3.6.1)",
-            {"op": "sign", "body": b, "secretKey": v.hx(owner), "auxRand": v.hx(aux)},
+            {"op": "sign", "body": b_, "secretKey": v.hx(owner), "auxRand": v.hx(aux)},
             {
-                "jcs": jcs_lenient(b).decode("utf-8"),
-                "bodyHash": v.hx(body_hash(b)),
-                "signatureInput": v.hx(v.tagged_hash(TAG, body_hash(b))),
-                "sig": sign(b, owner, aux),
+                "jcs": jcs_lenient(b_).decode("utf-8"),
+                "bodyHash": v.hx(body_hash(b_)),
+                "signatureInput": v.hx(v.tagged_hash(TAG, body_hash(b_))),
+                "sig": sign(b_, owner, aux),
             },
         )
     )
+
+    def check_case(case_id, why, signed, ctx, accept):
+        if reference_verify_contact_check(signed, ctx) != accept:
+            v.fail(f"{case_id}: the reference verifier disagrees")
+        cases.append(
+            v.case(
+                case_id,
+                f"{SPEC} contact.check, 04 §3.6.1: {why}" + ("" if accept else "; rejected, nothing stored"),
+                {"op": "verify", "signed": signed, "context": ctx},
+                {"outcome": "accept" if accept else "reject"},
+            )
+        )
+
+    expiring = check()
+    check_case("verify-contact-check", "pairingDigest equals the digest recomputed from the stored H and K", signed_body(check()), pairing_ctx, True)
+    check_case("verify-contact-check-at-expiry", "verified at now = expiresAt (expiry has no skew)", signed_body(expiring), {**pairing_ctx, "now": expiring["expiresAt"]}, True)
+    tampered_k = {**stored, "ack": {"envelope": {**k_item["envelope"], "sig": k_item["envelope"]["sig"][:-1] + ("0" if k_item["envelope"]["sig"][-1] != "0" else "1")}, "cek": k_item["cek"]}}
+    for case_id, why, signed, ctx in [
+        ("verify-contact-check-reject-contact-uppercase", "`contact` in upper-case hex (04 §2.4.1)", signed_body(check(contact="0x" + other_agent[2:].upper())), pairing_ctx),
+        ("verify-contact-check-reject-digest-mismatch", "pairingDigest is not the recomputed one (it is the role-swapped digest)", signed_body(check(pairingDigest=swapped)), pairing_ctx),
+        ("verify-contact-check-reject-wrong-signer", "signed by another key than `owner`", {"body": check(), "sig": sign(check(), other, aux)}, pairing_ctx),
+        ("verify-contact-check-reject-expired", "now = expiresAt + 1", signed_body(expiring), {**pairing_ctx, "now": expiring["expiresAt"] + 1}),
+        ("verify-contact-check-reject-lifetime", "expiresAt - issuedAt = 86 401 s (L(contact.check) = 86 400 s, G-7)", signed_body(op_body("contact.check", {"contact": other_agent, "pairingDigest": pairing_digest}, expires_at=ISSUED_AT + 86401)), pairing_ctx),
+        ("verify-contact-check-reject-unknown-contact", "`contact` is not a stored contact", signed_body(check(contact=third_agent)), pairing_ctx),
+        ("verify-contact-check-reject-stored-ack-tampered", "the stored K no longer verifies, so no digest can be recomputed (never a stored digest)", signed_body(check()), {**context, "pairings": [tampered_k]}),
+    ]:
+        check_case(case_id, why, signed, ctx, False)
     for case_id, why, bad in [
         ("reject-pairing-digest-0x", "`pairingDigest` with 0x (bare hex, 04 §2.4.1)", check(pairingDigest="0x" + pairing_digest)),
         ("reject-pairing-digest-uppercase", "`pairingDigest` in upper-case hex", check(pairingDigest=pairing_digest.upper())),
@@ -495,6 +568,8 @@ def build():
         ("reject-contact-checksummed", "`contact` in EIP-55 mixed case", check(contact=v.eip55(other_agent))),
         ("reject-contact-check-unknown-param", "unknown key in contact.check params", op_body("contact.check", {"contact": other_agent, "pairingDigest": pairing_digest, "note": "x"})),
     ]:
+        if reference_verify_contact_check(signed_body(bad), pairing_ctx):
+            v.fail(f"{case_id}: the reference verifier accepts it")
         reject(case_id, why, signed_body(bad), pairing_ctx)
 
     # Raw JSON text (04 §2.4.1: integer tokens must match 0|[1-9][0-9]*, checked on the token; I-JSON
@@ -523,6 +598,92 @@ def build():
     return cases
 
 
+def keyed_party(name, labels, relays):
+    """A card from explicit key labels (so the agent under test has the context's own keys), with
+    the owner's cardSig and the agent's cardAgentSig, in the shape generate_pairing_bodies uses."""
+    sk = {field: v.det(label, 32) for field, label in labels.items()}
+    name_hash, relays_hash = eip712.card_hashes(name, relays)
+    card = {
+        "version": 1,
+        "agentEvm": v.evm_address(sk["agentEvm"]),
+        "agentNostr": eip712.b32(v.xonly_public_key(sk["agentNostr"])),
+        "agentEnc": eip712.b32(v.x25519_public_key(sk["agentEnc"])),
+        "ownerEvm": v.evm_address(sk["ownerEvm"]),
+        "ownerNostr": eip712.b32(v.xonly_public_key(sk["ownerNostr"])),
+        "ownerEnc": eip712.b32(v.x25519_public_key(sk["ownerEnc"])),
+        "nameHash": name_hash,
+        "relaysHash": relays_hash,
+        "issuedAt": 1760000000,
+        "expiresAt": 1791536000,
+        "keyEpoch": 0,
+    }
+    digest = eip712.card_digest(card)
+    return {
+        "card": card,
+        "name": name,
+        "relays": list(relays),
+        "cardSig": eip712.card_sig(sk["ownerEvm"], digest),
+        "cardAgentSig": eip712.card_sig(sk["agentEvm"], digest),
+        "nostr": sk["agentNostr"],
+        "enc": [sk["agentEnc"], sk["ownerEnc"]],
+    }
+
+
+SKEW = 300
+L_CONTACT_CHECK = 86400
+
+
+def reference_verify_contact_check(signed, ctx):
+    """04 §2.5.1 verification of a contact.check, in order, then 04 §3.6.1: the digest must equal
+    the one recomputed from the stored H and K of a completed pairing with that contact."""
+    import re
+
+    if not isinstance(signed, dict) or set(signed) != {"body", "sig"}:
+        return False
+    body, sig = signed["body"], signed["sig"]
+    if not isinstance(body, dict) or set(body) != {"v", "agent", "owner", "op", "params", "nonce", "issuedAt", "expiresAt"}:
+        return False
+    if body["v"] != 1 or body["op"] != "contact.check" or not isinstance(sig, str) or not re.fullmatch(r"[0-9a-f]{128}", sig):
+        return False
+    if not isinstance(body["agent"], str) or not re.fullmatch(r"0x[0-9a-f]{40}", body["agent"]):
+        return False
+    if not isinstance(body["owner"], str) or not re.fullmatch(r"[0-9a-f]{64}", body["owner"]):
+        return False
+    try:
+        if len(v.unb64u(body["nonce"])) != 16:
+            return False
+    except (ValueError, TypeError):
+        return False
+    for key in ("issuedAt", "expiresAt"):
+        if isinstance(body[key], bool) or not isinstance(body[key], int) or not 0 <= body[key] <= 2**53 - 1:
+            return False
+    params = body["params"]
+    if not isinstance(params, dict) or set(params) != {"contact", "pairingDigest"}:
+        return False
+    if not isinstance(params["contact"], str) or not re.fullmatch(r"0x[0-9a-f]{40}", params["contact"]):
+        return False
+    if not isinstance(params["pairingDigest"], str) or not re.fullmatch(r"[0-9a-f]{64}", params["pairingDigest"]):
+        return False
+    if body["agent"] != ctx["agent"] or bytes.fromhex(body["owner"]) != bytes.fromhex(ctx["ownerNostr"][2:]):
+        return False
+    if not v.schnorr_verify(bytes.fromhex(body["owner"]), v.tagged_hash(TAG, body_hash(body)), bytes.fromhex(sig)):
+        return False
+    now = ctx["now"]
+    if body["issuedAt"] > now + SKEW or now > body["expiresAt"] or body["issuedAt"] >= body["expiresAt"]:
+        return False
+    if body["expiresAt"] - body["issuedAt"] > L_CONTACT_CHECK:
+        return False
+    matches = [p for p in ctx.get("pairings", []) if p["contact"] == params["contact"]]
+    if len(matches) != 1:
+        return False
+    stored = matches[0]
+    try:
+        digest, _ = safety.recompute(ctx["agent"], stored["contactCard"], stored["handshake"], stored["ack"])
+    except (ValueError, KeyError, TypeError):
+        return False
+    return digest.hex() == params["pairingDigest"]
+
+
 CONTEXT = {
     "type": "object",
     "additionalProperties": False,
@@ -536,7 +697,10 @@ CONTEXT = {
             "type": "array",
             "items": v.strict_object({"approvalId": v.STRING, "actionDigest": v.hexn(32), "expiresAt": v.INTEGER}),
         },
-        "pairing": v.strict_object({"contact": v.ADDRESS, "pairingDigest": v.hexn(32)}),
+        "pairings": {
+            "type": "array",
+            "items": v.strict_object({"contact": v.ADDRESS, "contactCard": v.OBJECT, "handshake": safety.ITEM, "ack": safety.ITEM}),
+        },
         "appliedPolicyVersion": v.INTEGER,
     },
 }
@@ -546,7 +710,9 @@ SCHEMA = v.case_schema(
     "sig for a body. `verify`: accept or reject a SignedOwnerAction for a receiving core whose "
     "agent address, card ownerNostr and clock are given in `context` (nonce store empty; "
     "`appliedPolicyVersion` absent means 0; `pendingApprovals` lists the pending requests an "
-    "approval.decideBatch names).",
+    "approval.decideBatch names; `pairings` lists the completed pairings as stored, each with its "
+    "signed handshake and handshake-ack and their CEKs, from which contact.check's pairingDigest is "
+    "recomputed).",
     {
         "sign": (
             {"body": v.OBJECT, "secretKey": v.hexn(32), "auxRand": v.hexn(32)},
@@ -562,7 +728,7 @@ if __name__ == "__main__":
         suite=SUITE,
         version=VERSION,
         script="tools/vectors/generate_owner_action.py",
-        libraries=["coincurve", "pycryptodome", "rfc8785"],
+        libraries=["cryptography", "coincurve", "pycryptodome", "pyhpke", "rfc8785"],
         build=build,
         schema=SCHEMA,
         doc=__doc__,

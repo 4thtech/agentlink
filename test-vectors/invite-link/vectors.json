@@ -1,7 +1,7 @@
 {
   "$schema": "../schema/vector-file.schema.json",
   "suite": "invite-link",
-  "version": 1,
+  "version": 2,
   "generator": {
     "tool": "python (hashlib, cryptography 50.0.2, coincurve 21.0.0, pycryptodome 3.23.0, rfc8785 0.1.4)",
     "version": "cpython 3.13.11",
@@ -333,6 +333,193 @@
       "input": {
         "op": "decodeInviteLink",
         "link": "https://agentlink.4thtech.io/i#"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-url-http",
+      "source": "04 \u00a73.6 invite encoding (D-69): the http scheme; refused, no partial result",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": "http://agentlink.4thtech.io/i#XVQBZGRJEwYAAAD4Pfghu9tV3d1VHWA2Oyt7OZecxGXXOae6uzo7e5k3ybxkkuxZAAAAAAAAAAAAAAAAAAAAAK7eZDfHDYZX3d9XX331vff3sBsO4WBYjbvVnX5ow-HAfty-fahlcf_WvVoefb05o8uvi-FgmLRu9c5uuPe_3o7QP__524enfLs7W9JdWUy30-X5aWl89O7-48-7djJe7M4_GazK1mitkW6n1Wbct5MrHe-Wu_VM9uh895oiO3WYsmstthZ8V8eOfILkkUlCQuPa437ZTHfbPdIuk0fXAoj9zzwcIlf2vXhBg6WURL09VPFcA2lQRW7YlGt18INxOdY9H_iYHcZYBIgSG5QgenaBCs68GISxM6kYt5VizTHX4Gpz1LxLxrd5GHX7YzIJzDW5nHtOORRskqBBFalEsbviIbTaZdaxx_07WckOUIW4JVIEh12KV2EbKXoTIllEiRM4oQrVVPbmElYfI5AP9KLk-2TYY4eUGgAn6T6KeKcxVIqBTH_R5BK3TMVccRKzDZnEV1dZAjDO3o-y1mOZPu_5TFVplEoKbpZSoTMauHSsGhAyGDSEnGxsTB6s6DwZk_TWTIgzvq1ey9P0wmg-NS8A3phKJurF1sA-Oq_BwAxIwiFA7AVBeuaiWrkkwGJ7j2yMq2m617awiAIl9_w7GPTxZrXV6bmczan56GD4S5-WN5tqzd2355Cer672Sjh4qlXB5DsKMcdKOXMGqzqQ2M1f10rTolI7S-lcQVgcgTaOZmdvPqWO0Fq11VMlNfNjccTW2aoYMEQfkarvLnZMQiVUtaaIJVhAvr81izmbL6rEttYiRzbfuxkUm5mjkALbTNgwWrpCb0iW4hoxV0iFmaGySz0GzD5qJF-gMeRCoZfW0WOs2L33YinPPrPlpNj6WnfNLlHR0kXmRT6r2jQ92qzXq_kz8P44f1mM13x6fH_8Eb68ezddPhyXi1eC4aYffVruTtLZ09Pp5U8n83Lm-BjoQq5X_5_-d3Qt901fUjAc_j48TNPhmzf759f6KOuba31dN2u783wyzi_Hy8lme3VIIdCb1Vg2j8Mf_9mzxdkFs_vbPw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-url-other-host",
+      "source": "04 \u00a73.6 invite encoding (D-69): another host; refused, no partial result",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": "https://agentlink.example.com/i#XVQBZGRJEwYAAAD4Pfghu9tV3d1VHWA2Oyt7OZecxGXXOae6uzo7e5k3ybxkkuxZAAAAAAAAAAAAAAAAAAAAAK7eZDfHDYZX3d9XX331vff3sBsO4WBYjbvVnX5ow-HAfty-fahlcf_WvVoefb05o8uvi-FgmLRu9c5uuPe_3o7QP__524enfLs7W9JdWUy30-X5aWl89O7-48-7djJe7M4_GazK1mitkW6n1Wbct5MrHe-Wu_VM9uh895oiO3WYsmstthZ8V8eOfILkkUlCQuPa437ZTHfbPdIuk0fXAoj9zzwcIlf2vXhBg6WURL09VPFcA2lQRW7YlGt18INxOdY9H_iYHcZYBIgSG5QgenaBCs68GISxM6kYt5VizTHX4Gpz1LxLxrd5GHX7YzIJzDW5nHtOORRskqBBFalEsbviIbTaZdaxx_07WckOUIW4JVIEh12KV2EbKXoTIllEiRM4oQrVVPbmElYfI5AP9KLk-2TYY4eUGgAn6T6KeKcxVIqBTH_R5BK3TMVccRKzDZnEV1dZAjDO3o-y1mOZPu_5TFVplEoKbpZSoTMauHSsGhAyGDSEnGxsTB6s6DwZk_TWTIgzvq1ey9P0wmg-NS8A3phKJurF1sA-Oq_BwAxIwiFA7AVBeuaiWrkkwGJ7j2yMq2m617awiAIl9_w7GPTxZrXV6bmczan56GD4S5-WN5tqzd2355Cer672Sjh4qlXB5DsKMcdKOXMGqzqQ2M1f10rTolI7S-lcQVgcgTaOZmdvPqWO0Fq11VMlNfNjccTW2aoYMEQfkarvLnZMQiVUtaaIJVhAvr81izmbL6rEttYiRzbfuxkUm5mjkALbTNgwWrpCb0iW4hoxV0iFmaGySz0GzD5qJF-gMeRCoZfW0WOs2L33YinPPrPlpNj6WnfNLlHR0kXmRT6r2jQ92qzXq_kz8P44f1mM13x6fH_8Eb68ezddPhyXi1eC4aYffVruTtLZ09Pp5U8n83Lm-BjoQq5X_5_-d3Qt901fUjAc_j48TNPhmzf759f6KOuba31dN2u783wyzi_Hy8lme3VIIdCb1Vg2j8Mf_9mzxdkFs_vbPw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-url-host-uppercase",
+      "source": "04 \u00a73.6 invite encoding (D-69): the host in another case; refused, no partial result",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": "https://AgentLink.4thtech.io/i#XVQBZGRJEwYAAAD4Pfghu9tV3d1VHWA2Oyt7OZecxGXXOae6uzo7e5k3ybxkkuxZAAAAAAAAAAAAAAAAAAAAAK7eZDfHDYZX3d9XX331vff3sBsO4WBYjbvVnX5ow-HAfty-fahlcf_WvVoefb05o8uvi-FgmLRu9c5uuPe_3o7QP__524enfLs7W9JdWUy30-X5aWl89O7-48-7djJe7M4_GazK1mitkW6n1Wbct5MrHe-Wu_VM9uh895oiO3WYsmstthZ8V8eOfILkkUlCQuPa437ZTHfbPdIuk0fXAoj9zzwcIlf2vXhBg6WURL09VPFcA2lQRW7YlGt18INxOdY9H_iYHcZYBIgSG5QgenaBCs68GISxM6kYt5VizTHX4Gpz1LxLxrd5GHX7YzIJzDW5nHtOORRskqBBFalEsbviIbTaZdaxx_07WckOUIW4JVIEh12KV2EbKXoTIllEiRM4oQrVVPbmElYfI5AP9KLk-2TYY4eUGgAn6T6KeKcxVIqBTH_R5BK3TMVccRKzDZnEV1dZAjDO3o-y1mOZPu_5TFVplEoKbpZSoTMauHSsGhAyGDSEnGxsTB6s6DwZk_TWTIgzvq1ey9P0wmg-NS8A3phKJurF1sA-Oq_BwAxIwiFA7AVBeuaiWrkkwGJ7j2yMq2m617awiAIl9_w7GPTxZrXV6bmczan56GD4S5-WN5tqzd2355Cer672Sjh4qlXB5DsKMcdKOXMGqzqQ2M1f10rTolI7S-lcQVgcgTaOZmdvPqWO0Fq11VMlNfNjccTW2aoYMEQfkarvLnZMQiVUtaaIJVhAvr81izmbL6rEttYiRzbfuxkUm5mjkALbTNgwWrpCb0iW4hoxV0iFmaGySz0GzD5qJF-gMeRCoZfW0WOs2L33YinPPrPlpNj6WnfNLlHR0kXmRT6r2jQ92qzXq_kz8P44f1mM13x6fH_8Eb68ezddPhyXi1eC4aYffVruTtLZ09Pp5U8n83Lm-BjoQq5X_5_-d3Qt901fUjAc_j48TNPhmzf759f6KOuba31dN2u783wyzi_Hy8lme3VIIdCb1Vg2j8Mf_9mzxdkFs_vbPw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-url-host-port",
+      "source": "04 \u00a73.6 invite encoding (D-69): the host with an explicit port; refused, no partial result",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": "https://agentlink.4thtech.io:443/i#XVQBZGRJEwYAAAD4Pfghu9tV3d1VHWA2Oyt7OZecxGXXOae6uzo7e5k3ybxkkuxZAAAAAAAAAAAAAAAAAAAAAK7eZDfHDYZX3d9XX331vff3sBsO4WBYjbvVnX5ow-HAfty-fahlcf_WvVoefb05o8uvi-FgmLRu9c5uuPe_3o7QP__524enfLs7W9JdWUy30-X5aWl89O7-48-7djJe7M4_GazK1mitkW6n1Wbct5MrHe-Wu_VM9uh895oiO3WYsmstthZ8V8eOfILkkUlCQuPa437ZTHfbPdIuk0fXAoj9zzwcIlf2vXhBg6WURL09VPFcA2lQRW7YlGt18INxOdY9H_iYHcZYBIgSG5QgenaBCs68GISxM6kYt5VizTHX4Gpz1LxLxrd5GHX7YzIJzDW5nHtOORRskqBBFalEsbviIbTaZdaxx_07WckOUIW4JVIEh12KV2EbKXoTIllEiRM4oQrVVPbmElYfI5AP9KLk-2TYY4eUGgAn6T6KeKcxVIqBTH_R5BK3TMVccRKzDZnEV1dZAjDO3o-y1mOZPu_5TFVplEoKbpZSoTMauHSsGhAyGDSEnGxsTB6s6DwZk_TWTIgzvq1ey9P0wmg-NS8A3phKJurF1sA-Oq_BwAxIwiFA7AVBeuaiWrkkwGJ7j2yMq2m617awiAIl9_w7GPTxZrXV6bmczan56GD4S5-WN5tqzd2355Cer672Sjh4qlXB5DsKMcdKOXMGqzqQ2M1f10rTolI7S-lcQVgcgTaOZmdvPqWO0Fq11VMlNfNjccTW2aoYMEQfkarvLnZMQiVUtaaIJVhAvr81izmbL6rEttYiRzbfuxkUm5mjkALbTNgwWrpCb0iW4hoxV0iFmaGySz0GzD5qJF-gMeRCoZfW0WOs2L33YinPPrPlpNj6WnfNLlHR0kXmRT6r2jQ92qzXq_kz8P44f1mM13x6fH_8Eb68ezddPhyXi1eC4aYffVruTtLZ09Pp5U8n83Lm-BjoQq5X_5_-d3Qt901fUjAc_j48TNPhmzf759f6KOuba31dN2u783wyzi_Hy8lme3VIIdCb1Vg2j8Mf_9mzxdkFs_vbPw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-url-other-path",
+      "source": "04 \u00a73.6 invite encoding (D-69): another path; refused, no partial result",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": "https://agentlink.4thtech.io/invite#XVQBZGRJEwYAAAD4Pfghu9tV3d1VHWA2Oyt7OZecxGXXOae6uzo7e5k3ybxkkuxZAAAAAAAAAAAAAAAAAAAAAK7eZDfHDYZX3d9XX331vff3sBsO4WBYjbvVnX5ow-HAfty-fahlcf_WvVoefb05o8uvi-FgmLRu9c5uuPe_3o7QP__524enfLs7W9JdWUy30-X5aWl89O7-48-7djJe7M4_GazK1mitkW6n1Wbct5MrHe-Wu_VM9uh895oiO3WYsmstthZ8V8eOfILkkUlCQuPa437ZTHfbPdIuk0fXAoj9zzwcIlf2vXhBg6WURL09VPFcA2lQRW7YlGt18INxOdY9H_iYHcZYBIgSG5QgenaBCs68GISxM6kYt5VizTHX4Gpz1LxLxrd5GHX7YzIJzDW5nHtOORRskqBBFalEsbviIbTaZdaxx_07WckOUIW4JVIEh12KV2EbKXoTIllEiRM4oQrVVPbmElYfI5AP9KLk-2TYY4eUGgAn6T6KeKcxVIqBTH_R5BK3TMVccRKzDZnEV1dZAjDO3o-y1mOZPu_5TFVplEoKbpZSoTMauHSsGhAyGDSEnGxsTB6s6DwZk_TWTIgzvq1ey9P0wmg-NS8A3phKJurF1sA-Oq_BwAxIwiFA7AVBeuaiWrkkwGJ7j2yMq2m617awiAIl9_w7GPTxZrXV6bmczan56GD4S5-WN5tqzd2355Cer672Sjh4qlXB5DsKMcdKOXMGqzqQ2M1f10rTolI7S-lcQVgcgTaOZmdvPqWO0Fq11VMlNfNjccTW2aoYMEQfkarvLnZMQiVUtaaIJVhAvr81izmbL6rEttYiRzbfuxkUm5mjkALbTNgwWrpCb0iW4hoxV0iFmaGySz0GzD5qJF-gMeRCoZfW0WOs2L33YinPPrPlpNj6WnfNLlHR0kXmRT6r2jQ92qzXq_kz8P44f1mM13x6fH_8Eb68ezddPhyXi1eC4aYffVruTtLZ09Pp5U8n83Lm-BjoQq5X_5_-d3Qt901fUjAc_j48TNPhmzf759f6KOuba31dN2u783wyzi_Hy8lme3VIIdCb1Vg2j8Mf_9mzxdkFs_vbPw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-url-trailing-slash-path",
+      "source": "04 \u00a73.6 invite encoding (D-69): the path /i/; refused, no partial result",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": "https://agentlink.4thtech.io/i/#XVQBZGRJEwYAAAD4Pfghu9tV3d1VHWA2Oyt7OZecxGXXOae6uzo7e5k3ybxkkuxZAAAAAAAAAAAAAAAAAAAAAK7eZDfHDYZX3d9XX331vff3sBsO4WBYjbvVnX5ow-HAfty-fahlcf_WvVoefb05o8uvi-FgmLRu9c5uuPe_3o7QP__524enfLs7W9JdWUy30-X5aWl89O7-48-7djJe7M4_GazK1mitkW6n1Wbct5MrHe-Wu_VM9uh895oiO3WYsmstthZ8V8eOfILkkUlCQuPa437ZTHfbPdIuk0fXAoj9zzwcIlf2vXhBg6WURL09VPFcA2lQRW7YlGt18INxOdY9H_iYHcZYBIgSG5QgenaBCs68GISxM6kYt5VizTHX4Gpz1LxLxrd5GHX7YzIJzDW5nHtOORRskqBBFalEsbviIbTaZdaxx_07WckOUIW4JVIEh12KV2EbKXoTIllEiRM4oQrVVPbmElYfI5AP9KLk-2TYY4eUGgAn6T6KeKcxVIqBTH_R5BK3TMVccRKzDZnEV1dZAjDO3o-y1mOZPu_5TFVplEoKbpZSoTMauHSsGhAyGDSEnGxsTB6s6DwZk_TWTIgzvq1ey9P0wmg-NS8A3phKJurF1sA-Oq_BwAxIwiFA7AVBeuaiWrkkwGJ7j2yMq2m617awiAIl9_w7GPTxZrXV6bmczan56GD4S5-WN5tqzd2355Cer672Sjh4qlXB5DsKMcdKOXMGqzqQ2M1f10rTolI7S-lcQVgcgTaOZmdvPqWO0Fq11VMlNfNjccTW2aoYMEQfkarvLnZMQiVUtaaIJVhAvr81izmbL6rEttYiRzbfuxkUm5mjkALbTNgwWrpCb0iW4hoxV0iFmaGySz0GzD5qJF-gMeRCoZfW0WOs2L33YinPPrPlpNj6WnfNLlHR0kXmRT6r2jQ92qzXq_kz8P44f1mM13x6fH_8Eb68ezddPhyXi1eC4aYffVruTtLZ09Pp5U8n83Lm-BjoQq5X_5_-d3Qt901fUjAc_j48TNPhmzf759f6KOuba31dN2u783wyzi_Hy8lme3VIIdCb1Vg2j8Mf_9mzxdkFs_vbPw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-url-query",
+      "source": "04 \u00a73.6 invite encoding (D-69): a query before the fragment; refused, no partial result",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": "https://agentlink.4thtech.io/i?ref=x#XVQBZGRJEwYAAAD4Pfghu9tV3d1VHWA2Oyt7OZecxGXXOae6uzo7e5k3ybxkkuxZAAAAAAAAAAAAAAAAAAAAAK7eZDfHDYZX3d9XX331vff3sBsO4WBYjbvVnX5ow-HAfty-fahlcf_WvVoefb05o8uvi-FgmLRu9c5uuPe_3o7QP__524enfLs7W9JdWUy30-X5aWl89O7-48-7djJe7M4_GazK1mitkW6n1Wbct5MrHe-Wu_VM9uh895oiO3WYsmstthZ8V8eOfILkkUlCQuPa437ZTHfbPdIuk0fXAoj9zzwcIlf2vXhBg6WURL09VPFcA2lQRW7YlGt18INxOdY9H_iYHcZYBIgSG5QgenaBCs68GISxM6kYt5VizTHX4Gpz1LxLxrd5GHX7YzIJzDW5nHtOORRskqBBFalEsbviIbTaZdaxx_07WckOUIW4JVIEh12KV2EbKXoTIllEiRM4oQrVVPbmElYfI5AP9KLk-2TYY4eUGgAn6T6KeKcxVIqBTH_R5BK3TMVccRKzDZnEV1dZAjDO3o-y1mOZPu_5TFVplEoKbpZSoTMauHSsGhAyGDSEnGxsTB6s6DwZk_TWTIgzvq1ey9P0wmg-NS8A3phKJurF1sA-Oq_BwAxIwiFA7AVBeuaiWrkkwGJ7j2yMq2m617awiAIl9_w7GPTxZrXV6bmczan56GD4S5-WN5tqzd2355Cer672Sjh4qlXB5DsKMcdKOXMGqzqQ2M1f10rTolI7S-lcQVgcgTaOZmdvPqWO0Fq11VMlNfNjccTW2aoYMEQfkarvLnZMQiVUtaaIJVhAvr81izmbL6rEttYiRzbfuxkUm5mjkALbTNgwWrpCb0iW4hoxV0iFmaGySz0GzD5qJF-gMeRCoZfW0WOs2L33YinPPrPlpNj6WnfNLlHR0kXmRT6r2jQ92qzXq_kz8P44f1mM13x6fH_8Eb68ezddPhyXi1eC4aYffVruTtLZ09Pp5U8n83Lm-BjoQq5X_5_-d3Qt901fUjAc_j48TNPhmzf759f6KOuba31dN2u783wyzi_Hy8lme3VIIdCb1Vg2j8Mf_9mzxdkFs_vbPw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-url-leading-space",
+      "source": "04 \u00a73.6 invite encoding (D-69): a space before the prefix; refused, no partial result",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": " https://agentlink.4thtech.io/i#XVQBZGRJEwYAAAD4Pfghu9tV3d1VHWA2Oyt7OZecxGXXOae6uzo7e5k3ybxkkuxZAAAAAAAAAAAAAAAAAAAAAK7eZDfHDYZX3d9XX331vff3sBsO4WBYjbvVnX5ow-HAfty-fahlcf_WvVoefb05o8uvi-FgmLRu9c5uuPe_3o7QP__524enfLs7W9JdWUy30-X5aWl89O7-48-7djJe7M4_GazK1mitkW6n1Wbct5MrHe-Wu_VM9uh895oiO3WYsmstthZ8V8eOfILkkUlCQuPa437ZTHfbPdIuk0fXAoj9zzwcIlf2vXhBg6WURL09VPFcA2lQRW7YlGt18INxOdY9H_iYHcZYBIgSG5QgenaBCs68GISxM6kYt5VizTHX4Gpz1LxLxrd5GHX7YzIJzDW5nHtOORRskqBBFalEsbviIbTaZdaxx_07WckOUIW4JVIEh12KV2EbKXoTIllEiRM4oQrVVPbmElYfI5AP9KLk-2TYY4eUGgAn6T6KeKcxVIqBTH_R5BK3TMVccRKzDZnEV1dZAjDO3o-y1mOZPu_5TFVplEoKbpZSoTMauHSsGhAyGDSEnGxsTB6s6DwZk_TWTIgzvq1ey9P0wmg-NS8A3phKJurF1sA-Oq_BwAxIwiFA7AVBeuaiWrkkwGJ7j2yMq2m617awiAIl9_w7GPTxZrXV6bmczan56GD4S5-WN5tqzd2355Cer672Sjh4qlXB5DsKMcdKOXMGqzqQ2M1f10rTolI7S-lcQVgcgTaOZmdvPqWO0Fq11VMlNfNjccTW2aoYMEQfkarvLnZMQiVUtaaIJVhAvr81izmbL6rEttYiRzbfuxkUm5mjkALbTNgwWrpCb0iW4hoxV0iFmaGySz0GzD5qJF-gMeRCoZfW0WOs2L33YinPPrPlpNj6WnfNLlHR0kXmRT6r2jQ92qzXq_kz8P44f1mM13x6fH_8Eb68ezddPhyXi1eC4aYffVruTtLZ09Pp5U8n83Lm-BjoQq5X_5_-d3Qt901fUjAc_j48TNPhmzf759f6KOuba31dN2u783wyzi_Hy8lme3VIIdCb1Vg2j8Mf_9mzxdkFs_vbPw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-url-leading-character",
+      "source": "04 \u00a73.6 invite encoding (D-69): a character before the prefix; refused, no partial result",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": "xhttps://agentlink.4thtech.io/i#XVQBZGRJEwYAAAD4Pfghu9tV3d1VHWA2Oyt7OZecxGXXOae6uzo7e5k3ybxkkuxZAAAAAAAAAAAAAAAAAAAAAK7eZDfHDYZX3d9XX331vff3sBsO4WBYjbvVnX5ow-HAfty-fahlcf_WvVoefb05o8uvi-FgmLRu9c5uuPe_3o7QP__524enfLs7W9JdWUy30-X5aWl89O7-48-7djJe7M4_GazK1mitkW6n1Wbct5MrHe-Wu_VM9uh895oiO3WYsmstthZ8V8eOfILkkUlCQuPa437ZTHfbPdIuk0fXAoj9zzwcIlf2vXhBg6WURL09VPFcA2lQRW7YlGt18INxOdY9H_iYHcZYBIgSG5QgenaBCs68GISxM6kYt5VizTHX4Gpz1LxLxrd5GHX7YzIJzDW5nHtOORRskqBBFalEsbviIbTaZdaxx_07WckOUIW4JVIEh12KV2EbKXoTIllEiRM4oQrVVPbmElYfI5AP9KLk-2TYY4eUGgAn6T6KeKcxVIqBTH_R5BK3TMVccRKzDZnEV1dZAjDO3o-y1mOZPu_5TFVplEoKbpZSoTMauHSsGhAyGDSEnGxsTB6s6DwZk_TWTIgzvq1ey9P0wmg-NS8A3phKJurF1sA-Oq_BwAxIwiFA7AVBeuaiWrkkwGJ7j2yMq2m617awiAIl9_w7GPTxZrXV6bmczan56GD4S5-WN5tqzd2355Cer672Sjh4qlXB5DsKMcdKOXMGqzqQ2M1f10rTolI7S-lcQVgcgTaOZmdvPqWO0Fq11VMlNfNjccTW2aoYMEQfkarvLnZMQiVUtaaIJVhAvr81izmbL6rEttYiRzbfuxkUm5mjkALbTNgwWrpCb0iW4hoxV0iFmaGySz0GzD5qJF-gMeRCoZfW0WOs2L33YinPPrPlpNj6WnfNLlHR0kXmRT6r2jQ92qzXq_kz8P44f1mM13x6fH_8Eb68ezddPhyXi1eC4aYffVruTtLZ09Pp5U8n83Lm-BjoQq5X_5_-d3Qt901fUjAc_j48TNPhmzf759f6KOuba31dN2u783wyzi_Hy8lme3VIIdCb1Vg2j8Mf_9mzxdkFs_vbPw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bare-leading-space",
+      "source": "04 \u00a73.6 invite encoding (D-69): a bare payload with a leading space; refused, no partial result",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": " XVQBZGRJEwYAAAD4Pfghu9tV3d1VHWA2Oyt7OZecxGXXOae6uzo7e5k3ybxkkuxZAAAAAAAAAAAAAAAAAAAAAK7eZDfHDYZX3d9XX331vff3sBsO4WBYjbvVnX5ow-HAfty-fahlcf_WvVoefb05o8uvi-FgmLRu9c5uuPe_3o7QP__524enfLs7W9JdWUy30-X5aWl89O7-48-7djJe7M4_GazK1mitkW6n1Wbct5MrHe-Wu_VM9uh895oiO3WYsmstthZ8V8eOfILkkUlCQuPa437ZTHfbPdIuk0fXAoj9zzwcIlf2vXhBg6WURL09VPFcA2lQRW7YlGt18INxOdY9H_iYHcZYBIgSG5QgenaBCs68GISxM6kYt5VizTHX4Gpz1LxLxrd5GHX7YzIJzDW5nHtOORRskqBBFalEsbviIbTaZdaxx_07WckOUIW4JVIEh12KV2EbKXoTIllEiRM4oQrVVPbmElYfI5AP9KLk-2TYY4eUGgAn6T6KeKcxVIqBTH_R5BK3TMVccRKzDZnEV1dZAjDO3o-y1mOZPu_5TFVplEoKbpZSoTMauHSsGhAyGDSEnGxsTB6s6DwZk_TWTIgzvq1ey9P0wmg-NS8A3phKJurF1sA-Oq_BwAxIwiFA7AVBeuaiWrkkwGJ7j2yMq2m617awiAIl9_w7GPTxZrXV6bmczan56GD4S5-WN5tqzd2355Cer672Sjh4qlXB5DsKMcdKOXMGqzqQ2M1f10rTolI7S-lcQVgcgTaOZmdvPqWO0Fq11VMlNfNjccTW2aoYMEQfkarvLnZMQiVUtaaIJVhAvr81izmbL6rEttYiRzbfuxkUm5mjkALbTNgwWrpCb0iW4hoxV0iFmaGySz0GzD5qJF-gMeRCoZfW0WOs2L33YinPPrPlpNj6WnfNLlHR0kXmRT6r2jQ92qzXq_kz8P44f1mM13x6fH_8Eb68ezddPhyXi1eC4aYffVruTtLZ09Pp5U8n83Lm-BjoQq5X_5_-d3Qt901fUjAc_j48TNPhmzf759f6KOuba31dN2u783wyzi_Hy8lme3VIIdCb1Vg2j8Mf_9mzxdkFs_vbPw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-url-second-hash",
+      "source": "04 \u00a73.6 invite encoding (D-69): a second #; refused, no partial result",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": "https://agentlink.4thtech.io/i#XVQBZGRJEwYAAAD4Pfghu9tV3d1VHWA2Oyt7OZecxGXXOae6uzo7e5k3ybxkkuxZAAAAAAAAAAAAAAAAAAAAAK7eZDfHDYZX3d9XX331vff3sBsO4WBYjbvVnX5ow-HAfty-fahlcf_WvVoefb05o8uvi-FgmLRu9c5uuPe_3o7QP__524enfLs7W9JdWUy30-X5aWl89O7-48-7djJe7M4_GazK1mitkW6n1Wbct5MrHe-Wu_VM9uh895oiO3WYsmstthZ8V8eOfILkkUlCQuPa437ZTHfbPdIuk0fXAoj9zzwcIlf2vXhBg6WURL09VPFcA2lQRW7YlGt18INxOdY9H_iYHcZYBIgSG5QgenaBCs68GISxM6kYt5VizTHX4Gpz1LxLxrd5GHX7YzIJzDW5nHtOORRskqBBFalEsbviIbTaZdaxx_07WckOUIW4JVIEh12KV2EbKXoTIllEiRM4oQrVVPbmElYfI5AP9KLk-2TYY4eUGgAn6T6KeKcxVIqBTH_R5BK3TMVccRKzDZnEV1dZAjDO3o-y1mOZPu_5TFVplEoKbpZSoTMauHSsGhAyGDSEnGxsTB6s6DwZk_TWTIgzvq1ey9P0wmg-NS8A3phKJurF1sA-Oq_BwAxIwiFA7AVBeuaiWrkkwGJ7j2yMq2m617awiAIl9_w7GPTxZrXV6bmczan56GD4S5-WN5tqzd2355Cer672Sjh4qlXB5DsKMcdKOXMGqzqQ2M1f10rTolI7S-lcQVgcgTaOZmdvPqWO0Fq11VMlNfNjccTW2aoYMEQfkarvLnZMQiVUtaaIJVhAvr81izmbL6rEttYiRzbfuxkUm5mjkALbTNgwWrpCb0iW4hoxV0iFmaGySz0GzD5qJF-gMeRCoZfW0WOs2L33YinPPrPlpNj6WnfNLlHR0kXmRT6r2jQ92qzXq_kz8P44f1mM13x6fH_8Eb68ezddPhyXi1eC4aYffVruTtLZ09Pp5U8n83Lm-BjoQq5X_5_-d3Qt901fUjAc_j48TNPhmzf759f6KOuba31dN2u783wyzi_Hy8lme3VIIdCb1Vg2j8Mf_9mzxdkFs_vbPw#XVQBZGRJEwYAAAD4Pfghu9tV3d1VHWA2Oyt7OZecxGXXOae6uzo7e5k3ybxkkuxZAAAAAAAAAAAAAAAAAAAAAK7eZDfHDYZX3d9XX331vff3sBsO4WBYjbvVnX5ow-HAfty-fahlcf_WvVoefb05o8uvi-FgmLRu9c5uuPe_3o7QP__524enfLs7W9JdWUy30-X5aWl89O7-48-7djJe7M4_GazK1mitkW6n1Wbct5MrHe-Wu_VM9uh895oiO3WYsmstthZ8V8eOfILkkUlCQuPa437ZTHfbPdIuk0fXAoj9zzwcIlf2vXhBg6WURL09VPFcA2lQRW7YlGt18INxOdY9H_iYHcZYBIgSG5QgenaBCs68GISxM6kYt5VizTHX4Gpz1LxLxrd5GHX7YzIJzDW5nHtOORRskqBBFalEsbviIbTaZdaxx_07WckOUIW4JVIEh12KV2EbKXoTIllEiRM4oQrVVPbmElYfI5AP9KLk-2TYY4eUGgAn6T6KeKcxVIqBTH_R5BK3TMVccRKzDZnEV1dZAjDO3o-y1mOZPu_5TFVplEoKbpZSoTMauHSsGhAyGDSEnGxsTB6s6DwZk_TWTIgzvq1ey9P0wmg-NS8A3phKJurF1sA-Oq_BwAxIwiFA7AVBeuaiWrkkwGJ7j2yMq2m617awiAIl9_w7GPTxZrXV6bmczan56GD4S5-WN5tqzd2355Cer672Sjh4qlXB5DsKMcdKOXMGqzqQ2M1f10rTolI7S-lcQVgcgTaOZmdvPqWO0Fq11VMlNfNjccTW2aoYMEQfkarvLnZMQiVUtaaIJVhAvr81izmbL6rEttYiRzbfuxkUm5mjkALbTNgwWrpCb0iW4hoxV0iFmaGySz0GzD5qJF-gMeRCoZfW0WOs2L33YinPPrPlpNj6WnfNLlHR0kXmRT6r2jQ92qzXq_kz8P44f1mM13x6fH_8Eb68ezddPhyXi1eC4aYffVruTtLZ09Pp5U8n83Lm-BjoQq5X_5_-d3Qt901fUjAc_j48TNPhmzf759f6KOuba31dN2u783wyzi_Hy8lme3VIIdCb1Vg2j8Mf_9mzxdkFs_vbPw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-url-percent-hash",
+      "source": "04 \u00a73.6 invite encoding (D-69): the # percent-encoded; refused, no partial result",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": "https://agentlink.4thtech.io/i%23XVQBZGRJEwYAAAD4Pfghu9tV3d1VHWA2Oyt7OZecxGXXOae6uzo7e5k3ybxkkuxZAAAAAAAAAAAAAAAAAAAAAK7eZDfHDYZX3d9XX331vff3sBsO4WBYjbvVnX5ow-HAfty-fahlcf_WvVoefb05o8uvi-FgmLRu9c5uuPe_3o7QP__524enfLs7W9JdWUy30-X5aWl89O7-48-7djJe7M4_GazK1mitkW6n1Wbct5MrHe-Wu_VM9uh895oiO3WYsmstthZ8V8eOfILkkUlCQuPa437ZTHfbPdIuk0fXAoj9zzwcIlf2vXhBg6WURL09VPFcA2lQRW7YlGt18INxOdY9H_iYHcZYBIgSG5QgenaBCs68GISxM6kYt5VizTHX4Gpz1LxLxrd5GHX7YzIJzDW5nHtOORRskqBBFalEsbviIbTaZdaxx_07WckOUIW4JVIEh12KV2EbKXoTIllEiRM4oQrVVPbmElYfI5AP9KLk-2TYY4eUGgAn6T6KeKcxVIqBTH_R5BK3TMVccRKzDZnEV1dZAjDO3o-y1mOZPu_5TFVplEoKbpZSoTMauHSsGhAyGDSEnGxsTB6s6DwZk_TWTIgzvq1ey9P0wmg-NS8A3phKJurF1sA-Oq_BwAxIwiFA7AVBeuaiWrkkwGJ7j2yMq2m617awiAIl9_w7GPTxZrXV6bmczan56GD4S5-WN5tqzd2355Cer672Sjh4qlXB5DsKMcdKOXMGqzqQ2M1f10rTolI7S-lcQVgcgTaOZmdvPqWO0Fq11VMlNfNjccTW2aoYMEQfkarvLnZMQiVUtaaIJVhAvr81izmbL6rEttYiRzbfuxkUm5mjkALbTNgwWrpCb0iW4hoxV0iFmaGySz0GzD5qJF-gMeRCoZfW0WOs2L33YinPPrPlpNj6WnfNLlHR0kXmRT6r2jQ92qzXq_kz8P44f1mM13x6fH_8Eb68ezddPhyXi1eC4aYffVruTtLZ09Pp5U8n83Lm-BjoQq5X_5_-d3Qt901fUjAc_j48TNPhmzf759f6KOuba31dN2u783wyzi_Hy8lme3VIIdCb1Vg2j8Mf_9mzxdkFs_vbPw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-url-percent-payload",
+      "source": "04 \u00a73.6 invite encoding (D-69): percent-encoding inside the payload; refused, no partial result",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": "https://agentlink.4thtech.io/i#XVQBZGRJEwYAAAD4Pfghu9tV3d1VHWA2Oyt7OZecxGXXOae6uzo7e5k3ybxkkuxZAAAAAAAAAAAAAAAAAAAAAK7eZDfHDYZX3d9XX331vff3sBsO4WBYjbvVnX5ow%2DHAfty-fahlcf%5FWvVoefb05o8uvi-FgmLRu9c5uuPe_3o7QP__524enfLs7W9JdWUy30-X5aWl89O7-48-7djJe7M4_GazK1mitkW6n1Wbct5MrHe-Wu_VM9uh895oiO3WYsmstthZ8V8eOfILkkUlCQuPa437ZTHfbPdIuk0fXAoj9zzwcIlf2vXhBg6WURL09VPFcA2lQRW7YlGt18INxOdY9H_iYHcZYBIgSG5QgenaBCs68GISxM6kYt5VizTHX4Gpz1LxLxrd5GHX7YzIJzDW5nHtOORRskqBBFalEsbviIbTaZdaxx_07WckOUIW4JVIEh12KV2EbKXoTIllEiRM4oQrVVPbmElYfI5AP9KLk-2TYY4eUGgAn6T6KeKcxVIqBTH_R5BK3TMVccRKzDZnEV1dZAjDO3o-y1mOZPu_5TFVplEoKbpZSoTMauHSsGhAyGDSEnGxsTB6s6DwZk_TWTIgzvq1ey9P0wmg-NS8A3phKJurF1sA-Oq_BwAxIwiFA7AVBeuaiWrkkwGJ7j2yMq2m617awiAIl9_w7GPTxZrXV6bmczan56GD4S5-WN5tqzd2355Cer672Sjh4qlXB5DsKMcdKOXMGqzqQ2M1f10rTolI7S-lcQVgcgTaOZmdvPqWO0Fq11VMlNfNjccTW2aoYMEQfkarvLnZMQiVUtaaIJVhAvr81izmbL6rEttYiRzbfuxkUm5mjkALbTNgwWrpCb0iW4hoxV0iFmaGySz0GzD5qJF-gMeRCoZfW0WOs2L33YinPPrPlpNj6WnfNLlHR0kXmRT6r2jQ92qzXq_kz8P44f1mM13x6fH_8Eb68ezddPhyXi1eC4aYffVruTtLZ09Pp5U8n83Lm-BjoQq5X_5_-d3Qt901fUjAc_j48TNPhmzf759f6KOuba31dN2u783wyzi_Hy8lme3VIIdCb1Vg2j8Mf_9mzxdkFs_vbPw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bare-percent-payload",
+      "source": "04 \u00a73.6 invite encoding (D-69): percent-encoding inside a bare payload; refused, no partial result",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": "XVQBZGRJEwYAAAD4Pfghu9tV3d1VHWA2Oyt7OZecxGXXOae6uzo7e5k3ybxkkuxZAAAAAAAAAAAAAAAAAAAAAK7eZDfHDYZX3d9XX331vff3sBsO4WBYjbvVnX5ow%2DHAfty-fahlcf%5FWvVoefb05o8uvi-FgmLRu9c5uuPe_3o7QP__524enfLs7W9JdWUy30-X5aWl89O7-48-7djJe7M4_GazK1mitkW6n1Wbct5MrHe-Wu_VM9uh895oiO3WYsmstthZ8V8eOfILkkUlCQuPa437ZTHfbPdIuk0fXAoj9zzwcIlf2vXhBg6WURL09VPFcA2lQRW7YlGt18INxOdY9H_iYHcZYBIgSG5QgenaBCs68GISxM6kYt5VizTHX4Gpz1LxLxrd5GHX7YzIJzDW5nHtOORRskqBBFalEsbviIbTaZdaxx_07WckOUIW4JVIEh12KV2EbKXoTIllEiRM4oQrVVPbmElYfI5AP9KLk-2TYY4eUGgAn6T6KeKcxVIqBTH_R5BK3TMVccRKzDZnEV1dZAjDO3o-y1mOZPu_5TFVplEoKbpZSoTMauHSsGhAyGDSEnGxsTB6s6DwZk_TWTIgzvq1ey9P0wmg-NS8A3phKJurF1sA-Oq_BwAxIwiFA7AVBeuaiWrkkwGJ7j2yMq2m617awiAIl9_w7GPTxZrXV6bmczan56GD4S5-WN5tqzd2355Cer672Sjh4qlXB5DsKMcdKOXMGqzqQ2M1f10rTolI7S-lcQVgcgTaOZmdvPqWO0Fq11VMlNfNjccTW2aoYMEQfkarvLnZMQiVUtaaIJVhAvr81izmbL6rEttYiRzbfuxkUm5mjkALbTNgwWrpCb0iW4hoxV0iFmaGySz0GzD5qJF-gMeRCoZfW0WOs2L33YinPPrPlpNj6WnfNLlHR0kXmRT6r2jQ92qzXq_kz8P44f1mM13x6fH_8Eb68ezddPhyXi1eC4aYffVruTtLZ09Pp5U8n83Lm-BjoQq5X_5_-d3Qt901fUjAc_j48TNPhmzf759f6KOuba31dN2u783wyzi_Hy8lme3VIIdCb1Vg2j8Mf_9mzxdkFs_vbPw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bom",
+      "source": "04 \u00a73.6 invite encoding (D-69): the inflated JSON starts with a UTF-8 byte-order mark; refused, no partial result",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": "XVQBhGRHEAUAAACID4G9267u7q7qBeZ25-xlI7uxK3snIqq7q_fmsvNndv7M7M7FAQAAAAAAAIAgAAAAAACAAACk_szdhAyGX93v1atX7_9__vr7z27bncFJN-u3s7W8q91ZR65fvXkuebJ5Y15Nzz8vb_D-86Q76QYpK1nrDfP256ce2sfff3m3S0_bmymu82R4Gu5vr3Ol84vN-x-39aq_295-UFjhldJqI1kNs0W_b8cP0q-n2_lI9mJccxIDGTE2JlNrqNW7JoYMugjRWUL20SrXHvfTYliv9ki9jM6a6oH1f-QhH6iQa9mxVViMkcXpQ2FHxaN4EUvVVqFSDHxjnPZlzwcuJGNDyAyIkRSKEBwZj9mOvNYz2UYorNxaCiWFVLwp1WB1Jirf4rmX1bfJ2BOVaFJqKSafbeUIFQpzQQzNZAe-lsajjj3uv8lyMmCFkWpEsWBs4-yESUcKToVwYhakCIaxQFGVrZpoiwsB0Hk8Kvk6mW2hQYwVgCI3F5idkeALBo-qP0s0kWrCrK4YDkmHjOyKKcQeyI7e9zyXSx4-7vlUVa4Yc_RmlFKgkVVwbraIt5BAod6nqGPb6ECLxqEycatVhRjlW8kj74Yjo_pUHQM4ZcoJsWVdA7lgnHgFE1hk8h5Cyxa4JcoihXIEm3XvgZRxNgwbqRONKGA0h99JJy_L2UqGQzmpU-PRSfeH7KbLRdHm5sshpLezh70S8g5LEVD5Bn1IoWBKlECrBjg09dfUXCULl0acGxVgYoMglYLa2aqLsVmotejqsaCo-SEbJO2sVeutDy5YLK6Z0GxkzL6INrU2ew3I17dmMmbzqIp1azVQIPW9qUGhqjkC0ZPOZKsNmi7fqkVNcQk2FYiZiKCQiS14m1yQgC5DJUgZfcu1WWdDsc05x5ry5BJpTrKurzZT9RJmyY15XORB1aLK-WI-n42fgbeX6dOkf6Try83le_h0cTHcP1_mu1ds_bKdf5hur-LNbnd9_8PVuJwxPgq648fZ98N354-8qXJMQXf2a_c8DGenp_vn1_LC8-WjvC6Lud45nPTjy3E8WaweztB7PJ31efHS_fa_PWucjVe7v_wL"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-name-256-code-points",
+      "source": "04 \u00a73.6 invite encoding (D-69): a name of exactly 256 code points (04 \u00a73.4)",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": "5VQBhGRHEAUAAABYH8DebVV3d1f3AnO7c_aykd3Yk70TEdXd1Xtz2fkzO392dubiSACAAEAAEAAAAAEAAAAAgAAAUn_2dkMAAO4zw__d9eq9V6_7127THeNhN-s3s7W8qd1xF22_evVQ8uT-FbyYnnxaXtL1p0l32A1SVrLWHfD6-7se24eff3izS3ebyymt82S4G66vLnKNJ6f3777d1PP-7ebqvZYVXimsNpLVMFv0-3Z8I_16upmPYFuwzUrwEQRMSFCrr9XZJhCBbMBgTSR2wSjWvu67xbBe7St1M1kD1SHr_4gTnY8l2pYtGy0LIbBYfSlsY3EkTsTEaqrEUgCfEKd92eOh9QmM95mRKEQtJfQ2gqNsRlzjOJoWSVix9ZMvyafioFSgaiEo3uKhl9WTMnYxlgAptRSSy6ZywIqFuRD5Btmiq6XxyGNf95-ynACNMMUaSAyCaZytcFRJ3ioRTsxCMSAwFSzKslUIpljvkayjZyZflJnmG4ZQEWPgZj2zBfGukHek_LMECLEmyuoKsE8qMrAtUCI7jGb0vue5nPHwYY9XrY0GrTXMzSOqu9IMNiMlt0bFhAjcQNsYsuSTL82wc0ESlFaLjE6t5JZ3wzOi-lQtI9oWTU5ELesYovVgxTmwEQ1xdA59ywa5pZhFSswBTda5-6iIs2G4lzrRiCIFeHwOO9kuZysZHj8ndWpcOux-kd10uSjaHD4_hvRqdrNn4j1AMs6pxa41UDXcECjUSpTR-AxlnF8KthZXxKvaOrLVuHqfNL7SvBRDagc5HYhBTZQk60XFtWJztZVzKcE6jXdT1ZH8mE8rAJUL5i-nZjJm84kVZDCUxWtcNHJV3dLQh4Z6bsjY4ryGHIhtyk0qqTFGR6njC-ACB2E0wWJwpQUjiNpHIGGSYIJqiRVMjrZkrlqclCll9ho_UKIYa4wJy8hqUeVkMZ_Pxmvg9Vn6OOlv48XZ_dk7_Hh6Olw_nOW3L9i4ZTt5P92ch8vd7uL6m_NxOGN8tGiv6eCfP__4TX-_H_z918H2a3ye898d_9g9DMPx0dH-_aVseb68lZdlMdc9jyv9eC08ryxWN8fkHB3N-rzYdj_9L-F6kMFFgM__Ag"
+      },
+      "expected": {
+        "inviteJcs": "{\"card\":{\"agentEnc\":\"0x13590255ba17768ae371538047b258c824a82f87ea287b255c959c40cd07d306\",\"agentEvm\":\"0x03f3e6580e02690dd5dd43fe080736163287a462\",\"agentNostr\":\"0x90d7320d41a20d03f38458c83fb3a2287666ae3b3aca38c47e4ee28d2de8cc01\",\"expiresAt\":1791536000,\"issuedAt\":1760000000,\"keyEpoch\":0,\"nameHash\":\"0xd33821332aaf511a38ef21f2ecbff7c2680af05aa2737595cf2a446e90cfdce6\",\"ownerEnc\":\"0x2f5f166d1186af35aa30e54c754740cbe6068d97bc010a59f876a3c0c8a41822\",\"ownerEvm\":\"0xa488c6099f9694b2da61d1caac775f0b314dcfa1\",\"ownerNostr\":\"0xb9012ea78d67e2102fab3ea887653c82a9aae78610a7c1c153fd062c35517347\",\"relaysHash\":\"0xc60d3a113f82b977fb5ba83503e44038127a84415fb21af98beec8b612b3f358\",\"version\":1},\"cardAgentSig\":\"0x0b027be5fa19c4d60d1a26f1580723c453ac07a39bfed78b62c01c8a6046a6ea1263164cf62e110dae0919e6267758d02b83cbaded795e17ba5a780abc18d8891c\",\"cardSig\":\"0x550092449aa4ff07c2af1076dd77b125b0cc775963dc4ce5c26dfb5b807559dd5ef5ec271f2743552155be935e13ffc3bd3dabcc634361fd3a875a38c3e00dac1b\",\"codeCommit\":\"FH9jAnl8OHuHX1jDDsWwHbT-a24pfCYEvK6PyyOWJK8\",\"expiresAt\":1760604800,\"inviteId\":\"83nrBwcbAuB0-ECzpP7WzA\",\"name\":\"Agent \ud835\udc00\ud835\udc01 \u00e9 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"relays\":[\"wss://relay.example.com\",\"wss://nostr.example.org:7447/inbox\"],\"secret\":\"0FQqn1fh_VIy9qvPE7tbAsqsWSObd8CDuXLvdKnTvSY\",\"v\":1}"
+      }
+    },
+    {
+      "id": "reject-name-257-code-points",
+      "source": "04 \u00a73.6 invite encoding (D-69): a name of 257 code points (04 \u00a73.4: at most 256); refused, no partial result",
+      "input": {
+        "op": "decodeInviteLink",
+        "link": "5VQBhGRHEAUAAABYH8DebXd3d1X1AnO7c_aykd3Yk70TEdXd1Xtz2fmzO392dubiSACAAEAAEAAAAAEAAAAAgAAAUn_mdkMAAO4zQ__uevXqvff7127dHdvDbtavZyt5U7vjjny_fPVY8uThlXkxPfl0d4nXnybdYTdIWcpKT5jX39_3tn34-Yc323S_vpziKk-G--H66iJXOjl9ePftup73b9dX77Ws8FJhtZEsh9mi37XjG-lX0_V8BNsY37xAJCPGQTK1xlqDb2LIoAcL3hFyAKdYu7rvFsNquavUw-idqcGy_o84FCIV8i17dloGACxeF4U9lYASRBxVV4VKMfYJcdqXHZ71MRkXY2aLCKSlaKMnEzC7EdcFJtcIhRVbX8WSYirBlGqwegOKt3jsZfk0GQeiAialliCF7CqDrbYwF8TYTPY21NJ45LGr-2-ynIx1wkgVUJw1rnH2wqQjRa9EODELEljDWGxRlq0acMXHaNEHfGbyZTLXYrMA1VoCbj4yeyMxFIwBlX8WMEA1YVZVDMekQwL7YgpxsORG7XueyxkPH_ZKZaLoMFI1SVGzVeFVUx9UHCDhmnQZa_QWDIJPTtW0wSXAEmv2pHhLueXt8IyoOlXP1vpGLifEltUG8tF4CcF4sg6ZQrCxZWe5JcoihTJYl9X3OCLOhuFB6kQjahHM_jnsZHM3W8qwf51UqXHrsPtFttO7RdHm5vM-pFezm71roLaqRNo-SoDSYnak3FOzQWeBWIKOGExW7zJmbMFrWiAJAaZggvMmGmgB7ZgjDoyaOt-ab5qHwEwalxaDqgI1R3WELTWpUjImDZXY8uWrmYzZfGKlfgWAXKrmhQRDyVEUH5SYSbEmi1EkRkrqJECpCDbmqKwqlDIqqGHSwNkorSiTjK5qt5Fi9EaVVT9DqB5zTU0Jl9ya6GGvMZTcbLR5ZLWocrKYz2fjNfD6LH2c9Ld0cfZw9s5-PD0drh_P8tsX7MJdO3k_XZ_D5XZ7cf3N-WjOGB8t2s108M-ff_ymv98P_v7rYPNVPs8fQHf8Y_c4DMdHR7v1S9nw_O5WXpbFXM_sd_rxXnjeWSxvjjEEPJr1ebHpfvpfxNV_E8iYz_8C"
       },
       "expected": {
         "outcome": "reject"

@@ -32,6 +32,7 @@ import {
   approvalDecideBatchAction,
   approvalRequestFor,
   commitmentScope,
+  contactCheckAction,
   envelope,
   fileEntryInline,
   invite,
@@ -75,6 +76,12 @@ const SCHEMAS = [
     'signedOwnerAction (approval.decideBatch)',
     signedOwnerActionSchema,
     () => signed(approvalDecideBatchAction(20)),
+  ],
+  // M1-2f (G-28)
+  [
+    'signedOwnerAction (contact.check)',
+    signedOwnerActionSchema,
+    () => signed(contactCheckAction()),
   ],
 ] as const;
 

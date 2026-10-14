@@ -1,7 +1,7 @@
 {
   "$schema": "../schema/vector-file.schema.json",
   "suite": "pairing-bodies",
-  "version": 1,
+  "version": 2,
   "generator": {
     "tool": "python (hashlib, cryptography 50.0.2, coincurve 21.0.0, pycryptodome 3.23.0, rfc8785 0.1.4)",
     "version": "cpython 3.13.11",
@@ -3048,6 +3048,222 @@
       }
     },
     {
+      "id": "invite-accept-name-256-code-points",
+      "source": "04 \u00a73.6 invite: a name of exactly 256 code points (258 UTF-16 units; 04 \u00a73.4)",
+      "input": {
+        "op": "parseInvite",
+        "body": {
+          "v": 1,
+          "inviteId": "83nrBwcbAuB0-ECzpP7WzA",
+          "secret": "0FQqn1fh_VIy9qvPE7tbAsqsWSObd8CDuXLvdKnTvSY",
+          "card": {
+            "version": 1,
+            "agentEvm": "0x03f3e6580e02690dd5dd43fe080736163287a462",
+            "agentNostr": "0x90d7320d41a20d03f38458c83fb3a2287666ae3b3aca38c47e4ee28d2de8cc01",
+            "agentEnc": "0x13590255ba17768ae371538047b258c824a82f87ea287b255c959c40cd07d306",
+            "ownerEvm": "0xa488c6099f9694b2da61d1caac775f0b314dcfa1",
+            "ownerNostr": "0xb9012ea78d67e2102fab3ea887653c82a9aae78610a7c1c153fd062c35517347",
+            "ownerEnc": "0x2f5f166d1186af35aa30e54c754740cbe6068d97bc010a59f876a3c0c8a41822",
+            "nameHash": "0xd33821332aaf511a38ef21f2ecbff7c2680af05aa2737595cf2a446e90cfdce6",
+            "relaysHash": "0xc60d3a113f82b977fb5ba83503e44038127a84415fb21af98beec8b612b3f358",
+            "issuedAt": 1760000000,
+            "expiresAt": 1791536000,
+            "keyEpoch": 0
+          },
+          "cardSig": "0x550092449aa4ff07c2af1076dd77b125b0cc775963dc4ce5c26dfb5b807559dd5ef5ec271f2743552155be935e13ffc3bd3dabcc634361fd3a875a38c3e00dac1b",
+          "cardAgentSig": "0x0b027be5fa19c4d60d1a26f1580723c453ac07a39bfed78b62c01c8a6046a6ea1263164cf62e110dae0919e6267758d02b83cbaded795e17ba5a780abc18d8891c",
+          "codeCommit": "FH9jAnl8OHuHX1jDDsWwHbT-a24pfCYEvK6PyyOWJK8",
+          "name": "Agent \ud835\udc00\ud835\udc01 \u00e9 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "relays": [
+            "wss://relay.example.com",
+            "wss://nostr.example.org:7447/inbox"
+          ],
+          "expiresAt": 1760604800
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "invite-reject-name-257-code-points",
+      "source": "04 \u00a73.6 invite: a name of 257 code points (04 \u00a73.4: at most 256); rejected, never normalised",
+      "input": {
+        "op": "parseInvite",
+        "body": {
+          "v": 1,
+          "inviteId": "83nrBwcbAuB0-ECzpP7WzA",
+          "secret": "0FQqn1fh_VIy9qvPE7tbAsqsWSObd8CDuXLvdKnTvSY",
+          "card": {
+            "version": 1,
+            "agentEvm": "0x03f3e6580e02690dd5dd43fe080736163287a462",
+            "agentNostr": "0x90d7320d41a20d03f38458c83fb3a2287666ae3b3aca38c47e4ee28d2de8cc01",
+            "agentEnc": "0x13590255ba17768ae371538047b258c824a82f87ea287b255c959c40cd07d306",
+            "ownerEvm": "0xa488c6099f9694b2da61d1caac775f0b314dcfa1",
+            "ownerNostr": "0xb9012ea78d67e2102fab3ea887653c82a9aae78610a7c1c153fd062c35517347",
+            "ownerEnc": "0x2f5f166d1186af35aa30e54c754740cbe6068d97bc010a59f876a3c0c8a41822",
+            "nameHash": "0x1b8852758d096d1b1845e8c3487e68ead95e85d531607639268a142967c5db38",
+            "relaysHash": "0xc60d3a113f82b977fb5ba83503e44038127a84415fb21af98beec8b612b3f358",
+            "issuedAt": 1760000000,
+            "expiresAt": 1791536000,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xa6c9535aba85e46cf5b284299f1476365c468e40bdcfb7b7f4377669e8679404230506f471ba17a4a74ee3ff3fa484aa8cd0f546396db5118a18fedecb79b25e1c",
+          "cardAgentSig": "0x30e466bcdfa18e74cb5eba16429095d9175ee558960666cd7615b569ed6cc4403a78b3115efc3fab72d9b21ba1530a8488544d37bd9f74ecbffe15e312eebf151b",
+          "codeCommit": "FH9jAnl8OHuHX1jDDsWwHbT-a24pfCYEvK6PyyOWJK8",
+          "name": "Agent \ud835\udc00\ud835\udc01 \u00e9 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "relays": [
+            "wss://relay.example.com",
+            "wss://nostr.example.org:7447/inbox"
+          ],
+          "expiresAt": 1760604800
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "handshake-accept-name-256-code-points",
+      "source": "04 \u00a73.6 handshake: a name of exactly 256 code points (258 UTF-16 units; 04 \u00a73.4)",
+      "input": {
+        "op": "parseHandshake",
+        "body": {
+          "inviteId": "83nrBwcbAuB0-ECzpP7WzA",
+          "card": {
+            "version": 1,
+            "agentEvm": "0xa6a3bfbb7c9007039b19dd6b9f993b1c2ea5df7a",
+            "agentNostr": "0xf62efcc81b79583629dc60a09fcdb751eba1329c5575a57e0f19e6147747272c",
+            "agentEnc": "0x714f6ec29d2c2f1c8a3ba0fdef5df72062b6020c863b9692dbf54839fd1fad2f",
+            "ownerEvm": "0xb9495207ce4c6c8a56f154577142648cad2bcc55",
+            "ownerNostr": "0x4e7c98e08089aac49ea5ad33185436bdcdd7f56c88f17fd8b096223cf09702c2",
+            "ownerEnc": "0x7783134252f6c8692f78165e72649d447ab296030f11243e6eb5beebf8d11505",
+            "nameHash": "0xd33821332aaf511a38ef21f2ecbff7c2680af05aa2737595cf2a446e90cfdce6",
+            "relaysHash": "0x51f7b365aaf159e0a92fdfb805524d6d94f615dac3223a6f5d0567d604d231e0",
+            "issuedAt": 1760000000,
+            "expiresAt": 1791536000,
+            "keyEpoch": 0
+          },
+          "cardSig": "0x7b2e871e7b5e29d4f7622f3da453252d4892f8532a8cd2ef7323ec5a122636a7379a97a288b872907ea6bc9a0a7061deca4aec3397ca23e8cda95baeb595f5ea1c",
+          "cardAgentSig": "0xa69fda048bda040e525b70bf41d13cc36360f19099d60e389bead1b141e9c8050b10ccbd60fffead3aa9130d2ad25e3052ca79ff2f1a178f2e5ead8adc8d4c881c",
+          "name": "Agent \ud835\udc00\ud835\udc01 \u00e9 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "relays": [
+            "wss://relay.example.net",
+            "wss://relay.example.com"
+          ],
+          "proof": "XNBPbpJVTxs9V87X7JET7w8DgCGOAEITMo2Suie4egs",
+          "codeNonce": "1Ks5BKU1FZFc2JtFTMsiEzsDjzs0nfcirOJcf985mzE",
+          "codeCommit": "FH9jAnl8OHuHX1jDDsWwHbT-a24pfCYEvK6PyyOWJK8",
+          "inviterCardHash": "d9c45653cc49e7a36162fcb7212cd159b9caa6368aeed72ccb238a2126fa4c0d"
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "handshake-reject-name-257-code-points",
+      "source": "04 \u00a73.6 handshake: a name of 257 code points (04 \u00a73.4: at most 256); rejected, never normalised",
+      "input": {
+        "op": "parseHandshake",
+        "body": {
+          "inviteId": "83nrBwcbAuB0-ECzpP7WzA",
+          "card": {
+            "version": 1,
+            "agentEvm": "0xa6a3bfbb7c9007039b19dd6b9f993b1c2ea5df7a",
+            "agentNostr": "0xf62efcc81b79583629dc60a09fcdb751eba1329c5575a57e0f19e6147747272c",
+            "agentEnc": "0x714f6ec29d2c2f1c8a3ba0fdef5df72062b6020c863b9692dbf54839fd1fad2f",
+            "ownerEvm": "0xb9495207ce4c6c8a56f154577142648cad2bcc55",
+            "ownerNostr": "0x4e7c98e08089aac49ea5ad33185436bdcdd7f56c88f17fd8b096223cf09702c2",
+            "ownerEnc": "0x7783134252f6c8692f78165e72649d447ab296030f11243e6eb5beebf8d11505",
+            "nameHash": "0x1b8852758d096d1b1845e8c3487e68ead95e85d531607639268a142967c5db38",
+            "relaysHash": "0x51f7b365aaf159e0a92fdfb805524d6d94f615dac3223a6f5d0567d604d231e0",
+            "issuedAt": 1760000000,
+            "expiresAt": 1791536000,
+            "keyEpoch": 0
+          },
+          "cardSig": "0x1719ac36011d5fba7b5ee0f0de14068931b7d396fd682f43a72cf816d95560e434c7f46ae636bca50019adb23d635bb6d206ac80e53812f04435faf018a688c71b",
+          "cardAgentSig": "0x74ebf9c981caefb200ed273919a8780b486771ea5f8cda51c1289f163e3767cd19cfda305b2e0b048875b58493cbeb649247c595177416a3aacf780a2d0df8181c",
+          "name": "Agent \ud835\udc00\ud835\udc01 \u00e9 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "relays": [
+            "wss://relay.example.net",
+            "wss://relay.example.com"
+          ],
+          "proof": "Kqe6H27g3_YSQUvg0wQ9ysE8hUgGXTNzmsaBklVwUzw",
+          "codeNonce": "1Ks5BKU1FZFc2JtFTMsiEzsDjzs0nfcirOJcf985mzE",
+          "codeCommit": "FH9jAnl8OHuHX1jDDsWwHbT-a24pfCYEvK6PyyOWJK8",
+          "inviterCardHash": "d9c45653cc49e7a36162fcb7212cd159b9caa6368aeed72ccb238a2126fa4c0d"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-update-accept-name-256-code-points",
+      "source": "04 \u00a73.4.1 card-update: a name of exactly 256 code points (258 UTF-16 units; 04 \u00a73.4)",
+      "input": {
+        "op": "parseCardUpdate",
+        "body": {
+          "card": {
+            "version": 1,
+            "agentEvm": "0x03f3e6580e02690dd5dd43fe080736163287a462",
+            "agentNostr": "0x90d7320d41a20d03f38458c83fb3a2287666ae3b3aca38c47e4ee28d2de8cc01",
+            "agentEnc": "0x13590255ba17768ae371538047b258c824a82f87ea287b255c959c40cd07d306",
+            "ownerEvm": "0xa488c6099f9694b2da61d1caac775f0b314dcfa1",
+            "ownerNostr": "0xb9012ea78d67e2102fab3ea887653c82a9aae78610a7c1c153fd062c35517347",
+            "ownerEnc": "0x2f5f166d1186af35aa30e54c754740cbe6068d97bc010a59f876a3c0c8a41822",
+            "nameHash": "0xd33821332aaf511a38ef21f2ecbff7c2680af05aa2737595cf2a446e90cfdce6",
+            "relaysHash": "0xc60d3a113f82b977fb5ba83503e44038127a84415fb21af98beec8b612b3f358",
+            "issuedAt": 1760000000,
+            "expiresAt": 1791536000,
+            "keyEpoch": 0
+          },
+          "cardSig": "0x550092449aa4ff07c2af1076dd77b125b0cc775963dc4ce5c26dfb5b807559dd5ef5ec271f2743552155be935e13ffc3bd3dabcc634361fd3a875a38c3e00dac1b",
+          "name": "Agent \ud835\udc00\ud835\udc01 \u00e9 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "relays": [
+            "wss://relay.example.com",
+            "wss://nostr.example.org:7447/inbox"
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "card-update-reject-name-257-code-points",
+      "source": "04 \u00a73.4.1 card-update: a name of 257 code points (04 \u00a73.4: at most 256); rejected, never normalised",
+      "input": {
+        "op": "parseCardUpdate",
+        "body": {
+          "card": {
+            "version": 1,
+            "agentEvm": "0x03f3e6580e02690dd5dd43fe080736163287a462",
+            "agentNostr": "0x90d7320d41a20d03f38458c83fb3a2287666ae3b3aca38c47e4ee28d2de8cc01",
+            "agentEnc": "0x13590255ba17768ae371538047b258c824a82f87ea287b255c959c40cd07d306",
+            "ownerEvm": "0xa488c6099f9694b2da61d1caac775f0b314dcfa1",
+            "ownerNostr": "0xb9012ea78d67e2102fab3ea887653c82a9aae78610a7c1c153fd062c35517347",
+            "ownerEnc": "0x2f5f166d1186af35aa30e54c754740cbe6068d97bc010a59f876a3c0c8a41822",
+            "nameHash": "0x1b8852758d096d1b1845e8c3487e68ead95e85d531607639268a142967c5db38",
+            "relaysHash": "0xc60d3a113f82b977fb5ba83503e44038127a84415fb21af98beec8b612b3f358",
+            "issuedAt": 1760000000,
+            "expiresAt": 1791536000,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xa6c9535aba85e46cf5b284299f1476365c468e40bdcfb7b7f4377669e8679404230506f471ba17a4a74ee3ff3fa484aa8cd0f546396db5118a18fedecb79b25e1c",
+          "name": "Agent \ud835\udc00\ud835\udc01 \u00e9 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "relays": [
+            "wss://relay.example.com",
+            "wss://nostr.example.org:7447/inbox"
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
       "id": "invite-reject-invite-id-short",
       "source": "04 \u00a73.6 invite: `inviteId` of 15 bytes (it is exactly 16); rejected, never normalised",
       "input": {
@@ -5031,6 +5247,20 @@
         "relays": [
           "wss://relay.example.com",
           "wss://0x7f.example.com"
+        ]
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "relays-reject-bare-0x-label",
+      "source": "04 \u00a73.4 relays (2 to 16, unique) and the 04 \u00a74 relay URL rule: a bare 0x label (0x followed by zero hex digits is numeric); rejected, never normalised",
+      "input": {
+        "op": "parseRelayList",
+        "relays": [
+          "wss://relay.example.com",
+          "wss://0x.example.com"
         ]
       },
       "expected": {

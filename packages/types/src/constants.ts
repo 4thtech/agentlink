@@ -169,6 +169,7 @@ export const OWNER_ACTION_OPS = freeze([
   'approval.decideBatch',
   'approval.cancel',
   'policy.set',
+  'contact.check',
   'agent.revoke',
 ] as const);
 export type OwnerActionOp = (typeof OWNER_ACTION_OPS)[number];
@@ -198,8 +199,8 @@ export const CLOCK_SKEW_SECONDS = 300;
 
 /**
  * Maximum lifetime `L(op)` = the largest allowed `expiresAt − issuedAt` (04 §2.5.1 table). `null`:
- * the op never expires (`agent.revoke`, `expiresAt` = 0). `contact.check` (G-28) is listed although
- * its schema lands with the task that builds it.
+ * the op never expires (`agent.revoke`, `expiresAt` = 0). `contact.check` (G-28): 24 h, as for
+ * `policy.set`; its schema is M1-2f.
  */
 export const OWNER_ACTION_MAX_LIFETIME_SECONDS = freeze({
   'approval.decide': 86_400,

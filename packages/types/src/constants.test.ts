@@ -161,6 +161,7 @@ describe('constants (04, 05, 06)', () => {
         'approval.cancel',
         'approval.decide',
         'approval.decideBatch',
+        'contact.check',
         'policy.set',
       ].sort(),
     );
@@ -243,6 +244,10 @@ describe('constants (04, 05, 06)', () => {
     ).filter((l): l is number => l !== null);
     // Every op that expires is covered by OWNER_ACTION_OPS or named in 04 §2.5.1; agent.revoke never expires.
     for (const op of OWNER_ACTION_OPS) expect(op in OWNER_ACTION_MAX_LIFETIME_SECONDS).toBe(true);
+    // ...and, since contact.check has its schema (M1-2f), every listed lifetime belongs to an op.
+    expect(Object.keys(OWNER_ACTION_MAX_LIFETIME_SECONDS).sort()).toEqual(
+      [...OWNER_ACTION_OPS].sort(),
+    );
     // No op may exceed 7 days; nonces outlive the longest lifetime plus skew.
     for (const l of [...lifetimes, LATER_OP_DEFAULT_LIFETIME_SECONDS]) {
       expect(l).toBeLessThanOrEqual(MAX_OWNER_ACTION_LIFETIME_SECONDS);

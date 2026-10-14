@@ -7,6 +7,7 @@ import {
   approvalCancelActionSchema,
   approvalDecideActionSchema,
   approvalDecideBatchActionSchema,
+  contactCheckActionSchema,
   ownerActionSchema,
   policySetActionSchema,
   signedAgentRevokeSchema,
@@ -22,6 +23,7 @@ import {
   approvalDecideBatchAction,
   b64u,
   BIP340_SIG,
+  contactCheckAction,
   DELETE,
   edit,
   ID16,
@@ -35,6 +37,7 @@ const ALL = [
   ['agent.revoke', agentRevokeAction, agentRevokeActionSchema],
   ['approval.cancel (D-55)', approvalCancelAction, approvalCancelActionSchema],
   ['approval.decideBatch (D-68)', approvalDecideBatchAction, approvalDecideBatchActionSchema],
+  ['contact.check (G-28)', contactCheckAction, contactCheckActionSchema],
 ] as const;
 
 describe('OwnerAction round trips', () => {
@@ -108,6 +111,7 @@ describe('OwnerAction rejects every non-canonical or malformed field', () => {
     ['policy.set', policySetAction],
     ['approval.cancel', approvalCancelAction],
     ['approval.decideBatch', approvalDecideBatchAction],
+    ['contact.check', contactCheckAction],
   ] as const)('%s requires a non-zero expiresAt after issuedAt', (_op, make) => {
     expectReject(ownerActionSchema, edit(make(), ['expiresAt'], 0));
     expectReject(ownerActionSchema, edit(make(), ['expiresAt'], 1760000000));
