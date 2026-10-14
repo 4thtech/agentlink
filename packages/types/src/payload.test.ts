@@ -21,12 +21,20 @@ import {
   B32,
   b64u,
   bodyOf,
+  CARD_AGENT_SIG,
   CARD_SIG,
+  CODE_COMMIT,
+  CODE_NONCE,
+  CODE_REVEAL,
   DELETE,
   edit,
   fileEntryInline,
   fileEntryUrl,
+  HANDSHAKE_HASH,
+  hex,
+  hex0x,
   ID16,
+  INVITER_CARD_HASH,
   KEY32,
   payloads,
   policySetAction,
@@ -260,18 +268,53 @@ describe('offer / accept / reject outer shape (04 §3.4; terms schema lands in M
   });
 });
 
+const RELAYS_17 = Array.from({ length: 17 }, (_, i) => `wss://r${i}.example.org`);
+const RELAYS_16 = RELAYS_17.slice(0, 16);
+
 describe('handshake and card-update bodies (04 §3.6, §3.4.1)', () => {
   const hs = () => payloads().handshake;
 
   it.each([
+    'inviteId',
+    'card',
+    'cardSig',
+    'cardAgentSig',
+    'name',
+    'relays',
+    'proof',
+    'codeNonce',
+    'codeCommit',
+    'inviterCardHash',
+  ])('handshake rejects a body without %s (every field is required)', (field) => {
+    expectReject(payloadSchema, edit(hs(), ['body', field], DELETE));
+  });
+
+  it.each([
     ['unknown key', ['body', 'secret'], KEY32],
-    ['missing proof', ['body', 'proof'], DELETE],
+    ['codeReveal smuggled in', ['body', 'codeReveal'], CODE_REVEAL],
     ['proof 31 bytes', ['body', 'proof'], b64u(31)],
     ['proof hex', ['body', 'proof'], SHA],
     ['inviteId 32 bytes', ['body', 'inviteId'], KEY32],
     ['card with unknown key', ['body', 'card', 'x'], 1],
     ['cardSig short', ['body', 'cardSig'], CARD_SIG.slice(0, -2)],
+    ['cardAgentSig short', ['body', 'cardAgentSig'], CARD_AGENT_SIG.slice(0, -2)],
+    ['cardAgentSig bare hex', ['body', 'cardAgentSig'], CARD_AGENT_SIG.slice(2)],
+    ['cardAgentSig v 1', ['body', 'cardAgentSig'], `${CARD_AGENT_SIG.slice(0, -2)}01`],
+    ['codeNonce 31 bytes', ['body', 'codeNonce'], b64u(31)],
+    ['codeNonce 16 bytes', ['body', 'codeNonce'], ID16],
+    ['codeNonce padded', ['body', 'codeNonce'], `${CODE_NONCE}=`],
+    ['codeNonce hex', ['body', 'codeNonce'], hex(32)],
+    ['codeCommit 33 bytes', ['body', 'codeCommit'], b64u(33)],
+    ['codeCommit padded', ['body', 'codeCommit'], `${CODE_COMMIT}=`],
+    ['codeCommit standard base64', ['body', 'codeCommit'], `${CODE_COMMIT.slice(0, -1)}/`],
+    ['inviterCardHash with 0x', ['body', 'inviterCardHash'], `0x${INVITER_CARD_HASH}`],
+    ['inviterCardHash uppercase', ['body', 'inviterCardHash'], INVITER_CARD_HASH.toUpperCase()],
+    ['inviterCardHash 63 hex', ['body', 'inviterCardHash'], INVITER_CARD_HASH.slice(1)],
+    ['inviterCardHash 65 hex', ['body', 'inviterCardHash'], `${INVITER_CARD_HASH}a`],
+    ['inviterCardHash base64url', ['body', 'inviterCardHash'], KEY32],
     ['relays empty', ['body', 'relays'], []],
+    ['relays with 1 entry', ['body', 'relays'], [RELAYS[0]]],
+    ['relays with 17 entries', ['body', 'relays'], RELAYS_17],
     ['name too long', ['body', 'name'], 'x'.repeat(257)],
   ] as const)('handshake rejects %s', (_l, path, value) => {
     expectReject(payloadSchema, edit(hs(), path, value));
@@ -282,20 +325,77 @@ describe('handshake and card-update bodies (04 §3.6, §3.4.1)', () => {
     ['missing card', ['body', 'card'], DELETE],
     ['missing relays', ['body', 'relays'], DELETE],
     ['keyEpoch 2^32', ['body', 'card', 'keyEpoch'], 2 ** 32],
+    ['relays with 1 entry', ['body', 'relays'], [RELAYS[0]]],
+    ['relays with 17 entries', ['body', 'relays'], RELAYS_17],
   ] as const)('card-update rejects %s', (_l, path, value) => {
     expectReject(payloadSchema, edit(payloads()['card-update'], path, value));
   });
 
-  it('handshake-ack is strict', () => {
-    const p = payloads()['handshake-ack'];
-    expectReject(payloadSchema, edit(p, ['body', 'extra'], 1));
-    expectReject(payloadSchema, edit(p, ['body', 'handshakeId'], DELETE));
-    expectReject(payloadSchema, edit(p, ['body', 'inviteId'], `${ID16}==`));
-  });
-
   it('relay URL and card values are the canonical forms', () => {
     expectAccept(payloadSchema, edit(hs(), ['body', 'relays'], RELAYS));
+    expectAccept(payloadSchema, edit(hs(), ['body', 'relays'], RELAYS_16));
+    expectAccept(payloadSchema, edit(payloads()['card-update'], ['body', 'relays'], RELAYS_16));
     expectReject(payloadSchema, edit(hs(), ['body', 'card'], { ...agentCard(), version: 2 }));
+  });
+});
+
+describe('handshake-ack body (04 §3.4.1, §3.6.1; G-24 relays, D-65)', () => {
+  const ack = () => payloads()['handshake-ack'];
+
+  it('round-trips with relays of 2 and 16 entries', () => {
+    expectRoundTrip(payloadSchema, ack());
+    expectRoundTrip(payloadSchema, edit(ack(), ['body', 'relays'], RELAYS_16));
+  });
+
+  it.each(['inviteId', 'handshakeId', 'handshakeHash', 'codeReveal', 'card', 'cardSig', 'relays'])(
+    'rejects an ack without %s (every field is required)',
+    (field) => {
+      expectReject(payloadSchema, edit(ack(), ['body', field], DELETE));
+    },
+  );
+
+  it.each([
+    ['unknown key', ['body', 'extra'], 1],
+    // The ack carries the card exactly as in the invite, with `cardSig` only (04 §3.4.1).
+    ['cardAgentSig', ['body', 'cardAgentSig'], CARD_AGENT_SIG],
+    ['name', ['body', 'name'], 'Tali'],
+    ['codeCommit', ['body', 'codeCommit'], CODE_COMMIT],
+    ['proof', ['body', 'proof'], KEY32],
+  ] as const)('rejects an ack with %s (strict)', (_l, path, value) => {
+    expectReject(payloadSchema, edit(ack(), path, value));
+  });
+
+  it.each([
+    ['inviteId padded', ['body', 'inviteId'], `${ID16}==`],
+    ['inviteId 32 bytes', ['body', 'inviteId'], KEY32],
+    ['handshakeId 32 bytes', ['body', 'handshakeId'], KEY32],
+    ['handshakeHash bare hex', ['body', 'handshakeHash'], HANDSHAKE_HASH.slice(2)],
+    [
+      'handshakeHash uppercase',
+      ['body', 'handshakeHash'],
+      `0x${HANDSHAKE_HASH.slice(2).toUpperCase()}`,
+    ],
+    ['handshakeHash 0X prefix', ['body', 'handshakeHash'], `0X${HANDSHAKE_HASH.slice(2)}`],
+    ['handshakeHash 31 bytes', ['body', 'handshakeHash'], hex0x(31)],
+    ['handshakeHash 33 bytes', ['body', 'handshakeHash'], hex0x(33)],
+    ['handshakeHash base64url', ['body', 'handshakeHash'], KEY32],
+    ['codeReveal 31 bytes', ['body', 'codeReveal'], b64u(31)],
+    ['codeReveal 16 bytes', ['body', 'codeReveal'], ID16],
+    ['codeReveal padded', ['body', 'codeReveal'], `${CODE_REVEAL}=`],
+    ['codeReveal non-zero tail bits', ['body', 'codeReveal'], `${CODE_REVEAL.slice(0, -1)}H`],
+    ['codeReveal hex', ['body', 'codeReveal'], hex(32)],
+    ['card with unknown key', ['body', 'card', 'x'], 1],
+    ['card version 2', ['body', 'card', 'version'], 2],
+    ['cardSig short', ['body', 'cardSig'], CARD_SIG.slice(0, -2)],
+    ['cardSig v 0', ['body', 'cardSig'], `${CARD_SIG.slice(0, -2)}00`],
+    ['relays empty', ['body', 'relays'], []],
+    ['relays with 1 entry', ['body', 'relays'], [RELAYS[0]]],
+    ['relays with 17 entries', ['body', 'relays'], RELAYS_17],
+    ['relays duplicated', ['body', 'relays'], [RELAYS[0], RELAYS[0]]],
+    ['relays local host', ['body', 'relays'], [RELAYS[0], 'wss://127.0.0.1']],
+    ['relays a string', ['body', 'relays'], RELAYS[0]],
+  ] as const)('rejects %s', (_l, path, value) => {
+    expectReject(payloadSchema, edit(ack(), path, value));
   });
 });
 

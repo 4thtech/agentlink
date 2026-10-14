@@ -242,6 +242,8 @@ export const BYTE_LENGTHS = freeze({
   secret: 32,
   /** Handshake `proof` = HMAC-SHA256 (§3.6). */
   hmac: 32,
+  /** Safety-code `codeCommit`, `codeNonce` (`nonceB`) and `codeReveal` (`nonceA`) (§3.6.1). */
+  safetyCode: 32,
   sha256: 32,
   /** HPKE `enc` for DHKEM(X25519, HKDF-SHA256) (§3.3). */
   hpkeEnc: 32,
@@ -291,7 +293,11 @@ export const FILE_LINK_MAX_EXPIRY_DAYS = 7;
 
 /** Files per payload. `agentlink_send` attaches one; the envelope size cap bounds the rest. */
 export const MAX_FILES_PER_PAYLOAD = 16;
-/** Relays per card, handshake or invite. */
+/**
+ * Relays in a list carried with a card (invite, `handshake`, `handshake-ack`, `card-update`): 2 to 16
+ * (04 §3.4; the minimum of 2 is G-24, D-65).
+ */
+export const MIN_RELAYS = 2;
 export const MAX_RELAYS = 16;
 export const MAX_RELAY_URL_LENGTH = 256;
 /** Raw, self-declared display name before `restrictName` (06 §2.1). Untrusted; never shown raw. */

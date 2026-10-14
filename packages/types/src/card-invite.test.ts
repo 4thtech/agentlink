@@ -17,7 +17,9 @@ import { expectAccept, expectReject, expectRoundTrip } from './testing/assert.js
 import {
   agentCard,
   b64u,
+  CARD_AGENT_SIG,
   CARD_SIG,
+  CODE_COMMIT,
   DELETE,
   edit,
   ID16,
@@ -143,15 +145,18 @@ describe('display names and relay lists (untrusted, bounded)', () => {
     expectReject(displayNameSchema, null);
   });
 
-  it('accepts 1–16 distinct wss:// relay URLs and rejects everything else', () => {
+  it('accepts 2–16 distinct wss:// relay URLs and rejects everything else (04 §3.4, G-24)', () => {
     expectAccept(relayListSchema, RELAYS);
-    expectAccept(relayListSchema, ['wss://ab.cd']);
+    expectAccept(relayListSchema, ['wss://ab.cd', 'wss://ef.gh']);
     expectAccept(
       relayListSchema,
       Array.from({ length: 16 }, (_, i) => `wss://r${i}.example.org`),
     );
     for (const bad of [
       [],
+      // A list carried with a card holds at least 2 (G-24, D-65): a single relay never reaches `sent`.
+      ['wss://ab.cd'],
+      [RELAYS[0]],
       Array.from({ length: 17 }, (_, i) => `wss://r${i}.example.org`),
       ['wss://relay.example.org', 'wss://relay.example.org'],
       ['ws://relay.example.org'],
@@ -178,12 +183,20 @@ describe('Invite (04 §3.6)', () => {
     expectRoundTrip(inviteSchema, invite());
   });
 
-  it.each(['v', 'inviteId', 'secret', 'card', 'cardSig', 'name', 'relays', 'expiresAt'])(
-    'rejects an invite without %s',
-    (field) => {
-      expectReject(inviteSchema, edit(invite(), [field], DELETE));
-    },
-  );
+  it.each([
+    'v',
+    'inviteId',
+    'secret',
+    'card',
+    'cardSig',
+    'cardAgentSig',
+    'codeCommit',
+    'name',
+    'relays',
+    'expiresAt',
+  ])('rejects an invite without %s', (field) => {
+    expectReject(inviteSchema, edit(invite(), [field], DELETE));
+  });
 
   it.each([
     ['v 2', ['v'], 2],
@@ -199,8 +212,28 @@ describe('Invite (04 §3.6)', () => {
       '0x1A1a1A1a1A1a1A1a1A1a1A1a1A1a1A1a1A1a1A1a',
     ],
     ['cardSig of 64 bytes', ['cardSig'], `0x${'3c'.repeat(64)}`],
+    ['cardAgentSig of 64 bytes', ['cardAgentSig'], CARD_AGENT_SIG.slice(0, -2)],
+    ['cardAgentSig without 0x', ['cardAgentSig'], CARD_AGENT_SIG.slice(2)],
+    ['cardAgentSig uppercase', ['cardAgentSig'], `0x${CARD_AGENT_SIG.slice(2).toUpperCase()}`],
+    ['cardAgentSig v 0', ['cardAgentSig'], `${CARD_AGENT_SIG.slice(0, -2)}00`],
+    ['cardAgentSig s out of range', ['cardAgentSig'], `0x${'3c'.repeat(32)}${'ff'.repeat(32)}1b`],
+    ['cardAgentSig null', ['cardAgentSig'], null],
+    ['codeCommit 31 bytes', ['codeCommit'], b64u(31)],
+    ['codeCommit 33 bytes', ['codeCommit'], b64u(33)],
+    ['codeCommit 16 bytes', ['codeCommit'], ID16],
+    ['codeCommit padded', ['codeCommit'], `${CODE_COMMIT}=`],
+    ['codeCommit standard base64', ['codeCommit'], `${CODE_COMMIT.slice(0, -1)}+`],
+    ['codeCommit non-zero tail bits', ['codeCommit'], `${CODE_COMMIT.slice(0, -1)}B`],
+    ['codeCommit hex', ['codeCommit'], 'ab'.repeat(32)],
+    ['codeCommit 0x hex', ['codeCommit'], `0x${'ab'.repeat(32)}`],
     ['name too long', ['name'], 'x'.repeat(257)],
     ['relays empty', ['relays'], []],
+    ['relays with 1 entry', ['relays'], [RELAYS[0]]],
+    [
+      'relays with 17 entries',
+      ['relays'],
+      Array.from({ length: 17 }, (_, i) => `wss://r${i}.example.org`),
+    ],
     ['relays not wss', ['relays'], ['http://169.254.169.254/']],
     ['expiresAt negative', ['expiresAt'], -1],
     ['expiresAt string', ['expiresAt'], '1760600000'],
@@ -291,8 +324,8 @@ describe('relay hosts are never local (I-5, 04 §4 SSRF; IR-M1-2a-1 M-1)', () =>
     ['URL over 256 characters', `wss://relay.example.org/${'a'.repeat(240)}`],
   ])('rejects %s', (_l, url) => {
     expectReject(relayUrlSchema, url);
-    expectReject(relayListSchema, [url]);
-    expectReject(inviteSchema, { ...invite(), relays: [url] });
+    expectReject(relayListSchema, [RELAYS[0], url]);
+    expectReject(inviteSchema, { ...invite(), relays: [RELAYS[0], url] });
   });
 
   it('accepts public DNS names, including ones that contain digits or local-looking words', () => {
