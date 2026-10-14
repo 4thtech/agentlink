@@ -869,6 +869,12 @@ The terms fingerprint is under Advanced. Tool summaries name only the contact, t
 - One gift wrap per recipient Nostr key (recipient agent, recipient owner, sender owner).
 - **Size limits:** serialized envelope ≤ **24 KB** (24 576 bytes; every limit and where it is enforced: §3.1.1); inline files ≤ **12 KB**. Nesting (seal + gift wrap, NIP-44 padding, base64) roughly doubles size, and NIP-44 caps plaintext at 65,535 bytes; many relays cap events at 64 KB. Before publishing, check the final gift-wrap size against each relay's NIP-11 `max_message_length`.
 - Gift-wrap timestamps are randomized up to 2 days in the past (NIP-59), so inbox sync must use a ≥ 48 h look-back window and deduplicate by envelope ID (see 07 §4.2).
+- **Event shapes the receiver accepts (M1-5a, IR-M1-5a-1 L-2; proposed, owner confirms at merge).** Senders produce exactly these shapes, and a receiver drops anything else before the envelope is parsed (§3.1.1 step 2):
+  1. The gift wrap (kind 1059) and the seal (kind 13) have exactly the seven NIP-01 event keys `id`, `pubkey`, `created_at`, `kind`, `tags`, `content` and `sig`, with no other key, and each `id` is the event's NIP-01 id with a valid `sig` (NIP-01, NIP-59).
+  2. The rumor (kind 14) has exactly the six keys `id`, `pubkey`, `created_at`, `kind`, `tags` and `content`. It has no `sig`: a signed rumor is dropped (NIP-59 "rumor", NIP-17 "kind 14 … MUST never be signed").
+  3. The seal's `tags` are empty (NIP-59).
+  4. The rumor carries a tag that is exactly `["agentlink","1"]`, two items. Other tags may sit beside it (NIP-01 tags; this section).
+  5. The rumor's `id` equals its NIP-01 id over `[0, pubkey, created_at, kind, tags, content]` (NIP-01; NIP-59 unsigned events keep their id).
 
 ### 3.6 Pairing protocol
 

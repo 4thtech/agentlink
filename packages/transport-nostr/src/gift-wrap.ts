@@ -205,10 +205,11 @@ export async function wrapEnvelope(
   const wraps: GiftWrap[] = [];
   for (const recipient of targets) {
     const sealContent = await keys.nip44Encrypt(recipient, rumorJson);
+    const sealCreatedAt = randomPastTimestamp(now);
     const seal = copySigned(
       await keys.signNostr({
         kind: NOSTR_KIND_SEAL,
-        created_at: randomPastTimestamp(now),
+        created_at: sealCreatedAt,
         tags: [],
         content: sealContent,
       }),
@@ -219,7 +220,15 @@ export async function wrapEnvelope(
     if (!sameKey(seal.pubkey, parsed.from)) {
       fail('sender_mismatch', 'gift wrap: the seal key is not the envelope sender');
     }
-    if (seal.kind !== NOSTR_KIND_SEAL || seal.content !== sealContent) {
+    // IR-M1-5a-1 L-4: the seal is exactly what was requested (kind 13, no tags, the back-dated
+    // created_at, the encrypted rumor), so a faulty signer cannot emit wraps receivers refuse.
+    if (
+      seal.kind !== NOSTR_KIND_SEAL ||
+      seal.content !== sealContent ||
+      seal.created_at !== sealCreatedAt ||
+      !Array.isArray(seal.tags) ||
+      seal.tags.length !== 0
+    ) {
       fail('invalid_seal', 'gift wrap: the signer returned a different seal');
     }
     // createGiftWrap verifies the seal signature and wipes its ephemeral key (M1-1g).
