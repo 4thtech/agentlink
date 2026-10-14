@@ -561,7 +561,7 @@ All binary values are base64url **without padding** in JSON unless §2.4.1 puts 
 3. `m = taggedHash("agentlink/envelope/v1", envelopeHash) = sha256(sha256(t) ‖ sha256(t) ‖ envelopeHash)`. `t` is the 21 UTF-8 bytes of the tag, and `envelopeHash` enters as its 32 raw bytes, never as hex.
 4. `sig = BIP-340 Sign(sk, m, auxRand)`, with 32 fresh CSPRNG bytes as `auxRand` (vectors fix them). `sk` is the secret key of `from` (table below). `sig` is the 64-byte signature as 128 lowercase hex (§2.4.1).
 
-The AAD (§3.1) covers the header only. The hash also covers `aead`, so the signature commits to the ciphertext. It does not commit to the plaintext, because AES-GCM is not key-committing (G-46).
+The AAD (§3.1) covers the header only. The hash also covers `aead`, so the signature commits to the ciphertext. The requirement that every recipient reads the same plaintext is G-46.
 
 **Domain separation.** A Nostr key signs several kinds of object. Each has its own 32-byte message:
 
