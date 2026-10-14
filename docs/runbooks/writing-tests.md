@@ -23,7 +23,7 @@ The builder, at the tier on the card. The orchestrator checks the result in the 
    ```bash
    pnpm --filter <package> test        # red: record the failing test names
    git commit -m "<TASK-ID>: add failing tests for <behaviour>"
-   git push                              # own task branch only; the red CI run is the tests-first evidence
+   git push                              # own task branch only; CI runs on the push, and that red run is the tests-first evidence
    ```
    A builder pushes only its own task branch, and only when the brief says so (`development-process.md` §4.2); otherwise it hands back and the orchestrator pushes.
    Then implement in a later commit. Put the red commit SHA and the CI run link in the PR's **Tests-first evidence** section.

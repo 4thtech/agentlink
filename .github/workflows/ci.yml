@@ -14,20 +14,25 @@
 # no event data interpolated into shell scripts.
 name: CI
 
-# The coordination branch `sync` (markdown only, pushed directly) never runs CI: pushes
-# are limited to `main` and pull requests into `sync` are ignored.
+# CI runs on every branch push (tests-first red runs, lint and tests before the independent
+# review) and again on the pull request, which is opened after that review. Once a PR exists a
+# push produces two runs (one per event); that duplicate is accepted. The coordination branch
+# `sync` (markdown only, pushed directly) never runs CI: pushes to it and pull requests into it
+# are ignored. Tags do not trigger it. Nothing here reads `github.event.pull_request`, so every
+# job behaves the same on a push; the repository content is the only input.
 on:
   pull_request:
     branches-ignore: [sync]
   push:
-    branches: [main]
+    branches-ignore: [sync]
   merge_group:
 
 permissions: {}
 
 concurrency:
   group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # A newer push to a branch or PR supersedes the older run; runs on `main` are never cancelled.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main') }}
 
 env:
   # No remote cache, no telemetry: CI holds no secrets and talks to nobody but the registry.
@@ -253,7 +258,10 @@ jobs:
           exit "$failed"
 
   ci-gate:
-    name: ci-gate
+    # A push run on a feature branch tests the branch tip, while the pull request run tests the
+    # merge with `main`. Only the latter may satisfy the required check `ci-gate`, so a feature
+    # branch push publishes `ci-gate (push)` instead.
+    name: ${{ (github.event_name == 'push' && github.ref != 'refs/heads/main') && 'ci-gate (push)' || 'ci-gate' }}
     needs: [detect, checks, vectors, context-budget]
     if: always()
     runs-on: ubuntu-latest
