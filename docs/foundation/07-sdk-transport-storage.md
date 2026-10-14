@@ -61,7 +61,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | `files` | envelope_id, idx, name, size, sha256, locator, url, file_key (encrypted at rest with a keychain-held local key), expires_at, deleted_at |
 | `proofs` | envelope_id, chain_id, record_id, tx_hash, status, fee_token, fee_amount, salt, created_at |
 | `receipts` | record_id, type, signer, tx_hash, at |
-| `approvals` | approval_id, action_json, summary, status, created_at, decided_at |
+| `approvals` | approval_id, action_json, summary, status, created_at, decided_at, signed_decision (the owner's `SignedOwnerAction`; re-verified on every use, `status` is only a cache, 04 §2.5.1) |
 | `policies` | key, value_json, updated_at |
 | `sync_cursors` | relay_url, last_seen |
 
