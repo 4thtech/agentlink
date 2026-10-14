@@ -107,14 +107,6 @@ Merging is continuous (D-25, amended by D-51 and D-52): agents work under Tali's
 
 **Sensitive paths (resolved by D-51, simplified).** S1 changes on sensitive paths (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files, including `review-gate.yml`, the root `package.json`, `pnpm-workspace.yaml`, `.npmrc` and `.pnpmfile.*`) need a human gate: Tali's explicit "merge" in chat, the same as S2. It is a process control, not enforced by the ruleset or by `review-gate`.
 
-### 3.4 Tests-first evidence (S2)
-
-Proved locally, not with a red CI run: a deliberately red run e-mails the owner (LL-14).
-- The builder commits the failing tests as their own commit, message prefix `RED (expected):`, runs them locally and records in the PR's **Tests-first evidence** section the commit SHA, the exact command and a short output excerpt that shows the failures.
-- The builder does not push that commit alone. The branch is pushed once the implementation commit sits on top, so CI's first run is green. The RED commit stays in the branch history; do not rebase or squash it away before review.
-- The reviewer checks out the RED commit in a scratch worktree, confirms it is an ancestor of the head and holds tests only, re-runs the command and confirms it fails for the stated reason. The report records `tests-first reproduced: yes|no`; a `no` is a finding.
-- Negative controls (break the code on purpose, see the test go red, restore) are also done locally and recorded in the PR; they never go into a pushed commit.
-
 **Automated PRs (Renovate, Changesets "Version packages").** A PR is automated only when its **author** (GitHub's `pull_request.user.login`) is `renovate[bot]` or `github-actions[bot]`. Commit author names, e-mail addresses and the `verified` flag are never used: anyone who can push to the branch can forge them. An automated PR has no report to cite, so for S1/S2 `review-gate` (c) is satisfied **only** by an APPROVED GitHub review from `@talirezun` or `@denisjazbec` on the current head commit; a new commit invalidates it. Nothing else is exempt: (b) needs no ticked class, and (d) applies unchanged for S2 (a human fills in the Threat note and Tests-first evidence sections), and the code-owner approval applies as for any S2 PR. The bot is the author, so the owner's own approval counts for (c). Crypto dependency updates remain S2 (`development-process.md` §11): the approver SHOULD have the orchestrator's review of the new version's changelog and diff first. Owner action (`ci-cd.md`, checklist section 6): a ruleset restricting who may push to `renovate/**` and `changeset-release/**` branches, so nobody else can add commits to a bot-authored PR.
 
 **Releases:** any mainnet-bound contract release or crypto release (`@agentlink/crypto`, or any package whose crypto code changed since the last reviewed release) MUST have the owner's "merge" in chat (D-51, D-52) and an independent review recorded on the release PR. `@denisjazbec`'s review is recommended for contracts.
@@ -140,6 +132,14 @@ One entry per merged S2 PR: task ID, PR, merge commit, files, invariants touched
 | e | Fails while `DEPLOY_FREEZE` is `true` (`release-and-deployment.md` §3.1). |
 
 The class used for (c) and (d) is the higher of the derived and the declared class. Automated PRs have no exemption beyond (b) and (c) as described above (§3, `ci-cd.md`). A red `review-gate` is never bypassed by an agent; only the owner's break-glass (§6) applies.
+
+### 3.4 Tests-first evidence (S2)
+
+Proved locally, not with a red CI run: a deliberately red run e-mails the owner (LL-14).
+- The builder commits the failing tests as their own commit, message prefix `RED (expected):`, runs them locally and records in the PR's **Tests-first evidence** section the commit SHA, the exact command and a short output excerpt that shows the failures.
+- The builder does not push that commit alone. The branch is pushed once the implementation commit sits on top, so CI's first run is green. The RED commit stays in the branch history; do not rebase or squash it away before review.
+- The reviewer checks out the RED commit in a scratch worktree, confirms it is an ancestor of the head and holds tests only, re-runs the command and confirms it fails for the stated reason. The report records `tests-first reproduced: yes|no`; a `no` is a High finding (§9.1): the review is REJECTED until the red is reproduced.
+- Negative controls (break the code on purpose, see the test go red, restore) are also done locally and recorded in the PR; they never go into a pushed commit.
 
 ---
 
@@ -178,7 +178,7 @@ Class / areas:     <S1|S2> / <checklist IDs applied>
 Inputs:            <list of spec sections, CI run IDs>
 CHECKLIST:         <item ID> | finding <ID> | no finding | n/a: <reason>   (one line per item)
 INVARIANTS (S2):   I-x | holds: <evidence file:line> | finding <ID>
-TESTS-FIRST (S2):  tests-first reproduced: yes | no   (<RED SHA>, <command>, <failure excerpt>)
+TESTS-FIRST (S2):  tests-first reproduced: yes | no   (no = High finding, REJECTED; <RED SHA>, <command>, <failure excerpt>)
 FINDINGS:
   ID:              IR-<TASK-ID>-<n>-F<nn>
   Severity:        Critical | High | Medium | Low | Info   (§9.1)
@@ -392,7 +392,7 @@ Milestone additions: **M1**: same-OS-user test, prompt-injection suite, testnet 
 | Severity | Definition (any one suffices) |
 |---|---|
 | **Critical** | Any breach of **I-1, I-2, I-3 or I-4**; loss, theft or freezing of user credits or funds; forged records, receipts, approvals or policies; bypass of owner presence; key or seed extraction; remote code execution. |
-| **High** | Practical breach of I-5…I-10 (e.g. inbound content causing a tool call, replay of a record or receipt, secrets in local logs, owner unable to decrypt, no export path); SSRF to internal addresses; path escape from allowed folders; contract DoS of core functions; charging above `maxFee`. |
+| **High** | Practical breach of I-5…I-10 (e.g. inbound content causing a tool call, replay of a record or receipt, secrets in local logs, owner unable to decrypt, no export path); SSRF to internal addresses; path escape from allowed folders; contract DoS of core functions; charging above `maxFee`.  An S2 red that the reviewer cannot reproduce (`tests-first reproduced: no`, §3.4). |
 | **Medium** | Defence-in-depth failure without a direct exploit; spec deviation in security behaviour; missing tests for security behaviour; gas target missed. |
 | **Low** | Hardening and best-practice gaps. |
 | **Info** | Observations. |
