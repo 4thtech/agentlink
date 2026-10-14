@@ -76,11 +76,11 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | `identity` | agent_id (the agent's EVM address, 04 §2.9), agent_card_json, key_epoch, storage_prefix (04 §2.9), revoked_at (set only together with a `revoked_agents` row for the own agent, §3.4), created_at |
 | `contacts` | contact_id, name, agent_card_json, owner_fingerprint, verified, status (active / blocked / revoked; `revoked` is final, §3.4), created_at |
 | `invites` | invite_id, proof_key (encrypted at rest; never the raw secret, 04 §3.6), label, expires_at, used_at |
-| `envelopes` | envelope_id (unique), envelope_hash, thread_id, direction, contact_id (null for a request), from_key (the sender's Nostr key), type, state (ok \| request \| refused, §3.2), created_at, envelope_json (ciphertext), payload_json (decrypted, optional per setting), read_at, delivery (outbound only: queued \| sent \| not_delivered, §3.2) |
+| `envelopes` | envelope_id (unique), envelope_hash, thread_id, direction, contact_id (null for a request), from_key (the sender's Nostr key), type, state (received \| ok \| request \| refused, §3.2), refused_reason, created_at, envelope_json (ciphertext; not kept for `refused`), payload_json (decrypted, optional per setting; never kept for `refused`), read_at, delivery (outbound only: queued \| sent \| not_delivered, §3.2) |
 | `files` | envelope_id, idx, name, size, sha256, locator, url, file_key (encrypted at rest with a keychain-held local key), expires_at, deleted_at |
-| `proofs` | envelope_id, chain_id, record_id, tx_hash, status, fee_token, fee_amount, salt, created_at |
+| `proofs` | envelope_id, chain_id, record_id, record_json (the signed Record, stored in the reserve transaction, §3.5), tx_hash, status, fee_token, fee_amount, salt (`enc`), created_at |
 | `receipts` | record_id, type, signer, tx_hash, at |
-| `approvals` | approval_id, action_json, scope_json (commitments, D-55; immutable after creation, carried in `action.context.scope`, 04 §3.4.2), answers_envelope_id, scope_key (at most one live scope per value, §3.5), source (owner \| policy grant, with policy hash), signed_decision (the owner's `SignedOwnerAction`; re-verified on every use, `status` is only a cache, 04 §2.5.1), signed_cancel (the owner's `approval.cancel`, if any; re-verified on use), parts in `commitment_parts` (§3.5; this replaces the earlier parts_used_json), summary, status (pending \| approved \| denied \| expired \| cancelled \| void), expires_at, created_at, decided_at |
+| `approvals` | approval_id, action_json (`enc`: `args` can hold message text), scope_json (commitments, D-55; immutable after creation, carried in `action.context.scope`, 04 §3.4.2), answers_envelope_id, scope_key (at most one live scope per value, §3.5), source (owner \| policy grant, with policy hash), signed_decision (the owner's `SignedOwnerAction`; re-verified on every use, `status` is only a cache, 04 §2.5.1), signed_cancel (the owner's `approval.cancel`, if any; re-verified on use), parts in `commitment_parts` (§3.5; this replaces the earlier parts_used_json), summary (`enc`: it names the contact), status (pending \| approved \| denied \| expired \| cancelled \| void), expires_at, created_at, decided_at |
 | `policies` | The current signed policy, one row (§3.4); this replaces the earlier key, value_json, updated_at |
 | `sync_cursors` | relay_url, last_seen |
 | `outbox`, `seen`, `held_envelopes`, `rate_counters` | Delivery (§3.2) |
@@ -108,8 +108,9 @@ Every mutating call runs: **policy check → (approval) → action → store →
   - An enum column holds exactly the listed values. Any other value is an inconsistency, and each table says what the core then does.
 - **At rest.** An `enc` column is encrypted under the store key with AES-256-GCM through `@agentlink/crypto`, with AAD bound to the table, the column and the row key (M1-8b), so a value copied into another row or column does not open. A value that does not open makes the row unreadable. It is never read as empty.
 - **Time.** The core passes `now` into every store call that compares times; the store never reads a clock. This keeps the boundaries testable, as for G-7.
-- **Store transactions.** "One store transaction" means that every read and write inside it commits together or not at all, and that no other write to the same store interleaves with it (serializable). Everything it writes, including signed items and `enc` values, is prepared before it starts. Its body is synchronous: no network call, no KeyStore call and no `await`. Nothing is published, submitted or returned to the caller before its transaction commits. A signature made for a transaction that then does not commit is discarded, never published or submitted.
-- **Fail closed.** A store error or an unreadable row never counts as absent, empty or allowed. Each table states what the core does then. `seen` is the only table whose loss is harmless, because it decides nothing (§3.2).
+- **Store transactions.** "One store transaction" means that every read and write inside it commits together or not at all, and that no other write to the same store interleaves with it (serializable). Everything it writes, including signed items and `enc` values, is prepared before it starts. Its body is synchronous: no network call, no KeyStore call, no `await`, and no encryption or decryption of an `enc` value (WebCrypto AES-GCM is asynchronous; values are encrypted before and decrypted after). Nothing is published, submitted or returned to the caller before its transaction commits. A signature made for a transaction that then does not commit is discarded, never published or submitted.
+- **Fail closed.** A store error or an unreadable row never counts as absent, empty or allowed. Each table states what the core does then. Losing `seen` costs only work, and at worst a dropped item is evaluated again (§3.2).
+- **Keyed digests.** A digest of low-entropy sensitive data (`idempotency.request_digest`) is an HMAC-SHA256 under an index key that `@agentlink/crypto` derives from the store key with HKDF (M1-8b), never a plain hash, so the file alone cannot confirm a guessed message or policy.
 - **Pruning** runs in its own store transaction and deletes only rows past the retention stated for them.
 
 ### 3.2 Delivery: outbox, seen-set, held envelopes, requests and rate counters
@@ -124,15 +125,19 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | wrap_json | `json`: the signed kind 1059 event |
 | relays | `enc` `json`: the relay URLs it goes to (§4.2) |
 | acks | `enc` `json`: relay URL → time of its first `OK` |
+| attempt | `int`: 1 for the first wrap; a later wrap of the same stored envelope for the same key gets the next number |
+| role | `contact` \| `owner` (whose key recipient_key is, 04 §3.2) |
 | attempts, next_attempt_at, created_at, give_up_at | `int`; give_up_at = created_at + 86 400 |
 | state | `pending` \| `sent` \| `not_delivered` |
+| reason | for `not_delivered`: `timeout` \| `revoked` \| `unreadable` |
 
-- **Keys.** wrap_id is the primary key; (envelope_id, recipient_key) is unique.
-- **Transaction.** The core stores the outbound envelope and all of its outbox rows in one store transaction before the first publish. For a commitment part this is the claim transaction (§2.1, §3.5). A retry after a crash republishes the same stored event: nothing is wrapped or signed again, and the retry needs no key.
-- **States.** A row is `sent` once 2 relays have returned `OK` (§4.2), and `not_delivered` if that has not happened by give_up_at. `envelopes.delivery` is `sent` when every row of the envelope is `sent`, and `not_delivered` as soon as one row is. The activity feed then says that the message did not reach that contact's agent.
+- **Keys.** wrap_id is the primary key; (envelope_id, recipient_key, attempt) is unique. At most one row per (envelope_id, recipient_key) is `pending`.
+- **Transaction.** The core stores the outbound envelope and all of its outbox rows in one store transaction before the first publish. For a commitment part this is the claim transaction (§2.1, §3.5). A retry after a crash republishes the same stored event: no envelope or seal is signed again. A relay that asks for NIP-42 AUTH still gets a login signed through the KeyStore (§4.2).
+- **States.** A row is `sent` once 2 relays have returned `OK` (§4.2), and `not_delivered` if that has not happened by give_up_at. `envelopes.delivery` follows the `contact` rows only: `sent` when every one is `sent`, `not_delivered` as soon as one is. The activity feed then says that the message did not reach that contact's agent. A failed `owner` row is reported separately, as an owner copy that did not arrive. Sending again is a new row with the next attempt, wrapping the same stored envelope.
 - **Retention.** wrap_json is deleted when the row leaves `pending`. The row itself is deleted 7 days later.
 - **At rest.** relays and acks are `enc` (URLs). wrap_json stays in clear: it is the ciphertext that relays already hold.
-- **On failure.** If the outbox write fails, nothing is published and the call returns `error`, so the sender always holds what it sent. A row that cannot be read is marked `not_delivered` and reported; it is never sent to relays other than those it lists.
+- **Revocation (proposed; owner confirms at merge).** The revoke transaction (§3.4) sets every `pending` row whose recipient_key is a known key of the revoked agent, at any epoch, to `not_delivered` with reason `revoked`. For the own agent it does so for every `pending` row. The activity feed reports it.
+- **On failure.** If the outbox write fails, nothing is published and the call returns `error`, so the sender always holds what it sent. A row that cannot be read is marked `not_delivered` (reason `unreadable`) and reported; it is never sent to relays other than those it lists.
 
 **`seen`**: the seen-set of §4.2.
 
@@ -143,10 +148,12 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | first_seen_at | `int` |
 
 - **Keys.** (kind, id) is the primary key.
-- **Transaction.** The row is written in the store transaction that stores the item's outcome (stored, held, queued, refused or dropped), never earlier, so a crash between receipt and processing never marks an unprocessed item as seen.
-- **Retention.** At least 604 800 s (7 days) after first_seen_at; pruning deletes older rows.
+- **Transaction.** The row is written in the store transaction that stores the item durably (a `received` envelope, below) or records its final outcome (held, refused or dropped), never earlier, so a crash before that never marks an unstored item as seen. A wrap that fails 04 §3.1.1 steps 1–4 is not recorded, so junk cannot grow the table; it is dropped again if a relay serves it again.
+- **Retention.** A row is pruned only when it is older than 604 800 s (7 days) **and** older than the earliest `since` a sync can still request (the lowest `sync_cursors.last_seen` of the relays in use, minus 172 800 s and `S` = 300 s, 04 §2.5.1).
 - **At rest.** In clear (random IDs).
-- **On failure.** A seen-set that cannot be read is treated as empty for that sync pass. This only costs work: 04 §3.1.1 step 9 deduplicates against every stored envelope, with no retention cutoff.
+- **On failure.** A seen-set that cannot be read is treated as empty for that sync pass. For stored envelopes this only costs work, because 04 §3.1.1 step 9 deduplicates against every stored envelope with no retention cutoff. An item that was dropped (rate limit, `unknownSenders: drop`, a cap, a blocked contact) may be evaluated again and then delivered late. That is a late delivery of an authentic message, never a forgery.
+
+**Received, not yet processed (`envelopes.state = received`; proposed, owner confirms at merge).** `agentlink_status` and the sync loop only fetch and store (06 §2.0, §6). An envelope that passed 04 §3.1.1 steps 1–4 is stored as `received`, with its seen row, in one store transaction. Processing (steps 5–9 and the effects: a `card-update` applied, a pairing completed, held rows run again, a deferred receipt) moves it to `ok`, `request`, `refused`, a held row, or deletes it when it is dropped, in one store transaction with those effects. A crash in between leaves it `received`, and the next pass processes it. Each pass takes `card-update` rows first (04 §3.1.1, step 7). At most 1 000 rows are `received`. Above that, a new item is neither stored nor marked as seen, and a later sync fetches it again within the 48 h look-back.
 
 **`held_envelopes`**: envelopes held by the arrival-order rule (04 §3.1.1, step 7; G-2).
 
@@ -162,13 +169,13 @@ Every mutating call runs: **policy check → (approval) → action → store →
 
 - **Keys.** envelope_id is the primary key. Step 9 (freshness and uniqueness) covers held rows as it covers stored envelopes, so an envelope ID is unique across `held_envelopes` and `envelopes`.
 - **Cap.** At most 100 rows per owner_kid (proposed with D-62; owner confirms at merge). The insert, the count and the deletion of the oldest row (lowest received_at, then lowest envelope_id) run in one store transaction, so the cap holds under concurrent sync.
-- **Requests-queue limit.** Held rows count against the same limit as requests (below).
-- **Release.** Each time a `card-update` is applied, the core runs step 7 again for the held rows whose owner_kid belongs to that contact's owner. At release_at, a row that no `card-update` claimed goes to the requests queue, after the `from` re-check of 04 §3.1.1. A row is deleted only in the store transaction that stores its outcome: the contact's envelope, a request or a refused envelope.
+- **Own pool.** Held rows have their own pool of 100 per owner_kid and do not count toward the requests-queue total (below), so a stranger that copies a contact owner's `kid` delays only held rows (proposed; owner confirms at merge).
+- **Release.** Each time a `card-update` is applied, the core runs step 7 again for the held rows whose owner_kid belongs to that contact's owner. It also does so for every held row at the start of each processing pass, so a crash after the `card-update` never leaves a row waiting. At release_at, a row that no `card-update` claimed goes to the requests queue, after the `from` re-check of 04 §3.1.1. A row is deleted only in the store transaction that stores its outcome: the contact's envelope, a request or a refused envelope.
 - **Retention.** Until release_at, or until the row is dropped by the cap.
 - **At rest.** payload_json is `enc`; the other columns are in clear.
 - **On failure.** If the held set cannot be read or written, the envelope is not processed and not marked as seen; a later sync fetches it again within the 48 h look-back. It is never processed as the contact's and never shown as a request.
 
-**Requests queue.** A request from an unknown sender (02 F-65, 06 §3 `unknownSenders: queue`) is an `envelopes` row with `state = request`, `contact_id` null and `from_key` set. The requests-queue limit counts these rows plus the `held_envelopes` rows. Whatever its value, the count and the insert run in one store transaction. The limit's values are not yet specified (open question, below).
+**Requests queue.** A request from an unknown sender (02 F-65, 06 §3 `unknownSenders: queue`) is an `envelopes` row with `state = request`, `contact_id` null and `from_key` set. **Limits (proposed; owner confirms at merge):** at most 5 pending requests per unknown sender key and 200 in total. When a limit is reached, a new request is refused: it is not stored, its seen row records the outcome, and the sender is told that the request was not accepted. The notice is generated by the core and holds nothing from the owner; M1-7e fixes its message type. Held envelopes use their own pool (above). The count and the insert run in one store transaction. A request from a key in `revoked_agents.nostr_keys` is dropped (§3.4).
 
 **`rate_counters`**: inbound envelopes per contact, for `contacts.rateLimitPerContactPerHour` (06 §3; M1-7h).
 
@@ -180,7 +187,8 @@ Every mutating call runs: **policy check → (approval) → action → store →
 
 - **Keys.** (contact_id, bucket) is the primary key.
 - **Window.** The hour is the buckets with bucket > now − 3 600: a sliding hour at one-minute resolution, so no double burst is possible at the top of the hour (as for the daily budget, G-7).
-- **Transaction.** The core reads the window sum and increments the bucket in the store transaction that stores the contact's envelope. An envelope that would go above the limit is not processed in that pass. Whether it is then dropped or deferred is an open question (below).
+- **Transaction.** The core reads the window sum and increments the bucket in the store transaction that stores the contact's envelope, including a `refused` one (from a superseded key, or without the own owner's entry, 04 §3.1.1 steps 7 and 8), so refused envelopes cannot grow without bound either.
+- **Over the limit (proposed; owner confirms at merge).** An envelope that would go above the limit is dropped: it is not stored, its seen row records the outcome, and the activity feed shows one line per contact and hour with the count (for example, 37 messages from a contact were dropped), with the option to block the contact.
 - **Retention.** Buckets with bucket ≤ now − 3 600 are deleted.
 - **At rest.** In clear (IDs and counts).
 - **On failure.** A counter that cannot be read counts as being at the limit for that contact. Other contacts are not affected.
@@ -194,20 +202,30 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | tool | text: the MCP tool name (06 §2.0) |
 | client_request_id | text: the caller's value, compared as bytes; its bounds come from the MCP tool input schemas (M1-9c) |
 | approval_id | `id`: the call's `approvalId`, or the empty string |
-| request_digest | `id`: sha256(JCS(args)) as 64 lowercase hex, with `args` formed as for `action.args` (04 §3.4.1: defaults applied, without `approvalId` and `clientRequestId`, paths resolved with realpath) |
+| request_digest | `id`: HMAC-SHA256 under the index key (§3.1) of JCS(args), as 64 lowercase hex, with `args` formed as for `action.args` (04 §3.4.1: defaults applied, without `approvalId` and `clientRequestId`, paths resolved with realpath) |
 | state | `running` \| `done` |
+| run_id | `id`: 16 random bytes, base64url, chosen by each execution |
+| lease_until | `int`: the running execution's lease |
 | effect_ref | `enc` `json`: the IDs of the durable effects the call made (envelope IDs, record IDs, approval ID, ledger entry IDs) |
 | result_json | `enc` `json`: the original tool result |
-| created_at, expires_at | `int`; expires_at = created_at + 604 800 |
+| created_at, expires_at | `int`; expires_at = max(created_at + 604 800, the `expiresAt` of the call's approval or commitment scope + `S`), with `S` = 300 s (04 §2.5.1) |
 
 - **Keys.** (tool, client_request_id, approval_id) is the primary key. A retry with an `approvalId`, after a `pending_approval`, is a new call.
-- **Start.** In one store transaction the core reads the row. If it is `done` with the same request_digest, the core returns result_json and runs nothing. If there is no row, it inserts one as `running`.
-- **Effects.** The store transaction that makes the call's first durable effect (an envelope with its outbox rows, a ledger reservation, a part claim or a pending approval) also writes effect_ref. After a crash, a `running` row with effect_ref resumes from the stored effects (republish or resubmit) and never creates a second envelope or Record. A `running` row without effect_ref made no durable effect, so the call runs again.
-- **Concurrent repeat.** A call that finds the row `running` runs nothing and returns `error` with a next step to try again (proposed; owner confirms at merge).
-- **Which results are kept** (proposed; owner confirms at merge). A call that ends in `error`, `needs_setup` or `needs_credits` without any durable effect deletes its row, so a retry runs once the cause is fixed. Every other result is kept and returned to repeats.
-- **Same key, different request_digest.** The call runs nothing. Whether it returns the original result or `rejected` is an open question (below).
-- **Retention.** Pruned after expires_at (7 days; proposed, owner confirms at merge): longer than the 24 h approval TTL and the 7-day maximum commitment scope (04 §3.4.1, §3.4.2).
-- **At rest.** effect_ref and result_json are `enc` (summaries name contacts). The key columns, request_digest, state and times stay in clear.
+- **Execution lease (IR-G-9-1 H-1; proposed, owner confirms at merge).** Each execution picks a fresh run_id. Its lease lasts 60 s and the execution renews it every 20 s with a compare-and-set on (state `running`, run_id = its own).
+- **Start.** In one store transaction the core reads the row:
+  - no row: it inserts one as `running` with its run_id and lease_until = now + 60;
+  - `done` with the same request_digest: it returns result_json (but see stale approvals below) and runs nothing;
+  - `running` with lease_until > now: the call runs nothing and returns `error` with a next step to try again (in progress);
+  - `running` with lease_until ≤ now: the execution takes the row over with a compare-and-set that replaces the old run_id with its own, and then resumes (below).
+- **Effects.** Every store transaction that makes a durable effect for the call (an envelope with its outbox rows, a signed Record with its ledger reservation, a part claim, a pending approval) includes a compare-and-set on the idempotency row: state `running`, run_id = its own, lease_until > now. It appends the effect to effect_ref. If that compare-and-set changes no row, the whole transaction aborts: no effect is written, prepared signatures are discarded (§3.1), and the call returns the in-progress `error`. So two executions can never both make an effect, whatever the clocks or the lease timing; the lease decides only who may proceed.
+- **Resume.** A takeover never runs the call again blindly. With effect_ref present, it re-checks each stored effect and finishes from there: republish `pending` outbox rows, resubmit the stored signed Record (or settle it from what the chain shows, 04 §5), report the stored pending approval or the part states. With no effect_ref, nothing durable was made, so the call runs from the start.
+- **Finish.** One store transaction sets state `done` and stores result_json, with the same compare-and-set. If it changes no row, the execution returns its result without storing it, and the execution that holds the lease stores its own.
+- **Fail closed.** Any doubt (the row cannot be read, a compare-and-set fails, the lease cannot be renewed) means the call runs nothing more and returns `error`. A repeat never makes a second effect.
+- **Which results are kept** (proposed; owner confirms at merge). A call that ends in `error`, `needs_setup` or `needs_credits` without any durable effect deletes its row (with the same compare-and-set), so a retry runs once the cause is fixed. Every other result is kept and returned to repeats.
+- **Stale approvals.** A kept `pending_approval` result whose approval is no longer pending is not replayed: a repeat gets the approval's current state, as `agentlink_get_approval` reports it (06 §2.5), so the agent does not loop.
+- **Same key, different request_digest (proposed; owner confirms at merge).** The call runs nothing and returns `rejected` with code `IDEMPOTENCY_KEY_REUSED`, with no data from the original result. A different request is not a repeat (06 §1 rule 6).
+- **Retention.** Pruned after expires_at (proposed; owner confirms at merge): at least 7 days, longer than the 24 h approval TTL, and never before the call's approval or scope has expired.
+- **At rest.** effect_ref and result_json are `enc` (summaries name contacts). The key columns, the keyed request_digest, state, run_id and times stay in clear.
 - **On failure.** If the row cannot be read or written, the call runs nothing and returns `error`, so a repeat never sends twice.
 
 ### 3.4 Owner authority: nonces, signed objects and revocation
@@ -228,9 +246,10 @@ Every mutating call runs: **policy check → (approval) → action → store →
 - **On failure.** If the table cannot be read, every owner action except `agent.revoke` is refused and reported ("not applied, sign again", 04 §2.5.1).
 
 **Stored signed objects.** Each is kept as the exact `SignedOwnerAction` JSON that was applied and is verified again when used (04 §2.5.1). A column derived from it is only a cache.
-- **`policies`**: exactly one row: version (`int`, in clear), signed_json (`enc`: the `policy.set`, whose parameters are sensitive), policy_hash (`id`: sha256(JCS(policy)), the hash that grant rows name), applied_at.
-  - **Apply.** The core reads the KeyStore mark first. One store transaction then checks the nonce and that `version` is above both the stored row's version and the mark, inserts the nonce and replaces the row. After it commits, the core raises the policy-version high-water mark, which lives in the KeyStore and not in the store (04 §2.5.1, §2.2, §2.8). The mark is never lowered. If raising it fails, the stored version and the mark differ and the G-6 rules apply (06 §3), and this is reported, until the owner signs a newer `policy.set`.
-  - **Load.** signed_json must verify and its version must equal the mark (06 §3). A missing, unreadable or failing row is handled by G-6.
+- **`policies`**: exactly one row: version (`int`, in clear), signed_json (`enc`: the `policy.set`, whose parameters are sensitive), policy_hash (`enc`: sha256(JCS(policy)), the hash that grant rows name; encrypted because a policy can be guessed), applied_at.
+  - **Apply.** The core reads the KeyStore mark first. One store transaction then checks the nonce and that `version` is above both the stored row's version and the mark, inserts the nonce and replaces the row. After it commits, the core raises the policy-version high-water mark, which lives in the KeyStore and not in the store (04 §2.5.1, §2.2, §2.8). The store always commits first (proposed; owner confirms at merge). The mark only ever increases: it is set to max(current mark, `version`), read and written under the inter-process lock (06 §6), so two processes cannot lower it. In the Durable Object, where the mark lives is fixed in M2-3a. If raising it fails, the stored version and the mark differ and the G-6 rules apply (06 §3), and this is reported, until the owner signs a newer `policy.set`.
+  - **Load.** signed_json must verify and its version must equal the mark (06 §3). A missing, unreadable or failing row is handled by G-6. A mismatch is never repaired from the stored row.
+  - **Broken ledger.** When `budget_state.status` is `broken`, the apply transaction also starts a fresh ledger (§3.5).
 - **`approvals`**: signed_decision (`approval.decide`) and signed_cancel (`approval.cancel`), each verified again before use (04 §2.5.1, §3.4.2).
 - **`contacts.safety_check`**: the `contact.check` (§3, pairing columns).
 
@@ -239,6 +258,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | Column | Type and meaning |
 |---|---|
 | agent_evm | `id`: `0x` + 40 lowercase hex |
+| nostr_keys | `json`: every `agentNostr` key of that agent known from stored cards, at any epoch |
 | signed_json | `json`: the applied `agent.revoke`; null when only the Registry shows the revocation |
 | reason | `compromised` \| `retired` \| `other` \| null |
 | source | `envelope` \| `registry` (05 §4; either one counts, 04 §3.4.1) |
@@ -246,7 +266,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | applied_at | `int` |
 
 - **Keys.** agent_evm is the primary key; a re-published copy is a no-op.
-- **Transaction.** One store transaction inserts the row, sets `contacts.status` to `revoked` (or `identity.revoked_at` for the own agent) and voids every pending approval and every open commitment part with that agent as counterparty (void rule 3, 04 §3.4.2). From then on the core processes no envelope from that agent ID and refuses its `card-update` and `handshake`. For the own agent, the core stops sending and signing.
+- **Transaction.** One store transaction inserts the row, sets `contacts.status` to `revoked` (or `identity.revoked_at` for the own agent) voids every pending approval and every open commitment part with that agent as counterparty (void rule 3, 04 §3.4.2) and stops its `pending` outbox rows (§3.2). From then on the core processes no envelope from that agent ID or from a key in nostr_keys, including a request after the contact was removed, and refuses its `card-update` and `handshake`. For the own agent, the core stops sending and signing.
 - **Revoked means either.** An agent is revoked if it has a `revoked_agents` row **or** its contact status is `revoked`. Editing one of the two does not reverse a revocation. A same-OS-user process that edits both is the G-1 residual.
 - **Retention.** Permanent. A row is never deleted, not even when the contact is removed, so a re-pair under that agent ID is refused (04 §2.9, M1-7a).
 - **At rest.** In clear: agent IDs are already in clear, and the object holds no secret.
@@ -262,7 +282,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 |---|---|
 | entry_id | `id`: 16 random bytes, base64url |
 | ledger_epoch | `int` |
-| t | `int`: the time of the paid action |
+| t | `int`: the time of the paid action; for a replacement, the time it was reserved |
 | record_id | `id`: the Record's `recordId`, `0x` + 64 lowercase hex |
 | chain_id | `int` |
 | approval_id | `id` or null |
@@ -273,14 +293,15 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | replaces | `id`: the entry_id of the Record this one replaces (04 §5), or null |
 | settled_at | `int` or null |
 
-**`budget_state`**: exactly one row, created with `identity`: ledger_epoch (`int`), status (`ok` \| `broken`), newest_t (`int`: the highest t ever written), since (`int`).
+**`budget_state`**: exactly one row, created with `identity`: ledger_epoch (`int`), status (`ok` \| `broken`), newest_t (`int`: the highest t written in the current epoch), since (`int`: when the current epoch started), broken_at (`int` or null).
 
 - **Keys.** entry_id is the primary key; record_id is unique, so one signed Record has one entry.
 - **Spent.** The exact sum of reserved_usd over `reserved` rows and charged_usd over `charged` rows, for the current ledger_epoch and t > now − 86 400.
-- **Check and reserve.** One store transaction reads `budget_state` and the window, runs `evaluate`, inserts the `reserved` row and raises newest_t. The Record's `recordId` is fixed before it, from the Record's chosen nonce. Only after the commit does the core sign and submit (06 §3). For a commitment, this is the part's claim transaction (§2.1, below).
+- **Check and reserve.** The core signs the Record before the transaction (a prepared item, §3.1). One store transaction then reads `budget_state`, the window and `policies.version`, runs `evaluate`, inserts the `reserved` row, raises newest_t and stores the signed Record (`proofs.record_json`) with its salt (`proofs.salt`, `enc`), and the idempotency effect (§3.3). Only after the commit does the core submit (06 §3). After a crash, only that stored Record is ever resubmitted, and a replacement follows 04 §5. If the transaction does not commit, the signed Record is discarded. For a commitment, this is the part's claim transaction (§2.1, below).
+- **Policy version pinned.** If `policies.version` inside the transaction differs from the version that `evaluate` used, the transaction aborts, and the core reloads and verifies the policy and tries again. The same check runs in every part claim (below). A `policy.set` applied by another process is therefore never bypassed by a stale evaluation.
 - **Settle and release.** On confirmation the row becomes `charged` with charged_usd. It becomes `released` only under the 04 §5 condition (deadline passed and no record at the `finalized` block), never on a failed submission alone.
 - **Replacement (04 §5, D-62).** One store transaction marks the earlier row `released`, inserts the replacement's `reserved` row with `replaces` set, and replaces the stored item of its commitment part, if any, so the window never counts both.
-- **Broken ledger.** Any of these makes the ledger broken: a state outside the enum, an amount that is not a USD amount, a `charged` row without charged_usd, a ledger_epoch above the one in `budget_state`, a missing `budget_state` row, now < newest_t, or a read error. The core then sets status `broken`, in its own transaction where it can, and treats the ledger as broken even when it cannot write. Every paid action then needs the owner's approval (06 §3). The next applied `policy.set` (owner presence) raises ledger_epoch and sets status `ok`, which starts a fresh ledger. Rows from earlier epochs stay for settlement and display but no longer count.
+- **Broken ledger.** Any of these makes the ledger broken: a state outside the enum, an amount that is not a USD amount, a `charged` row without charged_usd, a ledger_epoch above the one in `budget_state`, a missing `budget_state` row, now < newest_t, or a read error. The core then sets status `broken`, in its own transaction where it can, and treats the ledger as broken even when it cannot write. Every paid action then needs the owner's approval (06 §3). The next applied `policy.set` (owner presence) starts a fresh ledger in its own apply transaction (§3.4): ledger_epoch + 1, status `ok`, newest_t = now, since = now, broken_at = null. The clock check then compares only with the new epoch's newest_t, so a clock that was once set forward cannot keep the ledger broken. Rows from earlier epochs stay for settlement and display but no longer count.
 - **Retention.** A row is never pruned while `reserved`. A settled row is pruned no earlier than 86 400 s after its t; the local UI may keep it longer for history. newest_t keeps the clock check valid after pruning.
 - **At rest.** In clear: IDs, times, states and fee amounts, which the public record shows once charged.
 - **On failure.** As for a broken ledger. A broken ledger never counts as an empty sum (06 §3).
@@ -300,9 +321,9 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | claimed_at, done_at, updated_at | `int` |
 
 - **Keys.** (approval_id, part) is the primary key. The rows are created with the scope, one per part that the 04 §3.4.2 table allows for its decision, all `unclaimed`.
-- **One live scope.** `approvals.scope_key` is `answers.envelopeId` for an answer, and the negotiation key with `version` for a firm offer (04 §3.4.2). At most one approval with a given scope_key is pending, or approved with a part still `unclaimed`. The store transaction that creates a scope enforces this and voids the older pending one.
-- **Claim.** One store transaction changes the part from `unclaimed` to `claimed` as a compare-and-set (an update that must change exactly one row), stores item_json and writes the item's own rows: the `envelopes` row and its `outbox` rows for an `envelope` part (§3.2), or the `reserved` ledger row for a `record` part. Only after it commits does the core publish or submit (§2.1).
-- **Done and void.** An `envelope` part is `done` when its outbox rows are `sent`. If they become `not_delivered`, it stays `claimed`, and only the same stored envelope may be published again. A `record` or `receipt` part when the chain shows its item or the identical one (05 §3.3). `unclaimed` or `claimed` becomes `void` when the scope expires or a void rule applies; `done` and `void` are final. A voided `record` part keeps its ledger row `reserved` until 04 §5 releases it, because a signed Record may still land.
+- **One live scope.** `approvals.scope_key` is `answers.envelopeId` for an answer, and the negotiation key with `version` for a firm offer (04 §3.4.2). Per scope_key, at most one approval is pending, and at most one is approved with a part still `unclaimed`. The store transaction that creates a pending scope voids an older pending one (04 §3.4.2). An older approved scope keeps its parts while the new one is pending: the transaction that applies the owner's approval of the new scope voids the older scope's `unclaimed` parts, so only an owner signature ends what an owner approved (proposed; owner confirms at merge). A part is claimed only if no other scope with the same scope_key has that part `claimed` or `done`, checked in the claim transaction.
+- **Claim.** One store transaction changes the part from `unclaimed` to `claimed` as a compare-and-set (an update that must change exactly one row), stores item_json and writes the item's own rows: the `envelopes` row and its `outbox` rows for an `envelope` part (§3.2), or the signed Record, its salt and the `reserved` ledger row for a `record` part (as in check and reserve, including the `policies.version` check). Only after it commits does the core publish or submit (§2.1).
+- **Done and void.** An `envelope` part is `done` when its outbox rows are `sent`. If they become `not_delivered`, it stays `claimed`, and only the same stored envelope may be published again. A `record` or `receipt` part is `done` when the chain shows its item or the identical one (05 §3.3). `unclaimed` or `claimed` becomes `void` when the scope expires or a void rule applies; `done` and `void` are final. A voided `record` part keeps its ledger row `reserved` until 04 §5 releases it, because a signed Record may still land.
 - **Replacement.** While the part is `claimed`, one store transaction replaces item_json and item_ref, moves the ledger reservation as above and increments replacements. The part stays `claimed`.
 - **Retention.** Kept with the `approvals` row.
 - **At rest.** item_json stays in clear: an envelope is ciphertext, and a Record or Receipt holds no salt (the salt stays in `proofs`, encrypted).
@@ -340,10 +361,7 @@ The console and the desktop app keep the owner's own store, never an agent's. Th
 - **Compare-and-set** as an update that reports how many rows it changed.
 - **`now` passed in**, and a pruning operation per table with its retention.
 - **Forward migrations only.** A store whose schema version is newer than the code refuses to open (fail closed) and is never downgraded.
-- **Open questions for the owner (G-9):**
-  1. The requests-queue limit: rows per unknown sender key and in total (02 F-65, 04 §7).
-  2. An inbound envelope above `rateLimitPerContactPerHour`: drop it (and mark it as seen) or defer it to a later pass.
-  3. A repeated `clientRequestId` whose request differs: return the original result or `rejected`.
+- **Proposed values for the owner to confirm at merge (G-9):** the requests-queue limits and the refusal notice (§3.2); dropping envelopes over `rateLimitPerContactPerHour` (§3.2); `IDEMPOTENCY_KEY_REUSED` for a reused `clientRequestId` (§3.3); idempotency retention and the execution lease (§3.3); the store committing before the KeyStore policy-version mark (§3.4).
 
 ---
 
