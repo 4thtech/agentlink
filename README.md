@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/4thtech/agentlink/actions/workflows/ci.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/ci.yml) [![Security checks](https://github.com/4thtech/agentlink/actions/workflows/security.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/security.yml) [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#status) [![Milestone: M0 Foundations](https://img.shields.io/badge/milestone-M0%20Foundations-blue)](#roadmap) [![Latest release](https://img.shields.io/github/v/release/4thtech/agentlink?include_prereleases&sort=semver)](https://github.com/4thtech/agentlink/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Token-less: no project token](https://img.shields.io/badge/token--less-no%20project%20token-lightgrey)](#principles) [![Built in public](https://img.shields.io/badge/built%20in-public-brightgreen)](https://github.com/4thtech/agentlink)
 
-AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any MCP-capable client) exchange end-to-end encrypted messages and files, and add verifiable proof when it matters. It is client software plus a protocol. 4thTech never sees keys, messages, files or contacts.
+AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any MCP-capable client) exchange end-to-end encrypted messages and files, and add verifiable proof when it matters. It is client software plus a protocol. 4thTech never sees keys, message or file contents, or contacts.
 
 *AgentLink is a working name. The protocol underneath is **OCC v2** (4thTech On-Chain Communication, version 2).*
 
@@ -36,16 +36,17 @@ flowchart LR
     M --> C["Core: crypto, envelopes, policies"]
   end
   C -->|"encrypted messages"| R["Nostr relays"]
-  C -->|"encrypted files"| S["Your own storage"]
+  C -->|"encrypted files (default)"| D["Encrypted drop: 4thTech, ciphertext only"]
+  C -.->|"encrypted files (optional)"| S["Your own storage"]
   C -->|"signed records"| E["EVM chains: OCC v2 notary on Base and Gnosis"]
   C -.->|"optional"| F["4thTech conveniences: submitter, relay, static pages"]
   F -.->|"submits records"| E
 ```
 
 - **Messages** travel as end-to-end encrypted, gift-wrapped Nostr events. The owners of both agents can read them.
-- **Files** are encrypted on your device and uploaded to storage you connect (S3-compatible first). The recipient gets a time-limited link (7 days at most) and the key inside the encrypted message.
+- **Files** are encrypted on your device. Larger files go through a zero-knowledge **encrypted drop** run by 4thTech, so sending a file needs no setup (planned): the drop stores only ciphertext under random names and deletes it within 7 days. Your own storage is optional (S3-compatible; Google Drive, Dropbox and OneDrive in the desktop apps, planned). The recipient gets a time-limited link and the key inside the encrypted message. Drop and S3 links expire after 7 days at most; Google Drive, Dropbox and OneDrive cannot always enforce that, so your agent removes the file and its link at expiry (best effort; the file stays encrypted).
 - **Proof** is an on-chain record of an envelope's hash with signed receipts from the recipient. Anyone can check a proof pack against the chain without an account.
-- **4thTech conveniences** (a fee submitter, an optional relay, static web pages) are zero-knowledge and optional. They see only signed hashes and page loads.
+- **4thTech conveniences** (a fee submitter, an optional relay, the encrypted drop, static web pages) are zero-knowledge. They see only ciphertext, signed hashes, sizes, timing and network addresses, never content, file keys or contact lists.
 
 ## Use cases (planned)
 
@@ -59,7 +60,7 @@ flowchart LR
 |---|---|
 | Install, identity, pairing, contacts | Free |
 | Encrypted messages and acknowledgements | Free |
-| Send files (inline, or via your own storage) | Free (your storage bills you) |
+| Send files (inline, through the encrypted drop, or via your own storage) | Free within the drop's quotas (your own storage may bill you) |
 | Owner console, policies, approvals, local verify | Free |
 | **Add proof** (record, with up to 3 receipts) | $0.10, paid by the sender |
 | **Verified registration** of an agent | $5 one-time, paid by the owner |
@@ -73,7 +74,7 @@ flowchart LR
 2. **Free to start.** No sign-up, no payment, no balance needed for messages and files.
 3. **Pay only for proof.** Fees apply only to on-chain actions.
 4. **No crypto in the UX.** One passkey and a recovery kit; prices in dollars; chain details only under "Advanced".
-5. **Bring your own storage.** 4thTech does not host user files.
+5. **Files work out of the box.** A zero-knowledge encrypted drop (ciphertext only, deleted within 7 days) means no storage setup; your own storage is optional.
 6. **Token-less.** No project token.
 7. **Harness-agnostic.** Everything works through MCP, with no harness-specific lock-in.
 
@@ -107,9 +108,10 @@ Milestones are sequential gates ([build plan](docs/foundation/10-build-plan.md))
 
 ## Documentation
 
-- [`docs/README.md`](docs/README.md): the documentation map, with reading paths by role.
+- [`docs/README.md`](docs/README.md): the documentation map, with reading paths.
+- [`docs/explainers/`](docs/explainers/): plain-language guides.
 - [`CHANGELOG.md`](CHANGELOG.md): what changed in each release.
-- [`docs/process/versioning.md`](docs/process/versioning.md): how versions, releases and compatibility work.
+- [`docs/process/versioning.md`](docs/process/versioning.md): how versions and releases work.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md): how to take part.
 - [`SECURITY.md`](SECURITY.md): how to report a vulnerability.
 - [`AGENTS.md`](AGENTS.md): the rules for AI agents working in this repository.
@@ -133,7 +135,7 @@ The design rests on invariants in [`04-security-and-crypto.md`](docs/foundation/
 
 ## Contributing and working with agents
 
-Much of this project is built by orchestrated AI agents under human review, so the rules for agents and people are the same. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how work is organised, and [`AGENTS.md`](AGENTS.md) if you are (or run) an agent. Code contributions open after the M1a skeleton lands; for now, [issues](https://github.com/4thtech/agentlink/issues) are open for feedback. Everyone is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+Much of this project is built by orchestrated AI agents under human review, so the rules for agents and people are the same. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how work is organised, and [`AGENTS.md`](AGENTS.md) if you are (or run) an agent. Code contributions open after the M1a skeleton lands; for now, [issues](https://github.com/4thtech/agentlink/issues) are open for feedback. Please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Hosting and public docs
 

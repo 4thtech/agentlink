@@ -23,9 +23,9 @@ See the Status and Roadmap in the [README](README.md) for where things stand.
   |---|---|---|
   | **S0** | No security-relevant behaviour (most docs, tooling without secrets) | None beyond CI |
   | **S1** | Sensitive: inbound content, files and URLs, storage credentials, approval UI, CI configuration, specs | Independent review session; a regression test for every fix |
-  | **S2** | Critical: crypto, keys, owner presence, envelope and pairing protocol, policy engine, anything that signs | Everything in S1, plus tests written first, a full threat note, and a GitHub approval by a code owner who is not the author |
+  | **S2** | Critical: crypto, keys, owner presence, envelope and pairing protocol, policy engine, anything that signs | Everything in S1, plus tests written first, a full threat note, and the owner's (@talirezun) explicit go-ahead before merge (D-51) |
 
-- **Merging.** Merges go through GitHub auto-merge behind the required checks. Nobody pushes to `main`, and there is no admin bypass.
+- **Merging.** S0/S1 changes merge through GitHub auto-merge once every required check is green. Changes to S2 paths and sensitive paths (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files) also need the owner's explicit go-ahead (D-51). Nobody pushes to `main`, and there is no admin bypass.
 - **Tests and checks.** Tests are expected with every change; crypto, the policy engine and anything that signs are tests-first. The commands are in [`docs/process/repo-reference.md`](docs/process/repo-reference.md) and will be usable once the first packages land.
 - **AI agents working in this repository follow [`AGENTS.md`](AGENTS.md).** Much of the project is built by orchestrated AI agents under human review, and the rules for agents and people are the same. Do not add AI-attribution lines (co-author trailers, "generated with" footers) to commits or PRs.
 

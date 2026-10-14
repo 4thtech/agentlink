@@ -28,12 +28,12 @@ Add exactly these four to the `main` ruleset: **`ci-gate`**, **`security-gate`**
 
 `review-gate` and `CODEOWNERS` together are the GitHub-enforced half of `audit-rules.md` §3:
 
-- **CODEOWNERS** lists only the S2 path defaults plus `/.github/`, `/AGENTS.md`, `/CLAUDE.md`, `/.claude/` and the supply-chain files that can execute code or redirect installs and publishing (`/package.json`, `/pnpm-workspace.yaml`, and `.npmrc` and `.pnpmfile.*` at any depth), each owned by `@talirezun @denisjazbec`. `review-gate` classifies the same files as S1. With "Require review from Code Owners" on, a PR touching them merges only after an approval by one of them who is not the author. PRs are opened under `@talirezun`'s account, so agent-built work there needs `@denisjazbec`'s GitHub approval.
+- **CODEOWNERS** lists only the S2 path defaults plus `/.github/`, `/AGENTS.md`, `/CLAUDE.md`, `/.claude/` and the supply-chain files that can execute code or redirect installs and publishing (`/package.json`, `/pnpm-workspace.yaml`, and `.npmrc` and `.pnpmfile.*` at any depth), each owned by `@talirezun @denisjazbec`. `review-gate` classifies the same files as S1. "Require review from Code Owners" stays **on** (D-51): S2 and code-owned paths need an approval from a code owner who is not the PR author. Under D-51 (simplified) code-owner review is OFF, so CODEOWNERS only requests reviews and notifies; S2 and sensitive-path PRs wait for Tali's "merge" in chat; Denis's approval is optional and also counts (`audit-rules.md` §3).
 - **`review-gate`** covers what CODEOWNERS cannot: the declared class, content-rule S2 on non-owned paths (the effective class is the higher of derived and declared), the review evidence in the PR body, and the freeze.
 - It reads the four PR template sections **Security class**, **Independent review**, **Threat note** and **Tests-first evidence**, using the same parser as `pr-hygiene` (`##`/`###` headings, HTML comments and fences ignored). Placeholders (`N/A`, `None`, `TBD`, `-`) count as empty where a section is required.
 - **(c) is attested, not proven.** CI checks that a review report is referenced; the report itself is private (`audit-rules.md` §4.5), and the orchestrator attests that the review happened as specified. DECISION NEEDED (owner): run the independent review as a machine job in CI (backlog M0-20). It would need an `ANTHROPIC_API_KEY` secret in an environment unreachable from fork PRs and from non-`main` branches, its output would be advisory, and the PR content it reads is untrusted input (I-5).
-- **(d)** counts only the latest non-comment review of each user, and only on the current head commit; a later "changes requested", a dismissal or a new commit removes it. Rebasing an S2 PR therefore needs a fresh approval, as does the ruleset's stale-approval dismissal.
-- **Automated PRs (no exemption, one substitution).** A PR is automated only when its **author** (`pull_request.user.login`, set by GitHub) is `renovate[bot]` or `github-actions[bot]` (the Changesets "Version packages" PR). Commit author names, e-mail addresses and the `verified` flag are not consulted: anyone who can push to the branch can forge them. For an automated PR, (c) is satisfied **only** by an APPROVED review by `@talirezun` or `@denisjazbec` on the current head commit (no report ID exists to cite); a new commit, including a bot rebase or "Update branch", invalidates it. (b) does not require a ticked class for it, and (d) applies unchanged for S2 (the bot is the author, so either code owner's approval counts; a human fills in the Threat note and Tests-first evidence sections). If the Changesets action ever uses a GitHub App token, add that app's login to `BOT_AUTHORS` in `review-gate.yml` and update `pr-hygiene.yml`. Pushes to `renovate/**` and `changeset-release/**` must be restricted to the bots (checklist section 2), otherwise a human with write access could add commits to a bot-authored PR; the head-commit approval is what still catches that.
+- **(d)** counts only the latest non-comment review of each user, and only on the current head commit; a later "changes requested", a dismissal or a new commit removes it. Rebasing an S2 PR therefore needs a fresh approval. Under D-51 (simplified) the owner removes the approval check from (d); for S2 it requires the Threat note and the Tests-first evidence. The S2 approval check in (d) is removed by the owner (D-51, simplified); (d) keeps the Threat note and Tests-first evidence checks; the owner's approval counts because the bot is the author.
+- **Automated PRs (no exemption, one substitution).** A PR is automated only when its **author** (`pull_request.user.login`, set by GitHub) is `renovate[bot]` or `github-actions[bot]` (the Changesets "Version packages" PR). Commit author names, e-mail addresses and the `verified` flag are not consulted: anyone who can push to the branch can forge them. For an automated PR, (c) is satisfied **only** by an APPROVED review by `@talirezun` or `@denisjazbec` on the current head commit (no report ID exists to cite); a new commit, including a bot rebase or "Update branch", invalidates it. (b) does not require a ticked class for it, and (d) applies unchanged for S2 (a human fills in the Threat note and Tests-first evidence sections). The bot is the author, so the owner's own approval counts for (c). If the Changesets action ever uses a GitHub App token, add that app's login to `BOT_AUTHORS` in `review-gate.yml` and update `pr-hygiene.yml`. Pushes to `renovate/**` and `changeset-release/**` must be restricted to the bots (checklist section 2), otherwise a human with write access could add commits to a bot-authored PR; the head-commit approval is what still catches that.
 - **Freeze (e):** setting `DEPLOY_FREEZE` does not re-run the check on open PRs. Whoever sets the freeze also disables auto-merge on open PRs (`gh pr merge --disable-auto`); see `release-and-deployment.md` §3.1.
 - Skeleton-tolerant: it needs nothing but the pull request, checks out nothing and uses no secrets. A docs-only S0 PR passes once its class box is ticked.
 
@@ -43,7 +43,7 @@ Until the monorepo skeleton exists, `detect` finds no `package.json` + `pnpm-loc
 
 - `package.json` must pin pnpm with `"packageManager": "pnpm@x.y.z"`, otherwise `detect` fails.
 - A missing root script (`lint`, `typecheck`, `build`, `test`) is a warning annotation and the step is skipped. `vectors:check` is optional.
-- **Strict mode:** commit an empty file `.github/ci-strict` and a missing root script (or a `package.json` without a lockfile) becomes a failure. Add it in the same PR that completes the skeleton, so a deleted `test` script can never turn CI silently green. `.github/` is code-owned, so the change needs a code-owner approval.
+- **Strict mode:** commit an empty file `.github/ci-strict` and a missing root script (or a `package.json` without a lockfile) becomes a failure. Add it in the same PR that completes the skeleton, so a deleted `test` script can never turn CI silently green. `.github/` is code-owned, so the code owners are notified.
 
 ### Contract with the monorepo skeleton
 
@@ -102,15 +102,15 @@ Everything below is manual (GitHub, npm or Cloudflare settings) and owner-only: 
 
 1. Push the initial commit to `main` (rulesets do not exist yet).
 2. Open one small PR titled `CHORE: bootstrap CI` using the PR template, so that `ci-gate`, `security-gate`, `pr-hygiene` and `review-gate` each run once. A required check can only be selected in the ruleset after it has reported at least once.
-3. Create the environments (section 4) and the `main` ruleset (section 2), then merge the bootstrap PR through it. It touches `.github/`, so it needs `@denisjazbec`'s approval.
-4. Verify on two fixture PRs (backlog M0-17): an S0 PR auto-merges once the checks are green; a PR touching an S2 path cannot merge without a non-author code-owner approval.
+3. Create the environments (section 4) and the `main` ruleset (section 2), then merge the bootstrap PR through it.
+4. Verify on fixture PRs (backlog M0-17): an S0 PR auto-merges once the checks are green; an S2 PR without its Threat note and Tests-first evidence stays red on `review-gate`; a PR touching a code-owned path waits for a non-author code-owner approval.
 5. Install Renovate (section 6).
 6. Create the orphan `sync` branch and add its secret-scan stub (see "The sync branch"), then enable its ruleset.
 
 ### 1. Repository settings (Settings, General and Code security)
 
 - [ ] Merging: allow **squash merging only** (default message: pull request title and description); disable merge commits and rebase merging; auto-delete head branches. The PR title, which `pr-hygiene` validates, becomes the commit subject.
-- [ ] **Allow auto-merge: on** (D-25). Agents enable it per PR (`gh pr merge --auto --squash`); GitHub merges when every required check and the code-owner review are satisfied.
+- [ ] **Allow auto-merge: on** (D-25). Agents enable it per PR (`gh pr merge --auto --squash`); GitHub merges when every required check is green. On S2 and code-owned paths GitHub holds the merge until a non-author code owner approves (D-51).
 - [ ] Private vulnerability reporting: **enable** (`SECURITY.md` depends on it).
 - [ ] Dependency graph and Dependabot alerts: **enable** (dependency review and Renovate's `vulnerabilityAlerts` use them). **Decision:** leave Dependabot *security updates* off, Renovate opens those PRs.
 - [ ] Secret scanning and **push protection**: **enable**.
@@ -120,16 +120,28 @@ Everything below is manual (GitHub, npm or Cloudflare settings) and owner-only: 
 
 ### 2. Ruleset for `main` (Settings, Rules, Rulesets)
 
-- [ ] Target: default branch; enforcement: Active; **bypass list: empty**. No bypass actors, and the owner's account is never one: with a bypass, an agent holding the owner's credentials could merge past every gate.
+- [ ] Target: default branch; enforcement: Active; **bypass list: empty**. No bypass actors, not even the owner's account, because agents use it and a bypass would let them merge past every gate.
 - [ ] Restrict deletions; block force pushes.
 - [ ] Require linear history.
-- [ ] Require a pull request before merging: allowed merge method squash; **required approvals: 0**; **require review from Code Owners: on**; dismiss stale approvals on new commits; require conversation resolution. Required approvals stay 0 because PRs are opened under the owner's account; the code-owner rule makes the S2, CI and agent-rule paths need a non-author approval (`CODEOWNERS`).
+- [ ] Require a pull request before merging: allowed merge method squash; **required approvals: 0**; **require review from Code Owners: OFF** (D-51, simplified: agents use Tali's account, so Tali cannot approve agent PRs; S2 and sensitive paths are gated by his "merge" in chat); dismiss stale approvals on new commits; require conversation resolution. Required approvals stay 0 so that only code-owned paths need a human approval and other S0/S1 PRs auto-merge when green.
 - [ ] Require status checks to pass: **`ci-gate`**, **`security-gate`**, **`pr-hygiene`**, **`review-gate`** (source: GitHub Actions). **Decision:** "require branches to be up to date" is safer and causes more rebases; recommended on. Let the bots rebase their own PRs (section 6); a rebase or manual "Update branch" on a bot PR changes its head commit, so its code-owner approval has to be given again.
 - [ ] **Decision (optional):** require signed commits. Squash merges made in the web UI and commits created by the Changesets action through the API are signed by GitHub. Direct pushes need a local signing key.
 - [ ] **Decision (optional):** "Require code scanning results" for CodeQL (high or higher), after the first clean run.
 - [ ] Second ruleset on tags (`refs/tags/*`): restrict updates and deletions, but **not** creation (the release jobs create tags).
 - [ ] Ruleset on the bot branches (`renovate/**` and `changeset-release/**`): enforcement Active; **restrict who can push**, with the Renovate GitHub App (and the actor that pushes the Changesets branch) as the only bypass actors. Without it, anyone with write access can add commits to a branch behind a bot-authored PR; `review-gate` identifies automated PRs by their author, so only a code-owner approval on the head commit stands between such a commit and the merge. Block force pushes and deletions as well if the apps allow it. Not verified: whether the `GITHUB_TOKEN` of `release.yml` (`github-actions[bot]`) can be a bypass actor; if not, pass a GitHub App token as `github-token` to the `version` job (section 3), or leave `changeset-release/**` out and rely on the head-commit approval.
 - [ ] Third ruleset on the coordination branch `sync`: target `sync`, enforcement Active, bypass list empty; **block force pushes and restrict deletions** only. No pull-request requirement, no status checks, no linear-history rule (it is pushed to directly).
+
+### 2a. Agent bot account `4thtech-agent`: DEFERRED (D-51, simplified; revisit before M3, backlog M0-22 and M0-23)
+
+Agents push branches and open PRs as a dedicated machine account, never with your personal login. You create it and its token; an agent never does.
+
+- [ ] Create the GitHub account `4thtech-agent` with **2FA enabled**. Keep its recovery codes yourself.
+- [ ] Give it **write** access to the three repos: `4thtech/agentlink`, `4thtech/occ-v2-contracts`, `4thtech/agentlink-ops`. Not admin, not an organisation owner.
+- [ ] Confirm it is **never a ruleset bypass actor** (the `main` bypass list stays empty) and **never a code owner** (it is not in `CODEOWNERS`, and not in `BOT_AUTHORS` in `review-gate.yml`).
+- [ ] Create a **fine-grained personal access token** for the account, restricted to those three repos, with **Contents: read and write, Pull requests: read and write, Workflows: read and write, Metadata: read**, and a **90-day expiry**. Note the expiry date, and rotate the token before it lapses.
+- [ ] Enter the token yourself into a **separate GitHub CLI profile** (`GH_CONFIG_DIR=<dir> gh auth login --with-token`). Agent checkouts set `GH_CONFIG_DIR` to that directory; your personal `gh` login stays in the default location and is never used by agents for PRs. Never paste the token into chat, a file in a repo or a sync file.
+- [ ] Verify with a fixture PR (backlog M0-22): `gh api user --jq .login` returns `4thtech-agent`; the bot's PR touching `AGENTS.md` stays blocked until you approve it; the bot cannot approve, merge past the gate or change rulesets.
+- [ ] Until the account exists (fallback): agent PRs opened under your account that touch code-owned paths need Denis's approval, because you cannot approve your own PR. Or wait for the bot.
 
 ### 3. Actions settings (Settings, Actions, General)
 
@@ -149,7 +161,7 @@ Everything below is manual (GitHub, npm or Cloudflare settings) and owner-only: 
 | `production` | Cloudflare deploy workflow → production jobs (not built yet) | **`@talirezun`** | `main`, and release tags | secret `CLOUDFLARE_API_TOKEN` (production token); variable `CLOUDFLARE_ACCOUNT_ID` |
 | `deploy-freeze` | `release.yml` → `freeze` (later also the Cloudflare workflow) | none | `main` only | secret `DEPLOY_FREEZE_TOKEN` (section 8) |
 
-- [ ] Create the five environments as above. For `npm-publish` and `production`, **"Prevent self-review" stays off**: merges, and therefore the runs waiting for approval, happen under your account, so with it on you could never approve.
+- [ ] Create the five environments as above. For `npm-publish` and `production`, **"Prevent self-review" stays off**: merges you make yourself, and the runs you start or re-run, happen under your account, so with it on you could not approve them. (Agents use your account, D-51.)
 - [ ] Do not define `DEPLOY_FREEZE` as an environment variable anywhere: an environment variable of the same name shadows the repository variable inside that job.
 - [ ] Approving is one click on the waiting run (web or GitHub mobile). GitHub shows all environments of a run that wait for you in one dialog.
 
@@ -231,7 +243,7 @@ The organisation stays on the **Free** plan (D-27); revisit before M3.
 ## Not verified when this was written
 
 - None of the workflows has run yet; no `actionlint`, `zizmor` or `shellcheck` was available locally. YAML syntax was validated, and the `review-gate` script was exercised against mocked pull requests (S0/S1/S2, stale and self approvals, automated PRs by author including forged commit identities, path classification, freeze). The first CI run is the real test. Expect to triage any zizmor finding; to relax it temporarily set `min-severity: low` on the zizmor step.
-- That a ruleset with **0 required approvals and "Require review from Code Owners" on** blocks a PR touching a code-owned path until a non-author code owner approves, and lets other PRs merge without approval. Verify with the bootstrap fixture PRs (section 0, step 4).
+- That a ruleset with **0 required approvals and "Require review from Code Owners" on** (D-51) blocks a PR on a code-owned path until a non-author code owner approves, and does not block a PR on other paths. Verify with the bootstrap fixture PRs (section 0, step 4) and, once the bot exists, with a bot-authored fixture PR (backlog M0-22).
 - That zizmor 1.30.1 accepts `rules.self-repository.disable: true` in `.github/zizmor.yml` (documented since 1.13.0) and honours `# zizmor: ignore[adhoc-packages]` on a `run: |` line (documented example form); neither was run locally. If the inline ignore is not honoured, a `release.yml` ignore entry in `zizmor.yml` (`rules.adhoc-packages.ignore`, `release.yml:<line>`) is the fallback.
 - That `pnpm install --ignore-pnpmfile` is accepted by the pinned pnpm (documented as the `ignorePnpmfile` setting); the first CI run proves it. `pnpm rebuild` (the optional `rebuild` input, unused so far) does not get the flag; the hooks guard step covers it.
 - That a ruleset restricting pushes to `renovate/**` and `changeset-release/**` can list the Renovate app and the Changesets pusher as bypass actors (checklist section 2).

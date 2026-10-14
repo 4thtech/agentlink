@@ -30,7 +30,7 @@ Contents: §1 How to read a card · §2 M0 Foundations (incl. legacy OPS-L items
 | **Status** | See the legend below. |
 | **Size** | **S** ≤ 2 days · **M** 3–5 days · **L** 6–8 days of focused agent + human work. Anything larger is split. The changed-lines limits in `development-process.md` §7.4 also apply. |
 | **Tier** | Worker model routing (`development-process.md` §3): **Haiku** (mechanical, read-only, no design choices, never S1/S2) · **Sonnet** (clear-spec implementation, tests, CI, UI, docs, non-security review) · **Opus** (S2 work, architecture, protocol, contracts, signing, deploy scripts, audits). **Owner** marks a card that only the human owner can execute (accounts, settings, keys, legal, money); an agent may prepare material for it. |
-| **Security** | **S0** none · **S1** sensitive · **S2** critical (`audit-rules.md` §2). The highest applicable class wins; only the owner may lower it. S1/S2 need an independent review session; S2 also needs @denisjazbec's review, tests-first evidence, a full threat note and an external-audit scope-register entry (`audit-rules.md` §3). |
+| **Security** | **S0** none · **S1** sensitive · **S2** critical (`audit-rules.md` §2). The highest applicable class wins; only the owner may lower it. S1/S2 need an independent review session; S2 also needs a non-author code-owner approval on GitHub (normally the owner's, D-51), tests-first evidence, a full threat note and an external-audit scope-register entry (`audit-rules.md` §3). |
 | **Phase** | M1 cards only: `M1a` (walking skeleton: pair and talk) or `M1b` (files, proof, credits), D-33. Appended to the Status line; see §3. |
 | **Repo/path** | `agentlink` = public `4thtech/agentlink`; `occ-v2-contracts` = private contracts repo (D-19); `agentlink-ops` = private ops/internal-docs repo (D-26). |
 | **Depends on** | Cards that must be `done` (or stubbed behind an agreed interface, `development-process.md` §6.2) before this one is `ready`. |
@@ -63,12 +63,12 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 
 | Section | Cards |
 |---|---|
-| M0 Foundations | 27 (incl. 5 in the D-25 group; 9 `done (setup)`) |
+| M0 Foundations | 29 (incl. 7 in the D-25 group; 9 `done (setup)`) |
 | Legacy OPS-L | 9 |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 80 (M1a 38, M1b 42; incl. 11 split-off and 7 new cards from D-31…D-41) |
-| M2 Console, desktop apps, self-host, design | 35 (incl. 10 new cards from D-34…D-36, D-41) |
-| M3 Mainnet beta | 20 (incl. 2 new cards from D-45…D-47) |
+| M1 Local beta | 84 (M1a 38, M1b 46; incl. 11 split-off, 7 new cards from D-31…D-41 and 4 from D-48) |
+| M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
+| M3 Mainnet beta | 21 (incl. 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
 
 ---
@@ -351,11 +351,10 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
 - **Status:** done (setup) · **Size:** S · **Tier:** Owner · **Security:** S1
 - **Repo/path:** agentlink · .github/CODEOWNERS
 - **Depends on:** —
-- **Spec:** D-23, D-24; `audit-rules.md` §3
+- **Spec:** D-23, D-24, D-51; `audit-rules.md` §3
 - **Invariants:** —
 - **Scope:**
-  - @denisjazbec named as reviewer (required on S2); CODEOWNERS requests him on S1/S2 paths. More reviewers are added later if needed (owner PR).
-  - Open: the waiver path when he is unavailable (`audit-rules.md` §3, DECISION NEEDED, see §9).
+  - @denisjazbec named as code owner; his approval is optional (D-51) and also satisfies the code-owner gate. CODEOWNERS requests him on S1/S2 paths. More reviewers are added later if needed (owner PR).
 - **Acceptance:**
   - A PR touching `packages/crypto/` auto-requests @denisjazbec (verified on the first such PR).
 
@@ -385,7 +384,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
 
 ### Continuous delivery (D-25, adopted)
 
-D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub auto-merge once `ci-gate`, `security-gate`, `pr-hygiene` and `review-gate` are green (plus a non-author code-owner approval where CODEOWNERS applies); a merge to `main` deploys automatically to staging; production (npm `latest`, production Workers and sites) waits for one approval click by the owner (`talirezun`, required reviewer on the `production` and `npm-publish` environments). Mainnet contract deploys, contract upgrades, Safe operations and production secrets stay manual and owner-only. Normative: `release-and-deployment.md` §1, §3; implementation and owner checklist: `ci-cd.md`. The `review-gate` workflow exists (`done (setup)`); the cards in which the owner applies the ruleset, the environments and the `DEPLOY_FREEZE` variable stay `backlog` (owner actions). M0-20 is a separate, still open decision. See gap G-38.
+D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub auto-merge once `ci-gate`, `security-gate`, `pr-hygiene` and `review-gate` are green (S2 and code-owned paths also need a non-author code-owner approval, normally the owner's one tap on GitHub, D-51; agents work under Tali's account; D-51 simplified: S2 and sensitive paths wait for Tali's "merge" in chat); a merge to `main` deploys automatically to staging; production (npm `latest`, production Workers and sites) waits for one approval click by the owner (`talirezun`, required reviewer on the `production` and `npm-publish` environments). Mainnet contract deploys, contract upgrades, Safe operations and production secrets stay manual and owner-only. Normative: `release-and-deployment.md` §1, §3; implementation and owner checklist: `ci-cd.md`. The `review-gate` workflow exists (`done (setup)`); the cards in which the owner applies the ruleset, the environments and the `DEPLOY_FREEZE` variable stay `backlog` (owner actions). M0-20 is a separate, still open decision. See gap G-38.
 
 #### M0-16 · `review-gate` check (new)
 - **Status:** done (setup) — the workflow exists; making it a required check is M0-17 · **Size:** S · **Tier:** Sonnet · **Security:** S1
@@ -395,7 +394,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Invariants:** I-4 (process analogue: no self-approval)
 - **Scope:**
   - Derives the security class from changed paths (mirrors `audit-rules.md` §2.2; highest wins) and requires the PR body to declare at least that class.
-  - S1/S2: an independent-review report ID (`IR-…`) without a FAIL verdict. S2: an approval on the head commit by @talirezun or @denisjazbec who is not the author, plus threat-note and tests-first sections.
+  - S1/S2: an independent-review report ID (`IR-…`) without a FAIL verdict. S2: threat-note and tests-first sections. The S2 approval check was removed by the owner (D-51, simplified); the owner's "merge" go-ahead is a process control.
   - Fails while `DEPLOY_FREEZE` is `true`; narrow bot exemptions (Renovate, Changesets version PR); reads PR text only through the API, no secrets, no checkout.
 - **Acceptance:**
   - Fixture PRs on the first real runs: S2 without non-author approval → red; with it → green; declared class lower than derived → red; S0 docs PR with its box ticked → green.
@@ -409,9 +408,9 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Invariants:** —
 - **Scope:**
   - "Allow auto-merge" on (agents enable it per PR with `gh pr merge --auto --squash`; they never approve and never bypass).
-  - `main` ruleset: required checks `ci-gate`, `security-gate`, `pr-hygiene`, `review-gate`; required approvals 0 with "Require review from Code Owners" on (S2, CI and agent-rule paths need a non-author code-owner approval); dismiss stale approvals; empty bypass list.
+  - `main` ruleset: required checks `ci-gate`, `security-gate`, `pr-hygiene`, `review-gate`; required approvals 0 with "Require review from Code Owners" **off** (D-51, simplified); dismiss stale approvals; empty bypass list (not even the owner).
 - **Acceptance:**
-  - An S2 fixture PR cannot auto-merge without a non-author code-owner approval; an S0 PR auto-merges once checks are green.
+  - An S2 fixture PR without its threat note stays red on `review-gate`; an S2 fixture PR and a PR touching `AGENTS.md` stay blocked until a non-author code owner approves, and then merge; an S0 PR auto-merges once checks are green.
 
 #### M0-18 · GitHub Environments: `production` and `npm-publish` gated by the owner, staging open (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner · **Security:** S1
@@ -420,7 +419,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Spec:** D-25; `release-and-deployment.md` §1, §3 rule 1; `ci-cd.md` §4
 - **Invariants:** I-3
 - **Scope:**
-  - `production` and `npm-publish`: required reviewer `talirezun`; "Prevent self-review" **off** (merges, and so the runs waiting for approval, happen under the owner's account); deployment branches limited to `main` and release tags (`npm-publish`: Changesets tags `*@*`); `npm-publish` holds no secrets, `production` holds the production Cloudflare token only.
+  - `production` and `npm-publish`: required reviewer `talirezun`; "Prevent self-review" **off** (merges and runs the owner makes himself happen under his account; agents use the owner's account, D-51); deployment branches limited to `main` and release tags (`npm-publish`: Changesets tags `*@*`); `npm-publish` holds no secrets, `production` holds the production Cloudflare token only.
   - `staging` and `npm-next` (npm `next` prereleases): no reviewer, deployment branch `main` only; `staging` holds the staging Cloudflare token only. `deploy-freeze`: no reviewer, `main` only, secret `DEPLOY_FREEZE_TOKEN` (M0-19).
   - Secrets scoped per environment; testnet and production keys never shared.
 - **Acceptance:**
@@ -446,9 +445,38 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Spec:** `audit-rules.md` §4 (independent review inputs and output); D-23
 - **Invariants:** I-7 (no secrets to the reviewer), I-5 (PR content is untrusted input to the reviewer)
 - **Scope:**
-  - Decide whether the independent review session runs as a CI job using an `ANTHROPIC_API_KEY` secret. Constraints if adopted: never on fork PRs; key in an environment limited to `main`-based PRs from the owner's account; reviewer receives only the `audit-rules.md` §4.1 inputs; output is advisory and posted as a PR comment; prompt-injection exposure from PR content documented.
+  - Decide whether the independent review session runs as a CI job using an `ANTHROPIC_API_KEY` secret. Constraints if adopted: never on fork PRs; key in an environment limited to `main`-based PRs from the owner; reviewer receives only the `audit-rules.md` §4.1 inputs; output is advisory and posted as a PR comment; prompt-injection exposure from PR content documented.
 - **Acceptance:**
   - Decision recorded (D-xx). If adopted: a fork PR cannot reach the secret (demonstrated); review output format matches `audit-rules.md` §4.3.
+
+#### M0-22 · Create the agent bot account `4thtech-agent` and its token (D-51) (new)
+- **Status:** deferred (D-51 simplified; revisit before M3) · **Size:** S · **Tier:** Owner · **Security:** S1
+- **Repo/path:** GitHub account and organisation settings; the three repos (`agentlink`, `occ-v2-contracts`, `agentlink-ops`)
+- **Depends on:** —
+- **Spec:** D-51; `development-process.md` §1.3; `audit-rules.md` §3; `ci-cd.md` (owner setup checklist, bot account)
+- **Invariants:** I-4 (process analogue: an agent cannot approve its own change)
+- **Scope:**
+  - The owner creates the machine account `4thtech-agent` with 2FA (recovery codes held by the owner only) and gives it **write** access to the three repos, nothing more. It is never a ruleset bypass actor, never a code owner and not an organisation owner.
+  - The owner creates a fine-grained personal access token for the account, limited to those three repos, with Contents: read and write, Pull requests: read and write, Workflows: read and write, Metadata: read; 90-day expiry. Only the owner creates, enters and rotates it; an agent never does, and the token is never pasted into chat, logs or sync files.
+  - Record the token's expiry date in the owner's private notes and rotate it before it lapses.
+- **Acceptance:**
+  - The account has no bypass role: the `main` ruleset bypass list is empty, and a fixture PR opened by the bot touching `AGENTS.md` stays blocked until the owner approves it on GitHub (demonstrated).
+  - The bot cannot approve or merge past a missing code-owner review, cannot push to `main`, and cannot change rulesets, environments or settings (each demonstrated by a refused attempt).
+
+#### M0-23 · Configure agent checkouts to use the bot gh profile (D-51) (new)
+- **Status:** deferred (D-51 simplified; revisit before M3) · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `docs/process/development-process.md` §1.3, `docs/process/onboarding.md`, helper script or instructions for the orchestrator's worktrees
+- **Depends on:** M0-22
+- **Spec:** D-51; `development-process.md` §1.3; `AGENTS.md` Hard rules
+- **Invariants:** I-4
+- **Scope:**
+  - Agent checkouts and worktrees set `GH_CONFIG_DIR` to a separate directory that holds only the bot's login, so `gh pr create`, `gh pr merge --auto` and pushes run as `4thtech-agent`. Tali's personal `gh` login is never used by agents for PRs once the bot exists. Commits keep Tali's git identity, with no AI attribution.
+  - A preflight the orchestrator runs before opening a PR: `gh api user --jq .login` returns `4thtech-agent`; otherwise stop and tell the owner (the fallback in D-51 applies: code-owned paths then need Denis's approval, or wait for the bot).
+  - The owner enters the token into that profile himself (M0-22); this card writes the instructions and the preflight only, and never handles the token.
+  - Harness deny rules keep agents out of the owner's personal `gh` config directory (`release-and-deployment.md` §10).
+- **Acceptance:**
+  - A test PR opened from an agent worktree shows `4thtech-agent` as author and Tali's identity on the commits; the preflight fails closed when the profile is missing or is the owner's.
+  - No file in the repo, the worktree or the sync branch contains the token; the secret scan stays green.
 
 ### Legacy security (OPS-L)
 
@@ -575,7 +603,7 @@ Goal (10 M1): two people on different harnesses exchange messages and files and 
 **Phases (D-33, walking skeleton first).** Every M1 card carries `**Phase:** M1a` or `M1b` on its Status line.
 
 - **M1a "Walking skeleton: pair and talk"**: the crypto Talk needs, types, transport, core identity/pairing/contacts/envelopes, a minimal policy engine with approvals (incl. the D-31 `commitments` policy), keychain and SQLite, owner presence via the CLI passphrase prompt, the Talk and approval MCP tools, agent-assisted install (D-39), and e2e pair-and-message plus J8 over Talk. **M1a gate** (recorded by M1-23): Tali's and Denis's agents pair and sync project status through AgentLink (J9 dogfood), and complete a J8 negotiation over Talk without on-chain proof. There is no milestone audit at M1a; per-card S1/S2 reviews apply.
-- **M1b "Files, proof, credits"**: storage, contracts, chain (incl. zero-config chain selection, D-40), submitter and faucet, file and proof tools, passkey owner presence and the full local approval UI (D1 styling), and the remaining e2e. `M1-GATE` needs both phases.
+- **M1b "Files, proof, credits"**: storage (incl. the D-48 encrypted drop, so files need no setup), contracts, chain (incl. zero-config chain selection, D-40), submitter and faucet, file and proof tools, passkey owner presence and the full local approval UI (D1 styling), and the remaining e2e. `M1-GATE` needs both phases.
 - **Phase** names the gate that needs the card. M1b cards with long lead times (contracts, proof-layer vectors, chain configuration, audit RFP, owner actions) SHOULD start during M1a when a lane has capacity. Design-dependent cards (DESIGN-D1, M1-9g) never block the M1a gate (D-30). DESIGN-D3 is an M3 deliverable and carries no phase.
 - A card that spanned both phases was split: the original ID keeps the M1a part and the M1b part has a new letter, marked "(new, split from …)". Schemas and interface definitions that M1b will use stay in their M1a card.
 
@@ -666,17 +694,19 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/crypto
 - **Depends on:** M1-1a, M1-1h
-- **Spec:** 04 §2.1, §2.4, §2.6, §3.1 (`kid`)
+- **Spec:** 04 §2.1, §2.4, §2.6, §3.1 (`kid`), §4 (drop key)
 - **Invariants:** I-1, I-8
 - **Scope:**
   - `deriveKey(masterSeed, label, epoch, counter)` exactly per 04 §2.1 (HKDF-SHA256, salt `agentlink-v1`, info = label ‖ 0x00 ‖ u32be(epoch) ‖ u8(counter), L = 32).
   - secp256k1 rejection loop (okm = 0 or ≥ n → counter + 1); `agentlink/v1/evm` always epoch 0; Nostr and enc keys per `keyEpoch`; X25519 from okm (library clamping).
   - Public bundle: checksummed EVM address, Nostr x-only key, X25519 key, `kid` = first 16 bytes of SHA-256(encPub). BIP-340 sign/verify helpers for KeyStore implementations only.
+  - Drop key (`agentlink/v1/drop`, secp256k1/BIP-340, current `keyEpoch`; D-48): signs only encrypted-drop requests and is never part of the public bundle or agent card, so it stays unlinkable to the agent's public identity.
   - Intermediate secrets wiped.
 - **Acceptance:**
   - M1-1h derivation vectors pass in all runtimes.
   - Rejection loop covered by a unit test that injects an out-of-range okm (a natural vector is infeasible).
   - Requesting the EVM key with epoch ≠ 0 is rejected by the API (test).
+  - The derivation vectors cover `agentlink/v1/drop`; the drop public key never appears in the public bundle or agent card (test).
 
 #### M1-1c · crypto: HPKE CEK wrapping, payload AEAD, envelope hash and signature helpers
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1073,6 +1103,27 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - 1 GB round trip against MinIO with RSS growth < 128 MiB (measured in the test).
   - An aborted upload leaves no open multipart uploads; lifecycle rule applied and read back on MinIO and R2.
 
+#### M1-6c · storage: drop adapter and storage selection (new, D-48)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/storage
+- **Depends on:** M1-6a, M1-6b, M1-1g, M1-27a (or its API stub, `development-process.md` §6.2)
+- **Spec:** 07 §5.1, §5.4, §5.6; 04 §4 (encrypted drop); 06 §2.3, §3 (`files.storage`); 02 F-31; D-48
+- **Invariants:** I-1, I-2, I-3, I-7
+- **Scope:**
+  - `drop` adapter on the `StorageAdapter` interface: `POST /v1/upload` signed with the agent's drop key through the `KeyStore` (04 §2.1; format and vectors from M1-27a), PUT of the ALF1 ciphertext (multipart above 64 MB), signed commit with the `ciphertextSha256` computed while streaming, `presignGet` returning the drop's signed GET, signed `DELETE`.
+  - One encryption pass per file (07 §5.4): never re-encrypt with the same file key and nonce prefix; a retry re-sends the same bytes or uses a new file key and nonce prefix.
+  - Refuse any `uploadUrl` or `getUrl` that is not https on the configured drop origin; map drop errors to typed codes, never echoing response text into tool results or errors.
+  - Storage selection per 07 §5.6 (`inline` / own / `drop` / `needs_setup`); the drop's typed `limit` errors map to `needs_setup`; no silent fallback from configured own storage to the drop.
+  - Nothing but size, `ciphertextSha256`, expiry and the signature reaches the drop: no file name, file key, owner key or recipient. Signed URLs are never logged.
+  - (IR-D48-1 F10) Today `limit` maps to `needs_setup` (07 §5.4 Limits, 06 §2.3). Split the drop's errors: size, quota and policy limits keep `needs_setup`; transient rate limits and an unavailable drop map to a retryable `rate_limited` or `unavailable` and are described in 07 §5.6, so a busy drop never tells the user to set up own storage.
+  - (IR-D48-1 F16) The drop endpoint is configuration, not a constant: default `drop.agentlink.4thtech.io`, overridable for staging and self-hosting, and always https, with the same off-origin refusal for `uploadUrl` and `getUrl`.
+- **Acceptance:**
+  - Tests first for the signing path. Miniflare integration against M1-27a: 5 MB and 100 MB round trips, quota exceeded → `needs_setup`, a replayed upload signature rejected.
+  - Selection table test over every `files.storage` value × own storage configured or not × within or above the drop limits; under `own` a network spy shows no request to the drop.
+  - Canary: no signed URL, nonce or key material in logs; captured drop requests carry no file name or metadata beyond size and hash, and are signed with the drop key, never the Nostr or EVM identity key.
+  - The encryptor runs once per send (test); a file modified during upload never leads to a second encryption under the same key and nonce prefix; an off-origin `uploadUrl` or `getUrl` is refused.
+  - (IR-D48-1 F10, F16) A transient 429 or 503 from the drop yields the retryable code and never `needs_setup`; a quota or size limit still yields `needs_setup`; the configured endpoint is used for upload, commit and download, and an `http:` endpoint is refused.
+
 ### Core (`@agentlink/core`)
 
 #### M1-7a · core: client skeleton, Store and ApprovalChannel interfaces, identity, contacts
@@ -1140,7 +1191,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 06 §3; 07 §2; 02 F-61–F-63
 - **Invariants:** I-4
 - **Scope:**
-  - The remaining 06 §3 rules in the same pure `evaluate`: files, proofs incl. `dailyBudgetUSD` and `perActionMaxUSD` (budget ledger passed in as context), receipts. `ACCEPTED`/`REJECTED` receipt signing stays under `commitments` (M1-20).
+  - The remaining 06 §3 rules in the same pure `evaluate`: files (incl. `files.storage`, D-48), proofs incl. `dailyBudgetUSD` and `perActionMaxUSD` (budget ledger passed in as context), receipts. `ACCEPTED`/`REJECTED` receipt signing stays under `commitments` (M1-20).
 - **Acceptance:**
   - Tests first; a table-driven test per rule and boundary (e.g. $1.00 vs $1.01 for `perActionMaxUSD`; budget day boundary as fixed by G-7).
   - Property test: `evaluate` stays deterministic and side-effect free.
@@ -1162,17 +1213,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-7f · core: files (send, fetch, refresh link, crypto-shredding)
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core
-- **Depends on:** M1-7b, M1-6b, M1-15; gap G-27 resolved
-- **Spec:** 04 §4; 03 §4.2; 06 §2.3; 02 F-30–F-34; D-18
+- **Depends on:** M1-7b, M1-6b, M1-6c, M1-15; gap G-27 resolved (G-44 resolved)
+- **Spec:** 04 §4; 03 §4.2; 06 §2.3; 07 §5.6; 02 F-30–F-34; D-18, D-48
 - **Invariants:** I-2, I-5, I-7
 - **Scope:**
-  - `sendFile`: allowed-folder check (M1-15), size policy, inline vs storage chosen so the final envelope stays ≤ 24 KB (G-27), STREAM encryption, both hashes, presign with expiry ≤ 7 days, payload `files[]`.
+  - `sendFile`: allowed-folder check (M1-15), size policy, inline vs storage chosen so the final envelope stays ≤ 24 KB (G-27), then own storage or the encrypted drop per 07 §5.6 (M1-6c), STREAM encryption, both hashes, presign with expiry ≤ 7 days, payload `files[]`.
   - `fetchFile`: SSRF-safe download (M1-15) capped at declared size + overhead; check `ciphertextSha256` before and `plaintextSha256` after decryption; write only to the inbox folder with a sanitised name; never execute.
-  - `refresh-link` request and answer; retention (`files.deleteAfter` = expiry | receipt): delete the object and discard the file key on both sides; file keys encrypted at rest.
+  - `refresh-link` request and answer; retention (`files.deleteAfter` = expiry | receipt): delete the object and discard the file key on both sides; the drop follows the same policy, deleting with a DELETE signed by the drop key (D-48, G-44); file keys encrypted at rest.
 - **Acceptance:**
-  - 5 MB round trip via MinIO; tampered ciphertext → integrity error and nothing written.
+  - 5 MB round trip via MinIO, and via the drop (Miniflare) with no own storage configured; tampered ciphertext → integrity error and nothing written.
   - Oversized download aborted; hostile names (`../../.ssh/x`, control characters, hidden names) sanitised.
   - Expired link → refresh-link flow returns a working URL; after the retention trigger the object returns 404 and file-key rows are gone on both sides.
+  - With `deleteAfter: expiry`, a drop object stays retrievable by the owner console after the recipient's `DELIVERED` (I-9).
 
 #### M1-7g · core: proofs and receipts
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -1314,7 +1366,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 06 §8 (†); 04 §2.3, §2.5; 07 §5.2 (guided setup, lifecycle)
 - **Invariants:** I-4, I-7, I-10
 - **Scope:**
-  - `storage connect` (provider picker, test upload/download/delete, lifecycle-rule offer, credentials → keychain), `backup export | restore` (recovery kit).
+  - `storage connect` (optional own storage, D-48: provider picker, test upload/download/delete, lifecycle-rule offer, credentials → keychain), `backup export | restore` (recovery kit).
   - Each † command requires owner presence and emits an owner-signed action; non-TTY invocation of a presence prompt is refused.
 - **Acceptance:**
   - Each † command fails with piped stdin and no passkey or passphrase (tests).
@@ -1333,10 +1385,12 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Until the local approval server lands (M1-8d, M1b), `pending_approval` results name the owner's CLI command (`agentlink approve <id>`, run in a terminal the agent does not control) as `nextStep`; M1-11a adds the local UI `url`.
   - Untrusted-content wrapper exactly per 06 §4 (escape `</untrusted_content>` and control characters, in text and `structuredContent`); server instructions verbatim from 06 §5.
   - Relay subscriptions while running; optional `agentlink://inbox` resource notifications (tools work without them).
+  - (IR-D48-1 F15f) Define the `InboundMessage` shape in 06 (it is referenced but not defined): fields, which are untrusted and wrapped (06 §4), and that no tool result, summary or error ever contains a drop, presigned or share URL, a file key, or a signed token from an inbound message.
 - **Acceptance:**
   - Schema test + behaviour test for each `status` value of each tool.
   - A canary sent through the inbound path never appears in tool descriptions, server instructions or error messages (test scans all three).
   - Summaries pass the vocabulary lint (11 §5).
+  - (IR-D48-1 F15f) A canary URL and key inside an inbound message appear only inside the untrusted-content wrapper and never in a summary, `nextStep` or error.
 
 #### M1-9d · MCP server: file and proof tools
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
@@ -1347,10 +1401,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - `send_file` (realpath allowed-folder check; outside or none → `needs_setup` with the local UI link, file never opened), `fetch_file`, `fee_quote` (USD split `protocolUsd` / `integratorUsd`, G-43), `notarize`, `acknowledge` (`opened` only when the user asked), `get_proof`, `export_proof_pack` (to `proofs.exportFolder`; key disclosure needs approval), `verify_proof_pack` (file-path argument restricted per G-25), `get_credits`.
   - No tool asks for or requires a chain in its default inputs; the chain is picked automatically (M1-26, D-40).
+  - (IR-D48-1 F15f) `fetch_file` and `send_file` results carry size, hash, name (untrusted) and expiry only: never the drop or presigned URL, the share link, or the file key (shape per `InboundMessage` in M1-9c).
 - **Acceptance:**
   - `send_file` outside allowed folders → `needs_setup`, and a filesystem spy shows the file was never opened; a symlink escaping an allowed folder is refused.
+  - With no own storage: a 5 MB `send_file` → `ok` with `delivery: "drop"`; above the drop cap or quota → `needs_setup` (own storage); `agentlink_status` reports `storage.mode` (06 §2.1, D-48).
   - `notarize` with zero credits → `needs_credits` with agent address and `topUpUrl`.
   - Schema + behaviour test per `status` value of each tool.
+  - (IR-D48-1 F15f) A scan of every file-tool result and error in the test run finds no URL from the drop or a connector, and no key material.
 
 #### M1-9e · MCP conformance and tool-surface guard
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
@@ -1360,7 +1417,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-4
 - **Scope:**
   - MCP Inspector (CLI mode) schema validation of all tools in CI.
-  - Committed tool-surface snapshot (names, input and output schemas); changes need code-owner review.
+  - Committed tool-surface snapshot (names, input and output schemas); changes need the owner's approval on GitHub (D-51).
   - Deny assertions: no tool name, description or argument that changes policy, exports keys, adds storage credentials, decides approvals or reads arbitrary files. Vocabulary lint over summaries and server instructions.
 - **Acceptance:**
   - Adding a fixture tool `set_policy` or an argument `privateKey` fails CI (red run linked); Inspector validation passes for every tool.
@@ -1443,6 +1500,61 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - **Deploy (D-25):** staging deploy on merge; smoke test (health + simulated notarize per chain); production after the owner's approval click (`production` environment); health check after deploy with automatic `wrangler rollback` on failure (rehearsed); deploy record written; nothing runs while `DEPLOY_FREEZE` is set.
 
+### Encrypted drop (`apps/drop`) (new, D-48)
+
+#### M1-27a · drop: Worker, R2 and signed-upload protocol (new, D-48)
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/drop
+- **Depends on:** M1-1a, M1-1g, M0-8, M0-9, M0-2g; M1-28 (buckets and lifecycle rule) before staging
+- **Spec:** 07 §5.4; 04 §4 (encrypted drop), §7 (drop rows); 03 §2, §5; 08 §6; D-48
+- **Invariants:** I-1, I-2, I-3, I-7
+- **Scope:**
+  - Endpoints per 07 §5.4: `POST /v1/upload` (signature, nonce and time-window check; size cap; weekly quota per drop key; rate limits per drop key and per IP, IPv6 per /64; global cap), a single-use signed PUT target that accepts exactly the declared size and never overwrites a stored object, the signed commit (bytes verified against `ciphertextSha256`, mismatch deletes), a signed GET valid until `expiresAt`, `DELETE` signed by the uploading drop key only, `POST /v1/report` (deletes only that object; no automatic key block), `GET /v1/health` (liveness only).
+  - Signature format fixed (proposed: a NIP-98-style event in the `Authorization` header, signed with the agent's drop key, 04 §2.1, 07 §5.4), domain-separated from envelopes, records and receipts, with test vectors in Node, browser and Workers. URL MACs, SHA-256 and random IDs come from `@agentlink/crypto` helpers, with vectors for the URL MAC.
+  - Random 128-bit object IDs chosen by the Worker; no file names or metadata on objects; quota and nonce counters in Durable Objects; no accounts.
+  - Hard 7-day expiry: GET refused after `expiresAt`, R2 lifecycle rule (M1-28) as the backstop; per-object download limit (proposed 10).
+  - Serving only as `application/octet-stream` with `Content-Disposition: attachment`, `nosniff`, a sandboxing CSP and CORS for GET.
+  - Logging (I-7, 04 §4): aggregate counters only; no request URLs, signed URLs, object IDs, drop keys or upload signatures in any log, metric label or analytics, with or without IPs; request bodies never logged. Production config keeps Workers observability and request logging, Tail Workers and Logpush off for the drop Worker.
+  - (IR-D48-1 F10) Close the abuse-control residuals in the spec (04 §4, 07 §5.4, §5.6) before implementing: shared-egress collateral (per-IP and per-/64 limits can block innocent users behind an office or carrier NAT; a per-drop-key allowance keeps them working); the behaviour when the global cap is exhausted (fail closed with a typed, retryable `rate_limited` or `unavailable`, never silent drops); and the per-object download limit (proposed 10) against the recipient set (a file sent to more recipients than the limit must still be fetchable by each of them).
+  - (IR-D48-1 F15d) Decide and write the CORS policy for GET (allowed origins, headers, no credentials) in 08 §7, so browser recipients (M2-13) work without a wildcard that exposes non-drop endpoints.
+- **Acceptance:**
+  - Tests first. Miniflare tests: invalid signature, replayed nonce, stale timestamp, size above the cap, quota exceeded per key, rate limit per IP (including many fresh keys from one IP), wrong-length PUT, GET after expiry, DELETE by another key refused, download limit reached.
+  - Signature vectors pass in all three runtimes (M0-9 harness).
+  - Captured logs and metric labels from the whole suite contain no request URL, signed URL, upload target, object ID, drop key or upload signature, with or without IPs (canary test).
+  - Many fresh drop keys from one IP or one IPv6 /64 are limited; a report never blocks a key automatically; a commit with a wrong hash leaves nothing readable; a second PUT is refused.
+  - The threat note covers the 04 §7 rows "malicious or compromised encrypted drop" and "drop abuse / free storage misuse".
+  - (IR-D48-1 F10, F15d) Tests: a global-cap hit returns the typed retryable error and no object is stored; a file with N recipients above the download limit is still fetched by all N; the CORS preflight answers only the documented origins and methods.
+
+#### M1-27b · drop: deploy pipeline and hostname (new, D-48)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · .github/workflows/deploy-drop.yml, apps/drop/wrangler config; `docs/process/release-and-deployment.md`
+- **Depends on:** M1-27a, M1-28, M0-2g; gap G-40 resolved
+- **Spec:** `release-and-deployment.md` §1.1, §2, §4.5, §5, §6, §8; 08 §6; D-25, D-28, D-48
+- **Invariants:** I-3, I-7
+- **Scope:**
+  - CI-only `wrangler deploy`; staging on `workers.dev` previews; beta hostname `drop.agentlink.4thtech.io`; R2 bucket bindings per environment.
+  - Any Worker signing secret (for GET and PUT URLs) set by the owner with `wrangler secret put`; never in GitHub, logs or sync files.
+  - Adds the drop to `release-and-deployment.md`: hostname (§1.1), deployables (§2), Workers pipeline (§4.5), secrets inventory (§6) and rollback matrix (§8).
+- **Acceptance:**
+  - **Deploy (D-25):** staging deploy on merge; smoke test (signed upload, GET and DELETE with a test key; an expired GET refused); production after the owner's approval click (`production` environment); health check after deploy with automatic `wrangler rollback` on failure (rehearsed); deploy record written; nothing runs while `DEPLOY_FREEZE` is set.
+  - The production bucket's lifecycle rule (7 days) is read back after each deploy, and so is the drop Worker's logging config (observability and request logging, Tail Workers and Logpush off; 04 §4).
+
+#### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
+- **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink-ops · legal/ (counsel brief and sign-off, private); Cloudflare account (buckets, lifecycle rule, hostname)
+- **Depends on:** M0-2g · **Due:** start during M1a; buckets needed before M1-27b, terms before anyone outside the internal testers uses the drop
+- **Spec:** D-48; 04 §4 (encrypted drop), §7; 07 §5.4; 08 §6; 12 §2
+- **Invariants:** I-3
+- **Scope:**
+  - Create staging and production R2 buckets for the drop with a lifecycle rule deleting every object after 7 days; the `drop.agentlink.4thtech.io` hostname.
+  - Counsel reviews the hosting terms: terms of service for the drop, a takedown and abuse-report process for content that cannot be inspected (ciphertext), and the privacy notice for drop metadata (drop key, sizes, times, IPs; Cloudflare as processor). **DECISION NEEDED (owner):** terms of service and takedown process.
+  - Confirm the proposed limits: 100 MB per file, 1 GB per drop key per week, 10 downloads per object.
+  - (IR-D48-1 F15g) Word the retention promise in 04 §4, 07 §5.4 and the privacy notice precisely: GET is refused at `expiresAt` by the Worker, while the R2 lifecycle rule deletes objects asynchronously, so physical deletion can lag the expiry (state the maximum observed lag after reading it back). No document promises deletion at an exact time.
+- **Acceptance:**
+  - Buckets and lifecycle rule exist and are read back (with M1-27b); confirmed limits recorded in 07 §5.4 and 12 §2.
+  - Counsel's written sign-off on the terms and takedown process before external testers (M2-GATE) use the drop.
+  - (IR-D48-1 F15g) The maximum lag between `expiresAt` and physical deletion is measured on staging and recorded next to the confirmed limits; the privacy notice and 07 §5.4 use that wording.
+
 ### Local approval UI (`apps/cli` local UI)
 
 #### M1-11a · local UI: owner setup and approvals
@@ -1467,7 +1579,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 08 §1 (pages); 11 §6.2; 10 M1-11
 - **Invariants:** I-4, I-10
 - **Scope:**
-  - Activity; Contacts (safety-code compare, block); Files (allowed folders with resolved paths, inbox folder, expiry); Storage (connect, test); Proofs & credits (balances, agent address QR, faucet button on testnets); Policies (plain-language rules → owner-signed, incl. `commitments` limits); Backup (recovery kit export/restore); Advanced (fingerprints, relays, RPCs, chains; the only place a chain can be chosen, D-40).
+  - Activity; Contacts (safety-code compare, block); Files (allowed folders with resolved paths, inbox folder, expiry); Storage (drop usage against the quota; optional own storage under Advanced: connect, test; D-48); Proofs & credits (balances, agent address QR, faucet button on testnets); Policies (plain-language rules → owner-signed, incl. `commitments` limits); Backup (recovery kit export/restore); Advanced (fingerprints, relays, RPCs, chains; the only place a chain can be chosen, D-40).
   - All owner operations call M1-8c / M1-8e / M1-9b / M1-9i APIs; no new crypto or signing code in the UI.
   - Before DESIGN-D1 lands: functional and unstyled, strings externalized, no invented visual design. Styling is M1-11b.
 - **Acceptance:**
@@ -1533,7 +1645,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 04 §2.5; 06 §7; 02 F-51, J1–J5; 10 M1-12; D-39, D-40
 - **Invariants:** I-4
 - **Scope:**
-  - Local UI and passkey setup, storage connect, credits (keep them small; faucet on testnets), proofs and verification. No wallet, extension, gas or chain choice in any default step.
+  - Local UI and passkey setup, files through the encrypted drop with no setup and own storage as an optional step (D-48), credits (keep them small; faucet on testnets), proofs and verification. No wallet, extension, gas or chain choice in any default step.
 - **Acceptance:**
   - Two people new to AgentLink complete J1 from the docs alone (observed, times recorded; install → first message under 5 minutes).
 
@@ -1553,13 +1665,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-13c · e2e: files, proof and proof of agreement (new, split from M1-13a)
 - **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · e2e/, .github/workflows/e2e.yml
-- **Depends on:** M1-13a, M1-22, M1-9d, M1-10c, M1-11a, M1-12c
+- **Depends on:** M1-13a, M1-22, M1-9d, M1-10c, M1-11a, M1-12c, M1-27b
 - **Spec:** 10 M1-13; 06 §3, §9; 02 F-43, F-51, J2–J5, J8; 04 §3.4 (proof of agreement); 07 §6.3; D-31, D-32, D-40
 - **Invariants:** I-1, I-2, I-5, I-6
 - **Scope:**
-  - Extends the M1-13a scenario: 5 MB file, notarize, DELIVERED and OPENED, export and verify the proof pack.
+  - Extends the M1-13a scenario: a 5 MB file with zero storage setup (encrypted drop, D-48), notarize, DELIVERED and OPENED, export and verify the proof pack.
   - J8 with proof of agreement: extends M1-22; the final `terms` are notarized, the counterparty's ACCEPTED receipt is signed after owner approval, and the exported pack verifies as a proof of agreement.
-  - Deterministic variant on local relays, MinIO and testnets or anvil forks; LLM variant on a schedule.
+  - Deterministic variant on local relays, MinIO, a local drop Worker (Miniflare) and testnets or anvil forks; LLM variant on a schedule against the staging drop.
 - **Acceptance:**
   - Deterministic variant green on PRs within 15 minutes; LLM variant pass rate reported per run; no chain is chosen by hand anywhere in the scenario (D-40).
   - Canary scan of all e2e logs and artifacts finds no plaintext, keys or presigned URLs.
@@ -1756,6 +1868,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Audit report with a verdict per invariant and zero open Critical/High findings.
   - Testing log: testers × journeys × harness combinations, with issues filed as cards; J8 completed with on-chain proof of agreement (D-32).
   - UX (D-39, D-40): no wallet, browser extension, gas or chain choice appears anywhere in the J1–J9 default flows; install → first message stays under 5 minutes (median, per G-21).
+  - Files (D-48): in J1 a file over 12 KB is sent with zero storage setup through the encrypted drop; the audit covers the 04 §7 drop rows.
   - README Status and roadmap updated to the state at this point; README never claims unimplemented features.
   - Owner sign-off recorded.
 
@@ -2071,8 +2184,10 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Scope:**
   - Production domain TBD (owner chooses and registers). Deadline: **before M2-2 reaches external testers**, because owner passkeys are bound to the WebAuthn RP ID of the origin where they are created.
   - If the production console moves to a different domain later: Related Origin Requests plan plus a recovery-kit re-wrap for existing owners. Keep `agentlink.4thtech.io` redirects alive so old invite links work.
+  - (IR-D48-1 F16) Add the RP ID pinning note to 08 §2.3: the console pins its WebAuthn RP ID to the production domain chosen here, the console refuses to create owner passkeys on any other origin, and a staging RP ID is never reused for production.
 - **Acceptance:**
   - Decision recorded; the console's RP ID set accordingly before external testers onboard; if a later move is planned, the migration plan is written and tested on staging.
+  - (IR-D48-1 F16) 08 §2.3 contains the RP ID pinning rule; a test creates a passkey on a non-pinned origin and is refused.
 
 ### Desktop apps, owner identity, counterparty (D-34…D-36, D-41) (new)
 
@@ -2089,7 +2204,7 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
   - Threat model against a same-user agent with shell access (G-1, G-42): how the native approval window and keychain access bound to the signed app stop a tampered install or another process from unlocking the owner key, and what remains on Linux.
   - Output before any shell code: decision record, spec PR, and a scope and estimate check for M2.
 - **Acceptance:**
-  - Independent security review session, @denisjazbec review and owner approval of the decision; spec PR merged.
+  - Independent security review session and owner approval of the decision (@denisjazbec's review recommended, D-51); spec PR merged.
   - A spike shows biometric-gated unlock of a keychain item on macOS and Windows that an unsigned or re-signed build cannot use.
 
 #### M2-11b · desktop: shared shell and macOS app (new)
@@ -2188,6 +2303,7 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
 - **Scope:**
   - P1. A counterparty without an agent opens the invite link, sees the inviter (self-declared name, fingerprint) and the offer's `terms`, and accepts or rejects in the browser. Zero install: keys generated in the browser with the console identity model (passkey PRF, recovery code); the binding `accept` needs the person's presence.
   - The fragment is never sent; console origin rules apply (CSP, no third-party scripts, no analytics); inbound `terms` rendered as text.
+  - (IR-D48-1 F15d) Implement the CORS policy from 08 §7 (recorded under M1-27a): the browser counterparty fetches drop ciphertext only from the documented drop origin, and the console CSP `connect-src` lists exactly that origin.
 - **Acceptance:**
   - Playwright: open invite → view terms → accept → the inviting agent receives a valid `accept` with the matching `termsHash`; the fragment is never transmitted; XSS fixtures in `terms` are inert; restore on a second browser from the recovery code.
   - **Deploy (D-25)** block as in M2-5a.
@@ -2203,6 +2319,72 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
   - Custody on a hardware token or a cloud signing service, never on a workstation disk.
 - **Acceptance:**
   - Certificates issued; custody recorded privately; a test signature from the CI release environment verifies (with M2-11e).
+
+### Storage connectors (D-49) (new)
+
+#### M2-15a · storage: connector framework (OAuth with PKCE, keychain tokens, share links) (new, D-49)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · packages/storage, packages/node (keychain token store), apps/desktop (Settings → Storage)
+- **Depends on:** M1-6c, M2-11b, M2-11g; M2-16 for live provider tests
+- **Spec:** 07 §5.5, §5.6; 04 §4 (consumer storage connectors), §7; 08 §8 (storage settings); 02 F-36; D-49
+- **Invariants:** I-1, I-2, I-3, I-4, I-7
+- **Scope:**
+  - OAuth 2.0 authorization code with PKCE and a loopback redirect (`127.0.0.1`, random port, `state` check) in the system browser, never an embedded webview; minimal scopes per provider.
+  - Token store in the OS keychain (bound to the signed app where the OS allows, 04 §2.2); refresh handling; tokens never logged, never in plaintext in the local store, never in backups or the recovery kit.
+  - Connect and disconnect are owner operations (biometric prompt, owner-signed action); disconnect also revokes the token at the provider.
+  - Shared adapter base: random 128-bit names in a dedicated app folder, share links expiring at `expiresAt`, and a revocation job in the tray app for providers that need sender-side revocation (only where the owner decides so, G-45).
+- **Acceptance:**
+  - Tests first: PKCE verifier and challenge, `state` and redirect checks (a wrong `state`, port or path is refused).
+  - A filesystem diff and the log canary show no token in any file, log or backup; connecting without the biometric prompt is impossible (test); the MCP tool list has no connector or token tool (06 §1 rule 4).
+  - Against a fake provider, the revocation job removes links and objects at expiry, including after an app restart.
+  - The granted scopes in the token response must equal the minimal set; a fake provider granting a broader scope is refused (test). PKCE and randomness come from `@agentlink/crypto` helpers.
+
+#### M2-15b · storage: Google Drive connector (new, D-49)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · packages/storage (gdrive)
+- **Depends on:** M2-15a, M2-16; gap G-45 resolved for Drive
+- **Spec:** 07 §5.5; 04 §4; 02 F-36; D-49
+- **Invariants:** I-2, I-3, I-7
+- **Scope:**
+  - `drive.file` scope; a dedicated AgentLink folder; resumable upload of ciphertext with random names; an "anyone with the link" reader permission per file; a direct-download URL within the SSRF redirect cap; permanent delete (not trash).
+  - "Anyone" permissions cannot expire on Drive: sender-side revocation at expiry, or no Drive connector, per the owner's decision (G-45).
+- **Acceptance:**
+  - Against a test account: upload, share, anonymous download through the M1-15 fetch, delete (the file then returns 404); a 100 MB round trip; link removed at expiry in the revocation test; verified link semantics and download URL format recorded in the PR.
+
+#### M2-15c · storage: Dropbox connector (new, D-49)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · packages/storage (dropbox)
+- **Depends on:** M2-15a, M2-16; gap G-45 resolved for Dropbox
+- **Spec:** 07 §5.5; 04 §4; 02 F-36; D-49
+- **Invariants:** I-2, I-3, I-7
+- **Scope:**
+  - App-folder access; upload sessions for large files; a shared link per file with `expires` where the account supports it (paid plans), otherwise sender-side revocation or not offered, per the owner's decision (G-45); direct download within the SSRF redirect cap; delete.
+- **Acceptance:**
+  - Against a free and a paid test account: upload, share, anonymous download through the M1-15 fetch, delete; a 100 MB round trip; expiry behaviour per account type verified and recorded in the PR.
+
+#### M2-15d · storage: OneDrive connector (new, D-49)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · packages/storage (onedrive)
+- **Depends on:** M2-15a, M2-16; gap G-45 resolved for OneDrive
+- **Spec:** 07 §5.5; 04 §4; 02 F-36; D-49
+- **Invariants:** I-2, I-3, I-7
+- **Scope:**
+  - App-folder access (`Files.ReadWrite.AppFolder`) if `createLink` works with it on personal accounts; otherwise the broader-scope question goes to the owner before this ships (G-45). Upload sessions for large files; an anonymous view link per file with `expirationDateTime`; direct download within the SSRF redirect cap; delete.
+- **Acceptance:**
+  - Against a personal test account: upload, share, anonymous download through the M1-15 fetch, delete; a 100 MB round trip; the scope actually needed for `createLink` and the expiry behaviour verified and recorded in the PR.
+
+#### M2-16 · OAuth client registration with Google, Dropbox and Microsoft (D-49) (new)
+- **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet drafts app descriptions and scope justifications) · **Security:** S1
+- **Repo/path:** agentlink-ops · integrations/ (registration notes, private); public client IDs in the desktop build configuration
+- **Depends on:** M1-24 (the product name shown on consent screens) · **Due:** start during M1b (provider reviews take weeks); needed by M2-15b–M2-15d
+- **Spec:** D-49; 07 §5.5; 04 §4 (consumer storage connectors)
+- **Invariants:** I-1, I-7
+- **Scope:**
+  - Register public desktop OAuth clients (PKCE): a Google Cloud project with the `drive.file` scope and consent-screen verification; a Dropbox app with app-folder access, submitted for production status; a Microsoft Entra app for personal accounts with publisher verification.
+  - Registrations owned by a 4thTech organisation account, never a personal one; no security relies on a client secret, and any provider-issued secret stays out of the public repo.
+  - Record each provider's review requirements and timelines, and feed scope findings into G-45.
+- **Acceptance:**
+  - Client IDs issued and provider reviews passed (or their status recorded) before M2-15b–M2-15d ship.
 
 #### M2-GATE · Milestone 2 gate: internal audit and external testing
 - **Status:** backlog · **Size:** M · **Tier:** Opus (audit session) + Owner (sign-off) · **Security:** S2
@@ -2288,7 +2470,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Spec:** 05 §5, §9; 10 M3-2; `release-and-deployment.md` §3 rule 2, §4.3
 - **Invariants:** I-6, I-10
 - **Scope:**
-  - Only the audited commit (bytecode rebuilt and compared); fork dry-run; the owner runs the deploy locally with the hardware deployer key while @denisjazbec witnesses and independently verifies; identical addresses on both chains; all roles to the Safes; deployer roles revoked in the same script.
+  - Only the audited commit (bytecode rebuilt and compared); fork dry-run; the owner runs the deploy locally with the hardware deployer key while a second person (by agreement, @denisjazbec) witnesses and independently verifies; identical addresses on both chains; all roles to the Safes; deployer roles revoked in the same script.
   - New `@agentlink/occ-v2-abi` version with mainnet addresses.
 - **Acceptance:**
   - Scripted check "deployer holds no role" passes on both chains; delays equal `docs/roles.md`; addresses identical; deployed bytecode matches the audited build; witness record stored.
@@ -2356,14 +2538,16 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Status:** backlog · **Size:** M · **Tier:** Owner · **Security:** S0
 - **Repo/path:** agentlink-ops · legal/ (private); public terms and privacy pages
 - **Depends on:** M0-5
-- **Spec:** 10 M3-7; 12 §9; D-11, D-15, D-47; 01 positioning rules (private)
+- **Spec:** 10 M3-7; 12 §7.1, §9; D-11, D-15, D-47, D-50; 01 positioning rules (private)
 - **Invariants:** —
 - **Scope:**
   - Counsel reviews terms of use, privacy notice (zero-access claims), positioning and the operating entity (D-15); includes the clean-room record (D-20) and BUSL parameters (D-11).
   - Tax and VAT assessment before paid mainnet (D-47): EU VAT exposure for fees paid by EU consumers (including non-Union OSS for a non-EU seller), treatment of fees paid in stablecoins, and any record-keeping or invoicing duties.
+  - Revenue and billing (D-50): accounting treatment of stablecoin revenue (recognition per chain, sweeps, integrator parts), and counsel on billing data for opt-in billing profiles (data protection, retention, invoicing and VAT duties).
 - **Acceptance:**
   - Written counsel sign-off before public launch; D-11 and D-15 updated; terms and privacy notice published.
   - Written tax and VAT assessment received before the fee-configuration Safe batch (M3-3) is signed; 12 §9 updated to match.
+  - Written accounting treatment and billing-data guidance before any invoice is issued; 12 §7.1 updated to match.
 
 #### M3-8 · Bug bounty preparation (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet drafts) · **Security:** S1
@@ -2451,6 +2635,19 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Acceptance:**
   - Decision recorded (D-xx) with its parameters, or "no"; if adopted, 12 §10 updated and grants issued by a script whose total cannot exceed the approved budget.
 
+#### M3-16 · Monthly revenue report from on-chain events (D-50) (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink-ops · finance/revenue-report/ (private)
+- **Depends on:** M3-2c, M3-3
+- **Spec:** 10 M3-16; 12 §4.3, §7, §7.1; 05 §6 (events); D-46, D-50
+- **Invariants:** —
+- **Scope:**
+  - A script that builds a monthly CSV per chain and token from `Charged`, `Deposited`, `Withdrawn` and `Swept` events: revenue by day, fee type and `appId`; protocol and integrator parts; deposits, withdrawals and outstanding credits; sweeps to the treasury Safe.
+  - Read-only: public RPC (or a configured RPC endpoint), no keys, no signing, no write calls.
+- **Acceptance:**
+  - Totals reconcile with the treasury Safe and explorer data for a testnet month and for the first mainnet month; re-running a month gives identical output (fixed block ranges).
+  - The script runs without any credential (its configuration passes the secret scan).
+
 #### M3-GATE · Milestone 3 gate: mainnet readiness audit and first paid use
 - **Status:** backlog · **Size:** M · **Tier:** Opus (audit session) + Owner (sign-off) · **Security:** S2
 - **Repo/path:** private audit store; summary in the owner's sync file
@@ -2461,6 +2658,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - Milestone audit (parts A–F) plus M3 additions: M3-1 closed, mainnet release prerequisites met, zero open Medium.
   - First paid notarizations on mainnet; zero security incidents.
 - **Acceptance:**
+  - Revisit the D-51 merge model before mainnet: an agent bot account with an enforced owner approval and/or GitHub Team (M0-22/M0-23 deferred).
   - Zero open Critical, High or Medium findings; first paid notarizations recorded; incident log empty for the period.
   - README Status and roadmap updated to the state at this point; README never claims unimplemented features.
   - Owner sign-off recorded.
@@ -2475,7 +2673,7 @@ Epics are decomposed into cards (same format, same rules) when the milestone sta
 - **Status:** backlog · **Size:** — · **Tier:** Opus (decomposition) · **Security:** S2 (contains S2 work)
 - **Repo/path:** agentlink, occ-v2-contracts
 - **Depends on:** M3-GATE
-- **Spec:** 10 M4; 03 §7; 04 §2.7 (what domain verification proves); 05 §1 (OCCAnchor), §2.2 (`PRICE_UPDATER`), §5 (freeze); 07 §4.1, §5.4, §6.2; 08 §5; 12 §3.4; 02 F-08, F-24, F-35, F-48, F-72, F-73; D-34, D-37, D-46
+- **Spec:** 10 M4; 03 §7; 04 §2.7 (what domain verification proves); 12 §7.1 (D-50); 05 §1 (OCCAnchor), §2.2 (`PRICE_UPDATER`), §5 (freeze); 07 §4.1, §5.7, §6.2; 08 §5; 12 §3.4; 02 F-08, F-24, F-35, F-48, F-72, F-73; D-34, D-37, D-46
 - **Invariants:** I-1 … I-10
 - **Scope:**
   - Deployments to Arbitrum One, Optimism, Polygon PoS (+ testnets) with identical addresses (deployer-key lifecycle, G-8); chain verification per M3-2a.
@@ -2486,9 +2684,13 @@ Epics are decomposed into cards (same format, same rules) when the milestone sta
   - ElizaOS plugin rewrite on `@agentlink/core`; group threads (F-24); webhooks for self-hosted agents (F-72).
   - Notary `freezeUpgrades()` at GA once GA criteria are defined (G-18).
   - Native-coin fees (D-46): **DECISION NEEDED (owner)** whether to offer volatile native coins at all; if yes, a bounded `PRICE_UPDATER` role (narrow band around the USD target, rate-limited, never above the cap) with contract design, security review and an external audit delta before any such token is allowlisted, plus a USD price source for display (formerly G-30).
+  - Revenue operations (D-50), in `agentlink-ops`: an internal read-only finance dashboard indexing the on-chain events (revenue by day, chain, fee type and `appId`; payers; credit flows; treasury balances; sweep status; current fees and caps; alerts). It holds no keys; fee and treasury changes are only drafted as Safe transaction proposals and signed in the Safe. **DECISION NEEDED (owner):** the indexer.
+  - Opt-in billing profiles and invoicing (D-50): a business signs once with its owner key (an owner operation, never an MCP tool) to link its agent addresses to billing details; identity hooks OCCRegistry (M2) and domain verification (D-34); billing data held only by 4thTech operations, never content; starts only after M3-7's billing-data and VAT guidance. Fiat stays out of scope.
+  - (IR-D48-1 F13) Billing-profile design record, before any code: the signed-object format (domain-separated, versioned, with a purpose field), purpose limitation (billing and invoicing only; never used for analytics or marketing), where the PII lives (agentlink-ops only, encrypted at rest, with a retention period), how a profile is revoked or erased, and that it is never read from or written to the drop, relays or public files. M3-7 supplies the legal basis and retention advice.
   - Research: EU qualified electronic signature (eIDAS) integration so owners can give a proof of agreement legal weight (D-34); output is a research note and a go/no-go, decomposed into cards only if adopted.
 - **Acceptance:**
   - Each item decomposed into cards before work starts; each new contract externally audited before mainnet; README Status and roadmap updated per release.
+  - (IR-D48-1 F13) The billing-profile design record is reviewed (S2) and accepted by the owner before the billing card is decomposed.
 
 #### M5-EPIC · Agent commerce
 - **Status:** backlog · **Size:** — · **Tier:** Opus (decomposition) · **Security:** S2
@@ -2525,23 +2727,24 @@ Converging M1b chains:
 
 - **Proof-layer crypto and chain:** M1-1h → M1-1i → {M1-1d, M1-1j, M1-1k}; M1-1j + M1-1g + M1-3f + M1-14 → M1-4a → {M1-4b → M1-26, M1-4d} → (M1-7g). M1-3d runs beside M1-3b against a vault mock.
 - **Owner presence (passkey and local UI):** M1-8c + M1-7e → M1-8d → M1-8e (+ M1-1k) → M1-11a → M1-11c → M1-11b (after DESIGN-D1) → (M1-13c).
-- **Files:** M1-6a → M1-6b (+ M1-1d) → M1-7f (+ M1-15) → (M1-9d).
+- **Files:** M1-6a → M1-6b (+ M1-1d) → M1-6c (+ M1-27a) → M1-7f (+ M1-15) → (M1-9d).
+- **Encrypted drop (D-48):** M1-28 (owner, buckets) + M1-27a → M1-27b → (M1-13c).
 - **Submitter:** M1-4a + M1-3g → M1-10a → M1-10b → M1-10c → (M1-13c).
 - **Policy:** M1-7d + M1-20 → M1-7i → (M1-7g).
 
-Sizes are effort, not calendar time. The M1a path has thirteen sequential M1 cards, most of them S2; together with the M1b chain it fits the build plan's 5–7 weeks only if S2 reviews (independent session plus @denisjazbec) turn around in 1–2 days. Review capacity, not implementation, is the expected bottleneck; schedule S2 reviews as soon as a card enters `in-review`.
+Sizes are effort, not calendar time. The M1a path has thirteen sequential M1 cards, most of them S2; together with the M1b chain it fits the build plan's 5–7 weeks only if S2 reviews (independent session plus the owner's GitHub approval) turn around in 1–2 days. Review capacity, not implementation, is the expected bottleneck; schedule S2 reviews as soon as a card enters `in-review`.
 
 ### 7.2 Parallel lanes (separate worktrees)
 
 | Stage | Lanes that can run concurrently |
 |---|---|
 | **A — M0 (week 1)** | Owner: M0-2a, M0-2b, M0-2e, M0-2g, M0-4, M0-6, M0-12 · Skeleton: M0-2d → {M0-8, M0-9, M0-10, M0-15} · Contracts repo: M0-2f · Legacy: OPS-L1, OPS-L5, OPS-L8 (→ M0-1), OPS-L3 → OPS-L2, OPS-L4, OPS-L9 |
-| **B — M1a weeks 1–2** | Vectors: M1-1h · Crypto: M1-1a → M1-1b → {M1-1c, M1-1f} → M1-1g; M1-1e · Types: M1-2a → {M1-2b, M1-21} · Relays: M1-18 · Release: M1-16 · Invite page: M1-19 · Started early for M1b: M1-1i; Contracts M1-3a → {M1-3b, M1-3d}; Chain config M1-14; Utilities M1-15; Audit RFP M1-17; Trademark M1-24 |
+| **B — M1a weeks 1–2** | Vectors: M1-1h · Crypto: M1-1a → M1-1b → {M1-1c, M1-1f} → M1-1g; M1-1e · Types: M1-2a → {M1-2b, M1-21} · Relays: M1-18 · Release: M1-16 · Invite page: M1-19 · Started early for M1b: M1-1i; Contracts M1-3a → {M1-3b, M1-3d}; Chain config M1-14; Utilities M1-15; Audit RFP M1-17; Trademark M1-24; Drop buckets and terms M1-28 (owner) |
 | **C — M1a weeks 2–4** | Core: M1-7a → M1-7b → M1-7c → M1-7h; M1-7d → {M1-7e, M1-20} · Transport: M1-5a → M1-5b → M1-5c · Node: M1-8a → {M1-8b, M1-8c} · CLI: M1-9a → M1-9b · MCP: M1-9c → {M1-9e, M1-9g (after DESIGN-D1), M1-12a, M1-13b} · Install: M1-12b → M1-25 · E2E: M1-13a → M1-22 → **M1-23 (M1a gate)** · M1b in parallel: M1-1d, M1-1j, M1-1k, M1-3c, M1-3e, M1-3f, M1-6a |
-| **D — M1b weeks 4–6** | Chain: M1-4a → {M1-4b → M1-26, M1-4d}, M1-3g → M1-4c · Storage: M1-6b · Core: M1-7f, M1-7i, M1-7g · Owner presence: M1-8d → M1-8e → M1-11a → M1-11c → M1-11b (after DESIGN-D1) · Submitter: M1-10a → M1-10b → M1-10c · CLI: M1-9h, M1-9i · Owner: M2-14 enrolment starts |
+| **D — M1b weeks 4–6** | Chain: M1-4a → {M1-4b → M1-26, M1-4d}, M1-3g → M1-4c · Storage: M1-6b → M1-6c · Drop: M1-27a → M1-27b · Core: M1-7f, M1-7i, M1-7g · Owner presence: M1-8d → M1-8e → M1-11a → M1-11c → M1-11b (after DESIGN-D1) · Submitter: M1-10a → M1-10b → M1-10c · CLI: M1-9h, M1-9i · Owner: M2-14 enrolment and M2-16 OAuth registrations start |
 | **E — M1b weeks 6–7** | M1-9d, M1-9f, M1-12c, M1-12d, M1-13c, M1-13d → M1-GATE |
-| **M2** | Design: DESIGN-D2 → M2-1a → M2-1b → M2-6 · Console: M2-2a → M2-2b → {M2-2c, M2-2d → M2-2e}, M2-2f, M2-2h · Cloud: M2-3a → M2-3b → M2-3c → {M2-3d, M2-3e}, M2-2g · Registry: M2-4a → M2-4b → M2-12 · Public pages: M2-5a, M2-5b → M2-13, M2-8 · Desktop: M2-11a → M2-11b → {M2-11c, M2-11d, M2-11e (+ M2-14) → M2-11f}, M2-11g (after M2-2e, DESIGN-D2) · M2-7, M2-9 · M2-10 (after M1-24) before external testers → M2-GATE |
-| **M3** | M3-12 and M3-2a first · Audits: M3-1a, M3-1b · Governance: M3-2b → M3-2c → {M3-3, M3-4a, M3-5, M3-6} · M3-4b · M3-7, M3-8, M3-9 · M3-14, M3-15 (after M3-3) · M3-10 → M3-11 → M3-GATE |
+| **M2** | Design: DESIGN-D2 → M2-1a → M2-1b → M2-6 · Console: M2-2a → M2-2b → {M2-2c, M2-2d → M2-2e}, M2-2f, M2-2h · Cloud: M2-3a → M2-3b → M2-3c → {M2-3d, M2-3e}, M2-2g · Registry: M2-4a → M2-4b → M2-12 · Public pages: M2-5a, M2-5b → M2-13, M2-8 · Desktop: M2-11a → M2-11b → {M2-11c, M2-11d, M2-11e (+ M2-14) → M2-11f}, M2-11g (after M2-2e, DESIGN-D2) · Storage connectors: M2-16 (owner) → M2-15a (after M2-11b, M2-11g) → {M2-15b, M2-15c, M2-15d} · M2-7, M2-9 · M2-10 (after M1-24) before external testers → M2-GATE |
+| **M3** | M3-12 and M3-2a first · Audits: M3-1a, M3-1b · Governance: M3-2b → M3-2c → {M3-3, M3-4a, M3-5, M3-6} · M3-4b · M3-7, M3-8, M3-9 · M3-14, M3-15, M3-16 (after M3-3) · M3-10 → M3-11 → M3-GATE |
 
 ### 7.3 M2 critical path
 
@@ -2600,6 +2803,8 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 41. **G-41 (L) D-12 propagation.** The decision log now records MIT (D-12); the private internal docs predate it. *Proposed:* align them privately; every public `package.json` and the cloud-agent template carry MIT. *Blocks:* M0-2d (check script), M2-3d (template licence).
 42. **G-42 (H, note) Desktop owner presence as the G-1 mitigation.** D-36; 04 §2.5; 08 §1. D-36's desktop model (a signed app, a native approval window, the owner key in the OS keychain gated by OS biometrics such as Touch ID or Windows Hello) is the intended mitigation for G-1: the OS, not a `localhost` web origin, shows the presence prompt, and keychain access bound to the app's signing identity is meant to stop a tampered installation or another same-user process from unlocking the owner key. It is not yet specified or proven: Linux has no equivalent OS binding, and `npx` installs keep G-1's residual risk. *Proposed:* M2-11a's threat model states exactly which G-1 paths the desktop app closes, per OS; 04 §2.5 is updated when the desktop app ships, and only then is G-1 closed for desktop installs. G-1 stays open until then. *Blocks:* M2-11a, M2-11b, M2-11c, M2-11d.
 43. **G-43 (M) `fee_quote` split.** RESOLVED by 06 §2.4: `fee_quote` returns `{chain, token, amount, usd, protocolUsd, integratorUsd, payFrom}`, and `ProofStatus.fee` carries the same split, as D-45 and 12 §4.3, §5 require. *Was:* `fee_quote` returned only `{chain, token, amount, usd, payFrom}`. *Blocked:* M1-9d.
+44. **G-44 (M) Drop delete on receipt vs owner access.** RESOLVED: the drop follows `files.deleteAfter` like any storage (default `expiry`, `receipt` as an owner option; D-48, 04 §4), so I-9 holds as written: owners keep access to file contents until expiry. *Was:* D-48 deleted drop objects on receipt, ending owner access before expiry. *Blocked:* M1-7f.
+45. **G-45 (M) Consumer providers without expiring public links.** 07 §5.5; D-18 (links expire after at most 7 days); D-49. Google Drive "anyone with the link" permissions cannot expire; Dropbox link expiry needs a paid plan; Microsoft Graph documents `Files.ReadWrite` (broader than the app folder) as the least-privileged permission for `createLink` on personal accounts. Sender-side revocation works only while the sender's device is online. *Proposed:* accept sender-side revocation, run by the desktop tray app at expiry and at start-up, as the expiry mechanism where a provider has no expiring link; ship OneDrive only if `createLink` works with the app-folder scope. Owner decides per provider. A scope broader than the app folder (e.g. OneDrive `Files.ReadWrite`) voids the 04 §7 "stolen token reaches only AgentLink ciphertext" mitigation on Windows and Linux, where same-user processes can read keychain tokens. *Blocks:* M2-15b, M2-15c, M2-15d.
 
 ---
 
@@ -2617,8 +2822,9 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | M0-4 | D-11 to counsel; D-14 name; record D-12 = MIT |
 | M0-6 | Move docs 01 and 09 into `agentlink-ops/docs/internal/`; grant @denisjazbec access |
 | M0-12 | Create the `sync` branch, its ruleset and secret-scan stub; onboard @denisjazbec |
-| M0-14 | Add further reviewers when needed; decide the S2 review waiver path (`audit-rules.md` §3) |
-| M0-17, M0-18 | (D-25) Apply the `main` ruleset with auto-merge and the four required checks; create the environments `npm-next`, `npm-publish`, `staging`, `production`, `deploy-freeze`, with `talirezun` as required reviewer on `production` and `npm-publish`, "Prevent self-review" off, deployment branches `main`/tags only |
+| M0-14 | Add further reviewers when needed |
+| M0-17, M0-18 | (D-25, D-51) Apply the `main` ruleset with auto-merge, the four required checks and code-owner review on; create the environments `npm-next`, `npm-publish`, `staging`, `production`, `deploy-freeze`, with `talirezun` as required reviewer on `production` and `npm-publish`, "Prevent self-review" off, deployment branches `main`/tags only |
+| M0-22 | (D-51, DEFERRED: revisit before M3) Create the GitHub account `4thtech-agent` with 2FA; invite it with write access to the three repos (never a bypass actor, never a code owner); create its fine-grained token (90 days) and enter it yourself in the bot's gh profile; rotate before expiry |
 | M0-19 | Create the repository variable `DEPLOY_FREEZE` and the freeze credential `DEPLOY_FREEZE_TOKEN` (environment `deploy-freeze`); clearing `DEPLOY_FREEZE` is owner-only |
 | M0-20 | **DECISION NEEDED:** machine-run AI review in CI with an `ANTHROPIC_API_KEY` secret |
 | M0-1, OPS-L1, OPS-L5 | Unpublish or patch the Encryptor; confirm the PX auth service is offline; sign the confirmations |
@@ -2634,6 +2840,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | M1-18 | **DECISION NEEDED:** `agentlink-ops` pipeline; host the optional relay |
 | M1-23 | Run the J9 dogfood with @denisjazbec (install, pair, daily project sync, a J8 negotiation); sign off the M1a gate |
 | M1-24 | Trademark and name check (D-38) with counsel before the production domain (M2-10); start early |
+| M1-28 | (D-48) Create the drop's R2 buckets with a 7-day lifecycle rule and the `drop.` hostname; confirm the drop limits; engage counsel on the hosting terms; **DECISION NEEDED:** terms of service and takedown process |
 | M1-GATE, M2-GATE, M3-GATE | Recruit testers; sign off the gate; accept or reject residual risks |
 | DESIGN-D1 | Deliver D1 (copy sheet, tokens + core components, local approval UI, invite placeholder) by week 3 of M1; record it in `docs/design/README.md` |
 | DESIGN-D2 | Deliver D2 (full component library, console, verify, invite landing, onboarding, pay page and pricing, prototypes, rationale) before M1-GATE; late delivery slips M2 |
@@ -2642,15 +2849,16 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | M2-3e | Provide paid ChatGPT and claude.ai plans for connector tests |
 | M2-10 | **DECISION NEEDED:** production console domain (TBD; choose and register) before external testers |
 | M2-11a | Approve the desktop framework decision after its security review |
+| M2-16, M2-15b–M2-15d | (D-49) Register the OAuth clients with Google, Dropbox and Microsoft under a 4thTech organisation account and pass provider reviews; **DECISION NEEDED:** per provider, sender-side revocation where no expiring link exists, and OneDrive's scope (G-45) |
 | M2-14, M2-11e, M2-11f | Buy and enrol: Apple Developer ID (organisation) and a Windows code-signing certificate, starting in M1b; hold signing credentials and the offline update key; approve each desktop release |
 | M3-12 | **DECISION NEEDED:** GitHub Team before mainnet (D-27) |
 | M3-1a, M3-1b | Run the audit engagements; accept final reports |
 | M3-2b | Create mainnet Safes with hardware signers; PAUSER key; mainnet deployer hardware key and its custody |
-| M3-2c | Run the mainnet deploy with the hardware key, @denisjazbec witnessing |
+| M3-2c | Run the mainnet deploy with the hardware key, a second person witnessing |
 | M3-3 | Confirm the D-45 beta prices and `minDeposit`; sign the fee-configuration Safe batch |
 | M3-5 | Set and fund mainnet gas keys |
 | M3-6 | Publish BUSL-1.1 source; explorer verification accounts |
-| M3-7 | Engage counsel; decide the entity (D-15); obtain the tax and VAT assessment before paid launch (D-47) |
+| M3-7 | Engage counsel; decide the entity (D-15); obtain the tax and VAT assessment before paid launch (D-47); accounting treatment of stablecoin revenue and counsel on billing data for opt-in billing profiles (D-50) |
 | M3-8 | **DECISION NEEDED:** bounty platform and budget |
 | M3-14 | Approve the published fee schedule; announce every later price increase ≥ 7 days ahead (D-45) |
 | M3-15 | **DECISION NEEDED (optional):** welcome credits, eligibility and budget |

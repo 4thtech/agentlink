@@ -21,15 +21,15 @@
 | Internal docs and infra | `4thtech/agentlink-ops` (**private**) | Docs 01 (commercial) and 09 (legacy audit, incl. unpatched issues) under `docs/internal/`; later infra, Safe addresses and gas monitoring |
 | Tali's Curator | Tali's private second brain | Tali's own detailed session state. **You don't need it and your agents can't read it.** The sync branch is the shared layer |
 
-### A2. Your role (decisions D-23, D-24, D-25)
+### A2. Your role (decisions D-23, D-24, D-25, D-51)
 
 - **Tali leads development.** His orchestrated agents build: an Opus orchestrator delegates to Haiku, Sonnet or Opus workers by complexity.
 - **You give feedback and review.** You can do that in three ways:
-  - **On PRs** (best for anything code-specific). Comment, request changes or approve.
+  - **On PRs** (best for anything code-specific). Comment, request changes or approve; review comments are welcome.
   - **Through Tali.** He relays it, and his agent logs every item in `talirezun.md` → *Feedback log* with a disposition (accepted → task/PR, declined → reason, or needs discussion). Check that log to see what happened to your feedback.
   - **In your sync file** under *Asks*. Tali's agents surface it to Tali at the start of each session.
-- **S2 PRs need your GitHub approval.** S2 covers crypto, keys, owner presence, the policy engine, the envelope/pairing protocol, contracts, signing, the submitter and deploy scripts. These paths are code-owned by you and Tali. PRs are opened under Tali's account, so **your Approve is what lets agent-built S2 work merge**. "Request changes" blocks it. Approve only when you have actually reviewed it (§A4).
-- **Mainnet contract deployment:** you witness and independently verify it when Tali deploys with his hardware key (`release-and-deployment.md`).
+- **Your approval is not required (D-51).** Tali leads and works independently; his agents work under his GitHub account. S0/S1 PRs auto-merge when all checks are green. S2 PRs (crypto, keys, owner presence, the policy engine, the envelope/pairing protocol, contracts, signing, the submitter, the encrypted drop, deploy scripts) and sensitive-path PRs (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files) merge only after CI, the independent AI review and Tali's explicit "merge". You stay a code owner, so GitHub notifies you; your feedback and review comments are welcome, and each item is logged with a disposition (§A4).
+- **Mainnet contract deployment:** a second person witnesses and independently verifies it when Tali deploys with his hardware key; by agreement, that is you (`release-and-deployment.md`).
 - **Taking over a part:** agree it with Tali. The board's *Area ownership* row is updated, and from then on you work the same process (§A6).
 
 ### A3. Seeing the current state
@@ -39,11 +39,11 @@
 3. Open PRs: `gh pr list --repo 4thtech/agentlink`. Draft PRs are task claims. Reviews requested from you: `gh pr list --repo 4thtech/agentlink --search "review-requested:@me"`.
 4. Task definitions: `docs/process/backlog.md`.
 
-### A4. Reviewing an S2 PR
+### A4. Reviewing an S2 PR (optional for you)
 
-- The PR body must have: Security class, Threat note, the Independent review report (a fresh AI reviewer that never saw the implementation), and Tests-first evidence. The `review-gate` check verifies that these exist, not that they are good. Judging that is your job.
+- The PR body must have: Security class, Threat note, the Independent review report (a fresh AI reviewer that never saw the implementation), and Tests-first evidence. The `review-gate` check verifies that these exist, not that they are good. Judging that is what your review adds.
 - Read the spec sections the PR cites and the matching checklist in `audit-rules.md` §5.
-- Approve only if you would sign off on it yourself. Your agent may draft review comments, but **the Approve is your human decision**. Agents must never approve on anyone's behalf.
+- Approve only if you would sign off on it yourself. Your approval is optional (D-51), but it is a real one: it counts as a code-owner approval. Your agent may draft review comments, but **the Approve is your human decision**. Agents must never approve on anyone's behalf.
 
 ### A5. One-time setup on your machine
 
@@ -79,7 +79,7 @@ You follow the same process as Tali's agents (`development-process.md`):
 - fill in the PR template;
 - get an independent review.
 
-For your S2 PRs, Tali is the code-owner approver. Merging and deploying follow D-25: auto-merge behind GitHub-enforced gates, and production only after Tali's approval click.
+Your S2 and code-owned PRs merge after Tali's GitHub approval as a code owner (D-51). Otherwise merging and deploying follow D-25: auto-merge behind GitHub-enforced gates, and production only after Tali's approval click.
 
 ### A7. Never
 

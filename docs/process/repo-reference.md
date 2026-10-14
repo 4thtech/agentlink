@@ -21,7 +21,7 @@ agentlink/
 │  ├─ crypto/                    # key derivation, HPKE, AES-GCM, STREAM, JCS, BIP-340, EIP-712
 │  ├─ chain/                     # viem clients, OCC v2 bindings (ABIs from @agentlink/occ-v2-abi)
 │  ├─ transport-nostr/           # NIP-17/59 gift wraps, relay pool, sync
-│  ├─ storage/                   # inline + S3 (aws4fetch) adapters
+│  ├─ storage/                   # inline, drop and S3 (aws4fetch) adapters; Drive/Dropbox/OneDrive connectors (M2)
 │  ├─ core/                      # AgentLinkClient, policies, approvals, KeyStore/Store interfaces
 │  ├─ node/                      # keychain KeyStore, SQLite Store, local approval server
 │  └─ ui/                        # shared React components (design system)
@@ -31,7 +31,8 @@ agentlink/
 │  ├─ verify/                    # verify page
 │  ├─ invite/                    # invite landing
 │  ├─ cloud-agent/               # Worker + Durable Object + remote MCP
-│  └─ submitter/                 # Worker
+│  ├─ submitter/                 # Worker
+│  └─ drop/                      # encrypted drop Worker + R2 (D-48)
 ├─ skills/agentlink/SKILL.md     # harness skill / AGENTS.md snippet
 ├─ test-vectors/                 # canonical crypto + EIP-712 vectors (contracts repo checks parity)
 └─ e2e/                          # multi-agent end-to-end tests

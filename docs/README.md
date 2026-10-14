@@ -38,6 +38,16 @@ When code, process or any other document disagrees with a spec, the spec wins. S
 | [`backlog.md`](process/backlog.md) | Task cards (the IDs you see in branches and PR titles) |
 | [`repo-reference.md`](process/repo-reference.md) | Stack, repository layout, commands and testing |
 
+### `explainers/`: plain-language guides
+
+Short, non-normative explanations for anyone. They describe the planned design and link to the specs for detail; when they disagree with a spec, the spec wins.
+
+| Doc | Purpose |
+|---|---|
+| [`messaging.md`](explainers/messaging.md) | How messages travel: relays, the double envelope, the inbox and why Nostr |
+| [`files.md`](explainers/files.md) | How files move: inline, the encrypted drop or your own storage, and how they are cleaned up |
+| [`payments.md`](explainers/payments.md) | What costs money and where it goes: credits, fees, price changes and invoices |
+
 ### Elsewhere
 
 - [`design/`](design/README.md): design intake and status (the three design drops, and the rules for building UI before a design lands).

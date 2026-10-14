@@ -79,11 +79,12 @@ Priority: **P0** = beta must-have · **P1** = beta should-have · **P2** = post-
 | ID | Feature | Detail | Priority |
 |---|---|---|---|
 | F-30 | **Inline small files** | Files ≤ 12 KB travel inside the encrypted envelope (transport size limit) | P0 |
-| F-31 | **Send file via own storage** | File encrypted on device, uploaded to the user's storage; recipient receives a time-limited download link plus key inside the envelope | P0 |
-| F-32 | **Connect storage** | Guided setup for S3-compatible storage (Cloudflare R2, AWS S3, Hetzner, Scaleway, Backblaze, MinIO). Credentials stored locally in keychain | P0 |
-| F-33 | **Expiry and crypto-shred** | Default and maximum 7 days (recipient can request a fresh link). On expiry (default) or confirmed receipt (configurable), the sender deletes the object and both sides discard the file key. Optional owner archive keeps owner copies (P1) | P0 |
+| F-31 | **Send file via the encrypted drop or own storage** | File encrypted on device and uploaded as ciphertext: by default to the 4thTech **encrypted drop** (zero-knowledge, no setup, within the drop limits: proposed 100 MB per file and 1 GB per agent per week, D-48), or to the user's own storage when it is connected, when the file exceeds the drop limits, or when policy keeps files in own storage (`files.storage`, 06 §3). Recipient receives a time-limited download link plus key inside the envelope | P0 |
+| F-32 | **Connect own storage (optional, Advanced)** | Guided setup for S3-compatible storage (Cloudflare R2, AWS S3, Hetzner, Scaleway, Backblaze, MinIO). Credentials stored locally in keychain. Not needed to send files; used for files above the drop limits, longer retention or a policy that keeps files in own storage (D-48) | P1 |
+| F-33 | **Expiry and crypto-shred** | Default and maximum 7 days (recipient can request a fresh link). On expiry (default) or confirmed receipt (configurable), the sender deletes the object and both sides discard the file key. The encrypted drop follows the same policy and deletes everything 7 days after upload in any case (D-48, 04 §4). Optional owner archive keeps owner copies in the owner's own storage (P1) | P0 |
 | F-34 | **Integrity check** | Recipient verifies the SHA-256 of the ciphertext before decrypting | P0 |
 | F-35 | **IPFS pinning adapter** | Optional backend (Pinata / Filebase / Storacha) | P2 |
+| F-36 | **One-click storage connectors** | Desktop apps: Settings → Storage → Connect Google Drive, Dropbox or OneDrive. OAuth sign-in with minimal scopes; only AgentLink ciphertext with random names, in a dedicated app folder; the recipient downloads through a time-limited share link created by the sender's agent; tokens stay in the OS keychain (D-49, 07 §5.5) | P1 (M2) |
 
 ### Proof (paid)
 
@@ -107,7 +108,7 @@ Priority: **P0** = beta must-have · **P1** = beta should-have · **P2** = post-
 | ID | Feature | Detail | Priority |
 |---|---|---|---|
 | F-60 | **Owner can read everything** | Every envelope's content key is also wrapped to the owner keys of both sides | P0 |
-| F-61 | **Policies** | Per agent: allowed contacts, max file size, may-notarize (yes/no/approval), daily fee budget, allowed local folders for file sending, **commitments** (sending `accept` and signing `ACCEPTED` / `REJECTED`: approval by default; optional auto-accept only for allowlisted contacts up to a maximum value, D-31, 06 §3) | P0 |
+| F-61 | **Policies** | Per agent: allowed contacts, max file size, where files are stored (`files.storage`: encrypted drop or own storage, D-48), may-notarize (yes/no/approval), daily fee budget, allowed local folders for file sending, **commitments** (sending `accept` and signing `ACCEPTED` / `REJECTED`: approval by default; optional auto-accept only for allowlisted contacts up to a maximum value, D-31, 06 §3) | P0 |
 | F-62 | **Approvals** | Actions outside policy pause and request owner approval (local UI, console, push; native approval window in the desktop app). By default this includes every commitment: the owner sees the terms, and the changes from the previous version, before an `accept` is sent or an `ACCEPTED` / `REJECTED` receipt is signed (D-31) | P0 |
 | F-63 | **Policies cannot be changed by the agent** | No MCP tool changes policies; only CLI, local UI or console with owner auth | P0 |
 | F-64 | **Activity feed** | Chronological view of everything agents did | P1 |
@@ -130,7 +131,7 @@ Priority: **P0** = beta must-have · **P1** = beta should-have · **P2** = post-
 |---|---|---|
 | Install, identity, pairing, contacts | Free | — |
 | Talk messages, off-chain acknowledgements | Free | — |
-| Send file (inline or own storage) | Free | — (user's own storage cost) |
+| Send file (inline, encrypted drop or own storage) | Free (within the drop quotas, D-48) | — (4thTech carries the drop's cost; own storage is billed by its provider) |
 | Owner console, policies, approvals, local verify | Free | — |
 | **Notarize** (record) | Fee `NOTARIZE`: **$0.10** (cap $0.50) | Sender (credits or direct) |
 | **Notarize file delivery** | Fee `NOTARIZE` (same $0.10; receipts included) | Sender |
@@ -153,7 +154,7 @@ Prices are the planned beta prices (D-45), the same in USD on every chain, paid 
 3. `init` opens the local setup page: the user protects approvals with a passkey (Touch ID / Windows Hello) or an owner passphrase, which creates and wraps the owner key (04 §2.2), and is offered the recovery kit. The user restarts the harness if it needs it.
 4. User says to their agent: "Create an AgentLink invite for Marko." The agent calls `create_invite` and returns a link with its expiry and the user's own owner fingerprint. There is no safety code yet, because it is derived from both sides' keys (04 §3.6).
 5. Marko (already set up) tells his agent: "Accept this invite." His local approval page asks him to confirm the contact (name, fingerprint, safety code) with his passkey. Contact paired: once the handshake completes, both sides show the same safety code, and the two owners can compare it by phone or in person (F-12).
-6. User: "Send Marko's agent the draft proposal from ~/Documents/proposal.pdf." The file is 2 MB, so the agent explains that storage is needed and offers the guided setup (F-32), or the user picks a smaller file or text.
+6. User: "Send Marko's agent the draft proposal from ~/Documents/proposal.pdf." The file is 2 MB: it is encrypted on the device and sent through the encrypted drop (F-31, D-48), with no storage setup. The only prompt is a one-time owner approval to allow that folder, if it isn't allowed yet (`files.allowedFolders`, 06 §3).
 7. Message arrives; Marko asks his agent "check AgentLink"; the agent reads the message.
 
 ### J2 — Notarized document handover
@@ -224,7 +225,7 @@ Prices are the planned beta prices (D-45), the same in USD on every chain, paid 
 
 - Human-to-human chat app. AgentLink is agent-first; humans use the console to supervise.
 - Real-time chat. Harness agents act when a session runs; the inbox works like email.
-- Hosting user files (BYO storage).
+- Hosting user files in readable form, or as a file store or archive. The encrypted drop holds only ciphertext, for at most 7 days (D-48).
 - Custodying funds or holding keys for users.
 - A project token.
 - Payments between parties (x402 is P2/M5).
