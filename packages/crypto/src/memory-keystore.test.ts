@@ -379,7 +379,8 @@ describe('MemoryOwnerKeyStore', () => {
     const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(owner)).filter(
       (name) => name !== 'constructor',
     );
-    expect(methods.sort()).toEqual(['close', 'getPublicKeys', 'lock', 'unlock']);
+    // epochControl (M1-1g-d) signs nothing: it hands out the agent store's epoch control.
+    expect(methods.sort()).toEqual(['close', 'epochControl', 'getPublicKeys', 'lock', 'unlock']);
   });
 
   it('refuses unlock without a presence proof', async () => {

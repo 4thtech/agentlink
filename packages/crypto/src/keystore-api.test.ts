@@ -10,6 +10,7 @@ import {
   type EnvelopeKeys,
   type KeyStoreErrorCode,
   type EpochOptions,
+  type KeyEpochControl,
   type KeyStore,
   type OwnerKeyStore,
   type OwnerPresence,
@@ -111,6 +112,34 @@ describe('KeyStore (type level)', () => {
       [(EpochOptions | undefined)?]
     >();
     expectTypeOf<Params<KeyStore, 'sign712'>>().toEqualTypeOf<[TypedData]>();
+  });
+});
+
+describe('KeyEpochControl (type level, M1-1g-d: the owner-only epoch advance)', () => {
+  it('is not on the KeyStore the agent path uses', () => {
+    expectTypeOf<'advanceEpoch'>().not.toExtend<keyof KeyStore>();
+    expectTypeOf<'previewEpoch'>().not.toExtend<keyof KeyStore>();
+    expectTypeOf<'advanceEpoch'>().not.toExtend<keyof EnvelopeKeys>();
+  });
+
+  it('has exactly previewEpoch and advanceEpoch, and returns public keys only', () => {
+    expectTypeOf<MethodNames<KeyEpochControl>>().toEqualTypeOf<'previewEpoch' | 'advanceEpoch'>();
+    expectTypeOf<BytesReturning<KeyEpochControl>>().toEqualTypeOf<never>();
+    expectTypeOf<Result<KeyEpochControl, 'previewEpoch'>>().toEqualTypeOf<PublicIdentity>();
+    expectTypeOf<Result<KeyEpochControl, 'advanceEpoch'>>().toEqualTypeOf<PublicIdentity>();
+  });
+
+  it('advanceEpoch is a compare-and-set that needs an OwnerSession (I-4)', () => {
+    expectTypeOf<Params<KeyEpochControl, 'advanceEpoch'>>().toEqualTypeOf<[number, OwnerSession]>();
+    expectTypeOf<Params<KeyEpochControl, 'previewEpoch'>>().toEqualTypeOf<[number]>();
+    const advanceWithout = (control: KeyEpochControl) =>
+      // @ts-expect-error: advanceEpoch requires an OwnerSession.
+      control.advanceEpoch(0);
+    expect(typeof advanceWithout).toBe('function');
+  });
+
+  it('refuses a stale compare-and-set with its own code', () => {
+    expectTypeOf<'epoch_conflict'>().toExtend<KeyStoreErrorCode>();
   });
 });
 

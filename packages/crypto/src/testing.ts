@@ -36,6 +36,7 @@ import {
   OWNER_SESSION_DEFAULT_TTL_MS,
   OWNER_SESSION_MAX_TTL_MS,
   type EpochOptions,
+  type KeyEpochControl,
   type KeyStore,
   type OwnerKeyStore,
   type OwnerPresence,
@@ -196,34 +197,62 @@ export interface MemoryKeyStoreOptions {
   readonly keyEpoch?: number;
 }
 
+const epochConflict = (): KeyStoreError =>
+  new KeyStoreError('epoch_conflict', 'keystore: the key epoch is not the expected one');
+const epochUnavailable = (): KeyStoreError =>
+  new KeyStoreError('epoch_unavailable', 'keystore: that key epoch is not available');
+
+/**
+ * The state one MemoryKeyStore and every epoch control over it share (IR-M1-1g-d-1 L-5): an advance
+ * is seen at once by the KeyStore and by every other control over it.
+ */
+interface KeyStoreState {
+  readonly seed: Uint8Array;
+  epoch: number;
+  closed: boolean;
+}
+
+/**
+ * Module-private: the state of each MemoryKeyStore, reachable only through
+ * MemoryOwnerKeyStore.epochControl. The KeyStore object itself has no way to move its epoch
+ * (IR-M1-1g-d-1 M-1).
+ */
+const KEYSTORE_STATE = new WeakMap<object, KeyStoreState>();
+
 /**
  * A KeyStore over a 32-byte master seed held in memory. NOT FOR PRODUCTION (see the file header).
  * The constructor copies the seed; the caller may wipe its own buffer at once.
+ *
+ * It has no method that moves the key epoch. The epoch moves only through a separate
+ * KeyEpochControl from MemoryOwnerKeyStore.epochControl(keyStore) (M1-1g-d, IR-M1-1g-d-1 M-1).
  */
 export class MemoryKeyStore implements KeyStore {
-  readonly #seed: Uint8Array;
-  readonly #keyEpoch: number;
-  #closed = false;
+  readonly #state: KeyStoreState;
 
   constructor(masterSeed: Uint8Array, options: MemoryKeyStoreOptions = {}) {
     const keyEpoch = options.keyEpoch ?? 0;
     assertEpoch(keyEpoch);
-    this.#seed = copySeed(masterSeed, 'MemoryKeyStore: the master seed');
-    this.#keyEpoch = keyEpoch;
+    this.#state = {
+      seed: copySeed(masterSeed, 'MemoryKeyStore: the master seed'),
+      epoch: keyEpoch,
+      closed: false,
+    };
+    KEYSTORE_STATE.set(this, this.#state);
+  }
+
+  get #keyEpoch(): number {
+    return this.#state.epoch;
   }
 
   #open(): Uint8Array {
-    if (this.#closed) throw new KeyStoreError('keystore_closed', 'keystore: the store is closed');
-    return this.#seed;
+    return openState(this.#state);
   }
 
   /** The epoch of a lookup or decryption: default current, never above it (04 §3.1.1). */
   #epochOf(options: EpochOptions | undefined): number {
     const epoch = options?.epoch ?? this.#keyEpoch;
     assertEpoch(epoch);
-    if (epoch > this.#keyEpoch) {
-      throw new KeyStoreError('epoch_unavailable', 'keystore: that key epoch is not available');
-    }
+    if (epoch > this.#keyEpoch) throw epochUnavailable();
     return epoch;
   }
 
@@ -294,11 +323,82 @@ export class MemoryKeyStore implements KeyStore {
   }
 
   close(): Promise<void> {
-    if (!this.#closed) {
-      this.#closed = true;
-      wipe(this.#seed);
+    if (!this.#state.closed) {
+      this.#state.closed = true;
+      wipe(this.#state.seed);
     }
     return Promise.resolve();
+  }
+}
+
+function openState(state: KeyStoreState): Uint8Array {
+  if (state.closed) throw new KeyStoreError('keystore_closed', 'keystore: the store is closed');
+  return state.seed;
+}
+
+/** Module-private: only MemoryOwnerKeyStore.epochControl can construct a control. */
+const CONTROL_TOKEN = Symbol('MemoryKeyEpochControl');
+
+/**
+ * Module-private: every session a MemoryOwnerKeyStore issued, mapped to that store. A control accepts
+ * only the sessions its own owner store minted, never a look-alike (IR-M1-1g-d-1 M-1).
+ */
+const ISSUED_SESSIONS = new WeakMap<object, object>();
+
+/**
+ * The reference KeyEpochControl (M1-1g-d): a separate object over a MemoryKeyStore's state, made only
+ * by MemoryOwnerKeyStore.epochControl. The check and the set of advanceEpoch run in one synchronous
+ * step, so concurrent advances from one epoch cannot both win. Being in memory, it has nothing to
+ * make durable; real backends must (keystore-api.ts).
+ */
+class MemoryKeyEpochControl implements KeyEpochControl {
+  readonly #state: KeyStoreState;
+  readonly #ownerStore: object;
+
+  constructor(token: symbol, state: KeyStoreState, ownerStore: object) {
+    if (token !== CONTROL_TOKEN) {
+      throw new KeyStoreError('presence_required', 'owner keystore: a presence proof is required');
+    }
+    this.#state = state;
+    this.#ownerStore = ownerStore;
+  }
+
+  previewEpoch(epoch: number): Promise<PublicIdentity> {
+    return Promise.resolve().then(() => {
+      const seed = openState(this.#state);
+      assertEpoch(epoch);
+      if (epoch <= this.#state.epoch) throw epochConflict();
+      if (epoch !== this.#state.epoch + 1) throw epochUnavailable();
+      return derivePublicIdentity(seed, epoch);
+    });
+  }
+
+  advanceEpoch(expected: number, owner: OwnerSession): Promise<PublicIdentity> {
+    return Promise.resolve().then(() => {
+      // One synchronous step from the check to the set: the compare-and-set is atomic.
+      const seed = openState(this.#state);
+      assertEpoch(expected);
+      // Only a session the paired owner store minted (by identity, so no look-alike or Proxy), and
+      // only while it is live.
+      if (
+        typeof owner !== 'object' ||
+        owner === null ||
+        ISSUED_SESSIONS.get(owner) !== this.#ownerStore
+      ) {
+        throw new KeyStoreError(
+          'presence_required',
+          'owner keystore: a presence proof is required',
+        );
+      }
+      if (!owner.isActive()) {
+        throw new KeyStoreError('owner_locked', 'owner keystore: the owner session has ended');
+      }
+      if (expected !== this.#state.epoch) throw epochConflict();
+      if (expected === MAX_KEY_EPOCH) throw epochUnavailable();
+      const bundle = derivePublicIdentity(seed, expected + 1);
+      this.#state.epoch = expected + 1;
+      return bundle;
+    });
   }
 }
 
@@ -582,6 +682,26 @@ export class MemoryOwnerKeyStore implements OwnerKeyStore {
     });
   }
 
+  /**
+   * The epoch control of an agent MemoryKeyStore (M1-1g-d, IR-M1-1g-d-1 M-1): a separate object that
+   * moves that store's key epoch, reachable only from the owner side. Its advanceEpoch accepts only
+   * sessions this owner store issued. Owner flows only; never handed to agent-reachable code (I-4).
+   */
+  epochControl(agentKeys: MemoryKeyStore): KeyEpochControl {
+    this.#open();
+    const state =
+      typeof agentKeys === 'object' && agentKeys !== null
+        ? KEYSTORE_STATE.get(agentKeys)
+        : undefined;
+    if (state === undefined) {
+      throw new CryptoInputError(
+        'invalid_argument',
+        'owner keystore: epochControl takes a MemoryKeyStore',
+      );
+    }
+    return new MemoryKeyEpochControl(CONTROL_TOKEN, state, this);
+  }
+
   unlock(presence: OwnerPresence, options: UnlockOptions = {}): Promise<OwnerSession> {
     // Captured when the call is made: a lock() or close() before this resolves cancels it
     // (IR-M1-1g-1 L-2).
@@ -620,6 +740,7 @@ export class MemoryOwnerKeyStore implements OwnerKeyStore {
           throw error;
         }
         this.#sessions.add(session);
+        ISSUED_SESSIONS.set(session, this);
         return session;
       } finally {
         // The presented secret is consumed whether or not it unlocked the store (04 §8.3).
