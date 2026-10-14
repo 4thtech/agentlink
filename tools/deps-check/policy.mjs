@@ -287,7 +287,8 @@ export const ZONES = {
     [
       {
         pattern: 'better-sqlite3',
-        reason: 'SQLite Store; approved build script (pnpm-workspace.yaml)',
+        reason:
+          'SQLite Store (07 §3.7, M1-8b); prebuilt binaries in the package, no install script',
       },
       {
         pattern: '@napi-rs/keyring',

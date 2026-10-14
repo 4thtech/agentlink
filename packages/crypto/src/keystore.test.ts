@@ -45,6 +45,8 @@ const SEED_OR_SECRET = [
   // IR-M1-1f-1 L-3: the agent ≠ owner probes take a candidate secret (04 §2.8).
   'ownerSecretUnlocks',
   'keystoreSecretUnlocks',
+  // M1-8b (07 §3.1): the store's column cipher, which takes the store key.
+  'createStoreColumnCipher',
 ];
 
 // The one deterministic test seam (@agentlink/crypto/testing, never built or exported).

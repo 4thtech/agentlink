@@ -13,11 +13,14 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'LOCAL_APPROVAL_LIFETIME_S',
       'MAX_APPROVAL_BATCH_ITEMS',
       'NodeKeyStoreError',
+      // M1-8b: the store entry returns the Store and its cipher, never the store key.
+      'NodeStoreError',
       'assertAgentId',
       'createOsKeychainAgent',
       'decideReviewedApprovals',
       'initOwner',
       'openAgentKeyStore',
+      'openAgentStore',
       'packageName',
       'performOwnerOperation',
       'probeOsKeychain',
@@ -42,6 +45,9 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'decideReviewedWith',
       'initOwnerWith',
       'ttyOwnerTerminal',
+      'openAgentStoreWith',
+      'createAgentStoreCipher',
+      'SqliteStore',
     ]) {
       expect(names).not.toContain(name);
     }

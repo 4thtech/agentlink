@@ -38,3 +38,8 @@ export {
   type ApprovalContext,
   type ReviewedApproval,
 } from './owner-approval.js';
+// M1-8b: the agent's local SQLite store and the cipher of its `enc` columns (07 §3). The store key
+// stays inside the package: the entry returns only the Store and the cipher (fence.test.ts).
+export { NodeStoreError, type NodeStoreErrorCode } from './store-errors.js';
+export { openAgentStore, type AgentStore, type AgentStoreOptions } from './agent-store.js';
+export type { AgentStoreCipher } from './store-cipher.js';
