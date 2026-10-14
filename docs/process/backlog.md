@@ -618,7 +618,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Spec:** 11 §6.1, §6.2, §8, §9, §11, §13; 10 "Design deliveries"; D-30
 - **Invariants:** —
 - **Scope:**
-  - In-chat copy sheet (11 §6.1, highest priority: it feeds the M1a tool summaries through M1-9g); design tokens (§11.7) and core components (§8); local settings and approvals app (§6.2) with its states (§9); simple "how to install" invite placeholder page.
+  - Brand core (11 §2, D-56: mark, wordmark, lockups, favicon, AI-app listing icon); in-chat copy sheet (11 §6.1, highest priority: it feeds the M1a tool summaries through M1-9g) and terminal copy (§6.10); design tokens (§11.7) and core components (§8); local settings and approvals app (§6.2.1) with its states (§9); simple "how to install" invite placeholder page. Exports per `docs/design/README.md`; paste-ready package `docs/design/claude-design-handoff.md`.
 - **Acceptance:**
   - Drop recorded in `docs/design/README.md` (date, links/files, delivered or partial); intake cards M1-9g, M1-11b and the M1-19 restyle become `ready`.
 
@@ -629,7 +629,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Spec:** 11 §6.3–§6.8, §8, §13; 08 §7 (browser counterparty, D-35), §8 (desktop dashboard, D-41); 02 F-15; D-30
 - **Invariants:** —
 - **Scope:**
-  - Complete component library; owner console (§6.3, desktop and mobile); verify page (§6.4); invite landing (§6.5); browser counterparty view-and-accept (D-35); onboarding (§6.6); pay page (§6.7) and pricing (§6.8); clickable prototypes J1, J2, J4, J5, J8; rationale notes (§13). The console screens are also the desktop dashboard (D-41).
+  - Complete component library; OS app, tray and PWA icons (§2.4); desktop apps for macOS, Windows and Linux (§6.2.2); cloud agent pages (§6.9); storage, proofs and printed records, registration and domain verification (§6.11–§6.13); owner console (§6.3, desktop and mobile); verify page (§6.4); invite landing (§6.5); browser counterparty view-and-accept (D-35); onboarding (§6.6); pay page (§6.7) and pricing (§6.8); clickable prototypes J1, J2, J4, J5, J8; rationale notes (§13). The console screens are also the desktop dashboard (D-41).
 - **Acceptance:**
   - Drop recorded in `docs/design/README.md`; M2-1a becomes `ready`. Arriving after M1-GATE delays the start of M2 by the same amount.
 
@@ -640,7 +640,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Spec:** 11 §2 (brand), §13 (D3 deliverables), §15 (marketing site out of scope for beta); D-28, D-30
 - **Invariants:** —
 - **Scope:**
-  - Production-domain brand and marketing site.
+  - Brand final after the trademark check (M1-24), marketing site (§6.15) and social images on the production domain.
 - **Acceptance:**
   - Drop recorded in `docs/design/README.md`; M3-13 becomes `ready`.
 
@@ -1932,6 +1932,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Editorial only: no change to any rule, threshold or invariant.
 - **Acceptance:**
   - `grep` finds none of the 17 pre-D-53 tool names in `docs/` outside the 06 §2.0 consolidation table and contract or SDK function names; the independent S2 review confirms no rule changed.
+
+#### M1-31 · Local UI passkey origin: `localhost` vs `127.0.0.1` (new, IR-D56-1 F12)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · docs/foundation/08-clients-console-cloud.md §1, docs/foundation/06-mcp-server.md §2.5 (example URL), apps/cli (local UI server)
+- **Depends on:** — (before M1-8e and M1-11a are implemented)
+- **Spec:** 08 §1; 04 §2.5; 06 §2.5; 11 §6.2.1
+- **Invariants:** I-4
+- **Scope:**
+  - 08 §1 serves the local UI on `127.0.0.1` but registers the owner passkey for the RP ID `localhost`. WebAuthn does not accept an IP address as an RP ID, so the page must be opened as `http://localhost:<port>`. Fix 08 §1, the 06 §2.5 approval URL example and 11 §6.2.1 to one origin, and keep the `Host`-header and DNS-rebinding checks consistent with it.
+  - Check how `localhost` resolves on each OS (IPv4 and IPv6) and bind accordingly, without listening on non-loopback interfaces.
+- **Acceptance:**
+  - Specs name one origin for the local UI; a test registers and uses a PRF passkey on that origin, and requests with any other `Host` value are rejected.
 
 #### M1-GATE · Milestone 1 gate: internal audit and user testing
 - **Status:** backlog · **Size:** M · **Tier:** Opus (audit session) + Owner (sign-off) · **Security:** S2 · **Phase:** M1b
