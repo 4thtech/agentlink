@@ -1,5 +1,5 @@
 # AgentLink — sync board
-_Updated 2026-10-14 by @talirezun_
+_Updated 2026-10-14 (end of session) by @talirezun_
 
 ## Area ownership
 | Area | Repo / paths | Lead | Review |
@@ -17,9 +17,12 @@ _Updated 2026-10-14 by @talirezun_
 | M0-8 Redacting logger | @talirezun (agents) | in-progress | feat/M0-8-redacting-logger | 2026-10-14 |
 | M0-10 Boundary guards | @talirezun (agents) | done | #9 merged | 2026-10-14 |
 | G-29 / G-3 spec gaps | @talirezun (agents) | done | #10, #11 (D-58, D-59) | 2026-10-14 |
-| M1-1h Crypto test vectors (S2) | @talirezun (agents) | in-progress | feat/M1-1h-vectors | 2026-10-14 |
-| M1-2a Types (S2) | @talirezun (agents) | in-progress | feat/M1-2a-types | 2026-10-14 |
-| M1-3a Contract interfaces (S2) | @talirezun (agents) | in-progress | occ-v2-contracts feat/M1-3a-interfaces | 2026-10-14 |
+| M1-1h Crypto test vectors (S2) | @talirezun (agents) | done | #25 | 2026-10-14 |
+| M1-1a/1b crypto base, keys | @talirezun (agents) | done | #27, #29 | 2026-10-14 |
+| M1-1c/1e/1g crypto | @talirezun (agents) | in review | #32, branches | 2026-10-14 |
+| M1-2a/2b Types (S2) | @talirezun (agents) | done | #23, #31 | 2026-10-14 |
+| M1-3a/3b contracts | @talirezun (agents) | done | contracts #2, #3 | 2026-10-14 |
+| M1-3d Notary | @talirezun (agents) | in review | contracts #4 | 2026-10-14 |
 | D-53…D-57 specs | @talirezun (agents) | done | #4, #5, #6, #8, #14 | 2026-10-14 |
 | DOCS-RB runbooks / DOCS-PUB public docs | @talirezun (agents) | done | #7, #8 | 2026-10-14 |
 | M0-2f Foundry skeleton (occ-v2-contracts) | @talirezun (agents) | done | contracts #1 merged | 2026-10-14 |

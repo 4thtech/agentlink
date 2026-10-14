@@ -1,6 +1,6 @@
 # @talirezun — sync
-**Headline:** M0 nearly done: monorepo, Foundry, vector harness, guards, delivery pipeline and docs merged; M1a crypto starting (M1-1h)
-_Updated 2026-10-14 · claude-code / claude-opus-5-5 · orchestrator_
+**Headline:** M0 done; M1a crypto underway: encodings, keys, types merged; encryption, key store, card signatures, Notary in final review
+_Updated 2026-10-14 (end of session) · claude-code / claude-opus-5-5 · orchestrator_
 
 ## Now
 - main 9cac3a1. Merged 2026-10-14: monorepo skeleton (M0-2d), vector harness (M0-9), boundary guards (M0-10), Foundry skeleton (private), runbooks/lessons/onboarding, public docs (`docs-site/`, D-57), specs D-52…D-59.
@@ -10,11 +10,12 @@ _Updated 2026-10-14 · claude-code / claude-opus-5-5 · orchestrator_
 ## In flight
 | Task | Branch / PR | Status | Next step |
 |---|---|---|---|
-| M1-1h crypto vectors | feat/M1-1h-vectors | building | independent review |
-| M1-2a types | feat/M1-2a-types | building | independent review |
-| M1-3a contract interfaces | occ-v2-contracts feat/M1-3a-interfaces | building | review, then Tali merges |
-| M0-8 redacting logger | #12 | fix round (review found 2 leaks) | delta review |
-| DESIGN-D1 | — | Tali in Claude Design | export to docs/design/d1 |
+| M1-1e EIP-712 | #32 | approved, resolving conflict | merge |
+| G-2 envelope signatures (+G-4, gas 170k) | docs/G-2-envelope-signatures | spec written | independent review, PR |
+| M1-1c HPKE/AEAD | feat/M1-1c-hpke-aead | reviewed, fixed | PR after G-2 |
+| M1-1g KeyStore/NIP-44 | feat/M1-1g-keystore-nip44 | reviewed, fixed | PR after G-2 |
+| M1-3d Notary | occ-v2-contracts #4 | reviewed, fixing | merge (Tali) |
+| DESIGN-D1 | — | Tali in Claude Design | export to ~/Projects/agentlink-design |
 
 ## Next
 1. M1-1a/1b/1c/1g crypto (S2, tests first) after M1-1h.
