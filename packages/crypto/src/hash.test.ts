@@ -53,6 +53,15 @@ describe('taggedHash (BIP-340)', () => {
     expect(TAGS.ownerAction).toBe('agentlink/owner-action/v1');
   });
 
+  it('cannot be changed at run time (IR-M1-1a-1 L-1)', () => {
+    expect(Object.isFrozen(TAGS)).toBe(true);
+    // ES modules are strict, so writing to a frozen object throws.
+    expect(() => {
+      (TAGS as { envelope: string }).envelope = 'nostr';
+    }).toThrow(TypeError);
+    expect(TAGS.envelope).toBe('agentlink/envelope/v1');
+  });
+
   it('is sha256(sha256(tag) || sha256(tag) || message)', () => {
     const message = decodeHex('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
     // The committed tagged-hash vector `envelope-hash32` (tools/vectors/generate_tagged_hash.py).

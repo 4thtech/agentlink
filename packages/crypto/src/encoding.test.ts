@@ -94,6 +94,15 @@ describe('0x + lowercase hex', () => {
     rejects(() => decodeHex0x(address, { length: 32 }), 'invalid_length');
     expect(decodeHex0x('0x' + 'ab'.repeat(32), { length: 32 })).toHaveLength(32);
   });
+
+  // IR-M1-1a-1 I-3: no 04 §2.4.1 path carries an empty 0x value (fixed-length rows, and ERC-1271
+  // signatures are "a non-empty, even number of hex characters"), so `0x` alone is not canonical.
+  it('rejects an empty 0x value and refuses to produce one', () => {
+    rejects(() => decodeHex0x('0x'), 'invalid_hex');
+    rejects(() => decodeHex0x('0x', { length: 0 }), 'invalid_hex');
+    rejects(() => encodeHex0x(new Uint8Array(0)), 'invalid_argument');
+    expect(decodeHex0x('0x00')).toEqual(bytes(0));
+  });
 });
 
 describe('base64url without padding', () => {

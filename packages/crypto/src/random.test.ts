@@ -89,4 +89,43 @@ describe('wipe', () => {
     expect(() => wipe('secret' as unknown as Uint8Array)).toThrow(CryptoInputError);
     expect(() => wipe([1, 2] as unknown as Uint8Array)).toThrow(CryptoInputError);
   });
+
+  // IR-M1-1a-1 L-2: a buffer whose fill throws must not stop the others from being wiped.
+  it('keeps wiping past a buffer that throws, then reports every failure', () => {
+    class Broken extends Uint8Array {
+      override fill(): this {
+        throw new TypeError('fill failed');
+      }
+    }
+    const before = Uint8Array.of(1, 2);
+    const after = Uint8Array.of(3, 4);
+    let caught: unknown;
+    try {
+      wipe(before, new Broken(2), 'x' as unknown as Uint8Array, new Broken(1), after);
+    } catch (error) {
+      caught = error;
+    }
+    expect(before).toEqual(new Uint8Array(2));
+    expect(after).toEqual(new Uint8Array(2));
+    expect(caught).toBeInstanceOf(CryptoInputError);
+    expect((caught as CryptoInputError).code).toBe('wipe_failed');
+    const cause = (caught as Error).cause;
+    expect(cause).toBeInstanceOf(AggregateError);
+    expect((cause as AggregateError).errors).toHaveLength(2);
+  });
+
+  it('reports a detached buffer as a wipe failure and still wipes the rest', () => {
+    const detached = new Uint8Array(new ArrayBuffer(8));
+    // ArrayBuffer.prototype.transfer (ES2024) detaches the original; the lib is ES2022, so cast.
+    (detached.buffer as unknown as { transfer(): ArrayBuffer }).transfer();
+    const secret = Uint8Array.of(9, 9, 9);
+    let caught: unknown;
+    try {
+      wipe(detached, secret);
+    } catch (error) {
+      caught = error;
+    }
+    expect(secret).toEqual(new Uint8Array(3));
+    expect((caught as CryptoInputError).code).toBe('wipe_failed');
+  });
 });
