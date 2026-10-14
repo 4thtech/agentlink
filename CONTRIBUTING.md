@@ -21,7 +21,7 @@ See the Status and Roadmap in the [README](README.md) for where things stand.
 
   | Class | What it covers | Review needed, on top of the CI gates |
   |---|---|---|
-  | **S0** | No security-relevant behaviour (most docs, tooling without secrets) | None beyond CI |
+  | **S0** | No security-relevant behaviour (docs outside `docs/foundation/`, `docs/process/` and `docs-site/`, tooling without secrets) | None beyond CI |
   | **S1** | Sensitive: inbound content, files and URLs, storage credentials, approval UI, CI configuration, specs | Independent review session; a regression test for every fix |
   | **S2** | Critical: crypto, keys, owner presence, envelope and pairing protocol, policy engine, anything that signs | Everything in S1, plus tests written first, a full threat note, and the owner's (@talirezun) explicit go-ahead before merge (D-51) |
 
