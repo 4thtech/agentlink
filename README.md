@@ -8,11 +8,16 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 
 ## Status
 
-> **Phase:** M0 Foundations (pre-alpha) · **Version:** v0.0.1 (M0 Foundations) · **Last updated:** 2026-10-12
+> **Phase:** M0 Foundations (pre-alpha) · **Version:** v0.0.1 (M0 Foundations) · **Last updated:** 2026-10-14
 >
-> - **Exists today:** specifications ([`docs/foundation`](docs/foundation/00-README.md)), the development and audit process ([`docs/process`](docs/process/development-process.md)), CI workflows and repository checks, and a [security policy](SECURITY.md).
-> - **Does not exist yet:** product code. **There is nothing to install or run yet.** Everything below describes the design and is marked "planned" where it is not built.
-> - **Next:** M1a, a walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets.
+> - **Done in M0:**
+>   - the monorepo skeleton (pnpm workspace with Turborepo, strict CI), the Foundry contracts skeleton and architecture boundary guards;
+>   - the automated delivery pipeline (D-52) and the runbooks;
+>   - the public documentation structure ([`docs-site/`](docs-site/README.md), D-57);
+>   - the specifications ([`docs/foundation`](docs/foundation/00-README.md)), including decisions D-53, D-54, D-56, D-58 and D-59, the development and audit process ([`docs/process`](docs/process/development-process.md)), and a [security policy](SECURITY.md).
+> - **In progress (M0):** the cross-runtime test-vector harness, the redacting logger, shared types, the contract interfaces and the terms tools (D-55).
+> - **Does not exist yet:** product code. The packages are private skeletons and nothing is published. **There is nothing to install or run yet.** Everything below describes the design and is marked "planned" where it is not built.
+> - **Next:** M1a crypto, then the walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets.
 >
 > We build in public. This section is kept current: it is updated whenever a milestone, release or user-visible capability changes.
 
@@ -96,8 +101,8 @@ Milestones are sequential gates ([build plan](docs/foundation/10-build-plan.md))
 
 | Milestone | Gate |
 |---|---|
-| **M0 Foundations** (in progress) | Specs, repositories, CI and open decisions in place. |
-| **M1a Walking skeleton: pair and talk** | Two developers' agents (Claude Code and Codex) pair and keep a shared project in sync over AgentLink, and negotiate terms with owner approval. |
+| **M0 Foundations** (in progress) | Specs, repositories, CI and open decisions in place. Done so far: monorepo and contracts skeletons, boundary guards, delivery pipeline, runbooks, public docs structure and specs D-53 to D-59. In progress: test-vector harness, logger, types, contract interfaces, terms tools. |
+| **M1a Walking skeleton: pair and talk** (next: crypto) | Two developers' agents (Claude Code and Codex) pair and keep a shared project in sync over AgentLink, and negotiate terms with owner approval. |
 | **M1b Files, proof, credits** (completes M1, testnets) | 10 internal testers on at least 3 harness combinations complete setup, first message, a file handover with proof, an owner approval, a third-party verification and a proof of agreement. |
 | **M2 Owner console, desktop apps, self-host, design** | 20 to 50 external early adopters on testnets; install to first message in under 5 minutes. |
 | **M3 Mainnet beta** (Base, Gnosis) | External audit findings (high and medium) fixed; first paid proofs with zero security incidents. |
