@@ -19,10 +19,10 @@ import {
   encodeUtf8,
   hashTypedData,
   keccak256,
-  signTypedData,
   type TypedData,
   type TypedDataTypes,
 } from './index.js';
+import { signTypedData } from './keystore.js';
 
 // EIP-712 Example.js (ethereum/EIPs@e1e9c0c0), the same values tools/vectors/generate_eip712.py
 // checks before it writes the suite.
@@ -378,7 +378,7 @@ describe('hashTypedData refuses malformed typed data', () => {
       signTypedData(MAIL, zero);
       throw new Error('expected a CryptoInputError');
     } catch (error) {
-      expect((error as CryptoInputError).code).toBe('invalid_secret_key');
+      expect((error as CryptoInputError).code).toBe('invalid_argument');
     }
   });
 });

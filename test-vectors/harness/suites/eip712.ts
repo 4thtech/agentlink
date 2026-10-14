@@ -10,12 +10,11 @@ import {
   hashAgentCard,
   hashTypedData,
   parseAgentCardJson,
-  signAgentCard,
-  signTypedData,
   verifyCardAgentSig,
   verifyCardOwnerSig,
   type TypedData,
 } from '@agentlink/crypto';
+import { signAgentCard, signTypedData } from '@agentlink/crypto/keystore';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

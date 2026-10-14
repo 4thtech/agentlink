@@ -13,8 +13,8 @@ import {
   encodeUtf8,
   keccak256,
   recoverEvmAddress,
-  signDigestEcdsa,
 } from './index.js';
+import { signDigestEcdsa } from './keystore.js';
 
 /** secp256k1 group order n. */
 const N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
@@ -93,11 +93,17 @@ describe('signDigestEcdsa', () => {
       fromBig(N + 1n),
       new Uint8Array(31).fill(7),
     ]) {
-      const error = expectInputError(() => signDigestEcdsa(digest, key), 'invalid_secret_key');
+      // The same codes as bip340Sign (IR-M1-1e-1 L-2): length, then range.
+      const code = key.length === 32 ? 'invalid_argument' : 'invalid_length';
+      const error = expectInputError(() => signDigestEcdsa(digest, key), code);
       if (key.length === 32 && toBig(key) !== 0n) {
         expect(error.message).not.toContain(encodeHex(key));
       }
     }
+    expectInputError(
+      () => signDigestEcdsa(digest, [1, 2] as unknown as Uint8Array),
+      'invalid_argument',
+    );
   });
 
   it('refuses a digest that is not 32 bytes', () => {

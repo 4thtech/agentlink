@@ -19,12 +19,12 @@ import {
   parseAgentCard,
   parseAgentCardJson,
   sha256,
-  signAgentCard,
   verifyAgentCard,
   verifyCardAgentSig,
   verifyCardOwnerSig,
   type AgentCard,
 } from './index.js';
+import { signAgentCard } from './keystore.js';
 
 const N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
 
@@ -430,7 +430,20 @@ describe('cardSig and cardAgentSig', () => {
   });
 
   it('verification never throws on hostile input', () => {
-    const hostile = [null, 1, 'x', [], {}, card({ agentEvm: CARD.ownerEvm }), card({ version: 2 })];
+    const trap = (): never => {
+      throw new TypeError('trap');
+    };
+    const proxy = new Proxy(card(), { ownKeys: trap, getOwnPropertyDescriptor: trap });
+    const hostile = [
+      null,
+      1,
+      'x',
+      [],
+      {},
+      card({ agentEvm: CARD.ownerEvm }),
+      card({ version: 2 }),
+      proxy, // IR-M1-1e-1 I-1
+    ];
     for (const c of hostile) {
       expect(verifyCardOwnerSig(c, cardSig)).toBe(false);
       expect(verifyCardAgentSig(c, cardAgentSig)).toBe(false);
@@ -439,12 +452,15 @@ describe('cardSig and cardAgentSig', () => {
   });
 
   it('signing refuses a bad key without echoing it', () => {
-    for (const key of [new Uint8Array(32), new Uint8Array(31).fill(9)]) {
+    for (const [key, code] of [
+      [new Uint8Array(32), 'invalid_argument'],
+      [new Uint8Array(31).fill(9), 'invalid_length'],
+    ] as const) {
       try {
         signAgentCard(CARD, key);
         throw new Error('expected a CryptoInputError');
       } catch (error) {
-        expect((error as CryptoInputError).code).toBe('invalid_secret_key');
+        expect((error as CryptoInputError).code).toBe(code);
         expect((error as Error).message).not.toContain('0909');
       }
     }
