@@ -37,15 +37,21 @@ export type ChainConfig = {
   contracts: ChainContracts;
   feeTokens: FeeToken[];
   explorer: string;
+  /**
+   * Blocks after inclusion before the client shows a proof as included. Where `finalizedTag` is
+   * true, 04 §5 reads chain state at the `finalized` block and this is only the display threshold;
+   * on a chain without the tag it is also the 04 §5 fallback depth. Not a reorg-safety bound.
+   */
   confirmations: number;
+  /** The chain answers `eth_getBlockByNumber("finalized")` (proven by verify-chain), so the client never probes. */
+  finalizedTag: boolean;
   testnet: boolean;
-};
-
-/**
- * A chain's network and fee-token entry before its contracts are deployed (M1-14). The registry
- * (M1-4a) adds `contracts` from the pinned `@agentlink/occ-v2-abi` once M1-3g has deployed them.
- */
-export type ChainNetwork = Omit<ChainConfig, 'contracts'> & {
   /** Official page for the chain ID, RPC and explorer entries. */
   source: ConfigSource;
 };
+
+/**
+ * A chain's shipped network and fee-token entry (M1-14). The registry (M1-4a) composes the full
+ * `ChainConfig` from it plus `contracts` from the pinned `@agentlink/occ-v2-abi` (07 §6.1).
+ */
+export type ChainNetwork = Omit<ChainConfig, 'contracts'>;

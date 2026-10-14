@@ -64,11 +64,31 @@ describe('committed testnet config (M1-14)', () => {
     ]);
   });
 
+  it('accepts a host with a port and an upper-case host', () => {
+    expect(isKeylessHttpsUrl('https://rpc.example:8545')).toBe(true);
+    expect(isKeylessHttpsUrl('https://RPC.Example.org/v1/path')).toBe(true);
+  });
+
   it('ships keyless public RPC URLs only (07 §6.1)', () => {
     for (const n of TESTNET_NETWORKS) {
       expect(n.rpcUrls.length).toBeGreaterThanOrEqual(2);
       for (const url of n.rpcUrls) expect(isKeylessHttpsUrl(url)).toBe(true);
     }
+  });
+
+  it('both chains answer the finalized tag; confirmations are the display threshold (04 §5)', () => {
+    expect(BASE_SEPOLIA.finalizedTag).toBe(true);
+    expect(GNOSIS_CHIADO.finalizedTag).toBe(true);
+    expect(BASE_SEPOLIA.confirmations).toBe(10);
+    expect(GNOSIS_CHIADO.confirmations).toBe(12);
+  });
+
+  it('lists the same RPC URLs, in the same order, as the deploy config', () => {
+    expect(BASE_SEPOLIA.rpcUrls).toEqual([
+      'https://base-sepolia-rpc.publicnode.com',
+      'https://sepolia.base.org',
+      'https://base-sepolia.drpc.org',
+    ]);
   });
 
   it('is frozen, so no caller can redirect a payment', () => {
@@ -212,6 +232,15 @@ describe('config check rejects', () => {
       'https://rpc.example/${RPC_KEY}',
       'https://rpc.example/#key',
       'https://',
+      // IR-M1-14-1 L-2: the same host rule as the deploy-side check.
+      'https:///path',
+      'https://:443',
+      'https://-rpc.example',
+      'https://localhost/x',
+      'https://rpc.example\\x',
+      'https://rpc.example:123456',
+      'https://rpc.example:/x',
+      'https://rpc.exa mple',
     ]) {
       const n = copy(BASE_SEPOLIA);
       n.rpcUrls = [...n.rpcUrls.slice(0, 1), url];
@@ -220,6 +249,18 @@ describe('config check rejects', () => {
     const n = copy(BASE_SEPOLIA);
     n.rpcUrls = n.rpcUrls.slice(0, 1);
     expectCode(n, 'too_few_rpc_urls');
+  });
+
+  it('two tokens under one symbol (IR-M1-14-1 L-7)', () => {
+    const n = copy(BASE_SEPOLIA);
+    n.feeTokens = [firstToken(n), { ...firstToken(n), address: `0x${'be'.repeat(20)}` }];
+    expectCode(n, 'duplicate_symbol');
+  });
+
+  it('a missing finalized-tag flag', () => {
+    const n = copy(BASE_SEPOLIA);
+    (n as { finalizedTag?: unknown }).finalizedTag = 'yes';
+    expectCode(n, 'bad_finalized_tag');
   });
 
   it('a bad explorer or confirmations', () => {

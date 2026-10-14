@@ -510,12 +510,22 @@ type ChainConfig = {
   chainId: number;
   rpcUrls: string[];                // multiple public + optional user-provided; fallback transport
   contracts: { vault: Address; notary: Address; registry?: Address };
-  feeTokens: { symbol: "NATIVE" | "USDC" | "USDT"; address: Address | null; decimals: number; eip3009?: boolean }[];
+  feeTokens: { symbol: "NATIVE" | "USDC" | "USDT"; address: Address | null; decimals: number; eip3009?: boolean; source: Source }[];
   explorer: string;
-  confirmations: number;
+  confirmations: number;            // display threshold; 04 §5 fallback depth only where finalizedTag is false
+  finalizedTag: boolean;            // the chain answers eth_getBlockByNumber("finalized")
   testnet: boolean;
+  source: Source;                   // official page for the chain ID, RPC and explorer entries
 };
+type Source = { url: string; verifiedOn: string };  // https URL; YYYY-MM-DD
 ```
+
+**Sources, finality and composition (proposed; owner confirms at merge; M1-14, IR-M1-14-1 L-4, L-5).**
+
+- Every chain entry and every `feeTokens[]` element carries a required `source`: the issuer's or chain's official page and the date it was last checked (12 §3.2). The private deploy configuration (occ-v2-contracts `script/config`) records the same values, and its verify-chain script checks them against chain state.
+- `finalizedTag` is true where the chain answers the `finalized` block tag (proven by verify-chain), so the client never probes. There, 04 §5 reads chain state at `finalized`, and `confirmations` is only the threshold for showing a proof as included. On a chain without the tag, `confirmations` is also the 04 §5 fallback depth. It is never a reorg-safety bound.
+- The client ships one network entry per chain without `contracts` (`@agentlink/chain`, M1-14). The registry (M1-4a) composes each `ChainConfig` from that entry plus `contracts` from the pinned `@agentlink/occ-v2-abi`, once M1-3g has deployed them.
+- At most one fee token per symbol on a chain, so the user can tell tokens apart by symbol.
 
 At launch `feeTokens` lists only USD stablecoins (D-46, 12 §3): USDC, USDT where available, and on Gnosis the native xDAI (`symbol: "NATIVE"`, `address: null`). A volatile native coin is never a fee token at launch (`NATIVE` on other chains is used only for gas in direct mode).
 

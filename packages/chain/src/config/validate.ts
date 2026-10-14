@@ -30,14 +30,21 @@ function fail(code: string, message: string): never {
 }
 
 /**
- * `https://` with a host and no userinfo, query, fragment or template: the usual places an API key
- * hides. A key inside the path cannot be detected here; review covers it.
+ * The rule shared with the deploy-side check (occ-v2-contracts `ChainConfig._isPlainHttpsUrl`,
+ * IR-M1-14-1 L-2): `https://`, then a host that starts with a letter or digit, has only letters,
+ * digits, `.` and `-`, and contains a `.`; then an optional `:port` of 1–5 digits; then the end or
+ * a `/` path. Nowhere a userinfo `@`, query `?`, fragment `#`, template `$`, backslash, whitespace or
+ * control character: the usual places an API key hides. A key inside the path cannot be detected
+ * here; review covers it.
  */
 export function isKeylessHttpsUrl(url: string): boolean {
-  if (!url.startsWith('https://') || url.length <= 'https://'.length) return false;
-  if (/[@?#$\s\\]/.test(url)) return false;
-  // A host must follow the scheme: `https:///path` and `https://:443` are refused.
-  return /^https:\/\/[a-z0-9.-]+(:[0-9]{1,5})?(\/|$)/i.test(url);
+  if (/[@?#$\\]/.test(url)) return false;
+  for (let i = 0; i < url.length; i++) {
+    const c = url.charCodeAt(i);
+    if (c <= 0x20 || c === 0x7f) return false; // whitespace and control characters
+  }
+  const m = /^https:\/\/([A-Za-z0-9][A-Za-z0-9.-]*)(:[0-9]{1,5})?(\/.*)?$/.exec(url);
+  return m !== null && m[1] !== undefined && m[1].includes('.');
 }
 
 function checkSource(code: string, field: string, src: { url: string; verifiedOn: string }): void {
@@ -100,14 +107,22 @@ export function validateChainNetwork(n: ChainNetwork): void {
       `chain ${String(n.chainId)}: confirmations must be a positive integer`,
     );
   }
+  if (typeof n.finalizedTag !== 'boolean') {
+    fail('bad_finalized_tag', `chain ${String(n.chainId)}: finalizedTag must be true or false`);
+  }
   checkSource('missing_source', `chain ${String(n.chainId)}.source`, n.source);
   if (n.feeTokens.length === 0) fail('no_fee_tokens', `chain ${String(n.chainId)}: no fee tokens`);
   const seen = new Set<string>();
+  const symbols = new Set<string>();
   for (const t of n.feeTokens) {
     checkToken(n.chainId, t);
     const id = t.address ?? 'native';
     if (seen.has(id))
       fail('duplicate_token', `chain ${String(n.chainId)}: ${t.symbol} listed twice`);
+    // One token per symbol and chain: the user sees the symbol, so two would be indistinguishable.
+    if (symbols.has(t.symbol))
+      fail('duplicate_symbol', `chain ${String(n.chainId)}: two ${t.symbol} tokens`);
     seen.add(id);
+    symbols.add(t.symbol);
   }
 }

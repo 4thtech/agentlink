@@ -25,8 +25,8 @@ export const BASE_SEPOLIA: ChainNetwork = frozen({
   key: 'base-sepolia',
   chainId: 84532,
   rpcUrls: [
-    'https://sepolia.base.org',
     'https://base-sepolia-rpc.publicnode.com',
+    'https://sepolia.base.org',
     'https://base-sepolia.drpc.org',
   ],
   feeTokens: [
@@ -43,6 +43,7 @@ export const BASE_SEPOLIA: ChainNetwork = frozen({
   ],
   explorer: 'https://sepolia.basescan.org',
   confirmations: 10,
+  finalizedTag: true,
   testnet: true,
   source: {
     url: 'https://docs.base.org/base-chain/quickstart/connecting-to-base',
@@ -76,6 +77,7 @@ export const GNOSIS_CHIADO: ChainNetwork = frozen({
   ],
   explorer: 'https://gnosis-chiado.blockscout.com',
   confirmations: 12,
+  finalizedTag: true,
   testnet: true,
   source: { url: 'https://docs.gnosischain.com/about/networks/chiado', verifiedOn: VERIFIED_ON },
 });
