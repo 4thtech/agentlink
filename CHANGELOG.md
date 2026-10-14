@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+- CI: `review-gate` fails fast on draft PRs with a one-line reason instead of a full set of errors; it runs in full once the PR is marked ready.
+
 ### Added
 
 - Monorepo skeleton (M0-2d): pnpm workspace with Turborepo, strict ESM TypeScript with project references, ESLint, Prettier, Vitest and Changesets; a stub package for every directory in the repository layout; manifest checks (MIT licence, no install scripts) inside `pnpm lint`; and CI strict mode (`.github/ci-strict`), so a missing root script now fails CI. All packages are private stubs and nothing is published yet.

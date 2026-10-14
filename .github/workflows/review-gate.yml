@@ -61,11 +61,7 @@ jobs:
   review-gate:
     name: review-gate
     # pull_request_review has no branch filter: ignore reviews on PRs into the coordination branch.
-    # Draft PRs are skipped: they cannot merge, and their independent review is still pending.
-    # The gate runs in full on `ready_for_review` and on every later event.
-    if: >-
-      github.event_name == 'merge_group' ||
-      (github.event.pull_request.base.ref != 'sync' && github.event.pull_request.draft != true)
+    if: github.event_name == 'merge_group' || github.event.pull_request.base.ref != 'sync'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -112,6 +108,14 @@ jobs:
 
             // Always read the current state; a review event's payload can be older than the PR.
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+            // A draft fails fast with one line: its independent review is still pending. The job never
+            // reports "skipped" (a skipped required check counts as passed), so no draft-to-ready window
+            // exists in which an unchecked head could merge. The full gate runs on `ready_for_review`.
+            if (pr.draft) {
+              problems.push('Draft PR: review-gate runs in full once the PR is marked ready for review.');
+              finish();
+              return;
+            }
             const author = (pr.user?.login ?? '').toLowerCase();
             const headSha = pr.head?.sha ?? '';
             const CODE_OWNERS = ['talirezun', 'denisjazbec'];
