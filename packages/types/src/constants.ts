@@ -176,6 +176,45 @@ export type ApprovalDecision = (typeof APPROVAL_DECISIONS)[number];
 export const REVOKE_REASONS = freeze(['compromised', 'retired', 'other'] as const);
 export type RevokeReason = (typeof REVOKE_REASONS)[number];
 
+// --- Lifetimes, clock skew, nonces and the budget window (G-7) ----------------------------------
+//
+// All times are unix seconds. The schemas check only the static shape (`issuedAt < expiresAt`, the
+// approval-request TTL); every check against "now" is the core's (M1-7d, M1-7i), pure, with `now`
+// passed in.
+
+/** Clock skew `S`: the core refuses `issuedAt > now + S`. Expiry has no skew (04 §2.5.1). */
+export const CLOCK_SKEW_SECONDS = 300;
+
+/**
+ * Maximum lifetime `L(op)` = the largest allowed `expiresAt − issuedAt` (04 §2.5.1 table). `null`:
+ * the op never expires (`agent.revoke`, `expiresAt` = 0). `contact.check` (G-28) is listed although
+ * its schema lands with the task that builds it.
+ */
+export const OWNER_ACTION_MAX_LIFETIME_SECONDS = freeze({
+  'approval.decide': 86_400,
+  'approval.cancel': 604_800,
+  'policy.set': 86_400,
+  'contact.check': 86_400,
+  'agent.revoke': null,
+} as const);
+
+/** `L(op)` of any later op (storage credentials, key export, disclosure) unless its task sets one. */
+export const LATER_OP_DEFAULT_LIFETIME_SECONDS = 600;
+/** No op may exceed 7 days (04 §2.5.1). */
+export const MAX_OWNER_ACTION_LIFETIME_SECONDS = 604_800;
+
+/** Approval TTL: `approval-request.expiresAt = requestedAt + 86 400` (04 §3.4.1). */
+export const APPROVAL_TTL_SECONDS = 86_400;
+
+/** Applied owner-action nonces are kept at least 30 days, above the longest `L(op)` + `S` (04 §2.5.1). */
+export const NONCE_RETENTION_SECONDS = 30 * 86_400;
+
+/** `proofs.dailyBudgetUSD` covers any rolling 24 hours, never a calendar day (06 §3). */
+export const BUDGET_WINDOW_SECONDS = 86_400;
+
+/** A commitment scope lasts at most 7 days: `min(terms.validUntil, createdAt + 7 days)` (04 §3.4.2). */
+export const COMMITMENT_SCOPE_MAX_LIFETIME_SECONDS = 604_800;
+
 /** `approvalId` = `apr_` + 16 random bytes, base64url (04 §3.4.1). */
 export const APPROVAL_ID_PREFIX = 'apr_';
 
@@ -267,8 +306,8 @@ export const MAX_JSON_NODES = 4096;
 // --- Policy defaults reference (06 §3) -----------------------------------------------------------
 
 /**
- * The policy defaults are defined in 06 §3 and become a schema with exact defaults in M1-2b. This
- * package only pins the policy values that are also protocol caps, so the two cannot drift.
+ * The policy defaults are defined in 06 §3; `POLICY_DEFAULTS` and `policySchema` (policy.ts) carry
+ * them. These are the policy values that are also protocol caps, so the two cannot drift.
  */
 export const POLICY_DEFAULTS_SPEC = 'docs/foundation/06-mcp-server.md §3';
 export const POLICY_PROTOCOL_LIMITS = freeze({

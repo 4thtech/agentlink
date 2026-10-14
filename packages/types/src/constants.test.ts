@@ -10,7 +10,15 @@ import {
   APPROVAL_STATUSES,
   APPROVAL_SUMMARY_MAX_CHARS,
   APPROVAL_TOOL_NAMES,
+  APPROVAL_TTL_SECONDS,
+  BUDGET_WINDOW_SECONDS,
   BYTE_LENGTHS,
+  CLOCK_SKEW_SECONDS,
+  COMMITMENT_SCOPE_MAX_LIFETIME_SECONDS,
+  LATER_OP_DEFAULT_LIFETIME_SECONDS,
+  MAX_OWNER_ACTION_LIFETIME_SECONDS,
+  NONCE_RETENTION_SECONDS,
+  OWNER_ACTION_MAX_LIFETIME_SECONDS,
   CORE_ONLY_PAYLOAD_TYPES,
   FEE_TYPES,
   FILE_LINK_MAX_EXPIRY_DAYS,
@@ -183,6 +191,47 @@ describe('constants (04, 05, 06)', () => {
       bip340Sig: 64,
       eip712Sig: 65,
     });
+  });
+
+  it('pins the G-7 times: skew, lifetimes, approval TTL, nonce retention, budget window', () => {
+    // 04 §2.5.1 "Lifetimes, skew and nonces"; 04 §3.4.1 approval TTL; 04 §3.4.2 scope expiry;
+    // 06 §3 "Daily budget window".
+    expect(CLOCK_SKEW_SECONDS).toBe(300);
+    expect(OWNER_ACTION_MAX_LIFETIME_SECONDS).toEqual({
+      'approval.decide': 86_400,
+      'approval.cancel': 604_800,
+      'policy.set': 86_400,
+      'contact.check': 86_400,
+      'agent.revoke': null,
+    });
+    expect(LATER_OP_DEFAULT_LIFETIME_SECONDS).toBe(600);
+    expect(MAX_OWNER_ACTION_LIFETIME_SECONDS).toBe(604_800);
+    expect(APPROVAL_TTL_SECONDS).toBe(86_400);
+    expect(NONCE_RETENTION_SECONDS).toBe(30 * 86_400);
+    expect(BUDGET_WINDOW_SECONDS).toBe(86_400);
+    expect(COMMITMENT_SCOPE_MAX_LIFETIME_SECONDS).toBe(7 * 86_400);
+  });
+
+  it('keeps the G-7 relations the spec states', () => {
+    const lifetimes = (
+      Object.values(OWNER_ACTION_MAX_LIFETIME_SECONDS) as (number | null)[]
+    ).filter((l): l is number => l !== null);
+    // Every op that expires is covered by OWNER_ACTION_OPS or named in 04 §2.5.1; agent.revoke never expires.
+    for (const op of OWNER_ACTION_OPS) expect(op in OWNER_ACTION_MAX_LIFETIME_SECONDS).toBe(true);
+    // No op may exceed 7 days; nonces outlive the longest lifetime plus skew.
+    for (const l of [...lifetimes, LATER_OP_DEFAULT_LIFETIME_SECONDS]) {
+      expect(l).toBeLessThanOrEqual(MAX_OWNER_ACTION_LIFETIME_SECONDS);
+    }
+    expect(NONCE_RETENTION_SECONDS).toBeGreaterThan(
+      MAX_OWNER_ACTION_LIFETIME_SECONDS + CLOCK_SKEW_SECONDS,
+    );
+    // An approval.decide is useless after its request expires (L = the TTL).
+    expect(OWNER_ACTION_MAX_LIFETIME_SECONDS['approval.decide']).toBe(APPROVAL_TTL_SECONDS);
+    // approval.cancel must reach an offline agent before the scope it cancels expires.
+    expect(OWNER_ACTION_MAX_LIFETIME_SECONDS['approval.cancel']).toBe(
+      COMMITMENT_SCOPE_MAX_LIFETIME_SECONDS,
+    );
+    expect(Object.isFrozen(OWNER_ACTION_MAX_LIFETIME_SECONDS)).toBe(true);
   });
 
   it('references the policy defaults and their protocol caps (06 §3; values land in M1-2b)', () => {
