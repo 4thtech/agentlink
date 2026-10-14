@@ -20,7 +20,7 @@ import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
 import { payloadSchema } from '@agentlink/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkRecipientWrap } from './envelope-wraps.js';
-import { MAX_WRAP_CHECKS, UNOPENED_TYPE, type InboundReport } from './envelopes.js';
+import { MAX_WRAP_CHECKS, PROCESS_BATCH, UNOPENED_TYPE, type InboundReport } from './envelopes.js';
 import { FakeClock, passphrase, seed } from './testing/fixtures.js';
 import {
   agentEnc,
@@ -93,17 +93,24 @@ const contactRow = (agent: TestAgent, id: string) =>
   agent.store.transaction((tx) => tx.get('contacts', { contact_id: id }));
 
 /** Captures every CEK the KeyStore hands out, to check that the core wipes it (04 §3.1.1 step 5). */
-function captureCeks(agent: TestAgent): { ceks: Uint8Array[]; calls: () => number } {
+function captureCeks(agent: TestAgent): {
+  ceks: Uint8Array[];
+  calls: () => number;
+  /** The most CEKs not yet wiped at any one time. */
+  maxLive: () => number;
+} {
   const ceks: Uint8Array[] = [];
+  let maxLive = 0;
   const original = agent.keyStore.unwrapCek.bind(agent.keyStore);
   const spy = vi
     .spyOn(agent.keyStore, 'unwrapCek')
     .mockImplementation(async (wrapped, envelopeId, options) => {
       const cek = await original(wrapped, envelopeId, options);
       ceks.push(cek);
+      maxLive = Math.max(maxLive, ceks.filter((c) => !c.every((b) => b === 0)).length);
       return cek;
     });
-  return { ceks, calls: () => spy.mock.calls.length };
+  return { ceks, calls: () => spy.mock.calls.length, maxLive: () => maxLive };
 }
 
 /** test-vectors/aead-envelope, case `verify` (M1-1h): a signed envelope. */
@@ -479,7 +486,7 @@ describe('04 §3.1.1 step 7: sender role', () => {
     });
   });
 
-  it('a handshake-ack from an unknown key is left for the pairing flow, never queued as a request', async () => {
+  it('a handshake-ack from an unknown key is dropped until the pairing flow exists, never queued as a request', async () => {
     const { a } = await world();
     const s = await makeAgent(clock, new MemoryKeyStore(seed(9)), ownerS, 'stranger');
     const env = await craft({
@@ -500,10 +507,12 @@ describe('04 §3.1.1 step 7: sender role', () => {
       },
       createdAt: clock.t,
     });
+    // No pairing can exist before M1-7c, so it is dropped, never parked (IR-M1-7b-1 M-1).
     expect(await deliver(a, env)).toEqual([
-      { envelopeId: env.id, outcome: 'deferred', flagged: false },
+      { envelopeId: env.id, outcome: 'dropped', reason: 'type_unhandled', flagged: false },
     ]);
-    expect(await row(a, env.id)).toMatchObject({ state: 'received' });
+    expect(await row(a, env.id)).toBeUndefined();
+    expect(await a.store.transaction((tx) => tx.count('envelopes', { state: 'request' }))).toBe(0);
   });
 
   it('key table: a text from the own owner key or from a contact owner key is dropped', async () => {
@@ -1095,5 +1104,239 @@ describe('build: recipient set, signature and limits (04 §3.1–§3.2, §3.4.1)
     await expect(
       b.client.envelopes.build({ to: { contact: a.id }, payload: textPayload() }),
     ).rejects.toMatchObject({ code: 'rotation_pending' });
+  });
+});
+
+// --- Review IR-M1-7b-1 -----------------------------------------------------------------------------
+
+/** A schema-valid `approval` payload (approval.cancel). Its owner signature is M1-7d/e's to verify. */
+const approvalPayload = (): JsonValue => ({
+  type: 'approval',
+  body: {
+    signed: {
+      body: {
+        v: 1,
+        agent: `0x${'1a'.repeat(20)}`,
+        owner: 'c3'.repeat(32),
+        op: 'approval.cancel',
+        params: { approvalId: `apr_${encodeBase64url(new Uint8Array(16).fill(7))}` },
+        nonce: encodeBase64url(new Uint8Array(16).fill(9)),
+        issuedAt: 1_760_000_000,
+        expiresAt: 1_760_000_600,
+      },
+      sig: 'f6'.repeat(64),
+    },
+  },
+  replyTo: null,
+  files: [],
+});
+
+const handshakeAckPayload = (): JsonValue => ({
+  type: 'handshake-ack',
+  body: {
+    inviteId: encodeBase64url(randomBytes(16)),
+    handshakeId: encodeBase64url(randomBytes(16)),
+  },
+  replyTo: null,
+  files: [],
+});
+
+describe('review IR-M1-7b-1', () => {
+  it('M-1: a stranger flood of pairing envelopes cannot push out a contact message', async () => {
+    const { a, b } = await world();
+    const s = await makeAgent(clock, new MemoryKeyStore(seed(9)), ownerS, 'stranger');
+    const signer = await agentSigner(s.keyStore);
+    const entries = [{ pk: await agentEnc(a) }, { pk: await ownerEnc(ownerA) }];
+    // Fill the 1 000 `received` slots with signature-valid handshake-acks from an unknown key.
+    for (let i = 0; i < 1_000; i += 1) {
+      const env = await craft({
+        signer,
+        entries,
+        payload: handshakeAckPayload(),
+        createdAt: clock.t,
+      });
+      expect((await a.client.envelopes.receive({ envelope: env })).status).toBe('verified');
+    }
+    const honest = await b.client.envelopes.build({
+      to: { contact: a.id },
+      payload: textPayload(),
+    });
+    expect((await a.client.envelopes.receive({ envelope: honest.envelope })).status).toBe('retry');
+    // One pass drops every one (no pairing can exist before M1-7c): nothing stays parked.
+    const reports = await a.client.envelopes.processReceived();
+    expect(reports).toHaveLength(1_000);
+    expect(reports.every((r) => r.outcome === 'dropped' && r.reason === 'type_unhandled')).toBe(
+      true,
+    );
+    expect(await a.store.transaction((tx) => tx.count('envelopes', { state: 'received' }))).toBe(0);
+    expect(await deliver(a, honest.envelope)).toMatchObject([{ outcome: 'ok', contactId: b.id }]);
+  }, 120_000);
+
+  it('M-1: a revoke from an unknown key is dropped, not parked in `received`', async () => {
+    const { a } = await world();
+    const s = await makeAgent(clock, new MemoryKeyStore(seed(9)), ownerS, 'stranger');
+    const revoke: JsonValue = {
+      type: 'revoke',
+      body: {
+        signed: {
+          body: {
+            v: 1,
+            agent: `0x${'1a'.repeat(20)}`,
+            owner: 'c3'.repeat(32),
+            op: 'agent.revoke',
+            params: { reason: 'retired' },
+            nonce: encodeBase64url(new Uint8Array(16).fill(9)),
+            issuedAt: 1_760_000_000,
+            expiresAt: 0,
+          },
+          sig: 'f6'.repeat(64),
+        },
+      },
+      replyTo: null,
+      files: [],
+    };
+    expect(payloadSchema.safeParse(revoke).success).toBe(true);
+    const env = await craft({
+      signer: await agentSigner(s.keyStore),
+      entries: [{ pk: await agentEnc(a) }, { pk: await ownerEnc(ownerA) }],
+      payload: revoke,
+      createdAt: clock.t,
+    });
+    expect(await deliver(a, env)).toEqual([
+      { envelopeId: env.id, outcome: 'dropped', reason: 'type_unhandled', flagged: false },
+    ]);
+    expect(await row(a, env.id)).toBeUndefined();
+  });
+
+  it('M-2: an owner kid shared by an active and a blocked contact holds; the active one is delivered, the blocked one dropped at release', async () => {
+    const { a, b } = await world();
+    const d = await makeAgent(clock, new MemoryKeyStore(seed(4)), ownerB, 'dave');
+    await pairWith(clock, a, d);
+    await pairWith(clock, d, a);
+    await a.client.contacts.block(d.id);
+    // B (active) rotates: its text before the card-update is held, then delivered.
+    await rotate(b);
+    const text = await b.client.envelopes.build({ to: { contact: a.id }, payload: textPayload() });
+    expect(await deliver(a, text.envelope)).toMatchObject([{ outcome: 'held' }]);
+    const update = await b.client.envelopes.build({
+      to: { contact: a.id },
+      payload: await cardUpdatePayload(b),
+    });
+    expect(await deliver(a, update.envelope)).toEqual([
+      { envelopeId: update.envelope.id, outcome: 'ok', contactId: b.id, flagged: false },
+      { envelopeId: text.envelope.id, outcome: 'ok', contactId: b.id, flagged: false },
+    ]);
+    // D (blocked) rotates: its new key's text carries the same owner kid, is held, never queued.
+    await rotate(d);
+    const fromD = await craft({
+      signer: await agentSigner(d.keyStore),
+      entries: await standardEntries(a, d, { fromAgentEpoch: 1 }),
+      createdAt: clock.t,
+    });
+    expect(await deliver(a, fromD)).toMatchObject([{ outcome: 'held' }]);
+    const start = clock.t;
+    try {
+      clock.t = start + 172_800;
+      expect(await a.client.envelopes.processReceived()).toEqual([
+        { envelopeId: fromD.id, outcome: 'dropped', reason: 'held_owner_inactive', flagged: false },
+      ]);
+      expect(await heldRow(a, fromD.id)).toBeUndefined();
+      expect(await a.store.transaction((tx) => tx.count('envelopes', { state: 'request' }))).toBe(
+        0,
+      );
+    } finally {
+      clock.t = start;
+    }
+  });
+
+  it('L-1: a card-update from a key that is neither the contact key nor the card key is dropped', async () => {
+    const { a, b } = await world();
+    const s = await makeAgent(clock, new MemoryKeyStore(seed(9)), ownerS, 'stranger');
+    await rotate(b);
+    const env = await craft({
+      signer: await agentSigner(s.keyStore),
+      entries: [
+        { pk: await agentEnc(a) },
+        { pk: await ownerEnc(ownerA) },
+        { pk: await ownerEnc(ownerB) },
+        { pk: await agentEnc(s) },
+      ],
+      payload: await cardUpdatePayload(b),
+      createdAt: clock.t,
+    });
+    expect(await deliver(a, env)).toEqual([
+      { envelopeId: env.id, outcome: 'dropped', reason: 'card_update_invalid', flagged: false },
+    ]);
+    expect(await heldRow(a, env.id)).toBeUndefined();
+    expect((await contactRow(a, b.id))?.key_epoch).toBe(0);
+  });
+
+  it('L-2: the key table for `approval` (owner channel)', async () => {
+    const { a, b } = await world();
+    expect(payloadSchema.safeParse(approvalPayload()).success).toBe(true);
+    const to = async () => [{ pk: await agentEnc(a) }, { pk: await ownerEnc(ownerA) }];
+    const cases = [
+      // From a contact's agent key: owner-channel types come only from the own owner.
+      { signer: await agentSigner(b.keyStore), reason: 'owner_channel_type' },
+      // From a contact's owner key.
+      { signer: await ownerSigner(ownerB), reason: 'owner_key_type' },
+      // Signed by the agent's own key: the agent never signs an owner-authored type.
+      { signer: await agentSigner(a.keyStore), reason: 'agent_key_type' },
+    ] as const;
+    for (const { signer, reason } of cases) {
+      const env = await craft({
+        signer,
+        entries: await to(),
+        payload: approvalPayload(),
+        createdAt: clock.t,
+      });
+      expect(await deliver(a, env)).toEqual([
+        { envelopeId: env.id, outcome: 'dropped', reason, flagged: false },
+      ]);
+      expect(await row(a, env.id)).toBeUndefined();
+    }
+    // From the own owner key: accepted for its handler (M1-7d/e), kept as `received`.
+    const own = await craft({
+      signer: await ownerSigner(ownerA),
+      entries: await to(),
+      payload: approvalPayload(),
+      createdAt: clock.t,
+    });
+    expect(await deliver(a, own)).toEqual([
+      { envelopeId: own.id, outcome: 'deferred', flagged: false },
+    ]);
+    expect(await row(a, own.id)).toMatchObject({ state: 'received' });
+  });
+
+  it('L-4: a malformed gift-wrap id is refused (`retry`), and nothing is stored', async () => {
+    const { a, b } = await world();
+    const built = await b.client.envelopes.build({ to: { contact: a.id }, payload: textPayload() });
+    for (const bad of ['', 'XYZ', 'A'.repeat(64), 'ab'.repeat(31)]) {
+      expect(
+        await a.client.envelopes.receive({ envelope: built.envelope, giftWrapId: bad }),
+      ).toEqual({
+        status: 'retry',
+        report: { outcome: 'dropped', reason: 'wrap_id_invalid', flagged: false },
+      });
+    }
+    expect(await row(a, built.envelope.id)).toBeUndefined();
+    expect(await seenRows(a)).toEqual([]);
+  });
+
+  it(`L-5: a pass holds at most ${PROCESS_BATCH} CEKs at once, and each is wiped`, async () => {
+    const { a, b } = await world();
+    const signer = await agentSigner(b.keyStore);
+    const entries = await standardEntries(a, b);
+    const count = PROCESS_BATCH + 10;
+    for (let i = 0; i < count; i += 1) {
+      const env = await craft({ signer, entries, createdAt: clock.t });
+      expect((await a.client.envelopes.receive({ envelope: env })).status).toBe('verified');
+    }
+    const spy = captureCeks(a);
+    const reports = await a.client.envelopes.processReceived();
+    expect(reports.filter((r) => r.outcome === 'ok')).toHaveLength(count);
+    expect(spy.calls()).toBe(count);
+    expect(spy.maxLive()).toBeLessThanOrEqual(PROCESS_BATCH);
+    expect(spy.ceks.every(allZero)).toBe(true);
   });
 });

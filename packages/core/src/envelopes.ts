@@ -139,7 +139,13 @@ export type InboundReason =
   | 'wrap_mismatch'
   | 'future_created_at'
   | 'duplicate_id'
-  | 'unreadable';
+  | 'unreadable'
+  /** A type this build has no handler for from that sender (pairing or revoke from an unknown key). */
+  | 'type_unhandled'
+  /** An owner-authored type (`approval`, `revoke`) signed by the agent's own key. */
+  | 'agent_key_type'
+  /** `receive` was given a gift-wrap id that is not 64 lowercase hex (a caller bug). */
+  | 'wrap_id_invalid';
 
 export interface InboundReport {
   /** The validated envelope `id` (base64url, 16 bytes); absent when the envelope did not parse. */
@@ -164,6 +170,9 @@ export interface ReceiveResult {
 
 /** `envelopes.type` of a `received` row: its payload type is known only after step 6. */
 export const UNOPENED_TYPE = 'unopened';
+
+/** `processReceived` opens and decides `received` rows in batches of this size (IR-M1-7b-1 L-5). */
+export const PROCESS_BATCH = 50;
 
 /** 04 §3.1.1 limits table: at most 7 recomputed seals for the step 8 wrap check. */
 export const MAX_WRAP_CHECKS = 7;
@@ -481,10 +490,16 @@ export class EnvelopeService {
     }
     const hashHex = encodeHex0x(envelopeHash(envelope));
     const envelopeJson = canonicalize(envelope as unknown as JsonValue);
-    const wrapId =
-      typeof input.giftWrapId === 'string' && HEX64.test(input.giftWrapId)
-        ? input.giftWrapId
-        : undefined;
+    // IR-M1-7b-1 L-4: a gift-wrap id that is present but not 64 lowercase hex is a caller bug
+    // (transport passes the verified event id). It is refused, so the bug shows, and nothing is
+    // stored or marked seen.
+    const wrapId = input.giftWrapId;
+    if (wrapId !== undefined && (typeof wrapId !== 'string' || !HEX64.test(wrapId))) {
+      return {
+        status: 'retry',
+        report: report(undefined, 'dropped', { reason: 'wrap_id_invalid' }),
+      };
+    }
     try {
       const now = nowOf(this.#ctx);
       return await this.#ctx.store.transaction((tx): ReceiveResult => {
@@ -507,6 +522,10 @@ export class EnvelopeService {
           if (stored.from_key !== envelope.from) {
             // Another key's envelope holds this id (IR-M1-5a-1 L-3): it must not suppress this one.
             // Nothing is recorded, so a later sync offers it again once that row is gone.
+            // Residual (IR-M1-7b-1 L-3): while the colliding row is stored durably (a request, a
+            // refused row), this one keeps returning `retry` and is lost after the 48 h look-back.
+            // Only a co-recipient who learned the 16-byte id in advance can do this. A later
+            // schema version may key `envelopes` on (envelope_id, envelope_hash).
             return { status: 'retry', report: report(envelope.id, 'deferred') };
           }
           // Step 9: the same sender signed two envelopes under one id.
@@ -581,38 +600,44 @@ export class EnvelopeService {
         },
       ),
     );
-    const opened: Opened[] = [];
-    try {
-      for (const row of rows) {
-        const item: Item = {
-          envelopeId: row.envelope_id,
-          envelopeHash: row.envelope_hash,
-          envelopeJson: row.envelope_json ?? '',
-          source: 'received',
-        };
-        const result = await this.#open(item, own);
-        if ('kind' in result) {
-          const done = await this.#settle(item, result);
+    // IR-M1-7b-1 L-5: rows are opened and decided in batches of PROCESS_BATCH, so at most that many
+    // CEKs and plaintexts are in memory at once. Card-updates go first within each batch. A
+    // contact's envelope from a new key that lands in an earlier batch than its card-update is
+    // held there and released when the card-update is applied (step 7), so the outcome is the same.
+    for (let start = 0; start < rows.length; start += PROCESS_BATCH) {
+      const opened: Opened[] = [];
+      try {
+        for (const row of rows.slice(start, start + PROCESS_BATCH)) {
+          const item: Item = {
+            envelopeId: row.envelope_id,
+            envelopeHash: row.envelope_hash,
+            envelopeJson: row.envelope_json ?? '',
+            source: 'received',
+          };
+          const result = await this.#open(item, own);
+          if ('kind' in result) {
+            const done = await this.#settle(item, result);
+            if (done !== undefined) reports.push(done);
+          } else {
+            opened.push(result);
+          }
+        }
+        // Step 7, arrival order: every card-update of the batch before any other envelope.
+        const ordered = [
+          ...opened.filter((o) => o.payload.type === 'card-update'),
+          ...opened.filter((o) => o.payload.type !== 'card-update'),
+        ];
+        for (const o of ordered) {
+          const { report: done, applied } = await this.#decide(o, own, book);
           if (done !== undefined) reports.push(done);
-        } else {
-          opened.push(result);
+          if (applied !== undefined) {
+            book = await this.#book();
+            reports.push(...(await this.#runHeld(own, book, kidOf(bytesOf(applied.ownerEnc)))));
+          }
         }
+      } finally {
+        for (const o of opened) wipeCek(o);
       }
-      // Step 7, arrival order: every card-update of this pass before any other envelope.
-      const ordered = [
-        ...opened.filter((o) => o.payload.type === 'card-update'),
-        ...opened.filter((o) => o.payload.type !== 'card-update'),
-      ];
-      for (const o of ordered) {
-        const { report: done, applied } = await this.#decide(o, own, book);
-        if (done !== undefined) reports.push(done);
-        if (applied !== undefined) {
-          book = await this.#book();
-          reports.push(...(await this.#runHeld(own, book, kidOf(bytesOf(applied.ownerEnc)))));
-        }
-      }
-    } finally {
-      for (const o of opened) wipeCek(o);
     }
     return reports;
   }
@@ -828,6 +853,8 @@ export class EnvelopeService {
     const { from } = envelope;
     const type = payload.type;
     if (own.agentNostr.has(from)) {
+      // Key table (04 §3.1.1): the agent key never signs an owner-authored type (IR-M1-7b-1 L-2).
+      if (OWNER_AUTHORED_TYPES.has(type)) return { kind: 'drop', reason: 'agent_key_type' };
       // The agent's own sent copy (04 §3.2 entry 4, §3.4.1 owner card-update): stored as sent,
       // never applied.
       return { kind: 'accept', state: 'sent_copy' };
@@ -843,11 +870,12 @@ export class EnvelopeService {
     }
     const sender = screen.sender;
     if (type === 'revoke') {
-      // Authority comes from the carried SignedOwnerAction, whatever the `from` (M1-7h).
-      return {
-        kind: 'deferred',
-        ...(sender.kind === 'unknown' ? {} : { contactId: sender.contactId }),
-      };
+      // Authority comes from the carried SignedOwnerAction, whatever the `from` (M1-7h). Until
+      // M1-7h handles it, one from an unknown key is dropped rather than parked in `received`,
+      // where a stranger could fill the 1 000-row cap (IR-M1-7b-1 M-1). From a contact key it
+      // waits for M1-7h.
+      if (sender.kind === 'unknown') return { kind: 'drop', reason: 'type_unhandled' };
+      return { kind: 'deferred', contactId: sender.contactId };
     }
     if (book.ownerNostr.has(from)) return { kind: 'drop', reason: 'owner_key_type' };
     if (OWNER_CHANNEL_TYPES.has(type)) return { kind: 'drop', reason: 'owner_channel_type' };
@@ -865,36 +893,44 @@ export class EnvelopeService {
         : { kind: 'accept', state: 'ok', contactId, senderCard };
     }
 
-    // Unknown key. A card-update from the new key of a stored contact: authority from cardSig.
+    // Unknown key. A card-update is accepted only from the new key its own card names, for a
+    // stored contact (04 §3.4.1: the old or the new epoch key; authority from cardSig). From any
+    // other key it is dropped, never held or queued (IR-M1-7b-1 L-1).
     if (type === 'card-update') {
       const named = book.byId.get(payload.body.card.agentEvm);
-      if (named !== undefined && agentNostrKey(named.card) !== from) {
-        const bodyKey = payload.body.card.agentNostr.slice(2);
-        if (bodyKey === from) {
-          if (named.status !== 'active') return { kind: 'drop', reason: named.status };
-          return this.#cardUpdate(o, named.id);
-        }
+      const bodyKey = payload.body.card.agentNostr.slice(2);
+      if (named === undefined || bodyKey !== from) {
+        return { kind: 'drop', reason: 'card_update_invalid' };
       }
+      if (named.status !== 'active') return { kind: 'drop', reason: named.status };
+      return this.#cardUpdate(o, named.id);
     }
-    if (PAIRING_TYPES.has(type)) return { kind: 'deferred' };
-    // Arrival order: a stored contact owner's `kid` among the recipients holds it. A kid of a
-    // blocked, removed or revoked contact's owner drops it (IR-M1-7a-1 R2-M1).
+    // Pairing types from an unknown key: no invite or staged pairing can exist before M1-7c, so
+    // they are dropped rather than parked in `received` (IR-M1-7b-1 M-1). M1-7c replaces this.
+    if (PAIRING_TYPES.has(type)) return { kind: 'drop', reason: 'type_unhandled' };
+    // Arrival order: a stored contact owner's `kid` among the recipients holds it while any such
+    // contact is active (IR-M1-7b-1 M-2). With only blocked, removed or revoked matches it is
+    // dropped at once, and a held row with any inactive match is dropped at release instead of
+    // becoming a request (IR-M1-7a-1 R2-M1). A held row is never accepted as a contact's without
+    // that contact's card-update.
     const kids = new Set(envelope.recipients.map((r) => r.kid));
     const matches: InboundCard[] = [];
     for (const [kid, cards] of book.byOwnerKid) if (kids.has(kid)) matches.push(...cards);
-    if (matches.some((c) => c.status !== 'active')) {
-      return { kind: 'drop', reason: 'held_owner_inactive' };
+    const active = matches.filter((c) => c.status === 'active');
+    const inactive = matches.length > active.length;
+    const first = active[0];
+    if (first === undefined) {
+      return inactive
+        ? { kind: 'drop', reason: 'held_owner_inactive' }
+        : { kind: 'accept', state: 'request' };
     }
-    const first = matches[0];
-    if (first !== undefined) {
-      const now = nowOf(this.#ctx);
-      if (o.item.source === 'held') {
-        if ((o.item.releaseAt ?? 0) > now) return { kind: 'keep_held' };
-        return { kind: 'accept', state: 'request' };
-      }
-      return { kind: 'hold', ownerKid: kidOf(bytesOf(first.card.ownerEnc)) };
+    if (o.item.source === 'held') {
+      if ((o.item.releaseAt ?? 0) > nowOf(this.#ctx)) return { kind: 'keep_held' };
+      return inactive
+        ? { kind: 'drop', reason: 'held_owner_inactive' }
+        : { kind: 'accept', state: 'request' };
     }
-    return { kind: 'accept', state: 'request' };
+    return { kind: 'hold', ownerKid: kidOf(bytesOf(first.card.ownerEnc)) };
   }
 
   /** A card-update for `contactId`: §3.4.1 through ContactBook; its card is the step 8 sender card. */

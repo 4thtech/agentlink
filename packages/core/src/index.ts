@@ -33,6 +33,7 @@ export {
 export {
   EnvelopeService,
   MAX_WRAP_CHECKS,
+  PROCESS_BATCH,
   UNOPENED_TYPE,
   type BuildEnvelopeInput,
   type BuiltEnvelope,
