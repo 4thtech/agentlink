@@ -247,7 +247,7 @@ Reviewers apply every checklist the diff touches. Item IDs are stable; new items
 - IN-4 No code path turns inbound content into a tool call or command; the prompt-injection suite covers the change.
 - IN-5 Seal pubkey equals `envelope.from`; signature valid; unknown senders → requests queue; `handshake` accepted only with a valid unused invite proof.
 - IN-6 Every inbound object is schema-validated before use; size limits (envelope 24 KB, inline 12 KB, deflated invite size capped before inflation).
-- IN-7 Per-contact rate limits; dedup by gift-wrap ID, then by `envelopeHash` after the signature check, never by the sender-chosen envelope ID, with a seen-set ≥ 7 days (04 §3.5, 07 §4.2; proposed, owner confirms at merge).
+- IN-7 Per-contact rate limits; dedup by envelope ID with a seen-set ≥ 7 days.
 - IN-8 `approval` and `policy` envelopes accepted only when signed by the owner key in the agent card.
 - IN-9 Display names labelled self-declared unless registered; cloud autonomy off by default.
 
