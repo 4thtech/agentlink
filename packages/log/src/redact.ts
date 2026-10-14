@@ -127,14 +127,9 @@ export function classifyKey(key: string): KeyClass {
   if (named.length === 0) return 'none';
   if (SENSITIVE_WHOLE.has(named.join(''))) return 'secret';
   const matched = new Set<string>();
-  for (let start = 0; start < parts.length; start += 1) {
-    let joined = '';
-    for (let end = start; end < parts.length; end += 1) {
-      joined += parts[end];
-      if (joined.length > MAX_NAME) break;
-      for (const name of SENSITIVE_JOINED) {
-        if (joined === name || joined === `${name}s`) matched.add(name);
-      }
+  for (const joined of wordRuns(parts)) {
+    for (const name of SENSITIVE_JOINED) {
+      if (joined === name || joined === `${name}s`) matched.add(name);
     }
   }
   if (matched.size === 0) return 'none';
@@ -144,6 +139,36 @@ export function classifyKey(key: string): KeyClass {
   if (matched.size === 1 && matched.has('code')) return 'code';
   return 'secret';
 }
+
+/**
+ * Every run of consecutive words, joined, that could equal a sensitive name. Runs longer than the
+ * longest name are cut off, so there are at most (words × MAX_NAME) of them: linear in the key.
+ */
+function* wordRuns(parts: readonly string[]): Generator<string> {
+  for (let start = 0; start < parts.length; start += 1) {
+    let joined = '';
+    for (let end = start; end < parts.length; end += 1) {
+      joined += parts[end];
+      if (joined.length > MAX_NAME) break;
+      yield joined;
+    }
+  }
+}
+
+/**
+ * The work classifyKey does for `key`, as the number of word runs it compares (0 when the key is
+ * classified without inspection). Lets tests bound the cost deterministically, without a clock.
+ */
+export function keyMatchingWork(key: string): number {
+  if (key.length > MAX_KEY_LENGTH) return 0;
+  let count = 0;
+  const runs = wordRuns(words(key));
+  while (runs.next().done !== true) count += 1;
+  return count;
+}
+
+/** The longest run of words classifyKey ever compares, in characters. */
+export const MAX_KEY_RUN = MAX_NAME;
 
 /** True when a field with this name is never logged as is (see classifyKey). */
 export function isSensitiveKey(key: string): boolean {

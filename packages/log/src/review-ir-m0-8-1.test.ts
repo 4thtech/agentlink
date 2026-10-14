@@ -4,20 +4,32 @@
 import { describe, expect, it } from 'vitest';
 import { captureConsole } from './console.js';
 import { createLogger, type Fields, type Level } from './logger.js';
-import { isSensitiveKey, redact, REDACTED, redactString, stripUrls } from './redact.js';
+import {
+  isSensitiveKey,
+  keyMatchingWork,
+  MAX_KEY_RUN,
+  MAX_NODES,
+  redact,
+  REDACTED,
+  redactString,
+  stripUrls,
+} from './redact.js';
 
 const HEX64 = 'ef56'.repeat(16);
-const performance = (globalThis as unknown as { performance: { now(): number } }).performance;
+
+/** Objects and arrays in a redacted value: each one is a node the walk expanded. */
+function containers(value: unknown): number {
+  if (value === null || typeof value !== 'object') return 0;
+  const children = Array.isArray(value) ? value : Object.values(value);
+  return 1 + children.reduce((sum: number, child) => sum + containers(child), 0);
+}
 
 describe('F08: string budget per record', () => {
   it('stops scrubbing after 256 KiB of strings in one record', () => {
     const worst = 'a:'.repeat(8 * 1024);
-    const start = performance.now();
     const out = redact(Array.from({ length: 200 }, () => worst)) as string[];
-    // Structural bound (deterministic): only 256 KiB / 16 KiB = 16 strings are scrubbed at all.
+    // Deterministic work bound: only 256 KiB / 16 KiB = 16 strings are scrubbed at all.
     expect(out.filter((item) => item !== '[Truncated]')).toHaveLength(16);
-    // Wall-clock backstop with CI headroom; the recursive rule took 3.1 s on CI.
-    expect(performance.now() - start).toBeLessThan(2000);
   });
 
   it('long keys are shown as their length, never their text', () => {
@@ -69,20 +81,24 @@ describe('F01: non-object fields are wrapped, never spread', () => {
 });
 
 describe('F02: key-name matching is bounded', () => {
-  it('a 16K-character key takes a few milliseconds and is redacted', () => {
+  // Deterministic work bounds, no clock (timings: src/redact.bench.ts, `pnpm bench`).
+  it('a 16K-character key is redacted without inspecting it', () => {
     const key = 'a_'.repeat(8 * 1024);
-    const start = performance.now();
+    expect(keyMatchingWork(key)).toBe(0);
     const out = redact({ [key]: 'value' }) as Record<string, unknown>;
-    const elapsed = performance.now() - start;
-    expect(elapsed).toBeLessThan(50);
     expect(Object.values(out)).toEqual([REDACTED]);
   });
 
-  it('a 16K-character key through the logger stays fast', () => {
-    const { logger } = capture();
-    const start = performance.now();
-    logger.info('x', { ['a_'.repeat(8 * 1024)]: 1 });
-    expect(performance.now() - start).toBeLessThan(50);
+  it('matching work is linear: at most (words × longest name) runs, not words²', () => {
+    const key = 'a_'.repeat(128); // 256 characters, 128 one-letter words
+    expect(keyMatchingWork(key)).toBeLessThanOrEqual(128 * MAX_KEY_RUN);
+    expect(keyMatchingWork(key)).toBeLessThan((128 * 129) / 2); // what the uncapped loop did
+  });
+
+  it('a 16K-character key through the logger is logged with its value redacted', () => {
+    const { logger, lines } = capture();
+    logger.info('x', { ['a_'.repeat(8 * 1024)]: 'value' });
+    expect(Object.values(JSON.parse(lines[0]!))).toContain(REDACTED);
   });
 
   it('keys over 256 characters are sensitive', () => {
@@ -182,14 +198,11 @@ describe('F08: node and key budget', () => {
   it('fan-out of shared references is capped', () => {
     let node: unknown = { leaf: 1 };
     for (let i = 0; i < 7; i += 1) node = [node, node, node, node, node];
-    const start = performance.now();
-    const text = JSON.stringify(redact(node));
-    // Structural bound (deterministic): at most 10 000 nodes are expanded, about 92 KB of output
-    // instead of about 900 KB unbudgeted.
-    expect(text.length).toBeLessThan(400_000);
-    expect(text).toContain('[Truncated]');
-    // Wall-clock backstop with CI headroom.
-    expect(performance.now() - start).toBeLessThan(2000);
+    const out = redact(node);
+    // Deterministic work bound: the walk expands at most MAX_NODES objects and arrays. Without the
+    // budget it would expand all 97 656 (5^0 + … + 5^7) arrays plus 78 125 leaves.
+    expect(containers(out)).toBeLessThanOrEqual(MAX_NODES);
+    expect(JSON.stringify(out)).toContain('[Truncated]');
   });
 
   it('objects keep at most 1000 keys', () => {
