@@ -6,6 +6,8 @@
 // runs in all five runtime projects (the suite declares no `runtimes`). Signature checks, the
 // lifetime bound and the comparison with the digest recomputed from the signed `handshake` and
 // `handshake-ack` are the core's (M1-7c, M1-7d); the owner-action suite itself stays pending until then.
+// Version 4 of the suite (IR-M1-2f-1 F02) adds verify cases for those core checks; here they must pass
+// the schema unchanged (CORE_ONLY), and the context names each stored pairing in `pairings`.
 import {
   contactCheckActionSchema,
   contactCheckParamsSchema,
@@ -29,7 +31,7 @@ interface Input {
   readonly op?: unknown;
   readonly body?: Body;
   readonly signed?: { readonly body: Body; readonly sig: string };
-  readonly context?: { readonly pairing?: Params };
+  readonly context?: { readonly pairings?: readonly { readonly contact: string }[] };
 }
 
 const ownerAction = vectorFiles.find((f) => f.directory === 'owner-action')?.file;
@@ -76,6 +78,26 @@ const REPAIRS: Readonly<Record<string, (p: Params) => void>> = {
   'reject-contact-check-unknown-param': (p) => {
     for (const key of Object.keys(p)) if (!PARAM_KEYS.has(key)) delete p[key];
   },
+  'verify-contact-check-reject-contact-uppercase': (p) => {
+    p.contact = p.contact.toLowerCase();
+  },
+};
+
+/**
+ * Verify cases that the strict schema must accept unchanged: the two accepted checks, and the
+ * rejections that only the core can make (04 §2.5.1 signature, expiry and lifetime; 04 §3.6.1 the
+ * digest recomputed from the stored pair; an unknown contact). A schema that refused one of them
+ * would over-reject (version 4 of the suite, IR-M1-2f-1 F02).
+ */
+const CORE_ONLY: Readonly<Record<string, 'accept' | 'reject'>> = {
+  'verify-contact-check': 'accept',
+  'verify-contact-check-at-expiry': 'accept',
+  'verify-contact-check-reject-digest-mismatch': 'reject',
+  'verify-contact-check-reject-wrong-signer': 'reject',
+  'verify-contact-check-reject-expired': 'reject',
+  'verify-contact-check-reject-lifetime': 'reject',
+  'verify-contact-check-reject-unknown-contact': 'reject',
+  'verify-contact-check-reject-stored-ack-tampered': 'reject',
 };
 
 describe('owner-action contact.check vectors follow 04 §2.5.1 and §3.6.1 (M1-2f, G-28)', () => {
@@ -111,15 +133,32 @@ describe('owner-action contact.check vectors follow 04 §2.5.1 and §3.6.1 (M1-2
       const c = byId(id);
       expect(c, `${id} is missing`).toBeDefined();
       expect(c?.expected, id).toStrictEqual({ outcome: 'reject' });
-      expect(input(c!).context?.pairing, id).toStrictEqual(signedParams());
+      expect(
+        input(c!).context?.pairings?.map((p) => p.contact),
+        id,
+      ).toStrictEqual([signedParams().contact]);
+    }
+  });
+
+  test('the core-only cases pass the strict schema unchanged', () => {
+    for (const [id, expected] of Object.entries(CORE_ONLY)) {
+      const c = byId(id);
+      expect(c, `${id} is missing`).toBeDefined();
+      expect(outcome(c!), id).toBe(expected);
+      const signed = input(c!).signed;
+      for (const schema of [signedOwnerActionSchema, signedContactCheckSchema]) {
+        const parsed = schema.safeParse(signed);
+        expect(parsed.success, `${id}: ${parsed.error?.message ?? ''}`).toBe(true);
+        expect(parsed.data, id).toStrictEqual(signed);
+      }
     }
   });
 
   test('every contact.check rejection is refused by the schema for exactly its named rule', () => {
-    const accepted = verifyCases.filter((c) => outcome(c) !== 'reject');
-    expect(accepted.map((c) => c.id)).toStrictEqual([]);
-    expect(verifyCases.map((c) => c.id).sort()).toStrictEqual(Object.keys(REPAIRS).sort());
-    for (const c of verifyCases) {
+    expect(verifyCases.map((c) => c.id).sort()).toStrictEqual(
+      [...Object.keys(REPAIRS), ...Object.keys(CORE_ONLY)].sort(),
+    );
+    for (const c of verifyCases.filter((v) => v.id in REPAIRS)) {
       const signed = input(c).signed!;
       for (const schema of [signedOwnerActionSchema, signedContactCheckSchema]) {
         expect(schema.safeParse(signed).success, `${c.id}: schema accepts`).toBe(false);
