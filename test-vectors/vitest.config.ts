@@ -1,0 +1,58 @@
+// Cross-runtime vector harness (M0-9, 04 §8.2). One test file, harness/vectors.test.ts, runs in five
+// runtimes. Each project provides the runtime it expects (`vectorsRuntime`); the test compares that
+// with what the engine reports, so a project that silently falls back to Node fails. Run it through
+// `pnpm vectors:check` (tools/vectors/check.mjs), which also requires every runtime to have run every
+// case and that the run changed nothing under test-vectors/.
+import { cloudflareTest } from '@cloudflare/vitest-plugin';
+import { playwright } from '@vitest/browser-playwright';
+import { defineConfig } from 'vitest/config';
+
+const SHARED = 'harness/vectors.test.ts';
+
+export default defineConfig({
+  test: {
+    projects: [
+      {
+        test: {
+          name: 'node',
+          environment: 'node',
+          include: [SHARED, 'harness/schema.test.ts'],
+          provide: { vectorsRuntime: 'node' },
+        },
+      },
+      {
+        test: {
+          name: 'browser',
+          include: [SHARED],
+          browser: {
+            enabled: true,
+            provider: playwright(),
+            headless: true,
+            // Failure screenshots would be written next to the tests, inside test-vectors/.
+            screenshotFailures: false,
+            instances: [
+              { browser: 'chromium', provide: { vectorsRuntime: 'chromium' } },
+              { browser: 'firefox', provide: { vectorsRuntime: 'firefox' } },
+              { browser: 'webkit', provide: { vectorsRuntime: 'webkit' } },
+            ],
+          },
+        },
+      },
+      {
+        plugins: [
+          cloudflareTest({
+            miniflare: {
+              compatibilityDate: '2026-08-01',
+              compatibilityFlags: ['nodejs_compat'],
+            },
+          }),
+        ],
+        test: {
+          name: 'workers',
+          include: [SHARED],
+          provide: { vectorsRuntime: 'workerd' },
+        },
+      },
+    ],
+  },
+});

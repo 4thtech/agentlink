@@ -116,11 +116,14 @@ jobs:
           check_script has_typecheck typecheck true
           check_script has_build build true
           check_script has_test test true
-          check_script has_vectors_script vectors:check false
+          # Required in strict mode since M0-9: a deleted vectors:check script must not turn
+          # the vectors job into a silent skip.
+          check_script has_vectors_script vectors:check true
 
-          # Browsers are only downloaded when Playwright is part of the dependency graph.
+          # Browsers are only downloaded when Playwright is a root devDependency. The lockfile
+          # is not a signal: it lists Playwright as an optional peer of Vitest (IR-M0-2d-1 F07).
           needs_playwright=false
-          if [ "$has_skeleton" = true ] && grep -qiF playwright pnpm-lock.yaml; then
+          if [ "$has_skeleton" = true ] && jq -e '(.devDependencies // {}) | has("playwright") or has("@playwright/test")' package.json > /dev/null; then
             needs_playwright=true
           fi
           out needs_playwright "$needs_playwright"
@@ -179,14 +182,28 @@ jobs:
       - name: Set up Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
-      # Requires @playwright/test as a root devDependency (docs/process/ci-cd.md).
+      # Requires playwright (or @playwright/test) as a root devDependency (docs/process/ci-cd.md).
+      # The vectors run in all three Playwright engines (M0-9).
       - name: Install Playwright browsers
         if: needs.detect.outputs.needs_playwright == 'true'
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
 
-      # Crypto + EIP-712 vectors across Node, browser (Playwright) and Workers (Miniflare).
+      # Crypto + EIP-712 vectors across Node, browsers (Playwright) and Workers (workerd).
       - name: Check test vectors across runtimes
         run: pnpm vectors:check
+
+      # Vectors come from an independent generator and are committed; tests only read them
+      # (docs/process/development-process.md §10). Independent of the runner's own check.
+      - name: Fail if the run created or changed anything under test-vectors/
+        shell: bash
+        run: |
+          set -euo pipefail
+          changes="$(git status --porcelain --untracked-files=all -- test-vectors)"
+          if [ -n "$changes" ]; then
+            # Paths are not echoed (they could carry workflow commands); the runner's own output names them.
+            echo "::error::The vector run wrote to test-vectors/ ($(printf '%s\n' "$changes" | wc -l | tr -d ' ') path(s)). Tests must never write or regenerate vector files."
+            exit 1
+          fi
 
   # AGENTS.md and CLAUDE.md are auto-loaded into every agent session, so they have hard
   # size budgets to keep context lean. Plain shell, no Node skeleton needed: this job runs
