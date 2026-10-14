@@ -3,6 +3,7 @@ import { bip340 } from './bip340';
 import { fingerprint } from './fingerprint';
 import { hkdfDerive } from './hkdf-derive';
 import { jcs } from './jcs';
+import { nip44 } from './nip44';
 import { placeholderSha256 } from './placeholder-sha256';
 import { taggedHashSuite } from './tagged-hash';
 
@@ -16,6 +17,7 @@ export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['fingerprint', fingerprint],
   ['hkdf-derive', hkdfDerive],
   ['jcs', jcs],
+  ['nip44', nip44],
   ['placeholder-sha256', placeholderSha256],
   ['tagged-hash', taggedHashSuite],
 ]);

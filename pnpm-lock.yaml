@@ -283,6 +283,9 @@ importers:
 
   packages/crypto:
     dependencies:
+      '@noble/ciphers':
+        specifier: 2.4.0
+        version: 2.4.0
       '@noble/curves':
         specifier: 2.4.0
         version: 2.4.0
@@ -709,6 +712,10 @@ packages:
   '@manypkg/tools@2.1.2':
     resolution: {integrity: sha512-6QEf6yqFbETdwGITKq57aYoPfX/3K8XFNwsAlx0C1M7o8cb79sv1M3w+tWuWvIcSbNqrLF7OD7YpZMVVz335hQ==}
     engines: {node: '>=20.0.0'}
+
+  '@noble/ciphers@2.4.0':
+    resolution: {integrity: sha512-AnjFn0Jv92laAkvMrghlFZq4qQCIN/4DxFV/eooqtC2YTjB7kBeLMS2T9KJX4Dn+ZVXLOwK0lSgqDtx9gvxtiw==}
+    engines: {node: '>= 20.19.0'}
 
   '@noble/curves@2.4.0':
     resolution: {integrity: sha512-P4/62zrgfH33CneE3Dn4WhJVA22YUU0eR51wKIan4NVRvwsA0YnPTwWGpNbpuacSujmSFLvyzpyuR30+fbq2Ew==}
@@ -2033,6 +2040,8 @@ snapshots:
       jju: 1.4.0
       tinyglobby: 0.2.17
       yaml: 2.9.1
+
+  '@noble/ciphers@2.4.0': {}
 
   '@noble/curves@2.4.0':
     dependencies:
