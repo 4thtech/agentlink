@@ -41,6 +41,7 @@ uint16 integratorFeeCapMultiple;                                       // defaul
 
 - `FEE_ADMIN` sets `protocolFee` ≤ `maxProtocolFee` (immediate; above the cap reverts `FeeAboveCap()`).
 - `maxProtocolFee` can be **lowered** immediately and only **raised** with a 7-day execution delay, so users see fee-cap increases in advance. These are two functions, each mapped to one role (§5, G-3; decided, D-59): **lower the cap** (`FEE_ADMIN`, immediate; if the current fee is above the new cap, the fee drops to the cap) and **raise the cap** (`CAP_RAISER`, 7 days). Each reverts `InvalidCapChange()` if the new value goes the other way.
+- `setIntegratorFeeCapMultiple` reverts `MultipleAboveMax()` if the new multiple is above `MAX_MULTIPLE` (proposed). The exact function names and parameters of every restricted function are in §5.2.
 - Fees are fixed token amounts (no oracle).
 - **Launch configuration (D-45, D-46; 12 §2–§3):** only USD stablecoins are allowlisted: USDC, USDT where available, and on Gnosis the native xDAI (`address(0)`), which counts as a USD-pegged native coin. No volatile native coin (e.g. ETH) is allowlisted. Each token is valued at $1, so every fee is the same USD amount on every chain: `NOTARIZE` $0.10 with `maxProtocolFee` $0.50, `REGISTER` $5 with `maxProtocolFee` $25, set in token units (USD × 10^decimals, e.g. 500000 for $0.50 in 6-decimal USDC). `ANCHOR`, `DEAL` and `DISCLOSE` are not configured (fee 0 and cap 0; their modules do not exist yet).
 - Removing a token from the allowlist stops new deposits and charges in it; `withdraw` of existing credits in it keeps working (§2.5 invariant).
@@ -280,9 +281,34 @@ OpenZeppelin Contracts v5 `AccessManager`; the role map below is **decided (D-59
 
 Contracts are UUPS proxies with ERC-7201 namespaced storage; `_authorizeUpgrade` is restricted to `UPGRADER`. The AccessManager itself is not upgradeable.
 
+### 5.2 Restricted functions (names the interfaces use)
+
+*Status: proposed; the owner confirms at merge. The M1-3a interfaces and `docs/roles.md` in `occ-v2-contracts` already use these names; this table makes the spec the source, so the two cannot drift.* Each function maps to exactly one role (§5.1), and `docs/roles.md` is checked against this table and the AccessManager readback.
+
+| Contract | Function (parameters) | Role | Delay | Notes |
+|---|---|---|---|---|
+| vault | `setProtocolFee` (fee type, token, fee) | `FEE_ADMIN` | 0 | Reverts `FeeAboveCap()` if the fee is above `maxProtocolFee` |
+| vault | `lowerMaxProtocolFee` (fee type, token, new cap) | `FEE_ADMIN` | 0 | Lowers the cap; a current fee above it drops to it; `InvalidCapChange()` if the new cap is higher |
+| vault | `raiseMaxProtocolFee` (fee type, token, new cap) | `CAP_RAISER` | 7 days | `InvalidCapChange()` if the new cap is lower |
+| vault | `setIntegratorFeeCapMultiple` (multiple) | `CAP_RAISER` | 7 days | Reverts `MultipleAboveMax()` above `MAX_MULTIPLE` (10) |
+| vault | `setAppActive` (app ID, active) | `FEE_ADMIN` | 0 | |
+| vault | `setFeeTokenAllowed` (token, allowed) | `CONFIG_ADMIN` | 48 h | Allowlist or remove a fee token |
+| vault | `setMinDeposit` (token, amount) | `CONFIG_ADMIN` | 48 h | |
+| vault | `setTreasury` (new treasury) | `TREASURY_ADMIN` | 7 days | |
+| vault | `registerModule` (module) | `MODULE_ADMIN` | 7 days | Never a combined `setModule` |
+| vault | `removeModule` (module) | `PAUSE_ADMIN` | 0 | |
+| vault, Notary, Registry | `pause` | `PAUSER` | 0 | |
+| vault, Notary, Registry | `unpause` | `PAUSE_ADMIN` | 0 | |
+| vault, Notary, Registry | `upgradeToAndCall` (implementation, data) | `UPGRADER` | 7 days | Gated through `_authorizeUpgrade` |
+| Notary | `freezeUpgrades` | `FREEZER` | 7 days | One-way |
+
+As in OpenZeppelin `Pausable`, `pause` while already paused reverts `EnforcedPause()` and `unpause` while not paused reverts `ExpectedPause()`; neither emits an event in that case (proposed). The integrator's own functions (`setIntegratorFee`, `setIntegrator`, `withdrawIntegrator`) and every user function are not restricted (§5).
+
 ---
 
 ## 6. Events
+
+*Status: proposed; the owner confirms at merge. The first group is unchanged. The parameters of the second group and all of the third group are new.*
 
 ```
 RecordNotarized(bytes32 indexed recordId, address indexed signer, bytes32 envelopeHash,
@@ -294,14 +320,54 @@ Deposited(address indexed payer, address indexed token, uint256 amount, address 
 Withdrawn(address indexed payer, address indexed token, uint256 amount, address to)
 Charged(address indexed payer, uint8 feeType, bytes32 indexed appId, address token, uint256 protocolPart, uint256 integratorPart)
 Swept(address indexed token, uint256 amount, address treasury)
-FeeSet / CapSet / AppRegistered / IntegratorFeeSet / AppStatusChanged / ModuleSet / TokenAllowed / UpgradesFrozen
 ```
+
+Parameters of the entries that were listed by name only (they match the M1-3a interfaces). `feeType` is `uint8`, as in `Charged`.
+
+```
+FeeSet(uint8 feeType, address indexed token, uint256 fee)
+CapSet(uint8 feeType, address indexed token, uint256 cap)
+AppRegistered(bytes32 indexed appId, address indexed integrator, string name)
+IntegratorFeeSet(bytes32 indexed appId, uint8 feeType, address indexed token, uint256 amount)
+AppStatusChanged(bytes32 indexed appId, bool active)
+ModuleSet(address indexed module, bool registered)
+TokenAllowed(address indexed token, bool allowed)
+UpgradesFrozen()
+```
+
+Added:
+
+```
+Paused(address account)                      -- vault, Notary, Registry
+Unpaused(address account)                    -- vault, Notary, Registry
+TreasuryChanged(address indexed oldTreasury, address indexed newTreasury)
+MinDepositSet(address indexed token, uint256 amount)
+IntegratorFeeCapMultipleSet(uint16 multiple)
+IntegratorChanged(bytes32 indexed appId, address indexed oldIntegrator, address indexed newIntegrator)
+IntegratorWithdrawn(bytes32 indexed appId, address indexed token, address indexed to, uint256 amount)
+```
+
+| Event | Emitted by | Meaning |
+|---|---|---|
+| `Paused(account)` / `Unpaused(account)` | `pause` / `unpause` (§5.2), on each state change only (a call that reverts emits nothing); also once at initialisation, with the initialising caller, when a mainnet contract starts paused (§5.1) | `account` is the caller. Both functions have no delay, so it is the actual ops key or Safe that paused, and which one tells the on-call who to revoke. Same names and signature as OpenZeppelin `Pausable`, so standard monitors recognise them. |
+| `TreasuryChanged(old, new)` | `setTreasury` | The address that receives `sweep` changed. The most important event to monitor: it redirects all protocol fees. Both addresses are indexed so an alert can match either. |
+| `MinDepositSet(token, amount)` | `setMinDeposit` | New anti-griefing minimum for gasless deposits in `token`. |
+| `IntegratorFeeCapMultipleSet(multiple)` | `setIntegratorFeeCapMultiple` | New integrator fee cap, as a multiple of the protocol fee. |
+| `IntegratorChanged(appId, old, new)` | `setIntegrator` | An app's integrator address changed; `appId` is unchanged. After this, `withdrawIntegrator` for that app is callable by the new address. |
+| `IntegratorWithdrawn(appId, token, to, amount)` | `withdrawIntegrator` | An integrator withdrew `amount` of `token` for `appId` to `to`. This path stays open while paused (§5.1), so an alert on unusually large amounts is the compensating control for that residual risk. |
+
+Notes:
+
+- **No actor on delayed changes.** An operation with an execution delay runs through the AccessManager, so the caller the contract sees is the AccessManager. `TreasuryChanged`, `MinDepositSet`, `IntegratorFeeCapMultipleSet`, `ModuleSet`, `TokenAllowed`, `CapSet` and the upgrade events therefore carry no actor. Who scheduled the operation is in the AccessManager's `OperationScheduled` event (caller, target, data), and its `OperationExecuted` and `OperationCanceled` events mark the outcome. Monitoring watches both: the schedule (7 days before the change) is the early warning, and the contract event confirms it happened.
+- **Inherited events.** The ERC-1967 `Upgraded(address indexed implementation)` marks every upgrade; the AccessManager emits `RoleGranted`, `RoleRevoked`, `TargetFunctionRoleUpdated` and related events for every role-map change.
+- **`CapSet`** is emitted by both `lowerMaxProtocolFee` and `raiseMaxProtocolFee`; `FeeSet` is also emitted when a lowered cap drags the current fee down to it. `ModuleSet` is emitted with `registered = true` by `registerModule` and `false` by `removeModule`.
+- **Naming.** The pause events use the OpenZeppelin v5 names (`Paused`, `Unpaused`). The earlier error `Paused()` could not coexist with an event of the same name in one contract, so the error is renamed to the OpenZeppelin name `EnforcedPause()`, which also reverts a `pause` while paused, and `ExpectedPause()` reverts an `unpause` while not paused (§7).
 
 ---
 
 ## 7. Errors (custom errors only)
 
-`Expired()`, `InvalidSignature()`, `RecordExists()`, `RecordNotFound()`, `ReceiptExists()`, `ConflictingReceipt()`, `NotRecipient()`, `NotSigner()`, `InsufficientCredits(address,address,uint256,uint256)`, `FeeAboveMax(uint256,uint256)`, `TokenNotAllowed(address)`, `BelowMinDeposit()`, `NotModule()`, `AppExists()`, `AppInactive()`, `NotIntegrator()`, `FeeAboveCap()`, `Paused()`, `UpgradesAreFrozen()`, `ZeroAddress()`, `TransferFailed()`, `InvalidCapChange()` (G-3; decided, D-59).
+`Expired()`, `InvalidSignature()`, `RecordExists()`, `RecordNotFound()`, `ReceiptExists()`, `ConflictingReceipt()`, `NotRecipient()`, `NotSigner()`, `InsufficientCredits(address payer, address token, uint256 needed, uint256 available)`, `FeeAboveMax(uint256 total, uint256 maxTotal)`, `TokenNotAllowed(address token)`, `BelowMinDeposit()`, `NotModule()`, `AppExists()`, `AppInactive()`, `NotIntegrator()`, `FeeAboveCap()`, `EnforcedPause()` (renamed from `Paused()`, which collided with the event `Paused`; proposed, §6), `UpgradesAreFrozen()`, `ZeroAddress()`, `TransferFailed()`, `InvalidCapChange()` (G-3; decided, D-59), `ExpectedPause()` and `MultipleAboveMax()` (proposed; §5.2).
 
 ---
 

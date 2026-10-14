@@ -223,7 +223,7 @@ Reviewers apply every checklist the diff touches. Item IDs are stable; new items
 - CR-14 Safety code and agent ID (04 §2.9, §3.6, §3.6.1; G-23, G-28):
   - `handshake` accepted only from `card.agentNostr` (envelope `from` and seal key); `handshake-ack` accepted only from the invite card's key;
   - `codeReveal` must open `codeCommit` before any code is shown; the transcript is role-ordered, inviter first;
-  - the code is recomputed from the signed `handshake` and `handshake-ack` on every display, never read from a stored digest; the digits never appear in MCP results, logs or `nextStep`, and the CLI shows them only in an interactive terminal;
+  - the code is recomputed from the signed `handshake` and `handshake-ack` on every display, never read from a stored digest, and conflicting handshakes or acks for one `inviteId` show no code; the digits never appear in MCP results, logs or `nextStep`, and the CLI shows them only in an interactive terminal;
   - "Safety code checked" only through a `contact.check` verified against a fresh recomputation;
   - `cardAgentSig` must recover `card.agentEvm`, and `agentEvm` ≠ `ownerEvm`;
   - at most one contact per `agentId`; a re-pair takes effect only on completion.
