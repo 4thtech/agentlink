@@ -593,7 +593,7 @@ All binary values are base64url **without padding** in JSON unless §2.4.1 puts 
   - **`recipients`** (§3.1) has 2 to 5 entries with unique `kid`, because the wrap is picked by `kid`.
   - **`relays`** (here, in the invite, `handshake` and `card-update`) has 1 to 16 entries, unique, each passing the relay URL rule (§4).
   - **Expiry order.** A card's `expiresAt` is `0` (no expiry) or after its `issuedAt`. An `approval-request`'s `expiresAt` is after its `requestedAt` (and exactly the TTL below).
-  - **`approval-request.summary`** contains no control character and no format character (newlines, bidi controls and zero-width characters included), so it can never fake structure in an approval screen.
+  - **`approval-request.summary`** is non-empty and contains no control (Cc), format (Cf) or line or paragraph separator (Zl, Zp: U+2028, U+2029) character (newlines, bidi controls and zero-width characters included), so it can never fake structure in an approval screen.
   - **Integers** are JSON integers in [0, 2^53 − 1], including every `uint64` field of the card and of EIP-712 messages (§2.4.1).
 - **`proof` type** (body `{envelopeId, chainId, recordId, salt}`) is sent **after** a record is submitted, as a follow-up envelope. `envelopeId` is the notarized envelope's `id` (base64url), `chainId` a JSON integer, and `recordId` and `salt` are `bytes32` values, each `0x` + 64 lowercase hex (EVM-native, §2.4.1), spelled exactly as in the proof pack (07 §8). This works both for "send with proof" and for notarizing an older envelope; a notarized envelope itself never claims proof.
 - **`approval-request` / `approval` / `policy` / `revoke` / `card-update` / `handshake-ack`** bodies are fixed in §3.4.1.
