@@ -6,6 +6,6 @@
 
 **Cause.** zsh expands `?`, `*` and `[` as filename patterns and, by default, fails when nothing matches.
 
-**Rule.** Quote such arguments: `gh api 'repos/4thtech/agentlink/pulls?state=all'`, or pass parameters as flags: `gh api -X GET repos/4thtech/agentlink/pulls -f state=all`.
+**Rule.** Quote such arguments: `gh api 'repos/4thtech/agentlink/pulls?state=all'`, or pass parameters as flags: `gh api -X GET repos/4thtech/agentlink/pulls -f state=all`. A related trap: in `"$B:turbo.json"` zsh reads `:t` as a modifier; write `"${B}:turbo.json"`.
 
 **Source.** Orchestrator sessions, October 2026.

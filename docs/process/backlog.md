@@ -145,7 +145,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
 - **Scope:**
   - pnpm workspace (`packageManager` pinned, pnpm `minimumReleaseAge`), Turborepo tasks `build`, `test`, `lint`, `typecheck`, `vectors:check`, `test:e2e`; strict ESM `tsconfig.base.json` with project references.
   - Stub package per directory in the `AGENTS.md` layout, each building to ESM + `.d.ts`; ESLint flat config + Prettier; Vitest workspace; Changesets initialised (`publishConfig.access`, `repository` fields).
-  - Install scripts: none in our packages; dependency builds only via an explicit allowlist (`onlyBuiltDependencies`; CI keeps `--ignore-scripts`).
+  - Install scripts: none in our packages; dependency builds only via an explicit allowlist (`allowBuilds` in `pnpm-workspace.yaml`, with `strictDepBuilds: true`, pnpm 12; CI keeps `--ignore-scripts`).
   - LICENSE: MIT (D-12); every `package.json` has `"license": "MIT"`, enforced by a check script. Commit `.github/ci-strict` in the same PR.
 - **Acceptance:**
   - `pnpm install && pnpm build && pnpm lint && pnpm typecheck && pnpm test` pass on a clean clone and in CI with strict mode on.

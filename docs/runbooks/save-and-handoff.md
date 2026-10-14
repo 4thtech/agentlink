@@ -14,7 +14,7 @@ The orchestrator (Opus) in the owner's setup: it alone writes the Curator and `t
 
 ## Steps
 1. Collect the state: milestone; active tasks with PR numbers and status; decisions taken and pending; open questions for the owner; traps met this session; next steps; verified vs reported.
-2. **Curator (owner's setup only):** call `save_working_state` with that complete state. A save overwrites the previous one, so each save is the whole picture, not a delta. Keep it ≤ 6 KB. Never store secrets, presigned URLs, unredacted inbound content or unfixed-vulnerability details (advisory ID only).
+2. **Curator (owner's setup only):** call `save_working_state` with `scope: "orchestrator"` and that complete state (a single-task session uses its task ID as scope, `development-process.md` §13.1). A save overwrites the previous one, so each save is the whole picture, not a delta. Keep it ≤ 6 KB. Never store secrets, presigned URLs, unredacted inbound content or unfixed-vulnerability details (advisory ID only).
 3. After a merge that changed `docs/foundation/**` or `docs/process/**`, refresh the Curator foundations mirror (`save_foundation`).
 4. **Sync file:** update your `<login>.md` (state, not history; ≤ 4 KB) and your board rows, then commit and push ([RB-01](session-start-end.md) steps 8–10).
 5. At about 60% context: do steps 1–4, then tell the owner "state saved; a fresh session can resume from here" and stop starting new work.

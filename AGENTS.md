@@ -25,7 +25,7 @@ New collaborator, or an agent working for one? Start with `docs/process/onboardi
    - Push after every meaningful step and before you stop.
    - Content is public. Protocol: `docs/process/sync-protocol.md`.
 2. **Curator (optional, owner's setup only).** If the `my-curator` MCP has project `agentlink` (domain `projects`):
-   - call `get_project_context({project: "agentlink", domain: "projects", scope: "latest"})` at start and on "continue" or "resume";
+   - call `get_project_context({project: "agentlink", domain: "projects", scope: "orchestrator"})` at start and on "continue" or "resume";
    - call `save_working_state` after every decision and every ~10 tool calls;
    - only the orchestrator writes it.
 

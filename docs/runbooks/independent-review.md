@@ -12,7 +12,7 @@ The orchestrator spawns it and handles the result. The reviewer is a **different
 ## Preconditions
 - The builder's work is committed and pushed; CI has run on the head commit.
 - You know the class and the areas touched (to choose the `audit-rules.md` §5 checklists).
-- `<n>` is the PR number. Review number `<k>` is 1 for the first review of a task, then 2, 3 … for each delta review (for example `IR-D52-1`, then `IR-D52-2`).
+- `<n>` is the PR number. Review number `<k>` is 1 for the first review of a task, then 2, 3 … for each delta review (for example `IR-M1-5a-1`, then `IR-M1-5a-2`).
 
 ## Steps
 1. Write the diff and the CI result to scratch files; the reviewer reads files, not your context:
@@ -29,11 +29,13 @@ The orchestrator spawns it and handles the result. The reviewer is a **different
 7. File the full report privately: `4thtech/agentlink-ops` → `audits/reviews/IR-<TASK-ID>-<k>.md`, through a PR in that repository (private runbook "Filing audit and independent-review reports"). It may contain unfixed details, so it never goes into the public repo.
 8. Put the one-line summary in the public PR's **Independent review** section:
    ```text
-   IR-<TASK-ID>-<k>: PASS WITH FINDINGS (0 Critical, 0 High, 2 Medium, 1 Low); tracker <IDs>; report: agentlink-ops audits/reviews/IR-<TASK-ID>-<k>.md
+   IR-<TASK-ID>-<k> · Verdict: PASS WITH FINDINGS · 0 Critical, 0 High, 2 Medium, 1 Low · tracker <IDs> · report: agentlink-ops audits/reviews/IR-<TASK-ID>-<k>.md
    ```
+   The literal word `Verdict:` is required: `review-gate` detects a FAIL only as "Verdict: FAIL" and would miss a line like "IR-X-1: FAIL".
 
 ## Verify
-- `gh pr checks <n>` shows `review-gate` green (it looks for `IR-<TASK-ID>-<k>` and fails on a FAIL verdict).
+- The PR line contains `IR-<TASK-ID>-<k>` and `Verdict: <PASS|PASS WITH FINDINGS|FAIL>`.
+- `gh pr checks <n>` shows `review-gate` green (it looks for the `IR-` ID and fails on "Verdict: FAIL").
 - Every finding has a disposition (§9.4) in the PR or the tracker before the PR leaves `audit`.
 - The ops PR with the report exists, or is merged on the owner's instruction.
 
@@ -44,4 +46,3 @@ The orchestrator spawns it and handles the result. The reviewer is a **different
 
 ## Related
 - Rules: [`audit-rules.md`](../process/audit-rules.md) §3, §4 (inputs, procedure, format, handling, storage), §5 (checklists), §9 (findings); [`development-process.md`](../process/development-process.md) §5 step 8.
-- Verdict names: `audit-rules.md` §4.3 uses `PASS`, `PASS WITH FINDINGS`, `FAIL`; `delivery-process.md` §1 says "PASS WITH FIXES" for the middle one. Use the §4.3 name; the wording is a known inconsistency to fix in `delivery-process.md`.

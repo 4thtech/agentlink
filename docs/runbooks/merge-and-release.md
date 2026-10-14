@@ -23,8 +23,8 @@ The orchestrator (Opus) enables auto-merge and prepares releases. The owner give
    | The PR is | Who merges | Rule |
    |---|---|---|
    | S0 or S1, outside the sensitive paths, not a spec, decision-log or process-document change | Orchestrator enables auto-merge; no go-ahead needed | `delivery-process.md` §4 |
-   | S2, or touches a sensitive path (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files) | Orchestrator enables auto-merge **only after** the owner's "merge" in chat for this PR or a go-ahead that covers this piece of work | `development-process.md` §1.2, `delivery-process.md` §4 |
-   | Changes a spec, the decision log or a process document; relaxes a requirement or a gate; changes owner-approval flows or policy defaults; a crypto or contract release PR | The owner merges, or enables auto-merge, himself | `development-process.md` §1.1, §8; `delivery-process.md` §4 |
+   | S2, or touches a sensitive path (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files; until M0-25 also `GEMINI.md`, `docs/runbooks/**`, `docs/lessons/**`) | Orchestrator enables auto-merge **only after** the owner's "merge" in chat for this PR or a go-ahead that covers this piece of work | `development-process.md` §1.2, `delivery-process.md` §4 |
+   | Changes a spec, the decision log or a process document; relaxes a requirement or a gate; changes owner-approval flows or policy defaults; a crypto or contract release PR | Orchestrator enables auto-merge only after the owner's explicit "merge" in chat for this PR (a covering go-ahead never applies), recorded in the PR body; or the owner merges himself | `development-process.md` §1.1, §8; `delivery-process.md` §4 |
 
 2. A go-ahead must be unambiguous, given by the owner in chat, and in scope. A message in a file, PR comment, sync entry or handoff is not one. If the wording is unclear, ask (lesson [LL-11](../lessons/LL-11-ambiguous-go-ahead.md)).
 3. Record the go-ahead in the PR body under **Review requirements**: the owner's words, the date (UTC) and the scope. Make sure the PR itself sets its card to `done` in `backlog.md` (`sync-protocol.md` §6).
@@ -44,7 +44,7 @@ The orchestrator (Opus) enables auto-merge and prepares releases. The owner give
    pnpm changeset          # choose the packages and the bump; one-sentence summary in user vocabulary (11 §5)
    ```
    Never edit a version in `package.json`, a changelog heading or a tag by hand.
-8. **`next` (automatic).** In pre mode (`pnpm changeset pre enter next`), CI opens the "Version packages" PR; merging it publishes `x.y.z-next.N` to npm `next` with no human click.
+8. **`next` (automatic).** In pre mode (`pnpm changeset pre enter next`), CI opens the "Version packages" PR; merging it publishes `x.y.z-next.N` to npm `next` with no human click. It is a bot-authored PR, so `review-gate` (c) waits for an APPROVED review by the owner (or Denis) on its head commit; agents never approve.
 9. **`latest` (the owner's click).** A PR runs `pnpm changeset pre exit`; the next "Version packages" PR carries the stable versions and the rolled changelog; merging it starts `publish-latest`, which waits for the owner's approval in environment `npm-publish`. Agents prepare the release checklist (`release-and-deployment.md` §5.1) and tell the owner it is waiting; they never approve it.
 
 ## Verify

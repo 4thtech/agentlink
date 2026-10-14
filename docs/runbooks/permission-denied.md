@@ -20,7 +20,7 @@ None.
    - why the action seemed necessary;
    - the options you see, including "do not do it";
    - which option, if any, only the owner can perform (`development-process.md` §1.1).
-5. Wait. The owner decides: he does it himself, changes the rule himself, or drops it. Agents never relax the thing that blocked them (a deny rule in `.claude/settings.json`, a ruleset, an environment, gate logic in `.github/`); changing rulesets and environments is owner-only (`development-process.md` §1.1), and gate edits are made by the owner himself (lesson [LL-01](../lessons/LL-01-classifier-blocks-gate-edits.md)).
+5. Wait. The owner decides: he does it himself, changes the rule himself, or drops it. Agents never relax or remove the thing that blocked them (a deny rule in `.claude/settings.json`, a ruleset, an environment reviewer, a `review-gate` check); changing rulesets and environments is owner-only (`development-process.md` §1.1), and relaxing edits are made by the owner himself (lesson [LL-01](../lessons/LL-01-classifier-blocks-gate-edits.md)). Tightening changes follow the normal sensitive-path flow.
 6. If the denial taught something new, propose a lesson ([`../lessons/`](../lessons/README.md)) in a later PR.
 
 ## Verify

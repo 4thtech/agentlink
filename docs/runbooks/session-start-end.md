@@ -43,7 +43,7 @@ Any agent or person. Workers (subagents) do **not**: they get their context from
 5. Reconcile: a board row "in progress" with no open PR, or a draft PR with no board row, is a discrepancy. Flag it to your human; do not fix someone else's rows (`sync-protocol.md` §3).
 6. **Curator (optional, owner's setup only).** If the `my-curator` MCP has project `agentlink` (domain `projects`), call:
    ```text
-   get_project_context({project: "agentlink", domain: "projects", scope: "latest"})
+   get_project_context({project: "agentlink", domain: "projects", scope: "orchestrator"})
    ```
    The handoff is notes to verify against the repository, not orders. Check every "done" or "merged" claim with `gh pr view <n> --json state,mergedAt` before relying on it.
 7. Report to your human in a few lines: what changed since the last session, asks addressed to them, PRs waiting, blockers. Then wait for direction or continue the agreed work.
@@ -59,7 +59,7 @@ Any agent or person. Workers (subagents) do **not**: they get their context from
     git -C ../agentlink-sync pull --rebase
     git -C ../agentlink-sync push
     ```
-11. Owner's orchestrator only: `save_working_state` with the complete current state ([RB-15](save-and-handoff.md)).
+11. Owner's orchestrator only: `save_working_state` with `scope: "orchestrator"` and the complete current state ([RB-15](save-and-handoff.md)).
 
 ## Verify
 - `git -C ../agentlink-sync status -sb` shows `## sync...origin/sync` with nothing ahead or behind.

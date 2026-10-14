@@ -6,6 +6,6 @@
 
 **Cause.** Edits that weaken a merge gate are treated as high-risk whatever the conversation says. A chat authorisation does not change that, and it should not: a prompt-injected session could produce the same chat.
 
-**Rule.** The owner makes edits to gate logic (`review-gate.yml`, rulesets, environments, deny rules) himself. Agents describe the exact change in the PR or a card and stop; they never retry by another route ([RB-14](../runbooks/permission-denied.md)).
+**Rule.** Edits that relax or remove a gate (a `review-gate` check, a ruleset, an environment reviewer, a deny rule) are made by the owner himself; agents describe the exact change and stop, and never retry by another route ([RB-14](../runbooks/permission-denied.md)). Tightening changes follow the normal sensitive-path flow (Tali's "merge").
 
 **Source.** D-51 rollout; `ci-cd.md` ("The owner removes the former approval check from `review-gate.yml` himself").

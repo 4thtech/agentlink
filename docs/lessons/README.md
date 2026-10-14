@@ -10,7 +10,7 @@ A lesson explains a rule; it does not create one. When a lesson needs a binding 
 | [LL-02](LL-02-pr-title-prefix.md) | PR titles must start with a task ID or an allowed prefix |
 | [LL-03](LL-03-no-push-to-main.md) | Never push to `main`; always branch plus PR |
 | [LL-04](LL-04-turbo-agent-guidance.md) | Turborepo rewrites `AGENTS.md` unless told not to |
-| [LL-05](LL-05-pnpm-allow-builds.md) | pnpm 12 ignores `onlyBuiltDependencies` |
+| [LL-05](LL-05-pnpm-allow-builds.md) | pnpm 11 and later ignore `onlyBuiltDependencies` |
 | [LL-06](LL-06-vitest-root-config.md) | A root `vitest.config.ts` leaks into every package |
 | [LL-07](LL-07-playwright-lockfile-heuristic.md) | The word "playwright" in the lockfile makes CI install browsers |
 | [LL-08](LL-08-drive-docs-stale.md) | Copies of the specs outside the repository go stale |

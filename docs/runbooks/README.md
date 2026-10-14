@@ -18,7 +18,7 @@ Private procedures (incident response, secret rotation, deploy keys, Safe operat
 | RB-08 | [CI is red](ci-red.md) | Orchestrator or builder | Sonnet or above |
 | RB-09 | [Merging, releases and changesets](merge-and-release.md) | Orchestrator; owner for his steps | Opus |
 | RB-10 | [Deploying and verifying by content](deploy-and-verify.md) | CI deploys, orchestrator verifies | Opus |
-| RB-11 | [Rollback and `DEPLOY_FREEZE`](rollback-and-freeze.md) | Any agent sets the freeze; owner clears it | Opus |
+| RB-11 | [Rollback and `DEPLOY_FREEZE`](rollback-and-freeze.md) | Orchestrator sets the freeze on the owner's instruction; owner clears it | Opus |
 | RB-12 | [Design drop intake](design-drop-intake.md) | Orchestrator | Opus plans, Sonnet builds |
 | RB-13 | [Relaying Denis's feedback](relay-feedback.md) | Orchestrator | Opus |
 | RB-14 | [When a permission or safety check denies an action](permission-denied.md) | Any agent | Any |

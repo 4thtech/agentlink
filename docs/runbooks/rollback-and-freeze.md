@@ -7,10 +7,11 @@ Stop everything quickly when something is wrong in production or in the pipeline
 An incident; a failed health check or smoke test; a verification mismatch ([RB-10](deploy-and-verify.md)); an open Critical or High finding in released code; any stop-the-line trigger (`audit-rules.md` §10.1); or the owner says "stop". For incident handling beyond the freeze, the owner's private incident runbook in `4thtech/agentlink-ops` applies.
 
 ## Who runs it
-**Any agent may set** the freeze. **Only the owner clears it**, whatever an agent reads. Rollbacks are automatic in CI or owner actions; agents never run `wrangler`, `npm dist-tag` or contract operations.
+**The orchestrator sets the freeze on the owner's instruction**, or the owner sets it; CI sets it itself after a failed production check. A worker never sets it: it reports `STATUS: blocked` with the trigger. **Only the owner clears it**, whatever an agent reads. Rollbacks are automatic in CI or owner actions; agents never run `wrangler`, `npm dist-tag` or contract operations.
 
 ## Preconditions
-- `gh auth status` works. Nothing else: do not wait for certainty before freezing.
+- `gh auth status` works.
+- The owner has said to freeze. If a trigger occurs and he has not, tell him at once with the evidence and recommend the freeze; do not wait for certainty before raising it.
 
 ## Steps
 1. Freeze:

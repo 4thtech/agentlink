@@ -2,7 +2,7 @@
 
 Where everything lives in the AgentLink repository, what to read first for your role, and how to get productive in a set time. AgentLink is pre-alpha (M0 Foundations): the documents describe the design and the way we build; product code does not exist yet. For the current state, see the Status box in the [root README](../README.md).
 
-Three kinds of document, three jobs:
+Four kinds of document, four jobs:
 
 | Kind | Where | Answers | When two disagree |
 |---|---|---|---|

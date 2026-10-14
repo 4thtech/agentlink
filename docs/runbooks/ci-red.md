@@ -32,7 +32,7 @@ The orchestrator, or the builder that owns the change (Sonnet or above). The fix
    | `security-gate` | `secret-scan` | gitleaks found a secret | **Stop the line** (`audit-rules.md` §10.3): tell the owner at once. Do not push more commits or rewrite history on your own; the secret is already public and must be rotated |
    | `security-gate` | `codeql`, `zizmor` | code or workflow finding | Fix the code. A workflow finding is a `.github` change for the owner's "merge" |
    | `pr-hygiene` | — | title prefix; an empty template section; not exactly one class ticked | `gh pr edit <n> --title "<TASK-ID> <summary>"` or `--body-file <file>`; lesson [LL-02](../lessons/LL-02-pr-title-prefix.md) |
-   | `review-gate` | — | ticked class lower than the derived one; no `IR-<TASK-ID>-<k>`; a FAIL verdict; S2 sections empty; `DEPLOY_FREEZE` is `true` | Tick the derived class; run the review ([RB-04](independent-review.md)); fill the sections. Freeze: wait for the owner |
+   | `review-gate` | — | ticked class lower than the derived one; no `IR-<TASK-ID>-<k>`; a FAIL verdict; S2 sections empty; `DEPLOY_FREEZE` is `true` | Tick the derived class; run the review ([RB-04](independent-review.md)); fill the sections. Bot PR (Renovate, "Version packages"): it waits for the owner's GitHub approval on the head commit; agents never approve. Freeze: wait for the owner |
 
 3. **Flaky or unrelated failure:** re-run the failed jobs once:
    ```bash
