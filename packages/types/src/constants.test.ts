@@ -5,6 +5,9 @@ import {
   AGENT_CARD_EIP712_TYPES,
   ALF1_HEADER_BYTES,
   AEAD_TAG_BYTES,
+  APPROVAL_BATCH_LOCAL_MAX_LIFETIME_SECONDS,
+  APPROVAL_BATCH_MAX_ITEMS,
+  APPROVAL_BATCH_MIN_ITEMS,
   APPROVAL_DECISIONS,
   APPROVAL_ID_PREFIX,
   APPROVAL_STATUSES,
@@ -151,12 +154,24 @@ describe('constants (04, 05, 06)', () => {
 
   it('has the owner-action ops, decisions and revoke reasons of 04 §2.5.1', () => {
     expect([...OWNER_ACTION_OPS].sort()).toEqual(
-      ['agent.revoke', 'approval.cancel', 'approval.decide', 'policy.set'].sort(),
+      [
+        'agent.revoke',
+        'approval.cancel',
+        'approval.decide',
+        'approval.decideBatch',
+        'policy.set',
+      ].sort(),
     );
     expect(APPROVAL_DECISIONS).toEqual(['approve', 'deny']);
     expect(REVOKE_REASONS).toEqual(['compromised', 'retired', 'other']);
     expect(APPROVAL_ID_PREFIX).toBe('apr_');
     expect(APPROVAL_SUMMARY_MAX_CHARS).toBe(200);
+  });
+
+  it('has the batch approval bounds of 04 §2.5.2 (D-68; 20 and 600 s are proposed)', () => {
+    expect(APPROVAL_BATCH_MIN_ITEMS).toBe(2);
+    expect(APPROVAL_BATCH_MAX_ITEMS).toBe(20);
+    expect(APPROVAL_BATCH_LOCAL_MAX_LIFETIME_SECONDS).toBe(600);
   });
 
   it('has the size limits of 04 §3.5 and 06 §3 (KB = 1024 bytes)', () => {
@@ -200,6 +215,7 @@ describe('constants (04, 05, 06)', () => {
     expect(CLOCK_SKEW_SECONDS).toBe(300);
     expect(OWNER_ACTION_MAX_LIFETIME_SECONDS).toEqual({
       'approval.decide': 86_400,
+      'approval.decideBatch': 86_400,
       'approval.cancel': 604_800,
       'policy.set': 86_400,
       'contact.check': 86_400,
@@ -228,6 +244,8 @@ describe('constants (04, 05, 06)', () => {
     );
     // An approval.decide is useless after its request expires (L = the TTL).
     expect(OWNER_ACTION_MAX_LIFETIME_SECONDS['approval.decide']).toBe(APPROVAL_TTL_SECONDS);
+    // A batch never outlives any of its requests (04 §2.5.2 "Expiry"): the same bound.
+    expect(OWNER_ACTION_MAX_LIFETIME_SECONDS['approval.decideBatch']).toBe(APPROVAL_TTL_SECONDS);
     // approval.cancel must reach an offline agent before the scope it cancels expires.
     expect(OWNER_ACTION_MAX_LIFETIME_SECONDS['approval.cancel']).toBe(
       COMMITMENT_SCOPE_MAX_LIFETIME_SECONDS,

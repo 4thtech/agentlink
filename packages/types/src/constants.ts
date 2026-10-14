@@ -160,9 +160,13 @@ export type ApprovalToolName = (typeof APPROVAL_TOOL_NAMES)[number];
 
 // --- Owner actions (04 §2.5.1, §3.4.1) -----------------------------------------------------------
 
-/** Ops defined in 04 §2.5.1 (`approval.cancel` from D-55). Other ops land with the tasks that build them. */
+/**
+ * Ops defined in 04 §2.5.1 (`approval.cancel` from D-55, `approval.decideBatch` from D-68). Other ops
+ * land with the tasks that build them.
+ */
 export const OWNER_ACTION_OPS = freeze([
   'approval.decide',
+  'approval.decideBatch',
   'approval.cancel',
   'policy.set',
   'agent.revoke',
@@ -170,6 +174,13 @@ export const OWNER_ACTION_OPS = freeze([
 export type OwnerActionOp = (typeof OWNER_ACTION_OPS)[number];
 
 export const APPROVAL_DECISIONS = freeze(['approve', 'deny'] as const);
+
+/**
+ * `approval.decideBatch` item count (04 §2.5.1, §2.5.2; D-68): at least 2, because one decision is
+ * always an `approval.decide`; at most 20 (proposed), which bounds one review and one signature.
+ */
+export const APPROVAL_BATCH_MIN_ITEMS = 2;
+export const APPROVAL_BATCH_MAX_ITEMS = 20;
 export type ApprovalDecision = (typeof APPROVAL_DECISIONS)[number];
 
 /** `agent.revoke` reasons: fixed values, never free text (04 §2.5.1). */
@@ -192,11 +203,18 @@ export const CLOCK_SKEW_SECONDS = 300;
  */
 export const OWNER_ACTION_MAX_LIFETIME_SECONDS = freeze({
   'approval.decide': 86_400,
+  'approval.decideBatch': 86_400,
   'approval.cancel': 604_800,
   'policy.set': 86_400,
   'contact.check': 86_400,
   'agent.revoke': null,
 } as const);
+
+/**
+ * The CLI and the local UI set a batch's `expiresAt` at most `issuedAt + 600` (04 §2.5.2 "Expiry";
+ * proposed). A signing-surface rule: the core accepts up to `L(op)`, because the console may use it.
+ */
+export const APPROVAL_BATCH_LOCAL_MAX_LIFETIME_SECONDS = 600;
 
 /** `L(op)` of any later op (storage credentials, key export, disclosure) unless its task sets one. */
 export const LATER_OP_DEFAULT_LIFETIME_SECONDS = 600;

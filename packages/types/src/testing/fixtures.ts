@@ -433,6 +433,34 @@ export const approvalCancelAction = () => ({
   expiresAt: 1760000600,
 });
 
+/**
+ * Base64url characters in ascending byte (ASCII) order: `-` < digits < upper case < `_` < lower case.
+ * This is not base64url value order (`-` is 62, `A` is 0), so fixtures built from it check byte order.
+ */
+export const B64U_ASCII_ORDER = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
+
+/** A canonical `approvalId` whose random part is filled with `fill` (one base64url character). */
+export const approvalIdOf = (fill: string) => `apr_${b64u(16, fill)}`;
+
+/** `approval.decide` params for item `i` of a batch: ids in byte order, mixed decisions. */
+export const batchItem = (i: number) => ({
+  approvalId: approvalIdOf(B64U_ASCII_ORDER.charAt(i)),
+  actionDigest: hex(32, (i + 16).toString(16)),
+  decision: i % 3 === 1 ? 'deny' : 'approve',
+});
+
+/** `approval.decideBatch` (04 §2.5.2, D-68) with `n` items in strictly ascending `approvalId` order. */
+export const approvalDecideBatchAction = (n = 2) => ({
+  v: 1,
+  agent: AGENT_EVM,
+  owner: OWNER_NOSTR,
+  op: 'approval.decideBatch',
+  params: { items: Array.from({ length: n }, (_, i) => batchItem(i)) },
+  nonce: b64u(16, 'Y'),
+  issuedAt: 1760000000,
+  expiresAt: 1760000600,
+});
+
 export const signed = <T>(body: T) => ({ body, sig: BIP340_SIG });
 
 export const fileEntryInline = () => ({
