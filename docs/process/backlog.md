@@ -1292,7 +1292,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - `notarize(envelopeId)`: kind mapping (G-13), salt + commitment, `Record`, policy `proofs.*` and budgets (→ approval), automatic chain selection (M1-26; nothing funded → `needs_credits` with agent address and top-up link), submit, then a follow-up `proof` envelope `{envelopeId, chainId, recordId, salt}`.
   - Recipient: on a `proof` envelope, check on-chain that recordId matches the envelope hash and `commitment(self, salt)` before any receipt.
-  - Receipts: DELIVERED automatic per `receipts.autoDelivered`; OPENED only on explicit request; ACCEPTED/REJECTED exclusive and only after the `commitments` policy allows it or the owner approves (D-31, M1-20). On records whose envelope carries `terms`, only under a commitment scope (M1-32, 04 §3.4.1), including the deferred `ACCEPTED` receipt signed when the offer's `proof` envelope is processed after the accept (07 §2.1 step 4); `notarize` on an accept is skipped and not charged when the answered offer is already recorded. `getProof`; `exportProofPack` (content key only with `proofs.allowKeyDisclosure` approval).
+  - Receipts: DELIVERED automatic per `receipts.autoDelivered`; OPENED only on explicit request; ACCEPTED/REJECTED exclusive and only after the `commitments` policy allows it or the owner approves (D-31, M1-20). On records whose envelope carries `terms`, only under a commitment scope (M1-32, 04 §3.4.1), including the deferred `ACCEPTED` receipt signed when the offer's `proof` envelope is processed after the accept (07 §2.1 step 4); `notarize` on an accept is skipped and not charged when the answered offer is already recorded. `getProof`; `exportProofPack` (content key only with `proofs.allowKeyDisclosure` approval; for a proof of agreement, `ownerApproval` with the signed `OwnerAction` and `CommitmentScope`, or the standing-rule policy hash, included by default and left out on the owner's choice, 07 §8, D-55).
   - Proof of agreement (D-32): notarizing the envelope that carries the final `terms`, plus the counterparty's ACCEPTED receipt, yields a pack that states mutual assent, not just a timestamp.
 - **Acceptance:**
   - Testnet integration: notarize → automatic DELIVERED → explicit OPENED → export → `verifyProofPack` valid.
@@ -1435,7 +1435,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 06 §3 (`commitments`), §8 (†); 04 §2.5 (Commitments); D-31, D-33
 - **Invariants:** I-4
 - **Scope:**
-  - `policy show | set` (incl. `commitments` limits, M1-20), `approve | deny <id>`: the M1a approval channel, since the local UI arrives in M1b.
+  - `policy show | set` (incl. `commitments` limits and `autoAcceptDirection`, M1-20), `approve | deny <id>`: the M1a approval channel, since the local UI arrives in M1b. `cancel <id>` voids the unused parts of a commitment approval (D-55, 04 §3.4.1 rule 6); for terms, `approve` prints the commitment card (11 §6.10).
   - Each † command requires owner presence (passphrase at a TTY) and emits an owner-signed action; non-TTY invocation of a presence prompt is refused.
   - `storage connect` and `backup` are M1-9i (M1b).
 - **Acceptance:**
@@ -1494,6 +1494,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `agentlink_send` with a `path` outside allowed folders → `needs_setup`, and a filesystem spy shows the file was never opened; a symlink escaping an allowed folder is refused.
   - With no own storage: a 5 MB `agentlink_send` with `path` → `ok` with `delivery: "drop"`; above the drop cap or quota → `needs_setup` (own storage); `agentlink_status` reports `storage.mode` (06 §2.1, D-48).
   - `agentlink_notarize` with zero credits → `needs_credits` with agent address and `topUpUrl`.
+  - `agentlink_notarize` on an `offer`, `accept` or `reject` envelope → `USE_TERMS_TOOLS`, and no record is submitted (D-55, IR-D55-1 F02).
   - `agentlink_verify_proof_pack` on a pack whose signer name is the 06 §2.1 name canary returns `signerName` only restricted, with `signerLabel` (or the local alias for a known contact).
   - `agentlink_fetch_file` and `agentlink_inbox` carry `idempotentHint: false` (06 §2.0).
   - Schema + behaviour test per `status` value of each tool.
@@ -1879,10 +1880,10 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-4, I-5
 - **Scope:**
   - New `commitments` policy, default `approval`, covering: sending a binding `accept` (one that answers an `offer` with `terms`), and signing an on-chain `ACCEPTED` or `REJECTED` receipt (the receipt side is applied by M1-7g in M1b). The rule evaluates a whole commitment scope (04 §3.4.1, M1-32), so one decision covers an `accept` and its `ACCEPTED` receipt.
-  - Owner-signed relaxations only: auto-accept within limits (contact allowlist, maximum value taken from the `terms` price). Anything the limits cannot evaluate (no price, a different currency, unparsable terms) → `approval` (fail closed). An `allow` result yields a policy grant with the same scope, carrying the policy document's hash; it is void when the policy changes (D-55). `REJECTED` receipts never get an auto-accept grant.
+  - Owner-signed relaxations only: auto-accept within limits (contact allowlist, maximum value taken from the `terms` price). Anything the limits cannot evaluate (no price, a different currency, unparsable terms) → `approval` (fail closed). An `allow` result yields a policy grant with the same scope, carrying the policy document's hash; the grant is a ledger row and the rule is re-evaluated on the verified policy before each part (D-55). Auto-accept is direction-aware (`autoAcceptDirection: buy | sell`, `autoAcceptMinUSD`, 06 §3): `buy` only when `price.payer` is this agent, the amount is a positive decimal at most `autoAcceptMaxUSD` and every deliverable is `by` the contact; `sell` only when the contact pays at least `autoAcceptMinUSD` and every deliverable is `by` this agent. Firm offers are never under the limits. `REJECTED` receipts never get an auto-accept grant.
   - Schema, defaults and the pure rule in the engine; the approval request shows the counterparty under the 06 §2.1 name rule with its label, the stored terms as their content with the changes from the previous version, what the single approval does, and the terms fingerprint under Advanced (11 §8).
 - **Acceptance:**
-  - Tests first; table-driven tests: default → `pending_approval`; allowlisted contact under the limit → allow (policy grant); over the limit, contact not allowlisted, or unevaluable terms → `approval`; `REJECTED` for an allowlisted contact under the limit → `approval`.
+  - Tests first; table-driven tests: default → `pending_approval`; allowlisted contact under the limit → allow (policy grant); over the limit, contact not allowlisted, or unevaluable terms → `approval`; `REJECTED` for an allowlisted contact under the limit → `approval`; direction rows (IR-D55-1 F01): under `buy`, terms where this agent delivers any item or the contact pays → `approval`; amounts `0`, `-5`, `1e3`, `1,500` → refused by the schema, never allowed; `sell` with `autoAcceptMinUSD` unset → `approval`; a firm offer within the limits → `approval`.
   - Inbound content can never produce a binding `accept` or a receipt without the owner: it cannot change policy or limits (I-4, I-5); a policy row edited in the store is ignored.
   - Defaults snapshot test cites the 06 §3 `commitments` defaults.
 
@@ -1894,13 +1895,16 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-5, I-8
 - **Scope:**
   - Strict zod schema for `terms` (parties, deliverables, price, deadlines, validity) as the body of `offer`, `accept` and `reject` payloads; an `accept` or `reject` binds to the exact terms it answers through `termsHash` (04 §3.4).
-  - `TermsInput` (06 §2.2a, D-55): the strict tool-input schema with only the fields an agent may supply, its JSON Schema for the MCP tools, and the mapping to `terms` with the core-filled fields (`termsId`, `version`, `parties`, `previousTermsHash`). One set of size limits serves both.
+  - `TermsInput` (06 §2.2a, D-55): the strict tool-input schema with only the fields an agent may supply, its JSON Schema for the MCP tools, and the mapping to `terms` with the core-filled fields (`termsId`, `version`, `parties`, `previousTermsHash`) and `me`/`them` mapped to agent IDs in `price.payer` and `deliverables[].by`. One set of size limits serves both.
+  - Canonical form (04 §3.4, IR-D55-1 F07), checked on send and on receipt: NFC strings without C0/C1, bidi, other Cf or private-use code points; the amount, currency, date and hash formats; `payer` and `by` in `parties`. Non-canonical input is refused, never rewritten.
+  - Negotiation chain (04 §3.4, IR-D55-1 F04): key = `termsId` plus the unordered parties; `version` = newest + 1 and `previousTermsHash` = newest hash, computed from the local store; the fork rule (lower `envelopeHash` stands).
   - `termsHash` helper exactly per 04 §3.4; inbound `terms` are untrusted data (sizes, string lengths and list lengths bounded).
   - Vectors (canonical inputs, hashes, rejected inputs) generated by a session that does not implement the schema, under the M1-1h rules.
 - **Acceptance:**
   - Round-trip and strictness tests; property fuzzing raises only validation errors; vectors pass in Node, browsers and Workers.
   - The hash is canonical (key order and whitespace do not change it; any covered field does); an `accept` whose `termsHash` does not match the offer it answers is rejected.
   - `TermsInput` rejects `termsId`, `version`, `parties`, `previousTermsHash`, `termsHash` and unknown keys.
+  - Vectors include rejected inputs for every canonical-form rule (an RLO in `subject`, a zero-width space in a deliverable, Cyrillic `ЕUR`, `1500.0000001`, `0`, a due date with an offset instead of `Z`, upper-case hex) and chain cases (a version gap, a pointer to an older version, the same `termsId` from another pair, two envelopes for one version).
 
 #### M1-22 · e2e: J8 negotiate and agree over Talk (new)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
@@ -2008,7 +2012,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-4, I-5, I-6
 - **Scope:**
   - `proposeTerms` and `respondToTerms` (`accept`, `reject`, `counter`): the core fills `termsId`, `version`, `parties`, `previousTermsHash` and `termsHash`; `revises` only for the caller's newest unanswered offer; `accept` and `reject` copy the terms from the stored offer.
-  - `CommitmentScope` v1 and its digest; pending approval or policy grant (M1-20); the ledger of used parts in the `approvals` table; void rules 1–5 and expiry (04 §3.4.1); one request per call when a proof approval is also needed (M1b).
+  - `CommitmentScope` v1 and its digest, immutable from creation, with `expiresAt = min(validUntil, createdAt + 7 days)`; pending approval or policy grant (M1-20, re-evaluated before each part); one live scope per answered envelope; atomic claim of each part (compare-and-set in the transaction that stores the signed item); void rules 1–6 incl. owner cancel (04 §3.4.1); one request per call when a proof approval is also needed (M1b).
+  - `note` refused with `accept` and with `notarize`; incoming accepts of own superseded, unexpired versions stored and surfaced, never dropped.
   - The lookup for the deferred `ACCEPTED` receipt (07 §2.1 step 4) as a function that M1-7g calls from `syncInbox` processing in M1b; never run from `agentlink_status`.
 - **Acceptance:**
   - Tests first; a table-driven test per decision and record state (offer recorded before, after or never) asserts exactly which parts run: one `accept` envelope and at most one `ACCEPTED` receipt per approval.
@@ -2016,6 +2021,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A call with another envelope, decision or `notarize` value → a new `pending_approval`; the first approval stays unused.
   - Policy grant: allowlisted contact under the limit → no approval and the same single-use rules; policy document changed before the deferred receipt → the receipt asks the owner; never an auto-accept grant for `REJECTED`.
   - Fault injection between parts: the resumed run republishes the same signed envelope; no second envelope ID exists.
+  - Review cases (IR-D55-1): two concurrent retries with one `approvalId` → one `accept` (F06); a second scope for the same envelope voids the pending first, and both approved never yields two accepts (F06); a grant row inserted directly in the store authorises nothing (F10); `cancel` voids a waiting receipt (F11); `note` with `accept` → `INVALID_ARGUMENT` (F03); a counterparty offer whose `previousTermsHash` points to an older version, or a second envelope for an existing version, is refused or loses the fork rule and voids scopes on it (F04); an `accept` of version 3 arriving after version 4 was sent is stored and offered for `confirm` with the warning (F08); the digest computed at creation verifies at run time (F05).
   - Property test: across random interleavings of offers, counters, approvals and `proof` envelopes, no scope ever sends more than one `accept` or signs more than one receipt, and nothing runs without an owner-signed approval or a matching grant.
 
 #### M1-GATE · Milestone 1 gate: internal audit and user testing

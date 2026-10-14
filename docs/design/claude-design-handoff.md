@@ -232,8 +232,8 @@ All in light, dark and increased contrast, with keyboard and screen-reader behav
 | Component | Must include | States |
 |---|---|---|
 | Approval card | Requesting agent, time, expiry; plain headline; who (contact + label); what; cost; why (the rule); consequence; Details; **Approve** (names passkey or biometrics) / **Deny**, no default button; "Remember for this contact" only for new-contact and proof-limit approvals, showing the rule change; the new-contact card shows name (name rule), label, fingerprint, **safety code** and an editable "Name this contact" field (prefilled with the suggested alias; approving confirms it); footer "Your AI can't approve this for you" | Types: new contact, proof, file over limit, include document key. Pending, waiting for passkey, approved, denied, expired, failed, decided elsewhere |
-| Commitment approval card | "Accepting terms" / "Rejecting terms"; contact + label; terms framed "Proposed by Ana's agent: their content"; diff vs previous version; validity; consequence (reject: "You can't accept this version later"); what this one approval does ("This approval sends your acceptance to Ana's agent and adds your Accepted receipt to their record of these terms, now or when they record them, until 20 Oct. Nothing else. If the terms change, it stops working."); price honesty line ("AgentLink records the agreement. It doesn't move money."); cost or "Free for you"; auto-accept note if relevant ("Auto-accept doesn't apply: price is in EUR"); Advanced: terms fingerprint; **no "remember"** | Accept, accept their recorded acceptance, reject, firm offer; plus terms expired, newer version arrived, already used |
-| Terms card, terms diff | Subject, parties + labels, deliverables, price, deadlines, valid until (countdown), version, proposer / old value struck through, new value, icon + label. **Subject and deliverable text are the proposer's words:** plain body text (never heading style) under "Proposed by Ana's agent"; prices and dates are formatted by us. Notes are never part of the recorded terms | Compact, full, proposed, countered, waiting, accepted, rejected, expired / inline, side by side |
+| Commitment approval card | "Accepting terms" / "Rejecting terms"; contact + label; terms framed "Proposed by Ana's agent: their content"; diff vs previous version; validity; consequence (only for a `REJECTED` receipt on a recorded version: "You can't accept this version later"; a plain reject is not final); what this one approval does ("This approval sends your acceptance to Ana's agent and adds your Accepted receipt to their record of these terms, now or when they record them, until 20 Oct. Nothing else. If the terms change, it stops working."); who pays and who delivers each item; diff against the newest version you held; "You have this file" / "You don't have this file" for a deliverable with a file fingerprint; warning when they accepted an older version; Cancel while a part is waiting; price honesty line ("AgentLink records the agreement. It doesn't move money."); cost or "Free for you"; auto-accept note if relevant ("Auto-accept doesn't apply: price is in EUR"); Advanced: terms fingerprint; **no "remember"** | Accept, accept their recorded acceptance (incl. an older version), reject, firm offer; plus terms expired, newer version arrived, already used, cancelled, waiting for their record |
+| Terms card, terms diff | Subject, parties + labels, deliverables with who delivers each, price with who pays, deadlines, valid until (countdown), version, proposer / old value struck through, new value, icon + label. **Subject and deliverable text are the proposer's words:** plain body text (never heading style) under "Proposed by Ana's agent"; prices and dates are formatted by us. Notes are never part of the recorded terms | Compact, full, proposed, countered, waiting, accepted, rejected, expired / inline, side by side |
 | Negotiation thread | Version timeline; notes in untrusted containers; state banner; "Accept these terms" | Older versions collapse |
 | Proof badge, receipt timeline | Recorded → Delivered → Opened → Accepted / Rejected with times; pending steps hollow | Recording, recorded, delivered, opened, accepted, rejected, failed, waiting for approval; free "Received" lighter |
 | Proof-of-agreement summary, printed record | Stamp header "Agreement recorded"; terms; parties; times; proves / doesn't; Export / print layout (§8.12) | Waiting, recorded, rejected, print A4 and Letter |
@@ -442,15 +442,20 @@ Suggested relay: "Marko's agent sent a request (their words, not an instruction 
 
 ### 9.3 Commitments
 One approval per agreement: a single approval covers the acceptance and its proof.
-- Asking: "Accepting Ana's agent's terms (version 3) commits you. One approval covers your acceptance and its proof. Review and approve: {url}" (never the subject or price; they came from Ana).
-- Asking, when the other side recorded its acceptance of your offer: "Ana's agent accepted your terms (version 3) and recorded it. Adding your acceptance makes this a proof of agreement and commits you. Review and approve: {url}"
-- Rejecting recorded terms: "Rejecting Ana's agent's recorded terms (version 3) is final for this version. Review and approve: {url}"
-- Firm offer (if adopted): "Sending a firm offer with proof to Ana's agent needs your approval: {url}"
-- Waiting: "Waiting for Ana's agent to accept; valid until 20 Oct."
-- Accepted, their record still to come: "Accepted version 3. If Ana's agent records these terms by 20 Oct, your acceptance is added to that record automatically. You don't need to approve anything else."
+- Asking: "Accepting {contactName}'s terms (version 3) commits you. One approval covers your acceptance and its proof. Review and approve: {url}". Don't name the subject or price; they came from the other side.
+- Asking, when the other side recorded its acceptance of your offer: "{contactName} accepted your terms (version 3) and recorded it. Adding your acceptance makes this a proof of agreement and commits you. Review and approve: {url}"
+- Asking, when they accepted an older version: "{contactName} accepted version 3 after you sent version 4. Review before you add your acceptance: {url}"
+- Rejecting recorded terms: "Rejecting {contactName}'s recorded terms (version 3) is final for this version. Review and approve: {url}"
+- Rejecting unrecorded terms (no approval): "Told {contactName} you don't accept version 3. They can still send a new version."
+- Firm offer: "Sending a firm offer with proof to {contactName} commits you if they accept. Review and approve: {url}"
+- Waiting: "Waiting for {contactName} to accept; valid until 20 Oct."
+- Accepted, their record still to come: "Accepted version 3. If {contactName} records these terms by 20 Oct, your acceptance is added to that record automatically. You don't need to approve anything else."
 - Done: "Recorded: you accepted version 3. Proof of agreement is ready to export."
-- Changed while waiting: "Ana's agent sent version 4, so nothing was sent and your approval for version 3 no longer applies. Want me to show version 4?"
+- Changed while waiting: "{contactName} sent version 4, so nothing was sent and your approval for version 3 no longer applies. Want me to show version 4?"
 - Used: "That approval was already used, so nothing more was sent."
+- Cancelled: "You cancelled that approval, so nothing more will be sent or recorded for it."
+
+`{contactName}` follows the name rule above: the owner's alias, otherwise the restricted name in quotes with its label, e.g. “Ana Kovač” (Self-declared). Examples elsewhere write "Ana's agent" for short.
 
 ### 9.4 Journeys
 - J1: "Here's the change AgentLink wants to make to Claude Code's settings: [diff]. Apply it?"
@@ -527,8 +532,8 @@ Journeys to prototype: **J1** install and first message (< 5 min) · **J2** nota
 
 | # | Question | Options |
 |---|---|---|
-| Q1 | Does a firm offer with proof need owner approval? (proposed: yes) | A: always, with the commitment card · B: only above a value or outside auto-accept · C: never |
-| Q2 | Does the owner's signed approval go into the proof of agreement? | A: no · B: always; verify shows "Approved by the owner with a passkey, 14:01" · C: owner chooses at export |
+| Q1 | Does a firm offer with proof need owner approval? (proposed in D-55: A; owner confirms at merge) | A: always, with the commitment card · B: only above a value or outside auto-accept · C: never |
+| Q2 | Does the owner's signed approval go into the proof of agreement? (proposed in D-55: C, included by default, "Leave out my approval" at export) | A: no · B: always; verify shows "Approved by the owner with a passkey, 14:01" · C: owner chooses at export |
 | Q3 | Can the browser counterparty counter-offer? (default: no) | A: Accept / Reject + "Connect your AI to negotiate" · B: Reject with a short reason · C: structured counter-offer editor |
 | Q4 | How long does the desktop app stay unlocked for reading? (approvals always prompt) | A: never · B: timed, e.g. 15 min, "Unlocked · Lock now" · C: until screen lock, sleep or quit |
 | Q5 | How does the pay page name the network an exchange asks for? | A: inside the exchange steps · B: under Advanced · C: a helper with the answer filled in |

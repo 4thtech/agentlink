@@ -390,30 +390,37 @@ All binary values are base64url **without padding** in JSON unless noted.
 // body of offer / accept / reject
 {
   "terms": {
-    "termsId": "<16 random bytes>",              // stable for one negotiation
-    "version": 3,                                 // +1 for each counter-offer
+    "termsId": "<16 random bytes>",              // stable for one negotiation; scoped to the two parties
+    "version": 3,                                 // newest version + 1, set by the sender's core
     "parties": ["0x<agent A>", "0x<agent B>"],    // agent IDs = stable agent EVM addresses (§2.1); two parties in beta
     "subject": "Spec v2 – milestone 3",
-    "deliverables": [ { "id": "d1", "description": "…", "plaintextSha256": "hex | null" } ],
-    "price": { "amount": "1500.00", "currency": "EUR" },   // optional; decimal string; ISO 4217 code or token symbol
+    "deliverables": [ { "id": "d1", "description": "…", "by": "0x<agent B>", "plaintextSha256": "hex | null" } ],  // by = the party that delivers
+    "price": { "amount": "1500.00", "currency": "EUR", "payer": "0x<agent A>" },   // optional; payer = the party that pays
     "deadlines": [ { "ref": "d1", "due": "2026-11-30T17:00:00Z" } ],
     "validUntil": 1760600000,                     // unix seconds; the terms lapse after this
     "previousTermsHash": "hex | null"             // termsHash of the version this one replaces
   },
   "termsHash": "hex",                             // sha256(JCS(terms)), RFC 8785
-  "note": "string | null"                         // optional free text (e.g. reason for a reject); not covered by termsHash
+  "note": "string | null"                         // free text, not covered by termsHash; only on reject and on unrecorded offers (never on accept or a firm offer)
 }
 ```
 
   - `termsHash = sha256(JCS(terms))`. The core recomputes it on send and on receipt and refuses a mismatch.
-  - `offer` carries proposed terms. `accept` and `reject` carry the terms they answer (so a notarized `accept` is self-contained) and **must quote their `termsHash`**. The core refuses to send an `accept` unless the hash matches an `offer` received from that contact in the thread, that offer is the newest version of its negotiation (same `termsId`) in the store, the terms are within `validUntil`, and `parties` are exactly the sender and the recipient. Agents never supply the terms of an `accept` or `reject`: the core copies them from the stored offer (06 §2.2a, D-55). `previousTermsHash` must point to an earlier version in the thread (`null` for version 1).
+  - **Canonical form (D-55).** The core refuses, on send and on receipt, terms that are not already canonical, so what the owner sees is exactly what is hashed:
+    - every string is Unicode NFC and contains no C0 or C1 control, no bidi control (U+200E, U+200F, U+202A–U+202E, U+2066–U+2069), no other format character (category Cf, zero-width characters included) and no private-use code point;
+    - `price.amount` matches `^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$` and is greater than zero;
+    - `price.currency` matches `^[A-Z]{3}$` (ISO 4217) or is exactly one of the allowlisted token symbols;
+    - `price.payer` and every `deliverables[].by` are one of the two `parties`, and `deliverables` ids are unique;
+    - `deadlines[].due` is strict RFC 3339 in UTC (`YYYY-MM-DDTHH:MM:SSZ`), `validUntil` is an integer, `plaintextSha256` is 64 lower-case hex digits, and size limits follow M1-21.
+    Displays derive from these stored bytes: amounts and dates are formatted from the canonical values, and text is shown as stored.
+  - `offer` carries proposed terms. `accept` and `reject` carry the terms they answer (so a notarized `accept` is self-contained) and **must quote their `termsHash`**. The core refuses to send an `accept` unless the hash matches an `offer` received from that contact in the thread, that offer is the newest version of its negotiation (same `termsId`) in the store, the terms are within `validUntil`, and `parties` are exactly the sender and the recipient. Agents never supply the terms of an `accept` or `reject`: the core copies them from the stored offer (06 §2.2a, D-55). **Negotiation chain (D-55).** A negotiation is keyed by `termsId` plus the unordered pair of `parties`, so a `termsId` from one pair never affects another. Each core computes the chain from its own store and never trusts the counterparty's pointer. A sending core sets `version` to the newest version it holds plus one and `previousTermsHash` to that version's `termsHash` (`null` and 1 for a new negotiation). A receiving core accepts an `offer` only when `version` is its newest plus one and `previousTermsHash` equals its newest `termsHash`; otherwise it stores the envelope as refused and shows it in the activity feed. **No forks:** two different envelopes for the same key and version (concurrent counters, or the same terms re-sent in a new envelope) resolve the same way on both sides. The envelope with the lower `envelopeHash` stands; the other is stored as superseded, cannot be accepted, and voids any scope on it.
   - Before signing `ACCEPTED` or `REJECTED` on a record whose envelope carries `terms`, the core applies the same checks (own agent ID in `parties`, not expired). Both need owner approval by default (policy `commitments.accept`, §2.5, 06 §3), and one approval covers the `accept` and its receipt (§3.4.1).
-  - Received terms are untrusted content (I-5): validated structurally only, shown inside the untrusted block (06 §4) and marked as the other party's content on approval screens. `price` is informational: AgentLink moves no money.
-  - **Proof of agreement.** The final terms envelope is notarized (record kind `OFFER` for an `offer`, `ACCEPT` for an `accept`, 05 §3.1) and the counterparty signs `ACCEPTED` on that record. The proof pack (07 §8) includes the envelope and its disclosed content key (policy `proofs.allowKeyDisclosure`), so a verifier can decrypt, recompute `termsHash` and check that the record signer and the receipt signer are the two `parties`. Disclosing the key reveals the whole payload, so the final terms envelope should carry only the terms. The pack shows that both agents, each bound to its owner by the agent card, assented to the same terms at the recorded times (mutual assent). It does not by itself establish legal enforceability or the signatory's authority. `DECISION NEEDED (owner)`: optionally add each owner's signed approval (§2.5) to the pack, as off-chain evidence that the owners, not only their agents, approved.
+  - Received terms are untrusted content (I-5): validated structurally and for canonical form only, shown inside the untrusted block (06 §4) and marked as the other party's content on approval screens. `price` is informational: AgentLink moves no money.
+  - **Proof of agreement.** The final terms envelope is notarized (record kind `OFFER` for an `offer`, `ACCEPT` for an `accept`, 05 §3.1) and the counterparty signs `ACCEPTED` on that record. The proof pack (07 §8) includes the envelope and its disclosed content key (policy `proofs.allowKeyDisclosure`), so a verifier can decrypt, recompute `termsHash` and check that the record signer and the receipt signer are the two `parties`. Disclosing the key reveals the whole payload, so the final terms envelope should carry only the terms. The pack shows that both agents, each bound to its owner by the agent card, assented to the same terms at the recorded times (mutual assent). It does not by itself establish legal enforceability or the signatory's authority. **Owner approval in the pack (proposed answer to 11 §14 Q2; owner confirms at merge).** By default, a proof-of-agreement export includes the exporting side's signed approval: the `OwnerAction` and its `CommitmentScope` (§3.4.1). A verifier can then recompute the digest, check the `termsHash` and check the signature against the owner key in the agent card. For a policy grant, the pack says "approved by the owner's standing rule" and gives the policy document's hash, not its limits. The owner can leave the approval out at export. Including it reveals the counterparty's owner key and the fee cap to whoever receives the pack, and the export screen says so (07 §8).
 
 #### 3.4.1 Commitment approvals: one approval per agreement (D-55)
 
-A commitment (D-31) is approved once per agreement and per owner. The approval binds a **commitment scope** that the core builds from its own store. Only two inputs come from the tool call: the envelope being answered and the decision (06 §2.2a). The agent never supplies the terms, the fingerprint or the counterparty.
+A commitment (D-31) is approved once per agreement and per owner. The approval binds a **commitment scope** that the core builds from its own store, once, when it creates the pending request (or the policy grant). The scope is immutable after that. Only the envelope being answered and the decision come from the tool call; for a firm offer, the `TermsInput` and the contact come from it too (06 §2.2a). The agent never supplies the terms of an answer, the fingerprint or the counterparty's identity.
 
 ```jsonc
 // CommitmentScope v1. Approval digest = sha256(JCS(scope)) (RFC 8785)
@@ -421,16 +428,17 @@ A commitment (D-31) is approved once per agreement and per owner. The approval b
   "v": 1,
   "kind": "agentlink/commitment",
   "agentId": "0x<own agent>",
-  "decision": "accept | reject | confirm | offer",  // confirm = ACCEPTED on their ACCEPT record; offer only if 11 §14 Q1 is yes
+  "decision": "accept | reject | confirm | offer",  // confirm = ACCEPTED on their ACCEPT record; offer = firm offer
   "counterparty": { "agentId": "0x<contact agent>", "ownerKey": "<contact owner public key, hex>" },
   "thread": "<thread id>",
-  "termsId": "<16 bytes>",
+  "termsId": "<16 bytes>",                         // with the two agent IDs above, the negotiation key (§3.4)
   "version": 3,
   "termsHash": "hex",
   "answers": { "envelopeId": "<id>", "envelopeHash": "hex" },  // the counterparty envelope answered; null for a firm offer
   "notarize": false,
   "maxFeeUsd": "0.10",                                         // null when nothing is paid
-  "expiresAt": 1760600000
+  "createdAt": 1760000000,
+  "expiresAt": 1760600000                                      // min(terms.validUntil, createdAt + 7 days)
 }
 ```
 
@@ -438,41 +446,54 @@ A commitment (D-31) is approved once per agreement and per owner. The approval b
 
 | `decision` | Parts |
 |---|---|
-| `accept` | (1) One `accept` envelope to `counterparty` in `thread`, with `replyTo = answers.envelopeId` and the stored terms of that offer, so its `termsHash` equals the scope's. (2) With `notarize`, and only if the answered offer has no record: one `Record` for that envelope, kind `ACCEPT`, with a fee of at most `maxFeeUsd`. (3) At most one `ACCEPTED` receipt on the record whose `envelopeHash` equals `answers.envelopeHash`, whose signer is `counterparty.agentId` and whose recipient commitment opens to this agent with the salt from its `proof` envelope (checked on-chain, as for any receipt). The core signs it as soon as that record is known, before `expiresAt` |
-| `reject` | One `REJECTED` receipt on the answered offer's record, if that record is known when the call is made. The `reject` envelope sent in the same call is free and is not itself a commitment. Never covered by the auto-accept limits |
-| `confirm` | One `ACCEPTED` receipt on the counterparty's `ACCEPT` record. The `termsHash` of that accept must equal the hash of this agent's own newest offer in the negotiation. No envelope is sent |
-| `offer` (only if 11 §14 Q1 is yes) | One `offer` envelope with these terms, and its `Record` (kind `OFFER`) with a fee of at most `maxFeeUsd` |
+| `accept` | (1) One `accept` envelope to `counterparty` in `thread`, with `replyTo = answers.envelopeId`, the stored terms of that offer (so its `termsHash` equals the scope's) and no `note`. (2) With `notarize`, and only if the answered offer has no record: one `Record` for that envelope, kind `ACCEPT`, with a fee of at most `maxFeeUsd`. (3) At most one `ACCEPTED` receipt on the record whose `envelopeHash` equals `answers.envelopeHash`, whose kind is `OFFER`, whose signer is `counterparty.agentId` and whose recipient commitment opens to this agent with the salt from its `proof` envelope (checked on-chain, as for any receipt). The core signs it as soon as that record is known, before `expiresAt` |
+| `reject` | One `REJECTED` receipt on the answered record, if that record is known when the call is made (never deferred). The `reject` envelope sent in the same call is free, is not itself a commitment and is not final (06 §2.2a). Never covered by the auto-accept limits |
+| `confirm` | One `ACCEPTED` receipt on the counterparty's `ACCEPT` record. That accept must answer one of this agent's own offers that has not expired (its newest, or a superseded one with the warning below). No envelope is sent |
+| `offer` (firm offer) | One `offer` envelope with these terms and no `note`, and its `Record` (kind `OFFER`) with a fee of at most `maxFeeUsd` |
 
-`reject` on a counterparty's `ACCEPT` record uses the `reject` row with that record. Each J8 shape asks each owner once. If the offer is recorded, the offerer approves the firm offer (if Q1 is yes) and the accepter approves the accept, which covers the receipt. If the accept is recorded, the accepter approves the accept with `notarize`, and the offerer approves `confirm`.
+**Firm offers (proposed answer to 11 §14 Q1; owner confirms at merge).** An offer sent with `notarize` is a firm offer and a commitment: the counterparty's single approval can turn it into a proof of agreement. It needs one approval under `commitments.accept` and is never covered by the auto-accept limits (only by an explicit `commitments.accept: allow`). It is the only way to record an offer: `agentlink_notarize` refuses any envelope that carries `terms` (06 §2.4).
 
-**Owner signature and single use.**
+`reject` on a counterparty's `ACCEPT` record uses the `reject` row with that record. Each J8 shape asks each owner once. If the offer is recorded, the offerer approves the firm offer and the accepter approves the accept, which covers the receipt. If the accept is recorded, the accepter approves the accept with `notarize`, and the offerer approves `confirm`.
+
+**Owner signature, single use and one live scope.**
 - The owner approves with presence (§2.5) by signing `OwnerAction{agentId, action: "approve", params: {approvalId, digest}, nonce, issuedAt}`.
-- The core accepts the signature only for its own `agentId`, with an unused nonce, within the `OwnerAction` freshness window (G-7). It also checks, before each part runs, that the digest equals the digest it recomputes from its store.
-- The core records each part it uses against the approval ID: the accept envelope ID, the record ID and the receipt's record ID (07 §2.1). A used part is never authorised again. The record's single-use nonce and the on-chain one-time receipt flag (I-6, 05 §3.3) are the second line of defence.
+- The core accepts the signature only for its own `agentId`, with an unused nonce, within the `OwnerAction` freshness window (G-7). Before each part runs, it checks that the digest of the stored scope still matches and that the void rules below do not apply.
+- At most one live scope exists per answered envelope (`agentId`, `answers.envelopeId`), and per firm offer (`agentId`, negotiation key, `version`). Creating a new scope voids an older one that is still pending. Once the `accept` part has run for an envelope, any later scope on it covers only the receipt.
+- The core claims a part atomically: in one store transaction (SQLite, or Durable Object storage) it checks that the part is unused, marks it used and stores the signed item, before it publishes anything (07 §2.1). Two concurrent retries therefore cannot both run a part. A used part is never authorised again. The record's single-use nonce and the on-chain one-time receipt flag (I-6, 05 §3.3) are the second line of defence.
 - A repeat with the same `clientRequestId` returns the original result. A repeat call with the same `approvalId` after every part has run or is waiting for its record returns `rejected` with `APPROVAL_USED` and the state of the original response (for example `waiting_for_record`). It never sends or signs a part twice.
 
-**Expiry.** `expiresAt = min(terms.validUntil, approvedAt + 7 days)`. The 7 days are proposed and settled with G-7. The pending request expires earlier, per G-7 (proposed 24 h). After `expiresAt`, unused parts are void. If the offerer records the offer after that, the accepter's `ACCEPTED` receipt is not signed. The accept message then stands without on-chain evidence. A new `accept` call on the same offer asks the owner again; because the accept was already sent, its scope covers only the receipt.
+**Expiry (proposed; owner confirms at merge).** `expiresAt = min(terms.validUntil, createdAt + 7 days)`, where `createdAt` is when the core created the pending request or the grant. Both values are set then and are part of the signed digest. The pending request itself expires sooner, per G-7 (proposed 24 h); an approval arriving after that is refused. After `expiresAt`, unused parts are void. If the offerer records the offer after that, the accepter's `ACCEPTED` receipt is not signed. The accept message then stands without on-chain evidence. A new `accept` call on the same offer asks the owner again; because the accept was already sent, its scope covers only the receipt.
 
-**Void on any change.** Before each part runs, the core rebuilds the scope from its store. The approval is void when any of the following holds. Then nothing is sent or signed, and the call returns `status: "rejected"` with the code shown (06 §2.2a):
-1. Before the accept is sent, a newer version of the same negotiation (same `termsId`, higher `version`, from either side) is in the store (`TERMS_SUPERSEDED`). The receiving core also refuses to accept any version older than the newest it holds. After the accept is sent, a later version does not void the receipt for the accepted version.
+**Void on any change.** The approval is void when any of the following holds. Then nothing is sent or signed, and the call returns `status: "rejected"` with the code shown (06 §2.2a):
+1. For an `accept` or `offer` scope, before its envelope is sent: a newer version of the same negotiation (same negotiation key, higher `version`, from either side), or a competing envelope for the same version that wins the fork rule (§3.4), is in the store (`TERMS_SUPERSEDED`). After the accept is sent, a later version does not void the receipt for the accepted version.
 2. The stored offer's `termsHash` or envelope hash differs from the scope (`APPROVAL_VOID`). This cannot happen for a validly signed envelope, but the check is mandatory.
 3. The counterparty's agent card or owner key changed, the contact is blocked, or either agent is revoked (`APPROVAL_VOID`).
 4. Policy `commitments.accept` is now `deny` (`APPROVAL_VOID`).
 5. `expiresAt` has passed (`TERMS_EXPIRED`).
+6. The owner cancelled the approval (`APPROVAL_VOID`). **Cancel** is an owner operation with presence (§2.5; `agentlink cancel <approvalId>` †, the local UI, the console or the desktop app). It voids every unused part, for example a receipt still waiting for the offer's record.
 
-A call that asks for a different action (another envelope, decision or `notarize` value, or a fee above `maxFeeUsd`) is not covered. It gets a new `pending_approval`, and the first approval stays unused until it expires.
+A call that asks for a different action (another envelope, decision or `notarize` value, or a fee above `maxFeeUsd`) is not covered. It gets a new `pending_approval`, which voids the first one if that is still pending.
 
-**Auto-accept with the same binding (D-31).** Sometimes the policy allows a commitment without asking: `commitments.accept: allow`, or a contact in `autoAcceptContacts` with `terms.price` in USD or a USD stablecoin of at most `autoAcceptMaxUSD`. The core then creates the same scope as a **policy grant**. Its authority is the owner-signed policy document, whose hash is stored with the grant, not a per-action owner signature. A grant authorises and is used up exactly like an approval. It is also void when the policy document changes before a part runs; the core then asks the owner for any remaining part. A grant from the auto-accept limits never covers a `REJECTED` receipt. Whether it may cover a firm offer is part of 11 §14 Q1.
+**Auto-accept with the same binding (D-31).** The policy may allow a commitment without asking: `commitments.accept: allow`, or the auto-accept limits. The limits apply only in the direction the owner chose in the signed policy (`autoAcceptDirection`, 06 §3), and only when every condition holds; anything else asks the owner (fail closed):
+- the contact is in `autoAcceptContacts`;
+- `terms.price` is present, its currency is USD or a USD stablecoin, and its amount is a strict positive decimal (§3.4);
+- `buy`: `price.payer` is this agent, the amount is at most `autoAcceptMaxUSD`, and every deliverable is `by` the counterparty;
+- `sell`: `price.payer` is the counterparty, the amount is at least `autoAcceptMinUSD` (sell is off while it is unset), and every deliverable is `by` this agent.
+
+The core then creates the same scope as a **policy grant**. The grant row is a ledger, never authority. Before each part runs, the core re-runs `evaluate` on the owner-signed policy as verified on load and requires `allow` for this scope. A row inserted or edited in the store therefore authorises nothing. A grant is used up exactly like an approval, and when the policy no longer allows a remaining part, the core asks the owner for it. The auto-accept limits never cover a `REJECTED` receipt or a firm offer. A `REJECTED` receipt asks the owner unless the policy is explicitly `allow` (proposed; owner confirms at merge).
 
 **One request per call.** A call that needs both a commitment approval and a proof approval (`notarize` with `proofs.notarize: approval`, or above a budget) raises one approval whose scope carries both, so the fee appears on the same screen. The approval never relaxes the proof budgets for any other action.
 
-**Counter-offers.** A counter (06 §2.2a `counter`) and a revision of one's own unanswered offer (`revises`) are new `offer` versions with `previousTermsHash` set. They are free and are not commitments, except for a firm offer if Q1 is yes. They supersede earlier versions under rule 1. An offer stays acceptable until its `validUntil` for a counterparty that has not yet received a newer version; offerers choose `validUntil` with that in mind.
+**Counter-offers and late accepts.** A counter (06 §2.2a `counter`) and a revision of one's own unanswered offer (`revises`) are new `offer` versions; the sender's core sets `version` and `previousTermsHash` from its own store (§3.4). They are free and are not commitments, unless sent with `notarize` (a firm offer). They supersede earlier versions under rule 1. An offer stays acceptable until its `validUntil` for a counterparty that has not yet received a newer version. If an `accept` arrives for one of this agent's own versions that has been superseded but has not expired, the core stores it and never drops it. The owner sees "Ana's agent accepted version 3 after you sent version 4". The agent can then `confirm` with that warning on the card, if the accept is recorded, or `reject`.
 
-**What the owner sees (I-5).** The approval screen renders the stored, validated terms the scope is bound to, never terms text from the tool call. It shows:
+**What the owner sees (I-5).** The approval screen renders the stored, canonical terms the scope is bound to (§3.4), never terms text from the tool call. Escaping is defence in depth, never the safety mechanism. It shows:
 - the counterparty under the 06 §2.1 name rule, with its label;
-- the terms as that party's content, and the changes from the previous version;
+- the terms as that party's content, with who pays and who delivers each item;
+- the changes from the newest version this side held before it, computed locally, never from the counterparty's `previousTermsHash`;
+- for a deliverable with `plaintextSha256`, whether that file is held locally;
 - the validity and the fee;
 - what the single approval will do (11 §6.1, §8).
+
 The terms fingerprint is under Advanced. Tool summaries name only the contact, the action and the version.
 
 ### 3.5 Transport wrapping (Nostr)
@@ -578,8 +599,8 @@ Static recipient keys mean a stolen encryption key decrypts past envelopes addre
 | **Submitter gas griefing** | Simulate before submit; require on-chain credits; per-signer rate limits; minimum deposit for gasless top-ups |
 | **Supply chain (npm)** | Minimal dependencies, pinned lockfile, npm provenance, 2FA, reviewed updates, no postinstall scripts in our packages |
 | **On-chain metadata analysis** | Pseudonymous agent keys, salted commitments; per-relationship keys (P2) |
-| **Agent commits its owner to terms** (prompt injection or an over-eager agent) | Policy `commitments.accept` defaults to `approval` (D-31); auto-accept only for allowlisted contacts up to a maximum value; the approval screen shows the terms and the changes from the previous version; `termsHash` binds exactly what was accepted (§3.4); the agent names the offer by envelope ID and cannot supply the accepted terms (D-55) |
-| **Reuse or replay of a commitment approval** (an approval used for other terms, a newer version, another contact or agent, a second accept, or a late receipt) | One approval binds one commitment scope (§3.4.1): own agent, counterparty and its owner key, thread, the answered envelope and its hash, `termsHash`, decision, fee cap and an expiry no later than `validUntil`; each part runs once and is recorded; the digest is recomputed from the store before each part, and any change voids it; record nonces and one-time receipt flags on-chain (I-6); auto-accept grants are void when the policy changes |
+| **Agent commits its owner to terms** (prompt injection or an over-eager agent, including terms where the owner is the one who delivers or pays) | Policy `commitments.accept` defaults to `approval` (D-31); auto-accept only for allowlisted contacts, in the direction the owner chose (who pays and who delivers) and within its limits (§3.4.1); the approval screen shows the terms and the changes from the previous version; `termsHash` binds exactly what was accepted (§3.4); the agent names the offer by envelope ID and cannot supply the accepted terms (D-55) |
+| **Reuse or replay of a commitment approval** (an approval used for other terms, a newer version, another contact or agent, a second accept, or a late receipt) | One approval binds one commitment scope (§3.4.1): own agent, counterparty and its owner key, thread, the answered envelope and its hash, `termsHash`, decision, fee cap and an expiry no later than `validUntil`; each part runs once and is recorded; the digest is recomputed from the store before each part, and any change voids it; record nonces and one-time receipt flags on-chain (I-6); auto-accept grants are ledger rows re-evaluated against the verified policy before each part; one live scope per answered envelope with atomic claims; no forks in the negotiation chain (§3.4); the owner can cancel unused parts |
 | **Local page imitating the approval page** (shared `localhost` passkey RP ID) | The owner's gesture is still required; the desktop app (M2) replaces the localhost page with a native window and a keystore bound to the signed app (§2.5) |
 | **Spoofed or lapsed domain claim** | Owner-signed claim checked against the contact's owner key; periodic re-check with downgrade and warning; exact domain shown; SSRF rules on `.well-known` fetches (§2.7) |
 | **Malicious desktop app update** | Updates signed with a key pinned in the app and verified before install; OS code signing and notarization; no downgrades; reproducible builds with published hashes; releases need owner approval (08 §8) |
