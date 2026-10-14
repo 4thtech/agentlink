@@ -67,8 +67,23 @@ export const LIBRARIES = [
   },
 ];
 
-/** A test file: `*.test.<ext>`. LIBRARIES `testZones` apply to these files only. */
-export const isTestFile = (file) => /\.test\.[cm]?[jt]sx?$/.test(file ?? '');
+/**
+ * A test file: exactly `*.test.ts`. LIBRARIES and RESTRICTED_ENTRY_POINTS `testZones` apply to these
+ * files only. Every package build excludes exactly `src/**\/*.test.ts` (tsconfig.json), so any other
+ * test-like name (`.test.mts`, `.test.cts`, `.test.tsx`, `.test.js`, `.spec.*`) would be built into
+ * dist/: it counts as production code here, and deps-check reports it (IR-M1-1c-G2-1 L-1).
+ */
+export const isTestFile = (file) => /\.test\.ts$/.test(file ?? '');
+
+/** A file name test runners pick up as a test: `<name>.test.<ext>` or `<name>.spec.<ext>`. */
+const TEST_LIKE = /\.(?:test|spec)\.[^/\\.]+$/;
+
+export const MISNAMED_TEST_MESSAGE =
+  'test files are named *.test.ts: package builds exclude only that name, so this file would be built into dist/ and counts as production code (IR-M1-1c-G2-1 L-1); rename it';
+
+/** The message for a test-like file name that is not `*.test.ts`, or null. */
+export const misnamedTestFile = (file) =>
+  TEST_LIKE.test(file ?? '') && !isTestFile(file) ? MISNAMED_TEST_MESSAGE : null;
 
 /** True when `lib` may be used in `zone`: everywhere in its zones, in tests only in its testZones. */
 export const libraryAllowed = (lib, zone, { test = false } = {}) =>
@@ -92,16 +107,42 @@ export const RESTRICTED_ENTRY_POINTS = [
     via: 'the KeyStore interface (04 §8.1)',
     reason: 'master seeds and secret keys stay inside KeyStore backends (04 §8.1, §2.5)',
   },
-  // M1-1c, M1-1f: the deterministic test seam (fixed AES-GCM nonce or IV, fixed HPKE ephemeral key,
-  // Argon2id with a secret value and associated data). It is never built and has no package export;
-  // only the vector harness's Vitest alias resolves it. This entry also refuses it by name elsewhere.
+  // M1-1c, M1-1f, M1-1g: the deterministic test seam (fixed AES-GCM nonce or IV, fixed HPKE
+  // ephemeral key, Argon2id with a secret value and associated data) and the test doubles
+  // MemoryKeyStore and MemoryOwnerKeyStore. It is never built and has no package export; only a
+  // Vitest alias and a noEmit tsconfig.test.json `paths` entry resolve it (test-vectors,
+  // packages/core, packages/transport-nostr). This entry refuses it by name everywhere else.
+  // 04 §3.1.1: an entry point "that deps-check allows only in tests, test-vectors and e2e, never in
+  // production src". `zones` are the test-only directories (never built or published); `testZones`
+  // are the packages whose *.test.ts files may import the exact name `@agentlink/crypto/testing`
+  // (M1-1g-b, IR-M1-1g-G2-1 R2-L-1): transport-nostr for M1-5a and core for M1-7a. packages/crypto's
+  // own tests use the relative path (TEST_SEAM_SOURCE). Another package's tests: add it here (S1).
   {
     group: ['@agentlink/crypto/testing', '@agentlink/crypto/testing/*'],
-    zones: ['test-vectors'],
+    zones: ['test-vectors', 'e2e'],
+    testZones: ['packages/core', 'packages/transport-nostr'],
     via: 'the public entry points (the test seam is never built)',
-    reason: 'a fixed nonce, IV or ephemeral key must never reach production code (M1-1c, M1-1f)',
+    reason:
+      'a fixed nonce, IV or ephemeral key, or an in-memory seed holder, must never reach production code (M1-1c, M1-1f, M1-1g)',
   },
 ];
+
+/**
+ * True when `entry` (RESTRICTED_ENTRY_POINTS) may be used in `zone`: everywhere in its zones; in a
+ * test file of its testZones, by an exact (non-`/*`) name of its group only, never a subpath.
+ */
+export function entryAllowed(entry, zone, specifier, { test = false } = {}) {
+  if (entry.zones.includes(zone)) return true;
+  return (
+    test &&
+    (entry.testZones ?? []).includes(zone) &&
+    entry.group.some((pattern) => !pattern.endsWith('/*') && pattern === specifier)
+  );
+}
+
+/** The exact names of `entry` that its testZones' test files may import (ESLint needs them apart). */
+export const entryTestNames = (entry) =>
+  (entry.testZones ?? []).length === 0 ? [] : entry.group.filter((p) => !p.endsWith('/*'));
 
 /**
  * The test seam's source file (M1-1c, M1-1f), without extension. RESTRICTED_ENTRY_POINTS refuses
@@ -112,7 +153,7 @@ export const RESTRICTED_ENTRY_POINTS = [
 export const TEST_SEAM_SOURCE = 'packages/crypto/src/testing';
 
 export const TEST_SEAM_MESSAGE =
-  'packages/crypto/src/testing.ts (the test seam) may be imported only by test files and test-vectors; production code uses the public functions (M1-1c, M1-1f)';
+  'packages/crypto/src/testing.ts (the test seam) may be imported only by test files (*.test.ts) and test-vectors; production code uses the public functions (M1-1c, M1-1f)';
 
 /**
  * The message for a relative import from `file` (repo path) that resolves to `target` (repo path),
@@ -321,18 +362,50 @@ export const DEEP_IMPORT_DIRS = ['dist', 'src'];
 export const deepImportGroup = (name) =>
   DEEP_IMPORT_DIRS.flatMap((dir) => [`${name}/${dir}`, `${name}/${dir}/*`]);
 
-/** True when `specifier` is a deep import into the workspace package `name`. */
+/**
+ * True when `specifier` is a deep import into the workspace package `name`: its first segment is
+ * dist/ or src/, or any segment is `.` or `..` (`<pkg>/testing/../src/x` names a file by path).
+ */
 export function isDeepImport(name, specifier) {
   if (!specifier.startsWith(`${name}/`)) return false;
-  const first = specifier.slice(name.length + 1).split('/')[0];
-  return DEEP_IMPORT_DIRS.includes(first) || first === '..' || first === '.';
+  const segments = specifier.slice(name.length + 1).split('/');
+  return (
+    DEEP_IMPORT_DIRS.includes(segments[0]) ||
+    segments.some((segment) => segment === '..' || segment === '.')
+  );
 }
+
+/** The npm scopes of the workspace packages (`@agentlink/`, `@4thtech/`). */
+const WORKSPACE_SCOPES = [...new Set(WORKSPACE_NAMES.map((name) => `${name.split('/')[0]}/`))];
+
+/**
+ * True for a specifier in a workspace scope that is not in canonical form (IR-M1-1g-b-1 L-2): an
+ * upper-case letter, or an empty, `.` or `..` segment (`@agentlink/crypto//testing`,
+ * `@agentlink/crypto/Testing`, `@agentlink/crypto/./testing`, a trailing `/`). The policy matches
+ * exact, lower-case names; a case-insensitive file system or a lenient resolver could map such a
+ * spelling onto a restricted entry point, so every guard refuses it outright.
+ */
+export function isNonCanonicalWorkspaceSpecifier(specifier) {
+  const lower = specifier.toLowerCase();
+  if (!WORKSPACE_SCOPES.some((scope) => lower.startsWith(scope))) return false;
+  return (
+    specifier !== lower ||
+    specifier.split('/').some((segment) => segment === '' || segment === '.' || segment === '..')
+  );
+}
+
+export const nonCanonicalMessage = (specifier) =>
+  `"${specifier}" is a non-canonical specifier for a workspace package (upper case, or an empty, "." or ".." segment); import the package by its exact name or a subpath its package.json "exports" declares (IR-M1-1g-b-1 L-2).`;
 
 export const deepImportMessage = (name) =>
   `${name}: deep import into the package's build or sources is not allowed; import ${name} or a subpath its package.json "exports" declares (IR-M1-1f-1 L-2).`;
 
 export const restrictedEntryMessage = (entry) =>
-  `${entry.group[0]} may be imported only in ${entry.zones.join(', ')}; everything else uses ${entry.via}.`;
+  `${entry.group[0]} may be imported only in ${entry.zones.join(', ')}${
+    entry.testZones?.length
+      ? ` (and by that exact name in *.test.ts files of ${entry.testZones.join(', ')})`
+      : ''
+  }; everything else uses ${entry.via}.`;
 export const layerMessage = (zone, name) =>
   ZONES[zone]
     ? `${zone} may not import ${name} (package layering: tools/deps-check/policy.mjs, 07 §1).`
@@ -356,10 +429,14 @@ export function violationFor(zone, specifier, file) {
     }
     return null;
   }
+  if (isNonCanonicalWorkspaceSpecifier(specifier)) return nonCanonicalMessage(specifier);
   const workspace = workspaceNameOf(specifier);
   if (workspace !== null && isDeepImport(workspace, specifier)) return deepImportMessage(workspace);
   for (const entry of RESTRICTED_ENTRY_POINTS) {
-    if (matchesGroup(specifier, entry.group) && !entry.zones.includes(zone)) {
+    if (
+      matchesGroup(specifier, entry.group) &&
+      !entryAllowed(entry, zone, specifier, { test: isTestFile(file) })
+    ) {
       return restrictedEntryMessage(entry);
     }
   }

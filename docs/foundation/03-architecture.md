@@ -80,7 +80,7 @@ AgentLink goes in **two directions** (D-37):
 | **Self-hosted cloud** | Streamable HTTP + OAuth | Worker secrets in **user's** Cloudflare account | Durable Object (SQLite-backed) | Always-on; polls relays with DO alarms; serves remote-only harnesses |
 | **Hosted remote (P2, M4)** | Streamable HTTP + OAuth | None server-side; signing via owner's browser passkey | Ciphertext only | Approval mode; every action proposed, owner signs in console |
 
-The MCP **tool surface is identical** across packagings (see 06). Differences live behind the `KeyStore`, `Store` and `ApprovalChannel` interfaces. `Store` and `ApprovalChannel` are in core. The key interfaces are types in `@agentlink/crypto`, so `transport-nostr` and core share them without a dependency cycle (04 §3.1.1, G-2; proposed, owner confirms at merge).
+The MCP **tool surface is identical** across packagings (see 06). Differences live behind the `KeyStore`, `Store` and `ApprovalChannel` interfaces. `Store` and `ApprovalChannel` are in core. The key interfaces are types in `@agentlink/crypto`, so `transport-nostr` and core share them without a dependency cycle (04 §3.1.1, G-2; D-62, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34).
 
 ```ts
 // @agentlink/crypto (types only). No method returns a private key or a seed (04 §3.1.1).

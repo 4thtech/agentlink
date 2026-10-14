@@ -228,10 +228,10 @@ describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', 
     },
   );
 
-  it('rejects it by name in a test file outside test-vectors', async () => {
-    expect(rules(await lint('packages/core/src/a.test.ts', byName))).toContain(
-      'no-restricted-imports',
-    );
+  it('rejects it by name in a test file of a zone 04 §3.1.1 does not list', async () => {
+    for (const filePath of ['packages/node/src/a.test.ts', 'apps/cli/src/a.test.ts']) {
+      expect(rules(await lint(filePath, byName)), filePath).toContain('no-restricted-imports');
+    }
   });
 
   it('rejects a relative import from crypto production code, allows it in crypto tests', async () => {
@@ -239,6 +239,85 @@ describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', 
       'boundaries/no-bypass',
     ]);
     expect(await lint('packages/crypto/src/memory-keystore.test.ts', relative)).toEqual([]);
+  });
+});
+
+describe('M1-1g-b (IR-M1-1g-G2-1 R2-L-1): the test seam in core and transport-nostr tests', () => {
+  const byName = `import { MemoryKeyStore } from '@agentlink/crypto/testing';\nvoid MemoryKeyStore;\n`;
+  const dynamic = `const m = await import('@agentlink/crypto/testing');\nvoid m;\n`;
+  const RESTRICTED = /@agentlink\/crypto\/testing may be imported only in test-vectors/;
+  const zones = ['packages/core', 'packages/transport-nostr'];
+
+  it.each(zones)('allows it by name in %s test files, static and dynamic', async (zone) => {
+    for (const code of [byName, dynamic]) {
+      expect(await lint(`${zone}/src/a.test.ts`, code)).toEqual([]);
+      expect(await lint(`${zone}/src/sub/b.test.ts`, code)).toEqual([]);
+    }
+  });
+
+  it.each(zones)('still rejects it in %s production files, static and dynamic', async (zone) => {
+    for (const code of [byName, dynamic]) {
+      const messages = await lint(`${zone}/src/a.ts`, code);
+      expect(messages.map((m) => m.message).join('\n')).toMatch(RESTRICTED);
+    }
+  });
+
+  it.each(['a.test.mts', 'a.test.cts', 'a.spec.ts', 'a.test.tsx'])(
+    'treats packages/core/src/%s as production code',
+    async (name) => {
+      const messages = await lint(`packages/core/src/${name}`, byName);
+      expect(messages.map((m) => m.message).join('\n')).toMatch(RESTRICTED);
+    },
+  );
+
+  it('rejects deep and sub paths of the seam in test files', async () => {
+    for (const specifier of [
+      '@agentlink/crypto/src/testing.js',
+      '@agentlink/crypto/dist/testing.js',
+      '@agentlink/crypto/testing/index.js',
+    ]) {
+      const code = `import * as m from '${specifier}';\nvoid m;\n`;
+      expect(await lint('packages/core/src/a.test.ts', code), specifier).not.toEqual([]);
+    }
+  });
+
+  it('rejects a cross-package relative path to the seam source in test files', async () => {
+    const code = `import { MemoryKeyStore } from '../../crypto/src/testing.js';\nvoid MemoryKeyStore;\n`;
+    expect(rules(await lint('packages/core/src/a.test.ts', code))).toContain(
+      'boundaries/no-bypass',
+    );
+  });
+});
+
+describe('IR-M1-1g-b-1 L-1, L-2: dot, empty and case-variant segments in static imports', () => {
+  const bad = [
+    '@agentlink/crypto/./testing',
+    '@agentlink/crypto/x/../testing',
+    '@agentlink/crypto//testing',
+    '@agentlink/crypto/Testing',
+    '@agentlink/Crypto/testing',
+  ];
+
+  it.each(['packages/core/src/a.ts', 'packages/core/src/a.test.ts'])(
+    'rejects each form in %s, static import and re-export',
+    async (filePath) => {
+      for (const specifier of bad) {
+        for (const code of [
+          `import * as m from '${specifier}';\nvoid m;\n`,
+          `export * from '${specifier}';\n`,
+        ]) {
+          const messages = await lint(filePath, code);
+          expect(messages.map((m) => m.message).join('\n'), `${specifier}: ${code}`).toMatch(
+            /non-canonical/,
+          );
+        }
+      }
+    },
+  );
+
+  it('leaves the canonical seam import alone in a core test file', async () => {
+    const code = `import { MemoryKeyStore } from '@agentlink/crypto/testing';\nvoid MemoryKeyStore;\n`;
+    expect(await lint('packages/core/src/a.test.ts', code)).toEqual([]);
   });
 });
 

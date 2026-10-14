@@ -12,6 +12,7 @@ import {
   WORKSPACE_NAMES,
   ZONES,
   allowedWorkspaceNames,
+  entryTestNames,
   layerMessage,
   libraryAllowed,
   libraryMessage,
@@ -42,9 +43,14 @@ function restrictionsFor(zone, { test = false } = {}) {
     patterns.push({ group: lib.group, message: libraryMessage(lib) });
   }
   // Restricted subpaths of packages this zone may otherwise import (IR-M1-1b-1 M-1).
+  // A test file of an entry's testZones may import its exact names only (M1-1g-b): ESLint gets the
+  // group minus those names; boundaries/no-bypass and deps-check use policy.entryAllowed.
   for (const entry of RESTRICTED_ENTRY_POINTS) {
     if (zone !== null && entry.zones.includes(zone)) continue;
-    patterns.push({ group: entry.group, message: restrictedEntryMessage(entry) });
+    const exact =
+      zone !== null && test && (entry.testZones ?? []).includes(zone) ? entryTestNames(entry) : [];
+    const group = entry.group.filter((pattern) => !exact.includes(pattern));
+    patterns.push({ group, message: restrictedEntryMessage(entry) });
   }
   // Deep imports into any workspace package's dist/ or src/, in every zone (IR-M1-1f-1 L-2).
   for (const name of WORKSPACE_NAMES) {
@@ -125,10 +131,14 @@ export default tseslint.config(
     files: [`${zone}/**/*.${SOURCE}`],
     rules: restrictionsFor(zone),
   })),
-  // Test files of zones with test-only libraries (LIBRARIES testZones, IR-M1-1e-1 L-1). This block
-  // comes after the zone's own, so it is the one no-restricted-imports block that applies to them.
-  ...[...new Set(LIBRARIES.flatMap((lib) => lib.testZones ?? []))].map((zone) => ({
-    files: [`${zone}/**/*.test.${SOURCE}`],
+  // Test files of zones with test-only libraries or entry points (LIBRARIES and RESTRICTED_ENTRY_POINTS
+  // testZones; IR-M1-1e-1 L-1, M1-1g-b). This block comes after the zone's own, so it is the one
+  // no-restricted-imports block that applies to them. Only *.test.ts, the one name every build
+  // excludes (policy.isTestFile, IR-M1-1c-G2-1 L-1): a .test.mts keeps the production rules.
+  ...[
+    ...new Set([...LIBRARIES, ...RESTRICTED_ENTRY_POINTS].flatMap((item) => item.testZones ?? [])),
+  ].map((zone) => ({
+    files: [`${zone}/**/*.test.ts`],
     rules: restrictionsFor(zone, { test: true }),
   })),
   {
