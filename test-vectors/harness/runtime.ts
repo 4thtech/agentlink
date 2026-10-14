@@ -12,7 +12,38 @@ export interface RuntimeIdentity {
   readonly detail: string;
 }
 
+interface RuntimeGlobals {
+  readonly navigator?: { readonly userAgent?: unknown };
+  readonly process?: { readonly versions?: { readonly node?: unknown } };
+  readonly WebSocketPair?: unknown;
+  readonly window?: unknown;
+  readonly document?: unknown;
+}
+
 export function observeRuntime(): RuntimeIdentity {
-  // Tests first (S2): implemented in the next commit.
-  throw new Error('observeRuntime: not implemented yet');
+  const g = globalThis as RuntimeGlobals;
+  const userAgent = typeof g.navigator?.userAgent === 'string' ? g.navigator.userAgent : '';
+  const nodeVersion = g.process?.versions?.node;
+  const isNode = typeof nodeVersion === 'string';
+
+  // workerd: fixed user agent plus a Workers-only global. Checked first because nodejs_compat may
+  // also define process.versions.node.
+  if (userAgent === 'Cloudflare-Workers' && typeof g.WebSocketPair === 'function') {
+    return { id: 'workerd', detail: userAgent };
+  }
+  if (isNode && userAgent.startsWith('Node.js/')) {
+    return { id: 'node', detail: `${userAgent} (process.versions.node ${nodeVersion})` };
+  }
+  // A real browser: a DOM and no Node. A DOM emulation running in Node (jsdom, happy-dom) is not a
+  // browser and falls through to 'unknown'.
+  if (!isNode && typeof g.window === 'object' && typeof g.document === 'object') {
+    if (/\bFirefox\/\d/.test(userAgent)) return { id: 'firefox', detail: userAgent };
+    if (/\b(HeadlessChrome|Chrome|Chromium)\/\d/.test(userAgent)) {
+      return { id: 'chromium', detail: userAgent };
+    }
+    if (/\bAppleWebKit\/\d/.test(userAgent) && /\bVersion\/\d/.test(userAgent)) {
+      return { id: 'webkit', detail: userAgent };
+    }
+  }
+  return { id: 'unknown', detail: userAgent || '(no navigator.userAgent)' };
 }

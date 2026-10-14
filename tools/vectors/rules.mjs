@@ -25,11 +25,39 @@ export const REQUIRED_RUNTIMES = Object.freeze([
  * @returns {string[]} Problems; empty when every runtime passed its identity check and every case.
  */
 export function checkCoverage(report, suites, required = REQUIRED_RUNTIMES) {
-  // Tests first (S2): implemented in the next commit.
-  void report;
-  void suites;
-  void required;
-  throw new Error('checkCoverage: not implemented yet');
+  const problems = [];
+  const results = /** @type {{ testResults?: unknown }} */ (report ?? {}).testResults;
+  if (!Array.isArray(results)) return ['the Vitest JSON report has no testResults'];
+  if (suites.length === 0) problems.push('no vector suites found under test-vectors/');
+
+  const passed = new Set();
+  for (const file of results) {
+    for (const assertion of file?.assertionResults ?? []) {
+      const meta = assertion?.meta?.vectors;
+      if (meta === undefined) continue;
+      if (!required.includes(meta.runtime)) {
+        problems.push(`a vector test ran in an unexpected runtime "${String(meta.runtime)}"`);
+        continue;
+      }
+      if (assertion.status !== 'passed') continue;
+      if (meta.kind === 'identity') passed.add(`${meta.runtime}\u0000identity`);
+      if (meta.kind === 'case')
+        passed.add(`${meta.runtime}\u0000${meta.suite}\u0000${meta.caseId}`);
+    }
+  }
+
+  for (const runtime of required) {
+    if (!passed.has(`${runtime}\u0000identity`)) {
+      problems.push(`${runtime}: no passing runtime identity test`);
+    }
+    for (const { suite, caseIds } of suites) {
+      const missing = caseIds.filter((id) => !passed.has(`${runtime}\u0000${suite}\u0000${id}`));
+      if (missing.length > 0) {
+        problems.push(`${runtime}: ${suite}: no passing result for ${missing.join(', ')}`);
+      }
+    }
+  }
+  return [...new Set(problems)];
 }
 
 /**
@@ -41,8 +69,13 @@ export function checkCoverage(report, suites, required = REQUIRED_RUNTIMES) {
  * @returns {string[]} One line per added, removed or changed file.
  */
 export function diffSnapshots(before, after) {
-  // Tests first (S2): implemented in the next commit.
-  void before;
-  void after;
-  throw new Error('diffSnapshots: not implemented yet');
+  const problems = [];
+  for (const [path, hash] of before) {
+    if (!after.has(path)) problems.push(`test-vectors/${path} was deleted during the run`);
+    else if (after.get(path) !== hash) problems.push(`test-vectors/${path} changed during the run`);
+  }
+  for (const path of after.keys()) {
+    if (!before.has(path)) problems.push(`test-vectors/${path} was created during the run`);
+  }
+  return problems;
 }
