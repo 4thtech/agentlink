@@ -341,6 +341,17 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
 - **Acceptance:**
   - Each item has a failing fixture test; `pnpm lint` stays green on the real tree.
 
+#### M0-10c · deps-check eslint-rules test: deterministic timeout (new)
+- **Status:** in progress · **Size:** XS · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · tools/deps-check/eslint-rules.test.mjs
+- **Depends on:** M0-10
+- **Spec:** `audit-rules.md` §2 (`tools/**` is S0; this card is S1 because it edits `docs/process/**`); `ci-cd.md`
+- **Invariants:** I-8
+- **Scope:**
+  - The first `lintText` call pays the cold ESLint start (config and plugin load), which exceeded the 5 s default test timeout under CI load, so the first test flaked and a rerun passed. Do the cold start once in `beforeAll`, with its own generous hook timeout; the per-test timeout stays at the default for warm runs.
+- **Acceptance:**
+  - No assertion changes; the suite passes repeatedly, also in parallel with the crypto tests.
+
 #### M0-11 · Curator project context (new)
 - **Status:** done (setup) · **Size:** S · **Tier:** Owner · **Security:** S0
 - **Repo/path:** owner's Curator (project `agentlink`, domain `projects`); agentlink · .curator-project
