@@ -31,6 +31,8 @@ afterEach(() => {
 const payloadOf = async (json: string): Promise<string> =>
   encodeBase64url(await compress(encodeUtf8(json)));
 const jsonOf = (invite: Invite): string => canonicalize(invite as unknown as JsonValue);
+/** The JSON object text with `text` inserted right after its opening brace. */
+const afterBrace = (json: string, text: string): string => `{${text}${json.slice(1)}`;
 
 async function anInvite(): Promise<Invite> {
   const clock = new FakeClock();
@@ -161,10 +163,7 @@ describe('decoder step 2: bounded inflation', () => {
   it('refuses output of 16 385 bytes and accepts exactly 16 384 (whitespace counts)', async () => {
     const invite = await anInvite();
     const json = jsonOf(invite);
-    const atCap = json.replace(
-      '{',
-      `{${' '.repeat(INVITE_MAX_JSON_BYTES - encodeUtf8(json).length)}`,
-    );
+    const atCap = afterBrace(json, ' '.repeat(INVITE_MAX_JSON_BYTES - encodeUtf8(json).length));
     expect(encodeUtf8(atCap).length).toBe(INVITE_MAX_JSON_BYTES);
     expect(await decodeInviteLink(await payloadOf(atCap))).toEqual(invite);
     await expect(decodeInviteLink(await payloadOf(`${atCap} `))).rejects.toMatchObject({
@@ -204,8 +203,8 @@ describe('decoder step 4: strict text, I-JSON and the strict schema', () => {
         await compress(new Uint8Array([...bytes.slice(0, 20), 0xff, ...bytes.slice(20)])),
       ),
       await payloadOf(`\uFEFF${json}`),
-      await payloadOf(json.replace('{', '{"v":1,')),
-      await payloadOf(json.replace('{', '{"extra":1,')),
+      await payloadOf(afterBrace(json, '"v":1,')),
+      await payloadOf(afterBrace(json, '"extra":1,')),
       await payloadOf(`[${json}]`),
     ];
     for (const payload of cases) {
