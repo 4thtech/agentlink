@@ -6,7 +6,13 @@ useDefault = true
 # Published cross-runtime test vectors (M0-9, M1-1h) contain test-only keys taken from RFCs, BIPs and
 # NIPs or generated for tests (development-process.md §9.1). They are public by design and never real
 # secrets. The allowlist covers only the vector data files, by exact path shape; generators, scripts
-# and every other file under test-vectors/ stay scanned. Widening it is a reviewed change (S2).
+# and every other file stay scanned, and only the generic-api-key rule is relaxed there, so any other
+# secret type in these files is still caught. The pinned upstream NIP-44 source vectors are included.
+# Widening it is a reviewed change (sensitive path, audit-rules.md §2).
 [[allowlists]]
 description = "Public cross-runtime test vectors: test-only keys, never real secrets"
-paths = ['''^test-vectors/[a-z0-9-]+/vectors\.json$''']
+targetRules = ["generic-api-key"]
+paths = [
+  '''^test-vectors/[a-z0-9-]+/vectors\.json$''',
+  '''^tools/vectors/sources/nip44\.vectors\.json$''',
+]
