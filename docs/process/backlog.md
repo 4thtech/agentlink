@@ -1040,6 +1040,19 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - Regressions in `tools/deps-check`: each of those imports planted in `e2e/` fails both tools, and the seam import passes. The repository scan covers `e2e/`.
 
+#### M1-1g-d · crypto: owner-only epoch advance with compare-and-set, and an epoch + 1 public preview (new, IR-M1-7a-1 Q1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/crypto (interface and test doubles), packages/node (backends with M1-8a, M1-8f), packages/core (rotation flow)
+- **Depends on:** M1-1g, M1-7a
+- **Spec:** 04 §2.6, §3.1.1 (Key interfaces, Epochs); 07 §9
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - The `KeyStore` interface has no way to advance `keyEpoch`; M1-7a's `identity.rotate` needs a backend that is already one epoch ahead, and the client refuses to send in that state (`rotation_pending`, IR-M1-7a-1 L-1). Add an explicit advance on the backend's management surface, reachable only from owner flows and not on the `KeyStore` interface the agent path uses: `advanceEpoch(expected)`, a compare-and-set that fails unless the current epoch equals `expected`.
+  - Allow `getPublicBundle({epoch: current + 1})` (public keys only, nothing else at that epoch), so the owner can sign the next card before the advance.
+  - Core order: sign the N + 1 card, store it as pending in `identity`, advance the KeyStore with the compare-and-set, then commit `key_epoch`. On open, a stored pending card that verifies for the KeyStore's epoch finishes the rotation without a new signature; stored + 1 without one stays `rotation_pending`; anything else is refused.
+- **Acceptance:**
+  - A concurrent advance fails the compare-and-set and changes nothing; a crash at each step leaves a state that either finishes or refuses to send, never one that sends under a key no contact knows. The epoch + 1 preview returns public keys only, and signing and decryption at that epoch stay `epoch_unavailable`.
+
 ### Types (`@agentlink/types`)
 
 #### M1-2a · types: constants and envelope, payload, card, invite schemas
@@ -1525,6 +1538,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Card with a signature not from `ownerEvm` rejected; rotation yields epoch + 1 and old-epoch keys still open old envelopes.
   - Envelopes from a blocked contact are dropped (test).
 
+#### M1-7a-b · core: test-only subpath for the in-memory Store (new, IR-M1-7a-1 L-6)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 (boundary policy, `tools/deps-check/policy.mjs`) · **Phase:** M1a
+- **Repo/path:** agentlink · packages/core, tools/deps-check/, eslint.config.mjs
+- **Depends on:** M1-7a
+- **Spec:** 07 §3.1 (in-memory Store for tests); 04 §2.5.1 (nonce retention)
+- **Invariants:** I-4
+- **Scope:**
+  - `MemoryStore` is exported from the `@agentlink/core` root, documented as NOT FOR PRODUCTION. A host that wires it in production forgets `owner_action_nonces`, `seen` and `idempotency` on restart, which reopens replay windows for signed owner actions until they expire.
+  - Move it to a `@agentlink/core/testing` export (package `exports`) and let the boundary guards allow that entry only in `*.test.ts` files, `e2e/` and the M1-8b store conformance tests, as for `@agentlink/crypto/testing`.
+- **Acceptance:**
+  - deps-check and ESLint regressions: production source importing `@agentlink/core/testing` fails both tools; test files pass. The root entry no longer exports `MemoryStore`.
+
 #### M1-7b · core: envelope build/open and threads
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
@@ -1545,12 +1570,14 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
     On send: exactly the §3.2 or §3.4.1 set, one entry per distinct `enc` key.
   - Store the ciphertext envelope; decrypted payload only in encrypted columns.
+  - (hand-off from M1-7a, IR-M1-7a-1 L-1, L-7, M-1) Every send and sign path calls `identity.assertCanSend()` first (refuses while a rotation is pending or the agent is revoked). Step 7 uses `contacts.screenInbound(from)`: a `drop` (blocked, removed or revoked) is recorded in `seen` only after step 4 authenticated `from`, and never goes to the requests queue or the held set.
 - **Acceptance:**
   - Each of the four recipients decrypts (test per role; I-9 for both owners).
   - Unknown sender lands in requests (F-13); unknown type or invalid body rejected; M1-1h envelope fixture opens.
   - Rotation order (04 §3.1.1, step 7): an envelope from a contact's new key that arrives before its `card-update` is held, then processed as from the contact once the `card-update` is applied, and is never shown as a new contact request. A held envelope with no `card-update` goes to requests after 48 h (fake clock), and one from a stranger key is never accepted as the contact's.
   - Two own entries at different epochs: exactly one `unwrapCek`, at the highest epoch. The same `id` with the same hash is dropped silently; with a different hash it is refused and flagged.
   - G-2: when both agents have the same owner, there are 3 entries and the owner opens one. Each refusal path has a test: a superseded epoch key, a missing own-owner `kid`, a duplicate `id` with a different hash, a future `createdAt`, and a `text` from the own owner key.
+  - (IR-M1-7a-1 R2-M1) A blocked or removed contact that rotates keys: its `card-update` is dropped, so its new key stays unknown. An envelope from an unknown key whose recipients include the `ownerEnc` `kid` of a **blocked or removed** contact's owner is dropped (recorded in `seen` after step 4), never held and never queued as a request, also after 48 h. Only active contacts' owner kids hold. Test, replacing the `it.todo` in `packages/core/src/contacts.test.ts`.
 
 #### M1-7c · core: pairing protocol (invite, accept, handshake)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1564,6 +1591,9 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A stores `{inviteId, proofKey, expiresAt, used}` (`proofKey` = HKDF of the secret, label `agentlink/v1/pairing-proof`, encrypted at rest; never the raw secret, 04 §3.6). B verifies `cardSig` and expiry, applies `contacts.acceptInvites` (default `approval` → `pending_approval`), then sends `handshake` with the HMAC proof.
   - Contact names (D-53, 06 §2.1 contact-name rule): the invite `label` is stored as A's suggested alias for B and shown restricted until A's owner confirms it (it is agent-written); B's owner types or confirms an alias on the pairing approval, prefilled with the restricted self-declared name. Only owner-set aliases are shown unrestricted. A shared `restrictName` helper exactly per 06 §2.1 (NFKC; only `[\p{L}\p{N} .'-]`; spaces collapsed; ≤ 32 code points; fallback "Contact" plus short owner fingerprint for empty, mixed-script or confusable names beyond UTS #39 moderately restrictive, or names containing a reserved label word) renders names quoted, followed by the identity label, with `nameSource`; the raw self-declared name is stored as untrusted data.
   - A accepts a `handshake` from an unknown sender only for an unused, unexpired invite; marks it used, adds B, replies `handshake-ack`. This processing runs in the background loop or on `agentlink_inbox`, never in a read-only status call (06 §2.0, §6). A completes on accepting the handshake and B on a verified ack. Each keeps the signed `handshake` and `handshake-ack` and recomputes the safety code from them on every display, never from a stored digest (04 §3.6.1). `createInvite` returns `{inviteUrl, ownerFingerprint, expiresAt}` and no safety code. No tool result carries the code; `acceptInvite` and `listContacts` return `pairing` and `safetyCodeChecked`. Contacts are keyed by `agentId`; a re-pair takes effect only on completion, and concurrent pairings converge per 04 §2.9.
+  - (hand-off from M1-7a, IR-M1-7a-1 M-2) Use the core's two-step pairing: `contacts.stagePairing` when a card arrives (nothing in `contacts` changes), `contacts.completePairing` with both stored pairing envelopes on completion (one transaction; the counterparty's envelope must be stored as received from the card's key), and `contacts.abortPairing` for a pairing that fails. Decide where the pending pairing data (`codeCommit`, `nonceB`) lives for a first pairing, since no contact row exists before completion (07 §3 `pairings`).
+  - (IR-M1-7a-1 R2-L1) Tie the completion evidence to its pairing: `completePairing` today checks only that a `handshake` and a `handshake-ack` with the right directions and sender key are stored. M1-7c must bind them to the staged pairing (the invite ID, `handshakeHash` in the ack, `inviterCardHash`), so another pairing's envelopes cannot complete this one. Add the binding to the core check and test it.
+  - (IR-M1-7a-1 R2-L2) Crossed invites: today the pairing that finishes later wins. Apply the 04 §2.9 tie-break: keep the completed pairing whose `handshake` has the later `createdAt`, with ties broken by the larger `envelopeHash`, so both sides converge on the same pairing. Test with two crossed pairings completing in both orders.
   - G-23/G-28 additions (04 §2.9, §3.6, §3.6.1, §3.4.1): the invite also carries `cardAgentSig` and `codeCommit`, and A keeps `nonceA` with it. B also verifies `cardAgentSig` and refuses `agentEvm = ownerEvm`. Its approval shows name, label and owner fingerprint, and no safety code. The `handshake` adds `cardAgentSig`, `codeNonce`, `codeCommit` (copied) and `inviterCardHash`, and A accepts it only if the envelope `from` and seal key equal `card.agentNostr`. The `handshake-ack` adds `handshakeHash`, `codeReveal`, `card` and `cardSig`, and B completes only if `codeReveal` opens `codeCommit`. A second valid answer to a used invite is refused and reported to A's owner.
 - **Acceptance:**
   - In-process two-client test over a local relay: pairing completes and both safety codes match.
@@ -2528,6 +2558,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
   - Core in the browser with an IndexedDB Store; subscribe with the owner Nostr key only (never agent keys) on the bootstrap set and the authenticated lists of all the owner's agents (07 §4.3, `owner_agents`), inside the `OwnerSession`; at most 32 live connections, the rest synced in turns; the 30-day overlap after a relay change; an agent whose list cannot be read or authenticated is shown as possibly incomplete; decrypt all envelope copies; unified timeline; threads with typed cards.
   - Files downloaded and decrypted in the browser with both hash checks; proof list and detail, export, link to the verify page; credit balances per agent and chain.
   - Untrusted content shown as text with its label.
+  - (IR-M1-7a-1 Q4) Owns the owner-surface store schema (`OwnerStore`, 07 §3.6), separate from any agent's Store: `owner_copies` and `owner_policy_echo`, with their keys, at-rest rules and retention. The desktop app (M2) uses the same schema.
 - **Acceptance:**
   - Two agents' sent and received envelopes appear for their owner (e2e with local relays).
   - File decryption verifies both hashes; captured network traffic contains no decrypted content.

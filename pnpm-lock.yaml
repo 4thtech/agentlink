@@ -271,6 +271,9 @@ importers:
       '@agentlink/crypto':
         specifier: workspace:*
         version: link:../crypto
+      '@agentlink/log':
+        specifier: workspace:*
+        version: link:../log
       '@agentlink/storage':
         specifier: workspace:*
         version: link:../storage
