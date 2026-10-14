@@ -180,7 +180,7 @@ When any tool needs approval it returns:
 }
 ```
 
-Every tool with an entry in the "Approval" column of §2.0 accepts `approvalId?`. A valid approved ID for the identical action lets the action proceed once. A request expires 24 h after it was made (for a commitment, at the scope's expiry if that is sooner). The owner's decision must arrive before then, and an approved action must run before then (an approved commitment's parts run until the scope's expiry); after that `agentlink_get_approval` reports `expired` and the next call asks again (04 §3.4.1, G-7). The approval binds the action digest (M1-7e); for `agentlink_send` with `path` the digest includes the resolved realpath and the file's `plaintextSha256`, the core re-hashes the file when the approved action runs, and a mismatch requires a new approval (nothing is sent). For commitments the digest is the commitment scope (04 §3.4.2, D-55): one approval covers an accept message and its `ACCEPTED` receipt, each at most once, until the scope's expiry, and any change to the terms, the counterparty or the call voids it. No tool creates, decides or widens an approval: the owner decides it with owner presence (04 §2.5, I-4).
+Every tool with an entry in the "Approval" column of §2.0 accepts `approvalId?`. A valid approved ID for the identical action lets the action proceed once. A request expires 24 h after it was made (for a commitment, at the scope's expiry if that is sooner). The owner's decision must arrive before then, and an approved action must run before then (an approved commitment's parts run until the scope's expiry); after that `agentlink_get_approval` reports `expired` and the next call asks again (04 §3.4.1, G-7). Until it is used, the owner can void an approved approval (`agentlink cancel`, §8), and a rule changed to `deny` in the meantime refuses it. The approval binds the action digest (M1-7e); for `agentlink_send` with `path` the digest includes the resolved realpath and the file's `plaintextSha256`, the core re-hashes the file when the approved action runs, and a mismatch requires a new approval (nothing is sent). For commitments the digest is the commitment scope (04 §3.4.2, D-55): one approval covers an accept message and its `ACCEPTED` receipt, each at most once, until the scope's expiry, and any change to the terms, the counterparty or the call voids it. No tool creates, decides or widens an approval: the owner decides it with owner presence (04 §2.5, I-4).
 
 ---
 
@@ -232,12 +232,12 @@ contactRules: []            # per-contact proof rules (G-32), at most 256; creat
 
 | Kind | Keys | JSON type and bounds |
 |---|---|---|
-| Enum | `contacts.acceptInvites` (`approval`, `auto`); `contacts.unknownSenders` (`queue`, `drop`); `files.storage` (`auto`, `drop`, `own`); `files.deleteAfter` (`expiry`, `receipt`); `proofs.notarize`, `proofs.allowKeyDisclosure` and `commitments.accept` (each `allow`, `approval`, `deny`); `commitments.autoAcceptDirection` (`buy`, `sell`) | String, exactly one of the listed values |
+| Enum | `contacts.acceptInvites` (`approval`, `auto`); `contacts.unknownSenders` (`queue`, `drop`); `files.storage` (`auto`, `drop`, `own`); `files.deleteAfter` (`expiry`, `receipt`); `proofs.notarize` and `commitments.accept` (each `allow`, `approval`, `deny`); `proofs.allowKeyDisclosure` (`approval`, `deny`: never `allow`, because disclosing a content key is owner-only, 04 §2.5); `commitments.autoAcceptDirection` (`buy`, `sell`) | String, exactly one of the listed values |
 | Contact list | `contacts.allowed` | The string `"paired"`, or a JSON array of 1–256 agent IDs |
 | Contact list | `commitments.autoAcceptContacts` | A JSON array of 0–256 agent IDs |
 | Boolean | `files.ownerArchive`, `receipts.autoDelivered`, `receipts.autoOpened` | `true` or `false` |
 | Integer | `contacts.rateLimitPerContactPerHour` [1, 3600]; `files.maxSendSizeMB` and `files.maxReceiveSizeMB` [1, 10 240]; `files.defaultExpiryDays` [1, 7]; `envelopes.maxEnvelopeKB` [1, 24] | JSON integer (04 §2.4.1 integer rule) in the range shown |
-| USD amount | `proofs.dailyBudgetUSD`, `proofs.perActionMaxUSD`, `commitments.autoAcceptMaxUSD`; `commitments.autoAcceptMinUSD` (or `null`); `contactRules[].proofs.perActionMaxUSD` | A decimal string matching `^(0\|[1-9][0-9]{0,8})(\.[0-9]{1,6})?$`, compared as an exact decimal and never as a binary float. `"1"` and `"1.00"` are equal. A JSON number is rejected |
+| USD amount | `proofs.dailyBudgetUSD`, `proofs.perActionMaxUSD`, `commitments.autoAcceptMaxUSD`; `commitments.autoAcceptMinUSD` (or `null`); `contactRules[].proofs.perActionMaxUSD` | A USD amount (04 §2.4.1): the single spelling `^(0\|[1-9][0-9]{0,8})(\.[0-9]{0,5}[1-9])?$` (`"5"`, `"0.5"`; never `"5.00"` or `"0.50"`), compared as an exact decimal and never as a binary float. A JSON number is rejected |
 | Path | `files.allowedFolders` (array of 0–32, unique), `files.inboxFolder`, `proofs.exportFolder` | String of 1–4096 UTF-8 bytes with no C0 or C1 control character. A leading `~/` means the user's home folder. The core resolves each path with realpath when it is used (04 §4) |
 | Chain | `proofs.defaultChain` | A chain key from 07 §6.3, matching `^[a-z0-9-]{1,32}$` |
 | Rules | `contactRules` | A JSON array of 0–256 `ContactRule` objects (below) |
@@ -267,12 +267,19 @@ contactRules: []            # per-contact proof rules (G-32), at most 256; creat
   5. Otherwise the result is `allow`.
 - **"Remember for this contact"** is offered only on a proof approval whose only triggers are step 2 (`notarize: approval`) or step 3, or both. It is never offered when the daily budget triggered the approval, on a commitment (even one that also carries a proof fee), on a new-contact, file or key-disclosure approval, or with Deny. The card shows the rule it creates, and the core (or the console) builds that rule from the verified policy:
   - triggered by step 2: `notarize: "allow"`;
-  - triggered by step 3: `perActionMaxUSD` = this action's fee in USD, rounded up to whole cents;
+  - triggered by step 3: `perActionMaxUSD` = this action's fee in USD, rounded up to whole cents and written in the USD amount spelling (04 §2.4.1; $2.50 is `"2.5"`);
   - any other field of an existing rule for the contact stays as it is.
+  - The card also states the per-proof limit that will apply to the contact: for a step 2 trigger alone, that is the global `perActionMaxUSD` (or the rule's own, if one exists).
 
   The surface signs two objects under the one presence gesture: the `approval.decide` and a `policy.set` with `version` = current + 1 that contains the whole policy with the rule. The core applies them independently. If the `policy.set` is refused, for example because another surface already used that version, the approval still stands and the refusal is reported (04 §2.5.1). The rules editor lists every contact rule and can remove it, each change being an owner-signed `policy.set`.
 
-**Daily budget window (G-7; proposed, owner confirms at merge).** `dailyBudgetUSD` limits spending in any rolling 24 hours, not per calendar day, so no burst is possible at midnight and no time zone is needed. The budget ledger (07 §3, G-9) holds one entry per paid proof action: its time `t` (unix seconds) and its fee in USD. The entry is written when the core submits the action, and released if the action is finally not charged. An action approved over the limit is counted too. The spent amount is the exact decimal sum of the entries with `t > now − 86 400`. A new action needs approval when the spent amount plus its fee is above `dailyBudgetUSD`. Equal is allowed. The local UI shows "used in the last 24 hours" and when the oldest entry leaves the window.
+**Daily budget window (G-7; proposed, owner confirms at merge).** `dailyBudgetUSD` limits spending in any rolling 24 hours, not per calendar day, so no burst is possible at midnight and no time zone is needed.
+- **Ledger.** The budget ledger (07 §3, G-9) holds one entry per paid action: its time `t` (unix seconds), the amount reserved and its state (`reserved`, `charged`, `released`). Amounts are USD amounts (04 §2.4.1). The spent amount is the exact decimal sum of the entries in state `reserved` or `charged` with `t > now − 86 400`.
+- **Check and reserve in one transaction.** The proof check is pure (`evaluate`, M1-7i), but the core runs it inside one store transaction (SQLite, or Durable Object storage) that reads the ledger, evaluates, and writes a `reserved` entry for the action's maximum fee: the `maxFee` of the Record it will sign, valued 1:1 in USD (D-46). Only then does it sign or submit. Paid actions are therefore serialized per agent, and two concurrent calls can never both pass on the same spent amount. This includes the proof part of a commitment, claimed in the same transaction as the part (04 §3.4.2). An action approved over the limit is reserved too.
+- **Settle or release.** When the Record is confirmed on-chain, the entry becomes `charged` with the charged fee. It is `released` only when the signed Record can no longer be charged: its `deadline` has passed and the chain shows no record for it. A failed submission alone does not release it, because a submitter may still include the signed Record.
+- **Threshold.** A new action needs approval when the spent amount plus its maximum fee is above `dailyBudgetUSD`. Equal is allowed.
+- **Fail closed.** A missing, unreadable or inconsistent ledger, or a clock earlier than the newest entry's `t`, makes every paid action need the owner's approval until the owner re-confirms the budget: a new owner-signed `policy.set` (with presence) starts a fresh ledger. A broken ledger never counts as an empty sum. Residual: the ledger has no KeyStore high-water mark, so a same-OS-user process that deletes ledger rows resets the budget (G-1). A clock moved forward repeatedly (root or `CAP_SYS_TIME`) empties the window. `perActionMaxUSD` still bounds each action (04 §7).
+- **Display.** The local UI shows "used in the last 24 hours" and when the oldest entry leaves the window.
 
 Policies are owner-signed documents (04 §2.5); the core verifies the owner signature on load and ignores unsigned or tampered policies (falling back to these defaults).
 
@@ -390,7 +397,7 @@ agentlink credits [--topup]              # shows agent address, balances, top-up
 agentlink backup export | restore <file>   †
 agentlink verify <proof.json>
 agentlink approve <approvalId> | deny <approvalId>   †
-agentlink cancel <approvalId>          † # void the unused parts of an approval, e.g. a receipt still waiting (D-55)
+agentlink cancel <approvalId>          † # void an approval not yet used, or the unused parts of a commitment approval, e.g. a receipt still waiting (D-55, G-7)
 agentlink doctor                         # diagnostics (relays, RPC, keychain or file KeyStore, storage)
 ```
 
