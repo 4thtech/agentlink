@@ -1352,7 +1352,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - CI fails if imported files differ from the release manifest; no `.sol` file is present in the public package (check).
 
 #### M1-3g · contracts: CREATE3 deploy script and testnet deployment
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (private repo, 4thtech/occ-v2-contracts#8 and #9 and the deploy runs; deployed to Base Sepolia, merged 2026-10-14; status in 4thtech/agentlink#65) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · script/Deploy.s.sol, script/config/*.json, .github/workflows/deploy-testnet.yml
 - **Depends on:** M1-3e, M1-14 (Base Sepolia entries, and the Chiado gas limits for sizing the stage), plus the block gas limits and EIP-7825 caps of Base, Gnosis and the planned M4 mainnets (D-64 (2), proposed); gap G-8 resolved by branch `docs/G-8-create3-salt` (05 §9.1; pending owner, proposed, owner confirms at merge); D-63; D-64
 - **Spec:** 05 §5, §9, §9.1; 03 §6–§7; `release-and-deployment.md` §4.2; D-63, D-64
