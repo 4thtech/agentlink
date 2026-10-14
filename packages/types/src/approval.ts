@@ -99,9 +99,10 @@ export const commitmentScopeSchema = z
 // --- fees and triggers ---------------------------------------------------------------------------
 
 /**
- * The fee a paid action binds: `token` and `amount` are the Record's `feeToken` and `maxFee`
- * (04 §2.4.1: a tool or context value uses the row of the protocol path it mirrors), `usd` the same
- * fee in USD (1:1 for stablecoins, D-46) as policy evaluated it.
+ * The fee a paid action binds (06 §2.4, 04 §2.4.1): `token` is the Record's `feeToken` (address),
+ * `amount` the signed `maxFee` in base units (uint256 decimal), `usd` the same fee in USD (1:1 for
+ * stablecoins, D-46) as policy evaluated it. No protocol/integrator split: that belongs to the
+ * charged fee.
  */
 export const approvalFeeSchema = z.strictObject({
   token: evmAddress,

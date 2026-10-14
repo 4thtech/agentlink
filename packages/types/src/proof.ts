@@ -159,9 +159,9 @@ export const proofPackReceiptSchema = z.strictObject({
 });
 
 /**
- * `signer`: the record signer and, optionally, its owner-signed agent card. PROPOSED: `cardSig`
- * travels with `agentCard`, since a card without its signature cannot be checked (07 §8 says the
- * card is "signed by owner" but gives the signature no field).
+ * `signer`: the record signer and, optionally, its agent card with the owner's `cardSig` (07 §8):
+ * `cardSig` is present exactly when `agentCard` is, since a card without its signature cannot be
+ * checked.
  */
 export const proofPackSignerSchema = z.strictObject({
   evm: evmAddress,
@@ -277,24 +277,43 @@ export const PROOF_STATUSES = freeze([
 ] as const);
 
 /**
- * `ProofStatus.fee`. `token` and `amount` mirror the Record's `feeToken` and `maxFee` (PROPOSED:
- * 04 §2.4.1 does not list them), the USD fields are USD amounts, and `usd` is exactly
- * `protocolUsd + integratorUsd` (12 §4.3, §5: the app fee is shown separately).
+ * `ProofStatus.fee` (06 §2.4, 04 §2.4.1 as merged in #30). `token` is the Record's `feeToken`
+ * (`0x` address; the zero address only for a native USD stablecoin, xDAI on Gnosis, which the core
+ * checks against its chain list). `amount` is base units, a uint256 decimal: the signed `maxFee`
+ * until the record is confirmed, then the fee charged. `usd` is its USD amount. `protocolUsd` and
+ * `integratorUsd` split the charged fee, so they come together, only once it is known (status
+ * `ok`, see checkProofStatus), and then `usd` is exactly their sum (12 §4.3, §5).
  */
 export const proofFeeSchema = z
   .strictObject({
     token: evmAddress,
     amount: uint256Decimal,
     usd: usdAmountSchema,
-    protocolUsd: usdAmountSchema,
-    integratorUsd: usdAmountSchema,
+    protocolUsd: usdAmountSchema.exactOptional(),
+    integratorUsd: usdAmountSchema.exactOptional(),
   })
-  .refine(
-    (f) =>
-      !(isUsdAmount(f.usd) && isUsdAmount(f.protocolUsd) && isUsdAmount(f.integratorUsd)) ||
-      parseUsd(f.usd) === parseUsd(f.protocolUsd) + parseUsd(f.integratorUsd),
-    { message: 'usd must equal protocolUsd + integratorUsd', path: ['usd'] },
-  );
+  .superRefine((f, ctx) => {
+    if ((f.protocolUsd === undefined) !== (f.integratorUsd === undefined)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'protocolUsd and integratorUsd come together',
+        path: ['protocolUsd'],
+      });
+      return;
+    }
+    if (
+      isUsdAmount(f.usd) &&
+      isUsdAmount(f.protocolUsd) &&
+      isUsdAmount(f.integratorUsd) &&
+      parseUsd(f.usd) !== parseUsd(f.protocolUsd) + parseUsd(f.integratorUsd)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'usd must equal protocolUsd + integratorUsd',
+        path: ['usd'],
+      });
+    }
+  });
 
 export const proofStatusReceiptSchema = z.strictObject({
   type: z.enum(RECEIPT_TYPE_NAMES),
@@ -321,11 +340,21 @@ export const proofStatusShape = {
  * `submitted` one has its `txHash`; receipts exist only on a record.
  */
 export function checkProofStatus(
-  s: { status?: unknown; recordId?: unknown; txHash?: unknown; receipts?: unknown },
+  s: { status?: unknown; recordId?: unknown; txHash?: unknown; receipts?: unknown; fee?: unknown },
   ctx: z.core.$RefinementCtx,
 ): void {
   const issue = (message: string, path: string[]) =>
     ctx.addIssue({ code: 'custom', message, path });
+  // The split belongs to the charged fee: present exactly on a confirmed (`ok`) record's fee.
+  if (s.fee !== null && typeof s.fee === 'object') {
+    const hasSplit = (s.fee as { protocolUsd?: unknown }).protocolUsd !== undefined;
+    if (s.status === 'ok' && !hasSplit) {
+      issue('a confirmed fee carries protocolUsd and integratorUsd', ['fee', 'protocolUsd']);
+    }
+    if (s.status !== 'ok' && hasSplit) {
+      issue('before confirmation the fee is maxFee, with no split', ['fee', 'protocolUsd']);
+    }
+  }
   if (s.status === 'ok' && s.recordId === undefined) issue('ok needs recordId', ['recordId']);
   if ((s.status === 'ok' || s.status === 'submitted') && s.txHash === undefined) {
     issue(`${s.status} needs txHash`, ['txHash']);

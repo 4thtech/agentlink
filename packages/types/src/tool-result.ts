@@ -96,7 +96,7 @@ export const proofStatusResultSchema = toolResult(proofStatusShape, checkProofSt
 
 /**
  * `agentlink_get_approval` (06 §2.5). The approval's state is `approval`, not `status`, so it never
- * collides with the common tool `status` (IR-M1-2b-1 Q3; the spec PR renames it in 06 §2.5). An
+ * collides with the common tool `status` (06 §2.5: `{status: "ok", approval, decidedAt?}`). An
  * `ok` result has `approval`; `decidedAt` (UTC) only once the owner decided, so never while pending.
  */
 export const getApprovalResultSchema = toolResult(
