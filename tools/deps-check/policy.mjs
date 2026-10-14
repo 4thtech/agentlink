@@ -75,6 +75,26 @@ export const LOADER_MEMBERS = ['getBuiltinModule', '_linkedBinding', 'dlopen', '
 /** Only this zone may touch `crypto.subtle` (backlog M0-10). */
 export const SUBTLE_ZONES = ['packages/crypto'];
 
+/**
+ * Directories outside packages/* and apps/* that deps-check scans for `crypto.subtle` only (their own
+ * ESLint config and the vector harness rules cover the rest). test-vectors/ is owned by M0-9.
+ */
+export const SUBTLE_ONLY_ZONES = ['test-vectors'];
+
+/**
+ * Files outside packages/crypto that may use `crypto.subtle`, each with a reason. Exact paths from the
+ * repository root; keep this list as short as possible.
+ */
+export const SUBTLE_EXEMPT_FILES = [
+  {
+    file: 'test-vectors/harness/suites/placeholder-sha256.ts',
+    reason:
+      "M0-9 placeholder suite: it tests the runtime's own SHA-256 against NIST/RFC values before @agentlink/crypto exists. Remove when the first real suite lands.",
+  },
+];
+
+export const isSubtleExempt = (file) => SUBTLE_EXEMPT_FILES.some((entry) => entry.file === file);
+
 // --- Layering -------------------------------------------------------------------------------------
 // `uses` lists the workspace packages (by directory name under packages/) that a zone may import AND
 // declare as a dependency. Importing your own package by name is always fine. The graph must stay

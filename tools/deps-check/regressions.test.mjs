@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { checkManifest, checkSource, runChecks, specProblem } from './check.mjs';
-import { LIBRARIES, ZONES, violationFor } from './policy.mjs';
+import { LIBRARIES, SUBTLE_EXEMPT_FILES, ZONES, violationFor } from './policy.mjs';
 
 const ROOT = '/repo';
 const src = (zone, code, name = 'src/a.ts') =>
@@ -241,5 +241,63 @@ describe('F07/F08: eval, Reflect and inline config', () => {
     [`/* eslint-disable no-new-func */`],
   ])('rejects the comment %s', (code) => {
     expect(src('packages/core', code).length).toBeGreaterThan(0);
+  });
+});
+
+describe('test-vectors/: crypto.subtle exemption for the M0-9 placeholder suite only', () => {
+  const PLACEHOLDER = 'test-vectors/harness/suites/placeholder-sha256.ts';
+  const code = `export const d = crypto.subtle.digest('SHA-256', new Uint8Array());`;
+  const inVectors = (path, text = code) =>
+    checkSource('test-vectors', join(ROOT, path), text, ROOT);
+
+  it('allows the one exempt file', () => {
+    expect(inVectors(PLACEHOLDER)).toEqual([]);
+    expect(inVectors(PLACEHOLDER, `Reflect.get(crypto, 'subtle');`)).toEqual([]);
+  });
+
+  it.each([
+    'test-vectors/harness/suites/other.ts',
+    'test-vectors/harness/suites/placeholder-sha256.test.ts',
+    'test-vectors/harness/runtime.ts',
+    'test-vectors/other/placeholder-sha256.ts',
+    'test-vectors/harness/suites/sub/placeholder-sha256.ts',
+    'test-vectors/harness/vectors.test.ts',
+  ])('still rejects crypto.subtle in %s', (path) => {
+    expect(inVectors(path)).toEqual([expect.stringContaining('crypto.subtle')]);
+  });
+
+  it.each([
+    `const { subtle } = globalThis.crypto;`,
+    `globalThis.crypto['subtle'];`,
+    `Reflect.get(globalThis.crypto, 'subtle');`,
+    `globalThis.crypto[k];`,
+  ])('rejects the other forms in a non-exempt file: %s', (text) => {
+    expect(inVectors('test-vectors/harness/x.ts', text).length).toBeGreaterThan(0);
+  });
+
+  it('does not exempt the same file name in another package', () => {
+    expect(src('packages/core', code, 'src/placeholder-sha256.ts')).not.toEqual([]);
+  });
+
+  it('checks test-vectors/ for crypto.subtle only (the harness has its own rules)', () => {
+    expect(inVectors('test-vectors/harness/x.ts', `import fs from 'node:fs'; fs.x();`)).toEqual([]);
+  });
+
+  it('keeps the exemption list short, exact and justified', () => {
+    expect(SUBTLE_EXEMPT_FILES.map((entry) => entry.file)).toEqual([PLACEHOLDER]);
+    for (const { reason } of SUBTLE_EXEMPT_FILES) expect(reason.trim().length).toBeGreaterThan(20);
+  });
+
+  it('runChecks scans test-vectors/ and reports a non-exempt file', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deps-check-tv-'));
+    const write = (path, text) => {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), text);
+    };
+    write(PLACEHOLDER, code);
+    write('test-vectors/harness/suites/second.ts', code);
+    const { problems } = runChecks(root);
+    rmSync(root, { recursive: true, force: true });
+    expect(problems).toEqual([expect.stringContaining('test-vectors/harness/suites/second.ts:1')]);
   });
 });

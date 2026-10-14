@@ -30,9 +30,11 @@ import ts from 'typescript';
 import {
   LIBRARIES,
   LOADER_MEMBERS,
+  SUBTLE_ONLY_ZONES,
   SUBTLE_ZONES,
   ZONES,
   allowedWorkspaceNames,
+  isSubtleExempt,
   layerMessage,
   libraryMessage,
   matchesGroup,
@@ -255,7 +257,16 @@ export function checkSource(zone, file, text, root) {
     checkSpecifier(node, specifier);
   }
 
-  const subtleAllowed = SUBTLE_ZONES.includes(zone);
+  // Zones such as test-vectors/ are checked for crypto.subtle only; the harness has its own rules.
+  const full = !SUBTLE_ONLY_ZONES.includes(zone);
+  const subtleAllowed = SUBTLE_ZONES.includes(zone) || isSubtleExempt(repoPath);
+  const isReflectSubtle = (node) =>
+    !subtleAllowed &&
+    ts.isCallExpression(node) &&
+    ts.isPropertyAccessExpression(node.expression) &&
+    ts.isIdentifier(node.expression.expression) &&
+    ['Reflect', 'Object'].includes(node.expression.expression.text) &&
+    node.arguments.some((argument) => staticText(argument) === 'subtle');
   const subtle = (node) => report(node, 'crypto.subtle may be used only in packages/crypto');
   const loader = (node, name) =>
     report(node, `"${name}" reaches the module loader around the import checks`);
@@ -272,7 +283,9 @@ export function checkSource(zone, file, text, root) {
   }
 
   function visit(node) {
-    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+    if (!full) {
+      if (isReflectSubtle(node)) subtle(node);
+    } else if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
       const specifier = staticText(node.moduleSpecifier);
       if (specifier != null) checkSpecifier(node, specifier);
     } else if (ts.isImportEqualsDeclaration(node)) {
@@ -305,14 +318,7 @@ export function checkSource(zone, file, text, root) {
         ts.isStringLiteralLike(node.arguments[0])
       ) {
         report(node, `${callee.text} with a string argument is eval`);
-      } else if (
-        ts.isCallExpression(node) &&
-        !subtleAllowed &&
-        ts.isPropertyAccessExpression(callee) &&
-        ts.isIdentifier(callee.expression) &&
-        ['Reflect', 'Object'].includes(callee.expression.text) &&
-        node.arguments.some((argument) => staticText(argument) === 'subtle')
-      ) {
+      } else if (isReflectSubtle(node)) {
         subtle(node);
       }
     } else if (ts.isIdentifier(node) && node.text === 'require') {
@@ -331,8 +337,8 @@ export function checkSource(zone, file, text, root) {
     ) {
       const name = memberName(node);
       const receiver = ts.isBindingElement(node) ? undefined : node.expression;
-      if (name !== null && LOADER_MEMBERS.includes(name)) loader(node, name);
-      if (receiver && ts.isIdentifier(receiver)) {
+      if (full && name !== null && LOADER_MEMBERS.includes(name)) loader(node, name);
+      if (full && receiver && ts.isIdentifier(receiver)) {
         if (name === 'require' && receiver.text === 'module') loader(node, 'module.require');
         if (name === 'binding' && receiver.text === 'process') loader(node, 'process.binding');
       }
@@ -351,6 +357,7 @@ export function checkSource(zone, file, text, root) {
     ts.forEachChild(node, visit);
   }
   visit(sourceFile);
+  if (!full) return problems;
 
   // Directives and inline config comments that switch the boundary rules off. Matched on comments only.
   const directive = /(?:\/\/|\/\*)\s*eslint-disable(?:-next-line|-line)?\b([^\n]*)/g;
@@ -464,6 +471,15 @@ export function runChecks(root) {
       );
     }
     if (!ZONES[zone]) continue; // already reported; do not guess its policy
+    for (const file of listSourceFiles(root, dir)) {
+      files += 1;
+      problems.push(...checkSource(zone, file, readFileSync(file, 'utf8'), root));
+    }
+  }
+
+  for (const zone of SUBTLE_ONLY_ZONES) {
+    const dir = join(root, zone);
+    if (!existsSync(dir)) continue;
     for (const file of listSourceFiles(root, dir)) {
       files += 1;
       problems.push(...checkSource(zone, file, readFileSync(file, 'utf8'), root));
