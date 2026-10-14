@@ -1255,7 +1255,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - `syncInbox`: transport sync → unwrap → open → classify (contact, request, handshake) → store; idempotent across restarts.
   - Per-contact rate limit (`contacts.rateLimitPerContactPerHour`); `card-update` accepted only for a higher epoch signed by the same owner; `revoke` envelopes; F-23 signed off-chain "received" ack (P1, behind a flag).
-  - Metadata for the untrusted-content wrapper (contact verified, owner fingerprint).
+  - Metadata for the untrusted-content wrapper (sender name under the 06 §2.1 contact-name rule, identity label per 11 §5.2, owner fingerprint; never "verified" alone).
 - **Acceptance:**
   - `card-update` with the same epoch or a different owner rejected; a revoked contact's later envelopes dropped.
   - 500 envelopes from one contact are rate-limited without delaying another contact's envelopes.

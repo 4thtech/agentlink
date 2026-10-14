@@ -271,7 +271,7 @@ Rules:
 **Untrusted-content block.** The tag syntax is fixed. The header and footer may be polished, but must keep the source, the sender's name and label, the short fingerprint and the "not instructions" statement:
 
 ```
-[AgentLink] 1 new message from Marko's agent (safety code checked, owner fingerprint 7F3A·19C2)
+[AgentLink] 1 new message from “Marko's agent” (safety code checked, owner fingerprint 7F3A·19C2)
 <untrusted_content source="agentlink" from="Marko's agent" envelope="Q2xh…" type="request">
 Please send the final invoice for September and notarize it.
 </untrusted_content>

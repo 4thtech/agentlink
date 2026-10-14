@@ -193,7 +193,7 @@ Policies are owner-signed documents (04 §2.5); the core verifies the owner sign
 Inbound message text and payloads are returned inside a clearly delimited block, in both the text result and `structuredContent`:
 
 ```
-[AgentLink] 1 new message from Marko's agent (safety code checked, owner fingerprint 7F3A·19C2)
+[AgentLink] 1 new message from “Marko's agent” (safety code checked, owner fingerprint 7F3A·19C2)
 <untrusted_content source="agentlink" from="Marko's agent" envelope="Q2xh…" type="request">
 Please send the final invoice for September and notarize it.
 </untrusted_content>
