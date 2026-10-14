@@ -91,44 +91,62 @@ AgentCard {
 
 Display names are **self-declared** unless the agent is registered (F-41); UIs must label them accordingly.
 
-**Card JSON form.** The card travels (invite, `handshake`, `card-update`, proof pack) and is hashed (`sha256(JCS(card))`, §3.6) as its EIP-712 message object: exactly the twelve fields above, with these names and no others, encoded per §2.4.1. Every address and `bytes32` field, including `agentNostr`, `ownerNostr`, `agentEnc` and `ownerEnc`, is `0x` + lowercase hex; `version`, `issuedAt`, `expiresAt` and `keyEpoch` are JSON integers. `cardSig` is the owner's EIP-712 signature, `0x` + 130 lowercase hex (proposed; owner confirms at merge). It is the 65 bytes `r || s || v` over the EIP-712 digest of the card under the domain above, with `v` ∈ {27, 28} and `s` in the lower half of the curve order (EIP-2). Any other `v`, a high `s`, or another length is rejected.
+**Card JSON form.** The card travels (invite, `handshake`, `card-update`, proof pack) and is hashed (`sha256(JCS(card))`, §3.6) as its EIP-712 message object: exactly the twelve fields above, with these names and no others, encoded per §2.4.1. It is I-JSON (RFC 7493), so a duplicate key is rejected. Every address and `bytes32` field, including `agentNostr`, `ownerNostr`, `agentEnc` and `ownerEnc`, is `0x` + lowercase hex; `version`, `issuedAt`, `expiresAt` and `keyEpoch` are JSON integers. `cardSig` is the owner's EIP-712 signature over the card's digest under the domain above, in the canonical ECDSA form of §2.4.1.
 
 #### 2.4.1 Canonical binary encodings (proposed; owner confirms at merge)
 
 Every binary value has exactly one spelling. The rule covers every JSON object the protocol signs, hashes, sends or exports: cards, owner actions, envelopes, payload bodies, proof packs and tool results. Non-JSON carriers (the DNS TXT record of §2.7) keep their own stated form.
 
-**Decision rule, applied per field name.** A field name has one encoding everywhere in the protocol:
-1. **`0x` + lowercase hex** if the value is ever an EIP-712 field or an ABI value: it goes on-chain, into a Record or Receipt, or into an EIP-712 message. A field that appears in both worlds counts as EVM-native everywhere. Examples: `envelopeHash` (in a commitment scope and in a Record), and `recordId` and `salt` (in the `proof` body and on-chain).
+**Decision rule, per schema path** (proposed; owner confirms at merge). Each JSON path in each schema has exactly one encoding. A decoder is chosen by schema and path, never by field name alone, because some names are reused with different meanings (listed below). For each path:
+1. **`0x` + lowercase hex** if the value is ever an EIP-712 field or an ABI value: it goes on-chain, into a Record or Receipt, or into an EIP-712 message. A value that appears in both worlds uses `0x` on every path that carries it. Examples: `envelopeHash` (in a commitment scope and in a Record), and `recordId` and `salt` (in the `proof` body and on-chain).
 2. Otherwise, **bare lowercase hex** if the value is a Nostr value, or a digest that is only ever signed or verified under a Nostr key (BIP-340: envelope `sig`, owner-action `sig`).
 3. Otherwise, **base64url without padding** (§3.1).
 
-An object embedded in another one keeps its own bytes. For example, a proof pack carries a `SignedOwnerAction` or a disclosed envelope verbatim, so their fields keep the forms below. Being inside a pack never re-encodes a field. A new field that would enter a Record or an EIP-712 message is EVM-native from its first version. An existing bare-hex field is never moved on-chain under the same name.
+An object embedded in another one keeps its own bytes. For example, a proof pack carries a `SignedOwnerAction` or a disclosed envelope verbatim, so their paths keep the forms below. Being inside a pack never re-encodes a value. A new path that would enter a Record or an EIP-712 message is `0x` from its first version. An existing bare-hex path never moves on-chain under the same name.
 
-| Encoding | Field names |
+| Encoding | Schema paths |
 |---|---|
-| `0x` + 40 hex (address) | `agent`, `agentId`, `parties[]`, `deliverables[].by`, `price.payer`, `counterparty.agentId`, card `agentEvm` and `ownerEvm`; proof pack `notary`, `signer.evm`, `recipient.evm`, `receipts[].signer`; Record and Receipt `signer`, `feeToken` |
-| `0x` + 64 hex (`bytes32`) | `recordId`, `salt`, `envelopeHash`, `recipientCommitment`, `parentRecordId`, `appId`, `recordStructHash`, `txHash`; card `agentNostr`, `agentEnc`, `ownerNostr`, `ownerEnc`, `nameHash`, `relaysHash`; EIP-712 digests and struct hashes; `DomainClaim` `ownerNostr` (§2.7) |
-| `0x` + hex (ECDSA signature) | `cardSig`, proof pack `signature`, and Record and Receipt signatures: 130 hex for a 65-byte EOA signature; an ERC-1271 signature has the length its account returns |
-| Decimal string (`uint256`) | Record `maxFee` and `nonce`: no sign and no leading zero |
-| Bare hex, 64 (Nostr key) | envelope `from`, OwnerAction `owner`, CommitmentScope `counterparty.ownerKey`, Nostr event ids |
-| Bare hex, 128 (BIP-340) | envelope `sig`, `SignedOwnerAction` `sig` |
-| Bare hex, 64 (digest under a Nostr key only) | `actionDigest`, `termsHash`, `previousTermsHash`, `plaintextSha256`, `ciphertextSha256`, `policyHash` |
-| base64url | `id`, `thread`, `envelopeId`, `replyTo`, `handshakeId`, `inviteId`, `secret`, `termsId`, the owner-action and drop `nonce`, `kid`, `enc`, `wk`, `iv`, `ct`, `inline`, `fileKey`, `contentKey`, the `handshake` `proof` |
+| `0x` + 40 hex (address) | OwnerAction `agent`; `approval-request.agent`; `terms.parties[]`, `terms.deliverables[].by`, `terms.price.payer`; CommitmentScope `agentId` and `counterparty.agentId`; AgentCard `agentEvm`, `ownerEvm`; proof pack `notary`, `signer.evm`, `recipient.evm`, `receipts[].signer`; Record and Receipt `signer`, Record `feeToken`; EIP-3009 `auth` addresses (07 §7) |
+| `0x` + 64 hex (`bytes32`) | `proof` body and proof pack `recordId`; `proof` body `salt` and proof pack `recipient.salt`; CommitmentScope `answers.envelopeHash`, proof pack `envelopeHash`; Record `envelopeHash`, `recipientCommitment`, `parentRecordId`, `appId`; Receipt `recordId`, `salt`; `recordStructHash`; `txHash` everywhere; AgentCard `agentNostr`, `agentEnc`, `ownerNostr`, `ownerEnc`, `nameHash`, `relaysHash`; `DomainClaim` `ownerNostr` (§2.7); EIP-712 digests and struct hashes; EIP-3009 `auth.nonce`, `auth.r` and `auth.s` (07 §7) |
+| `0x` + hex (ECDSA signature) | invite, `handshake` and `card-update` `cardSig`; proof pack `signature`; submitter `records[].signature` and `receipts[].signature` (07 §7) |
+| Decimal string (`uint256`) | Record `maxFee`, Record `nonce`, EIP-3009 `auth` amounts and times |
+| Bare hex, 64 (Nostr key) | envelope `from`; OwnerAction `owner`; CommitmentScope `counterparty.ownerKey`; Nostr event ids |
+| Bare hex, 128 (BIP-340) | envelope `sig`; `SignedOwnerAction` `sig` |
+| Bare hex, 64 (digest under a Nostr key only) | `approval-request.actionDigest` and `approval.decide` `params.actionDigest`; `terms` bodies' `termsHash` and `terms.previousTermsHash`; CommitmentScope `termsHash`; `files[].plaintextSha256`, `terms.deliverables[].plaintextSha256`, `files[].ciphertextSha256`, drop commit `ciphertextSha256`; proof pack `ownerApproval.policyHash` |
+| base64url | envelope `id`, `thread`, `recipients[].kid`, `.enc`, `.wk`, `aead.iv`, `aead.ct`; payload `replyTo`, `files[].inline`, `files[].fileKey`; `proof` body `envelopeId`; CommitmentScope `answers.envelopeId`, `thread`, `termsId`; `terms.termsId`; invite `inviteId`, `secret`; `handshake` `inviteId`, `proof`; `handshake-ack` `inviteId`, `handshakeId`; OwnerAction `nonce`; drop request `nonce`; proof pack `disclosure.contentKey` |
 
-**Hashes that reach a Record.** The Record and Receipt commit only `envelopeHash`, `recipientCommitment` (from `salt`), `parentRecordId` and `appId`. Files and terms reach the chain only through `envelopeHash`. `termsHash`, `plaintextSha256` and `ciphertextSha256` are never Record fields, so they stay bare hex everywhere, including inside a disclosed envelope in a proof pack.
+**Overloaded names.** The same name on a different path means a different thing:
+- `nonce`: base64url in an OwnerAction or a drop request, a decimal string in a Record, and `0x` `bytes32` in an EIP-3009 `auth`.
+- `sig` / `signature`: `sig` is a BIP-340 signature in bare hex on an envelope and a `SignedOwnerAction`. `signature` is an ECDSA signature in `0x` form in a proof pack and in the submitter bodies (07 §7).
+- `id`: an envelope `id` is base64url, while `terms.deliverables[].id` is a short free string (`"d1"`), not binary.
+- `agentId`: in protocol JSON (`terms`, CommitmentScope, tool results) it is the agent's EVM address. The local handle of G-23 (`[A-Za-z0-9_-]{1,64}`, in `.alks` headers, file names and keychain accounts) is never a JSON `agentId`.
+- `signer`: an address in a Record, a Receipt and a proof pack's `receipts[]`, but an object `{evm, agentCard}` at the top of a proof pack.
 
-- **The field name decides, not the key it holds.** A Nostr key inside an EIP-712 message is a `bytes32` there. The card's `ownerNostr` is `0x` + 64 hex, while the same key as an OwnerAction `owner` or an envelope `from` is 64 hex without a prefix.
+**Canonical ECDSA signatures** (proposed; owner confirms at merge). Every 65-byte secp256k1 ECDSA signature (`cardSig`, a proof pack `signature`, and Record and Receipt signatures from an EOA) is `r || s || v`, with:
+- `r` and `s` in [1, n − 1];
+- `s ≤ n/2` (EIP-2 low-s), which verifiers check themselves, because viem and noble recovery accept a high `s`;
+- `v` ∈ {27, 28}.
+
+Any other form is rejected, for example `v` ∈ {0, 1}, a high `s`, or a length other than 65 bytes. An ERC-1271 signature has the length its account returns: `0x` followed by a non-empty, even number of hex characters.
+
+**Hashes that reach a Record.** The Record and Receipt commit only `envelopeHash`, `recipientCommitment` (from `salt`), `parentRecordId` and `appId`. Files and terms reach the chain only through `envelopeHash`. `termsHash`, `plaintextSha256` and `ciphertextSha256` are never Record fields, so they stay bare hex on every path, including inside a disclosed envelope in a proof pack.
+
+- **The path decides, not the key it holds.** A Nostr key inside an EIP-712 message is a `bytes32` there. The card's `ownerNostr` is `0x` + 64 hex, while the same key as an OwnerAction `owner` or an envelope `from` is 64 hex without a prefix.
+- **Producers encode from bytes.** A value copied from one path to another, for example a card's `ownerNostr` into a CommitmentScope `counterparty.ownerKey`, is decoded to bytes and encoded for the target path through `@agentlink/types`, never by editing the string.
 - **Compare bytes, never strings.** Each value first passes its strict parse. Every equality between two encoded values then decodes both to bytes and compares the bytes. Examples: OwnerAction `owner` with the card's `ownerNostr` (§2.5.1, §3.4.1 `revoke`), envelope `from` with the card's `agentNostr` (§3.4.1), the seal key with `from` (§3.5), and a stored card's fields with a new card's (`card-update`). Nothing re-encodes, trims or lower-cases a value in order to compare it. `@agentlink/types` provides the decoders, so no caller writes its own conversion.
 - **Non-canonical forms are rejected on parse, never normalised:**
   - upper-case or mixed-case hex, including EIP-55 checksummed addresses (checksums are for display only);
   - a missing `0x` on a `0x` field, a `0x` on a bare-hex field, and `0X`;
   - a wrong length, or whitespace anywhere;
   - base64url with padding, `+` or `/`, or non-zero trailing bits;
-  - for decimal strings, a sign, a leading zero, or a value outside the type's range.
+  - for decimal strings, anything that does not match `^(0|[1-9][0-9]*)$` (so `"0"` is valid; signs, leading zeros, fractions, exponents and whitespace are not), or a value above the type's maximum.
 - **Integers** other than `uint256` are JSON integers in [0, 2^53 − 1], including the card's `uint8`, `uint32` and `uint64` fields. A `uint64` value above 2^53 − 1 is rejected.
+  - The JSON token itself must match `0|[1-9][0-9]*`, so `1.0`, `1e3`, `-0` and `9007199254740991.4` are rejected in every runtime.
+  - Parsers check the token with `JSON.parse` source-text access or a strict tokenizer, not only the parsed value, which differs across runtimes for such tokens.
 - **Test vectors (M1-1h).** M1-1h carries accept and reject vectors for each row of the table:
-  - the canonical form of each field listed above;
-  - each non-canonical form above, applied to a field of each row;
+  - the canonical form of each path listed above;
+  - each non-canonical form above, applied to a path of each row, including the integer tokens `1.0`, `1e3`, `-0` and `9007199254740991.4`;
+  - ECDSA: a high `s`, `v` ∈ {0, 1} and a 64-byte signature are rejected;
   - the cross-class cases: a card `ownerNostr` and an OwnerAction `owner` for the same key compare equal as bytes; an `owner` with `0x`, and a card key without it, are each rejected; a `proof` body whose `recordId` or `salt` is base64url is rejected.
 
 ### 2.5 Owner operations and user presence
@@ -267,7 +285,10 @@ ct          ciphertext || 16-byte tag
     6. Decode them to 15 bytes: 24 characters are exactly 120 bits, with no padding and no leftover bits.
 
     `password` is **those 15 bytes**, not the characters. Normalisation is fully specified above, so two spellings of one code always give the same bytes.
-  - **Kind 2, chosen passphrase.** `password` is the UTF-8 bytes of the NFKC form of the input. Nothing else changes, and spaces are kept.
+  - **Kind 2, chosen passphrase.**
+    1. The input bytes are decoded as **fatal** UTF-8: an invalid sequence, an overlong form or a lone surrogate is refused, never replaced with U+FFFD. A replacement would map different inputs to the same password.
+    2. A C0 or C1 control character (U+0000–U+001F, U+007F–U+009F) is refused.
+    3. `password` is the UTF-8 bytes of the NFKC form. Nothing else changes, and spaces are kept.
 - The owner passphrase wrap pins its own label, `agentlink/v1/owner-passphrase-wrap`, and its own magic, `ALKO` (M1-1f). The two blob types are therefore never interchangeable in either direction, and a test covers both directions. The `ALKO` layout is below.
 - **AAD = every header byte** from `magic` through `agentId`. A changed parameter, secret kind, salt, nonce or agent ID, a truncated file or a changed ciphertext all fail authentication.
 - **Expected agent ID.** Before the KDF runs, the reader refuses a file whose header `agentId` differs from the agent being opened, that is, the file name and the recorded config. After decryption, the `seed` entry must derive the expected agent ID. A file copied over another agent's file therefore fails **even when both agents use the same passphrase**.
@@ -310,9 +331,9 @@ ct          ciphertext || 16-byte tag
 | Runtimes | Node only | Browsers use the passkey PRF (§2.3) and Workers use Worker secrets (§2.2), so neither has a file KeyStore. Argon2id timing in browsers and Workers belongs to M1-1f |
 
 **Passphrase strength.**
-- **Agent:** the default is a generated unlock code; offline guessing of a stolen file is then infeasible. A passphrase the user chooses is allowed at the interactive prompt only. It must have at least 12 characters and comes with a warning that a weak passphrase can be guessed if the file leaks.
+- **Agent:** the default is a generated unlock code; offline guessing of a stolen file is then infeasible. A passphrase the user chooses is allowed at the interactive prompt only. It must have at least 12 Unicode code points, counted after NFKC, and comes with a warning that a weak passphrase can be guessed if the file leaks.
 - **Agent and owner secrets always differ, checked in both directions.**
-  - Setting or changing the agent passphrase refuses a candidate that unlocks the owner's wrapped seed. The candidate is normalised the way the owner wrap normalises it (M1-1f).
+  - Setting or changing the agent passphrase refuses a candidate that unlocks the owner's wrapped seed. The candidate is normalised the way the owner wrap normalises it (M1-1f). A candidate that fails a kind's normalisation (for example, it is not a valid generated code) counts as "does not unlock" for that kind, never as an error.
   - Creating or changing the owner secret on a machine with file KeyStores refuses a candidate that opens any of them, for every agent on the machine.
   - Any seed the check unwraps is wiped at once and never used.
 
@@ -682,14 +703,14 @@ The terms fingerprint is under Advanced. Tool summaries name only the contact, t
 - `card` is in the card JSON form and `cardSig` is `0x` hex (§2.4, §2.4.1). `inviteId` and `secret` are base64url.
 - `relays` (here, in `handshake` and in `card-update`) is inbound content: every URL must pass the relay URL rule (§4) at parse, or the whole body is rejected.
 - Encoded as base64url(deflate(JSON)). Shared as `https://<invite-host>/i#<payload>` (the fragment is never sent to a server) and accepted by the CLI/MCP from the full URL or the bare payload. Until the invite landing page ships (M2), the host serves a static "how to install" page.
-- A stores `{inviteId, sha256(secret), expiresAt, used=false}`. Single use; default expiry 7 days.
+- A stores `{inviteId, proofKey, expiresAt, used=false}`, where `proofKey = HKDF-SHA256(ikm = secret (its 32 raw bytes), salt = "", info = utf8("agentlink/v1/pairing-proof"), L = 32)` (proposed; owner confirms at merge). A derives `proofKey` when it creates the invite, keeps it only as an encrypted store column (07 §3), and never stores the raw `secret`. Anyone who reads `proofKey` can answer that one invite, just as with `secret`. The derivation adds key separation and keeps the secret that travels in the link out of the store, but it does not make the stored value safe to disclose. Single use; default expiry 7 days.
 
 **Accept** (agent B):
 
 1. Verify `cardSig` and expiry.
 2. Apply policy `contacts.acceptInvites` (default `approval`: owner confirms in local UI or console, seeing name, owner fingerprint and safety code).
-3. Send a `handshake` envelope to A (recipients: A agent, A owner, B owner, B agent) with body `{inviteId, card: B's AgentCard, cardSig, name, relays, proof}`, where `proof = HMAC-SHA256(secret, utf8("agentlink-handshake") || inviteId || sha256(JCS(B card)))`. Byte-exact input (proposed; owner confirms at merge):
-   - The HMAC key is the 32 raw bytes of `secret`, decoded from base64url.
+3. Send a `handshake` envelope to A (recipients: A agent, A owner, B owner, B agent) with body `{inviteId, card: B's AgentCard, cardSig, name, relays, proof}`, where `proof = HMAC-SHA256(proofKey, utf8("agentlink-handshake") || inviteId || sha256(JCS(B card)))`. Byte-exact input (proposed; owner confirms at merge):
+   - The HMAC key is `proofKey` (32 bytes): B derives it from the invite's `secret` (decoded from base64url) with the HKDF above, and A reads it from its store. The raw `secret` is never an HMAC key.
    - The message is the concatenation, with no separators and no length prefixes, of:
      - `utf8("agentlink-handshake")` (19 bytes);
      - `inviteId` as its 16 raw bytes, decoded from base64url (never its base64url text);
@@ -698,7 +719,7 @@ The terms fingerprint is under Advanced. Tool summaries name only the contact, t
 
 **Complete** (agent A):
 
-- Unknown senders normally go to the requests queue. A `handshake` is the one exception: it is accepted if `proof` matches an unused, unexpired invite. A then marks the invite used, adds B, and replies `handshake-ack`.
+- Unknown senders normally go to the requests queue. A `handshake` is the one exception: it is accepted if `proof` matches an unused, unexpired invite. A recomputes the HMAC with the stored `proofKey` and compares in constant time. A then marks the invite used, adds B, and replies `handshake-ack`.
 
 **Safety code:** `sha256(sortBytes(A.agentNostr, B.agentNostr) || sortBytes(A.ownerNostr, B.ownerNostr))` over the raw 32-byte keys (decoded per §2.4.1), first 40 bits shown as 12 decimal digits in three groups of four. Both sides show the same code. It needs both sides' keys, so it cannot exist when the invite is created: `create_invite` returns only the inviter's owner fingerprint. B can compute it at accept time, because it already holds A's card, so B's owner confirmation (Accept step 2) shows it; A learns it when B's handshake arrives. After the handshake both sides show it, to be compared through another channel.
 
@@ -729,13 +750,22 @@ The terms fingerprint is under Advanced. Tool summaries name only the contact, t
   - **Fetching.** The SSRF rules below apply unchanged to provider hosts, including the redirect cap.
 - **Downloads:** written only into the configured inbox folder, never executed; names sanitized (strip paths and control characters, no hidden files).
 - **SSRF protection (`fetch_file`):** URLs must be `https`. Hosts resolving to loopback, private, link-local (incl. `169.254.169.254`) or unique-local addresses are rejected. Redirects are capped at 2 and re-checked; download size is capped at the declared size plus overhead.
-- **SSRF protection (relay URLs; proposed, owner confirms at merge).** Relay lists arrive from other parties in invites, `handshake` and `card-update` bodies (§3.4.1, §3.6), and the core connects to them (07 §4.2). A WebSocket upgrade is an HTTP request, so a hostile relay URL is an SSRF vector like a download URL. Two layers:
-  - **Schema (at parse, `@agentlink/types`).** Only `wss://`; a lowercase host name, an optional port 1–65535 and an optional path; no user info, query or fragment. Rejected:
-    - every IP-literal host: IPv4 in any notation a URL parser accepts (for example `127.0.0.1`, `2130706433`, `0x7f.1`, `0177.0.0.1`) and every bracketed IPv6 literal. This covers the loopback, private, link-local, CGNAT (`100.64.0.0/10`), unique-local and cloud metadata (`169.254.169.254`) ranges without range arithmetic in the parser;
-    - a host whose last label is numeric, a single-label host, and a trailing dot;
-    - `localhost` and `*.localhost`, `*.local`, `*.internal` and `*.home.arpa`, which also covers the metadata host names (`metadata.google.internal`, `instance-data.ec2.internal`).
-    One rejected URL rejects the whole list, and with it the body, fail closed. Silently dropping the URL would also break `relaysHash` (§2.4).
-  - **Transport (M1-5, `transport-nostr`).** Before each connect and reconnect, the resolved addresses are checked against the `fetch_file` ranges plus CGNAT, `0.0.0.0/8`, multicast and the IPv4-mapped and NAT64 forms of all of them. A match skips that relay (DNS rebinding defence). Upgrade redirects are never followed.
+- **SSRF protection (relay URLs; proposed, owner confirms at merge).** Relay lists arrive from other parties in invites, `handshake` and `card-update` bodies (§3.4.1, §3.6), and the core connects to them (07 §4.2). A WebSocket upgrade is an HTTP request, so a hostile relay URL is an SSRF vector like a download URL. There are two layers.
+  - **Schema, at parse (`@agentlink/types`).** The check runs on the **raw string**, before any URL parser runs. A WHATWG or UTS-46 parser would map percent-encoding, full-width characters and U+3002 onto `localhost`, IP literals or trailing dots. A URL is accepted only if all of the following hold:
+    - **Characters and length.** The whole string is at most 256 characters of printable ASCII, with no `%`, `\`, whitespace or non-ASCII character anywhere. Percent-encoding and full-width forms are therefore rejected.
+    - **Form.** The URL is `wss://` + host + an optional `:` port + an optional path, with no user info, query or fragment.
+    - **Host.** Two or more dot-separated labels and at most 253 characters, with no trailing dot. Each label is 1–63 characters of `[a-z0-9-]` (lower case only) and neither starts nor ends with a hyphen.
+    - **No numeric labels.** A label that parses as a number in any base is rejected: all decimal digits, or `0x` followed by hex digits (octal is a subset of the first case). This rejects every IPv4 notation, including `127.0.0.1`, `2130706433`, `0x7f.1` and `0177.0.0.1`. Bracketed IPv6 cannot match the grammar.
+    - **Last label.** It matches `[a-z]{2,63}` or `xn--[a-z0-9-]{1,59}`.
+    - **Denied names.** `localhost`, and anything under `.localhost`, `.localdomain`, `.local`, `.internal` or `.home.arpa`, are rejected. This also covers the metadata host names (`metadata.google.internal`, `instance-data.ec2.internal`).
+    - **Port.** `[1-9][0-9]{0,4}`, at most 65535, with no leading zero.
+    - **Path.** `/` followed by characters from `[A-Za-z0-9._~!$&'()*+,;=:@/-]`.
+
+    One rejected URL rejects the whole list, and with it the body, fail closed. Silently dropping the URL would also break `relaysHash` (§2.4). `relaysHash` is computed over the received strings verbatim, never over a parser's re-serialisation (`URL.href` adds a `/`). The transport connects to exactly the validated host string.
+  - **Transport, at connect (M1-5, `transport-nostr`; 07 §4.2).**
+    - The host is resolved, and **every** resolved address must be globally routable under the allowlist of 07 §4.2. Otherwise the relay is skipped.
+    - The socket connects to **the checked address itself**, with TLS SNI, certificate verification and `Host` all using the host name. A second resolution between check and connect therefore cannot redirect the connection (DNS rebinding).
+    - The check repeats on every reconnect. Upgrade redirects are never followed. Proxy settings (`HTTPS_PROXY`, `ALL_PROXY`) are not honoured for relay connections, because a proxy would bypass the address check.
 - **Allowed folders:** paths are resolved with `realpath` (symlinks followed) and must remain inside an allowed folder after resolution. Hidden files and files under `~/.ssh`, `~/.agentlink` and the keychain directories are always refused.
 
 ---
