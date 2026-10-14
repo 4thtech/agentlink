@@ -399,6 +399,12 @@ describe('policy rejects (M1-2b acceptance)', () => {
     ['NEL (C1)', '~/Agent\u0085Link'],
     ['U+009F (C1)', '~/Agent\u009fLink'],
     ['a lone surrogate (not I-JSON)', '~/Agent\ud800Link'],
+    // IR-M1-2b-1 F-4: a bidi override or other format character can spoof a folder name on owner
+    // surfaces; line and paragraph separators break the display.
+    ['a bidi override (Cf)', '~/Agent‮knil'],
+    ['a zero-width space (Cf)', '~/Agent​Link'],
+    ['a line separator (Zl)', '~/Agent Link'],
+    ['a paragraph separator (Zp)', '~/Agent Link'],
     ['a number', 42],
     ['null', null],
   ] as const)('a path with %s', (_label, value) => {

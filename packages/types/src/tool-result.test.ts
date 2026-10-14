@@ -5,6 +5,7 @@ import { z } from 'zod';
 import {
   MCP_STATUSES,
   MAX_TOOL_TEXT_CHARS,
+  getApprovalResultSchema,
   proofStatusResultSchema,
   toolResult,
   toolResultSchema,
@@ -143,5 +144,50 @@ describe('toolResult(): the common fields plus a tool-specific shape', () => {
       url: `http://127.0.0.1:47321/approve/${APPROVAL_ID}`,
       nextStep: 'Share the link.',
     });
+  });
+});
+
+describe('agentlink_get_approval result (06 §2.5; IR-M1-2b-1 Q3)', () => {
+  // The approval's own state is `approval`, so it never collides with the common `status`.
+  const result = (approval: string, extra: object = {}) => ({
+    status: 'ok',
+    summary: 'The approval is pending.',
+    approval,
+    ...extra,
+  });
+
+  it('round-trips each approval state', () => {
+    expectRoundTrip(getApprovalResultSchema, result('pending'));
+    expectRoundTrip(
+      getApprovalResultSchema,
+      result('approved', { decidedAt: '2026-10-14T12:00:00Z' }),
+    );
+    expectRoundTrip(
+      getApprovalResultSchema,
+      result('denied', { decidedAt: '2026-10-14T12:00:00Z' }),
+    );
+    expectRoundTrip(getApprovalResultSchema, result('expired'));
+    expectRoundTrip(getApprovalResultSchema, {
+      status: 'not_found',
+      summary: 'No such approval.',
+      nextStep: 'Call the tool again to ask for a new approval.',
+    });
+  });
+
+  it.each([
+    ['the approval state in status', { status: 'pending', summary: 'Pending.' }],
+    ['an unknown approval state', result('granted')],
+    ['an ok result without approval', { status: 'ok', summary: 'Pending.' }],
+    [
+      'approval on a result that is not ok',
+      { ...result('pending'), status: 'error', nextStep: 'x' },
+    ],
+    ['decidedAt on a pending approval', result('pending', { decidedAt: '2026-10-14T12:00:00Z' })],
+    ['decidedAt as unix seconds', result('approved', { decidedAt: 1760443200 })],
+    ['decidedAt with an offset', result('approved', { decidedAt: '2026-10-14T14:00:00+02:00' })],
+    ['an approvalId on an ok result', result('approved', { approvalId: APPROVAL_ID })],
+    ['a decision key', result('pending', { decision: 'approve' })],
+  ] as const)('rejects %s', (_l, value) => {
+    expectReject(getApprovalResultSchema, value);
   });
 });

@@ -10,6 +10,7 @@ import {
   approvalActionSchema,
   approvalFeeSchema,
   approvalRequestBodySchema,
+  proofPackSchema,
   commitmentApprovalActionSchema,
   commitmentScopeSchema,
   payloadSchema,
@@ -32,6 +33,7 @@ import {
   fee,
   firmOfferScope,
   payloads,
+  proofPack,
 } from './testing/fixtures.js';
 
 type Path = (string | number)[];
@@ -401,6 +403,103 @@ describe('approval-request body: TTL and binding (04 §3.4.1, G-7)', () => {
         contactEvm: CONTACT_A,
       }),
     );
+  });
+});
+
+describe('commitment args: no note, no path, no alias (04 §3.4; IR-M1-2b-1 F-1, F-3)', () => {
+  const propose = () => approvalActions().agentlink_propose_terms;
+  const respond = () => approvalActions().agentlink_respond_to_terms;
+
+  it.each([
+    ['respond: a note', 'respond', ['args', 'note'], 'see you'],
+    ['respond: a local path', 'respond', ['args', 'path'], '/Users/tali/secret.pdf'],
+    ['respond: approvalId (never part of the action)', 'respond', ['args', 'approvalId'], 'apr_x'],
+    ['respond: clientRequestId', 'respond', ['args', 'clientRequestId'], 'r1'],
+    ['respond: an unknown key', 'respond', ['args', 'extra'], 1],
+    ['respond: terms with accept', 'respond', ['args', 'terms'], { subject: 'x' }],
+    [
+      'respond: decision "counter" with an accept scope',
+      'respond',
+      ['args', 'decision'],
+      'counter',
+    ],
+    ['respond: decision "reject" with an accept scope', 'respond', ['args', 'decision'], 'reject'],
+    [
+      'respond: another envelope than the scope answers',
+      'respond',
+      ['args', 'envelopeId'],
+      'C'.repeat(21) + 'A',
+    ],
+    ['respond: envelopeId as hex', 'respond', ['args', 'envelopeId'], 'ab'.repeat(16)],
+    ['respond: notarize differs from the scope', 'respond', ['args', 'notarize'], false],
+    ['respond: notarize missing (defaults are applied)', 'respond', ['args', 'notarize'], DELETE],
+    ['propose: a note', 'propose', ['args', 'note'], 'hello'],
+    ['propose: a local path', 'propose', ['args', 'path'], '~/x.pdf'],
+    ['propose: a contact alias instead of the agent ID', 'propose', ['args', 'to'], 'Marko'],
+    ['propose: another contact than the scope', 'propose', ['args', 'to'], CONTACT_B],
+    ['propose: without notarize (not a commitment)', 'propose', ['args', 'notarize'], false],
+    ['propose: terms not an object', 'propose', ['args', 'terms'], 'the terms'],
+    ['propose: revises as hex', 'propose', ['args', 'revises'], 'ab'.repeat(16)],
+  ] as [string, 'propose' | 'respond', Path, unknown][])('rejects %s', (_l, which, path, value) => {
+    const action = which === 'propose' ? propose() : respond();
+    expectReject(approvalActionSchema, edit(action, path, value));
+    expectReject(commitmentApprovalActionSchema, edit(action, path, value));
+  });
+
+  it('accepts the commitment shapes 06 §2.2a allows', () => {
+    // A revision of one's own unanswered offer.
+    expectAccept(approvalActionSchema, edit(propose(), ['args', 'revises'], ID16));
+    // reject on a recorded offer (REJECTED receipt).
+    const reject = edit(
+      edit(respond(), ['args', 'decision'], 'reject'),
+      ['context', 'scope', 'decision'],
+      'reject',
+    );
+    expectAccept(approvalActionSchema, reject);
+    // accept on (b): confirm the counterparty's ACCEPT record.
+    expectAccept(
+      approvalActionSchema,
+      edit(respond(), ['context', 'scope', 'decision'], 'confirm'),
+    );
+    // A notarized counter is a firm offer: scope "offer", the new terms in args.
+    const counter = {
+      ...respond(),
+      args: { envelopeId: ID16, decision: 'counter', terms: { subject: 'v4' }, notarize: true },
+      context: { ...respond().context, scope: firmOfferScope() },
+    };
+    expectAccept(approvalActionSchema, counter);
+    expectReject(approvalActionSchema, edit(counter, ['args', 'terms'], DELETE));
+    expectReject(approvalActionSchema, edit(counter, ['args', 'decision'], 'accept'));
+  });
+
+  it('a proof pack rejects an owner approval whose action carries a note or a path', () => {
+    for (const [key, value] of [
+      ['note', 'private note'],
+      ['path', '/Users/tali/contract.pdf'],
+    ]) {
+      const pack = proofPack();
+      expectReject(
+        proofPackSchema,
+        edit(pack, ['ownerApproval', 'action', 'args', key as string], value),
+      );
+    }
+    expectAccept(proofPackSchema, proofPack());
+  });
+});
+
+describe('approval-request: the scope is created with the request (IR-M1-2b-1 F-2)', () => {
+  const respond = () => approvalActions().agentlink_respond_to_terms;
+
+  it('scope.createdAt must equal requestedAt', () => {
+    expectAccept(approvalRequestBodySchema, approvalRequestFor(respond()));
+    const later = edit(
+      edit(respond(), ['context', 'scope', 'createdAt'], 1760000000 + 31_536_000),
+      ['context', 'scope', 'expiresAt'],
+      1760000000 + 31_536_000 + 604_800,
+    );
+    expectReject(approvalRequestBodySchema, approvalRequestFor(later));
+    const earlier = edit(respond(), ['context', 'scope', 'createdAt'], 1759999999);
+    expectReject(approvalRequestBodySchema, approvalRequestFor(earlier));
   });
 });
 
