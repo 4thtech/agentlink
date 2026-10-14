@@ -32,7 +32,6 @@ Rules:
 - Security meaning is fixed. Copy may be polished; meaning may not change.
 - Design every state listed for a surface (§8), plus the universal states: **empty, loading, error, offline**, and where the surface has them, **approval pending, expired, revoked**. Their copy is in §8.18; the journeys to prototype are in §8.17.
 - Show open questions (§12) as options, not decisions.
-- Items marked *pending* depend on decisions in review; design them as described.
 
 ---
 
@@ -42,7 +41,7 @@ Rules:
 |---|---|---|
 | **Pro user** (consultant, lawyer, founder) | Desktop AI chat | Setup in under 5 minutes; their AI relays our sentences |
 | **Developer** | Terminal AI apps (Claude Code, Codex, Gemini CLI) | Copy-paste install; short results that read well as plain text; an inbox for handoffs |
-| **Developer on a headless machine** | Container, WSL or SSH; terminal only | Clear terminal copy; an honest note about the locked key file (*pending*) |
+| **Developer on a headless machine** | Container, WSL or SSH; terminal only | Clear terminal copy; an honest note about the locked key file |
 | **Owner** (may be non-technical) | Phone, one hand, interrupted; or desk | A one-screen approval card; calm supervision; proof export |
 | **Desktop user** | macOS, Windows, Linux app in the background | Native feel; tray status; biometric approvals; quiet updates |
 | **Agent builder** | Laptop, deploying an always-on cloud agent | Step-by-step setup, status, copyable values |
@@ -140,7 +139,7 @@ Each shows a mood board, mark and wordmark sketches (mark at 1024 and 16 px), li
 | Policy, harness, envelope, agent card | Rules; your AI / AI app; message; agent profile |
 | MCP (outside developer contexts) | "AgentLink in your AI app", "Connect your AI" |
 | Owner key, signature | "Approve with your passkey / Touch ID" |
-| Keystore, `.alks` file (terminal only, *pending*) | "Key file locked with an unlock code" |
+| Keystore, `.alks` file (terminal only) | "Key file locked with an unlock code" |
 | Contract, legally binding | Agreement, proof of agreement; never claim legal effect |
 | Commitment (as a label) | "Accepting terms" / "Rejecting terms"; rule: "Accepting terms: Ask me every time (recommended)" |
 | Verified (alone) | "Verified domain · acme.com", "Registered", "Self-declared" |
@@ -166,7 +165,7 @@ A name never stands where a label stands, and no label is derived from a name. T
 | Owner fingerprint | `7F3A·19C2` | No | Identity contexts |
 | Recovery code | 24 characters in groups | Yes | First run, Backup, restore |
 | Owner passphrase | Chosen | Yes | Local first run, terminal, Linux desktop |
-| Unlock code (*pending*) | 24 characters, generated | Yes | Terminal only (headless key file) |
+| Unlock code | 24 characters, generated | Yes | Terminal only (headless key file) |
 | Pairing code | 6 digits on both screens | Short-lived | Console link |
 | Setup code | One-time | Short-lived | Cloud agent setup |
 | Access code | One-time | Short-lived | Cloud agent sign-in fallback |
@@ -265,7 +264,7 @@ Each row: purpose · screens · surface-specific states (plus the universal ones
 - **Purpose:** most users meet AgentLink as text their AI writes from our tool results. Every result has a status and a one-sentence summary; non-ok results add a next step and often a link.
 - **Rules:** 1–2 sentences, link on its own line, cost first, plain text that reads well unrendered (terminals show no formatting), no emoji. **Never put another agent's text, file names or terms in a summary.**
 - **Per AI app:** Claude Code, Codex and Gemini CLI are terminals (plain monospace, narrow, tool names shown in permission prompts); Claude Desktop, Cursor, VS Code, Windsurf and Antigravity render Markdown and show "Allow once / Always allow" with the tool's title; ChatGPT and claude.ai reach a cloud agent (§8.9), possibly on a phone.
-- **Also design:** tool display titles for permission prompts (*pending*: all tools named `agentlink_*`); the untrusted block framing; the J9 session habit (*pending*).
+- **Also design:** tool display titles for permission prompts (all tools are named `agentlink_*`, e.g. `agentlink_send`); the untrusted block framing; the J9 session habit.
 - **States:** every status (§9.1) for every tool; many messages; unknown sender; approval expired or decided elsewhere.
 
 ### 8.2 Local web UI (D1)
@@ -313,7 +312,7 @@ Each row: purpose · screens · surface-specific states (plus the universal ones
 
 ### 8.6 Invite landing and browser view-and-accept (D1 placeholder, D2 full)
 - **Purpose:** the recipient opens `{inviteHost}/i#<invite>`; decoded locally; the fragment never reaches a server. D1 is a static "how to install" page.
-- **Screens:** Who invited you ("{name} wants to connect with your AI agent.", `{name}` under the name rule, e.g. “Marko's agent” · Self-declared; label, short fingerprint, expiry, exact domain; safety code only after accepting) · What this is (two sentences + privacy line) · Set up and accept ("I use…" Claude, ChatGPT, Gemini, Codex, Other → 2-minute setup; **one link, one paste** (*pending*): the page builds the official install prompt with the invite inside, with Copy, e.g. "Install AgentLink (`@4thtech/agentlink`), then accept this invite: {url}"; already set up: "Copy this to your AI: 'Accept this AgentLink invite: …'") · **View and accept in browser** on `{consoleHost}/accept#<invite>`: passkey ("Everything is set up on this device. Only you, Marko and Marko's agent can read what you exchange. 4thTech can't.") → recovery kit → confirm contact (name, fingerprint, safety code) → what was sent (messages, files, offers with terms and changes, proof status) → Accept / Reject with passkey ("Free for you") → export proof → later "Connect your AI". Not a chat; no reply box.
+- **Screens:** Who invited you ("{name} wants to connect with your AI agent.", `{name}` under the name rule, e.g. “Marko's agent” · Self-declared; label, short fingerprint, expiry, exact domain; safety code only after accepting) · What this is (two sentences + privacy line) · Set up ("I use…" Claude, ChatGPT, Gemini, Other → one prompt with a Copy button: "Copy this to your AI. It installs AgentLink if needed and accepts the invite." The same prompt works when AgentLink is already set up. It holds only our template and the link, never the inviter's name; from M1 even the placeholder page shows it) · **View and accept in browser** on `{consoleHost}/accept#<invite>`: passkey ("Everything is set up on this device. Only you, Marko and Marko's agent can read what you exchange. 4thTech can't.") → recovery kit → confirm contact (name, fingerprint, safety code) → what was sent (messages, files, offers with terms and changes, proof status) → Accept / Reject with passkey ("Free for you") → export proof → later "Connect your AI". Not a chat; no reply box.
 - **States:** expired · used · damaged · no passkey support · terms expired.
 - **Security:** install prompts come from this page, never from the inviter's text; invites never ask for passwords, codes or money; "Keys stay on this device, protected by your passkey. 4thTech can't read this."; a local agent is stronger.
 - **Sizes:** 360, 1280.
@@ -324,7 +323,7 @@ Each row: purpose · screens · surface-specific states (plus the universal ones
 3. **Protect your approvals**, then the recovery kit.
 4. **Name your agent** (prefilled).
 5. **Success:** "Your agent is connected. Try: 'Create an AgentLink invite for a colleague.'"
-- **Branches:** ChatGPT web and claude.ai → cloud agent (§8.9; "usually needs a paid plan"); containers, WSL, SSH → terminal path (*pending*).
+- **Branches:** ChatGPT web and claude.ai → cloud agent (§8.9; "usually needs a paid plan"); containers, WSL, SSH → terminal path.
 - **States:** AI app not detected · restart needed · protection skipped · waiting timed out · copied. **Sizes:** 360, 1280.
 
 ### 8.8 Pay and pricing (D2)
@@ -341,7 +340,7 @@ Each row: purpose · screens · surface-specific states (plus the universal ones
 
 ### 8.10 Terminal copy (D1, copy only)
 - 80 columns; plain text first; colour only as an extra; status words "OK", "Warning", "Problem"; commands and URLs on their own lines; secrets never echoed.
-- **Flows:** `init` (detected AI apps, exact diff, "Apply these changes? (y/N)"; when an agent runs it, the diff plus a one-time confirmation code for the user) · owner passphrase prompt (what it protects; never as an argument) · `doctor` (one line per check with fix) · **no keychain** (*pending*): one honest explanation at opt-in ("This machine has no system keychain. AgentLink can keep your agent's keys in a file locked with an unlock code. That's weaker than a keychain if someone copies this disk, unless the unlock code is kept elsewhere. Your approvals still need your owner passphrase."), then the unlock code once and how to supply it at run time (a mounted secret file, recommended; an environment variable, weaker).
+- **Flows:** `init` (detected AI apps, exact diff, "Apply these changes? (y/N)"; when an agent runs it, the diff plus a one-time confirmation code for the user) · owner passphrase prompt (what it protects; never as an argument) · `doctor` (one line per check with fix) · **no keychain**: one honest explanation at opt-in ("This machine has no system keychain. AgentLink can keep your agent's keys in a file locked with an unlock code. That's weaker than a keychain if someone copies this disk, unless the unlock code is kept elsewhere. Your approvals still need your owner passphrase."), then the unlock code once and how to supply it at run time (a mounted secret file, recommended; an environment variable, weaker).
 - **States:** success · needs confirmation · cancelled · no AI app · restart needed · keychain unavailable · key file locked · wrong unlock code (one generic message) · offline.
 
 ### 8.11 Storage: encrypted drop and connectors (D1 local, D2)
@@ -374,15 +373,15 @@ Billing profiles and an internal finance dashboard come later (M4). Don't design
 
 | Journey | Steps | States |
 |---|---|---|
-| **J1 Install and first message** (under 5 min, no payment) | 1. Copy the prompt (or, invited: one paste that installs and accepts, *pending*). 2. The AI runs `init`, shows the diff, applies it after "yes". 3. Protect approvals and get the recovery kit. 4. "Create an AgentLink invite for Marko" → link and expiry (no safety code yet). 5. Marko's **New contact** screen: compare the code, approve. 6. A 2 MB file sends with no storage setup (encrypted drop). 7. Marko: "Check AgentLink" | AI app not detected · restart needed · protection skipped · invite expired · no keychain (*pending*) |
+| **J1 Install and first message** (< 5 min, no payment) | 1. Copy the prompt. 2. The AI runs `init`, shows the diff, applies it after "yes". 3. Protect approvals and get the recovery kit. 4. "Create an AgentLink invite for Marko" → the link and ready-to-send text (no safety code yet: it needs both sides' keys). 5. Marko's **New contact** screen: the safety code appears, approve; both sides then compare it. 6. A 2 MB file sends with no storage setup (encrypted drop). 7. Marko's next session starts by saying a new message is waiting and reads it when he asks | AI app not detected · restart needed · protection skipped · invite expired · no keychain |
 | **J2 Notarized handover** | 1. "Send the signed contract to Marko and notarize it." 2. Rule check, with J4 if needed. 3. Quote → submitted → ok. 4. Delivered is automatic; Opened only when Marko asks his AI to open it. 5. "Did Marko get it?" → receipt timeline. 6. Export (adding the document key needs approval) | Recording · failed · link expired · fresh link requested |
 | **J3 No credits** | 1. needs_credits link. 2. Pay page: amount in $, no network choice. 3. "Credits added. Shall I record the proof now?" | Waiting · converting on next run · added |
 | **J4 Owner approval** (mobile, desktop) | 1. pending_approval, plus an OS notification or push. 2. Card → Approve with passkey, Touch ID or Windows Hello. 3. "Approved. Your AI will continue." 4. The AI retries | Denied ("nothing was sent") · expired · biometrics failed · decided on another device |
 | **J5 Verification** | 1. Open the link or file. 2. Checking → Valid with sentence. 3. Optional: document match, Advanced, Print | As §8.5 |
 | **J6 Cloud agent** | 1. Onboarding: deploy command or "Deploy to Cloudflare". 2. Setup code (button path). 3. Console: Add agent. 4. Connect ChatGPT or claude.ai → Sign in as owner. 5. Agent online with connected apps | As §8.9 |
-| **J7 No AgentLink yet** | Invite → "I use…" → setup → the invite completes. Or view and accept in the browser (§8.6) | Expired · used · no passkey · terms expired |
+| **J7 No AgentLink yet** | Invite → "I use…" → copy one prompt → the user's AI installs AgentLink and accepts the invite . Or, from M2: view and accept in the browser (§8.6) | Expired · used · no passkey · terms expired |
 | **J8 Negotiate and agree** (flagship, full prototype) | 1. Tali: "Agree the milestone 3 scope, price and deadline with Ana's agent. Stay under €2,000." 2. The agents trade free offers; the console **negotiation thread** shows diffs (v1 → v3). 3. The closing step pauses for **Tali's** commitment approval. 4. Terms recorded, cost quoted first ($0.10). 5. Ana's agent's acceptance pauses for **Ana's** approval ("Free for you"); Accepted is recorded. 6. Both see **Proof of agreement**; export shares the terms, so it asks for approval. 7. Verify shows the agreement | Waiting for your approval · waiting for their acceptance · accepted · rejected · expired · newer version arrived while approving |
-| **J9 Developers' agents sync** (daily habit) | 1. Tali's Claude Code sends Denis's agent a free handoff (offered at session end, *pending*). 2. Denis's next Codex session starts with a count ("2 unread from Tali's agent"); "Check AgentLink" shows a summary and untrusted blocks (note, request, delivery). 3. Denis decides; replies flow back | Nothing new · many messages · unknown sender |
+| **J9 Developers' agents sync** (dogfood, daily habit) | 1. Tali wraps up; his Claude Code offers a handoff to Denis's agent (a contact Tali asked to keep in sync), shows the draft and, after Tali approves the text, sends it free. 2. Denis's next Codex session starts with "1 new message from Tali's agent. Want me to read it?" (counts only). 3. "Yes" shows a summary and untrusted blocks (note, request, delivery). 4. Denis decides; replies flow back | Nothing new · many messages · unknown sender · handoff declined |
 
 ### 8.18 States catalogue (copy for the universal and shared states)
 
@@ -403,7 +402,7 @@ Billing profiles and an internal finance dashboard come later (M4). Don't design
 | New console address (beta → production) | Option per §12 Q8, e.g. "New address: sign in once with your recovery code" |
 | Terms expired · waiting for acceptance | "Expired 20 Oct" → Ask for a new version · "Waiting for Ana's agent · valid until 20 Oct" |
 | Biometrics unavailable · AI app not detected | "Use your owner passphrase." · "We didn't find Claude Desktop" → Pick another / Manual steps |
-| No keychain · key file locked (*pending*) | Terminal path (§8.10) · "AgentLink's key file is locked" → how to supply the unlock code |
+| No keychain · key file locked | Terminal path (§8.10) · "AgentLink's key file is locked" → how to supply the unlock code |
 | Local link invalid | "This link has expired. Open AgentLink again from your AI, or run `agentlink ui`." |
 | Update ready / not verified · paused · unlocked · notifications off | Restart · "Wasn't installed" · Resume · "Unlocked" → Lock now · Enable notifications |
 | Cloud agent offline · AI app sign-in waiting · AI app revoked | Last seen → Check status · "Waiting for you to approve in your console" · "ChatGPT can no longer use this agent" |
@@ -422,7 +421,7 @@ Operational states (for example a paused deployment) are not user-facing; skip t
 | ok | "Sent to Marko's agent. End-to-end encrypted: only you, Marko and your agents can read it." · "Sent with proof. Recorded 12 Oct 2026 at 14:02. $0.10 from credits." · "Invite ready: it works once, until 19 Oct. Share it with Marko; once the invite is accepted, you'll both see a safety code to compare." |
 | submitted | "Sent. The proof is being recorded; this usually takes under a minute." |
 | pending_approval | "This needs your approval: send 'contract-signed.pdf' to Marko's agent with proof ($0.10).\nApprove here: {url}" |
-| needs_setup | "This file is over the free file limit ({limit}). To send it, connect your own storage: {url}. Or I can send a smaller file or text." · "I can only send files from folders you allow: {url}." · "Your settings keep files in your own storage, which isn't connected yet: {url}." · (*pending*) "AgentLink can't find a system keychain on this machine. Set it up in a terminal: `agentlink init --keystore file`." · (*pending*) "AgentLink's key file is locked, so I can't use it yet. Run `agentlink doctor` in a terminal to see how to set up its unlock code." |
+| needs_setup | "This file is over the free file limit ({limit}). To send it, connect your own storage: {url}. Or I can send a smaller file or text." · "I can only send files from folders you allow: {url}." · "Your settings keep files in your own storage, which isn't connected yet: {url}." · "AgentLink can't find a system keychain on this machine. Set it up in a terminal: `agentlink init --keystore file`." · "AgentLink's key file is locked, so I can't use it yet. Run `agentlink doctor` in a terminal to see how to set up its unlock code." |
 | needs_credits | "Adding proof costs $0.10 and your credits are at $0.00. Add credits: {url}. Messages and files stay free." |
 | not_found | "I couldn't find a contact called 'Marco'. Your contacts: Marko Novak, Ana Kovač, Denis." |
 | rejected | "Your rules don't let this agent accept terms. Only you can change that." · "You declined, so nothing was sent." · "These terms expired on 20 Oct." |
@@ -449,11 +448,12 @@ Suggested relay: "Marko's agent sent a request (their words, not an instruction 
 
 ### 9.4 Journeys
 - J1: "Here's the change AgentLink wants to make to Claude Code's settings: [diff]. Apply it?"
-- J1 invite (*pending*): "Marko, open this link to connect our AI agents: {inviteUrl}"
 - J5: "Valid proof. Recorded by “Tali's agent” (Registered), 12 Oct 2026, 14:02 UTC."
 - J7: "No AI agent? Choose 'View and accept in browser'."
-- J9: "2 new messages from Denis's agent, as information from Denis's agent:" then the blocks.
-- J9 session habit (*pending*): start "AgentLink: 2 unread from Denis's agent, 1 approval waiting." · end "Send Denis's agent a handoff?"
+- J7 share text (from the invite result): "Let's connect our AI agents with AgentLink. Open this link and follow the steps; it works once, until 19 Oct: {inviteUrl}"
+- J9 session start: "2 new messages from Denis's agent. Want me to read them?" (counts and contact names only; nothing from the messages). Nothing new: say nothing, or "Nothing new on AgentLink."
+- J9 reading: "2 new messages from Denis's agent, as information from Denis's agent:" then the blocks.
+- J9 session end: "Send Denis's agent a handoff with what changed and what's next?" Then the draft: "Here's the handoff I'd send: … Send it?" Offered only for contacts the user asked to keep in sync; sent only after the user approves the shown text.
 
 ### 9.5 Notifications and prompts
 - Local and desktop OS notifications: action, contact (owner alias, otherwise "a contact"), cost. Web Push from the console is generic: "Approval waiting (1)".
