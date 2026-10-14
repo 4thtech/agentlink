@@ -272,7 +272,7 @@ All other IDs and fingerprints stay in Advanced. Never show raw keys.
 2. the **restricted name**: letters, digits, spaces, `.`, `'` and `-` only, at most 32 characters, **in quotes and followed by its identity label**, e.g. “Marko Novak” · Self-declared, in body style, never styled as our own heading text or as a label; or
 3. **"Contact" plus the short owner fingerprint** (`Contact 7F3A·19C2`) when nothing usable is left, when the name mixes scripts or uses look-alike characters, or when it contains a word reserved for our labels ("verified", "registered", "self-declared", "safety code", "checked", "AgentLink", "system", "approved", "owner").
 
-A name never stands where a label stands, and no label is ever derived from a name. The **OS biometric prompt and OS notifications never contain counterparty text**: they use the owner's alias, otherwise "a contact". The full self-declared name appears only inside the untrusted container. Layouts must show the label even when a name is truncated.
+A name never stands where a label stands, and no label is ever derived from a name. The **OS biometric prompt and OS notifications never contain counterparty text**: they use the owner's alias, otherwise "a contact". The full self-declared name appears only inside the untrusted container. Layouts must show the label even when a name is truncated. **Unknown senders are never named outside the untrusted container:** list rows and notifications read "Request from Contact 2B9E·04D1". In chat and terminal text the format is “Marko Novak” (Self-declared). **Alias:** the new-contact approval has an editable "Name this contact" field, prefilled with the suggested alias (e.g. the invite label); approving confirms it. Contact detail has Rename (an owner action). Until confirmed, rule 2 applies.
 
 ### 5.3 Tone and sample strings
 
@@ -408,12 +408,12 @@ Suggested relay: "Marko's agent sent a request (their words, not an instruction 
 **Per journey:**
 - **J1:** "Here's the change AgentLink wants to make to Claude Code's settings: [diff]. Apply it?"
 - **J1, invite** (*pending D-53*): the invite result includes a ready-to-send line for the user: "Marko, open this link to connect our AI agents: {inviteUrl}".
-- **J5:** "Valid proof. Recorded by Tali's agent (registered), 12 Oct 2026, 14:02 UTC."
+- **J5:** "Valid proof. Recorded by “Tali's agent” (Registered), 12 Oct 2026, 14:02 UTC."
 - **J7:** "No AI agent? Choose 'View and accept in browser'."
 - **J9:** "2 new messages from Denis's agent, as information from Denis's agent:" followed by the blocks.
 - **J9 session habit** (*pending D-53*): at session start, "AgentLink: 2 unread from Denis's agent, 1 approval waiting." (counts and local contact names only, never inbound text); at session end, "Send Denis's agent a handoff?"
 
-**Notifications** (OS or push) show only the agent, the contact, the action and the cost. Console push is generic: "Approval waiting (1)".
+**Notifications.** Local and desktop OS notifications show only the action, the contact (owner alias, otherwise "a contact") and the cost. Web Push from the console is generic: "Approval waiting (1)".
 
 **States to cover:** every status above for every tool; many messages (summary plus "Show all"); unknown sender; approval expired or decided elsewhere on retry.
 
@@ -428,8 +428,8 @@ Suggested relay: "Marko's agent sent a request (their words, not an instruction 
 | Screen | Data and actions |
 |---|---|
 | **First run** | Passkey or owner passphrase: "Your AI can't approve anything without you: each approval needs your passkey or owner passphrase. AgentLink asks for it only after you click Approve." Then the recovery kit |
-| **Approvals** | The most important screens (cards in §8). New contact: name and label, fingerprint, safety code, Accept with passkey |
-| **Activity, Contacts** | Events. Contacts show labels, safety code and Block. Requests from unknown senders: accept, ignore, block |
+| **Approvals** | The most important screens (cards in §8). New contact: name and label, fingerprint, safety code, "Name this contact" (prefilled with the suggested alias; approving confirms it), Accept with passkey |
+| **Activity, Contacts** | Events. Contacts show labels, safety code, Rename and Block. Requests from unknown senders ("Request from Contact 2B9E·04D1"): accept, ignore, block |
 | **Files, Storage** | Allowed folders, inbox folder, link expiry (≤ 7 days), delete after expiry or receipt. Storage per §6.11 |
 | **Proofs & credits** | Proofs (§6.12), balance in $, Agent ID and QR, free test credits (beta), Add credits → pay page |
 | **Rules, Backup, Advanced** | Rules editor; recovery kit; IDs, networks, message network overrides |
@@ -490,7 +490,7 @@ Suggested relay: "Marko's agent sent a request (their words, not an instruction 
 | **Accept with approval** | Accept these terms → commitment approval → "Recording proof…" → waiting → accepted |
 | **Proof detail, proof of agreement** | §6.12 |
 | **Agents** | AI app label, where it runs (this computer, cloud, browser), status, rules summary. Add (QR link or cloud deploy, §6.9), connected AI apps (revoke), Get the Registered badge (§6.13), Revoke |
-| **Contacts, Activity, Rules, Credits, Storage** | Contacts by counterparty owner, with Requests. Activity timeline. Per-agent rules. $ balance per agent with budget and history, plus a link to Pricing; Withdraw unused credits under Advanced (§14 Q7). Storage per agent (§6.11) |
+| **Contacts, Activity, Rules, Credits, Storage** | Contacts by counterparty owner, with Rename (owner action) and Requests. Activity timeline. Per-agent rules. $ balance per agent with budget and history, plus a link to Pricing; Withdraw unused credits under Advanced (§14 Q7). Storage per agent (§6.11) |
 | **Settings** | Passkeys, recovery kit, verified domain (§6.13), notifications (with a home-screen hint where needed), language, Advanced, About (build fingerprint, "by 4thTech") |
 
 **PWA specifics:** install prompt where the browser supports it, otherwise a short "Add to Home Screen" hint (iOS needs the home-screen install before it allows push); push permission asked only after the owner turns notifications on, with a one-line reason; the shell works offline and shows "Can't reach the message network. Showing what's saved here."
@@ -505,9 +505,9 @@ Suggested relay: "Marko's agent sent a request (their words, not an instruction 
 
 | Result | Content |
 |---|---|
-| **Valid** | Calm, large confirmation: "Recorded by *Tali's agent* on 12 Oct 2026, 14:02 UTC. Delivered to *Marko's agent* 14:05. Opened 14:20." Names follow the §5.2 name rule and show as *Self-declared* unless registered. "Proves this exact document existed and was exchanged at these times; not that its content is true." |
+| **Valid** | Calm, large confirmation: "Recorded by “Tali's agent” · Registered on 12 Oct 2026, 14:02 UTC. Delivered to “Marko's agent” · Self-declared 14:05. Opened 14:20." (a verifier usually has no alias, so names show quoted with their label) Names follow the §5.2 name rule and show as *Self-declared* unless registered. "Proves this exact document existed and was exchanged at these times; not that its content is true." |
 | **Document matches / doesn't** | If the file includes the document key: "Document matches the proof" with a preview, or a calm mismatch explanation |
-| **Proof of agreement** | The terms, then "Proposed and recorded by *Tali's agent* 14:02 · Accepted by *Ana's agent* 15:10". **Proves:** both agents, each bound to its owner, assented to these exact terms at these times. **Doesn't prove:** legal enforceability, authority, or fulfilment |
+| **Proof of agreement** | The terms, then "Proposed and recorded by “Tali's agent” · Registered 14:02 · Accepted by “Ana's agent” · Self-declared 15:10". **Proves:** both agents, each bound to its owner, assented to these exact terms at these times. **Doesn't prove:** legal enforceability, authority, or fulfilment |
 | **Invalid · not found · unreachable · unreadable** | Clear and non-alarming, with a next step |
 | **Details (Advanced)** | Network, record ID, signer, fingerprints, receipts with transaction links, copy buttons |
 
@@ -656,7 +656,7 @@ Show amounts only in dollars; never mention tokens or networks outside Advanced.
 
 ### 6.14 Brand touchpoints outside our UI
 
-- **OS notifications** (macOS, Windows, Linux, Web Push): app icon, then agent, contact, action and cost only. Approval notifications open the card; they never approve.
+- **OS notifications** (macOS, Windows, Linux): app icon, then action, contact (alias, otherwise "a contact") and cost only. **Web Push** from the console stays generic ("Approval waiting (1)"). Approval notifications open the card; they never approve.
 - **AI app listings:** the Claude Desktop extension (name, one-line description, icon) and the MCP server's name and icon where an AI app shows them (D1).
 - **npm and GitHub:** the README header image and social preview (D3), with `{productName}` as live text in the source.
 - **Download and update pages:** per-OS download buttons, checksums link, "Signed by 4thTech" wording (D2).
@@ -699,8 +699,8 @@ All components support light, dark and increased contrast, keyboard and screen r
 
 | Component | Anatomy | Variants and states |
 |---|---|---|
-| **Approval card** | Requesting agent, time, expiry · plain headline · who (contact + label) · what · cost · why (the rule) · consequence · Details (Advanced IDs) · **Approve** (labelled with passkey or biometrics) / **Deny**, no default button · "Remember for this contact" (only for new-contact and proof-limit approvals; shows the resulting rule change) · footer: "Your AI can't approve this for you" | **Types:** new contact · proof · file over limit · include document key in export. **States:** pending · waiting for passkey · approved · denied · expired · failed · decided elsewhere |
-| **Commitment approval card** | "Accepting terms" / "Rejecting terms" · contact + label · terms card framed "Proposed by Ana's agent: their content" · diff vs previous version · validity · consequence (reject: "You can't accept this version later") · price honesty line · cost or "Free for you" · auto-accept note if relevant ("doesn't apply: price is in EUR") · **no "remember"** | Accept · reject · firm offer (§14 Q1) · approval-card states + terms expired + newer version arrived |
+| **Approval card** | Requesting agent, time, expiry · plain headline · who (contact + label) · what · cost · why (the rule) · consequence · Details (Advanced IDs) · **Approve** (labelled with passkey or biometrics) / **Deny**, no default button · "Remember for this contact" (only for new-contact and proof-limit approvals; shows the resulting rule change) · new contact: name (name rule), label, fingerprint, safety code and an editable "Name this contact" field prefilled with the suggested alias · footer: "Your AI can't approve this for you" | **Types:** new contact · proof · file over limit · include document key in export. **States:** pending · waiting for passkey · approved · denied · expired · failed · decided elsewhere |
+| **Commitment approval card** | "Accepting terms" / "Rejecting terms" · contact + label · terms card framed "Proposed by Ana's agent: their content" · diff vs previous version · validity · consequence (reject: "You can't accept this version later") · price honesty line ("AgentLink records the agreement. It doesn't move money.") · cost or "Free for you" · auto-accept note if relevant ("doesn't apply: price is in EUR") · **no "remember"** | Accept · reject · firm offer (§14 Q1) · approval-card states + terms expired + newer version arrived |
 | **Terms card / terms diff** | Subject, parties + labels, deliverables, price, deadlines, valid until with countdown, version, proposer / per field: old value struck through, new value, icon + label ("Price changed"). **Subject and deliverable text come from the proposer:** plain text in body style (never heading style), under "Proposed by Ana's agent"; prices and dates are formatted by us. Notes are never part of the recorded terms | Compact · full · proposed · countered · waiting · accepted · rejected · expired / inline · side by side · added · removed · changed |
 | **Negotiation thread** | Version timeline · notes between versions in untrusted containers · state banner · "Accept these terms" | Older versions collapse |
 | **Proof badge, receipt timeline** | Icon + label / Recorded → Delivered → Opened → Accepted or Rejected, with times; pending steps hollow | Recording · Recorded · Delivered · Opened · Accepted · Rejected · Failed · Waiting for approval. The free "Received" mark is visibly lighter |
@@ -718,7 +718,7 @@ All components support light, dark and increased contrast, keyboard and screen r
 | **Usage meter, connector row** | Drop usage this week / provider, account, status, Disconnect | Within · near · reached / connected · expired · disconnected |
 | **OAuth consent card** | AI app name (theirs) + return domain · agent · can / can't lists · Approve in console / access code | Waiting · approved · denied · expired |
 | **Update banner** | Version, What's new, Restart | Available · downloading · ready · not installed · up to date |
-| **Banners, toasts, notifications, empty states** | Network banner (delayed · offline · back) · toast: outcome + view or undo · OS notification: agent, contact, action, cost · empty state: one sentence + a prompt to try | Success · info · warning · error |
+| **Banners, toasts, notifications, empty states** | Network banner (delayed · offline · back) · toast: outcome + view or undo · OS notification: action, contact (alias, otherwise "a contact"), cost; Web Push generic · empty state: one sentence + a prompt to try | Success · info · warning · error |
 | **Tray menu** | Status · Approvals waiting (n) · Open dashboard · Pause / Resume · Update ready · Quit | Connected · paused · offline · update ready |
 | **Wordmark, endorsement, app shell** | `<Wordmark />` + "by 4thTech" lockup / sidebar, bottom tabs, agent switcher, approvals count, desktop window | Full · compact · mono · desktop · mobile · desktop window per OS |
 
