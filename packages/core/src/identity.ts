@@ -6,9 +6,12 @@
 //   endorsed by the agent (cardAgentSig, EIP-712 by agentEvm) through the KeyStore. Both signatures
 //   are checked before anything is stored, so a session of another owner is refused. The signed card
 //   is sealed at rest (`enc`), like the name and relays (IR-M1-7a-1 M-3).
-// - Rotation issues the card for keyEpoch + 1 once the KeyStore backend has advanced its epoch. Old
-//   epoch keys stay derivable, so history stays readable (04 §2.6). While the KeyStore is one epoch
-//   ahead of the stored card, the agent must not send (sendState `rotation_pending`, L-1).
+// - Rotation issues the card for keyEpoch + 1 (04 §2.6; M1-1g-d, IR-M1-7a-1 Q1). The owner flow passes
+//   the backend's KeyEpochControl: preview the next epoch's public keys, sign the next card, store it
+//   as pending, advance the KeyStore with a compare-and-set, then commit key_epoch. Old epoch keys
+//   stay derivable, so history stays readable. While the KeyStore is one epoch ahead of the stored
+//   card, the agent must not send (sendState `rotation_pending`, L-1); on open, a pending card the
+//   owner signed for exactly the KeyStore's epoch finishes the rotation (finishPendingRotation).
 //
 // I-4, D-54: the owner key unlocks only with presence collected by an owner surface (an interactive
 // prompt, a passkey or a native window). The core never takes presence: owner flows (the CLI's own
@@ -20,10 +23,12 @@ import {
   canonicalize,
   encodeBase64url,
   encodeHex0x,
+  KeyStoreError,
   randomBytes,
   verifyCardAgentSig,
   verifyCardOwnerSig,
   type AgentCard,
+  type KeyEpochControl,
   type OwnerPublicKeys,
   type OwnerSession,
   type PublicIdentity,
@@ -38,11 +43,12 @@ import {
   sameOwnerKeys,
   storedCardText,
   type SignedCard,
+  type StoredCard,
 } from './card.js';
 import { STORAGE_PREFIX_BYTES } from './constants.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
-import { SINGLETON_SLOT, type Row } from './store/schema.js';
+import { SINGLETON_SLOT, type Row, type Sealed } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 
 export type { SignedCard } from './card.js';
@@ -84,6 +90,12 @@ export interface RotateIdentityInput {
   readonly owner: OwnerSession;
   readonly ownerKeys: OwnerPublicKeys;
   readonly expiresAt?: number;
+  /**
+   * The agent KeyStore backend's epoch control (M1-1g-d), held by the owner flow, never by
+   * MCP-reachable code (I-4). Needed when the KeyStore is still at the stored epoch; when it is
+   * already one ahead (a rotation interrupted after the advance), the rotation finishes without it.
+   */
+  readonly epochControl?: KeyEpochControl;
 }
 
 function isRevoked(tx: StoreTx, row: Row<'identity'>): boolean {
@@ -214,6 +226,7 @@ export class IdentityService {
       agent_card_json: await seal(ctx, 'identity', 'agent_card_json', key, storedCardText(signed)),
       name: await seal(ctx, 'identity', 'name', key, name),
       relays: await seal(ctx, 'identity', 'relays', key, canonicalize([...relays])),
+      pending_card_json: null,
       key_epoch: bundle.keyEpoch,
       storage_prefix: encodeBase64url(randomBytes(STORAGE_PREFIX_BYTES)),
       revoked_at: null,
@@ -243,8 +256,12 @@ export class IdentityService {
   }
 
   /**
-   * Issues the card for keyEpoch + 1 (04 §2.6). The KeyStore must already be at that epoch (the
-   * backend advances it, M1-1g-d); the EVM key, the name, the relays and the owner keys stay the same.
+   * Issues the card for keyEpoch + 1 (04 §2.6) and moves the KeyStore there (M1-1g-d). With the
+   * KeyStore at the stored epoch n: previewEpoch(n + 1), sign the card (owner, then agent), store it
+   * as pending, advanceEpoch(n, owner) (compare-and-set), commit key_epoch = n + 1. With the KeyStore
+   * already at n + 1 (an interrupted rotation, or a backend advanced elsewhere), sign and commit. The
+   * EVM key, the name, the relays and the owner keys stay the same. Of concurrent rotations, one
+   * wins; the others fail a compare-and-set (`key_epoch_mismatch`).
    */
   async rotate(input: RotateIdentityInput): Promise<IdentityView> {
     const ctx = this.#ctx;
@@ -260,11 +277,19 @@ export class IdentityService {
     if (bundle.agentId !== old.agentId) {
       throw new CoreError('identity_mismatch', 'The keys do not belong to this agent.');
     }
-    if (bundle.keyEpoch !== old.keyEpoch + 1) {
-      throw new CoreError(
-        'key_epoch_mismatch',
-        'The key store is not at the next key epoch for this agent.',
-      );
+    let next: PublicIdentity;
+    let control: KeyEpochControl | undefined;
+    if (bundle.keyEpoch === old.keyEpoch + 1) {
+      next = bundle;
+    } else if (bundle.keyEpoch === old.keyEpoch && input.epochControl !== undefined) {
+      control = input.epochControl;
+      next = await control.previewEpoch(old.keyEpoch + 1);
+      if (next.agentId !== old.agentId) {
+        throw new CoreError('identity_mismatch', 'The keys do not belong to this agent.');
+      }
+      if (next.keyEpoch !== old.keyEpoch + 1) throw nextEpochMismatch();
+    } else {
+      throw nextEpochMismatch();
     }
     // Owner-key rotation is P2 (04 §2.6): the new card names the same owner keys.
     if (!sameOwnerKeys(old.card, ownerKeyFields(input.ownerKeys))) {
@@ -276,30 +301,50 @@ export class IdentityService {
       await open(ctx, 'identity', 'relays', key, current.row.relays),
     );
     const now = nowOf(ctx);
-    const signed = await this.#issue(bundle, input, name, relays, now);
+    // The session signs the card first, and its signature must recover to the stored owner keys:
+    // that is what binds the session handed to advanceEpoch to this agent's owner.
+    const signed = await this.#issue(next, input, name, relays, now);
+    const text = storedCardText(signed);
+    const sealedCard = await seal(ctx, 'identity', 'agent_card_json', key, text);
+    // Every write is a compare-and-set on the epoch the card was issued from.
+    const where = { agent_id: old.agentId, key_epoch: old.keyEpoch, revoked_at: null };
+
+    if (control !== undefined) {
+      // 1. Store the owner-signed next card as pending.
+      const sealedPending = await seal(ctx, 'identity', 'pending_card_json', key, text);
+      await ctx.store.transaction((tx) => {
+        assertNotRevoked(tx, old.agentId);
+        if (tx.update('identity', where, { pending_card_json: sealedPending }) !== 1) {
+          throw concurrentRotation();
+        }
+      });
+      // 2. Advance the KeyStore: compare-and-set on the stored epoch, with the owner session.
+      try {
+        await control.advanceEpoch(old.keyEpoch, input.owner);
+      } catch (error) {
+        if (error instanceof KeyStoreError && error.code === 'epoch_conflict') {
+          throw concurrentRotation();
+        }
+        throw error;
+      }
+      // The control must have advanced this client's own KeyStore, to exactly the signed keys.
+      if (!sameAgentKeys(await ctx.keyStore.getPublicBundle(), signed.card)) {
+        throw nextEpochMismatch();
+      }
+    }
+
+    // 3. Commit the card and key_epoch, and clear the pending card.
     const patch = {
-      agent_card_json: await seal(ctx, 'identity', 'agent_card_json', key, storedCardText(signed)),
-      key_epoch: bundle.keyEpoch,
+      agent_card_json: sealedCard,
+      pending_card_json: null,
+      key_epoch: next.keyEpoch,
       updated_at: now,
     };
     await ctx.store.transaction((tx) => {
-      if (tx.get('revoked_agents', { agent_evm: old.agentId }) !== undefined) {
-        throw new CoreError('identity_revoked', 'This agent has been revoked by its owner.');
-      }
-      // Compare-and-set on the epoch it was issued from: a concurrent rotation changes nothing.
-      const changed = tx.update(
-        'identity',
-        { agent_id: old.agentId, key_epoch: old.keyEpoch, revoked_at: null },
-        patch,
-      );
-      if (changed !== 1) {
-        throw new CoreError(
-          'key_epoch_mismatch',
-          'The identity changed while the new card was issued. Try again.',
-        );
-      }
+      assertNotRevoked(tx, old.agentId);
+      if (tx.update('identity', where, patch) !== 1) throw concurrentRotation();
     });
-    ctx.log.info('identity rotated', { keyEpoch: bundle.keyEpoch });
+    ctx.log.info('identity rotated', { keyEpoch: next.keyEpoch });
     return this.#view({ ...current.row, ...patch }, false);
   }
 
@@ -350,6 +395,117 @@ export class IdentityService {
     }
     return { card, cardSig, cardAgentSig };
   }
+}
+
+function nextEpochMismatch(): CoreError {
+  return new CoreError(
+    'key_epoch_mismatch',
+    'The key store is not at the next key epoch for this agent.',
+  );
+}
+
+function concurrentRotation(): CoreError {
+  return new CoreError(
+    'key_epoch_mismatch',
+    'The identity changed while the new card was issued. Try again.',
+  );
+}
+
+function assertNotRevoked(tx: StoreTx, agentId: string): void {
+  if (tx.get('revoked_agents', { agent_evm: agentId }) !== undefined) {
+    throw new CoreError('identity_revoked', 'This agent has been revoked by its owner.');
+  }
+}
+
+/** True when the card names exactly the KeyStore's agent keys at the card's epoch. */
+function sameAgentKeys(bundle: PublicIdentity, card: AgentCard): boolean {
+  return (
+    bundle.agentId === card.agentEvm &&
+    bundle.keyEpoch === card.keyEpoch &&
+    encodeHex0x(bundle.agentNostr) === card.agentNostr &&
+    encodeHex0x(bundle.agentEnc) === card.agentEnc
+  );
+}
+
+/**
+ * The stored pending card if it finishes a rotation to the KeyStore's epoch, else undefined. It must
+ * open and verify (cardSig and cardAgentSig), be for the stored epoch + 1, name exactly the
+ * KeyStore's keys at that epoch, and keep the current card's owner keys, name and relays.
+ */
+async function usablePendingCard(
+  ctx: CoreContext,
+  row: Row<'identity'>,
+  sealed: Sealed,
+  bundle: PublicIdentity,
+): Promise<StoredCard | undefined> {
+  const key = [row.agent_id];
+  try {
+    const pending = parseStoredCard(await open(ctx, 'identity', 'pending_card_json', key, sealed));
+    const current = parseStoredCard(
+      await open(ctx, 'identity', 'agent_card_json', key, row.agent_card_json),
+    ).card;
+    const usable =
+      pending.cardAgentSig !== null &&
+      current.agentEvm === row.agent_id &&
+      current.keyEpoch === row.key_epoch &&
+      pending.card.keyEpoch === row.key_epoch + 1 &&
+      sameAgentKeys(bundle, pending.card) &&
+      sameOwnerKeys(current, pending.card) &&
+      pending.card.nameHash === current.nameHash &&
+      pending.card.relaysHash === current.relaysHash;
+    return usable ? pending : undefined;
+  } catch (error) {
+    if (error instanceof CoreError) return undefined;
+    throw error;
+  }
+}
+
+/**
+ * On open (AgentLinkClient.create; M1-1g-d, IR-M1-7a-1 Q1). When the KeyStore is one epoch ahead of
+ * the stored identity and the pending card is signed by the stored owner for exactly the KeyStore's
+ * keys, the rotation finishes without a new owner signature: the owner signed that card before the
+ * KeyStore advanced. Otherwise nothing changes, and with the KeyStore ahead the identity stays
+ * `rotation_pending` (no send) until the owner runs rotate again. A revoked agent never finishes.
+ */
+export async function finishPendingRotation(ctx: CoreContext): Promise<void> {
+  const got = await readIdentity(ctx);
+  if (got === undefined || got.revoked) return;
+  const { row } = got;
+  const sealed = row.pending_card_json;
+  if (sealed === null) return;
+  const bundle = await ctx.keyStore.getPublicBundle();
+  if (bundle.agentId !== row.agent_id || bundle.keyEpoch !== row.key_epoch + 1) return;
+  const pending = await usablePendingCard(ctx, row, sealed, bundle);
+  if (pending === undefined) {
+    ctx.log.warn('pending rotation card not usable', { keyEpoch: row.key_epoch });
+    return;
+  }
+  const sealedCard = await seal(
+    ctx,
+    'identity',
+    'agent_card_json',
+    [row.agent_id],
+    storedCardText(pending),
+  );
+  const now = nowOf(ctx);
+  const finished = await ctx.store.transaction((tx) => {
+    if (isRevoked(tx, row)) return false;
+    // Exactly the row and the pending card that were verified; otherwise another flow moved on.
+    const where = {
+      agent_id: row.agent_id,
+      key_epoch: row.key_epoch,
+      revoked_at: null,
+      pending_card_json: sealed,
+    };
+    const patch = {
+      agent_card_json: sealedCard,
+      pending_card_json: null,
+      key_epoch: bundle.keyEpoch,
+      updated_at: now,
+    };
+    return tx.update('identity', where, patch) === 1;
+  });
+  if (finished) ctx.log.info('identity rotation finished', { keyEpoch: bundle.keyEpoch });
 }
 
 function checkStoredRelays(text: string): readonly string[] {

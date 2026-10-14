@@ -17,6 +17,8 @@
 // - Owner signatures exist only on an OwnerSession, and the only way to get one is
 //   OwnerKeyStore.unlock(presence). A session is short-lived, and lock, close and expiry wipe its
 //   key material.
+// - The key epoch moves only through KeyEpochControl.advanceEpoch (M1-1g-d), an owner-only
+//   compare-and-set on the backend's management surface, never on the KeyStore the agent path uses.
 // - Errors are fixed sentences that never contain an input (I-7).
 import type { TypedData } from './eip712.js';
 import type { WrappedCek } from './hpke.js';
@@ -36,6 +38,12 @@ export type KeyStoreErrorCode =
   | 'presence_rejected'
   /** A key epoch above the store's current epoch. */
   | 'epoch_unavailable'
+  /**
+   * The store is not at the key epoch the caller named: a compare-and-set advance (or a preview)
+   * found another epoch, because another flow advanced it first or the caller's view is stale.
+   * Nothing changed.
+   */
+  | 'epoch_conflict'
   /** This backend does not implement the operation yet; it fails closed. */
   | 'unsupported_operation'
   /**
@@ -122,6 +130,48 @@ export interface KeyStore extends EnvelopeKeys {
 
   /** Wipes what the store holds in memory; every later call fails with `keystore_closed`. */
   close(): Promise<void>;
+}
+
+/**
+ * The key-epoch management surface of a KeyStore backend (M1-1g-d; IR-M1-7a-1 Q1; 04 §2.6, §3.1.1).
+ * Owner flows only: the CLI's own terminal and the local UI hold it next to the OwnerSession they
+ * unlocked, and pass it to core's identity.rotate. It is deliberately not part of `KeyStore`, so the
+ * agent path (MCP tools, transport, core's send and receive) has no way to move the epoch (I-4).
+ *
+ * Rotation order (core): previewEpoch(n + 1), sign the n + 1 card with the owner session, store it
+ * as pending, advanceEpoch(n, owner), then commit key_epoch = n + 1. Whatever step a crash
+ * interrupts, the agent either finishes the rotation from the owner-signed pending card or refuses
+ * to send (`rotation_pending`); it never sends under keys no contact knows.
+ *
+ * Contract for every backend (Node keychain and file, M1-8a, M1-8f; Worker, M2-3a):
+ * - advanceEpoch is a compare-and-set: it moves the current epoch from exactly `expected` to
+ *   `expected + 1`, or fails with `epoch_conflict` and changes nothing. Two advances from the same
+ *   epoch never both succeed, in one process or across processes.
+ * - It is atomic and durable before it resolves: after a crash, the stored epoch is either
+ *   `expected` or `expected + 1`, never anything else and never a torn record.
+ * - It needs a live OwnerSession (`owner_locked` once the session has ended, `presence_required`
+ *   without one). The backend cannot tell which owner the session belongs to; core binds it, because
+ *   the same session must first sign the n + 1 card under the owner keys of the stored card. This is
+ *   a capability guard, not a cryptographic boundary: a same-user process that edits the backend's
+ *   stored epoch only stops the agent from sending (04 §2.5 residual; IR-M1-7a-1 Q1).
+ * - Older epochs stay usable for decryption and the public-key lookup only; signing and encryption
+ *   always use the current epoch. No method here returns a secret.
+ */
+export interface KeyEpochControl {
+  /**
+   * The public keys of `epoch`, which must be the current epoch + 1, without advancing: the owner
+   * signs the next card before the advance. Public keys only; getPublicBundle, signing and
+   * decryption at that epoch stay `epoch_unavailable` until advanceEpoch. Any other epoch is refused:
+   * the current one or lower with `epoch_conflict`, a later one with `epoch_unavailable`.
+   */
+  previewEpoch(epoch: number): Promise<PublicIdentity>;
+
+  /**
+   * Compare-and-set: advances the current epoch from `expected` to `expected + 1` and returns the
+   * public bundle of the new epoch. Fails with `epoch_conflict` (nothing changed) unless the store is
+   * at `expected`; with `owner_locked` or `presence_required` unless `owner` is a live session.
+   */
+  advanceEpoch(expected: number, owner: OwnerSession): Promise<PublicIdentity>;
 }
 
 /**

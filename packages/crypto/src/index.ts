@@ -104,6 +104,7 @@ export {
   OWNER_SESSION_MAX_TTL_MS,
   type EnvelopeKeys,
   type EpochOptions,
+  type KeyEpochControl,
   type KeyStore,
   type KeyStoreErrorCode,
   type OwnerKeyStore,

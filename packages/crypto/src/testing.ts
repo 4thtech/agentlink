@@ -36,6 +36,7 @@ import {
   OWNER_SESSION_DEFAULT_TTL_MS,
   OWNER_SESSION_MAX_TTL_MS,
   type EpochOptions,
+  type KeyEpochControl,
   type KeyStore,
   type OwnerKeyStore,
   type OwnerPresence,
@@ -197,12 +198,39 @@ export interface MemoryKeyStoreOptions {
 }
 
 /**
+ * The owner-session guard of KeyEpochControl.advanceEpoch (M1-1g-d): a live OwnerSession is
+ * required. It is a capability check (I-4), not proof of which owner holds it; core binds the
+ * session to the agent's owner by having it sign the next card first (keystore-api.ts).
+ */
+function assertLiveSession(owner: unknown): void {
+  if (
+    typeof owner !== 'object' ||
+    owner === null ||
+    typeof (owner as { isActive?: unknown }).isActive !== 'function'
+  ) {
+    throw new KeyStoreError('presence_required', 'owner keystore: a presence proof is required');
+  }
+  if ((owner as OwnerSession).isActive() !== true) {
+    throw new KeyStoreError('owner_locked', 'owner keystore: the owner session has ended');
+  }
+}
+
+const epochConflict = (): KeyStoreError =>
+  new KeyStoreError('epoch_conflict', 'keystore: the key epoch is not the expected one');
+const epochUnavailable = (): KeyStoreError =>
+  new KeyStoreError('epoch_unavailable', 'keystore: that key epoch is not available');
+
+/**
  * A KeyStore over a 32-byte master seed held in memory. NOT FOR PRODUCTION (see the file header).
  * The constructor copies the seed; the caller may wipe its own buffer at once.
+ *
+ * It is also the reference KeyEpochControl (M1-1g-d): the epoch changes only in advanceEpoch, whose
+ * check and set run in one synchronous step, so concurrent advances from one epoch cannot both win.
+ * Being in memory, it has nothing to make durable; real backends must (keystore-api.ts).
  */
-export class MemoryKeyStore implements KeyStore {
+export class MemoryKeyStore implements KeyStore, KeyEpochControl {
   readonly #seed: Uint8Array;
-  readonly #keyEpoch: number;
+  #keyEpoch: number;
   #closed = false;
 
   constructor(masterSeed: Uint8Array, options: MemoryKeyStoreOptions = {}) {
@@ -221,10 +249,32 @@ export class MemoryKeyStore implements KeyStore {
   #epochOf(options: EpochOptions | undefined): number {
     const epoch = options?.epoch ?? this.#keyEpoch;
     assertEpoch(epoch);
-    if (epoch > this.#keyEpoch) {
-      throw new KeyStoreError('epoch_unavailable', 'keystore: that key epoch is not available');
-    }
+    if (epoch > this.#keyEpoch) throw epochUnavailable();
     return epoch;
+  }
+
+  previewEpoch(epoch: number): Promise<PublicIdentity> {
+    return Promise.resolve().then(() => {
+      const seed = this.#open();
+      assertEpoch(epoch);
+      if (epoch <= this.#keyEpoch) throw epochConflict();
+      if (epoch !== this.#keyEpoch + 1) throw epochUnavailable();
+      return derivePublicIdentity(seed, epoch);
+    });
+  }
+
+  advanceEpoch(expected: number, owner: OwnerSession): Promise<PublicIdentity> {
+    return Promise.resolve().then(() => {
+      // One synchronous step from the check to the set: the compare-and-set is atomic.
+      const seed = this.#open();
+      assertEpoch(expected);
+      assertLiveSession(owner);
+      if (expected !== this.#keyEpoch) throw epochConflict();
+      if (expected === MAX_KEY_EPOCH) throw epochUnavailable();
+      const bundle = derivePublicIdentity(seed, expected + 1);
+      this.#keyEpoch = expected + 1;
+      return bundle;
+    });
   }
 
   getPublicBundle(options?: EpochOptions): Promise<PublicIdentity> {

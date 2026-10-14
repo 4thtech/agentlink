@@ -11,7 +11,7 @@ import { STORE_SCHEMA_VERSION } from './constants.js';
 import { ContactBook } from './contacts.js';
 import type { CoreContext } from './context.js';
 import { CoreError } from './errors.js';
-import { IdentityService } from './identity.js';
+import { IdentityService, finishPendingRotation } from './identity.js';
 import type { Store, StoreCipher } from './store/store.js';
 
 export interface AgentLinkClientOptions {
@@ -71,9 +71,10 @@ export class AgentLinkClient {
           'The keys do not belong to the agent in this store.',
         );
       }
-      // The KeyStore is at the stored epoch, or one ahead until the owner completes identity.rotate.
-      // In that state the client opens but must not send: identity.sendState() is `rotation_pending`
-      // and assertCanSend() refuses (IR-M1-7a-1 L-1; the epoch advance itself is M1-1g-d).
+      // The KeyStore is at the stored epoch, or one ahead while a rotation is unfinished (M1-1g-d).
+      // One ahead: a pending card the owner signed for exactly these keys finishes it below;
+      // without one the client opens but must not send: identity.sendState() is
+      // `rotation_pending` and assertCanSend() refuses (IR-M1-7a-1 L-1, Q1). Anything else is refused.
       if (bundle.keyEpoch !== row.key_epoch && bundle.keyEpoch !== row.key_epoch + 1) {
         throw new CoreError('key_epoch_mismatch', 'The key store epoch does not match this agent.');
       }
@@ -85,6 +86,7 @@ export class AgentLinkClient {
       now: options.clock ?? systemClock,
       log: options.logger ?? createLogger({ name: 'core' }),
     };
+    if (row !== undefined) await finishPendingRotation(ctx);
     return new AgentLinkClient(bundle.agentId, ctx, approvals);
   }
 }

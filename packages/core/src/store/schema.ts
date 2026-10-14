@@ -70,11 +70,14 @@ export const SINGLETON_SLOT = 'current' as const;
 export const TABLES = {
   // 07 §3; G-23. agent_card_json is `enc` and holds the signed card, {card, cardSig, cardAgentSig}
   // (IR-M1-7a-1 M-3: a clear card exposes nameHash and relaysHash). Added: name and relays (the
-  // off-chain card fields, `enc`), updated_at.
+  // off-chain card fields, `enc`), updated_at. pending_card_json (M1-1g-d, `enc`, null when no
+  // rotation is in progress): the owner-signed card for key_epoch + 1, stored before the KeyStore
+  // advances, {card, cardSig, cardAgentSig} like agent_card_json.
   identity: {
     columns: {
       agent_id: id,
       agent_card_json: enc,
+      pending_card_json: opt('enc'),
       name: enc,
       relays: enc,
       key_epoch: int,

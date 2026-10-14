@@ -1041,8 +1041,9 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Regressions in `tools/deps-check`: each of those imports planted in `e2e/` fails both tools, and the seam import passes. The repository scan covers `e2e/`.
 
 #### M1-1g-d · crypto: owner-only epoch advance with compare-and-set, and an epoch + 1 public preview (new, IR-M1-7a-1 Q1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** in-progress (branch `feat/M1-1g-d-epoch-advance`; interface, MemoryKeyStore and the core rotation flow; the Node backends implement the contract with M1-8a, M1-8f) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/crypto (interface and test doubles), packages/node (backends with M1-8a, M1-8f), packages/core (rotation flow)
+- **As built:** the preview is `KeyEpochControl.previewEpoch(n + 1)` on the management surface rather than a wider `getPublicBundle`, so the agent-path lookup keeps its 04 §3.1.1 rule (no epoch above the current one). The advance is `advanceEpoch(expected, ownerSession)`. `identity` gains `pending_card_json` (07 §3).
 - **Depends on:** M1-1g, M1-7a
 - **Spec:** 04 §2.6, §3.1.1 (Key interfaces, Epochs); 07 §9
 - **Invariants:** I-1, I-4
