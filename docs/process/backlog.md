@@ -67,7 +67,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 96 (M1a 43, M1b 53; incl. 11 split-off, 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, and M1-1l and M1-3l from D-66) |
+| M1 Local beta | 97 (M1a 43, M1b 54; incl. 11 split-off, 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, and M1-3n as a follow-up to M1-3e) |
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 21 (incl. 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
@@ -1429,6 +1429,25 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests first (local red run): a delegated signer whose delegate does not validate the key is accepted through the fallback; one whose delegate rejects and whose ECDSA signature is wrong is refused; a 23-byte code that is not a designator gets no fallback; the gas bound holds.
   - In M3-1a scope; independent review.
+
+#### M1-3n · contracts: stabilise the batch invariant suite's non-vacuity checks (new, follow-up to M1-3e)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** occ-v2-contracts · test/invariant/**
+- **Depends on:** M1-3e
+- **Spec:** `audit-rules.md` §5 (non-vacuity of invariant suites); 05 §3.3 (batch outcomes)
+- **Invariants:** I-6
+- **Scope:** a test-harness flake only; no contract change and no change to what the suite proves.
+  - **Symptom.** `test (invariant)` in contracts CI can fail on `main` and on pull requests with a `NotaryBatch` invariant suite message such as "wrong-salt or non-recipient batches: 0 <= 0". No code changed between a green run and the red one: the invariant job runs with a random fuzz seed. Reproduced locally on current `main` with the `ci` profile (fuzz seed 16: one failing run in 3,072).
+  - **Cause (measured).** The suite checks, once per run (`afterInvariant`, at 300 calls or more), that six kinds of event happened at least once. Four are driven by actions that first restore normal operation, and have wide margins (at least 28 events in every one of 6,144 measured runs). Two come only from random choices inside the receipt-batch action: a batch rejected for a wrong salt or a non-recipient signer, and an expired receipt batch. They average about 9.4 events per 500-call run, so a run with none is rare (2 such runs in about 15,000 measured, matching the Poisson estimate of one in 12,000 per check). With 512 runs per job and two such checks, roughly one invariant job in 12 to 15 is red by chance. A longer failing sequence is shrunk to exactly 300 calls (the check's arming threshold), so the printed sequence looks unrelated to the cause.
+  - **Fix, in order of preference (never weaken or remove a check, never lower the 300-call threshold, never pin the fuzz seed to hide it):**
+    1. Bias the handler: add actions that first restore normal operation and then submit a receipt batch built to be rejected for each reason (wrong salt, a signer who is not the recipient, an expired receipt), the pattern the suite already uses for the under-funded batch. Give them the selector weight needed for a safe margin.
+    2. Add ghost counters of the attempts made and keep every existing floor as it is, then raise the `ci` profile's invariant depth only if the margin measured after step 1 needs it. Report the extra CI time, because the suite is already the longest invariant job.
+  - Audit the sibling suites' floors the same way (the Notary suite is thinner than the vault's: its minimum over 6,144 local runs was 2 receipts and 2 skipped duplicates; the fee-vault suite has one check). Fix only a floor whose measured margin is under the target below.
+- **Acceptance:**
+  - Tests first (local red run per `audit-rules.md` §3.4): show that the new or changed floors fail when the biasing action is removed.
+  - Every non-vacuity floor has a measured minimum of at least 10 per run over at least 10,000 runs at the `ci` profile (10 or more seeds, no pinned seed in the workflow); the measurement table is in the PR.
+  - All suites green for the same runs; the `deep` profile is unchanged or faster; no contract file is touched.
+  - Independent review; the sibling-suite audit is recorded (changed or "margin adequate" per suite).
 
 #### M1-14 · Testnet chain and fee configuration verification, stablecoin allowlist (D-45, D-46) (new)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
