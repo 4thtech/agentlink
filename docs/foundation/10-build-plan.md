@@ -138,7 +138,7 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 | Task | Acceptance |
 |---|---|
 | M3-1 External audit of contracts; independent review of `crypto` + `core` | All high/medium findings fixed |
-| M3-2 Treasury Safes, timelocks, roles per chain; deploy to **Base + Gnosis** | Deployer holds no role (scripted check) |
+| M3-2 Treasury Safes, roles and AccessManager delays (the timelock, 05 §5) per chain; deploy to **Base + Gnosis** | Deployer holds no role (scripted check) |
 | M3-3 Fee configuration (stablecoins only at launch: USDC, USDT where available, xDAI on Gnosis; D-46) and pricing for beta | `agentlink_status` prices and every paid result show USD with the protocol and integrator split |
 | M3-4 Credits UX: `depositFor` page, gasless USDC (EIP-3009) | J3 completed without gas |
 | M3-5 Submitter mainnet with gas monitoring and alerts | — |

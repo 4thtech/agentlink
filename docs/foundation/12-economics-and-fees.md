@@ -123,9 +123,10 @@ The multiple defaults to **4** and can never exceed **10** (a contract constant)
 | Set a fee within its cap (up or down) | `FEE_ADMIN` (4thTech Safe) | None |
 | Lower a cap | `FEE_ADMIN` | None |
 | Raise a cap, or change the integrator multiple | `CAP_RAISER` (Safe) | **7 days** |
-| Allowlist or remove a fee token, set `minDeposit` | `ADMIN` (Safe) | 48 h |
+| Allowlist or remove a fee token, set `minDeposit` | `CONFIG_ADMIN` (Safe) | 48 h |
 | Change the treasury | `TREASURY_ADMIN` (Safe) | 7 days |
 | Pause charging | `PAUSER` | None; **never blocks withdrawals** |
+| Register a module, upgrade a contract (proposed, G-3) | `MODULE_ADMIN`, `UPGRADER` (Safe) | **7 days** |
 
 **Public price policy** (a commitment, not enforced on-chain):
 

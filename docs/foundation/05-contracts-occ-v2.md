@@ -39,8 +39,8 @@ mapping(address token => uint256) minDeposit;                          // anti-g
 uint16 integratorFeeCapMultiple;                                       // default 4 (×protocol fee), ≤ MAX_MULTIPLE = 10 (constant)
 ```
 
-- `FEE_ADMIN` sets `protocolFee` ≤ `maxProtocolFee` (immediate).
-- `maxProtocolFee` can be **lowered** immediately and only **raised** with a 7-day execution delay, so users see fee-cap increases in advance.
+- `FEE_ADMIN` sets `protocolFee` ≤ `maxProtocolFee` (immediate; above the cap reverts `FeeAboveCap()`).
+- `maxProtocolFee` can be **lowered** immediately and only **raised** with a 7-day execution delay, so users see fee-cap increases in advance. These are two functions, each mapped to one role (§5, G-3; proposed, owner confirms at merge): **lower the cap** (`FEE_ADMIN`, immediate; if the current fee is above the new cap, the fee drops to the cap) and **raise the cap** (`CAP_RAISER`, 7 days). Each reverts `InvalidCapChange()` if the new value goes the other way.
 - Fees are fixed token amounts (no oracle).
 - **Launch configuration (D-45, D-46; 12 §2–§3):** only USD stablecoins are allowlisted: USDC, USDT where available, and on Gnosis the native xDAI (`address(0)`), which counts as a USD-pegged native coin. No volatile native coin (e.g. ETH) is allowlisted. Each token is valued at $1, so every fee is the same USD amount on every chain: `NOTARIZE` $0.10 with `maxProtocolFee` $0.50, `REGISTER` $5 with `maxProtocolFee` $25, set in token units (USD × 10^decimals, e.g. 500000 for $0.50 in 6-decimal USDC). `ANCHOR`, `DEAL` and `DISCLOSE` are not configured (fee 0 and cap 0; their modules do not exist yet).
 - Removing a token from the allowlist stops new deposits and charges in it; `withdraw` of existing credits in it keeps working (§2.5 invariant).
@@ -219,20 +219,48 @@ function getAgent(address agentEvm) external view returns (AgentEntry memory);
 
 ## 5. Roles and governance
 
-OpenZeppelin `AccessManager` with **per-function execution delays**:
+OpenZeppelin Contracts v5 `AccessManager`; the role map below is **proposed; owner confirms at merge (G-3)**. The vault, the Notary and the Registry each delegate access control to it as their authority.
 
-| Role | Holder | Powers | Delay |
-|---|---|---|---|
-| `ADMIN` | 4thTech Safe (≥ 2-of-3) | Grant roles, register modules, allowlist tokens, set `minDeposit` | 48 h |
-| `FEE_ADMIN` | 4thTech Safe | Set fees ≤ caps, lower caps, (de)activate apps | 0 |
-| `CAP_RAISER` | 4thTech Safe | Raise `maxProtocolFee`, change `integratorFeeCapMultiple` | 7 days |
-| `TREASURY_ADMIN` | 4thTech Safe | Change treasury | 7 days |
-| `PAUSER` | Ops hardware key + Safe | Pause charging/notarization (never withdrawals) | 0 |
-| `UPGRADER` | 4thTech Safe | Notary/Registry upgrades: 48 h. Vault upgrades: 7 days (users can withdraw first) | 48 h / 7 days |
+**How the delays work.** In AccessManager, an execution delay attaches to a (role, account) grant, not to a function, and each restricted function maps to exactly one role. So every distinct delay is its own role (one role per power and delay), and every direction-dependent change has two functions: lowering vs raising the cap, `pause` vs `unpause`. The AccessManager delays are the timelock: there is no separate `TimelockController`. The Safe schedules, waits and executes through the AccessManager. An operation not executed within one week after it becomes executable expires (OZ `expiration()`) and must be scheduled again.
 
-**Freeze:** the Notary has a one-way `freezeUpgrades()` (ADMIN, 7-day delay). After it runs, `_authorizeUpgrade` always reverts, regardless of roles. It is executed at GA so records stay permanently neutral. The vault stays upgradeable with a 7-day delay.
+**User functions are never restricted.** Credits, quotes, apps, `sweep`, notarization, receipts, registration, revocation and views carry no access check in code. No AccessManager setting can gate them, and `withdraw` works in every state (§2.5). `charge` and `depositFromModule` check the vault's module list in code.
 
-Contracts are UUPS proxies with ERC-7201 namespaced storage.
+### 5.1 Role map
+
+| ID | Role | Restricted functions (contract) | Mainnet holder | Execution delay | Grant delay | Guardian | Role admin |
+|---|---|---|---|---|---|---|---|
+| 0 | `ADMIN_ROLE` (OZ built-in) | No contract function. AccessManager administration only: grants and revocations by default, role admins, guardians, grant delays, target function roles, target admin delays, closing targets, `updateAuthority` | 4thTech Safe (≥ 2-of-3) | **7 days** | 7 days | — (OZ allows none; the Safe itself cancels) | — |
+| 1 | `FEE_ADMIN` | Set the protocol fee ≤ cap, lower the cap, (de)activate apps (vault) | Safe | 0 | 0 | — | `ADMIN_ROLE` |
+| 2 | `PAUSER` | `pause` (vault, Notary, Registry) | Ops hardware key **and** Safe | 0 | 0 | — | `PAUSE_ADMIN` |
+| 3 | `PAUSE_ADMIN` | `unpause` (vault, Notary, Registry); admin of `PAUSER` | Safe | 0 | 0 | — | `ADMIN_ROLE` |
+| 4 | `GUARDIAN` | No function; guardian of roles 10–24, so it can **cancel** their scheduled operations, never execute | Ops hardware key | 0 | 0 | — | `ADMIN_ROLE` |
+| 10 | `CONFIG_ADMIN` | Allowlist or remove a fee token, set `minDeposit` (vault) | Safe | 48 h | 48 h | `GUARDIAN` | `ADMIN_ROLE` |
+| 20 | `CAP_RAISER` | Raise the cap, set `integratorFeeCapMultiple` (vault) | Safe | 7 days | 7 days | `GUARDIAN` | `ADMIN_ROLE` |
+| 21 | `TREASURY_ADMIN` | Change the treasury (vault) | Safe | 7 days | 7 days | `GUARDIAN` | `ADMIN_ROLE` |
+| 22 | `MODULE_ADMIN` | Register or remove a module (vault) | Safe | 7 days | 7 days | `GUARDIAN` | `ADMIN_ROLE` |
+| 23 | `UPGRADER` | `upgradeToAndCall` (vault, Notary, Registry) | Safe | 7 days | 7 days | `GUARDIAN` | `ADMIN_ROLE` |
+| 24 | `FREEZER` | `freezeUpgrades` (Notary) | Safe | 7 days | 7 days | `GUARDIAN` | `ADMIN_ROLE` |
+
+- **Target admin delay** = 7 days on the vault, the Notary and the Registry. Remapping a function to another role, closing a target or switching its authority (`updateAuthority`) therefore takes at least 7 days.
+- **`minSetback`** stays at the OZ default (5 days, not overridden). Every change to a grant delay or a target admin delay takes effect after max(5 days, the reduction), so a delay can never be shortened faster than it protects.
+- **Why 7 days for modules and every upgrade.** A module can call `charge` for any payer. A malicious module, or a malicious upgrade of the Notary or the Registry (both are modules), could therefore drain credits in fee-sized steps to an integrator app it controls. Registering a module and upgrading any module carry the same 7-day delay as a vault upgrade, so users can withdraw first. (This replaces the earlier 48 h for Notary and Registry upgrades and for module registration.)
+- **Why `ADMIN_ROLE` is 7 days.** With every AccessManager change at 7 days, no path to a 7-day power is shorter than 7 days. Grant delays and target admin delays add a second, independent layer. The only exceptions are the 0-delay emergency and fee roles above. Execution delays of existing members can be lowered only after the reduction (OZ); a revoke-and-regrant counts as a new grant and waits for the grant delay.
+- **Bound (tested in M1-3a).** With the Safe compromised, every path to `UPGRADER`, `MODULE_ADMIN`, `TREASURY_ADMIN`, `CAP_RAISER` or `FREEZER` power takes at least 7 days on-chain. That covers using the role, granting it to a new account, remapping the function, switching the authority, and lowering a delay first. `CONFIG_ADMIN` power takes at least 48 h.
+- **Emergency.**
+  - `PAUSER` (ops key or Safe) pauses at once. Pause blocks charges, deposits and notarization, never withdrawals.
+  - Only the Safe unpauses (`PAUSE_ADMIN`), so a stolen ops key cannot undo a pause during an incident. It can only pause again (denial of service). The Safe revokes it at once, because `PAUSE_ADMIN` administers `PAUSER` with no delay.
+  - `GUARDIAN` or the Safe cancels any unexpected scheduled operation at once. OZ allows no guardian on `ADMIN_ROLE`, so only the Safe or the scheduler can cancel scheduled AccessManager changes.
+- **Deployment (§9, D-52).**
+  - The deployer is the AccessManager's initial admin only inside the deploy script. The script maps every selector, sets delays, guardians and role admins, grants the roles above and renounces `ADMIN_ROLE`. The deployer holds no role afterwards (checked by script).
+  - Grant delays and target admin delays configured at deployment take effect only after `minSetback` (5 days).
+  - **Mainnet** contracts are therefore initialised **paused**. The Safe unpauses after the post-deploy check reads back every grant delay and target admin delay as in effect.
+  - **Testnets** are unpaused at deployment (faucet funds only).
+- **Testnets** use the same role IDs, selector map, guardians and role admins, with a separate **testnet Safe** and testnet ops key (never shared with mainnet, `release-and-deployment.md` §1). Delays are scaled so upgrades can be rehearsed during the beta: 48 h → 1 h, 7 days → 4 h, for execution and grant delays and the target admin delay. The values live in the per-chain config, and the M1-3a test checks them per chain.
+- Mainnet configuration, upgrades and Safe operations are owner-only (D-25, D-52): agents prepare evidence; they never schedule, sign, execute or cancel (`release-and-deployment.md` §4.4).
+
+**Freeze:** the Notary has a one-way `freezeUpgrades()` (`FREEZER`, 7-day delay). After it runs, `_authorizeUpgrade` always reverts, regardless of roles. It is executed at GA so records stay permanently neutral. The vault stays upgradeable with a 7-day delay.
+
+Contracts are UUPS proxies with ERC-7201 namespaced storage; `_authorizeUpgrade` is restricted to `UPGRADER`. The AccessManager itself is not upgradeable.
 
 ---
 
@@ -255,7 +283,7 @@ FeeSet / CapSet / AppRegistered / IntegratorFeeSet / AppStatusChanged / ModuleSe
 
 ## 7. Errors (custom errors only)
 
-`Expired()`, `InvalidSignature()`, `RecordExists()`, `RecordNotFound()`, `ReceiptExists()`, `ConflictingReceipt()`, `NotRecipient()`, `NotSigner()`, `InsufficientCredits(address,address,uint256,uint256)`, `FeeAboveMax(uint256,uint256)`, `TokenNotAllowed(address)`, `BelowMinDeposit()`, `NotModule()`, `AppExists()`, `AppInactive()`, `NotIntegrator()`, `FeeAboveCap()`, `Paused()`, `UpgradesAreFrozen()`, `ZeroAddress()`, `TransferFailed()`.
+`Expired()`, `InvalidSignature()`, `RecordExists()`, `RecordNotFound()`, `ReceiptExists()`, `ConflictingReceipt()`, `NotRecipient()`, `NotSigner()`, `InsufficientCredits(address,address,uint256,uint256)`, `FeeAboveMax(uint256,uint256)`, `TokenNotAllowed(address)`, `BelowMinDeposit()`, `NotModule()`, `AppExists()`, `AppInactive()`, `NotIntegrator()`, `FeeAboveCap()`, `Paused()`, `UpgradesAreFrozen()`, `ZeroAddress()`, `TransferFailed()`, `InvalidCapChange()` (G-3, proposed).
 
 ---
 
@@ -266,6 +294,7 @@ FeeSet / CapSet / AppRegistered / IntegratorFeeSet / AppStatusChanged / ModuleSe
   - A record's fields never change after creation; receipt flags and timestamps only ever get set once.
   - No role can reduce a payer's credits.
   - After `freezeUpgrades`, no upgrade succeeds.
+  - Role map (§5.1): every restricted selector has exactly the role and delay of the table; with the Safe compromised, no path to a 7-day power (use, new grant, selector remap, `updateAuthority`, delay reduction) completes in under 7 days.
 - ERC-1271 signer tests (Safe-style and passkey-style smart accounts).
 - Static analysis: Slither and Aderyn clean (or justified) in CI. Gas snapshots in CI.
 - Shared EIP-712 test vectors with `@agentlink/chain` (TypeScript) to guarantee identical hashing, including the chain-agnostic AgentCard domain.
@@ -280,7 +309,7 @@ FeeSet / CapSet / AppRegistered / IntegratorFeeSet / AppStatusChanged / ModuleSe
 - Beta: Base Sepolia and Gnosis Chiado (M1) → Base and Gnosis mainnet (M3). Then Arbitrum, Optimism, Polygon (M4).
 - **Testnet faucet:** a 4thTech-run `depositFor` faucet credits testnet agents (M1) so testers never need gas.
 - Verify on Sourcify and explorers at mainnet.
-- Deployer key: fresh hardware-backed key used only for deployment; all roles transferred to the Safe in the same script; deployer retains no role (CI check).
+- Deployer key: fresh hardware-backed key used only for deployment; all roles transferred to the Safe in the same script; deployer retains no role (CI check). Mainnet contracts are initialised paused and unpaused by the Safe once the configured grant and target admin delays are in effect (§5).
 - Publish ABIs and addresses as `@agentlink/occ-v2-abi`.
 
 ---

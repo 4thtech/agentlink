@@ -163,7 +163,7 @@ The testnet deployer key is testnet-only and never reused on mainnet. Testnet Sa
 - [ ] Per-chain config verified **independently by two people** against official issuer lists: USDC and USDT addresses and decimals per chain; EIP-3009 flag (native Circle USDC yes; bridged variants checked individually); no fee-on-transfer tokens; initial fees, caps, `minDeposit`; treasury Safe.
 - [ ] CreateX deployed at its canonical address on each chain (code hash checked).
 - [ ] `evm_version` and Solidity version supported on each chain.
-- [ ] Safes created per chain (≥ 2-of-3); each signer has confirmed their signer address on their own hardware device; PAUSER hardware key set up.
+- [ ] Safes created per chain (≥ 2-of-3); each signer has confirmed their signer address on their own hardware device; ops hardware key (`PAUSER`, `GUARDIAN`) set up.
 - [ ] Fork dry-run on anvil (`anvil --fork-url <chain>`) of the exact script, including the role transfer; roles check and deployer-holds-no-role script pass on the fork; smoke notarization on the fork.
 - [ ] Fresh hardware-backed deployer key, used for nothing else, funded with only the gas needed. It never touches GitHub.
 - [ ] Monitoring (§7.1) armed for the predicted addresses.
@@ -184,7 +184,8 @@ DECISION NEEDED (owner): who witnesses when `@denisjazbec` is unavailable.
 
 - Sourcify and explorer verification (at M3-6, BUSL-1.1 source).
 - Proxy addresses identical across chains.
-- Roles: AccessManager members exactly as configured; deployer holds no role; selector-to-role mapping and execution delays as in 05 §5, with each delay tier on its own role (`audit-rules.md` CT-5).
+- Roles: AccessManager members exactly as configured; deployer holds no role; selector-to-role mapping, execution delays, grant delays, guardians, role admins and target admin delays as in 05 §5.1, with each delay tier on its own role (`audit-rules.md` CT-5).
+- Contracts stay paused until the configured grant delays and target admin delays are in effect (OZ `minSetback`, 5 days after deployment); then the Safe unpauses (`PAUSE_ADMIN`) and the check is recorded.
 - Implementations have initializers disabled; proxies initialised; config read back (tokens, fees, caps, `minDeposit`, treasury).
 - Smoke test with small amounts: deposit credits, `notarize`, `acknowledge`, verify the proof pack via `agentlink verify` and the verify page, withdraw the remaining credits.
 
@@ -198,12 +199,15 @@ Manual and owner-only (§3.2). Agents prepare the evidence below; they never sch
 |---|---|---|
 | Fees ≤ caps, lowering caps, (de)activating apps | Safe → `FEE_ADMIN` | 0 |
 | Pause charging/notarization | `PAUSER` (ops hardware key + Safe) | 0 |
-| Roles, modules, token allowlist, `minDeposit` | Safe schedules → delay → Safe executes | 48 h |
-| Notary / Registry upgrade | same | 48 h |
-| Vault upgrade | same | 7 days (users can withdraw first) |
+| Unpause | Safe → `PAUSE_ADMIN` | 0 |
+| Cancel a scheduled operation | Safe, or `GUARDIAN` (ops hardware key) | 0 |
+| Token allowlist, `minDeposit` | Safe schedules → delay → Safe executes (`CONFIG_ADMIN`) | 48 h |
+| Roles, guardians, role admins, function-to-role map, target settings (AccessManager administration) | same (`ADMIN_ROLE`) | 7 days, plus the role's grant delay for a new member |
+| Register or remove a module | same (`MODULE_ADMIN`) | 7 days |
+| Vault, Notary or Registry upgrade | same (`UPGRADER`) | 7 days (users can withdraw first; every module can charge credits, 05 §5) |
 | Raise `maxProtocolFee`, change `integratorFeeCapMultiple` | same (`CAP_RAISER`) | 7 days |
 | Treasury change | same (`TREASURY_ADMIN`) | 7 days |
-| `freezeUpgrades()` on the Notary | same | 7 days |
+| `freezeUpgrades()` on the Notary | same (`FREEZER`) | 7 days |
 
 Every upgrade MUST have: the full test suite; an ERC-7201 storage-layout diff; a fork simulation of schedule and execute; a re-audit scope decision (auditor re-review, or owner risk acceptance per `audit-rules.md` §8); a public notice at scheduling time (vault upgrades: before the 7-day window starts). Unexpected scheduled operations are incidents (§7).
 
@@ -301,7 +305,7 @@ Secrets MUST NEVER appear in a repository (incl. `sync`), logs, CI output, Curat
 | Mainnet deployer key | One deployment campaign | Hardware wallet; never touches GitHub | Owner | New key per campaign; holds no role afterwards |
 | Testnet deployer key | Testnet deploys | Private-repo CI secret (no Environment protection on Free, D-27) | Owner | Per milestone, and on any suspicion; low balance |
 | Safe signer keys | Governance per chain | Signers' hardware wallets | DECISION NEEDED: signer set (private) | Safe owner swap on change or suspicion |
-| PAUSER ops key | Emergency pause | Hardware wallet | DECISION NEEDED: who is on call | On suspicion |
+| Ops hardware key (`PAUSER`, `GUARDIAN`) | Emergency pause; cancelling unexpected scheduled operations | Hardware wallet | DECISION NEEDED: who is on call | On suspicion (the Safe revokes `PAUSER` at once via `PAUSE_ADMIN`) |
 | Submitter gas keys | Gas per chain and environment | Worker secrets (`wrangler secret put`), staging and production | Owner | On suspicion; DECISION NEEDED: periodic interval |
 | Faucet key | Testnet credits | Worker secret per environment (testnet chains only) | Owner | As needed |
 | Drop URL-signing key | MAC key for the drop's signed GET and PUT URLs (D-48) | Worker secret per environment (`wrangler secret put`) | Owner | On suspicion; rotate with an overlap window (old key accepted for 7 days) so outstanding links stay valid |
@@ -358,7 +362,7 @@ Every automatic rollback sets `DEPLOY_FREEZE`; the owner clears it after the inc
 | `@agentlink/occ-v2-abi` | Same as npm | Wrong addresses are Critical: deprecate immediately |
 | Submitter / faucet / encrypted drop / cloud-agent demo Worker | **Automatic:** `deploy-production` runs `wrangler rollback` to the recorded versions after a failed health check. Manual: redeploy the previous release through the pipeline | DO migrations are forward-only (§4.5) |
 | Static sites | **Automatic:** back to the previous version (hash-identical) | Clients may cache; service-worker update needed |
-| Contracts (upgradeable, Notary before freeze) | Manual (§3.2): pause charging; schedule an upgrade back to the previous implementation | 48 h / 7 d delay; storage layout must stay compatible; users can always withdraw |
+| Contracts (upgradeable, Notary before freeze) | Manual (§3.2): pause charging; schedule an upgrade back to the previous implementation | 7-day delay (05 §5); storage layout must stay compatible; users can always withdraw |
 | Notary after freeze | None | Records are permanent; a new deployment needs a spec change |
 | Contract configuration | Manual: schedule the reverse change | Delays apply; lowering caps is immediate |
 | Cloud-agent template | Revert the template repo to the previous tag | User instances are theirs; notify users |

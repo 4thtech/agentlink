@@ -264,7 +264,7 @@ Reviewers apply every checklist the diff touches. Item IDs are stable; new items
 - CT-2 Checks-effects-interactions and `nonReentrant` on every value transfer; `call`, never `transfer`; native `msg.value` matches amount (zero on ERC-20 paths).
 - CT-3 `SafeERC20`; credits equal the measured balance delta; fee-on-transfer tokens never allowlisted.
 - CT-4 `depositWithAuthorization` calls `receiveWithAuthorization` with payee = vault (never `transferWithAuthorization`); `value ≥ minDeposit`; EIP-3009 flag required.
-- CT-5 AccessManager: every restricted selector mapped to its intended role; nothing left reachable through the admin role by accident. OZ AccessManager execution delays attach to (role, account) grants, so **each delay tier is its own role** (e.g. Notary/Registry upgrades 48 h vs vault upgrades 7 d; ADMIN 48 h vs `freezeUpgrades` 7 d). Grant delays, target-admin delays and guardians set as configured.
+- CT-5 AccessManager: every restricted selector mapped to its intended role; nothing left reachable through the admin role by accident. OZ AccessManager execution delays attach to (role, account) grants, so **each delay tier is its own role** (05 §5.1, e.g. `CONFIG_ADMIN` 48 h vs `UPGRADER` 7 d; `pause` vs `unpause`). Grant delays, target-admin delays and guardians set as configured.
 - CT-6 No admin path can move, freeze or reduce a payer's credits; pause blocks charges and deposits and **never** `withdraw`.
 - CT-7 `freezeUpgrades` is one-way: afterwards `_authorizeUpgrade` always reverts regardless of roles.
 - CT-8 UUPS: implementations call `_disableInitializers()`; proxies initialised in the deploying transaction; initializers not re-runnable.
