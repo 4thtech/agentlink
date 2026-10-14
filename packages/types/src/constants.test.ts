@@ -31,7 +31,9 @@ import {
   RECEIPT_TYPES,
   RECORD_KINDS,
   REVOKE_REASONS,
+  SEND_TOOL_PAYLOAD_TYPES,
   SENDABLE_PAYLOAD_TYPES,
+  TERMS_PAYLOAD_TYPES,
   packageName,
 } from './index.js';
 import { agentCard } from './testing/fixtures.js';
@@ -64,10 +66,12 @@ describe('constants (04, 05, 06)', () => {
     expect(new Set(PAYLOAD_TYPES).size).toBe(17);
   });
 
-  it('limits tool-sendable types to 02 F-22 / 06 §2.2', () => {
+  it('limits tool-sendable types to 02 F-22, split between send and the terms tools (06 §2.2, §2.2a)', () => {
     expect([...SENDABLE_PAYLOAD_TYPES].sort()).toEqual(
       ['text', 'note', 'request', 'delivery', 'offer', 'accept', 'reject'].sort(),
     );
+    expect(SEND_TOOL_PAYLOAD_TYPES).toEqual(['text', 'note', 'request', 'delivery']);
+    expect(TERMS_PAYLOAD_TYPES).toEqual(['offer', 'accept', 'reject']);
   });
 
   it('lists the owner-channel types and the types no MCP tool may create (04 §3.4.1)', () => {
@@ -117,13 +121,18 @@ describe('constants (04, 05, 06)', () => {
     expect(APPROVAL_STATUSES).toEqual(['pending', 'approved', 'denied', 'expired']);
   });
 
-  it('has the 13 frozen tool names (06 §2.0) and the five that can need approval', () => {
-    expect(MCP_TOOL_NAMES).toHaveLength(13);
+  it('has the 15 frozen tool names (06 §2.0, D-53, D-55) and the seven that can need approval', () => {
+    expect(MCP_TOOL_NAMES).toHaveLength(15);
+    expect(new Set(MCP_TOOL_NAMES).size).toBe(15);
+    expect(MCP_TOOL_NAMES).toContain('agentlink_propose_terms');
+    expect(MCP_TOOL_NAMES).toContain('agentlink_respond_to_terms');
     for (const name of MCP_TOOL_NAMES) expect(name).toMatch(/^agentlink_[a-z_]+$/);
     expect([...APPROVAL_TOOL_NAMES].sort()).toEqual(
       [
         'agentlink_accept_invite',
         'agentlink_send',
+        'agentlink_propose_terms',
+        'agentlink_respond_to_terms',
         'agentlink_notarize',
         'agentlink_acknowledge',
         'agentlink_export_proof_pack',
@@ -134,7 +143,7 @@ describe('constants (04, 05, 06)', () => {
 
   it('has the owner-action ops, decisions and revoke reasons of 04 §2.5.1', () => {
     expect([...OWNER_ACTION_OPS].sort()).toEqual(
-      ['agent.revoke', 'approval.decide', 'policy.set'].sort(),
+      ['agent.revoke', 'approval.cancel', 'approval.decide', 'policy.set'].sort(),
     );
     expect(APPROVAL_DECISIONS).toEqual(['approve', 'deny']);
     expect(REVOKE_REASONS).toEqual(['compromised', 'retired', 'other']);

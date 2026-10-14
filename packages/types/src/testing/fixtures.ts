@@ -91,6 +91,17 @@ export const agentRevokeAction = () => ({
   expiresAt: 0,
 });
 
+export const approvalCancelAction = () => ({
+  v: 1,
+  agent: AGENT_EVM,
+  owner: OWNER_NOSTR,
+  op: 'approval.cancel',
+  params: { approvalId: APPROVAL_ID },
+  nonce: b64u(16, 'Z'),
+  issuedAt: 1760000000,
+  expiresAt: 1760000600,
+});
+
 export const signed = <T>(body: T) => ({ body, sig: BIP340_SIG });
 
 export const fileEntryInline = () => ({
@@ -129,7 +140,7 @@ export const payloads = (): Record<string, Record<string, unknown>> => ({
   text: payloadOf('text', 'Hello from Tali’s agent ✓ — 你好', [fileEntryInline()]),
   request: payloadOf('request', { kind: 'refresh-link', envelopeId: ID16, ciphertextSha256: SHA }),
   offer: payloadOf('offer', { terms: { termsId: ID16, version: 1 }, termsHash: SHA, note: null }),
-  accept: payloadOf('accept', { terms: { termsId: ID16, version: 1 }, termsHash: SHA, note: 'ok' }),
+  accept: payloadOf('accept', { terms: { termsId: ID16, version: 1 }, termsHash: SHA, note: null }),
   reject: payloadOf('reject', { terms: { termsId: ID16 }, termsHash: SHA, note: 'too expensive' }),
   delivery: payloadOf('delivery', { milestone: 'd1', items: [1, 2, 3] }, [fileEntryUrl()]),
   note: payloadOf('note', 'a note to myself'),
@@ -173,6 +184,13 @@ export const payloads = (): Record<string, Record<string, unknown>> => ({
   }),
   revoke: payloadOf('revoke', { signed: signed(agentRevokeAction()) }),
 });
+
+/** The body of the fixture payload of `type`. */
+export function bodyOf(type: string): unknown {
+  const payload = payloads()[type];
+  if (payload === undefined) throw new Error(`no fixture for ${type}`);
+  return payload.body;
+}
 
 export const envelope = () => ({
   v: 1,

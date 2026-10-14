@@ -4,6 +4,7 @@
 import { describe, it } from 'vitest';
 import {
   agentRevokeActionSchema,
+  approvalCancelActionSchema,
   approvalDecideActionSchema,
   ownerActionSchema,
   policySetActionSchema,
@@ -15,6 +16,7 @@ import {
 import { expectReject, expectRoundTrip } from './testing/assert.js';
 import {
   agentRevokeAction,
+  approvalCancelAction,
   approvalDecideAction,
   b64u,
   BIP340_SIG,
@@ -29,6 +31,7 @@ const ALL = [
   ['approval.decide', approvalDecideAction, approvalDecideActionSchema],
   ['policy.set', policySetAction, policySetActionSchema],
   ['agent.revoke', agentRevokeAction, agentRevokeActionSchema],
+  ['approval.cancel (D-55)', approvalCancelAction, approvalCancelActionSchema],
 ] as const;
 
 describe('OwnerAction round trips', () => {
@@ -100,6 +103,7 @@ describe('OwnerAction rejects every non-canonical or malformed field', () => {
   it.each([
     ['approval.decide', approvalDecideAction],
     ['policy.set', policySetAction],
+    ['approval.cancel', approvalCancelAction],
   ] as const)('%s requires a non-zero expiresAt after issuedAt', (_op, make) => {
     expectReject(ownerActionSchema, edit(make(), ['expiresAt'], 0));
     expectReject(ownerActionSchema, edit(make(), ['expiresAt'], 1760000000));
@@ -145,6 +149,15 @@ describe('params are strict per op', () => {
     ['policy string', ['params', 'policy'], 'allow all'],
   ] as const)('policy.set rejects %s', (_l, path, value) => {
     expectReject(ownerActionSchema, edit(policySetAction(), path, value));
+  });
+
+  it.each([
+    ['unknown key', ['params', 'actionDigest'], 'e5'.repeat(32)],
+    ['missing approvalId', ['params', 'approvalId'], DELETE],
+    ['approvalId without apr_', ['params', 'approvalId'], ID16],
+    ['decision (cancel never approves)', ['params', 'decision'], 'approve'],
+  ] as const)('approval.cancel rejects %s', (_l, path, value) => {
+    expectReject(ownerActionSchema, edit(approvalCancelAction(), path, value));
   });
 
   it.each([

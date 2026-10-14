@@ -17,6 +17,7 @@ import {
   approvalDecideAction,
   APPROVAL_ID,
   b64u,
+  bodyOf,
   CARD_SIG,
   DELETE,
   edit,
@@ -115,10 +116,10 @@ describe('Payload envelope-level fields', () => {
 
   it('rejects a body of the wrong kind for the type', () => {
     expectReject(payloadSchema, { ...payloads().handshake, body: 'hello' });
-    expectReject(payloadSchema, { ...payloads().approval, body: payloads().policy.body });
-    expectReject(payloadSchema, { ...payloads().policy, body: payloads().approval.body });
-    expectReject(payloadSchema, { ...payloads().revoke, body: payloads().approval.body });
-    expectReject(payloadSchema, { ...payloads().proof, body: payloads()['handshake-ack'].body });
+    expectReject(payloadSchema, { ...payloads().approval, body: bodyOf('policy') });
+    expectReject(payloadSchema, { ...payloads().policy, body: bodyOf('approval') });
+    expectReject(payloadSchema, { ...payloads().revoke, body: bodyOf('approval') });
+    expectReject(payloadSchema, { ...payloads().proof, body: bodyOf('handshake-ack') });
     expectReject(payloadSchema, { ...payloads().text, body: null });
     expectReject(payloadSchema, { ...payloads().text, body: ['array'] });
     expectReject(payloadSchema, { ...payloads().text, body: 42 });
@@ -227,6 +228,12 @@ describe('offer / accept / reject outer shape (04 §3.4; terms schema lands in M
     expectReject(payloadSchema, edit(p, ['body', 'extra'], 1));
     expectReject(payloadSchema, { ...p, body: 'I accept' });
   });
+
+  it('an accept carries no note (04 §3.4, D-55); offer and reject may', () => {
+    expectReject(payloadSchema, edit(payloads().accept, ['body', 'note'], 'ok'));
+    expectAccept(payloadSchema, edit(payloads().offer, ['body', 'note'], 'draft'));
+    expectAccept(payloadSchema, edit(payloads().reject, ['body', 'note'], 'too expensive'));
+  });
 });
 
 describe('handshake and card-update bodies (04 §3.6, §3.4.1)', () => {
@@ -312,7 +319,7 @@ describe('owner-channel bodies (04 §3.4.1)', () => {
   });
 
   describe('approval-request', () => {
-    const body = () => payloads()['approval-request'].body as Record<string, unknown>;
+    const body = () => bodyOf('approval-request') as Record<string, unknown>;
 
     it('round-trips', () => expectRoundTrip(approvalRequestBodySchema, body()));
 

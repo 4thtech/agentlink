@@ -56,7 +56,6 @@ describe('base64url (no padding, canonical, exact byte length)', () => {
     ['non-zero trailing bits (len%4==2)', `${ID16.slice(0, -1)}B`],
     ['non-zero trailing bits (len%4==3)', `${b64u(32).slice(0, -1)}B`],
     ['impossible length (len%4==1)', 'AAAAA'],
-    ['empty', ''],
     ['non-ASCII look-alike', `${ID16.slice(0, -1)}Ａ`],
   ])('rejects %s', (_label, value) => {
     bad(base64url(16), value);
@@ -65,6 +64,8 @@ describe('base64url (no padding, canonical, exact byte length)', () => {
   });
 
   it('rejects a canonical value of the wrong byte length', () => {
+    bad(base64url(16), '');
+    expect(base64urlByteLength('')).toBe(0);
     bad(base64url(16), b64u(15));
     bad(base64url(16), b64u(17));
     bad(base64url(32), b64u(31));
