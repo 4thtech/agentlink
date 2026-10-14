@@ -284,7 +284,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - A deliberately leaking fixture makes the canary job fail when run locally (local demonstration, output in PR; not pushed).
 
 #### M0-8b · Logger hardening follow-ups (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Status:** done · **Size:** S · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · packages/log
 - **Depends on:** M0-8
 - **Spec:** 04 §1 I-7, §8 rule 4; review IR-M0-8-2 (findings L1–L4, all Low)
@@ -297,6 +297,20 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
 - **Acceptance:**
   - A regression test per item, red before the fix (negative control recorded in the PR).
   - A quadratic mutant of the scanner turns the L3 test red.
+
+#### M0-8c · Logger hardening, round 2 follow-ups (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · packages/log
+- **Depends on:** M0-8b
+- **Spec:** 04 §1 I-7, §8 rule 4; review IR-M0-8b-1, round 2 (findings R2-L2 and R2-L4, both Low)
+- **Invariants:** I-7
+- **Scope:**
+  - R2-L2: an apostrophe inside an object or array value (`secret=[don't ...]`) opens a string that never closes, so the rest of the string is redacted (over-redaction; it fails safe). Track `'` as a string quote only where JSON-like input can have one: after a `{`, `[`, `,` or `:` (a Python-style repr), not inside running text. Keep the fail-closed end of the value when a real string is unclosed.
+  - R2-L4: a JSON-escaped protocol-relative URL (`\/\/host\/v2\/KEY`) is not reduced to its host. Handle it with the same rules as `//host/path`, keeping the escaped-quote and drive-letter guards from M0-8b.
+  - Optional, from the same review: scheme-less URLs under a URL-named key inside strings (`rpcUrl=host.tld/v2/KEY`) get the field rule (origin or `[REDACTED]`); `upload` joins the capability words that redact a URL-named field whole (`uploadUrl`).
+- **Acceptance:**
+  - A regression test per item, red before the fix.
+  - The M0-8b worst-case work bounds and the no-unbounded-quantifier test still pass.
 
 #### M0-9 · Cross-runtime test-vector harness (new)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
@@ -340,6 +354,17 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - A narrow, reasoned carve-out for Node built-ins in `vite.config.ts` and `vitest.config.ts` of non-Node zones (IR-M0-10-1 F12).
 - **Acceptance:**
   - Each item has a failing fixture test; `pnpm lint` stays green on the real tree.
+
+#### M0-10c · deps-check eslint-rules test: deterministic timeout (new)
+- **Status:** in progress · **Size:** XS · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · tools/deps-check/eslint-rules.test.mjs
+- **Depends on:** M0-10
+- **Spec:** `audit-rules.md` §2 (`tools/**` is S0; this card is S1 because it edits `docs/process/**`); `ci-cd.md`
+- **Invariants:** I-8
+- **Scope:**
+  - The first `lintText` call pays the cold ESLint start (config and plugin load), which exceeded the 5 s default test timeout under CI load, so the first test flaked and a rerun passed. Do the cold start once in `beforeAll`, with its own generous hook timeout; the per-test timeout stays at the default for warm runs.
+- **Acceptance:**
+  - No assertion changes; the suite passes repeatedly, also in parallel with the crypto tests.
 
 #### M0-11 · Curator project context (new)
 - **Status:** done (setup) · **Size:** S · **Tier:** Owner · **Security:** S0
