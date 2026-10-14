@@ -1,30 +1,29 @@
 # @talirezun — sync
-**Headline:** M1a crypto, transport, core and keychain merged; contracts pre-audited and audit fixes merged; Base Sepolia deploy next
-_Updated 2026-10-14 19:15 · claude-code / claude-opus-5-5 · orchestrator_
+**Headline:** OCC v2 contracts live on Base Sepolia (smoke test passed); M1a transport, store, key commitment and envelope verification merged
+_Updated 2026-10-14 21:05 · claude-code / claude-opus-5-5 · orchestrator_
 
 ## Now
-- agentlink main fecd9a3. Merged 2026-10-14: #32–#56 (crypto M1-1c/1e/1f/1g/1g-b/1g-d/1h-c, keychain M1-8a, chain config M1-14, types M1-2c, transport M1-5a, core M1-7a, logger M0-8b, CI M0-10c/d/e, specs G-2/G-8/G-9/G-24, D-63–D-66 incl. G-46 key commitment, design intake, Fable audit follow-ups); contracts #4–#7 merged (#7 = audit fixes M1-3k).
-- Contracts pre-audited by Fable 5.1 (0 Critical, 0 High); Base Sepolia testnet deploy is next (owner-triggered, CI only).
+- agentlink merged 2026-10-14 evening: #57 M1-8a-b keychain CI matrix, #58 backlog cards, #59 M1-5b relay pool, #60 M1-8b SQLite store, #61 M1-1l key commitment, #62 D-67 (G-1 accepted as an M1 residual), #63 M1-5c transport sync, #64 D-68 batch owner approval, #65 README testnet status, #66 M1-7b envelope verification.
+- Contracts #7–#9 merged; OCC v2 deployed to Base Sepolia through CI and smoke-tested.
 
 ## In flight
 | Task | Branch / PR | Status | Next step |
 |---|---|---|---|
-| M1-3g deploy script (private) | — | updating from main | merge when green, then testnet dry-run |
-| M1-1l key commitment (G-46) | — | building | — |
-| M1-5b transport sync | — | building | — |
-| M1-8b SQLite store | — | building | — |
-| M1-8c owner passphrase | — | building | — |
-| M1-8a-b keychain CI matrix | — | building | — |
-| M1-3 invariant-test flake card | — | writing | — |
+| M1-8c owner code and batch approval | — | fix round | PR |
+| M1-2e batch approval vectors | — | building | — |
+| M1-7c pairing | — | building | — |
+| M1-8b concurrency test flake | #68 | final fix | — |
 
 ## Next
-1. Base Sepolia deploy + smoke test; M1-7b envelope verification (after M1-1l), M1-7c pairing.
-2. M1-9 CLI/MCP, M1-13 e2e, J9 dogfood (M1a gate, v0.1.0).
+1. M1-7d/7e (owner actions, requests), M1-9 CLI + MCP.
+2. M1-13 e2e, J9 dogfood → M1a gate (v0.1.0).
 
 ## Decisions made (still relevant)
 - D-61: G-4 batches all-or-nothing, identical duplicates skipped; notarize gas ≤ 170k; pause blocks receipts; fresh salt per record; G-46 one-plaintext requirement.
 - D-62 (confirmed at #34 merge): replacement rule at finalized block, held envelopes (48 h, ≤ 100 per owner kid), pause works after freeze, `soloAfterRevertSeconds` 1 h, G-46 timing before M1-7b.
 - D-52/D-57: build → independent review → CI → merge; services auto-deploy; npm `latest` keeps Tali's click.
+- D-67: same-user agent risk (G-1) accepted for M1 testnets, re-decided at the M2 gate.
+- D-68: batch owner approval, one code entry per reviewed batch, no unlock session; commitments never batched.
 
 ## Asks
 - [ ] @denisjazbec: start with `docs/README.md` and `docs/process/onboarding.md`. (2026-10-12)
