@@ -9,13 +9,16 @@ import {
   PAYLOAD_TYPES,
   payloadSchema,
   refreshLinkRequestBodySchema,
+  signedApprovalDecideSchema,
 } from './index.js';
 import { expectAccept, expectReject, expectRoundTrip } from './testing/assert.js';
 import {
   agentCard,
   agentRevokeAction,
+  approvalCancelAction,
   approvalDecideAction,
   APPROVAL_ID,
+  B32,
   b64u,
   bodyOf,
   CARD_SIG,
@@ -219,7 +222,10 @@ describe('request: refresh-link (04 §4, 07 §5.2)', () => {
 describe('offer / accept / reject outer shape (04 §3.4; terms schema lands in M1-21)', () => {
   it.each(['offer', 'accept', 'reject'])('%s rejects malformed outer fields', (type) => {
     const p = payloads()[type] as Record<string, unknown>;
-    expectReject(payloadSchema, edit(p, ['body', 'termsHash'], SHA.toUpperCase()));
+    expectReject(payloadSchema, edit(p, ['body', 'termsHash'], B32.toUpperCase()));
+    expectReject(payloadSchema, edit(p, ['body', 'termsHash'], `0X${B32.slice(2)}`));
+    // EVM-native: a bare sha256 hex (the Nostr-native spelling) is a different, rejected form.
+    expectReject(payloadSchema, edit(p, ['body', 'termsHash'], B32.slice(2)));
     expectReject(payloadSchema, edit(p, ['body', 'termsHash'], DELETE));
     expectReject(payloadSchema, edit(p, ['body', 'terms'], DELETE));
     expectReject(payloadSchema, edit(p, ['body', 'terms'], 'x'));
@@ -283,9 +289,12 @@ describe('proof body (04 §3.4: {envelopeId, chainId, recordId, salt})', () => {
     ['chainId negative', ['body', 'chainId'], -1],
     ['chainId string', ['body', 'chainId'], '8453'],
     ['chainId 2^53', ['body', 'chainId'], 2 ** 53],
-    ['recordId 31 bytes', ['body', 'recordId'], b64u(31)],
-    ['recordId 0x hex', ['body', 'recordId'], `0x${SHA}`],
-    ['salt padded', ['body', 'salt'], `${KEY32}=`],
+    ['recordId 31 bytes', ['body', 'recordId'], `0x${'7a'.repeat(31)}`],
+    ['recordId bare hex', ['body', 'recordId'], B32.slice(2)],
+    ['recordId uppercase', ['body', 'recordId'], B32.toUpperCase()],
+    ['recordId base64url', ['body', 'recordId'], KEY32],
+    ['salt base64url', ['body', 'salt'], KEY32],
+    ['salt uppercase 0X prefix', ['body', 'salt'], `0X${'5b'.repeat(32)}`],
     ['missing salt', ['body', 'salt'], DELETE],
     ['envelopeId 32 bytes', ['body', 'envelopeId'], KEY32],
   ] as const)('rejects %s', (_l, path, value) => {
@@ -294,6 +303,22 @@ describe('proof body (04 §3.4: {envelopeId, chainId, recordId, salt})', () => {
 });
 
 describe('owner-channel bodies (04 §3.4.1)', () => {
+  it('approval carries approval.decide or approval.cancel (04 §3.4.1, D-55)', () => {
+    expectRoundTrip(payloadSchema, payloads().approval);
+    expectRoundTrip(payloadSchema, {
+      ...payloads().approval,
+      body: { signed: signed(approvalCancelAction()) },
+    });
+    expectReject(
+      payloadSchema,
+      edit(
+        { ...payloads().approval, body: { signed: signed(approvalCancelAction()) } },
+        ['body', 'signed', 'body', 'params', 'decision'],
+        'approve',
+      ),
+    );
+  });
+
   it('approval, policy and revoke carry exactly {signed} with their own op', () => {
     expectReject(payloadSchema, edit(payloads().approval, ['body', 'extra'], 1));
     expectReject(
@@ -358,7 +383,18 @@ describe('owner-channel bodies (04 §3.4.1)', () => {
     });
 
     it('binds through the canonical approvalId shared with approval.decide', () => {
-      expect((body() as { approvalId: string }).approvalId).toBe(APPROVAL_ID);
+      // Both schemas accept the same canonical id, and the parsed values are identical strings.
+      const request = approvalRequestBodySchema.parse(body());
+      const decide = signedApprovalDecideSchema.parse(signed(approvalDecideAction()));
+      expect(request.approvalId).toBe(APPROVAL_ID);
+      expect(decide.body.params.approvalId).toBe(request.approvalId);
+      // A non-canonical spelling of the same 16 bytes (padded) is refused by both.
+      const padded = `${APPROVAL_ID}==`;
+      expectReject(approvalRequestBodySchema, { ...body(), approvalId: padded });
+      expectReject(
+        signedApprovalDecideSchema,
+        signed(edit(approvalDecideAction(), ['params', 'approvalId'], padded)),
+      );
     });
   });
 });

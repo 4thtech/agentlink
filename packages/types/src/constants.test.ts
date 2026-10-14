@@ -219,7 +219,20 @@ describe('constants (04, 05, 06)', () => {
   });
 
   it('freezes constant arrays and maps so callers cannot widen them at run time', () => {
-    for (const value of [PAYLOAD_TYPES, RECORD_KINDS, BYTE_LENGTHS, MCP_TOOL_NAMES]) {
+    const values = [
+      PAYLOAD_TYPES,
+      RECORD_KINDS,
+      BYTE_LENGTHS,
+      MCP_TOOL_NAMES,
+      APPROVAL_TOOL_NAMES,
+      AGENT_CARD_EIP712_TYPES,
+      AGENT_CARD_EIP712_TYPES.AgentCard,
+      ...AGENT_CARD_EIP712_TYPES.AgentCard,
+    ];
+    for (const value of values) {
+      // isFrozen(undefined) is true, so first prove the export exists and is an object.
+      expect(typeof value).toBe('object');
+      expect(value).not.toBeNull();
       expect(Object.isFrozen(value)).toBe(true);
     }
   });

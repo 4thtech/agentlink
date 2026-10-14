@@ -6,7 +6,10 @@ import {
   cardSigSchema,
   displayNameSchema,
   inviteSchema,
+  isAllowedRelayHost,
   relayListSchema,
+  relayUrlSchema,
+  sameNostrKey,
 } from './index.js';
 import { expectAccept, expectReject, expectRoundTrip } from './testing/assert.js';
 import {
@@ -18,6 +21,8 @@ import {
   ID16,
   invite,
   KEY32,
+  OWNER_NOSTR,
+  AGENT_NOSTR,
   RELAYS,
 } from './testing/fixtures.js';
 
@@ -171,5 +176,95 @@ describe('Invite (04 §3.6)', () => {
   it('never returns a normalised invite (output equals input exactly)', () => {
     const parsed = inviteSchema.parse(invite());
     expect(JSON.stringify(parsed)).toBe(JSON.stringify(invite()));
+  });
+});
+
+describe('relay hosts are never local (I-5, 04 §4 SSRF; IR-M1-2a-1 M-1)', () => {
+  it.each([
+    ['IPv4 loopback', 'wss://127.0.0.1'],
+    ['IPv4 loopback with port', 'wss://127.0.0.1:7777'],
+    ['short IPv4 form', 'wss://127.1'],
+    ['hex IPv4 form', 'wss://0x7f.1'],
+    ['hex IPv4 single number', 'wss://0x7f000001'],
+    ['decimal IPv4 integer', 'wss://2130706433'],
+    ['octal-looking IPv4', 'wss://0177.0.0.1'],
+    ['unspecified address', 'wss://0.0.0.0'],
+    ['private 10/8', 'wss://10.0.0.5'],
+    ['private 172.16/12', 'wss://172.16.0.1'],
+    ['private 192.168/16', 'wss://192.168.1.1/'],
+    ['link-local metadata', 'wss://169.254.169.254/'],
+    ['CGNAT 100.64/10', 'wss://100.64.0.1'],
+    ['public IP literal (any IP literal is refused)', 'wss://1.1.1.1'],
+    ['IPv6 loopback', 'wss://[::1]'],
+    ['IPv6 ULA', 'wss://[fd00::1]:443'],
+    ['IPv4-mapped IPv6', 'wss://[::ffff:127.0.0.1]'],
+    ['localhost', 'wss://localhost'],
+    ['localhost with port', 'wss://localhost:7777'],
+    ['subdomain of localhost', 'wss://relay.localhost'],
+    ['mDNS .local', 'wss://printer.local'],
+    ['.internal', 'wss://metadata.google.internal/'],
+    ['home.arpa', 'wss://router.home.arpa'],
+    ['single-label host', 'wss://metadata'],
+    ['single-label intranet host', 'wss://relay'],
+    ['trailing dot', 'wss://localhost.'],
+    ['trailing dot on a public name', 'wss://relay.example.org.'],
+  ])('rejects %s', (_l, url) => {
+    expectReject(relayUrlSchema, url);
+    expectReject(relayListSchema, [url]);
+    expectReject(inviteSchema, { ...invite(), relays: [url] });
+  });
+
+  it('accepts public DNS names, including ones that contain digits or local-looking words', () => {
+    for (const url of [
+      'wss://relay.damus.io',
+      'wss://nos.lol',
+      'wss://relay1.example.org:443/nostr',
+      'wss://127-0-0-1.example.com',
+      'wss://localhost.example.com',
+      'wss://local.example.org',
+      'wss://a.b',
+      'wss://1.example.org',
+    ]) {
+      expectAccept(relayUrlSchema, url);
+    }
+  });
+
+  it('isAllowedRelayHost classifies hosts directly', () => {
+    expect(isAllowedRelayHost('relay.example.org')).toBe(true);
+    expect(isAllowedRelayHost('10.1.2.3')).toBe(false);
+    expect(isAllowedRelayHost('0x7f.1')).toBe(false);
+    expect(isAllowedRelayHost('localhost')).toBe(false);
+    expect(isAllowedRelayHost('x.localhost')).toBe(false);
+  });
+});
+
+describe('sameNostrKey: Nostr-native bare hex vs AgentCard 0x hex, compared as bytes', () => {
+  const card = agentCard();
+
+  it('matches the same 32 bytes across the two canonical spellings', () => {
+    expect(card.ownerNostr).toBe(`0x${OWNER_NOSTR}`);
+    expect(sameNostrKey(OWNER_NOSTR, card.ownerNostr)).toBe(true);
+    expect(sameNostrKey(AGENT_NOSTR, card.agentNostr)).toBe(true);
+  });
+
+  it('does not match different keys', () => {
+    expect(sameNostrKey(OWNER_NOSTR, card.agentNostr)).toBe(false);
+    expect(sameNostrKey(AGENT_NOSTR, card.ownerNostr)).toBe(false);
+    // Differs only in the last byte.
+    expect(sameNostrKey(`${OWNER_NOSTR.slice(0, -2)}c4`, card.ownerNostr)).toBe(false);
+  });
+
+  it.each([
+    ['uppercase bare key', OWNER_NOSTR.toUpperCase(), `0x${OWNER_NOSTR}`],
+    ['uppercase card key', OWNER_NOSTR, `0x${OWNER_NOSTR.toUpperCase()}`],
+    ['0x on the Nostr side', `0x${OWNER_NOSTR}`, `0x${OWNER_NOSTR}`],
+    ['no 0x on the card side', OWNER_NOSTR, OWNER_NOSTR],
+    ['0X prefix on the card side', OWNER_NOSTR, `0X${OWNER_NOSTR}`],
+    ['short bare key', OWNER_NOSTR.slice(2), `0x${OWNER_NOSTR.slice(2)}`],
+    ['base64url key', KEY32, `0x${OWNER_NOSTR}`],
+    ['whitespace', ` ${OWNER_NOSTR}`, `0x${OWNER_NOSTR}`],
+    ['non-strings', 1, null],
+  ] as const)('fails closed on a non-canonical input: %s', (_l, a, b) => {
+    expect(sameNostrKey(a, b)).toBe(false);
   });
 });

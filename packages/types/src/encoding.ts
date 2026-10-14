@@ -115,6 +115,11 @@ export const hex0xBytes = (bytes: number) =>
 
 /** Canonical EVM address: `0x` + 40 lowercase hex, never EIP-55 checksummed (04 §2.5.1). */
 export const evmAddress = hex0xBytes(20);
+/**
+ * EVM-native 32-byte values (card keys and hashes, `recordId`, `salt`, `termsHash`): `0x` + 64
+ * lowercase hex. Nostr-native values stay bare hex (canonical-encodings rule).
+ */
+export const bytes32Hex = hex0xBytes(32);
 /** SHA-256 digest as 64 lowercase hex characters (04 §3.4 "hex"). */
 export const sha256Hex = hexBytes(BYTE_LENGTHS.sha256);
 /** Nostr x-only public key as 64 lowercase hex characters (04 §2.5.1, §3.1). */
@@ -123,6 +128,31 @@ export const nostrPubkeyHex = hexBytes(32);
 export const bip340SigHex = hexBytes(BYTE_LENGTHS.bip340Sig);
 /** EIP-712 signature (r ‖ s ‖ v) as `0x` + 130 lowercase hex characters (04 §2.4). */
 export const eip712SigHex = hex0xBytes(BYTE_LENGTHS.eip712Sig);
+
+/** Decodes canonical lowercase hex (no prefix) to bytes; null for anything else. */
+function decodeLowerHex(hex: string): Uint8Array | null {
+  if (hex.length % 2 !== 0 || !/^[0-9a-f]*$/.test(hex)) return null;
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.slice(2 * i, 2 * i + 2), 16);
+  return out;
+}
+
+/**
+ * True when a Nostr-native key (bare lowercase hex, e.g. OwnerAction `owner`, envelope `from`) and
+ * an AgentCard key (`0x` + lowercase hex, e.g. `ownerNostr`, `agentNostr`) are the same 32 bytes.
+ * Both must already be canonical; any other form is a mismatch (fail closed, never normalised).
+ * Use this for "`owner` equals `ownerNostr`" (04 §2.5.1, §3.4.1) instead of ad-hoc string handling.
+ */
+export function sameNostrKey(nostrHex: unknown, cardBytes32: unknown): boolean {
+  if (!nostrPubkeyHex.safeParse(nostrHex).success) return false;
+  if (!bytes32Hex.safeParse(cardBytes32).success) return false;
+  const a = decodeLowerHex(nostrHex as string);
+  const b = decodeLowerHex((cardBytes32 as string).slice(2));
+  if (a === null || b === null || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= (a[i] as number) ^ (b[i] as number);
+  return diff === 0;
+}
 
 // --- integers ------------------------------------------------------------------------------------
 

@@ -903,6 +903,35 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Defaults deep-equal 06 §3 (snapshot test citing the spec); the 07 §8 example pack parses.
   - Round-trip and strictness tests for each schema.
 
+#### M1-2c · types: run the schema tests in browsers and Workers; review follow-ups (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/types (Vitest config, tests), docs/foundation (spec lines)
+- **Depends on:** M1-2a, M0-9
+- **Spec:** 07 header (Node, browsers, Workers); 04 §3.4, §3.5, §4; 07 §1; review IR-M1-2a-1
+- **Invariants:** I-5
+- **Scope:**
+  - Run the `packages/types` tests as Vitest browser projects (Chromium, Firefox, WebKit, Playwright) and a workerd project (`@cloudflare/vitest-plugin`), set up as the M0-9 harness does. Each project asserts its runtime identity, so a silent fallback to Node fails. This closes the M1-2a acceptance item "schemas run in all three runtimes" (IR-M1-2a-1 M-3). The workerd run must cover zod's code-generation fallback (`new Function` is unavailable there).
+  - Review Lows from IR-M1-2a-1. Each item is skipped if the canonical-encodings spec PR already covers it.
+    - L-1: spec line in 04 §3.4 saying `files` appear only on user message types.
+    - L-2: spec line saying message bodies are a string or a JSON object.
+    - L-4: spec lines for the bounds M1-2a added:
+      - recipients 2–5 with unique `kid`;
+      - relays 1–16, unique;
+      - card `expiresAt` after `issuedAt`;
+      - approval-request `expiresAt` after `requestedAt`;
+      - `summary` with no control or format characters;
+      - EIP-712 `uint64` capped at 2^53 − 1.
+    - L-5: 07 §1 lists `zod` as a dependency of `@agentlink/types`.
+    - L-6: `downloadUrlSchema` requires a lowercase host and a port in 1–65535, as the relay schema does.
+    - L-7: the round-trip helper uses `toStrictEqual`.
+    - L-8: payload fuzzing also covers text with files, approval-request, revoke and request fixtures.
+  - Hand-offs to the owning cards; no code in types:
+    - transport-nostr re-checks relay hosts at connect time against private, loopback, link-local, CGNAT, ULA and metadata addresses, because a DNS name can resolve to one (IR-M1-2a-1 M-1, part 2);
+    - the invite decoder caps the inflated size before parsing (deflate bomb).
+- **Acceptance:**
+  - `packages/types` tests are green in Node, three browsers and workerd, and each run reports its runtime; a deliberately failing schema test fails in all five.
+  - Each Low is fixed with a negative control, or recorded as covered by the spec PR.
+
 ### Contracts (`occ-v2-contracts`, private)
 
 All contract cards: private repo on the Free plan (D-27), so no rulesets or environment protection; `contracts-gate` is verified by the owner before merge; testnet deploy keys only, low balances; no OCC v1 code (D-20). Landing order for cross-repo changes: `development-process.md` §9.3.

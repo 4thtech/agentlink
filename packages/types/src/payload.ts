@@ -23,6 +23,7 @@ import { agentCardSchema, cardSigSchema, displayNameSchema, relayListSchema } fr
 import {
   approvalIdSchema,
   base64url,
+  bytes32Hex,
   base64urlBounded,
   evmAddress,
   ijsonString,
@@ -34,7 +35,7 @@ import {
 } from './encoding.js';
 import {
   signedAgentRevokeSchema,
-  signedApprovalDecideSchema,
+  signedApprovalOpSchema,
   signedPolicySetSchema,
 } from './owner-action.js';
 
@@ -122,7 +123,7 @@ export const requestBodySchema = z.union([
 const termsBody = <N extends z.ZodType>(note: N) =>
   z.strictObject({
     terms: jsonObjectSchema,
-    termsHash: sha256Hex,
+    termsHash: bytes32Hex,
     note,
   });
 const termsNote = ijsonString({ max: MAX_TERMS_NOTE_CODE_POINTS }).nullable();
@@ -148,14 +149,14 @@ export const handshakeAckBodySchema = z.strictObject({
 });
 
 /**
- * `proof` (04 §3.4). `recordId` and `salt` are bytes32; with no other encoding noted they follow the
- * 04 §3.1 default (base64url without padding).
+ * `proof` (04 §3.4). `recordId` and `salt` are EVM bytes32, so `0x` + lowercase hex, the same
+ * spelling as the proof pack (07 §8) and the chain (canonical-encodings rule).
  */
 export const proofBodySchema = z.strictObject({
   envelopeId,
   chainId: uint53.refine((n) => n > 0, 'chainId must be positive'),
-  recordId: base64url(32),
-  salt: base64url(32),
+  recordId: bytes32Hex,
+  salt: bytes32Hex,
 });
 
 /** `card-update` (04 §3.4.1): the handshake shapes. */
@@ -166,7 +167,7 @@ export const cardUpdateBodySchema = z.strictObject({
   relays: relayListSchema,
 });
 
-export const approvalBodySchema = z.strictObject({ signed: signedApprovalDecideSchema });
+export const approvalBodySchema = z.strictObject({ signed: signedApprovalOpSchema });
 export const policyBodySchema = z.strictObject({ signed: signedPolicySetSchema });
 export const revokeBodySchema = z.strictObject({ signed: signedAgentRevokeSchema });
 

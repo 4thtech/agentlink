@@ -5,7 +5,7 @@
 // What a schema cannot see: duplicate keys and textual number forms (`1.0`, `1e3`) in the JSON text
 // are gone after JSON.parse. Parsing the wire bytes strictly (I-JSON) is the caller's job.
 import { z } from 'zod';
-import { APPROVAL_DECISIONS, PROTOCOL_VERSION, REVOKE_REASONS } from './constants.js';
+import { APPROVAL_DECISIONS, BYTE_LENGTHS, PROTOCOL_VERSION, REVOKE_REASONS } from './constants.js';
 import {
   approvalIdSchema,
   base64url,
@@ -16,7 +16,6 @@ import {
   sha256Hex,
   uint53,
 } from './encoding.js';
-import { BYTE_LENGTHS } from './constants.js';
 
 // --- params per op -------------------------------------------------------------------------------
 
@@ -117,6 +116,10 @@ export const signedApprovalDecideSchema = signedOf(approvalDecideActionSchema);
 export const signedApprovalCancelSchema = signedOf(approvalCancelActionSchema);
 export const signedPolicySetSchema = signedOf(policySetActionSchema);
 export const signedAgentRevokeSchema = signedOf(agentRevokeActionSchema);
+/** What an `approval` envelope carries: `approval.decide` or `approval.cancel` (04 §3.4.1, D-55). */
+export const signedApprovalOpSchema = signedOf(
+  z.discriminatedUnion('op', [approvalDecideActionSchema, approvalCancelActionSchema]),
+);
 
 export type ApprovalDecideParams = z.infer<typeof approvalDecideParamsSchema>;
 export type ApprovalCancelParams = z.infer<typeof approvalCancelParamsSchema>;
@@ -132,3 +135,4 @@ export type SignedApprovalDecide = z.infer<typeof signedApprovalDecideSchema>;
 export type SignedApprovalCancel = z.infer<typeof signedApprovalCancelSchema>;
 export type SignedPolicySet = z.infer<typeof signedPolicySetSchema>;
 export type SignedAgentRevoke = z.infer<typeof signedAgentRevokeSchema>;
+export type SignedApprovalOp = z.infer<typeof signedApprovalOpSchema>;
