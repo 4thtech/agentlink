@@ -1834,6 +1834,306 @@
       "expected": {
         "outcome": "reject"
       }
+    },
+    {
+      "id": "sign-contact-check",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, contact.check (04 \u00a73.6.1)",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "contact.check",
+          "params": {
+            "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+            "pairingDigest": "579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 1760000600
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"contact.check\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"contact\":\"0x879e48ea18a3dd814b18b51e5e6e665f87c1e613\",\"pairingDigest\":\"579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c\"},\"v\":1}",
+        "bodyHash": "76dc9b7afc596dcd9ed573428a16d40dfa382a710652b14d9cea06da63a57ae0",
+        "signatureInput": "cc072679e9679cc7ca39c7f78f86d9f1d3dd7009b326a4598669022c399a95cd",
+        "sig": "60d0f796ab536be65e10991a9ce539124fb35f0782d4c3983ca37924dd72fde5eda4f2356af8bb6e07091b1ce7e3893a67297a408387387ada6f22320ae1cf49"
+      }
+    },
+    {
+      "id": "reject-pairing-digest-0x",
+      "source": "04 \u00a72.5.1: `pairingDigest` with 0x (bare hex, 04 \u00a72.4.1); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.check",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+              "pairingDigest": "0x579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "be68f870019723acccfd8081e8682d100ee324cca47de69668c647d9e5b0a219fbaf70c9735e9a90250906bccbde3ebf051e3db0388082785b6a6ac2eecffe51"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pairing": {
+            "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+            "pairingDigest": "579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c"
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-pairing-digest-uppercase",
+      "source": "04 \u00a72.5.1: `pairingDigest` in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.check",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+              "pairingDigest": "579BD4909B9A9C8399802D72A0060770AC34CA5E107B58E468AA6857DBEFC69C"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "63630b720dad29e708e8f0397ec44578c244b076f5101fd99143eaabd20bd89aa3cf818b832dc2854f85d24c80676f06756968897cba992b108e1aed21111f52"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pairing": {
+            "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+            "pairingDigest": "579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c"
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-pairing-digest-base64url",
+      "source": "04 \u00a72.5.1: `pairingDigest` as base64url; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.check",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+              "pairingDigest": "V5vUkJuanIOZgC1yoAYHcKw0yl4Qe1jkaKpoV9vvxpw"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "8d7178941d1df1ea3020f137b36cd99a3068ef8eaf2faf27b3aa3c928247f523c2b75d76d7a9c50a69695b564a82394287ae9b2fdf98674631bbcb98c71210f8"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pairing": {
+            "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+            "pairingDigest": "579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c"
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-contact-checksummed",
+      "source": "04 \u00a72.5.1: `contact` in EIP-55 mixed case; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.check",
+            "params": {
+              "contact": "0x879E48eA18A3DD814b18b51E5E6E665f87C1e613",
+              "pairingDigest": "579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "fd9a4a07aca8ee1c523a8130ba6fc4ad1cedd712b1f8d28c1b07b5b75ded5e6f41f567fddc5d6efbc4a2cb15e32e0a10f70a21959dea535441a2216a1c56c4c2"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pairing": {
+            "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+            "pairingDigest": "579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c"
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-contact-check-unknown-param",
+      "source": "04 \u00a72.5.1: unknown key in contact.check params; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.check",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+              "pairingDigest": "579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c",
+              "note": "x"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "951fac01d2c7c5d3650ee53ed00799d1e178970fae85f3c060fb62054aa75f28726df8a38a3e7d9d81796964ebd4602eb01097db17129d1fedc62862b2e17477"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pairing": {
+            "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+            "pairingDigest": "579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c"
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-json-revoke",
+      "source": "04 \u00a72.5.1: the SignedOwnerAction as JSON text verifies",
+      "input": {
+        "op": "verifyJson",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "verify-json-reject-issued-at-fraction",
+      "source": "04 \u00a72.5.1, 04 \u00a72.4.1: issuedAt spelled 1760000000.0; the signature is valid over the parsed value, so only the token check refuses it",
+      "input": {
+        "op": "verifyJson",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000.0,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-json-reject-issued-at-exponent",
+      "source": "04 \u00a72.5.1, 04 \u00a72.4.1: issuedAt spelled 1.76e9; the signature is valid over the parsed value, so only the token check refuses it",
+      "input": {
+        "op": "verifyJson",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1.76e9,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-json-reject-v-fraction",
+      "source": "04 \u00a72.5.1, 04 \u00a72.4.1: v spelled 1.0; the signature is valid over the parsed value, so only the token check refuses it",
+      "input": {
+        "op": "verifyJson",
+        "json": "{\"body\":{\"v\":1.0,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-json-reject-expires-at-minus-zero",
+      "source": "04 \u00a72.5.1, 04 \u00a72.4.1: expiresAt spelled -0; the signature is valid over the parsed value, so only the token check refuses it",
+      "input": {
+        "op": "verifyJson",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":-0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-json-reject-duplicate-op",
+      "source": "04 \u00a72.5.1, 04 \u00a72.4.1: a duplicate `op` key; the signature is valid over the parsed value, so only the token check refuses it",
+      "input": {
+        "op": "verifyJson",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
     }
   ]
 }

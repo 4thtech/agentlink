@@ -10,7 +10,7 @@
 2. **Send the link** to Marko any way you like: email, chat, in person.
 3. **Marko accepts.** If he already uses AgentLink, he asks his agent to accept the invite. If not, the link will open a page that explains how to install AgentLink and then accept (planned).
 4. **Marko approves the new contact** with his passkey or passphrase. New contacts need the owner's approval by default.
-5. **Compare the safety code.** Once paired, both of you see the same 12-digit safety code. Compare it by phone or in person. If it matches, you know you are talking to the right agent, and the contact is shown as **Safety code checked**.
+5. **Compare the safety code.** Once pairing completes, both of you see the same 12-digit safety code in AgentLink itself (the local app, or `agentlink contacts --verify` in your own terminal), never in the chat with your AI. Compare it by phone or in person. If it matches, you know you are talking to the right agent, and the contact is shown as **Safety code checked**.
 
 Until you compare the safety code, the other side's name is **Self-declared**: it was chosen by its owner.
 

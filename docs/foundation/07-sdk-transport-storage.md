@@ -73,7 +73,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 
 | Table | Key columns |
 |---|---|
-| `identity` | agent_id, agent_card_json, key_epoch, created_at |
+| `identity` | agent_id (the agent's EVM address, 04 §2.9), agent_card_json, key_epoch, storage_prefix (04 §2.9), created_at |
 | `contacts` | contact_id, name, agent_card_json, owner_fingerprint, verified, status (active/blocked), created_at |
 | `invites` | invite_id, proof_key (encrypted at rest; never the raw secret, 04 §3.6), label, expires_at, used_at |
 | `envelopes` | envelope_id, thread_id, direction, contact_id, type, created_at, envelope_json (ciphertext), payload_json (decrypted, optional per setting), read_at |
@@ -85,6 +85,10 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | `sync_cursors` | relay_url, last_seen |
 
 **At rest:** all sensitive columns (decrypted payloads, contact names, file names, URLs, file keys, salts, invite proof keys, policies' parameters) are encrypted with a local **store key** (random, kept in the keychain, or in the file KeyStore on headless machines, §9). Non-sensitive columns (IDs, timestamps, statuses) stay in clear for indexing. Without the store key, the database reveals only activity timing and counts.
+
+**Pairing and identity columns (04 §2.9, §3.6.1; proposed, G-23 and G-28; owner confirms at merge).**
+- `contacts.contact_id` is the contact's agent ID, unique per store. `contacts` also holds `pairing` (`pending`, `complete` or `mismatch`), the envelope IDs of the pairing's signed `handshake` and `handshake-ack` (kept for as long as the contact exists; every display of the safety code recomputes it from them, never from a stored digest), the pending pairing data until completion (`codeCommit`, `nonceB`), and `safety_check`: the owner's signed `contact.check`, re-verified on load. `safety_code_checked` is only a cache of `safety_check`. A re-pair replaces these columns only when it completes (04 §2.9).
+- `invites` also holds `nonce_a`, encrypted at rest. After pairing it is in the signed ack, as `codeReveal`.
 
 ---
 
@@ -146,7 +150,7 @@ type StoredObject = { kind: string; locator: string; size: number; sha256: strin
 
 - Works with Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, Scaleway, Wasabi, MinIO.
 - Uses `aws4fetch` (SigV4 over `fetch`) so it runs in Node, browser and Workers.
-- Object key: `agentlink/<agentId>/<random 128-bit>` (no file names, no contact info).
+- Object key: `agentlink/<storagePrefix>/<random 128-bit>`: a random per-agent prefix, never the agent ID (04 §2.9), and no file names or contact info.
 - Multipart upload for files > 64 MB; streaming encryption so large files never fully load into memory.
 - Presigned GET valid until `expiresAt` (max 7 days per SigV4; shorter with temporary credentials). The recipient can ask for a fresh link (`request` envelope, `kind: refresh-link`); the sender's core answers when online.
 - Lifecycle: the CLI's `storage connect` offers to set a bucket lifecycle rule deleting `agentlink/` objects after 30 days as a safety net.

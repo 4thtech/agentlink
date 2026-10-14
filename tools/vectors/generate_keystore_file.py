@@ -22,7 +22,8 @@ of `generate_hkdf_derive.py`. Secrets, salts, nonces and entries are synthetic t
 
 Runtimes: Node only, as 04 §2.8 states for the file KeyStore (IR-M1-1h-1 Q7).
 
-Not covered: the second, seed-derived agent-ID check of ALKS (needs `agentId`, G-23).
+The agent ID is the agent's EVM address (04 §2.9): `0x` + 40 lowercase hex in the header and as the
+expected ID, and after decryption the `seed` entry must derive it (its agentlink/v1/evm key at epoch 0).
 
 Usage: python3 -I tools/vectors/generate_keystore_file.py --check [FILE] | --write
 """
@@ -133,12 +134,18 @@ def parse_entries(plaintext):
     return entries
 
 
-AGENT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+AGENT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")  # the format's general rule (04 §2.8)
+AGENT_ID_29 = re.compile(r"0x[0-9a-f]{40}")  # the exact agent ID form (04 §2.9)
+
+
+def agent_id_of(seed):
+    """04 §2.9: the agent ID is the EVM address of the seed's agentlink/v1/evm key at epoch 0."""
+    return v.evm_address(hkdf.secp_secret(seed, hkdf.EVM, 0))
 
 
 def open_alks(data, secret, expected_agent_id, source="prompt"):
     """Every ALKS refusal of 04 §2.8 that applies without an agentId derivation (G-23)."""
-    if not AGENT_ID.fullmatch(expected_agent_id):
+    if not AGENT_ID.fullmatch(expected_agent_id) or not AGENT_ID_29.fullmatch(expected_agent_id):
         raise ValueError("invalid expected agentId")
     if len(data) < 60 or data[:4] != b"ALKS" or data[4] != 1 or data[6] != 1 or data[29] != 1:
         raise ValueError("bad header")
@@ -148,12 +155,17 @@ def open_alks(data, secret, expected_agent_id, source="prompt"):
     if not 1 <= id_len <= 64 or len(data) < 43 + id_len + 16:
         raise ValueError("bad idLen")
     agent_id = data[43 : 43 + id_len].decode("ascii", "replace")
-    if not AGENT_ID.fullmatch(agent_id) or agent_id != expected_agent_id:
+    if not AGENT_ID.fullmatch(agent_id) or not AGENT_ID_29.fullmatch(agent_id) or agent_id != expected_agent_id:
         raise ValueError("agentId mismatch")
     h = data[: 43 + id_len]
     pw = password(secret, kind, source)  # refuses before the KDF runs
     key = v.hkdf_sha256(v.argon2id(pw, data[13:29], m, t, p, 32), b"", ALKS_INFO, 32)
-    return parse_entries(v.aes256gcm_decrypt(key, data[30:42], data[len(h) :], h))
+    entries = parse_entries(v.aes256gcm_decrypt(key, data[30:42], data[len(h) :], h))
+    seeds = [value for name, value in entries if name == "seed"]
+    # After decryption the seed entry must derive the expected agent ID, compared as bytes (§2.8, §2.9).
+    if len(seeds) != 1 or bytes.fromhex(agent_id_of(seeds[0])[2:]) != bytes.fromhex(expected_agent_id[2:]):
+        raise ValueError("the seed entry does not derive the expected agent ID")
+    return entries
 
 
 def owner_keys(seed):
@@ -202,10 +214,14 @@ def build():
     code = base64.b32encode(v.det("keystore-file/agent-code", 15)).decode("ascii")
     code_spelled = "-".join(code[i : i + 4] for i in range(0, 24, 4)).lower()
     seed = v.det("keystore-file/seed", 32)
+    seed2, seed3, seed4 = (v.det(f"keystore-file/seed-{i}", 32) for i in (2, 3, 4))
+    A1, A2, A3, A4 = (agent_id_of(x) for x in (seed, seed2, seed3, seed4))
     store_key = v.det("keystore-file/store-key", 32)
     s3 = b'{"accessKeyId":"TESTONLY","secret":"' + base64.b64encode(v.det("keystore-file/s3", 30)) + b'"}'
     entries1 = [("seed", seed), ("store-key", store_key)]
-    entries2 = [("seed", seed), ("store-key", store_key), ("s3:primary", s3)]
+    entries2 = [("seed", seed4), ("store-key", store_key), ("s3:primary", s3)]
+    entries_a2 = [("seed", seed2), ("store-key", store_key)]
+    entries_a3 = [("seed", seed3), ("store-key", store_key)]
 
     def entry_fields(entries):
         out = {"entryNames": ",".join(name for name, _ in entries)}
@@ -237,53 +253,53 @@ def build():
     def open_input(data, secret, expected, source="prompt"):
         return {"op": "open", "file": v.hx(data), "secret": secret, "source": source, "expectedAgentId": expected}
 
-    f1 = file_case("floor", "KDF floor m = 19 MiB, t = 2, p = 1", passphrase, 2, FLOOR, "agent_01", entries1, "salt-1", "nonce-1")
-    file_case("default", "default m = 64 MiB, t = 3, p = 1; storage credential entry", unicode_passphrase, 2, DEFAULT, "Agent-XYZ_123", entries2, "salt-2", "nonce-2")
+    f1 = file_case("floor", "KDF floor m = 19 MiB, t = 2, p = 1", passphrase, 2, FLOOR, A1, entries1, "salt-1", "nonce-1")
+    file_case("default", "default m = 64 MiB, t = 3, p = 1; storage credential entry", unicode_passphrase, 2, DEFAULT, A4, entries2, "salt-2", "nonce-2")
     cases.append(
         v.case(
             "open-default-nfkc-equivalent",
             f"{SPEC} open with the NFKC-equivalent spelling of the passphrase",
-            open_input(files["default"], unicodedata.normalize("NFKC", unicode_passphrase), "Agent-XYZ_123"),
+            open_input(files["default"], unicodedata.normalize("NFKC", unicode_passphrase), A4),
             entry_fields(entries2),
         )
     )
-    other_agent = file_case("other-agent", "a second agent with the same passphrase", passphrase, 2, FLOOR, "agent_02", entries1, "salt-3", "nonce-3")
-    code_file = file_case("code", f"secretKind 1, generated unlock code; {SPEC_PASSWORD}", code, 1, DEFAULT, "agent_03", entries1, "salt-4", "nonce-4")
+    other_agent = file_case("other-agent", "a second agent with the same passphrase", passphrase, 2, FLOOR, A2, entries_a2, "salt-3", "nonce-3")
+    code_file = file_case("code", f"secretKind 1, generated unlock code; {SPEC_PASSWORD}", code, 1, DEFAULT, A3, entries_a3, "salt-4", "nonce-4")
     cases.append(
         v.case(
             "open-code-other-spelling",
             f"{SPEC} open with the code in lower case with dashes ({SPEC_PASSWORD})",
-            open_input(code_file, code_spelled, "agent_03"),
-            entry_fields(entries1),
+            open_input(code_file, code_spelled, A3),
+            entry_fields(entries_a3),
         )
     )
     cases.append(
         v.case(
             "open-code-from-file",
             f"{SPEC} open with the code read from a file with a trailing CRLF ({SPEC_PASSWORD})",
-            open_input(code_file, code + "\r\n", "agent_03", "file"),
-            entry_fields(entries1),
+            open_input(code_file, code + "\r\n", A3, "file"),
+            entry_fields(entries_a3),
         )
     )
     for case_id, m, t, p in [("cap-memory", 262144, 2, 1), ("cap-iterations", 19456, 8, 1), ("cap-parallelism", 19456, 2, 4)]:
         salt = v.det(f"keystore-file/{case_id}/salt", 16)
         nonce = v.det(f"keystore-file/{case_id}/nonce", 12)
-        data = seal(passphrase, 2, m, t, p, salt, nonce, "agent_01", entries_bytes(entries1))
-        if open_alks(data, passphrase, "agent_01") != entries1:
+        data = seal(passphrase, 2, m, t, p, salt, nonce, A1, entries_bytes(entries1))
+        if open_alks(data, passphrase, A1) != entries1:
             v.fail(f"{case_id} does not open")
-        cases.append(v.case(f"open-{case_id}", f"{SPEC}: KDF parameters at the cap (m = {m} KiB, t = {t}, p = {p}) are accepted", open_input(data, passphrase, "agent_01"), entry_fields(entries1)))
+        cases.append(v.case(f"open-{case_id}", f"{SPEC}: KDF parameters at the cap (m = {m} KiB, t = {t}, p = {p}) are accepted", open_input(data, passphrase, A1), entry_fields(entries1)))
 
     # 64 KiB boundary: exactly 65536 bytes of plaintext opens; one more byte is refused.
-    big = [("blob", v.det("keystore-file/blob", 65536 - 2 - 4 - 4))]
+    big = [("seed", seed), ("blob", v.det("keystore-file/blob", 65536 - (2 + 4 + 4 + 32) - (2 + 4 + 4)))]
     if len(entries_bytes(big)) != 65536:
         v.fail("boundary plaintext is not 64 KiB")
     salt1, nonce1 = v.det("keystore-file/salt-1", 16), v.det("keystore-file/nonce-1", 12)
-    big_file = seal(passphrase, 2, *FLOOR, salt1, nonce1, "agent_01", entries_bytes(big))
-    if open_alks(big_file, passphrase, "agent_01") != big:
+    big_file = seal(passphrase, 2, *FLOOR, salt1, nonce1, A1, entries_bytes(big))
+    if open_alks(big_file, passphrase, A1) != big:
         v.fail("64 KiB plaintext does not open")
-    cases.append(v.case("open-plaintext-64-kib", f"{SPEC}: plaintext of exactly 64 KiB is accepted", open_input(big_file, passphrase, "agent_01"), entry_fields(big)))
+    cases.append(v.case("open-plaintext-64-kib", f"{SPEC}: plaintext of exactly 64 KiB is accepted", open_input(big_file, passphrase, A1), entry_fields(big)))
 
-    def reject(case_id, why, data, secret=passphrase, expected="agent_01", source="prompt"):
+    def reject(case_id, why, data, secret=passphrase, expected=A1, source="prompt"):
         if not refused(open_alks, data, secret, expected, source):
             v.fail(f"{case_id} opens")
         cases.append(v.case(case_id, f"{SPEC}: {why}", open_input(data, secret, expected, source), {"outcome": "reject"}))
@@ -295,13 +311,13 @@ def build():
 
     reject("open-reject-wrong-passphrase", "wrong passphrase", f1, secret="correct horse battery stapler")
     reject("open-reject-passphrase-trailing-newline", "a trailing newline typed at a prompt is part of the passphrase", f1, secret=passphrase + "\n")
-    reject("open-reject-code-wrong", "another code", code_file, secret=base64.b32encode(v.det("keystore-file/other-code", 15)).decode(), expected="agent_03")
+    reject("open-reject-code-wrong", "another code", code_file, secret=base64.b32encode(v.det("keystore-file/other-code", 15)).decode(), expected=A3)
     for field, offset in [
         ("magic", 0), ("version", 4), ("secret-kind", 5), ("kdf", 6), ("memory", 10), ("iterations", 11),
         ("parallelism", 12), ("salt", 13), ("aead", 29), ("nonce", 30), ("id-len", 42), ("agent-id", 43),
     ]:
         reject(f"open-reject-flip-{field}", f"header byte flipped ({field})", flipped(f1, offset))
-    header_len = 43 + len("agent_01")
+    header_len = 43 + len(A1)
     reject("open-reject-flip-ciphertext", "ciphertext byte flipped", flipped(f1, header_len))
     reject("open-reject-flip-tag", "tag byte flipped", flipped(f1, len(f1) - 1))
     reject("open-reject-truncated-tag", "file truncated by one byte", f1[:-1])
@@ -313,14 +329,14 @@ def build():
     plain1 = entries_bytes(entries1)
 
     def sealed(**overrides):
-        params = dict(m=FLOOR[0], t=FLOOR[1], p=FLOOR[2], kind=2, agent_id="agent_01", plaintext=plain1)
+        params = dict(m=FLOOR[0], t=FLOOR[1], p=FLOOR[2], kind=2, agent_id=A1, plaintext=plain1)
         params.update(overrides)
         header_args = {k: params.pop(k) for k in ["version", "kdf", "aead", "id_len"] if k in params}
         return seal(passphrase, params["kind"], params["m"], params["t"], params["p"], salt, nonce, params["agent_id"], params["plaintext"], **header_args)
 
     def crafted(kind=2, **fields):
         """A header with values the format forbids, sealed under the otherwise valid kek."""
-        h = header(kind, *FLOOR, salt, nonce, "agent_01", **fields)
+        h = header(kind, *FLOOR, salt, nonce, A1, **fields)
         return h + v.aes256gcm_encrypt(kek(passphrase, 2, salt, *FLOOR), nonce, plain1, h)
 
     reject("open-reject-version-2", "unknown version", crafted(version=2))
@@ -336,14 +352,26 @@ def build():
         ("parallelism-above-cap", "p above 4", 19456, 2, 5),
     ]:
         reject(f"open-reject-{case_id}", f"KDF parameters out of bounds ({why}), refused before the KDF runs", sealed(m=m, t=t, p=p))
-    h = header(2, FLOOR[0], FLOOR[1], 0, salt, nonce, "agent_01")
+    h = header(2, FLOOR[0], FLOOR[1], 0, salt, nonce, A1)
     reject("open-reject-parallelism-zero", "KDF parameters out of bounds (p = 0), refused before the KDF runs", h + bytes(len(plain1) + 16))
     reject("open-reject-id-len-zero", "idLen = 0 (no agentId)", sealed(agent_id=""))
     reject("open-reject-id-len-65", "idLen above 64", sealed(agent_id="a" * 65), expected="a" * 64)
-    reject("open-reject-agent-id-charset", "agentId outside [A-Za-z0-9_-]", sealed(agent_id="agent.01"), expected="agent_01")
+    reject("open-reject-agent-id-charset", "agentId outside [A-Za-z0-9_-]", sealed(agent_id="agent.01"), expected=A1)
+    # 04 §2.8, §2.9: the agent ID is the exact 0x + 40 lowercase hex form, checked before any path.
+    for case_id, bad in [
+        ("checksummed", v.eip55(A1)),
+        ("uppercase", "0x" + A1[2:].upper()),
+        ("no-prefix", A1[2:]),
+        ("39-hex", A1[:-1]),
+        ("legacy-handle", "agent_01"),
+    ]:
+        reject(f"open-reject-expected-id-{case_id}", f"an expected agent ID that is not in the exact §2.9 form ({case_id})", f1, expected=bad)
+    reject("open-reject-header-id-checksummed", "a header agent ID in EIP-55 form (sealed validly under it)", sealed(agent_id=v.eip55(A1)), expected=A1)
+    reject("open-reject-seed-other-agent", "the seed entry derives another agent ID (sealed validly under A1's header)", sealed(plaintext=entries_bytes(entries_a2)))
+    reject("open-reject-no-seed-entry", "no seed entry, so nothing derives the agent ID", sealed(plaintext=entries_bytes([("store-key", store_key)])))
     reject("open-reject-expected-id-path", "an expected agentId of ../owner is refused before any path is built", f1, expected="../owner")
     reject("open-reject-other-agent", "another agent's file with the same passphrase (header agentId differs)", other_agent)
-    reject("open-reject-expected-id-mismatch", "the file's agentId differs from the agent being opened", f1, expected="agent_02")
+    reject("open-reject-expected-id-mismatch", "the file's agentId differs from the agent being opened", f1, expected=A2)
 
     dup = entries_bytes([("seed", seed), ("seed", store_key)])
     reject("open-reject-duplicate-entry", "duplicate entry names", sealed(plaintext=dup))
@@ -351,7 +379,7 @@ def build():
     reject("open-reject-value-length-overflow", "entry value length past the end", sealed(plaintext=v.u16be(4) + b"seed" + v.u32be(33) + seed))
     reject("open-reject-trailing-byte", "trailing bytes after the last entry", sealed(plaintext=plain1 + b"\x00"))
     reject("open-reject-invalid-utf8-name", "an entry name that is not UTF-8", sealed(plaintext=entries_bytes([(b"se\xffd", seed)])))
-    too_big = [("blob", v.det("keystore-file/blob", 65536 - 2 - 4 - 4 + 1))]
+    too_big = [("seed", seed), ("blob", v.det("keystore-file/blob", 65536 - (2 + 4 + 4 + 32) - (2 + 4 + 4) + 1))]
     reject("open-reject-plaintext-above-64-kib", "plaintext above 64 KiB", sealed(plaintext=entries_bytes(too_big)))
 
     # password(): file and prompt input, both kinds.
@@ -483,7 +511,7 @@ def build():
     alko_reject("open-alko-reject-alks-magic", "an ALKS file given to the ALKO reader", code_file, secret=code)
     # The reverse: ALKS readers refuse ALKO bytes and ALKS files sealed under the ALKO label.
     reject("open-reject-alko-blob", "an ALKO blob given to the ALKS reader", a1, secret=owner_code)
-    reject("open-reject-alko-label", "an ALKS file sealed under the ALKO label (agentlink/v1/owner-passphrase-wrap)", seal(passphrase, 2, *FLOOR, salt, nonce, "agent_01", plain1, info=ALKO_INFO))
+    reject("open-reject-alko-label", "an ALKS file sealed under the ALKO label (agentlink/v1/owner-passphrase-wrap)", seal(passphrase, 2, *FLOOR, salt, nonce, A1, plain1, info=ALKO_INFO))
     patched = b"ALKS" + a1[4:]
     alko_reject("open-alko-reject-magic-patched", "ALKS magic on an ALKO blob", patched)
     return cases

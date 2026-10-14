@@ -151,6 +151,41 @@
           "additionalProperties": false,
           "required": [
             "op",
+            "masterSeed"
+          ],
+          "properties": {
+            "op": {
+              "const": "agentId"
+            },
+            "masterSeed": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "agentId"
+          ],
+          "properties": {
+            "agentId": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{40}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
             "masterSeed",
             "label",
             "epoch"
