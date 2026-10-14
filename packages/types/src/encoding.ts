@@ -116,8 +116,9 @@ export const hex0xBytes = (bytes: number) =>
 /** Canonical EVM address: `0x` + 40 lowercase hex, never EIP-55 checksummed (04 §2.5.1). */
 export const evmAddress = hex0xBytes(20);
 /**
- * EVM-native 32-byte values (card keys and hashes, `recordId`, `salt`, `termsHash`): `0x` + 64
- * lowercase hex. Nostr-native values stay bare hex (canonical-encodings rule).
+ * EVM-native 32-byte values (AgentCard keys and hashes, `proof` `recordId` and `salt`): `0x` + 64
+ * lowercase hex (04 §2.4.1). Nostr-native values and digests that never reach a Record (for example
+ * `termsHash`, `actionDigest`, file hashes) stay bare hex.
  */
 export const bytes32Hex = hex0xBytes(32);
 /** SHA-256 digest as 64 lowercase hex characters (04 §3.4 "hex"). */

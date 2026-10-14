@@ -6,6 +6,7 @@ import {
   cardSigSchema,
   displayNameSchema,
   inviteSchema,
+  DENIED_RELAY_NAMES,
   isAllowedRelayHost,
   isAllowedRelayUrl,
   relayListSchema,
@@ -269,6 +270,14 @@ describe('relay hosts are never local (I-5, 04 §4 SSRF; IR-M1-2a-1 M-1)', () =>
     ],
     ['empty label', 'wss://relay..example.org'],
     ['.localdomain', 'wss://relay.localdomain'],
+    // Special-use names (RFC 6761, 8375, 7686, 2606): the name itself and anything under it.
+    ['home.arpa itself', 'wss://home.arpa'],
+    ['.invalid', 'wss://relay.invalid'],
+    ['.test', 'wss://relay.test'],
+    ['.example', 'wss://relay.example'],
+    ['.onion', 'wss://abcdefghijklmnop.onion'],
+    ['deep under .local', 'wss://a.b.relay.local'],
+    ['deep under .test', 'wss://a.relay.test:443/path'],
     ['EC2 metadata name', 'wss://instance-data.ec2.internal'],
     ['port 0', 'wss://relay.example.org:0'],
     ['port with a leading zero', 'wss://relay.example.org:0443'],
@@ -319,6 +328,30 @@ describe('relay hosts are never local (I-5, 04 §4 SSRF; IR-M1-2a-1 M-1)', () =>
       ...invite(),
       relays: ['wss://relay.example.org', 'wss://localhost'],
     });
+  });
+
+  it('denies exactly the special-use names, not look-alikes', () => {
+    for (const name of DENIED_RELAY_NAMES) {
+      expect(isAllowedRelayHost(name)).toBe(false);
+      expect(isAllowedRelayHost(`relay.${name}`)).toBe(false);
+    }
+    // A label that merely contains or ends with the word is a different name.
+    for (const host of [
+      'mytest.org',
+      'test.org',
+      'example.org',
+      'relay.example.com',
+      'onion.net',
+      'invalidator.io',
+      'notlocal.dev',
+      'myhome.arpa.example.org',
+      'relay.mytest',
+      'relay.myonion',
+      'relay.notlocal',
+      'relay.myhomearpa',
+    ]) {
+      expect(isAllowedRelayHost(host), host).toBe(true);
+    }
   });
 
   it('isAllowedRelayHost classifies hosts directly', () => {

@@ -67,7 +67,22 @@ const RELAY_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 /** A label that parses as a number in any base: decimal (octal is a subset) or 0x hex. */
 const NUMERIC_LABEL = /^(?:[0-9]+|0x[0-9a-f]*)$/;
 const LAST_LABEL = /^(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$/;
-const DENIED_SUFFIXES = ['.localhost', '.localdomain', '.local', '.internal', '.home.arpa'];
+/**
+ * Special-use and local names (04 §4; RFC 6761, RFC 6762, RFC 8375, RFC 7686, RFC 2606): the name
+ * itself and everything under it are refused. `.example`, `.test` and `.invalid` never resolve
+ * publicly; `.onion` is not reachable over plain DNS.
+ */
+export const DENIED_RELAY_NAMES = Object.freeze([
+  'localhost',
+  'localdomain',
+  'local',
+  'internal',
+  'home.arpa',
+  'invalid',
+  'test',
+  'example',
+  'onion',
+] as const);
 
 /** True when `host` passes the host part of the relay URL rule (lowercase DNS name, never local). */
 export function isAllowedRelayHost(host: string): boolean {
@@ -78,7 +93,7 @@ export function isAllowedRelayHost(host: string): boolean {
     if (!RELAY_LABEL.test(label) || NUMERIC_LABEL.test(label)) return false;
   }
   if (!LAST_LABEL.test(labels[labels.length - 1] as string)) return false;
-  return !DENIED_SUFFIXES.some((suffix) => host.endsWith(suffix));
+  return !DENIED_RELAY_NAMES.some((name) => host === name || host.endsWith(`.${name}`));
 }
 
 /** True when `url` passes the relay URL rule of 04 §4 (raw-string check, before any URL parsing). */
