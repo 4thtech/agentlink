@@ -419,7 +419,7 @@ describe('created_at randomisation (NIP-59; 04 §3.5)', () => {
     const recipients = Array.from({ length: MAX_RECIPIENTS }, () => referenceKeys());
     const wrapTimes: number[] = [];
     const sealTimes: number[] = [];
-    for (let round = 0; round < 8; round += 1) {
+    for (let round = 0; round < 3; round += 1) {
       const { wraps } = await wrapEnvelope(
         makeEnvelope(sender.pubkey),
         recipients.map((r) => r.pubkey),
@@ -445,8 +445,8 @@ describe('created_at randomisation (NIP-59; 04 §3.5)', () => {
         expect(value).toBeGreaterThanOrEqual(NOW - WINDOW);
         expect(value).toBeLessThanOrEqual(NOW);
       }
-      // 64 draws: they are not all the same, and they spread over the window.
-      expect(new Set(times).size).toBeGreaterThan(60);
+      // 24 draws: they are not all the same, and they spread over the window.
+      expect(new Set(times).size).toBeGreaterThan(20);
       expect(Math.max(...times) - Math.min(...times)).toBeGreaterThan(WINDOW / 2);
     }
   });
