@@ -19,7 +19,7 @@ import {
 import { NodeKeyStoreError } from './errors.js';
 import { osKeychain } from './keychain.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
-import { ttyOwnerTerminal, type OwnerTerminal } from './owner-terminal.js';
+import { assertNoHarnessMarker, ttyOwnerTerminal, type OwnerTerminal } from './owner-terminal.js';
 
 /** The one object an owner operation signs. */
 export type OwnerSignRequest =
@@ -187,6 +187,7 @@ export async function performOwnerOperation(
   owner: OwnerPublicKeys,
   item: OwnerOperationItem,
 ): Promise<OwnerSignature> {
+  assertNoHarnessMarker();
   const terminal = ttyOwnerTerminal();
   const store = await KeychainOwnerKeyStore.open(osKeychain(), owner);
   try {

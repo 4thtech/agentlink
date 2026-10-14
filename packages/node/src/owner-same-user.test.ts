@@ -218,6 +218,9 @@ describe('a same-user script cannot approve or change policy (10 M1-8, D-67, D-6
     const reviewed = [1, 2].map((n): ReviewedApproval => ({
       approvalId: id(n),
       action: { tool: 'agentlink_send', to: `contact-${String(n)}` },
+      storedDigest: encodeHex(
+        sha256(canonicalizeToBytes({ tool: 'agentlink_send', to: `contact-${String(n)}` })),
+      ),
       decision: 'approve',
       commitment: false,
       summary: `Send a message to Contact ${String(n)}`,

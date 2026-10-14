@@ -34,7 +34,7 @@ import {
   runOwnerOperation,
   type PromptingOwnerKeyStore,
 } from './owner-operation.js';
-import { ttyOwnerTerminal, type OwnerTerminal } from './owner-terminal.js';
+import { assertNoHarnessMarker, ttyOwnerTerminal, type OwnerTerminal } from './owner-terminal.js';
 
 /** 04 §2.5.2 (proposed): at most 20 items per `approval.decideBatch`; a batch has at least 2. */
 export const MAX_APPROVAL_BATCH_ITEMS = 20;
@@ -51,8 +51,11 @@ export interface ReviewedApproval {
    * signed (for a commitment, the scope object of 04 §3.4.2). Recomputed here, never trusted.
    */
   readonly action: JsonValue;
-  /** The digest stored with the request, if the caller has one: it must equal the recomputed one. */
-  readonly storedDigest?: string;
+  /**
+   * The digest stored with the request (04 §3.4.1). Required: it must equal the digest recomputed
+   * here, or the request is never offered (04 §2.5.2 step 2; IR-M1-8c-1 F-3).
+   */
+  readonly storedDigest: string;
   readonly decision: 'approve' | 'deny';
   /**
    * True for a commitment (D-31: a binding `accept`, anything under policy `commitments`). It is
@@ -133,7 +136,10 @@ function item(value: unknown, index: number): Item {
   } catch {
     throw invalid(`${where}'s action is not valid JSON.`);
   }
-  if (storedDigest !== undefined && storedDigest !== actionDigest) {
+  if (typeof storedDigest !== 'string' || !DIGEST.test(storedDigest)) {
+    throw invalid(`${where} has no stored digest to check against.`);
+  }
+  if (storedDigest !== actionDigest) {
     // 04 §2.5.2 step 2: a request whose stored digest does not match is a problem, never offered.
     throw invalid(`${where} doesn't match what was requested. It was not offered for approval.`);
   }
@@ -217,7 +223,7 @@ export function buildApprovalOperation(
   const shown = [...signedOrder].sort((a, b) => a.requestExpiresAt - b.requestExpiresAt);
   const n = items.length;
   const lines = [
-    `Waiting for you: ${String(n)}`,
+    `Your decisions (${String(n)}):`,
     ...shown.map(
       (i, k) =>
         `  ${String(k + 1)}. ${i.decision === 'approve' ? 'Approve' : 'Deny'}: ${i.summary}`,
@@ -264,6 +270,7 @@ export async function decideReviewedApprovals(
   context: ApprovalContext,
   reviewed: readonly ReviewedApproval[],
 ): Promise<{ readonly body: JsonObject; readonly sig: string }> {
+  assertNoHarnessMarker();
   const terminal = ttyOwnerTerminal();
   const store = await KeychainOwnerKeyStore.open(osKeychain(), context.owner);
   try {

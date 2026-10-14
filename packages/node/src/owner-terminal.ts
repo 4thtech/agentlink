@@ -186,7 +186,7 @@ export function ttyOwnerTerminal(streams: TtyStreams = {}): OwnerTerminal {
 
 /**
  * Environment markers of AI apps that run shell commands (04 §2.8). While one is set, the owner
- * step is refused. A UX guard against an AI running it by accident, not a security boundary; M1-8f
+ * step is refused, and so is every owner operation (IR-M1-8c-1 F-2). A UX guard against an AI running it by accident, not a security boundary; M1-8f
  * maintains the full list.
  */
 export const HARNESS_MARKERS: readonly string[] = Object.freeze([
@@ -206,7 +206,7 @@ export function assertNoHarnessMarker(
     if (value !== undefined && value !== '') {
       throw new NodeKeyStoreError(
         'harness_detected',
-        'This looks like a terminal your AI app controls. Run `agentlink owner init` yourself, in a terminal window you opened, so your AI never sees your owner code.',
+        'This looks like a terminal your AI app controls. Run this command yourself, in a terminal window you opened, so your AI never sees your owner code.',
       );
     }
   }

@@ -292,7 +292,17 @@ describe('owner init on a keychain machine (04 §2.2, D-67)', () => {
   it('opt-in: states the offline-guessing exposure first, then takes a chosen passphrase (kind 2)', async () => {
     const keychain = new FakeKeychain();
     const passphrase = 'correct horse battery';
-    const run = scripted([passphrase, passphrase], [true]);
+    let beforePrompt: string[] = [];
+    const run = scripted(
+      [
+        (written) => {
+          beforePrompt = [...written];
+          return passphrase;
+        },
+        passphrase,
+      ],
+      [true],
+    );
     const result = await initOwnerWith(
       keychain,
       run.terminal,
@@ -301,8 +311,32 @@ describe('owner init on a keychain machine (04 §2.2, D-67)', () => {
     );
     expect(result.secretKind).toBe(2);
     expect(keychain.items.get(OWNER_ACCOUNT)?.[5]).toBe(2);
-    expect(run.written[0]).toContain('try to guess a chosen passphrase offline');
+    expect(run.written[0]).toContain('try to guess the passphrase offline');
     expect(run.written.join('\n')).not.toContain('Your owner code');
+    // IR-M1-8c-1 F-5: the fingerprint and what a lost passphrase means come before the passphrase.
+    expect(beforePrompt).toContain(`Your owner fingerprint: ${result.fingerprint}.`);
+    expect(
+      beforePrompt.some((t) => t.startsWith('Keep this owner passphrase off this machine')),
+    ).toBe(true);
+  });
+
+  it('the re-type check reads 0/1/8 as O/I/B, like the code itself (04 §2.8)', async () => {
+    const keychain = new FakeKeychain();
+    const lookalike = (written: readonly string[]): string =>
+      lastGroup(written)
+        .toLowerCase()
+        .replaceAll('o', '0')
+        .replaceAll('i', '1')
+        .replaceAll('b', '8');
+    const run = scripted([lookalike]);
+    const result = await initOwnerWith(
+      keychain,
+      run.terminal,
+      { backend: 'keychain', env: CLEAN_ENV },
+      { kdf: KDF },
+    );
+    expect(result.secretKind).toBe(1);
+    expect(keychain.items.has(OWNER_ACCOUNT)).toBe(true);
   });
 
   it('opt-in declined: falls back to the generated code', async () => {
@@ -398,6 +432,28 @@ describe('owner init on a keychain machine (04 §2.2, D-67)', () => {
       ).toBe('harness_detected');
       expect(keychain.items.size).toBe(0);
       expect(run.written).toEqual([]);
+    }
+  });
+
+  it('the public owner operations are refused while an AI-app marker is set (IR-M1-8c-1 F-2)', async () => {
+    const { keys } = newOwnerSeed();
+    const saved = { ...process.env };
+    process.env['CLAUDECODE'] = '1';
+    try {
+      expect(
+        await codeOf(() =>
+          performOwnerOperation(keys, {
+            kind: 'owner-action',
+            action: approvalBody(keys),
+            summary: 'Approve',
+          }),
+        ),
+      ).toBe('harness_detected');
+      expect(await codeOf(() => decideReviewedApprovals({ agent: AGENT, owner: keys }, []))).toBe(
+        'harness_detected',
+      );
+    } finally {
+      process.env = saved;
     }
   });
 
@@ -683,7 +739,7 @@ describe('batch approval (04 §2.5.2, D-68)', () => {
     expect(ownerSigValid(signed.body, signed.sig, owner)).toBe(true);
     // Shown before the code: every item, soonest to expire first, then the totals.
     expect(run.written).toEqual([
-      'Waiting for you: 4',
+      'Your decisions (4):',
       '  1. Approve: Send a message to Contact 0',
       '  2. Deny: Send a message to Contact 1',
       '  3. Approve: Send a message to Contact 2',
@@ -768,6 +824,28 @@ describe('batch approval (04 §2.5.2, D-68)', () => {
         decideReviewedWith(store, run.terminal, context, [reviewed(0), tampered], fixed),
       ),
     ).toBe('owner_operation_invalid');
+    expect(run.labels).toEqual([]);
+    expect(run.written).toEqual([]);
+  });
+
+  it('requires the stored digest: an item without one is never offered (IR-M1-8c-1 F-3)', async () => {
+    const { store, context } = await ready();
+    const withoutDigest: Record<string, unknown> = { ...reviewed(1) };
+    Reflect.deleteProperty(withoutDigest, 'storedDigest');
+    const run = scripted([], [true]);
+    for (const item of [withoutDigest, { ...reviewed(1), storedDigest: 'AB'.repeat(32) }]) {
+      expect(
+        await codeOf(() =>
+          decideReviewedWith(
+            store,
+            run.terminal,
+            context,
+            [reviewed(0), item as unknown as ReviewedApproval],
+            fixed,
+          ),
+        ),
+      ).toBe('owner_operation_invalid');
+    }
     expect(run.labels).toEqual([]);
     expect(run.written).toEqual([]);
   });
@@ -954,6 +1032,8 @@ describe('the TTY prompt (04 §2.8, 07 §9.2)', () => {
     const saved = { ...process.env };
     process.env['AGENTLINK_OWNER_CODE'] = 'ABCD EFGH IJKL MNOP QRST UVWX';
     process.env['AGENTLINK_OWNER_PASSPHRASE'] = 'ABCD EFGH IJKL MNOP QRST UVWX';
+    // This suite may itself run inside an AI app; the marker guard is tested separately.
+    for (const marker of HARNESS_MARKERS) Reflect.deleteProperty(process.env, marker);
     try {
       if (!isatty(0) || !isatty(1)) {
         expect(

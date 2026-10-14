@@ -59,13 +59,15 @@ const COPY = {
   fingerprint: (fingerprint: string): string => `Your owner fingerprint: ${fingerprint}.`,
   beforeCode:
     "Store this owner code off this machine, for example in your password manager. Without it, nobody can approve for this agent or remove it, and until backups are available you'd have to set up a new agent and pair again.",
+  beforePassphrase:
+    "Keep this owner passphrase off this machine, for example in your password manager. Without it, nobody can approve for this agent or remove it, and until backups are available you'd have to set up a new agent and pair again.",
   code: (grouped: string): string => `Your owner code: ${grouped}`,
   retype: 'Type its last four characters to continue:',
   retypeWrong: "That doesn't match. Check the last four characters of your owner code.",
   retypeFailed:
     "The owner code wasn't confirmed. Nothing was saved; run `agentlink owner init` again.",
   passphraseNote:
-    'A passphrase you choose is weaker than a generated owner code. Any program running as you on this computer, including your AI app, can read the locked copy of your owner key and try to guess a chosen passphrase offline. A generated owner code makes that infeasible.',
+    'A passphrase you choose is weaker than a generated owner code. Any program running as you on this computer, including your AI app, can read the locked copy your passphrase protects and try to guess the passphrase offline. A generated owner code makes that infeasible.',
   passphraseConfirm: 'Use your own owner passphrase anyway? [y/N]',
   passphrase: 'Owner passphrase (at least 12 characters):',
   passphraseAgain: 'Type it again:',
@@ -84,12 +86,19 @@ function grouped(code: Uint8Array): string {
   return (text.match(/.{1,4}/g) ?? []).join(' ');
 }
 
-/** The last group of the code, re-typed: ASCII, case-insensitive, spaces and dashes ignored. */
+/** 04 §2.8 kind 1, step 4: `0`, `1` and `8` read as `O`, `I` and `B`. */
+const LOOKALIKE: Readonly<Record<number, number>> = { 0x30: 0x4f, 0x31: 0x49, 0x38: 0x42 };
+
+/**
+ * The last group of the code, re-typed, read the way the code itself is read (04 §2.8 kind 1):
+ * spaces and dashes ignored, ASCII upper case, and 0/1/8 as O/I/B.
+ */
 function retypeMatches(typed: Uint8Array, code: Uint8Array): boolean {
   const cleaned: number[] = [];
   for (const byte of typed) {
     if (byte === 0x20 || byte === 0x2d) continue;
-    cleaned.push(byte >= 0x61 && byte <= 0x7a ? byte - 0x20 : byte);
+    const upper = byte >= 0x61 && byte <= 0x7a ? byte - 0x20 : byte;
+    cleaned.push(LOOKALIKE[upper] ?? upper);
   }
   const typedBytes = Uint8Array.from(cleaned);
   cleaned.fill(0);
@@ -145,10 +154,13 @@ export async function initOwnerWith(
   let secret: Uint8Array | undefined;
   try {
     const fingerprint = ownerFingerprintText(keys);
+    // 04 §2.8 owner init rules: the fingerprint and what a lost secret means come first, on both
+    // paths (IR-M1-8c-1 F-5).
+    terminal.write(COPY.fingerprint(fingerprint));
     if (usePassphrase) {
+      terminal.write(COPY.beforePassphrase);
       secret = await readNewPassphrase(terminal);
     } else {
-      terminal.write(COPY.fingerprint(fingerprint));
       terminal.write(COPY.beforeCode);
       secret = generateSecretCode();
       terminal.write(COPY.code(grouped(secret)));

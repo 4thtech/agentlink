@@ -94,7 +94,7 @@ export const ownerMissing = (): NodeKeyStoreError =>
 const ownerMismatch = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'owner_mismatch',
-    "The owner key on this computer is damaged or isn't the owner this agent names. `agentlink doctor` shows the owner fingerprint.",
+    "The owner set up on this computer isn't the owner this agent names, or its saved copy is damaged. `agentlink doctor` shows the owner fingerprint.",
   );
 
 const presenceRejected = (): KeyStoreError =>
