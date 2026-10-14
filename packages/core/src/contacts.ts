@@ -415,9 +415,13 @@ export class ContactBook {
    * this agent and signed by the owner key in this agent's own card; it is fresh (G-7: `issuedAt` at
    * most S ahead, not expired, lifetime at most 24 h); `contact` is a contact with a completed
    * pairing; its `pairingDigest` equals the digest recomputed now from that pairing's stored signed
-   * `handshake` and `handshake-ack`; and its nonce is unused. One store transaction then checks that
-   * the contact still points at the same pair, checks and records the nonce (07 §3.4) and stores the
-   * signed object in `safety_check`. A later check with a fresh nonce replaces it (idempotent).
+   * `handshake` and `handshake-ack`. The nonce is checked after the object checks and before the
+   * op's rule (04 §2.5.1). One store transaction then checks that the contact still points at the
+   * same pair, checks the nonce again and records it (07 §3.4) and stores the signed object in
+   * `safety_check`. A later check with a fresh nonce replaces it (idempotent).
+   *
+   * Out of scope here: refusing when the own agent is revoked (M1-7h, and M1-7d's `identity_revoked`
+   * once `contact.check` is routed through the owner-action module, hand-off on the M1-7d card).
    */
   async applyContactCheck(signed: unknown): Promise<ContactCheckOutcome> {
     const ctx = this.#ctx;
@@ -442,7 +446,9 @@ export class ContactBook {
       if (pair.status === 'ok') return { status: 'ok', pairingDigest: pair.pairingDigest };
       return pair.reason === 'not_paired' ? { status: 'unknown' } : { status: 'unavailable' };
     };
-    const verdict = await verifyContactCheck(signed, { ...own, now }, lookup);
+    const nonceUsed = (nonce: string): Promise<boolean> =>
+      ctx.store.transaction((tx) => tx.get('owner_action_nonces', { nonce }) !== undefined);
+    const verdict = await verifyContactCheck(signed, { ...own, now, nonceUsed }, lookup);
     if (!verdict.ok) return refused(verdict.reason);
     const checked = pair;
     if (checked?.status !== 'ok') return refused('pairing_unavailable');

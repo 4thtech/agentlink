@@ -7,10 +7,11 @@
 // Order of the checks (04 §2.5.1): the exact encoding (the strict `contact.check` schema, M1-2f:
 // rejected, never normalised); `agent` is the receiving agent; `owner` equals, as bytes, ownerNostr
 // in that agent's card; `sig` is BIP-340 by `owner` over taggedHash("agentlink/owner-action/v1",
-// sha256(JCS(body))); `issuedAt ≤ now + S`; `now ≤ expiresAt`; `expiresAt − issuedAt ≤ L(op)`. Then
-// the op's rule (04 §3.6.1): `contact` is a contact with a completed pairing, and `pairingDigest`
-// equals the digest recomputed from that pairing's signed `handshake` and `handshake-ack`, never a
-// stored digest. The nonce is the store's, inside the apply transaction (07 §3.4).
+// sha256(JCS(body))); `issuedAt ≤ now + S`; `now ≤ expiresAt`; `expiresAt − issuedAt ≤ L(op)`; the
+// nonce is unused (when the caller supplies `nonceUsed`, as M1-7d's verifier does). Then the op's
+// rule (04 §3.6.1): `contact` is a contact with a completed pairing, and `pairingDigest` equals the
+// digest recomputed from that pairing's signed `handshake` and `handshake-ack`, never a stored
+// digest. The store checks the nonce again, and records it, inside the apply transaction (07 §3.4).
 //
 // This is the contact.check part of the SignedOwnerAction verifier; the general one (every op, the
 // nonce table, refusal reports) is M1-7d.
@@ -36,9 +37,14 @@ import {
   type SignedContactCheck,
 } from '@agentlink/types';
 
-/** Why a `contact.check` was refused. Fixed codes; never input text (I-5, I-7). */
+/**
+ * Why a `contact.check` was refused. Fixed codes; never input text (I-5, I-7). Every code except the
+ * two `contact.check` rule codes (`contact_unknown`, `pairing_unavailable`) has the same name and
+ * stage as M1-7d's OwnerActionRefusal; those two join it when `contact.check` is routed through the
+ * owner-action module (IR-M1-7c-b-1 F02 hand-off on the M1-7d card).
+ */
 export type ContactCheckRefusal =
-  // the object (04 §2.5.1): dropped, nothing written
+  // the object (04 §2.5.1, in this order): dropped, nothing written
   | 'malformed'
   | 'agent_mismatch'
   | 'owner_mismatch'
@@ -46,12 +52,12 @@ export type ContactCheckRefusal =
   | 'issued_in_future'
   | 'expired'
   | 'lifetime_exceeded'
+  | 'nonce_used'
   // the op's rule (04 §3.6.1)
   | 'contact_unknown'
   | 'pairing_unavailable'
   | 'digest_mismatch'
-  // the store (07 §3.4)
-  | 'nonce_used'
+  // the store side (contacts.applyContactCheck)
   | 'store_changed'
   | 'identity_missing';
 
@@ -63,6 +69,11 @@ export interface ContactCheckContext {
   readonly ownerNostr: string;
   /** Unix seconds, from the verifying core's own clock. */
   readonly now: number;
+  /**
+   * True when the nonce is already recorded (07 §3.4). Absent: the caller checks it in its
+   * transaction only. Checked after the object checks and before the op's rule (04 §2.5.1).
+   */
+  readonly nonceUsed?: (nonce: string) => boolean | Promise<boolean>;
 }
 
 /**
@@ -154,9 +165,9 @@ export function checkContactCheckObject(
 }
 
 /**
- * Verifies a `contact.check` before it is applied: the object checks, then its `pairingDigest`
- * against the digest `lookup` recomputes for its `contact` (04 §3.6.1). The lookup runs only for an
- * object that passed every other check.
+ * Verifies a `contact.check` before it is applied: the object checks and the nonce, then its
+ * `pairingDigest` against the digest `lookup` recomputes for its `contact` (04 §3.6.1). The lookup
+ * runs only for an object that passed every other check.
  */
 export async function verifyContactCheck(
   signed: unknown,
@@ -165,6 +176,9 @@ export async function verifyContactCheck(
 ): Promise<ContactCheckVerdict> {
   const verdict = checkContactCheckObject(signed, context);
   if (!verdict.ok) return verdict;
+  if (context.nonceUsed !== undefined && (await context.nonceUsed(verdict.signed.body.nonce))) {
+    return refuse('nonce_used');
+  }
   const found = await lookup(verdict.signed.body.params.contact);
   if (found.status === 'unknown') return refuse('contact_unknown');
   if (found.status === 'unavailable') return refuse('pairing_unavailable');

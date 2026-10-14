@@ -16,6 +16,7 @@ import {
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
 import { CLOCK_SKEW_SECONDS, OWNER_ACTION_MAX_LIFETIME_SECONDS } from '@agentlink/types';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { storedContactCheckHolds } from './contact-check.js';
 import { FakeClock, passphrase, seed } from './testing/fixtures.js';
 import { makeAgent, pairWith, type TestAgent, type TestOwner } from './testing/envelopes.js';
 
@@ -352,6 +353,61 @@ describe('contact.check verify and store (M1-7c-b)', () => {
       ).toStrictEqual({ status: 'refused', reason: 'digest_mismatch' });
       expect((await a.client.contacts.applyContactCheck(await signCheck())).status).toBe('applied');
       expect(await checked(a, b.id)).toBe(true);
+    });
+
+    it('a validly signed check from before a re-pair, written back, does not count (IR-M1-7c-b-1 F01)', async () => {
+      const old = (await contactRow(a, b.id))!.safety_check!;
+      clock.t += 60;
+      await pairWith(clock, a, b);
+      // The old object is still exactly what the owner signed (agent, owner, sig, contact all
+      // valid); only its pairingDigest names the previous pairing.
+      await editRow({ safety_check: old, safety_code_checked: 1 });
+      const view = await a.client.contacts.get(b.id);
+      expect(view.safetyCodeChecked).toBe(false);
+      expect(view.display.label).toBe('self-declared');
+    });
+
+    it('a replay after a re-pair is refused by its nonce first (04 §2.5.1 order, IR-M1-7c-b-1 F02)', async () => {
+      const applied = JSON.parse((await contactRow(a, b.id))!.safety_check!) as unknown;
+      clock.t += 60;
+      await pairWith(clock, a, b);
+      expect(await a.client.contacts.applyContactCheck(applied)).toStrictEqual({
+        status: 'refused',
+        reason: 'nonce_used',
+      });
+      await a.client.contacts.remove(b.id);
+      expect(await a.client.contacts.applyContactCheck(applied)).toStrictEqual({
+        status: 'refused',
+        reason: 'nonce_used',
+      });
+    });
+  });
+
+  describe('storedContactCheckHolds (pure, IR-M1-7c-b-1 F01)', () => {
+    it('holds only for this agent, owner, contact and the recomputed digest', async () => {
+      const signed = await signCheck();
+      const own = (await a.client.identity.get())!.card;
+      const expected = {
+        agent: a.id,
+        ownerNostr: own.ownerNostr,
+        contact: b.id,
+        pairingDigest: await digestOf(a, b.id),
+      };
+      expect(storedContactCheckHolds(signed, expected)).toBe(true);
+      // Every field valid, only the recomputed digest differs: false.
+      expect(
+        storedContactCheckHolds(signed, {
+          ...expected,
+          pairingDigest: flipHex(expected.pairingDigest, 63),
+        }),
+      ).toBe(false);
+      expect(
+        storedContactCheckHolds(signed, { ...expected, pairingDigest: encodeHex(randomBytes(32)) }),
+      ).toBe(false);
+      expect(storedContactCheckHolds(signed, { ...expected, contact: a.id })).toBe(false);
+      expect(storedContactCheckHolds(signed, { ...expected, agent: b.id })).toBe(false);
+      const otherOwner = encodeHex0x((await ownerB.getPublicKeys()).ownerNostr);
+      expect(storedContactCheckHolds(signed, { ...expected, ownerNostr: otherOwner })).toBe(false);
     });
   });
 
