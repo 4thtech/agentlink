@@ -75,6 +75,7 @@ export {
   ENVELOPE_ID_LENGTH,
   ENVELOPE_VERSION,
   HPKE_ENC_LENGTH,
+  KEY_COMMITMENT_LENGTH,
   KID_LENGTH,
   MAX_RECIPIENTS,
   THREAD_ID_LENGTH,
@@ -92,8 +93,24 @@ export {
   type EnvelopeRecipient,
   type UnsignedEnvelope,
 } from './envelope.js';
-export { CEK_INFO_LABEL, cekInfo, wrapCek, type WrappedCek } from './hpke.js';
-export { decryptPayload, encryptPayload, generateCek } from './aead.js';
+// M1-1l (G-46, D-66): the CEK-derived wraps and their check, and the key commitment check, so the
+// core can tell a `kc` mismatch from a failed tag (04 §3.1.1 steps 5 and 8).
+export {
+  CEK_EPH_LABEL,
+  CEK_INFO_LABEL,
+  cekInfo,
+  checkWrap,
+  wrapCek,
+  type WrappedCek,
+} from './hpke.js';
+export {
+  PAYLOAD_COMMIT_LABEL,
+  PAYLOAD_KEY_LABEL,
+  checkKeyCommitment,
+  decryptPayload,
+  encryptPayload,
+  generateCek,
+} from './aead.js';
 // M1-1g: the key interfaces (types only; G-2, 04 §3.1.1, puts them here so transport-nostr and core
 // can name them), public NIP-44 helpers, Nostr events and the gift wrap. The NIP-44 functions that
 // take a secret or conversation key are in @agentlink/crypto/keystore; the in-memory KeyStores are

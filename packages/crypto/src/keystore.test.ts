@@ -54,6 +54,10 @@ const TEST_SEAM = [
   'encryptPayloadWithIv',
   'hpkeSealSequence',
   'hpkeOpen',
+  // M1-1l: the three derivations from the CEK (04 §3.3), for the vectors.
+  'derivePayloadKey',
+  'deriveKeyCommitment',
+  'deriveWrapEphemeralKey',
   // M1-1f: fixed nonce for ALKS and ALKO, Argon2id with K and X.
   'argon2idWithSecretAndAd',
   'sealKeystoreFileWithNonce',
@@ -121,6 +125,13 @@ describe('@agentlink/crypto/keystore', () => {
       'generateCek',
       'encryptPayload',
       'decryptPayload',
+      // M1-1l (G-46, D-66): the wrap check and the key commitment check (04 §3.1.1 steps 5, 8).
+      'checkWrap',
+      'checkKeyCommitment',
+      'KEY_COMMITMENT_LENGTH',
+      'PAYLOAD_KEY_LABEL',
+      'PAYLOAD_COMMIT_LABEL',
+      'CEK_EPH_LABEL',
       'recoverEvmAddress',
       'decodeEcdsaSignature',
       'hashTypedData',

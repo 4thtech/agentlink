@@ -531,7 +531,7 @@ export const envelope = () => ({
     { kid: b64u(16, 'G'), enc: b64u(32, 'H'), wk: b64u(48, 'I') },
     { kid: b64u(16, 'J'), enc: b64u(32, 'K'), wk: b64u(48, 'L') },
   ],
-  aead: { alg: 'A256GCM', iv: b64u(12), ct: b64u(300) },
+  aead: { alg: 'A256GCM-KC', iv: b64u(12), kc: b64u(32, 'M'), ct: b64u(300) },
   sig: BIP340_SIG,
 });
 

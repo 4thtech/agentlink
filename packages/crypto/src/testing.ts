@@ -3,6 +3,7 @@
 // harness use it.
 // - M1-1c: wrapCek and encryptPayload with a fixed HPKE ephemeral key or AES-GCM IV, and the raw
 //   RFC 9180 suite (hpkeSealSequence, hpkeOpen with any info) for the published CFRG vectors.
+// - M1-1l: the CEK derivations (payload key, key commitment, wrap ephemeral key) for the vectors.
 // - M1-1f: sealKeystoreFile and sealOwnerSeed with a fixed nonce, Argon2id with a secret value (K)
 //   and associated data (X) for the RFC 9106 vector, and pairingDigest for the `labels` vectors.
 // - M1-1g: MemoryKeyStore and MemoryOwnerKeyStore, in-memory KeyStore doubles that hold a seed in
@@ -55,8 +56,15 @@ import {
 } from './nostr-event.js';
 import { wipe } from './wipe.js';
 
-export { hpkeOpen, hpkeSealSequence, wrapCekWithEphemeralKey, type HpkeSealed } from './hpke.js';
-export { encryptPayloadWithIv } from './aead.js';
+export {
+  deriveWrapEphemeralKey,
+  hpkeOpen,
+  hpkeSealSequence,
+  wrapCekWithEphemeralKey,
+  type HpkeSealed,
+} from './hpke.js';
+// M1-1l: the three derivations from the CEK (04 §3.3), for the one-case-per-label vectors.
+export { deriveKeyCommitment, derivePayloadKey, encryptPayloadWithIv } from './aead.js';
 
 export {
   sealKeystoreFileWithNonceUnsafe as sealKeystoreFileWithNonce,

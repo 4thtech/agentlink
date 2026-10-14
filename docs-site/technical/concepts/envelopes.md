@@ -14,14 +14,15 @@ An **envelope** is the container for every message and file reference. It is enc
   "from": "<sender agent Nostr x-only pubkey>",
   "createdAt": 1760000000,
   "recipients": [ { "kid": "...", "enc": "<HPKE encapsulated key>", "wk": "<wrapped content key>" } ],
-  "aead": { "alg": "A256GCM", "iv": "<12 bytes>", "ct": "<ciphertext and tag>" },
+  "aead": { "alg": "A256GCM-KC", "iv": "<12 bytes>", "kc": "<32-byte key commitment>", "ct": "<ciphertext and tag>" },
   "sig": "<BIP-340 signature>"
 }
 ```
 
 - **Envelope hash:** `sha256(JCS(envelope without sig))` (RFC 8785). This is the value recorded on-chain.
 - **Signature:** BIP-340 Schnorr by `from` over a tagged hash of the envelope hash, so an envelope signature can never be confused with a Nostr event signature.
-- **AEAD:** AES-256-GCM over the payload, with the header fields bound as additional data.
+- **AEAD:** AES-256-GCM over the payload, with the header fields bound as additional data. The AES key is not the content key itself: it is derived from it with HKDF-SHA256 (`agentlink/v1/payload-key`).
+- **Key commitment (`kc`):** 32 bytes, also derived from the content key (`agentlink/v1/payload-commit`). It is covered by the signature, and every reader checks it before decrypting. A content key that does not match `kc` is refused, even if AES-GCM would accept it, so no sender can make one signed envelope decrypt to different contents for different readers. The parser refuses any other `alg` and a `kc` that is not exactly 32 bytes, so the earlier form without `kc` is not accepted.
 
 ## Recipients
 
@@ -30,6 +31,8 @@ Every envelope is wrapped to: the recipient agent, the recipient's owner, the se
 ## Content key wrapping
 
 A 32-byte random content key per envelope, wrapped with HPKE (RFC 9180), mode Base, `DHKEM(X25519, HKDF-SHA256)`, `HKDF-SHA256`, `AES-256-GCM`, with an info string bound to the envelope ID. Sender authenticity comes from the envelope signature and the owner-signed agent card, not from HPKE Auth mode.
+
+**Every wrap is derived from the content key.** The HPKE ephemeral key of each recipient entry is derived from the content key, the envelope ID and that recipient's public key (`agentlink/v1/cek-eph`), so the same inputs always give the same entry. Anyone who holds the content key and a recipient's public key can recompute that entry and compare it byte for byte. Every reader checks the entries it can: always its own owner's entry, and the sender's agent and owner entries once it holds the sender's card. A sender therefore cannot give one recipient a different key, or hide an envelope from an owner, without the mismatch being detected and the envelope refused. The content key is used only for these derivations and as the wrapped plaintext, never directly as a cipher key.
 
 ## Payload
 

@@ -38,7 +38,8 @@
       "minimumReleaseAge": "7 days",
       "addLabels": ["security-sensitive"],
       "prBodyNotes": [
-        "**Security-sensitive dependency.** Read the changelog and the diff of every package in this group, check that no install scripts were added, and re-run `pnpm vectors:check`. Security class S1 or higher: human review plus an independent review session (docs/foundation/10-build-plan.md, working rule 7)."
+        "**Security-sensitive dependency.** Read the changelog and the diff of every package in this group, check that no install scripts were added, and re-run `pnpm vectors:check`. Security class S1 or higher: human review plus an independent review session (docs/foundation/10-build-plan.md, working rule 7).",
+        "**`@hpke/*` updates (04 section 3.3, D-66, IR-G-46-1 F-1).** The CEK wraps hand a derived ephemeral key to `@hpke/core` through its `ekm` parameter. Before any `@hpke/*` update merges, the `hpke` and `aead-envelope` vector suites must pass in every runtime (`pnpm vectors:check`: Node, Chromium, Firefox, WebKit, workerd). There is no fallback: an update that breaks them stays unmerged until a replacement is reviewed."
       ]
     }
   ]
