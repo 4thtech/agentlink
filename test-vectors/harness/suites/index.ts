@@ -10,6 +10,7 @@ import { keystoreFile } from './keystore-file';
 import { nip44 } from './nip44';
 import { ownerWrap } from './owner-wrap';
 import { pairing } from './pairing';
+import { pairingBodies } from './pairing-bodies';
 import { placeholderSha256 } from './placeholder-sha256';
 import { safetyCode } from './safety-code';
 import { taggedHashSuite } from './tagged-hash';
@@ -31,6 +32,7 @@ export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['nip44', nip44],
   ['owner-wrap', ownerWrap],
   ['pairing', pairing],
+  ['pairing-bodies', pairingBodies],
   ['placeholder-sha256', placeholderSha256],
   ['safety-code', safetyCode],
   ['tagged-hash', taggedHashSuite],

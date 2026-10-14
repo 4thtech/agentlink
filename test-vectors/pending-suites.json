@@ -13,10 +13,6 @@
       "card": "M1-7d",
       "phase": "M1a"
     },
-    "pairing-bodies": {
-      "card": "M1-2d",
-      "phase": "M1a"
-    },
     "safety-code-recompute": {
       "card": "M1-1c",
       "phase": "M1a"
