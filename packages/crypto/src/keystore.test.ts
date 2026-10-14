@@ -17,7 +17,22 @@ const SEED_OR_SECRET = [
   'signDigestEcdsa',
   'signTypedData',
   'signAgentCard',
+  // M1-1f: Argon2id, password() normalisation and code generation, and the ALKS / ALKO seal and
+  // open functions (04 §2.8), which take or return a passphrase-derived key, a seed or the entries.
+  'argon2id',
+  'normalizeSecret',
+  'generateSecretCode',
+  'deriveKeystoreKek',
+  'newKeystoreKek',
+  'sealKeystoreFile',
+  'openKeystoreFile',
+  'openKeystoreFileWithKek',
+  'sealOwnerSeed',
+  'openOwnerSeed',
 ];
+
+// M1-1f: the deterministic test seam (fixed nonce for ALKS and ALKO, Argon2id with K and X).
+const TEST_SEAM = ['argon2idWithSecretAndAd', 'sealKeystoreFileWithNonce', 'sealOwnerSeedWithNonce'];
 
 describe('@agentlink/crypto/keystore', () => {
   it('exports exactly the seed and secret-key functions', () => {
@@ -50,6 +65,20 @@ describe('@agentlink/crypto/keystore', () => {
       'verifyAgentCard',
       'verifyCardOwnerSig',
       'verifyCardAgentSig',
+      // M1-1f: public values only (the invite secret's proofKey and the pairing transcript).
+      'derivePairingProofKey',
+      'pairingProof',
+      'verifyPairingProof',
+      'hmacSha256',
+      'safetyCodeCommit',
+      'checkSafetyCodeReveal',
+      'safetyCodeTranscript',
+      'pairingDigest',
+      'safetyCodeFromDigest',
+      'computeSafetyCode',
+      'safetyCodeForRole',
+      'KEYSTORE_KDF_DEFAULTS',
+      'KEYSTORE_KDF_BOUNDS',
     ]) {
       expect(Object.keys(main), name).toContain(name);
     }
@@ -64,5 +93,21 @@ describe('@agentlink/crypto/keystore', () => {
       types: './dist/keystore.d.ts',
       default: './dist/keystore.js',
     });
+  });
+
+  it('exports the deterministic test seam from no entry point (M1-1f)', async () => {
+    const seam = await import('./testing.js');
+    expect(Object.keys(seam).sort()).toEqual([...TEST_SEAM].sort());
+    for (const name of TEST_SEAM) {
+      expect(Object.keys(main), name).not.toContain(name);
+      expect(Object.keys(keystore), name).not.toContain(name);
+    }
+  });
+
+  it('never builds the test seam: tsconfig.json excludes src/testing.ts from dist', async () => {
+    const config = (await import('../tsconfig.json', { with: { type: 'json' } })).default as {
+      exclude: string[];
+    };
+    expect(config.exclude).toContain('src/testing.ts');
   });
 });
