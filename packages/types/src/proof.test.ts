@@ -2,6 +2,7 @@
 // (06 §2.4). Encodings per 04 §2.4.1; a verifier rejects a pack in any other form (07 §8).
 import { describe, expect, it } from 'vitest';
 import {
+  approvalFeeSchema,
   approvalRequestBodySchema,
   commitmentAnswersSchema,
   commitmentScopeSchema,
@@ -27,6 +28,7 @@ import {
   CONTACT_B,
   DELETE,
   ENVELOPE_HASH,
+  FEE_TOKEN,
   KEY32,
   SHA,
   agentCard,
@@ -264,10 +266,59 @@ function without<T extends object>(o: T, ...keys: string[]): Record<string, unkn
   return copy;
 }
 
+/** A fee before confirmation: the signed maxFee in base units and its USD value, no split yet. */
+const quotedFee = () => ({ token: FEE_TOKEN, amount: '100000', usd: '0.1' });
+
+describe('ProofStatus fee fields (06 §2.4, 07 §8 as merged in #30)', () => {
+  const unconfirmed = (status: string, fee: unknown) => ({
+    status,
+    chain: 'base',
+    ...(status === 'submitted' ? { recordId: B32, txHash: hex0x(32, '7e') } : {}),
+    fee,
+    receipts: [],
+  });
+
+  it.each(['pending_approval', 'needs_credits', 'submitted', 'error'])(
+    '%s: the fee is maxFee without a split',
+    (status) => {
+      expectRoundTrip(proofStatusSchema, unconfirmed(status, quotedFee()));
+      // The split is the charged fee's, so it is never present before confirmation.
+      expectReject(proofStatusSchema, unconfirmed(status, proofStatus().fee));
+    },
+  );
+
+  it('ok: the charged fee carries its split, both parts together', () => {
+    expectRoundTrip(proofStatusSchema, proofStatus());
+    expectReject(proofStatusSchema, { ...proofStatus(), fee: quotedFee() });
+    expectReject(proofStatusSchema, edit(proofStatus(), ['fee', 'protocolUsd'], DELETE));
+    expectReject(proofStatusSchema, edit(proofStatus(), ['fee', 'integratorUsd'], DELETE));
+  });
+
+  it('fee.token is an address (the zero address for a native stablecoin) and amount base units', () => {
+    const zero = `0x${'00'.repeat(20)}`;
+    expectRoundTrip(proofStatusSchema, edit(proofStatus(), ['fee', 'token'], zero));
+    for (const token of ['USDC', 'xDAI', `0x${'AB'.repeat(20)}`, FEE_TOKEN.slice(2), null]) {
+      expectReject(proofStatusSchema, edit(proofStatus(), ['fee', 'token'], token));
+    }
+    for (const amount of ['0.1', '1e5', '0100000', 100000]) {
+      expectReject(proofStatusSchema, edit(proofStatus(), ['fee', 'amount'], amount));
+    }
+  });
+
+  it('an approval context fee has no split (amount = the signed maxFee)', () => {
+    expectAccept(approvalFeeSchema, quotedFee());
+    expectReject(approvalFeeSchema, proofStatus().fee);
+  });
+});
+
 describe('ProofStatus (06 §2.4)', () => {
   it('round-trips each status', () => {
     expectRoundTrip(proofStatusSchema, proofStatus());
-    const noRecord = without(proofStatus(), 'recordId', 'txHash', 'explorerUrl', 'verifyUrl');
+    // Before confirmation the fee is the signed maxFee, with no protocol/integrator split (06 §2.4).
+    const noRecord = {
+      ...without(proofStatus(), 'recordId', 'txHash', 'explorerUrl', 'verifyUrl'),
+      fee: quotedFee(),
+    };
     expectRoundTrip(proofStatusSchema, { ...noRecord, status: 'pending_approval', receipts: [] });
     expectRoundTrip(proofStatusSchema, { ...noRecord, status: 'needs_credits', receipts: [] });
     expectRoundTrip(proofStatusSchema, { ...noRecord, status: 'error', receipts: [] });
@@ -324,8 +375,16 @@ describe('ProofStatus (06 §2.4)', () => {
   });
 
   it('a submitted proof has a txHash; receipts need a record; receipts are unique', () => {
-    expectReject(proofStatusSchema, { ...without(proofStatus(), 'txHash'), status: 'submitted' });
-    expectReject(proofStatusSchema, { ...without(proofStatus(), 'recordId'), status: 'submitted' });
+    expectReject(proofStatusSchema, {
+      ...without(proofStatus(), 'txHash'),
+      status: 'submitted',
+      fee: quotedFee(),
+    });
+    expectReject(proofStatusSchema, {
+      ...without(proofStatus(), 'recordId'),
+      status: 'submitted',
+      fee: quotedFee(),
+    });
     expectReject(proofStatusSchema, {
       ...proofStatus(),
       receipts: [
