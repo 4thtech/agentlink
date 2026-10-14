@@ -231,4 +231,4 @@ Console: approval request is sent as an encrypted envelope to the owner key; the
 | M4 | + Arbitrum One, Optimism, Polygon PoS | + their testnets |
 | Later | Sonic, Avalanche C-Chain, BNB Chain, Celo; Oasis Sapphire for confidential use | |
 
-Each chain has a config entry: chain ID, RPC URLs (several, with fallback), contract addresses (identical via CREATE3 / CreateX, see 05 §9), allowed fee tokens with addresses and decimals, block explorer, confirmations required.
+Each chain has a config entry: chain ID, RPC URLs (several, with fallback), contract addresses (identical via CREATE3 / CreateX within one campaign; the testnet and mainnet sets differ, see 05 §9.1), allowed fee tokens with addresses and decimals, block explorer, confirmations required.

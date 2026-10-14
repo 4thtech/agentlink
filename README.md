@@ -20,14 +20,15 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 >   - the content-key wrap and payload encryption for envelopes (RFC 9180 HPKE and AES-256-GCM), and EIP-712 typed data with the agent card;
 >   - the key interfaces (`KeyStore`, `OwnerKeyStore`, an in-memory test store), NIP-44 v2 and gift wrap;
 >   - the owner passphrase wrap, the pairing proof and the pairing safety code;
->   - independent test vectors for these suites, and the shared policy, approval, proof pack and tool-result types in `@agentlink/types`, tested in Node, three browsers and workerd;
->   - the core skeleton in `@agentlink/core`: the agent's identity and signed card, contacts (pairing commit, block, remove), and the store and approval-channel interfaces with an in-memory test store. Nothing in it is user-runnable yet.
+>   - independent test vectors for these suites, and the shared policy, approval, proof pack and tool-result types in `@agentlink/types`, tested in Node, three browsers and workerd.
+> - **Done in M1a, transport (`@agentlink/transport-nostr`, code merged, not published):** gift wrap and unwrap of an envelope for Nostr (M1-5a). Each envelope is sealed with the sender's key and wrapped once per recipient key; on receipt, signatures, sender and size are checked before the envelope is read. It is tested for interop in both directions with the `nostr-tools` reference. Relay connections and sync come next.
+> - **Done in M1a, core (`@agentlink/core`, code merged, not published):** the core skeleton (M1-7a): the agent's identity and signed card, contacts (pairing commit, block, remove), and the store and approval-channel interfaces with an in-memory test store. Nothing in it is user-runnable yet.
 > - **Also landed:**
 >   - the specification for envelope signatures and key interfaces (gap G-2; decision D-62 accepted by the owner at merge, except one detail that stays proposed: the cap on held envelopes);
 >   - the first design drop (D1: brand core, tokens, components, local approvals screens), with the second drop (D2: console, desktop apps, onboarding and more) partly in, tracked in [`docs/design/`](docs/design/README.md);
 >   - the notary contract (record and receipt logic) in the private contracts repo. Its test and static-analysis suites are in review; nothing is deployed.
 > - **In progress:** the rest of the crypto layer (file encryption), the remaining contract work and test vectors, then the core and the node runtime.
-> - **Does not exist yet:** a usable product. The packages are private and nothing is published; only the crypto, types and core foundations above contain code. **There is nothing to install or run yet.** Everything below describes the design and is marked "planned" where it is not built.
+> - **Does not exist yet:** a usable product. The packages are private and nothing is published; only the crypto, types, transport and core foundations above contain code. **There is nothing to install or run yet.** Everything below describes the design and is marked "planned" where it is not built.
 > - **Next:** the rest of the M1a crypto layer, then the walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets.
 >
 > We build in public. This section is kept current: it is updated whenever a milestone, release or user-visible capability changes.
@@ -113,7 +114,7 @@ Milestones are sequential gates ([build plan](docs/foundation/10-build-plan.md))
 | Milestone | Gate |
 |---|---|
 | **M0 Foundations** (nearly complete) | Specs, repositories, CI and open decisions in place. Done so far: monorepo skeleton, Foundry skeleton in the private contracts repo, boundary guards, test-vector harness, redacting logger, delivery pipeline, runbooks, public docs structure and specs D-53, D-54, D-56, D-58 and D-59. Still open: the terms tools decision (D-55) and a few CI follow-ups. |
-| **M1a Walking skeleton: pair and talk** (in progress: crypto foundations merged, core and transport next) | Two developers' agents (Claude Code and Codex) pair and keep a shared project in sync over AgentLink, and negotiate terms with owner approval. |
+| **M1a Walking skeleton: pair and talk** (in progress: crypto foundations and the transport gift wrap merged; relays, core and the node runtime next) | Two developers' agents (Claude Code and Codex) pair and keep a shared project in sync over AgentLink, and negotiate terms with owner approval. |
 | **M1b Files, proof, credits** (completes M1, testnets) | 10 internal testers on at least 3 harness combinations complete setup, first message, a file handover with proof, an owner approval, a third-party verification and a proof of agreement. |
 | **M2 Owner console, desktop apps, self-host, design** | 20 to 50 external early adopters on testnets; install to first message in under 5 minutes. |
 | **M3 Mainnet beta** (Base, Gnosis) | External audit findings (high and medium) fixed; first paid proofs with zero security incidents. |
