@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 - Monorepo skeleton (M0-2d): pnpm workspace with Turborepo, strict ESM TypeScript with project references, ESLint, Prettier, Vitest and Changesets; a stub package for every directory in the repository layout; manifest checks (MIT licence, no install scripts) inside `pnpm lint`; and CI strict mode (`.github/ci-strict`), so a missing root script now fails CI. All packages are private stubs and nothing is published yet.
 - Build plan "At a glance" (building blocks, stages, external services) and plain-language explainers on messaging, files and payments under `docs/explainers/`.
+- Process (DOCS-RB): runbooks for every repeatable procedure (`docs/runbooks/`), lessons learned (`docs/lessons/`), a role-based "Start here" map with a time-boxed onboarding track (`docs/README.md`), and a `GEMINI.md` pointer so Gemini CLI loads `AGENTS.md`.
 
 ### Changed
 
