@@ -1,5 +1,7 @@
 // @agentlink/crypto: the only package that reaches crypto primitives (04 §8.1). M1-1a adds the
-// base layer: canonical encodings, hashing, JCS, randomness and wiping.
+// base layer: canonical encodings, hashing, JCS, randomness and wiping. M1-1e adds EIP-712 typed-data
+// hashing, canonical ECDSA verification and the AgentCard; its signing functions are in
+// @agentlink/crypto/keystore.
 export const packageName = '@agentlink/crypto';
 
 export { CryptoInputError, type CryptoInputErrorCode } from './errors.js';
@@ -27,6 +29,7 @@ export {
   serializeNumber,
   type JsonObject,
   type JsonValue,
+  type ParseJsonOptions,
 } from './jcs.js';
 export { randomBytes } from './random.js';
 export { wipe } from './wipe.js';
@@ -56,3 +59,34 @@ export {
   ownerFingerprint,
   type FingerprintForm,
 } from './fingerprint.js';
+export {
+  ECDSA_SIGNATURE_BYTES,
+  decodeEcdsaSignature,
+  encodeEcdsaSignature,
+  recoverEvmAddress,
+} from './ecdsa.js';
+export {
+  eip712EncodeType,
+  eip712HashStruct,
+  eip712TypeHash,
+  hashTypedData,
+  type TypedData,
+  type TypedDataField,
+  type TypedDataHashes,
+  type TypedDataTypes,
+} from './eip712.js';
+export {
+  AGENT_CARD_DOMAIN,
+  AGENT_CARD_TYPES,
+  agentCardJcsHash,
+  agentCardNameHash,
+  agentCardRelaysHash,
+  hashAgentCard,
+  parseAgentCard,
+  parseAgentCardJson,
+  verifyAgentCard,
+  verifyCardAgentSig,
+  verifyCardOwnerSig,
+  type AgentCard,
+  type AgentCardHashes,
+} from './agent-card.js';

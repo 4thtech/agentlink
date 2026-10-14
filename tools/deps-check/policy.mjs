@@ -35,8 +35,12 @@ export const LIBRARIES = [
   },
   {
     group: ['viem', 'viem/*'],
-    zones: ['packages/crypto', 'packages/chain', 'apps/pay'],
+    zones: ['packages/chain', 'apps/pay'],
     via: '@agentlink/chain',
+    // Tests only (IR-M1-1e-1 L-1): @agentlink/crypto implements EIP-712 on noble (07 §1) and uses
+    // viem as an independent oracle in its *.test.ts files, as a devDependency. Runtime source and
+    // runtime dependencies of packages/crypto may not use it.
+    testZones: ['packages/crypto'],
   },
   { group: ['aws4fetch'], zones: ['packages/storage'], via: '@agentlink/storage' },
   {
@@ -62,6 +66,13 @@ export const LIBRARIES = [
     via: '@agentlink/crypto',
   },
 ];
+
+/** A test file: `*.test.<ext>`. LIBRARIES `testZones` apply to these files only. */
+export const isTestFile = (file) => /\.test\.[cm]?[jt]sx?$/.test(file ?? '');
+
+/** True when `lib` may be used in `zone`: everywhere in its zones, in tests only in its testZones. */
+export const libraryAllowed = (lib, zone, { test = false } = {}) =>
+  lib.zones.includes(zone) || (test && (lib.testZones ?? []).includes(zone));
 
 /**
  * Restricted entry points of workspace packages (IR-M1-1b-1 M-1). A zone that may import the package
@@ -266,7 +277,9 @@ export const CRYPTO_MSG =
 export const libraryMessage = (lib) =>
   lib.zones.length === 0
     ? `${lib.group[0]} is not on the crypto allowlist (04 §8.1); adding a library needs a decision and the owner's approval.`
-    : `${lib.group[0]} may be imported only in ${lib.zones.join(', ')}; everything else uses ${lib.via} (AGENTS.md).`;
+    : `${lib.group[0]} may be imported only in ${lib.zones.join(', ')}${
+        lib.testZones?.length ? ` (and in test files of ${lib.testZones.join(', ')})` : ''
+      }; everything else uses ${lib.via} (AGENTS.md).`;
 export const restrictedEntryMessage = (entry) =>
   `${entry.group[0]} may be imported only in ${entry.zones.join(', ')}; everything else uses ${entry.via}.`;
 export const layerMessage = (zone, name) =>
@@ -298,7 +311,12 @@ export function violationFor(zone, specifier, file) {
     }
   }
   for (const lib of LIBRARIES) {
-    if (matchesGroup(specifier, lib.group) && !lib.zones.includes(zone)) return libraryMessage(lib);
+    if (
+      matchesGroup(specifier, lib.group) &&
+      !libraryAllowed(lib, zone, { test: isTestFile(file) })
+    ) {
+      return libraryMessage(lib);
+    }
   }
   const name = workspaceNameOf(specifier);
   if (name !== null && !allowedWorkspaceNames(zone).includes(name)) {
