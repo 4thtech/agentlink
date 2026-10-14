@@ -47,3 +47,10 @@ export {
   sealKeystoreFile,
   sealOwnerSeed,
 } from './keystore-file.js';
+// M1-8b (07 §3.1): the cipher of the local store's `enc` columns and its index key. It takes the store
+// key, so only KeyStore backends (packages/node; the Durable Object in M2-3a) reach it.
+export {
+  createStoreColumnCipher,
+  type StoreColumnCipher,
+  type StoreColumnContext,
+} from './store-cipher.js';

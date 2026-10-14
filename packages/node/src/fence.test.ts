@@ -11,9 +11,12 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
     expect(Object.keys(entry).sort()).toEqual([
       'KEYCHAIN_SERVICE',
       'NodeKeyStoreError',
+      // M1-8b: the store entry returns the Store and its cipher, never the store key.
+      'NodeStoreError',
       'assertAgentId',
       'createOsKeychainAgent',
       'openAgentKeyStore',
+      'openAgentStore',
       'packageName',
       'probeOsKeychain',
       'selectKeyStoreBackend',
@@ -29,6 +32,9 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'createKeychainAgent',
       'openRecordedKeyStore',
       'KeychainKeyStore',
+      'openAgentStoreWith',
+      'createAgentStoreCipher',
+      'SqliteStore',
     ]) {
       expect(names).not.toContain(name);
     }

@@ -149,9 +149,10 @@ jobs:
 
       - name: Set up Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
-        # When packages/node (better-sqlite3) lands, allow its install script explicitly:
+        # A dependency that needs its install script is allowed here explicitly, for example:
         #   with:
-        #     rebuild: better-sqlite3
+        #     rebuild: <package>
+        # better-sqlite3 (packages/node) needs none: it ships prebuilt binaries and no install script.
 
       # Package tests that run in browsers (Playwright) need the engines (M1-2c).
       - name: Install Playwright browsers
