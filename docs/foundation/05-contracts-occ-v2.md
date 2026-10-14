@@ -132,6 +132,8 @@ struct Receipt {
 }
 ```
 
+**JSON form (04 §2.4.1).** Wherever these values appear in JSON (the `proof` body, proof packs, tool results, the submitter API), addresses and every `bytes32` (`recordId`, `salt`, `envelopeHash`, `recipientCommitment`, `parentRecordId`, `appId`), transaction hashes and signatures are `0x` + lowercase hex; `uint256` values (`maxFee`, `nonce`) are decimal strings; the other integers are JSON integers. Anything else is rejected, never normalised.
+
 ### 3.2 Functions
 
 ```solidity

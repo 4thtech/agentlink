@@ -91,6 +91,33 @@ AgentCard {
 
 Display names are **self-declared** unless the agent is registered (F-41); UIs must label them accordingly.
 
+**Card JSON form.** The card travels (invite, `handshake`, `card-update`, proof pack) and is hashed (`sha256(JCS(card))`, §3.6) as its EIP-712 message object: exactly the twelve fields above, with these names and no others, encoded per §2.4.1. Every address and `bytes32` field, including `agentNostr`, `ownerNostr`, `agentEnc` and `ownerEnc`, is `0x` + lowercase hex; `version`, `issuedAt`, `expiresAt` and `keyEpoch` are JSON integers. `cardSig` is the owner's EIP-712 signature, `0x` + 130 lowercase hex.
+
+#### 2.4.1 Canonical binary encodings (proposed; owner confirms at merge)
+
+Every binary value has exactly one spelling, fixed by the domain it comes from. The rule covers every JSON object the protocol signs, hashes, sends or exports: cards, owner actions, envelopes, payload bodies, proof packs and tool results. Non-JSON carriers (the DNS TXT record of §2.7) keep their own stated form.
+
+| Class | Form | Values |
+|---|---|---|
+| Nostr-native | Lowercase hex, no prefix: 64 characters for 32 bytes, 128 for 64 bytes (NIP-01) | Nostr x-only public keys outside EIP-712 messages (envelope `from`, OwnerAction `owner`, CommitmentScope `counterparty.ownerKey`); Nostr event ids; BIP-340 signatures (envelope and owner-action `sig`) |
+| EVM-native | `0x` + lowercase hex of the exact length | EVM addresses (`0x` + 40). Every value with an ABI or EIP-712 type: the `bytes32` fields of the 05 structs and events (`recordId`, `salt`, `envelopeHash`, `recipientCommitment`, `parentRecordId`, `appId`), every address or `bytes32` field of an EIP-712 message (the AgentCard; `DomainClaim`, §2.7), EIP-712 digests and struct hashes, transaction hashes, and ECDSA signatures (`cardSig`, record and receipt signatures: `0x` + 130 for a 65-byte EOA signature; an ERC-1271 signature has the length its account returns). `uint256` values (Record `maxFee`, `nonce`) are decimal strings with no sign and no leading zero |
+| Content digests | Lowercase hex, no prefix, 64 characters | SHA-256 values that never enter a contract or an EIP-712 message: `termsHash`, `previousTermsHash`, `actionDigest`, `plaintextSha256`, `ciphertextSha256`, `policyHash` |
+| Other bytes | base64url, no padding (§3.1) | Identifiers, nonces, keys and secrets (`id`, `thread`, `inviteId`, `secret`, `termsId`, the owner-action and drop `nonce`, `kid`, `enc`, `wk`, `iv`, `fileKey`, `contentKey`), ciphertext and payload bytes (`ct`, `inline`), the `handshake` `proof` |
+
+- **The carrying structure decides the class.** A Nostr key inside an EIP-712 message is a `bytes32` there. The card's `ownerNostr` is `0x` + 64 hex, while the same key as an OwnerAction `owner` or an envelope `from` is 64 hex without a prefix.
+- **Compare bytes, never strings.** Each value first passes its strict parse. Every equality between two encoded values then decodes both to bytes and compares the bytes. Examples: OwnerAction `owner` with the card's `ownerNostr` (§2.5.1, §3.4.1 `revoke`), envelope `from` with the card's `agentNostr` (§3.4.1), the seal key with `from` (§3.5), and a stored card's fields with a new card's (`card-update`). Nothing re-encodes, trims or lower-cases a value in order to compare it. `@agentlink/types` provides the decoders, so no caller writes its own conversion.
+- **Non-canonical forms are rejected on parse, never normalised:**
+  - upper-case or mixed-case hex, including EIP-55 checksummed addresses (checksums are for display only);
+  - a missing `0x` on an EVM-native value, a `0x` on a Nostr-native value or digest, and `0X`;
+  - a wrong length, or whitespace anywhere;
+  - base64url with padding, `+` or `/`, or non-zero trailing bits;
+  - for decimal strings, a sign, a leading zero, or a value outside the type's range.
+- **Integers** other than `uint256` are JSON integers in [0, 2^53 − 1], including the card's `uint8`, `uint32` and `uint64` fields. A `uint64` value above 2^53 − 1 is rejected.
+- **Test vectors (M1-1h).** M1-1h carries accept and reject vectors for each class:
+  - the canonical form of each value listed above;
+  - each non-canonical form above, applied to a value of each class;
+  - the cross-class cases: a card `ownerNostr` and an OwnerAction `owner` for the same key compare equal as bytes; an `owner` with `0x`, and a card key without it, are each rejected; a `proof` body whose `recordId` or `salt` is base64url is rejected.
+
 ### 2.5 Owner operations and user presence
 
 Owner-only operations: approve/deny, change policies, add/remove allowed folders, add storage credentials, export keys, revoke agents, disclose content keys.
@@ -109,7 +136,7 @@ Owner-only operations: approve/deny, change policies, add/remove allowed folders
 {
   "v": 1,
   "agent": "0x<40 lowercase hex>",          // the agent's EVM address (stable, §2.1)
-  "owner": "<64 lowercase hex>",            // owner Nostr x-only pubkey; must equal ownerNostr in that agent's card
+  "owner": "<64 lowercase hex>",            // owner Nostr x-only pubkey; equals, as bytes, ownerNostr in that agent's card (§2.4.1)
   "op": "approval.decide | policy.set | agent.revoke | …",
   "params": { },                            // strict schema per op
   "nonce": "<16 bytes, base64url, no padding>",
@@ -121,20 +148,20 @@ Owner-only operations: approve/deny, change policies, add/remove allowed folders
 ```
 
 - `sig` = BIP-340 Schnorr by `owner` over `taggedHash("agentlink/owner-action/v1", sha256(JCS(OwnerAction)))`. The tag differs from the envelope tag (§3.1), so an owner-action signature is never a valid envelope or Nostr event signature, and the reverse.
-- **Encoding (byte-exact).**
-  - `agent` is `0x` followed by 40 lowercase hex characters. `owner` is 64 lowercase hex characters, and `sig` is 128.
+- **Encoding (byte-exact, §2.4.1).**
+  - `agent` is `0x` followed by 40 lowercase hex characters (EVM-native). `owner` is 64 lowercase hex characters and `sig` is 128, both without a prefix (Nostr-native).
   - `nonce` is 16 bytes, base64url without padding.
   - Integers (`v`, `issuedAt`, `expiresAt`, `policy.set` `version`) are JSON integers in [0, 2^53 − 1].
   - All strings are I-JSON (RFC 7493), and JCS is RFC 8785.
   - Schemas are strict at every level (`SignedOwnerAction`, `OwnerAction`, `params`), so unknown keys are rejected.
   - An object in any other form is **rejected, never normalised**.
   - The same lowercase address form applies wherever an agent address appears in a signed or hashed object: `terms.parties` (§3.4) and `approval-request.agent` (§3.4.1).
-  - M1-1h carries signing vectors and rejection vectors for every non-canonical form (checksummed or uppercase address, uppercase hex, padded base64url, out-of-range integer, unknown key).
+  - M1-1h carries signing vectors and rejection vectors for every non-canonical form (checksummed or uppercase address, uppercase hex, a `0x` on `owner` or `sig`, padded base64url, out-of-range integer, unknown key), plus the §2.4.1 cross-class cases.
 - **Binding.** `agent` binds the action to one agent by its canonical EVM address (decided, D-58). The address is stable across epochs and covered by the agent card signature and the Registry. `agentId` (G-23) is only a local handle and never a second binding. An action signed for one agent is refused by every other agent of the same owner.
 - **Verification** (core, before applying). "The agent" means the receiving core's own agent, or, for `agent.revoke` at a contact, that contact's stored card (§3.4.1). Checks, in order:
   - the encoding above is exact;
   - `agent` is that agent's EVM address;
-  - `owner` equals `ownerNostr` in that agent's card;
+  - `owner` equals `ownerNostr` in that agent's card, compared as bytes (§2.4.1: the card spells it `0x` + 64 hex, `owner` has no prefix);
   - `sig` is valid;
   - `issuedAt` is not in the future beyond clock skew;
   - `now ≤ expiresAt`, and `expiresAt − issuedAt` is within the op's maximum lifetime;
@@ -152,7 +179,7 @@ Owner-only operations: approve/deny, change policies, add/remove allowed folders
 | `op` | `params` | Produced by | Rules |
 |---|---|---|---|
 | `approval.decide` | `{approvalId, actionDigest, decision: "approve" \| "deny"}` | Local UI, CLI, console (`approval` envelope) | Applies only to a pending request with the same `approvalId` and `actionDigest` (§3.4.1); single use. Its maximum lifetime is the request's `expiresAt`. A deny is signed too, so a forged deny cannot cancel a request |
-| `approval.cancel` (D-55) | `{approvalId}` | Local UI, CLI (`agentlink cancel`), console, desktop app | Voids the unused parts of an approved commitment scope (§3.4.2), for example a receipt still waiting for the offer's record; single use. It can only void: it never approves, revives or widens anything |
+| `approval.cancel` (D-55) | `{approvalId}` | Local UI, CLI (`agentlink cancel`), console (`approval` envelope), desktop app | Voids the unused parts of an approved commitment scope (§3.4.2), for example a receipt still waiting for the offer's record; single use. It can only void: it never approves, revives or widens anything |
 | `policy.set` | `{version, policy}` | Local UI, CLI, console (`policy` envelope) | `policy` is the complete 06 §3 document, never a partial patch. `version` must be greater than the highest applied version, so an older signed policy cannot be replayed to roll back. After applying, the core echoes the signed object to its owner on the owner channel (§3.4.1), so the console always knows the current version, including one set from the local UI or the CLI. Fail-closed behaviour on a missing or invalid policy stays with G-6 |
 | `agent.revoke` | `{reason: "compromised" \| "retired" \| "other"}` | Console (any reason); CLI only on an uncompromised machine (`revoke` envelope) | Permanent per `agent` EVM address, for every epoch, with no un-revoke (decided, D-58). A revoked agent returns only as a new identity (new seed) with new pairings, and the UI asks for explicit confirmation. `reason` is a fixed value, never free text. Delivery to contacts: §3.4.1 |
 
@@ -379,14 +406,14 @@ The user is told the trade-off once, in plain words, at opt-in, and `doctor` rep
 
 ### 3.1 Structure (v1)
 
-All binary values are base64url **without padding** in JSON unless noted.
+All binary values are base64url **without padding** in JSON unless §2.4.1 puts them in a hex class.
 
 ```jsonc
 {
   "v": 1,
   "id": "<16 random bytes>",
   "thread": "<16 bytes, stable per conversation>",
-  "from": "<sender nostr x-only pubkey, hex>",       // the sending agent; the owner on the owner channel (§3.4.1)
+  "from": "<sender nostr x-only pubkey, 64 lowercase hex>",  // the sending agent; the owner on the owner channel (§3.4.1)
   "createdAt": 1760000000,
   "recipients": [
     { "kid": "<first 16 bytes of sha256(raw 32-byte encPub)>",
@@ -394,7 +421,7 @@ All binary values are base64url **without padding** in JSON unless noted.
       "wk":  "<HPKE ciphertext of the CEK>" }
   ],
   "aead": { "alg": "A256GCM", "iv": "<12 bytes>", "ct": "<ciphertext || 16-byte tag>" },
-  "sig": "<hex BIP-340 signature>"
+  "sig": "<BIP-340 signature, 128 lowercase hex>"
 }
 ```
 
@@ -427,8 +454,8 @@ All binary values are base64url **without padding** in JSON unless noted.
   "replyTo": "envelope id | null",
   "files": [ {
       "name": "...", "size": 123, "mime": "...",
-      "plaintextSha256": "hex",                // proves 'document matches' later
-      "ciphertextSha256": "hex",               // integrity before decrypt
+      "plaintextSha256": "<64 lowercase hex>", // proves 'document matches' later
+      "ciphertextSha256": "<64 lowercase hex>",// integrity before decrypt
       "inline": "base64url (≤ 12 KB) | null",
       "url": "download URL (presigned, drop or share link) | null",
       "fileKey": "base64url(32)",
@@ -436,7 +463,7 @@ All binary values are base64url **without padding** in JSON unless noted.
 }
 ```
 
-- **`proof` type** (body `{envelopeId, chainId, recordId, salt}`) is sent **after** a record is submitted, as a follow-up envelope. This works both for "send with proof" and for notarizing an older envelope; a notarized envelope itself never claims proof.
+- **`proof` type** (body `{envelopeId, chainId, recordId, salt}`) is sent **after** a record is submitted, as a follow-up envelope. `envelopeId` is the notarized envelope's `id` (base64url), `chainId` a JSON integer, and `recordId` and `salt` are `bytes32` values, each `0x` + 64 lowercase hex (EVM-native, §2.4.1), spelled exactly as in the proof pack (07 §8). This works both for "send with proof" and for notarizing an older envelope; a notarized envelope itself never claims proof.
 - **`approval-request` / `approval` / `policy` / `revoke` / `card-update` / `handshake-ack`** bodies are fixed in §3.4.1.
 - **`offer` / `accept` / `reject` carry `terms`** (D-32), so agents can negotiate and agree on exact terms:
 
@@ -448,13 +475,13 @@ All binary values are base64url **without padding** in JSON unless noted.
     "version": 3,                                 // newest version + 1, set by the sender's core
     "parties": ["0x<agent A>", "0x<agent B>"],    // agent IDs = stable agent EVM addresses (§2.1), 0x + 40 lowercase hex (§2.5.1); two parties in beta
     "subject": "Spec v2 – milestone 3",
-    "deliverables": [ { "id": "d1", "description": "…", "by": "0x<agent B>", "plaintextSha256": "hex | null" } ],  // by = the party that delivers
+    "deliverables": [ { "id": "d1", "description": "…", "by": "0x<agent B>", "plaintextSha256": "<64 lowercase hex> | null" } ],  // by = the party that delivers
     "price": { "amount": "1500.00", "currency": "EUR", "payer": "0x<agent A>" },   // optional; payer = the party that pays
     "deadlines": [ { "ref": "d1", "due": "2026-11-30T17:00:00Z" } ],
     "validUntil": 1760600000,                     // unix seconds; the terms lapse after this
-    "previousTermsHash": "hex | null"             // termsHash of the version this one replaces
+    "previousTermsHash": "<64 lowercase hex> | null" // termsHash of the version this one replaces
   },
-  "termsHash": "hex",                             // sha256(JCS(terms)), RFC 8785
+  "termsHash": "<64 lowercase hex>",              // sha256(JCS(terms)), RFC 8785; a content digest (§2.4.1)
   "note": "string | null"                         // free text, not covered by termsHash; only on reject and on unrecorded offers (never on accept or a firm offer)
 }
 ```
@@ -465,7 +492,7 @@ All binary values are base64url **without padding** in JSON unless noted.
     - `price.amount` matches `^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$` and is greater than zero;
     - `price.currency` matches `^[A-Z]{3}$` (ISO 4217) or is exactly one of the allowlisted token symbols;
     - `price.payer` and every `deliverables[].by` are one of the two `parties`, and `deliverables` ids are unique;
-    - `deadlines[].due` is strict RFC 3339 in UTC (`YYYY-MM-DDTHH:MM:SSZ`), `validUntil` is an integer, `plaintextSha256` is 64 lower-case hex digits, and size limits follow M1-21.
+    - `deadlines[].due` is strict RFC 3339 in UTC (`YYYY-MM-DDTHH:MM:SSZ`), `validUntil` is an integer, `plaintextSha256` is 64 lower-case hex digits (§2.4.1), and size limits follow M1-21.
     Displays derive from these stored bytes: amounts and dates are formatted from the canonical values, and text is shown as stored.
   - `offer` carries proposed terms. `accept` and `reject` carry the terms they answer (so a notarized `accept` is self-contained) and **must quote their `termsHash`**. The core refuses to send an `accept` unless the hash matches an `offer` received from that contact in the thread, that offer is the newest version of its negotiation (same `termsId`) in the store, the terms are within `validUntil`, and `parties` are exactly the sender and the recipient. Agents never supply the terms of an `accept` or `reject`: the core copies them from the stored offer (06 §2.2a, D-55). **Negotiation chain (D-55).** A negotiation is keyed by `termsId` plus the unordered pair of `parties`, so a `termsId` from one pair never affects another. Each core computes the chain from its own store and never trusts the counterparty's pointer. A sending core sets `version` to the newest version it holds plus one and `previousTermsHash` to that version's `termsHash` (`null` and 1 for a new negotiation). A receiving core accepts an `offer` only when `version` is its newest plus one and `previousTermsHash` equals its newest `termsHash`; otherwise it stores the envelope as refused and shows it in the activity feed. **No forks**, and no tie-break that a sender could grind:
     1. A second, different envelope from the **same sender** for an existing key and version (for example the same terms re-sent in a new envelope) is refused outright. The first one seen wins, and the activity feed flags the contact.
@@ -483,10 +510,10 @@ All binary values are base64url **without padding** in JSON unless noted.
 | Type | Direction | Body | Receiver rules |
 |---|---|---|---|
 | `approval-request` | Agent → own owner (console) | `{approvalId, agent, action, actionDigest, summary, requestedAt, expiresAt}` | The console accepts it only from one of its own agents that is not revoked (`from` = `agentNostr` and `agent` = `agentEvm` of a card the owner signed); anything else is dropped |
-| `approval` | Owner → own agent | `{signed: SignedOwnerAction}` with `approval.decide` (§2.5.1) | `from` must be the agent's own owner key and the signed object must verify (§2.5.1); otherwise dropped |
+| `approval` | Owner → own agent | `{signed: SignedOwnerAction}` with `approval.decide` or `approval.cancel` (§2.5.1, D-55); any other `op` is dropped | `from` must be the agent's own owner key and the signed object must verify (§2.5.1); otherwise dropped. A verified `approval.cancel` for an `approvalId` the core does not hold is refused and reported (§2.5.1) |
 | `policy` | Owner → own agent; echo agent → own owner | `{signed: SignedOwnerAction}` with `policy.set` | Owner → agent: as for `approval`; the core stores the signed object, not the envelope. Echo: after applying a `policy.set` from any path, the core sends the same signed object to its owner. The console accepts it only from one of its own agents that is not revoked, only if `body.agent` equals that agent's `agentEvm` and only if the owner's own signature verifies. It keeps the highest `version` seen per agent, so an older or foreign echo cannot lower it |
-| `revoke` | Owner → the revoked agent and each of its contacts | `{signed: SignedOwnerAction}` with `agent.revoke` | Recipients per §3.2, with the owner as sender. **A contact applies it only if `signed` verifies per §2.5.1 with the contact's stored card in place of the agent's own**: `op` is `agent.revoke`; `agent` equals a stored contact's `agentEvm`; `owner` equals `ownerNostr` in that stored card; `sig` is valid; `v` = 1; `expiresAt` = 0; `issuedAt` is not in the future beyond skew; `params` are strict. Otherwise it is dropped (fail closed). This holds whatever the envelope's `from`: like `handshake`, a verified revoke is an exception to the requests queue, accepted directly from the owner key (decided, D-58). Once applied, the contact drops every envelope from that `agentEvm` processed afterwards, whatever its `createdAt`, and refuses later `card-update` and `handshake` for it. The contact status becomes `revoked` (distinct from `blocked`, not reversible); history stays readable. The revoked agent's own core stops sending and signing (best effort: a compromised agent ignores it, which is why contacts are told) |
-| `card-update` | Agent → each contact | `{card, cardSig, name, relays}` (the `handshake` shapes, §3.6) | `cardSig` valid; `card.agentEvm` equals the stored contact's; `ownerEvm`, `ownerNostr` and `ownerEnc` unchanged (owner-key rotation is P2); `keyEpoch` strictly greater; `nameHash` and `relaysHash` match `name` and `relays`. The envelope may come from the old or the new epoch key: authority comes from `cardSig` only. A changed name is shown as a change and stays self-declared (§2.4) |
+| `revoke` | Owner → the revoked agent and each of its contacts | `{signed: SignedOwnerAction}` with `agent.revoke` | Recipients per §3.2, with the owner as sender. **A contact applies it only if `signed` verifies per §2.5.1 with the contact's stored card in place of the agent's own**: `op` is `agent.revoke`; `agent` equals a stored contact's `agentEvm`; `owner` equals `ownerNostr` in that stored card, as bytes (§2.4.1); `sig` is valid; `v` = 1; `expiresAt` = 0; `issuedAt` is not in the future beyond skew; `params` are strict. Otherwise it is dropped (fail closed). This holds whatever the envelope's `from`: like `handshake`, a verified revoke is an exception to the requests queue, accepted directly from the owner key (decided, D-58). Once applied, the contact drops every envelope from that `agentEvm` processed afterwards, whatever its `createdAt`, and refuses later `card-update` and `handshake` for it. The contact status becomes `revoked` (distinct from `blocked`, not reversible); history stays readable. The revoked agent's own core stops sending and signing (best effort: a compromised agent ignores it, which is why contacts are told) |
+| `card-update` | Agent → each contact | `{card, cardSig, name, relays}` (the `handshake` shapes, §3.6) | `cardSig` valid; `card.agentEvm` equals the stored contact's; `ownerEvm`, `ownerNostr` and `ownerEnc` unchanged (owner-key rotation is P2); `keyEpoch` strictly greater; `nameHash` and `relaysHash` match `name` and `relays`; every URL in `relays` passes the relay URL rule (§4). The envelope may come from the old or the new epoch key: authority comes from `cardSig` only. A changed name is shown as a change and stays self-declared (§2.4) |
 | `handshake-ack` | Inviter A → B | `{inviteId, handshakeId}` (`handshakeId` = B's `handshake` envelope `id`) | B accepts it only from A's `agentNostr` in the invite card (or a later card from the same owner) and only for a handshake B sent with that `inviteId`; B then marks the pairing complete. A key change since the invite follows as a `card-update` |
 
 **Revoke delivery (decided, D-58).**
@@ -496,7 +523,7 @@ All binary values are base64url **without padding** in JSON unless noted.
 - **On-chain.** For a registered agent, the console also submits the Registry `revoke` (05 §4, M2-4b). Contacts and the verify page treat either one as revocation.
 
 **`approval-request` fields.**
-- `approvalId`: `apr_` followed by 16 random bytes (base64url). `agent`: the requesting agent's EVM address in the canonical form (§2.5.1).
+- `approvalId`: `apr_` followed by 16 random bytes (base64url). `agent`: the requesting agent's EVM address in the canonical form (§2.5.1). `actionDigest`: 64 lowercase hex (a content digest, §2.4.1).
 - `action`: the exact action the owner approves, `{tool, args, context}`. `tool` is the MCP tool name (06 §2.0). `args` is the tool input after defaults are applied, without `approvalId` and `clientRequestId`, with paths resolved by `realpath`. `context` holds the facts the core bound when it evaluated policy (for example the contact's agent EVM address, the file's `plaintextSha256`, and for paid actions the fee `{token, amount, usd}`), so the digest covers them. Its per-tool fields are fixed in M1-2b.
 - `actionDigest` = `sha256(JCS(action))` (M1-7e). The console recomputes it and refuses a mismatch, and the owner's `approval.decide` signs this digest. An approval therefore cannot be reused for any other action, even one the agent describes the same way.
 - `summary`: core-generated template text (≤ 200 characters) naming the contact (under the contact-name rule, 06 §2.1) and the action, never inbound text (06 §4). The console treats it as a label only and renders the approval card from `action`.
@@ -506,7 +533,7 @@ All binary values are base64url **without padding** in JSON unless noted.
 
 **Who may create these bodies (I-4).** No MCP tool can create or pass through `approval-request`, `approval`, `policy`, `revoke`, `card-update`, `handshake` or `handshake-ack`. `agentlink_send` accepts only the 02 F-22 types (06 §2.2), and the core's send path refuses every other type from tool input. `approval-request`, the `policy` echo, `handshake` and `handshake-ack` are produced by core flows. `approval`, `policy` and `revoke` carry an owner signature, and `card-update` an owner-signed card, so each needs owner presence. An agent that receives an owner-channel type from anyone but its own owner drops it, and owner-channel envelopes are never returned by `agentlink_inbox`.
 
-**Replays.** `approval.decide` is single use (nonce and `approvalId`). `policy.set` needs a higher `version`. `agent.revoke` and `card-update` are idempotent (revocation is permanent; the epoch must increase). `handshake-ack` matches one handshake.
+**Replays.** `approval.decide` and `approval.cancel` are single use (nonce; `approval.decide` also by `approvalId`). `policy.set` needs a higher `version`. `agent.revoke` and `card-update` are idempotent (revocation is permanent; the epoch must increase). `handshake-ack` matches one handshake.
 
 #### 3.4.2 Commitment approvals: one approval per agreement (D-55)
 
@@ -519,12 +546,12 @@ A commitment (D-31) is approved once per agreement and per owner. The approval b
   "kind": "agentlink/commitment",
   "agentId": "0x<own agent>",
   "decision": "accept | reject | confirm | offer",  // confirm = ACCEPTED on their ACCEPT record; offer = firm offer
-  "counterparty": { "agentId": "0x<contact agent>", "ownerKey": "<contact owner public key, hex>" },
+  "counterparty": { "agentId": "0x<contact agent>", "ownerKey": "<contact owner Nostr public key, 64 lowercase hex>" },
   "thread": "<thread id>",
   "termsId": "<16 bytes>",                         // with the two agent IDs above, the negotiation key (§3.4)
   "version": 3,
-  "termsHash": "hex",
-  "answers": { "envelopeId": "<id>", "envelopeHash": "hex" },  // the counterparty envelope answered; null for a firm offer
+  "termsHash": "<64 lowercase hex>",
+  "answers": { "envelopeId": "<id>", "envelopeHash": "0x<64 lowercase hex>" },  // the counterparty envelope answered; null for a firm offer; envelopeHash is EVM-native (§2.4.1)
   "notarize": false,
   "maxFeeUsd": "0.10",                                         // null when nothing is paid
   "createdAt": 1760000000,
@@ -601,9 +628,11 @@ The terms fingerprint is under Advanced. Tool summaries name only the contact, t
 
 ```jsonc
 { "v": 1, "inviteId": "<16 bytes>", "secret": "<32 bytes>", "card": { /* A's AgentCard */ },
-  "cardSig": "<owner EIP-712 sig>", "name": "Tali's Claude", "relays": ["wss://…"], "expiresAt": 1760600000 }
+  "cardSig": "0x<130 lowercase hex: owner EIP-712 sig>", "name": "Tali's Claude", "relays": ["wss://…"], "expiresAt": 1760600000 }
 ```
 
+- `card` is in the card JSON form and `cardSig` is `0x` hex (§2.4, §2.4.1). `inviteId` and `secret` are base64url.
+- `relays` (here, in `handshake` and in `card-update`) is inbound content: every URL must pass the relay URL rule (§4) at parse, or the whole body is rejected.
 - Encoded as base64url(deflate(JSON)). Shared as `https://<invite-host>/i#<payload>` (the fragment is never sent to a server) and accepted by the CLI/MCP from the full URL or the bare payload. Until the invite landing page ships (M2), the host serves a static "how to install" page.
 - A stores `{inviteId, sha256(secret), expiresAt, used=false}`. Single use; default expiry 7 days.
 
@@ -611,13 +640,13 @@ The terms fingerprint is under Advanced. Tool summaries name only the contact, t
 
 1. Verify `cardSig` and expiry.
 2. Apply policy `contacts.acceptInvites` (default `approval`: owner confirms in local UI or console, seeing name, owner fingerprint and safety code).
-3. Send a `handshake` envelope to A (recipients: A agent, A owner, B owner, B agent) with body `{inviteId, card: B's AgentCard, cardSig, name, relays, proof}`, where `proof = HMAC-SHA256(secret, utf8("agentlink-handshake") || inviteId || sha256(JCS(B card)))`.
+3. Send a `handshake` envelope to A (recipients: A agent, A owner, B owner, B agent) with body `{inviteId, card: B's AgentCard, cardSig, name, relays, proof}`, where `proof = HMAC-SHA256(secret, utf8("agentlink-handshake") || inviteId || sha256(JCS(B card)))`. `secret` and `inviteId` enter as their raw bytes, the card in its JSON form (§2.4), and `proof` travels as base64url.
 
 **Complete** (agent A):
 
 - Unknown senders normally go to the requests queue. A `handshake` is the one exception: it is accepted if `proof` matches an unused, unexpired invite. A then marks the invite used, adds B, and replies `handshake-ack`.
 
-**Safety code:** `sha256(sortBytes(A.agentNostr, B.agentNostr) || sortBytes(A.ownerNostr, B.ownerNostr))`, first 40 bits shown as 12 decimal digits in three groups of four. Both sides show the same code. It needs both sides' keys, so it cannot exist when the invite is created: `create_invite` returns only the inviter's owner fingerprint. B can compute it at accept time, because it already holds A's card, so B's owner confirmation (Accept step 2) shows it; A learns it when B's handshake arrives. After the handshake both sides show it, to be compared through another channel.
+**Safety code:** `sha256(sortBytes(A.agentNostr, B.agentNostr) || sortBytes(A.ownerNostr, B.ownerNostr))` over the raw 32-byte keys (decoded per §2.4.1), first 40 bits shown as 12 decimal digits in three groups of four. Both sides show the same code. It needs both sides' keys, so it cannot exist when the invite is created: `create_invite` returns only the inviter's owner fingerprint. B can compute it at accept time, because it already holds A's card, so B's owner confirmation (Accept step 2) shows it; A learns it when B's handshake arrives. After the handshake both sides show it, to be compared through another channel.
 
 ---
 
@@ -646,6 +675,13 @@ The terms fingerprint is under Advanced. Tool summaries name only the contact, t
   - **Fetching.** The SSRF rules below apply unchanged to provider hosts, including the redirect cap.
 - **Downloads:** written only into the configured inbox folder, never executed; names sanitized (strip paths and control characters, no hidden files).
 - **SSRF protection (`fetch_file`):** URLs must be `https`. Hosts resolving to loopback, private, link-local (incl. `169.254.169.254`) or unique-local addresses are rejected. Redirects are capped at 2 and re-checked; download size is capped at the declared size plus overhead.
+- **SSRF protection (relay URLs; proposed, owner confirms at merge).** Relay lists arrive from other parties in invites, `handshake` and `card-update` bodies (§3.4.1, §3.6), and the core connects to them (07 §4.2). A WebSocket upgrade is an HTTP request, so a hostile relay URL is an SSRF vector like a download URL. Two layers:
+  - **Schema (at parse, `@agentlink/types`).** Only `wss://`; a lowercase host name, an optional port 1–65535 and an optional path; no user info, query or fragment. Rejected:
+    - every IP-literal host: IPv4 in any notation a URL parser accepts (for example `127.0.0.1`, `2130706433`, `0x7f.1`, `0177.0.0.1`) and every bracketed IPv6 literal. This covers the loopback, private, link-local, CGNAT (`100.64.0.0/10`), unique-local and cloud metadata (`169.254.169.254`) ranges without range arithmetic in the parser;
+    - a host whose last label is numeric, a single-label host, and a trailing dot;
+    - `localhost` and `*.localhost`, `*.local`, `*.internal` and `*.home.arpa`, which also covers the metadata host names (`metadata.google.internal`, `instance-data.ec2.internal`).
+    One rejected URL rejects the whole list, and with it the body, fail closed. Silently dropping the URL would also break `relaysHash` (§2.4).
+  - **Transport (M1-5, `transport-nostr`).** Before each connect and reconnect, the resolved addresses are checked against the `fetch_file` ranges plus CGNAT, `0.0.0.0/8`, multicast and the IPv4-mapped and NAT64 forms of all of them. A match skips that relay (DNS rebinding defence). Upgrade redirects are never followed.
 - **Allowed folders:** paths are resolved with `realpath` (symlinks followed) and must remain inside an allowed folder after resolution. Hidden files and files under `~/.ssh`, `~/.agentlink` and the keychain directories are always refused.
 
 ---
@@ -680,7 +716,7 @@ Static recipient keys mean a stolen encryption key decrypts past envelopes addre
 | **Shell-capable harness agent (same OS user)** | Owner key never on disk unwrapped; owner operations need passkey/passphrase (§2.5); signed policies; harness permission guidance; small credit balances |
 | **Malicious counterparty: prompt injection** | Inbound content labelled `untrusted`; actions limited by owner-signed policies; new contacts need owner approval by default; files only from allowed folders; spending budgets |
 | **Malicious counterparty: spam / flooding** | Allowlist by default; unknown senders → requests queue; per-contact rate limits; envelope size cap |
-| **Malicious counterparty: SSRF via file URLs** | §4 SSRF rules |
+| **Malicious counterparty: SSRF via file or relay URLs** | §4 SSRF rules (`fetch_file`; relay URLs at parse and at connect) |
 | **Malicious files / symlink tricks** | Never executed; sanitized names; realpath checks; size limits |
 | **Stolen laptop** | Keychain protection (OS login); owner key needs passkey/passphrase; owner can revoke the agent (revocation envelope + on-chain revoke if registered) |
 | **Leaked file KeyStore on a headless machine** (D-54: home directory, volume, image layer or backup copied; passphrase in an environment variable or config) | Opt-in only, after a plain-words warning; Argon2id + AES-256-GCM with authenticated header; generated 120-bit unlock code by default; passphrase file from a run-time secret mount recommended over environment variables; 0700/0600 modes, symlink and `realpath` checks; `doctor` warnings; a copied `owner.alko` is protected by a required 120-bit owner code, and the owner key is never unlocked non-interactively, so a leak exposes the agent key only (revoke and replace the agent; changing the code does not protect earlier copies). Residual: a passphrase stored on the same disk gives no at-rest protection beyond disk encryption; an agent that fakes a terminal and runs the owner step itself voids owner presence on that machine (§2.8) |

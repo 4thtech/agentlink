@@ -108,7 +108,7 @@ An XMTP adapter (P2) implements the same interface; envelopes are unchanged.
 ### 4.2 Nostr implementation
 
 - **Wrapping:** NIP-59 gift wrap (kind 1059) of a NIP-59 seal (kind 13) containing an unsigned rumor (kind 14, tag `["agentlink","1"]`, `content` = envelope JSON). NIP-44 v2 encryption. Randomized `created_at` per NIP-59.
-- **Relays:** each agent card lists 3–5 relays (default: a curated set of reliable public relays + the optional 4thTech relay). Publish to the **recipient's** relays and the sender's own relays.
+- **Relays:** each agent card lists 3–5 relays (default: a curated set of reliable public relays + the optional 4thTech relay). Publish to the **recipient's** relays and the sender's own relays. Relay URLs from cards, invites and bodies are inbound content: they pass the relay URL schema at parse, and before each connect and reconnect the transport checks the resolved addresses and never follows an upgrade redirect (04 §4, relay URLs).
 - **Delivery reliability:** publish to all listed relays, consider sent when ≥ 2 acknowledge (`OK`). Retry with backoff for up to 24 h from the local outbox.
 - **Sync:** `REQ` with `#p` = own Nostr pubkeys, `kinds: [1059]`, `since = lastSync − 48 h` (NIP-59 randomizes gift-wrap timestamps up to 2 days back, so `created_at` cursors alone miss messages). Deduplicate by envelope ID (keep a seen-set for ≥ 7 days). Support **NIP-42 AUTH**, since many DM relays serve kind 1059 only to the authenticated recipient.
 - **Size:** envelope ≤ 24 KB serialized; inline files ≤ 12 KB; check the final gift-wrap size against each relay's NIP-11 `max_message_length` and skip relays that cannot carry it.
@@ -258,6 +258,8 @@ Cloudflare Worker; stateless except rate-limit counters (Durable Object). It nev
 |---|---|---|
 | `POST /v1/notarize` | `{chainId, records: [{record, sig}]}` | Validate signature and credits via `eth_call` simulation; submit (batched when possible); return tx hash and record IDs |
 | `POST /v1/receipt` | `{chainId, receipts: [{receipt, sig}]}` | Same for receipts |
+
+Requests and responses use the JSON form of 05 §3.1 (04 §2.4.1): `0x` + lowercase hex for addresses, `bytes32`, signatures and transaction hashes, and decimal strings for `uint256`.
 | `POST /v1/deposit-authorization` | `{chainId, token, auth: EIP-3009 fields}` | Check `value ≥ minDeposit` and token EIP-3009 support; submit `depositWithAuthorization` (vault calls `receiveWithAuthorization`) |
 | `GET /v1/status/:txHash` | — | Inclusion status |
 | `GET /v1/health` | — | Per-chain gas wallet balances, queue depth |
@@ -278,19 +280,21 @@ Cloudflare Worker; stateless except rate-limit counters (Durable Object). It nev
   "chainId": 8453,
   "notary": "0x…",
   "recordId": "0x…",
-  "record": { /* Record struct fields */ },
+  "record": { /* Record struct fields, JSON form of 05 §3.1 */ },
   "signature": "0x…",
-  "signer": { "evm": "0x…", "agentCard": { /* optional, signed by owner */ } },
+  "signer": { "evm": "0x…", "agentCard": { /* optional, signed by owner; card JSON form, 04 §2.4 */ } },
   "envelopeHash": "0x…",
   "envelope": { /* optional ciphertext envelope */ },
   "recipient": { "evm": "0x…", "salt": "0x…" },          // optional disclosure
   "receipts": [ { "type": "DELIVERED", "signer": "0x…", "txHash": "0x…", "at": "…" } ],
   "disclosure": { "contentKey": "base64url" } | null,  // only if owner approved
   "ownerApproval": { "signed": { /* SignedOwnerAction, approval.decide */ }, "action": { /* commitment approval-request.action incl. context.scope */ } }
-                 | { "standingRule": true, "policyHash": "hex" } | null,  // proof of agreement: included by default, owner may leave it out (04 §3.4, D-55)
+                 | { "standingRule": true, "policyHash": "<64 lowercase hex>" } | null,  // proof of agreement: included by default, owner may leave it out (04 §3.4, D-55)
   "exportedAt": "…"
 }
 ```
+
+Encodings follow 04 §2.4.1, and a verifier rejects a pack in any other form. `recordId`, `envelopeHash` and `recipient.salt` are `0x` + 64 lowercase hex. `recordId` and `salt` are the same strings as in the `proof` envelope body (04 §3.4), and `envelopeHash` the same as in a commitment scope (04 §3.4.2), so a value never has two spellings.
 
 ---
 
