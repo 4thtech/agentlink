@@ -67,7 +67,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 93 (M1a 42, M1b 51; incl. 11 split-off, 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63 and M1-3k from the AUDIT-FABLE-OCCv2-1 pre-audit) |
+| M1 Local beta | 94 (M1a 42, M1b 52; incl. 11 split-off, 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, and M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit) |
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 21 (incl. 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
@@ -1298,7 +1298,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The stage fits the Chiado block gas limit and per-transaction gas cap on a Chiado fork, and its init code is within EIP-3860 (so M1-3j can reproduce the addresses).
   - Addresses published in the next `@agentlink/occ-v2-abi` prerelease (M1-3f).
   - Negative tests for the config assertions: an allowlisted token with a zero fee or cap, the native coin on a non-Gnosis chain, and a fee-on-transfer mock each make the script fail.
-  - Pre-audit conditions (AUDIT-FABLE-OCCv2-1 FA-6, FA-7; prerequisites of the Base Sepolia broadcast):
+  - Pre-audit conditions (AUDIT-FABLE-OCCv2-1 FA-6, FA-7; proposed, owner confirms at merge; prerequisites of the Base Sepolia broadcast):
     - Config-only rules (FA-6): the contracts do not enforce them, so the script itself asserts them before any broadcast, not only review or M1-14: the native coin is allowlisted only on Gnosis chain IDs, every allowlisted token has a nonzero `NOTARIZE` and `REGISTER` fee and cap, no allowlisted token is fee-on-transfer or rebasing, and the target chain has Cancun (EIP-1153). The Base Sepolia run's assertion output is attached to the PR.
     - One-transaction stage (FA-7): the stage (AccessManager, proxies, initialisation, `OCCRoleSetup`, grants and the deployer's renounce) is one transaction; a test shows no block in which a proxy exists uninitialised or the deployer holds a role on a live proxy.
     - Guarded salts (FA-7): the script refuses any salt that is not guard ‖ `0x00` ‖ label (05 §9.1), and never calls CreateX through a forwarder or multicall; the stage deployer itself is deployed by CREATE3 under the key's guard, never by plain `CREATE`.
@@ -1330,7 +1330,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Depends on:** M1-3d, M1-3e
 - **Spec:** 05 §3.4, §5.2, §8; `audit-rules.md` §5 (CT-9, CT-14), §9.3; `release-and-deployment.md` §4.4
 - **Invariants:** I-6, I-10
-- **Scope:** the pre-audit's Lows that need no submitter or deploy-script change (FA-1, FA-3: M1-10a; FA-6, FA-7: M1-3g; FA-2: gap G-47).
+- **Scope (proposed, owner confirms at merge):** the pre-audit's Lows that need no submitter or deploy-script change (FA-1, FA-3: M1-10a; FA-6, FA-7: M1-3g; FA-2: gap G-47; the Infos and §8 condition 4: M1-3m).
   - FA-4 (gas gate): the per-item batch target has under 0.5 % headroom, so a toolchain or dependency bump can turn CI red with no regression. Keep the 05 §3.4 numbers as the absolute ceilings (never raised to make CI pass), and add a snapshot check against `.gas-snapshot` with a stated tolerance. Any compiler or dependency bump re-runs the gas suite and attaches the figures to the PR. Proposed for 05 §3.4 (owner confirms at merge): a repricing fork is handled by a re-baseline that the owner accepts.
   - FA-5 (upgrade value): upgrade transactions carry no native value. Add a runbook line and an evidence-template check in `release-and-deployment.md` §4.4. An on-chain rejection of value on upgrade is an optional M3 hardening (a 05 §5.2 note with a test), decided by the owner.
   - FA-8 (coverage), before the testnet if time allows: tests with an EIP-7702 designator (23 bytes of code) as signer and as recipient, so the result of gap G-47 is pinned; an `acknowledgeBatch` gas measurement at n = 20; a mixed native and ERC-20 batch gas figure.
@@ -1341,6 +1341,21 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The runbook line and evidence check for zero upgrade value are merged in the public repo (S1, a separate PR if the contracts PR merges first).
   - Each FA-8 item is either covered by a named test or carded with its target milestone; the 7702 tests and gas figures are in the PR.
   - Independent review; the pre-audit's FA-4, FA-5 and FA-8 are dispositioned in the contracts tracker (`audit-rules.md` §9.2).
+
+#### M1-3m · Spec text from the Fable pre-audit (FA-9…FA-12, §8 condition 4) (new, AUDIT-FABLE-OCCv2-1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · docs/foundation/05-contracts-occ-v2.md, 07-sdk-transport-storage.md (and 04 §5 if G-47 picks option (a))
+- **Depends on:** gap G-47 decided (for the FA-2 text only)
+- **Spec:** 05 §3.1, §3.3, §6; 07 §6–§7; 04 §5
+- **Invariants:** I-5, I-6
+- **Scope (proposed, owner confirms at merge):** the pre-audit's Infos and the docs condition of its go/no-go (§8 condition 4). Spec text only; no contract change.
+  - FA-9: 05 §3.3 lists `charge` before the store; the contract stores and emits first, then charges, which is the safer order under reentrancy. Fix the spec text to match.
+  - FA-10: 05 §6 says which address `Paused(account)` names at initialisation under CREATE3 (the CREATE3 intermediate proxy or CreateX, not the deployer), and that monitoring must not treat it as an ops key. Mainnet only; testnets start unpaused.
+  - FA-2 (§8 condition 4): the 04 §5 and 07 text for EIP-7702-delegated agent keys, as decided in G-47.
+  - FA-11: 07 notes that ERC-7739 smart accounts need the client to build the nested typed-data signature around the `Record` or `Receipt`, and that such signatures are several hundred bytes, which raises batch calldata. Hand-off: M1-4a typed-data builders.
+  - FA-12: 05 §3.1 states that `kind` is not constrained on-chain, so clients and the proof-pack verifier validate it (hand-off: M1-4d); an app `name` is inbound content (I-5), and the console and indexers bound what they render (hand-off: the M2 console cards).
+- **Acceptance:**
+  - Each item above is in the spec with its section reference; the PR lists FA-9…FA-12 and §8 condition 4 as closed or handed off by card ID.
 
 #### M1-14 · Testnet chain and fee configuration verification, stablecoin allowlist (D-45, D-46) (new)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -2460,7 +2475,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-1 … I-10
 - **Scope:**
   - Internal milestone audit by a fresh Opus session: invariant walkthrough I-1…I-10 with evidence; every 04 §7 threat row; dependency and licence audit; findings register; public-repo boundary sweep (incl. `sync`); process check (strict mode, gate bypasses, S1/S2 review evidence). M1 additions: same-OS-user test, prompt-injection suite, testnet contracts and faucet.
-  - The findings register (`audit-rules.md` §7, part D) includes the contracts pre-audit AUDIT-FABLE-OCCv2-1 (entry in M3-1a): each finding's state, with the FA-1 and FA-3 submitter rules (07 §7) in force before public beta traffic.
+  - Proposed (owner confirms at merge): the findings register (`audit-rules.md` §7, part D) includes the contracts pre-audit AUDIT-FABLE-OCCv2-1 (entry in M3-1a): each finding's state, with the FA-1 and FA-3 submitter rules (07 §7) in force before public beta traffic.
   - User testing: 10 internal testers on ≥ 3 harness combinations complete J1, J2, J4 and J5 on testnets, and J3 with faucet credits, plus J8 with on-chain proof of agreement; measured per G-21.
 - **Acceptance:**
   - Audit report with a verdict per invariant and zero open Critical/High findings.
@@ -3030,7 +3045,8 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - Audit commit tagged `audit-<firm>-<yyyymmdd>` with readiness pack (specs, threat model, NatSpec, coverage, static-analysis output, known issues, scope register).
   - Each finding fixed in its own PR with a regression test; fixes verified by the auditor.
   - Prior audits in the readiness pack (`audit-rules.md` §4.5, §8): **AUDIT-FABLE-OCCv2-1**, an independent pre-audit of `occ-v2-contracts` before the Base Sepolia deployment (2026-10-14). Verdict: GO for Base Sepolia with conditions. 0 Critical, 0 High, 1 Medium, 7 Low, 6 Info. Report: private, `agentlink-ops` `audits/reviews/AUDIT-FABLE-OCCv2-1.md`. Follow-ups: FA-1 and FA-3 (07 §7, M1-10a), FA-2 (gap G-47), FA-4, FA-5 and FA-8 (M1-3k), FA-6 and FA-7 (M1-3g). Before mainnet, FA-1 is fixed at the submitter and every Low is dispositioned (`audit-rules.md` §9.3); the pre-audit does not replace this audit.
-  - Scope item (FA-1, recommendation 2; owner decides before the audit commit is tagged; a 05 §3.2 change): an optional bound on the gas forwarded to ERC-1271 `isValidSignature` (for example 500 000, enough for a multi-owner Safe or a software P-256 verifier), so an account that burns gas at inclusion costs at most the bound. If adopted, a test asserts the bound. If gap G-47 picks option (b), the EIP-7702 fallback is in scope too.
+  - Pre-audit dispositions of the rest (proposed, owner confirms at merge): FA-9, FA-10, FA-11, FA-12 and §8 condition 4 (docs for FA-2, FA-9, FA-10) are carded as M1-3m. FA-13 needs no action: it confirms the D-59 residual (a malicious module, or a module upgrade, after the 7-day delay), which stays in this audit's scope as D-59 states. FA-14 needs no new action: it repeats earlier informational items that are already carded or documented (zero-amount events in the client cards; the others in 05 or in their original reviews).
+  - Scope item (FA-1, recommendation 2; owner decides before the audit commit is tagged; a 05 §3.2 change): an optional bound on the gas forwarded to ERC-1271 `isValidSignature` (for example 500 000, enough for a multi-owner Safe or a software P-256 verifier), so an account that burns gas at inclusion costs at most the bound. If adopted, a test asserts the bound. If gap G-47 picks option (b), the EIP-7702 fallback is in scope too and the bound becomes required.
 - **Acceptance:**
   - All High and Medium findings fixed and auditor-verified; Low/Info dispositioned; final report stored in `audits/` (published at mainnet).
   - The FA-1 gas-bound decision is recorded (adopted with a test, or declined with a reason).
@@ -3549,8 +3565,8 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 
 47. **G-47 (M) EIP-7702-delegated agent keys.** **DECISION NEEDED (owner).** Found by the contracts pre-audit AUDIT-FABLE-OCCv2-1 (FA-2, Low). 05 §3.2; 04 §5; 07 §7. An EOA with an EIP-7702 delegation has code (a 23-byte delegation designator), so the Notary checks its Record and Receipt signatures through ERC-1271 only. The agent key's own valid EIP-712 signature is refused (`InvalidSignature()`) unless the delegate implements `isValidSignature` and validates that key's signatures. Wallets are moving EOAs to 7702, so agent keys held in general-purpose wallets are at risk. There is no security loss: the delegate is the key holder's choice, and the key can always re-delegate. Today the spec does not mention 7702.
    - **Option (a), document a limitation (no contract change).** 04 §5 and 07 state that an agent key must not be 7702-delegated, or only to a delegate that validates the key's own signatures. `@agentlink/chain` reads the signer's code before signing and returns a typed error, so the MCP does not present it as a key problem. Enough for the testnet.
-   - **Option (b), contract fallback (new card M1-3l, S2).** When the signer's code is exactly a 7702 designator and the ERC-1271 check fails, the Notary also accepts the address's own ECDSA signature. This is a 05 §3.2 change with tests for both outcomes. The key can already act for its account, so authority does not change. Two things to settle: the ERC-1271 call needs the gas bound in M3-1a scope, so the fallback is always reached; and if a future EIP lets a 7702 account turn off its ECDSA key, the fallback must respect that.
-   - **Recommendation (not a decision):** (a) now, for the Base Sepolia testnet. Then (b) before mainnet, carded as M1-3l and in M3-1a scope. With (b), the signer's address no longer depends on its delegate. Together with the gas bound, it also stops a delegation made between simulation and inclusion from reverting a batch (07 §7, FA-1), which the submitter cannot see in advance.
+   - **Option (b), contract fallback (new card M1-3l, S2).** When the signer's code is exactly a 7702 designator and the ERC-1271 check fails, the Notary also accepts the address's own ECDSA signature. This is a 05 §3.2 change with tests for both outcomes. The key can already act for its account, so authority does not change. Under (b) the ERC-1271 gas bound in M3-1a scope becomes **required**, not optional, so the fallback is always reached. If a future EIP lets a 7702 account turn off its ECDSA key, the fallback must respect that.
+   - **Recommendation (not a decision):** (a) now, for the Base Sepolia testnet. Then (b) before mainnet, carded as M1-3l and in M3-1a scope, with the gas bound required. The reason is signer availability (FA-2): agent keys in wallets that move EOAs to 7702 keep working whatever their delegate checks. (b) does not close the FA-1 residual (07 §7): any signer can still cost other signers one batch per fresh address.
    - *Blocks:* M1-3k (the 7702 tests pin the chosen behaviour), M1-4a (pre-sign code check under (a)), M3-1a (scope under (b)).
 
 ---
@@ -3581,7 +3597,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | M1-3g | Testnet deployer key and testnet Safe; fund with low balances; trigger the private-repo deploy workflow for Base Sepolia (D-63); proposed (05 §9.1): keep the testnet deployer key offline for the life of the testnet campaign (ending no later than M3), add it as a CI secret only for a deploy window and delete it after (no testnet explorer verification: D-11, D-19) |
 | M1-3j | Trigger the Chiado deploy with the same testnet deployer key, added to CI only for that run (D-63) |
 | M1-3f | **DECISION NEEDED:** where `@agentlink/occ-v2-abi` is built and published (G-10) |
-| M1-3k, M3-1a | **DECISION NEEDED:** EIP-7702-delegated agent keys, option (a) or (b) (G-47); whether to bound the ERC-1271 gas at M3 (FA-1) |
+| M1-3k, M3-1a | **DECISION NEEDED:** EIP-7702-delegated agent keys, option (a) or (b) (G-47); whether to bound the ERC-1271 gas at M3 (FA-1; required under G-47 option (b)) |
 | M1-9f | **DECISION NEEDED:** Claude Desktop bundle build, signing and distribution |
 | M1-10c | Set submitter and faucet keys with `wrangler secret put`; fund them; approve promotions; **DECISION NEEDED:** Cloudflare staging account vs environments, environment names, beta environment (G-40) |
 | M1-13a | **DECISION NEEDED:** where e2e runs; provide harness API keys and testnet funds outside PR workflows |
