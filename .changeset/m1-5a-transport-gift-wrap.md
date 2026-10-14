@@ -1,0 +1,5 @@
+---
+'@agentlink/transport-nostr': minor
+---
+
+Add the NIP-59 gift wrap and unwrap of an envelope (04 §3.5, §3.1.1; 07 §4.1, §4.2). `wrapEnvelope(envelope, recipients, keys)` puts `JCS(envelope)` into an unsigned kind 14 rumor tagged `["agentlink","1"]`, seals it (kind 13) through `EnvelopeKeys.signNostr` and gift-wraps it (kind 1059) once per distinct recipient key (1 to 8) with an ephemeral key from `@agentlink/crypto`, NIP-44 v2 throughout; seal and gift-wrap `created_at` are drawn uniformly from the last 2 days. Envelopes over 24 576 bytes (`ENVELOPE_MAX_BYTES`) are refused before any key is used, and each result carries the gift wrap's event and relay-frame size in bytes. `unwrapGiftWrap(event, keys, {epoch})` fails closed with a `TransportError` unless both signatures verify, the rumor key equals the seal key, the `agentlink` tag is present, the rumor content is at most 24 576 bytes (checked before parsing), the envelope parses strictly and the seal key equals `envelope.from`. New devDependency: `nostr-tools` 2.25.2, for the interop tests only.

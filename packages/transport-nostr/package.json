@@ -34,5 +34,8 @@
   },
   "dependencies": {
     "@agentlink/crypto": "workspace:*"
+  },
+  "devDependencies": {
+    "nostr-tools": "2.25.2"
   }
 }

@@ -1412,10 +1412,12 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - `REQ {kinds: [1059], "#p": [own pubkeys]}` with `since = lastSync − 48 h`, per-relay cursors; live subscriptions.
   - Dedup by gift-wrap event ID, then by envelope ID, with a seen-set kept ≥ 7 days (injected persistence, `seen` in 07 §3.2): an ID is marked seen only with its processed outcome.
+  - (hand-off from M1-5a, IR-M1-5a-1 L-3) `unwrapGiftWrap` returns an envelope whose signature is not yet checked (04 §3.1.1 step 4 is core, M1-7b), so its `id` is chosen by whoever sent it. Key the seen-set on `giftWrapId`, or on (`id`, `envelopeHash`) only after step 4 has passed. Never dedup on `envelope.id` before verification: a self-signed envelope that copies a victim's `id` would suppress the real one.
   - Time-budgeted sync (3 s for `agentlink_inbox` and `agentlink_status`) returning partial results flagged as partial; malformed events dropped without logging content.
 - **Acceptance:**
   - An event with `created_at` 47 h in the past is found after a restart; the same envelope from 3 relays is delivered once.
   - Seen-set retention ≥ 7 days (fake clock); the time budget is respected under a slow relay.
+  - An unverified envelope that reuses another envelope's `id` (different `envelopeHash`, or a bad signature) does not suppress the real one (IR-M1-5a-1 L-3).
 
 ### Storage (`@agentlink/storage`)
 
