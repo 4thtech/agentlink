@@ -67,7 +67,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 97 (M1a 43, M1b 54; incl. 11 split-off, 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, and M1-3n as a follow-up to M1-3e) |
+| M1 Local beta | 101 (M1a 47, M1b 54; incl. 11 split-off, 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, and M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews) |
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 21 (incl. 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
@@ -1567,11 +1567,45 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Event contents never logged; per-relay health and timeouts.
   - (hand-off from M1-2c, IR-M1-2a-1 M-1 part 2) Re-check every relay host at connect time, and again on every reconnect: resolve it, and refuse the relay if any address is private, loopback, link-local, CGNAT, unique-local or a metadata address, because a DNS name can resolve to one (04 §4, 07 §4.2). The schema in `@agentlink/types` checks only the string.
 - **Acceptance:**
-  - Tests against 2–3 local relays in Docker (one requiring AUTH, one with a small `max_message_length`): success only with ≥ 2 `OK`; the small relay is skipped.
+  - Against in-memory fake relays behind the injected `RelayConnector`: success only with ≥ 2 `OK`; a relay whose `max_message_length` is below the wrap size is skipped; AUTH is answered on a challenge. The Docker suite against real local relays (one requiring AUTH, one with a small `max_message_length`) moves to M1-5b-b, because it needs the Node connector.
   - Routing (07 §4.3): with disjoint sender and recipient lists, the recipient owner's wrap reaches only the recipient's relays and the sender owner's only the sender's; a wrap is never published to a relay outside its row's list.
   - Outbox survives a restart (persistence fake) and gives up after 24 h (fake clock); canary test shows no content in logs.
   - An inbound frame of 131 073 bytes is dropped before `JSON.parse` and one of 131 072 bytes is parsed (spy test).
   - Relay pool bounds (07 §4.3, IR-G-24-1 L-8): at most 64 open connections, idle connections closed after 5 minutes, a relay that does not connect within 10 s skipped for that attempt (fake clock; 16-relay black-hole contacts do not stall other sends).
+
+#### M1-5b-b · node: relay connector, resolver and NIP-11 fetcher; Docker relay suite (new, IR-M1-5b-1 M-1)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (path default for `packages/node/**`; the content is network and SSRF handling, S1 by nature, and only the owner may lower the class) · **Phase:** M1a (before M1-23)
+- **Repo/path:** agentlink · packages/node (connector), packages/transport-nostr (tests only, if the Docker suite lives there)
+- **Depends on:** M1-5b
+- **Spec:** 07 §4.2 (relays, size, NIP-42), §4.3 (relay routing); 04 §4 (relay URL rule, SSRF)
+- **Invariants:** I-3, I-5
+- **Scope:**
+  - The Node implementations of the `RelayConnector`, `HostResolver` and `Nip11Fetcher` interfaces of `@agentlink/transport-nostr`.
+  - The connector connects to the address that the checks approved (the pinned address), never to a second lookup of the name.
+  - Redirects are refused, for the socket upgrade and for NIP-11. Proxy environment settings are ignored.
+  - Inbound socket messages are capped at 131 072 bytes in the socket layer itself, so an oversized message never reaches the pool.
+  - The NIP-11 read is size-capped and has its own timeout, separate from the connect timeout.
+  - Only `packages/node` may use these network primitives (boundary guards); the connector is injected into the pool by the CLI wiring (M1-9a).
+- **Acceptance:**
+  - Unit tests with a fake name server and a local socket server: the connection goes to the approved address even when a later lookup of the same name answers differently; a redirect is refused; a proxy variable in the environment is ignored; a 131 073-byte message closes the socket and a 131 072-byte one is delivered; an oversized or slow NIP-11 response is abandoned within its own timeout.
+  - Docker integration suite against 2–3 real local relays (one requiring NIP-42 AUTH, one with a small `max_message_length`): publish succeeds only with ≥ 2 `OK`, the small relay is skipped, AUTH completes, and an outbox row survives a restart and is republished. Runs in CI where Docker is available and is skipped locally with a clear message.
+  - Lands before M1-23 (the J9 dogfood, M1a gate), which runs on real relays through this connector.
+
+#### M1-5b-c · transport-nostr: hardening follow-ups (new, IR-M1-5b-1 L-2, L-6, I-1…I-3)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/transport-nostr
+- **Depends on:** M1-5b
+- **Spec:** 07 §4.2, §4.3 (an owner row with fewer than 2 usable relays; relay health); 04 §4
+- **Invariants:** I-3, I-7
+- **Scope:**
+  - A hanging NIP-11 fetch must not make a working relay time out for the publish: the NIP-11 wait has its own bound, after which the relay is used with the default limits for that attempt.
+  - A row with fewer than 2 usable relays reports why in the activity feed (07 §4.3), for example "no relay with a large enough message limit".
+  - A closed pool returns its own error code, not `invalid_url`.
+  - Relay health output follows the spec's URL rule and avoids full URLs where the spec says so (origin or a short relay label).
+  - Jitter on the outbox backoff, so that many queued rows do not retry in step.
+- **Acceptance:**
+  - Fake-clock tests: a NIP-11 fetch that never answers does not delay a publish to a working relay beyond its own bound; a row with one usable relay stays unsent and the activity entry names the reason; a publish on a closed pool returns the closed-pool code; health output contains no path or query; the retry times of two rows differ and stay within the 24 h bound.
+  - Existing M1-5b tests stay green; no test is weakened.
 
 #### M1-5c · transport-nostr: subscribe and sync with cursors and dedup
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
@@ -1908,6 +1942,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - One conformance suite runs against every backend; the node package keeps no copy of the sign and decrypt logic.
 
+#### M1-8a-d · CI: pin the keychain job's runner images; gating decision (new, IR-M1-8a-b-1 notes)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (sensitive path `.github/**`: merges only on Tali's "merge") · **Phase:** M1a
+- **Repo/path:** agentlink · .github/workflows/ci.yml
+- **Depends on:** M1-8a-b (merged); 5–10 green PR runs of the `keychain` job for the gating decision
+- **Spec:** M1-8a-b; docs/process/ci-cd.md
+- **Invariants:** I-1
+- **Scope:**
+  - Pin the macOS, Windows and Ubuntu runner image versions of the `keychain` job (no `*-latest`), so a runner image change cannot silently change the keychain behaviour under test. A bump is its own reviewed change.
+  - After 5–10 green PR runs, **the owner decides** whether `keychain` joins the `needs` of `ci-gate`. Until he does, it is not a required check. `continue-on-error` is never used.
+- **Acceptance:**
+  - The workflow names an exact image per runner; `zizmor` and the workflow lint stay green.
+  - The run history used for the decision (run count, failures, causes) is recorded in the PR; the owner's decision is recorded in this card or in `ci-cd.md`.
+
 #### M1-8b · node: SQLite Store with encrypted sensitive columns
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/node
@@ -1921,6 +1968,21 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Scanning the raw DB file finds none of the canary plaintexts; without the store key only the columns 07 §3 marks as clear are readable.
   - Two processes writing concurrently cause no corruption; migrations run from empty and from the previous schema version.
+
+#### M1-8b-b · store: schema, cipher and key-label follow-ups (new, draft: confirm after IR-M1-8b-1)
+- **Status:** backlog (draft: confirm after IR-M1-8b-1; the items come from the M1-8b worker's open questions and may change or drop once the review reports) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/core (schema, `StoreCipher`), packages/node (SQLite store), docs/foundation/07-sdk-transport-storage.md, test-vectors/**
+- **Depends on:** M1-8b
+- **Spec:** 07 §3 (`identity` columns, at-rest encryption); 04 §2.2 (key labels)
+- **Invariants:** I-2, I-7
+- **Scope:**
+  - Core's schema gains `identity.prev_relays` and `identity.prev_relays_until` as 07 §3 already lists them, with a forward migration in the SQLite store.
+  - The `StoreCipher` interface in core gains a keyed-digest method, so the request digest and other index values are computed through the interface and not inside one store implementation.
+  - 07 specifies the store key labels (`agentlink/v1/store-column` and `agentlink/v1/store-index`) and the `v1.` sealed-column format, with test vectors, so that the M2 Durable Object store (M2-3a) produces and reads the same bytes.
+- **Acceptance:**
+  - Tests first (local red run): a relay change records the previous list and its end time and survives a restart; the keyed digest of a fixed input equals the committed vector; a sealed column from the vectors opens in the SQLite store, and a column sealed under the wrong label or column does not.
+  - The vectors are registered with the harness (M0-9) and pass in every runtime.
+  - 07 text and the vectors agree; independent review; M2-3a lists these vectors as its conformance suite.
 
 #### M1-8c · node: OwnerKeyStore with the owner passphrase (CLI prompt)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
