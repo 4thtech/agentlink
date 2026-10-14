@@ -4,8 +4,8 @@
 
 **Symptom.** The `vectors` job failed at `pnpm exec playwright install` with "Command playwright not found".
 
-**Cause.** `ci.yml` decides to install Playwright by grepping `pnpm-lock.yaml` for "playwright". Vitest lists `@vitest/browser-playwright` as an optional peer, so the word is in the lockfile although Playwright is not installed.
+**Cause.** `ci.yml` decided to install Playwright by grepping `pnpm-lock.yaml` for "playwright". Vitest lists `@vitest/browser-playwright` as an optional peer, so the word is in the lockfile although Playwright is not installed.
 
-**Rule.** Add the root `vectors:check` script only together with a real `@playwright/test` root devDependency (M0-9). A better heuristic (read the root `package.json`) is a `.github` change for the owner.
+**Rule.** Decide from the root `package.json`, not the lockfile. Since M0-9, `detect` installs browsers only when `playwright` or `@playwright/test` is a root devDependency. The vector harness uses `playwright` (through Vitest browser mode), not `@playwright/test`.
 
-**Source.** M0-2d (PR #2) open question 6; `.github/workflows/ci.yml` `detect` job.
+**Source.** M0-2d (PR #2) open question 6; fixed in M0-9 (PR #13), `.github/workflows/ci.yml` `detect` job.

@@ -1,9 +1,7 @@
-# RB-06 · Cross-runtime test vectors (placeholder until M0-9)
-
-> **Placeholder.** The vector harness does not exist yet; card **M0-9** builds it. This page describes the intended flow from that card so builders can plan around it. Replace the steps with exact commands in the M0-9 PR. Until then, do not invent a vector format or commit vectors.
+# RB-06 · Cross-runtime test vectors
 
 ## Purpose
-Prove that our crypto and EIP-712 code produces the same bytes in Node, browsers and Workers, against vectors that our own code did not generate.
+Prove that our crypto and EIP-712 code produces the same bytes in Node, browsers and Workers, against vectors that our own code did not generate. The harness (M0-9) lives in `test-vectors/`; its format and rules are in [`test-vectors/README.md`](../../test-vectors/README.md).
 
 ## When to use
 Any change to a protocol suite (key derivation, envelope hash and signature, HPKE wrap, STREAM, pairing proof, EIP-712 including the AgentCard domain, NIP-44, safety code, owner wrap), and every new suite.
@@ -12,28 +10,40 @@ Any change to a protocol suite (key derivation, envelope hash and signature, HPK
 An Opus builder: `test-vectors/**` is S2 (`audit-rules.md` §2.2). Vectors change only with a spec change.
 
 ## Preconditions
-- M0-9 is `done` (it depends on M0-2d, the monorepo skeleton).
 - The spec section that defines the suite exists; a vector without a spec is a spec gap.
+- Browsers installed once per machine: `pnpm exec playwright install chromium firefox webkit`.
+- `python3` for the generators.
 
 ## Steps
-Intended flow, from the M0-9 card:
-1. Produce the vectors with an **independent generator** (a different implementation or tool, named in the file), never with the code under test.
-2. Commit them as JSON in `test-vectors/<suite>/`, shaped `{suite, version, generator: {tool, version}, cases[]}` and schema-validated.
-3. Run the same suite modules in all three runtimes:
+1. **Generator.** Write `tools/vectors/generate_<suite>.py`. It must not import repository TypeScript. Where published values exist, it cross-checks them and refuses to write on a mismatch. It supports `--write` (writes `test-vectors/<suite>/vectors.json`) and `--check [FILE]` (writes nothing; exits non-zero unless FILE equals its output). Model: `tools/vectors/generate_sha256.py`.
+2. **Vectors.** Run it once and commit the output, plus `test-vectors/<suite>/case.schema.json`:
    ```bash
-   pnpm vectors:check    # Node (Vitest), browsers (Playwright: Chromium, Firefox, WebKit), Workers (Miniflare/workerd)
+   python3 -I tools/vectors/generate_<suite>.py --write
    ```
-4. Negative control: mutate one byte of one vector and confirm the run fails in **all three** runtimes; restore it.
-5. Cross-repo parity: the private contracts repository pins a public commit (or vectors release) and checks parity in its own gate (`development-process.md` §9.1, §9.3).
+3. **Suite module.** Add `test-vectors/harness/suites/<suite>.ts` and register it in `harness/suites/index.ts`. It returns `{ field, actual }` for every field of the case's `expected`. It never returns expected values; `harness/compare.ts` reads them from the vector. It calls `@agentlink/crypto`, never a crypto library or `crypto.subtle` directly.
+4. **Tests first (S2).** Commit the vectors, schema and a stub suite that throws, with the prefix `RED (expected):`, and push so CI shows red. Then implement.
+5. **Run the checks:**
+   ```bash
+   node tools/vectors/check-generators.mjs   # every vectors.json equals its generator's output
+   pnpm vectors:check                         # node, chromium, firefox, webkit, workerd
+   ```
+6. **Negative controls**, each restored afterwards (`git status` clean):
+   - Flip one hex digit of one `expected` value: `vectors:check` fails for that case in all five runtimes, and `check-generators.mjs` fails.
+   - Change one input byte: the same.
+7. **Cross-repo parity:** the private contracts repository pins a public commit (or vectors release) and checks parity in its own gate (`development-process.md` §9.1, §9.3).
 
 ## Verify
-- `pnpm vectors:check` green in all three runtimes, and each runtime reports its identity (a silent fallback to Node fails the run).
-- The mutated-vector control failed in all three.
+- `pnpm vectors:check` ends with "passed in every runtime; test-vectors/ unchanged" and lists the five identities (`Node.js/…`, `HeadlessChrome/…`, `Firefox/…`, `AppleWebKit/… Version/…`, `Cloudflare-Workers`).
+- The mutated-vector control failed in all five runtimes; record it in the PR.
 
 ## If it fails
 - **One runtime differs:** a real portability bug until proven otherwise; do not "fix" the vector. Escalate.
-- **CI fails at `pnpm exec playwright install`:** see lesson [LL-07](../lessons/LL-07-playwright-lockfile-heuristic.md); M0-9 adds the root `vectors:check` script together with a real `@playwright/test` devDependency.
+- **"no passing runtime identity test" or a runtime MISSING:** a project ran somewhere else or not at all (for example, the browser or Workers project fell back to Node). Fix the config; never shrink `REQUIRED_RUNTIMES` in `tools/vectors/rules.mjs`.
+- **"changed during the run":** a test wrote under `test-vectors/`. Tests only read vectors.
+- **Provenance check fails:** the committed file is not what its generator produces. Regenerate only with a spec change.
+- **CI fails at `pnpm exec playwright install`:** see lesson [LL-07](../lessons/LL-07-playwright-lockfile-heuristic.md).
 
 ## Related
 - Card: M0-9 in [`backlog.md`](../process/backlog.md); also M1-1h and M1-1i (the suites).
 - Rules: [`development-process.md`](../process/development-process.md) §10 (test vectors row), 04 §8.2.
+- CI: the `vectors` job in [`ci-cd.md`](../process/ci-cd.md).
