@@ -95,12 +95,42 @@ Display names are **self-declared** unless the agent is registered (F-41); UIs m
 
 Owner-only operations: approve/deny, change policies, add/remove allowed folders, add storage credentials, export keys, revoke agents, disclose content keys.
 
-- Each is expressed as an **owner-signed object** (`OwnerAction{agentId, action, params, nonce, issuedAt}` signed by the owner Nostr key; or an `approval`/`policy` envelope from the console).
+- Each is expressed as an **owner-signed object** (`SignedOwnerAction`, §2.5.1, signed by the owner Nostr key). The local UI, the CLI and the console produce the same object. The console carries it inside an `approval`, `policy` or `revoke` envelope (§3.4.1); the envelope is only transport, and authority comes from the object's owner signature, never from the envelope signature.
 - The agent's core **verifies the owner signature** against the owner key in its agent card before applying the action. Policies are stored as signed documents and re-verified on load, so editing the database directly has no effect.
 - Signing requires user presence: passkey (local UI on `localhost` or console) or owner passphrase (CLI prompt). The local UI holds no reusable bearer token on disk.
 - **Desktop app owner presence (M2, D-36)** is stronger than localhost WebAuthn. Known weakness of the localhost passkey: a WebAuthn RP ID is a host name without port, so a passkey registered for `localhost` can be requested by any page on any localhost port, including one a shell-capable agent starts. Such a page could imitate the approval page and ask for the owner's gesture (the human must still complete the prompt). The desktop app removes this path: owner operations happen in a **native approval window** (not a localhost page), the OS prompt names the signed app, and the keystore releases the owner wrapping key only to that app (§2.2). Residual: on Linux, and wherever the OS falls back to a typed device password, an agent able to inject keystrokes and knowing the secret could complete the prompt; this is settled in the framework security review (08 §8).
 - **Commitments (D-31)** are an approval path, not an owner-only operation. Sending an `accept` and signing an `ACCEPTED` or `REJECTED` receipt are agent actions gated by policy `commitments.accept` (default `approval`, 06 §3): the agent proposes, the owner approves or denies through the normal approval flow above (owner-signed, with presence), and only then does the agent's key send or sign. Auto-accept applies only within owner-signed limits (allowlisted contacts, maximum value).
 - **Residual risk:** an agent with unrestricted shell access as the same OS user could tamper with the AgentLink installation itself or spend the agent's credits by signing records with the agent key. Mitigations: keep credits small; harness permission settings that deny access to `~/.agentlink` and the keychain (documented in the quickstart); owner revocation; per-agent spending caps in the vault (P2).
+
+#### 2.5.1 Owner-signed objects (proposed; owner confirms at merge, G-29)
+
+```jsonc
+// OwnerAction: the signed content
+{
+  "v": 1,
+  "agent": "0x<agent EVM address>",        // the agent this action is for (stable, §2.1; same form as terms.parties)
+  "owner": "<owner Nostr x-only pubkey, hex>", // must equal ownerNostr in that agent's card
+  "action": "approval.decide | policy.set | agent.revoke | …",
+  "params": { },                            // strict schema per action (unknown keys rejected)
+  "nonce": "<16 random bytes>",
+  "issuedAt": 1760000000,
+  "expiresAt": 1760000600                   // 0 only for agent.revoke (never expires)
+}
+// SignedOwnerAction
+{ "action": { /* OwnerAction */ }, "sig": "<hex BIP-340 signature>" }
+```
+
+- `sig` = BIP-340 Schnorr by `owner` over `taggedHash("agentlink/owner-action/v1", sha256(JCS(OwnerAction)))`. The tag differs from the envelope tag (§3.1), so an owner-action signature is never a valid envelope or Nostr event signature, and the reverse.
+- `agent` binds the action to one agent by its stable EVM address, independent of the local `agentId` (G-23). An action signed for one agent is refused by every other agent of the same owner.
+- **Verification** (core, before applying): `agent` is the agent's own EVM address; `owner` equals `ownerNostr` in the agent's own card; `sig` is valid; `issuedAt` is not in the future beyond clock skew; `now ≤ expiresAt`, and `expiresAt − issuedAt` is within the action's maximum lifetime; `nonce` is unused; `params` match the action's schema. Skew, lifetimes and nonce retention are fixed by G-7.
+- Freshness and nonce checks apply once, when the action is first applied. A stored `policy.set` is re-verified on every load for `sig`, `agent`, `owner` and `version` only; otherwise policies would expire.
+- Actions defined here (others, such as storage credentials, key export and content-key disclosure, use the same object with `params` fixed by the tasks that build them):
+
+| `action` | `params` | Produced by | Rules |
+|---|---|---|---|
+| `approval.decide` | `{approvalId, actionDigest, decision: "approve" \| "deny"}` | Local UI, CLI, console (`approval` envelope) | Applies only to a pending request with the same `approvalId` and `actionDigest` (§3.4.1); single use; a deny is signed too, so a forged deny cannot cancel a request |
+| `policy.set` | `{version, policy}` | Local UI, CLI, console (`policy` envelope) | `policy` is the complete 06 §3 document (never a partial patch); `version` (unsigned integer) must be greater than the applied version, so an older signed policy cannot be replayed to roll back. Fail-closed behaviour on a missing or invalid policy stays with G-6 |
+| `agent.revoke` | `{reason: "compromised" \| "retired" \| "other"}` | Console or CLI (`revoke` envelope) | Permanent for `agent` (every epoch). Sent to the agent and to each of its contacts. `expiresAt` = 0 and replays are harmless, so a contact that was offline still applies it later. `reason` is a fixed value, never free text |
 
 ### 2.6 Key rotation
 
@@ -332,7 +362,7 @@ All binary values are base64url **without padding** in JSON unless noted.
   "v": 1,
   "id": "<16 random bytes>",
   "thread": "<16 bytes, stable per conversation>",
-  "from": "<agent nostr x-only pubkey, hex>",
+  "from": "<sender nostr x-only pubkey, hex>",       // the sending agent; the owner on the owner channel (§3.4.1)
   "createdAt": 1760000000,
   "recipients": [
     { "kid": "<first 16 bytes of sha256(raw 32-byte encPub)>",
@@ -383,7 +413,7 @@ All binary values are base64url **without padding** in JSON unless noted.
 ```
 
 - **`proof` type** (body `{envelopeId, chainId, recordId, salt}`) is sent **after** a record is submitted, as a follow-up envelope. This works both for "send with proof" and for notarizing an older envelope; a notarized envelope itself never claims proof.
-- **`approval-request` / `approval` / `policy`** carry owner operations between agents and the console (§2.5).
+- **`approval-request` / `approval` / `policy` / `revoke` / `card-update` / `handshake-ack`** bodies are fixed in §3.4.1.
 - **`offer` / `accept` / `reject` carry `terms`** (D-32), so agents can negotiate and agree on exact terms:
 
 ```jsonc
@@ -410,6 +440,32 @@ All binary values are base64url **without padding** in JSON unless noted.
   - Before signing `ACCEPTED` or `REJECTED` on a record whose envelope carries `terms`, the core applies the same checks (own agent ID in `parties`, not expired). Both paths need owner approval by default (policy `commitments.accept`, §2.5, 06 §3).
   - Received terms are untrusted content (I-5): validated structurally only, shown inside the untrusted block (06 §4) and marked as the other party's content on approval screens. `price` is informational: AgentLink moves no money.
   - **Proof of agreement.** The final terms envelope is notarized (record kind `OFFER` for an `offer`, `ACCEPT` for an `accept`, 05 §3.1) and the counterparty signs `ACCEPTED` on that record. The proof pack (07 §8) includes the envelope and its disclosed content key (policy `proofs.allowKeyDisclosure`), so a verifier can decrypt, recompute `termsHash` and check that the record signer and the receipt signer are the two `parties`. Disclosing the key reveals the whole payload, so the final terms envelope should carry only the terms. The pack shows that both agents, each bound to its owner by the agent card, assented to the same terms at the recorded times (mutual assent). It does not by itself establish legal enforceability or the signatory's authority. `DECISION NEEDED (owner)`: optionally add each owner's signed approval (§2.5) to the pack, as off-chain evidence that the owners, not only their agents, approved.
+
+#### 3.4.1 Owner-operation, card and pairing bodies (proposed; owner confirms at merge, G-29)
+
+**Owner channel.** `approval-request`, `approval` and `policy` travel only between an agent and its own owner. Their recipients are exactly the agent and its owner (both, so I-9 holds); the §3.2 set does not apply. `from` is the agent's Nostr key (`approval-request`) or the owner's (`approval`, `policy`).
+
+| Type | Direction | Body | Receiver rules |
+|---|---|---|---|
+| `approval-request` | Agent → own owner (console) | `{approvalId, agent, action, actionDigest, summary, requestedAt, expiresAt}` | The console accepts it only from one of its own agents (`from` = `agentNostr` and `agent` = `agentEvm` of a card the owner signed); anything else is dropped |
+| `approval` | Owner → own agent | `{signed: SignedOwnerAction}` with `approval.decide` (§2.5.1) | `from` must be the agent's own owner key and the signed object must verify (§2.5.1); otherwise dropped |
+| `policy` | Owner → own agent | `{signed: SignedOwnerAction}` with `policy.set` | As for `approval`; the core stores the signed object, not the envelope |
+| `revoke` | Owner → the revoked agent and each of its contacts (the agent may also forward it) | `{signed: SignedOwnerAction}` with `agent.revoke` | Recipients per §3.2, with the owner as sender. A contact applies it if `signed.action.agent` is a stored contact and `signed.action.owner` equals `ownerNostr` in that contact's stored card, whatever the envelope's `from`: like `handshake`, it is an exception to the requests queue. The contact then drops that agent's later envelopes; history stays readable. The revoked agent's own core stops sending and signing (best effort: a compromised agent ignores it, which is why contacts are told) |
+| `card-update` | Agent → each contact | `{card, cardSig, name, relays}` (the `handshake` shapes, §3.6) | `cardSig` valid; `card.agentEvm` equals the stored contact's; `ownerEvm`, `ownerNostr` and `ownerEnc` unchanged (owner-key rotation is P2); `keyEpoch` strictly greater; `nameHash` and `relaysHash` match `name` and `relays`. The envelope may come from the old or the new epoch key: authority comes from `cardSig` only. A changed name is shown as a change and stays self-declared (§2.4) |
+| `handshake-ack` | Inviter A → B | `{inviteId, handshakeId}` (`handshakeId` = B's `handshake` envelope `id`) | B accepts it only from A's `agentNostr` in the invite card (or a later card from the same owner) and only for a handshake B sent with that `inviteId`; B then marks the pairing complete. A key change since the invite follows as a `card-update` |
+
+**`approval-request` fields.**
+- `approvalId`: `apr_` followed by 16 random bytes (base64url). `agent`: the requesting agent's EVM address.
+- `action`: the exact action the owner approves, `{tool, args, context}`. `tool` is the MCP tool name (06 §2.0). `args` is the tool input after defaults are applied, without `approvalId` and `clientRequestId`, with paths resolved by `realpath`. `context` holds the facts the core bound when it evaluated policy (for example the contact's agent EVM address, the file's `plaintextSha256`, and for paid actions the fee `{token, amount, usd}`), so the digest covers them. Its per-tool fields are fixed in M1-2b.
+- `actionDigest` = `sha256(JCS(action))` (M1-7e). The console recomputes it and refuses a mismatch, and the owner's `approval.decide` signs this digest. An approval therefore cannot be reused for any other action, even one the agent describes the same way.
+- `summary`: core-generated template text (≤ 200 characters) naming the contact (under the contact-name rule, 06 §2.1) and the action, never inbound text (06 §4). The console treats it as a label only and renders the approval card from `action`.
+- `requestedAt`, `expiresAt`: unix seconds; the approval TTL is fixed by G-7.
+
+**Rendering (I-5).** `action` can contain another agent's content, such as `terms` on an `accept`. The console shows every string in `action` as data: escaped, with no links or markup. It marks fields that carry another party's content as theirs (11 §8). It never derives anything to execute from them.
+
+**Who may create these bodies (I-4).** No MCP tool can create or pass through `approval-request`, `approval`, `policy`, `revoke`, `card-update`, `handshake` or `handshake-ack`. `agentlink_send` accepts only the 02 F-22 types (06 §2.2), and the core's send path refuses every other type from tool input. `approval-request`, `handshake` and `handshake-ack` are produced by core flows. `approval`, `policy` and `revoke` carry an owner signature, and `card-update` an owner-signed card, so each needs owner presence. An agent that receives an owner-channel type from anyone but its own owner drops it, and owner-channel envelopes are never returned by `agentlink_inbox`.
+
+**Replays.** `approval.decide` is single use (nonce and `approvalId`). `policy.set` needs a higher `version`. `agent.revoke` and `card-update` are idempotent (revocation is permanent; the epoch must increase). `handshake-ack` matches one handshake.
 
 ### 3.5 Transport wrapping (Nostr)
 

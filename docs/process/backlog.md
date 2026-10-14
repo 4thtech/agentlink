@@ -654,7 +654,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Invariants:** I-6, I-8
 - **Scope:**
   - Written by a session that does not implement the TypeScript code. Generators use independent implementations (e.g. Python `cryptography`, a reference BIP-340, RFC 9180 reference vectors, an RFC 8785 reference, `eth-account`/`eth-abi` or `cast` for EIP-712).
-  - Suites (M1a, what Talk needs): HKDF derivation per 04 §2.1 (labels × epochs 0–2), BIP-340 tagged-hash envelope signatures, HPKE CEK wrap (fixed ephemeral keys), payload AEAD + AAD, envelope hash via JCS, pairing HMAC, safety code, owner-seed wrap (Argon2id passphrase path), file KeyStore `ALKS` v1 for both secret kinds (D-54, 04 §2.8), EIP-712 domain separator / struct hash / digest for `AgentCard` (chain-agnostic domain).
+  - Suites (M1a, what Talk needs): HKDF derivation per 04 §2.1 (labels × epochs 0–2), BIP-340 tagged-hash envelope signatures, BIP-340 tagged-hash owner-action signatures (`agentlink/owner-action/v1`, 04 §2.5.1, G-29), HPKE CEK wrap (fixed ephemeral keys), payload AEAD + AAD, envelope hash via JCS, pairing HMAC, safety code, owner-seed wrap (Argon2id passphrase path), file KeyStore `ALKS` v1 for both secret kinds (D-54, 04 §2.8), EIP-712 domain separator / struct hash / digest for `AgentCard` (chain-agnostic domain).
   - Proof-layer suites (STREAM, PRF wrap, `Record`, `Receipt`, `Registration`) are M1-1i (M1b).
   - These are the **canonical** vectors; the contracts repo checks parity against a pinned commit (D-19).
   - Vectors that depend on open gap G-28 are added only after it is resolved.
@@ -814,11 +814,12 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types
 - **Depends on:** M0-2d; gap G-29 resolved for owner-operation bodies
-- **Spec:** 04 §2.4, §3.1, §3.4, §3.6; 05 §2.1, §3.1; 07 §1
+- **Spec:** 04 §2.4, §2.5.1, §3.1, §3.4, §3.4.1, §3.6; 05 §2.1, §3.1; 07 §1
 - **Invariants:** I-5
 - **Scope:**
   - Constants: 17 payload types, record kinds, receipt types, fee types, MCP status values, size limits (24 KB envelope, 12 KB inline), policy defaults reference.
-  - Strict zod schemas (unknown keys rejected) for Envelope v1, Payload with per-type bodies (handshake, handshake-ack, proof, approval-request, approval, policy, card-update, revoke, `request` with `kind: "refresh-link"`, file entries), AgentCard, Invite.
+  - Strict zod schemas (unknown keys rejected) for Envelope v1, Payload with per-type bodies (handshake, handshake-ack, proof, approval-request, approval, policy, card-update, revoke per 04 §3.4.1, `request` with `kind: "refresh-link"`, file entries), AgentCard, Invite.
+  - `OwnerAction` / `SignedOwnerAction` shape (04 §2.5.1) with `approval.decide` and `agent.revoke` params; the `policy.set` params (the policy schema) and the per-tool `context` schemas of `approval-request` plug in from M1-2b.
   - Field validation: base64url without padding, byte lengths (id/thread/kid 16 B, keys 32 B), hex formats.
   - Security S2 because envelope/payload schema changes are S2 (`audit-rules.md` §2.2).
 - **Acceptance:**
@@ -829,11 +830,11 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types
 - **Depends on:** M1-2a; gaps G-7, G-32 resolved
-- **Spec:** 06 §1 rule 3, §2 (`ProofStatus`), §3; 04 §2.5; 07 §8; 03 §3
+- **Spec:** 06 §1 rule 3, §2 (`ProofStatus`), §3; 04 §2.5, §2.5.1, §3.4.1; 07 §8; 03 §3
 - **Invariants:** I-4, I-5
 - **Scope:**
   - Policy schema with the exact 06 §3 defaults (plus per-contact overrides if G-32 adds them); signed-policy document wrapper.
-  - `OwnerAction{agentId, action, params, nonce, issuedAt}`, `ApprovalRequest`/`Approval` bound to an action digest, `ProofPack` v1, `ProofStatus`, the common tool-result shape `{status, summary, nextStep?, url?, approvalId?}`.
+  - `policy.set` params `{version, policy}` and the per-tool `action.context` schemas of `approval-request` (04 §2.5.1, §3.4.1; the `OwnerAction{v, agent, owner, action, params, nonce, issuedAt, expiresAt}` shape itself is M1-2a), approvals bound to the action digest, `ProofPack` v1, `ProofStatus`, the common tool-result shape `{status, summary, nextStep?, url?, approvalId?}`.
 - **Acceptance:**
   - Defaults deep-equal 06 §3 (snapshot test citing the spec); the 07 §8 example pack parses.
   - Round-trip and strictness tests for each schema.
@@ -1183,7 +1184,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Pure `evaluate(policy, action, context) → allow | approval | deny`, minimal for M1a (D-33): the 06 §3 rules for contacts and envelopes (hourly per-contact rate counts passed in as context), plus the `commitments` rule from M1-20. Files, proofs and receipts rules are M1-7i (M1b).
   - Signed policy documents verified against the owner key in the agent card on every load; behaviour on missing or invalid signatures per G-6.
-  - `OwnerAction` verification: owner signature, `agentId` binding, single-use nonce, freshness window (G-7).
+  - `SignedOwnerAction` verification (04 §2.5.1): owner signature, `agent` and `owner` binding, single-use nonce, freshness window (G-7); `policy.set` version must increase.
 - **Acceptance:**
   - Tests first; a table-driven test per rule and boundary (e.g. the per-contact hourly rate limit at N and N + 1).
   - A policy row edited directly in the store is ignored (I-4); a replayed or stale `OwnerAction` is rejected.
@@ -2878,7 +2879,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 26. **G-26 (L) STREAM header not authenticated.** 04 §4: AAD is `u8(isFinal)` only; header fields rely on `ciphertextSha256`. *Proposed:* AAD = header ‖ isFinal, decided before vectors freeze. *Blocks:* M1-1d, M1-1i.
 27. **G-27 (L) Inline file vs envelope size.** 04 §3.5; 02 F-30; 06 §2.3. A 12 KB file, base64-encoded inside an encrypted, base64-encoded payload with four recipient wraps, is already near 24 KB before any text. *Proposed:* "inline only if the final envelope ≤ 24 KB". *Blocks:* M1-7f.
 28. **G-28 (L) Safety-code encoding.** 04 §3.6: the first 40 bits (2^40 ≈ 1.1 × 10^12) do not fit 12 decimal digits, the format 11 §1 and §8 specify. *Blocks:* M1-1f, M1-1h.
-29. **G-29 (M) Owner-operation payload bodies.** 04 §3.4 lists `approval-request`, `approval`, `policy`, `card-update`, `revoke`, `handshake-ack` without body schemas. *Blocks:* M1-2a, M2-2e.
+29. **G-29 (M) Owner-operation payload bodies.** Resolved by PR #PRNUM (pending owner): one owner-signed object, `SignedOwnerAction` (04 §2.5.1, BIP-340 by the owner Nostr key over a tagged hash, bound to the agent's EVM address, with nonce and expiry), is produced by the local UI, the CLI and the console; `approval`, `policy` and `revoke` envelopes only carry it. Bodies for `approval-request`, `approval`, `policy`, `revoke`, `card-update` and `handshake-ack` in 04 §3.4.1, with receiver rules and the rule that no MCP tool can create them. Lifetimes stay with G-7, policy fail-closed with G-6. *Was:* 04 §3.4 listed these types without body schemas. *Blocks:* M1-2a, M2-2e.
 30. **G-30 (M) Native-coin price source.** RESOLVED for launch by D-46: fees are stablecoin-only, every fee token is valued 1:1, and 07 §6.2 needs no price endpoint. A USD price source for native coins returns with the `PRICE_UPDATER` work in M4-EPIC (12 §3.4). *Was:* 07 §6.2 "public price endpoint" unspecified (third-party egress, integrity). *Blocked:* M1-4b, M3-3.
 31. **G-31 (L) Linux without Secret Service.** RESOLVED by D-54 (04 §2.8, 07 §9): the OS keychain stays the default; without one, `needs_setup` unless the user opts in, in an interactive terminal, to a passphrase-locked file KeyStore (Argon2id + AES-256-GCM, unlocked by the MCP server from a passphrase file or an environment variable); the owner key is never unlocked non-interactively. Built in M1-8f. *Was:* 04 §2.2; 03 §6 (headless servers, containers, WSL); proposed `needs_setup` by default and a documented, weaker passphrase-wrapped file store as opt-in. *Blocked:* M1-8a.
 32. **G-32 (M) Per-contact policy overrides.** 11 §8 (approval card, "Remember for this contact") has no counterpart in 06 §3. *Blocks:* M1-2b, M1-11a.
