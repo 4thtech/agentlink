@@ -1,4 +1,4 @@
-// Errors of the Node KeyStore backends. Every message is a fixed sentence that says how to fix the
+// Errors of the Node KeyStore backends and the owner flows (M1-8c). Every message is a fixed sentence that says how to fix the
 // problem; no input, agent ID, keychain text or key material is ever interpolated, and no native
 // error is attached as `cause` (I-7). Callers branch on `code`.
 
@@ -16,7 +16,23 @@ export type NodeKeyStoreErrorCode =
   /** The OS keychain refused or failed the operation. */
   | 'keychain_failed'
   /** The recorded backend is not available in this build (the file KeyStore is M1-8f). */
-  | 'backend_unavailable';
+  | 'backend_unavailable'
+  /** No owner is set up on this computer (`needs_setup`, reason `owner_missing`; 04 §2.2). */
+  | 'owner_missing'
+  /** An owner already exists; `owner init` never replaces it (04 §2.8). */
+  | 'owner_exists'
+  /** The stored owner item is damaged or belongs to another owner (04 §2.8 "Expected owner"). */
+  | 'owner_mismatch'
+  /** No interactive terminal: owner secrets are read only at a TTY prompt (D-54, 04 §2.8). */
+  | 'owner_prompt_unavailable'
+  /** The owner cancelled the prompt (Ctrl-C or Ctrl-D). */
+  | 'owner_prompt_cancelled'
+  /** A new owner secret was refused: too short, not re-typed correctly, or not allowed here. */
+  | 'owner_secret_refused'
+  /** An AI app's environment marker is set; the owner step is refused (04 §2.8, UX guard). */
+  | 'harness_detected'
+  /** The owner operation's item list is empty, too long or malformed. */
+  | 'owner_operation_invalid';
 
 export class NodeKeyStoreError extends Error {
   readonly code: NodeKeyStoreErrorCode;
