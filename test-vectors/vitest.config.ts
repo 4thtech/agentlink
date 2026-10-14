@@ -8,6 +8,8 @@ import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
 
 const SHARED = 'harness/vectors.test.ts';
+// The approval.decideBatch schema cross-check (M1-2e): its card asks for every runtime.
+const BATCH_FORM = 'harness/batch-form.test.ts';
 
 // Suites test the source of @agentlink/crypto, not a build of it: the vectors job does not build,
 // and a stale dist/ must never be what passes. Inline projects do not inherit a root `resolve`, so
@@ -41,6 +43,7 @@ export default defineConfig({
             'harness/schema.test.ts',
             'harness/compare.test.ts',
             'harness/policy-form.test.ts',
+            BATCH_FORM,
           ],
           provide: { vectorsRuntime: 'node' },
         },
@@ -49,7 +52,7 @@ export default defineConfig({
         resolve,
         test: {
           name: 'browser',
-          include: [SHARED],
+          include: [SHARED, BATCH_FORM],
           browser: {
             enabled: true,
             provider: playwright(),
@@ -76,7 +79,7 @@ export default defineConfig({
         resolve,
         test: {
           name: 'workers',
-          include: [SHARED],
+          include: [SHARED, BATCH_FORM],
           provide: { vectorsRuntime: 'workerd' },
         },
       },
