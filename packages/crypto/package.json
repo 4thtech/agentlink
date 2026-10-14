@@ -20,6 +20,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./keystore": {
+      "types": "./dist/keystore.d.ts",
+      "default": "./dist/keystore.js"
     }
   },
   "files": [
@@ -33,6 +37,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0"
   }
 }

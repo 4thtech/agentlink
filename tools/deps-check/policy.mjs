@@ -64,6 +64,26 @@ export const LIBRARIES = [
 ];
 
 /**
+ * Restricted entry points of workspace packages (IR-M1-1b-1 M-1). A zone that may import the package
+ * may still not import these subpaths unless it is listed. `@agentlink/crypto/keystore` holds every
+ * function that takes a master seed or a secret key (04 §8.1: secret-key operations go through the
+ * KeyStore interface; 04 §2.5: the agent may run shell commands as the same user), so only the zones
+ * that host KeyStore backends may import it: packages/node (the file and keychain backends) and the
+ * vector harness (test-vectors, which has no layering entry and gets its rules from its own ESLint
+ * config). The package layering below still applies on top: packages/node does not list `crypto`
+ * in its `uses` yet, so the card that adds the backends widens that entry. Widening a zone here is a
+ * reviewed S1 change with a reason.
+ */
+export const RESTRICTED_ENTRY_POINTS = [
+  {
+    group: ['@agentlink/crypto/keystore', '@agentlink/crypto/keystore/*'],
+    zones: ['packages/node', 'test-vectors'],
+    via: 'the KeyStore interface (04 §8.1)',
+    reason: 'master seeds and secret keys stay inside KeyStore backends (04 §8.1, §2.5)',
+  },
+];
+
+/**
  * Files that may import `node:module` (createRequire can resolve code from another package's
  * directory). Each entry needs a reason. Empty: nothing needs it today.
  */
@@ -247,6 +267,8 @@ export const libraryMessage = (lib) =>
   lib.zones.length === 0
     ? `${lib.group[0]} is not on the crypto allowlist (04 §8.1); adding a library needs a decision and the owner's approval.`
     : `${lib.group[0]} may be imported only in ${lib.zones.join(', ')}; everything else uses ${lib.via} (AGENTS.md).`;
+export const restrictedEntryMessage = (entry) =>
+  `${entry.group[0]} may be imported only in ${entry.zones.join(', ')}; everything else uses ${entry.via}.`;
 export const layerMessage = (zone, name) =>
   ZONES[zone]
     ? `${zone} may not import ${name} (package layering: tools/deps-check/policy.mjs, 07 §1).`
@@ -269,6 +291,11 @@ export function violationFor(zone, specifier, file) {
       return MODULE_MSG;
     }
     return null;
+  }
+  for (const entry of RESTRICTED_ENTRY_POINTS) {
+    if (matchesGroup(specifier, entry.group) && !entry.zones.includes(zone)) {
+      return restrictedEntryMessage(entry);
+    }
   }
   for (const lib of LIBRARIES) {
     if (matchesGroup(specifier, lib.group) && !lib.zones.includes(zone)) return libraryMessage(lib);
