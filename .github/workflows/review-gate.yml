@@ -61,7 +61,11 @@ jobs:
   review-gate:
     name: review-gate
     # pull_request_review has no branch filter: ignore reviews on PRs into the coordination branch.
-    if: github.event_name == 'merge_group' || github.event.pull_request.base.ref != 'sync'
+    # Draft PRs are skipped: they cannot merge, and their independent review is still pending.
+    # The gate runs in full on `ready_for_review` and on every later event.
+    if: >-
+      github.event_name == 'merge_group' ||
+      (github.event.pull_request.base.ref != 'sync' && github.event.pull_request.draft != true)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
