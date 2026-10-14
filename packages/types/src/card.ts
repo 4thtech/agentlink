@@ -7,13 +7,12 @@ import { z } from 'zod';
 import {
   BYTE_LENGTHS,
   MAX_DISPLAY_NAME_CODE_POINTS,
-  MAX_RELAY_URL_LENGTH,
   MAX_RELAYS,
   PROTOCOL_VERSION,
 } from './constants.js';
 import {
   base64url,
-  eip712SigHex,
+  ecdsaSignatureSchema,
   evmAddress,
   bytes32Hex,
   ijsonString,
@@ -43,8 +42,8 @@ export const agentCardSchema = z
     path: ['expiresAt'],
   });
 
-/** The owner's EIP-712 signature over the card (04 §2.4). */
-export const cardSigSchema = eip712SigHex;
+/** The owner's EIP-712 signature over the card, canonical ECDSA (04 §2.4, §2.4.1). */
+export const cardSigSchema = ecdsaSignatureSchema;
 
 /**
  * A self-declared display name as it travels (04 §2.4: keccak256 of its UTF-8 is `nameHash`).
@@ -53,41 +52,48 @@ export const cardSigSchema = eip712SigHex;
  */
 export const displayNameSchema = ijsonString({ max: MAX_DISPLAY_NAME_CODE_POINTS });
 
-// A relay URL: wss, lowercase DNS host name (letters, digits, dots, hyphens), optional port, optional
-// path. No user info, query or fragment.
-const RELAY_URL =
-  /^wss:\/\/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*)(?::([0-9]{1,5}))?(?:\/[A-Za-z0-9._~%!$&'()*+,;=:@/-]*)?$/;
+// Relay URL rule (04 §4, "SSRF protection (relay URLs)"), checked on the RAW string before any URL
+// parser runs: a WHATWG or UTS-46 parser would map percent-encoding, full-width characters or U+3002
+// onto `localhost`, IP literals or trailing dots. Relay lists come from other parties (invites,
+// handshakes, card updates) and the core connects to them, so this is an SSRF boundary (I-5).
+// The transport re-checks every resolved address at connect time (M1-5, 07 §4.2).
 
-// Relay lists come from other parties (invites, handshakes, card updates) and the core connects to
-// them, so a relay host must not point at the local machine or network (I-5; 04 §4 SSRF rules):
-// - no IP literal at all. IPv6 literals cannot match RELAY_URL. A host whose last label is a number
-//   (`127.0.0.1`, `0x7f.1`, `2130706433`, `169.254.169.254`) is parsed as IPv4 by URL parsers
-//   (WHATWG "ends in a number"), so every such host is refused. That covers loopback, private,
-//   link-local, CGNAT and metadata addresses in every spelling;
-// - no single-label host (`localhost`, `metadata`, intranet names);
-// - no special-use local names (`*.localhost`, `*.local`, `*.internal`, `*.home.arpa`).
-// A DNS name can still resolve to a private address; the transport re-checks at connect time.
+/** Printable ASCII only, no `%`, `\` or whitespace, at most 256 characters. */
+const RELAY_CHARS = /^[\x21-\x24\x26-\x5b\x5d-\x7e]{1,256}$/;
+/** wss:// host [:port] [path]; no user info, query or fragment. */
+const RELAY_FORM =
+  /^wss:\/\/([a-z0-9.-]+)(?::([1-9][0-9]{0,4}))?(\/[A-Za-z0-9._~!$&'()*+,;=:@/-]*)?$/;
+const RELAY_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+/** A label that parses as a number in any base: decimal (octal is a subset) or 0x hex. */
 const NUMERIC_LABEL = /^(?:[0-9]+|0x[0-9a-f]*)$/;
-const LOCAL_SUFFIXES = ['.localhost', '.local', '.internal', '.home.arpa'];
+const LAST_LABEL = /^(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$/;
+const DENIED_SUFFIXES = ['.localhost', '.localdomain', '.local', '.internal', '.home.arpa'];
 
-/** True when a relay host is a public-looking DNS name (see the rules above). */
+/** True when `host` passes the host part of the relay URL rule (lowercase DNS name, never local). */
 export function isAllowedRelayHost(host: string): boolean {
+  if (host.length > 253 || host === 'localhost') return false;
   const labels = host.split('.');
-  if (labels.length < 2) return false;
-  if (NUMERIC_LABEL.test(labels[labels.length - 1] as string)) return false;
-  return !LOCAL_SUFFIXES.some((suffix) => host.endsWith(suffix));
+  if (labels.length < 2) return false; // also: no trailing dot (an empty last label fails below)
+  for (const label of labels) {
+    if (!RELAY_LABEL.test(label) || NUMERIC_LABEL.test(label)) return false;
+  }
+  if (!LAST_LABEL.test(labels[labels.length - 1] as string)) return false;
+  return !DENIED_SUFFIXES.some((suffix) => host.endsWith(suffix));
+}
+
+/** True when `url` passes the relay URL rule of 04 §4 (raw-string check, before any URL parsing). */
+export function isAllowedRelayUrl(url: unknown): boolean {
+  if (typeof url !== 'string' || !RELAY_CHARS.test(url)) return false;
+  const m = RELAY_FORM.exec(url);
+  if (m === null) return false;
+  const [, host, port] = m;
+  if (host === undefined || !isAllowedRelayHost(host)) return false;
+  return port === undefined || Number(port) <= 65535;
 }
 
 export const relayUrlSchema = z
   .string()
-  .max(MAX_RELAY_URL_LENGTH)
-  .refine((s) => {
-    const m = RELAY_URL.exec(s);
-    if (m === null) return false;
-    const [, host, port] = m;
-    if (host === undefined || !isAllowedRelayHost(host)) return false;
-    return port === undefined || (Number(port) >= 1 && Number(port) <= 65535);
-  }, 'must be a wss:// URL with a public lowercase DNS host and no user info, query or fragment');
+  .refine(isAllowedRelayUrl, 'must be a wss:// relay URL that passes the relay URL rule (04 §4)');
 
 export const relayListSchema = z
   .array(relayUrlSchema)

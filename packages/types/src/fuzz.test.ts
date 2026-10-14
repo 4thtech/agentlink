@@ -6,12 +6,15 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
   agentCardSchema,
+  cardSigSchema,
   envelopeSchema,
   fileEntrySchema,
   inviteSchema,
   ownerActionSchema,
   payloadSchema,
+  relayUrlSchema,
   signedOwnerActionSchema,
+  uint256Decimal,
 } from './index.js';
 import {
   agentCard,
@@ -126,4 +129,20 @@ describe('fuzzing: only validation errors, never a crash', () => {
       );
     },
   );
+
+  it.each([
+    ['relayUrl', relayUrlSchema],
+    ['cardSig', cardSigSchema],
+    ['uint256Decimal', uint256Decimal],
+  ] as const)('%s on arbitrary strings and values', (_name, schema) => {
+    const strings = fc.oneof(
+      fc.string({ unit: 'binary' }),
+      fc.string().map((t) => `wss://${t}`),
+      fc.string({ unit: fc.constantFrom(...'0123456789abcdefx.:/-'.split('')) }),
+    );
+    fc.assert(
+      fc.property(fc.oneof(strings, anyInput), (input) => checkTotal(schema, input)),
+      RUNS,
+    );
+  });
 });

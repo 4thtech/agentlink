@@ -7,6 +7,7 @@ import {
   displayNameSchema,
   inviteSchema,
   isAllowedRelayHost,
+  isAllowedRelayUrl,
   relayListSchema,
   relayUrlSchema,
   sameNostrKey,
@@ -87,6 +88,41 @@ describe('AgentCard', () => {
     expectReject(agentCardSchema, { ...agentCard(), expiresAt: 1 });
   });
 
+  describe('cardSig is a canonical ECDSA signature (04 §2.4.1)', () => {
+    const N = 'fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141';
+    const HALF_N = '7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0';
+    const HALF_N_PLUS_1 = '7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a1';
+    const R = '3c'.repeat(32);
+    const sig = (r: string, s: string, v: string) => `0x${r}${s}${v}`;
+
+    it('accepts r, s in range with low s and v 27 or 28, at the bounds', () => {
+      expectAccept(cardSigSchema, sig(R, R, '1b'));
+      expectAccept(cardSigSchema, sig(R, R, '1c'));
+      expectAccept(cardSigSchema, sig(R, HALF_N, '1b'));
+      expectAccept(cardSigSchema, sig(`${'00'.repeat(31)}01`, `${'00'.repeat(31)}01`, '1b'));
+      expectAccept(cardSigSchema, sig(`${N.slice(0, -2)}40`, R, '1c'));
+    });
+
+    it.each([
+      ['v = 0', sig(R, R, '00')],
+      ['v = 1', sig(R, R, '01')],
+      ['v = 29', sig(R, R, '1d')],
+      ['high s (n/2 + 1)', sig(R, HALF_N_PLUS_1, '1b')],
+      ['s = n - 1', sig(R, `${N.slice(0, -2)}40`, '1b')],
+      ['s = 0', sig(R, '00'.repeat(32), '1b')],
+      ['r = 0', sig('00'.repeat(32), R, '1b')],
+      ['r = n', sig(N, R, '1b')],
+      ['r all ff', sig('ff'.repeat(32), R, '1b')],
+      ['64 bytes (no v)', `0x${R}${R}`],
+      ['66 bytes', `${sig(R, R, '1b')}00`],
+      ['uppercase hex', sig(R, R, '1B')],
+      ['no 0x', sig(R, R, '1b').slice(2)],
+    ])('rejects %s', (_l, value) => {
+      expectReject(cardSigSchema, value);
+      expectReject(inviteSchema, { ...invite(), cardSig: value });
+    });
+  });
+
   it('validates cardSig as a 65-byte 0x-hex EIP-712 signature', () => {
     expectAccept(cardSigSchema, CARD_SIG);
     expectReject(cardSigSchema, CARD_SIG.toUpperCase());
@@ -108,7 +144,7 @@ describe('display names and relay lists (untrusted, bounded)', () => {
 
   it('accepts 1–16 distinct wss:// relay URLs and rejects everything else', () => {
     expectAccept(relayListSchema, RELAYS);
-    expectAccept(relayListSchema, ['wss://a.b']);
+    expectAccept(relayListSchema, ['wss://ab.cd']);
     expectAccept(
       relayListSchema,
       Array.from({ length: 16 }, (_, i) => `wss://r${i}.example.org`),
@@ -208,6 +244,42 @@ describe('relay hosts are never local (I-5, 04 §4 SSRF; IR-M1-2a-1 M-1)', () =>
     ['single-label intranet host', 'wss://relay'],
     ['trailing dot', 'wss://localhost.'],
     ['trailing dot on a public name', 'wss://relay.example.org.'],
+    // 04 §4 relay URL rule (#22): raw-string checks before any URL parser.
+    ['percent-encoded localhost', 'wss://%6c%6f%63%61%6c%68%6f%73%74'],
+    ['percent-encoding in a label', 'wss://relay%2eexample.org'],
+    ['percent-encoding in the path', 'wss://relay.example.org/%2e%2e/admin'],
+    ['full-width localhost', 'wss://ｌｏｃａｌｈｏｓｔ'],
+    ['ideographic full stops', 'wss://relay。example。org'],
+    ['full-width dot before a local suffix', 'wss://relay．localhost'],
+    ['non-ASCII host (IDN must be xn--)', 'wss://rélay.example.org'],
+    ['backslash', 'wss://relay.example.org\\path'],
+    ['tab', 'wss://relay.example.org/\t'],
+    ['last label one letter', 'wss://a.b'],
+    ['last label with a digit', 'wss://relay.example.c0m'],
+    ['numeric first label', 'wss://1.example.org'],
+    ['numeric middle label', 'wss://relay.1.example.org'],
+    ['hex middle label', 'wss://relay.0x1f.example.org'],
+    ['bare 0x label', 'wss://0x.example.org'],
+    ['leading hyphen', 'wss://-relay.example.org'],
+    ['trailing hyphen', 'wss://relay-.example.org'],
+    ['label of 64 characters', `wss://${'a'.repeat(64)}.example.org`],
+    [
+      'host over 253 characters',
+      `wss://${Array.from({ length: 5 }, () => 'a'.repeat(60)).join('.')}.org`,
+    ],
+    ['empty label', 'wss://relay..example.org'],
+    ['.localdomain', 'wss://relay.localdomain'],
+    ['EC2 metadata name', 'wss://instance-data.ec2.internal'],
+    ['port 0', 'wss://relay.example.org:0'],
+    ['port with a leading zero', 'wss://relay.example.org:0443'],
+    ['port 65536', 'wss://relay.example.org:65536'],
+    ['empty port', 'wss://relay.example.org:'],
+    ['query', 'wss://relay.example.org/?a=1'],
+    ['fragment', 'wss://relay.example.org/#x'],
+    ['user info', 'wss://u@relay.example.org'],
+    ['uppercase scheme', 'WSS://relay.example.org'],
+    ['ws scheme', 'ws://relay.example.org'],
+    ['URL over 256 characters', `wss://relay.example.org/${'a'.repeat(240)}`],
   ])('rejects %s', (_l, url) => {
     expectReject(relayUrlSchema, url);
     expectReject(relayListSchema, [url]);
@@ -222,11 +294,31 @@ describe('relay hosts are never local (I-5, 04 §4 SSRF; IR-M1-2a-1 M-1)', () =>
       'wss://127-0-0-1.example.com',
       'wss://localhost.example.com',
       'wss://local.example.org',
-      'wss://a.b',
-      'wss://1.example.org',
+      'wss://ab.cd',
+      'wss://relay.xn--p1ai',
+      'wss://relay.example.org:443',
+      'wss://r1.example.org',
+      `wss://${'a'.repeat(63)}.example.org`,
     ]) {
       expectAccept(relayUrlSchema, url);
     }
+  });
+
+  it('rejects non-strings and checks the raw string, never a parsed URL', () => {
+    for (const v of [null, 1, {}, ['wss://relay.example.org']]) {
+      expect(isAllowedRelayUrl(v)).toBe(false);
+    }
+    // A URL parser would accept and rewrite these; the raw-string rule refuses them.
+    expect(isAllowedRelayUrl('wss://relay.example.org')).toBe(true);
+    expect(isAllowedRelayUrl('wss://RELAY.example.org')).toBe(false);
+  });
+
+  it('one bad URL rejects the whole list and the body (fail closed)', () => {
+    expectReject(relayListSchema, ['wss://relay.example.org', 'wss://127.0.0.1']);
+    expectReject(inviteSchema, {
+      ...invite(),
+      relays: ['wss://relay.example.org', 'wss://localhost'],
+    });
   });
 
   it('isAllowedRelayHost classifies hosts directly', () => {

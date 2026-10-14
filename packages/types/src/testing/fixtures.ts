@@ -26,7 +26,7 @@ export const OWNER_EVM = '0x' + '2b'.repeat(20);
 export const OWNER_NOSTR = hex(32, 'c3');
 export const AGENT_NOSTR = hex(32, 'd4');
 export const SHA = hex(32, 'e5');
-/** An EVM-native 32-byte value (termsHash, recordId, salt): 0x + lowercase hex. */
+/** An on-chain 32-byte value (recordId, salt): 0x + lowercase hex (04 §2.4.1). */
 export const B32 = `0x${hex(32, '7a')}`;
 export const BIP340_SIG = hex(64, 'f6');
 export const APPROVAL_ID = `apr_${ID16}`;
@@ -46,7 +46,8 @@ export const agentCard = () => ({
   keyEpoch: 0,
 });
 
-export const CARD_SIG = hex0x(65, '3c');
+/** A canonical-form ECDSA signature: r = s = 0x3c…3c (in range, low s), v = 27 (0x1b). */
+export const CARD_SIG = `0x${hex(64, '3c')}1b`;
 export const RELAYS = ['wss://relay.example.org', 'wss://nos.example.net:7447/sub/path'];
 
 export const invite = () => ({
@@ -141,9 +142,9 @@ const payloadOf = (type: string, body: unknown, files: unknown[] = []) => ({
 export const payloads = (): Record<string, Record<string, unknown>> => ({
   text: payloadOf('text', 'Hello from Tali’s agent ✓ — 你好', [fileEntryInline()]),
   request: payloadOf('request', { kind: 'refresh-link', envelopeId: ID16, ciphertextSha256: SHA }),
-  offer: payloadOf('offer', { terms: { termsId: ID16, version: 1 }, termsHash: B32, note: null }),
-  accept: payloadOf('accept', { terms: { termsId: ID16, version: 1 }, termsHash: B32, note: null }),
-  reject: payloadOf('reject', { terms: { termsId: ID16 }, termsHash: B32, note: 'too expensive' }),
+  offer: payloadOf('offer', { terms: { termsId: ID16, version: 1 }, termsHash: SHA, note: null }),
+  accept: payloadOf('accept', { terms: { termsId: ID16, version: 1 }, termsHash: SHA, note: null }),
+  reject: payloadOf('reject', { terms: { termsId: ID16 }, termsHash: SHA, note: 'too expensive' }),
   delivery: payloadOf('delivery', { milestone: 'd1', items: [1, 2, 3] }, [fileEntryUrl()]),
   note: payloadOf('note', 'a note to myself'),
   file: payloadOf('file', 'here is the file', [fileEntryUrl()]),
@@ -169,7 +170,7 @@ export const payloads = (): Record<string, Record<string, unknown>> => ({
     agent: AGENT_EVM,
     action: {
       tool: 'agentlink_send',
-      args: { to: 'contact_1', type: 'accept', body: { termsHash: B32 } },
+      args: { to: 'contact_1', type: 'accept', body: { termsHash: SHA } },
       context: { contactEvm: OWNER_EVM },
     },
     actionDigest: SHA,

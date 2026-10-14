@@ -118,12 +118,13 @@ export const requestBodySchema = z.union([
 
 /**
  * offer / accept / reject (04 §3.4). `terms` is a bounded JSON object until M1-21 lands its strict
- * schema and canonical-form rules; `termsHash` binds it (checked by the core, not here).
+ * schema and canonical-form rules; `termsHash` binds it (checked by the core, not here). It is
+ * never a Record field, so it is bare hex (04 §2.4.1).
  */
 const termsBody = <N extends z.ZodType>(note: N) =>
   z.strictObject({
     terms: jsonObjectSchema,
-    termsHash: bytes32Hex,
+    termsHash: sha256Hex,
     note,
   });
 const termsNote = ijsonString({ max: MAX_TERMS_NOTE_CODE_POINTS }).nullable();
@@ -149,8 +150,8 @@ export const handshakeAckBodySchema = z.strictObject({
 });
 
 /**
- * `proof` (04 §3.4). `recordId` and `salt` are EVM bytes32, so `0x` + lowercase hex, the same
- * spelling as the proof pack (07 §8) and the chain (canonical-encodings rule).
+ * `proof` (04 §3.4). `recordId` and `salt` are on-chain bytes32, so `0x` + lowercase hex on this path
+ * as in the proof pack and the Record (04 §2.4.1). `envelopeId` is base64url.
  */
 export const proofBodySchema = z.strictObject({
   envelopeId,

@@ -222,10 +222,10 @@ describe('request: refresh-link (04 §4, 07 §5.2)', () => {
 describe('offer / accept / reject outer shape (04 §3.4; terms schema lands in M1-21)', () => {
   it.each(['offer', 'accept', 'reject'])('%s rejects malformed outer fields', (type) => {
     const p = payloads()[type] as Record<string, unknown>;
-    expectReject(payloadSchema, edit(p, ['body', 'termsHash'], B32.toUpperCase()));
-    expectReject(payloadSchema, edit(p, ['body', 'termsHash'], `0X${B32.slice(2)}`));
-    // EVM-native: a bare sha256 hex (the Nostr-native spelling) is a different, rejected form.
-    expectReject(payloadSchema, edit(p, ['body', 'termsHash'], B32.slice(2)));
+    expectReject(payloadSchema, edit(p, ['body', 'termsHash'], SHA.toUpperCase()));
+    // termsHash is never a Record field, so it is bare hex (04 §2.4.1); the 0x form is rejected.
+    expectReject(payloadSchema, edit(p, ['body', 'termsHash'], `0x${SHA}`));
+    expectReject(payloadSchema, edit(p, ['body', 'termsHash'], `0X${SHA}`));
     expectReject(payloadSchema, edit(p, ['body', 'termsHash'], DELETE));
     expectReject(payloadSchema, edit(p, ['body', 'terms'], DELETE));
     expectReject(payloadSchema, edit(p, ['body', 'terms'], 'x'));

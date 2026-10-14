@@ -3,6 +3,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   approvalIdSchema,
+  base64urlToBytes,
+  bytesEqual,
+  bytesTo0xHex,
+  bytesToBase64url,
+  bytesToHex,
+  hex0xToBytes,
+  hexToBytes,
+  uint256Decimal,
   base64url,
   base64urlBounded,
   base64urlByteLength,
@@ -252,4 +260,69 @@ describe('bounded JSON values (untrusted bodies, placeholders)', () => {
     expect(() => jsonValueSchema.safeParse(hostile)).not.toThrow();
     bad(jsonValueSchema, hostile);
   });
+});
+
+describe('codecs (04 §2.4.1: encode from bytes, compare bytes)', () => {
+  const bytes = (n: number, seed: number) =>
+    Uint8Array.from({ length: n }, (_, i) => (i * 37 + seed * 101 + 7) & 0xff);
+
+  it('round-trips bytes through every encoding, for lengths 0..70', () => {
+    for (let n = 0; n <= 70; n++) {
+      for (const seed of [0, 1, 2, 255]) {
+        const b = bytes(n, seed);
+        const b64 = bytesToBase64url(b);
+        expect(base64urlByteLength(b64)).toBe(n);
+        expect(base64urlToBytes(b64)).toEqual(b);
+        expect(hexToBytes(bytesToHex(b))).toEqual(b);
+        expect(hex0xToBytes(bytesTo0xHex(b))).toEqual(b);
+      }
+    }
+  });
+
+  it('matches known encodings', () => {
+    const b = Uint8Array.from({ length: 16 }, (_, i) => i + 1);
+    expect(bytesToBase64url(b)).toBe('AQIDBAUGBwgJCgsMDQ4PEA');
+    expect(bytesToHex(b)).toBe('0102030405060708090a0b0c0d0e0f10');
+    expect(bytesTo0xHex(Uint8Array.of(0xff, 0x00))).toBe('0xff00');
+    expect(bytesToBase64url(Uint8Array.of(0xfb, 0xff))).toBe('-_8');
+  });
+
+  it('decoders refuse every non-canonical form (null, never a normalised value)', () => {
+    for (const v of ['AB', 'ab0', '0xab', ' ab', 'ag', null, 1]) expect(hexToBytes(v)).toBe(null);
+    for (const v of ['ab', '0Xab', '0xAB', '0x0', ' 0xab', null])
+      expect(hex0xToBytes(v)).toBe(null);
+    for (const v of [`${ID16}==`, `${ID16.slice(0, -1)}B`, '+/AA', 'AAAAA', null]) {
+      expect(base64urlToBytes(v)).toBe(null);
+    }
+  });
+
+  it('bytesEqual compares bytes and length, and null never matches', () => {
+    expect(bytesEqual(Uint8Array.of(1, 2), Uint8Array.of(1, 2))).toBe(true);
+    expect(bytesEqual(Uint8Array.of(1, 2), Uint8Array.of(1, 3))).toBe(false);
+    expect(bytesEqual(Uint8Array.of(1, 2), Uint8Array.of(1, 2, 0))).toBe(false);
+    expect(bytesEqual(null, null)).toBe(false);
+    expect(bytesEqual(hexToBytes('AB'), hexToBytes('AB'))).toBe(false);
+  });
+});
+
+describe('uint256 decimal strings (04 §2.4.1)', () => {
+  const MAX = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
+
+  it('accepts 0, 1 and 2^256 - 1', () => {
+    for (const v of ['0', '1', '1500', MAX]) ok(uint256Decimal, v);
+  });
+
+  it.each([
+    ['leading zero', '01'],
+    ['sign', '-1'],
+    ['plus sign', '+1'],
+    ['fraction', '1.0'],
+    ['exponent', '1e3'],
+    ['whitespace', ' 1'],
+    ['empty', ''],
+    ['hex', '0x10'],
+    ['2^256', '115792089237316195423570985008687907853269984665640564039457584007913129639936'],
+    ['80 digits', '9'.repeat(80)],
+    ['a JSON number', 1],
+  ])('rejects %s', (_l, v) => bad(uint256Decimal, v));
 });
