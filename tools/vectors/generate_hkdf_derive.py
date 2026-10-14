@@ -173,6 +173,16 @@ def build():
                 {"outcome": "reject"},
             )
         )
+    # 04 §2.9 (G-23): the agent ID is the EVM address of the agentlink/v1/evm key at epoch 0.
+    for seed_id, seed in SEEDS:
+        cases.append(
+            v.case(
+                f"agent-id-seed-{seed_id}",
+                "04 §2.9 agent ID: keccak256 of the uncompressed agentlink/v1/evm key (epoch 0), last 20 bytes, 0x + 40 lowercase hex",
+                {"op": "agentId", "masterSeed": v.hx(seed)},
+                {"agentId": v.evm_address(secp_secret(seed, EVM, 0))},
+            )
+        )
     for case_id, label in [("key-reject-unknown-label", "agentlink/v1/unknown"), ("key-reject-label-v2", "agentlink/v2/nostr")]:
         cases.append(
             v.case(
@@ -201,6 +211,7 @@ SCHEMA = v.case_schema(
             {"masterSeed": v.HEX, "label": LABEL, "epoch": v.INTEGER, "counter": v.INTEGER},
             [{"okm": v.hexn(32)}, v.REJECT],
         ),
+        "agentId": ({"masterSeed": v.hexn(32)}, [{"agentId": v.ADDRESS}]),
         "key": (
             {"masterSeed": v.hexn(32), "label": v.STRING, "epoch": v.INTEGER},
             [

@@ -947,6 +947,39 @@
       }
     },
     {
+      "id": "agent-id-seed-a",
+      "source": "04 \u00a72.9 agent ID: keccak256 of the uncompressed agentlink/v1/evm key (epoch 0), last 20 bytes, 0x + 40 lowercase hex",
+      "input": {
+        "op": "agentId",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+      },
+      "expected": {
+        "agentId": "0xe8118b7407afbd4a12c0df832c67ce0e2eb20cd6"
+      }
+    },
+    {
+      "id": "agent-id-seed-b",
+      "source": "04 \u00a72.9 agent ID: keccak256 of the uncompressed agentlink/v1/evm key (epoch 0), last 20 bytes, 0x + 40 lowercase hex",
+      "input": {
+        "op": "agentId",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88"
+      },
+      "expected": {
+        "agentId": "0x441e5fe96afae9130411dabd2304e4bcc77e78bc"
+      }
+    },
+    {
+      "id": "agent-id-seed-c",
+      "source": "04 \u00a72.9 agent ID: keccak256 of the uncompressed agentlink/v1/evm key (epoch 0), last 20 bytes, 0x + 40 lowercase hex",
+      "input": {
+        "op": "agentId",
+        "masterSeed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "expected": {
+        "agentId": "0xae25b161cc95859f152010ff4df6913895c780d6"
+      }
+    },
+    {
       "id": "key-reject-unknown-label",
       "source": "04 \u00a72.1: only the four labels of the table derive keys",
       "input": {

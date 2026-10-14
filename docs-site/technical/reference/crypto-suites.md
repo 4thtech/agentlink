@@ -14,6 +14,6 @@
 | Files | AES-256-GCM STREAM (`ALF1`), 1 MiB chunks, final-chunk flag in the additional data |
 | Owner passphrase | Argon2id key wrapping |
 | Passkeys | WebAuthn PRF output to wrap the owner seed |
-| Pairing | HMAC-SHA256 handshake proof; safety code from SHA-256 over both sides' keys, shown as 12 digits |
+| Pairing | HMAC-SHA256 handshake proof; commit-then-reveal safety code (tagged SHA-256 over both cards, the invite ID and a nonce from each side), shown as 12 digits |
 
 **Libraries:** `@noble/curves`, `@noble/hashes`, `@noble/ciphers`, `@hpke/core`, `nostr-tools`, `viem` and WebCrypto. No custom primitives; all crypto goes through `@agentlink/crypto`.

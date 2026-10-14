@@ -25,6 +25,7 @@ Usage: python3 -I tools/vectors/generate_owner_action.py --check [FILE] | --writ
 """
 
 import copy
+import json
 import sys
 from pathlib import Path
 
@@ -263,6 +264,63 @@ def build():
         ("reject-decide-expired", "now is after expiresAt", op_body("approval.decide", decide(), expires_at=ISSUED_AT + 30)),
     ]:
         reject(case_id, why, signed_body(b), decide_ctx)
+
+    # contact.check (04 §2.5.1, §3.6.1; G-28): {contact, pairingDigest}. Its maximum lifetime is
+    # G-7's, so only signing and encoding rejections are vectored (no positive verify yet).
+    pairing_digest = v.hx(v.sha256(b"owner-action/pairing-digest"))
+    pairing_ctx = {**context, "pairing": {"contact": other_agent, "pairingDigest": pairing_digest}}
+
+    def check(**params):
+        p_ = {"contact": other_agent, "pairingDigest": pairing_digest}
+        p_.update(params)
+        return op_body("contact.check", p_)
+
+    b = check()
+    cases.append(
+        v.case(
+            "sign-contact-check",
+            f"{SPEC} SignedOwnerAction, contact.check (04 §3.6.1)",
+            {"op": "sign", "body": b, "secretKey": v.hx(owner), "auxRand": v.hx(aux)},
+            {
+                "jcs": jcs_lenient(b).decode("utf-8"),
+                "bodyHash": v.hx(body_hash(b)),
+                "signatureInput": v.hx(v.tagged_hash(TAG, body_hash(b))),
+                "sig": sign(b, owner, aux),
+            },
+        )
+    )
+    for case_id, why, bad in [
+        ("reject-pairing-digest-0x", "`pairingDigest` with 0x (bare hex, 04 §2.4.1)", check(pairingDigest="0x" + pairing_digest)),
+        ("reject-pairing-digest-uppercase", "`pairingDigest` in upper-case hex", check(pairingDigest=pairing_digest.upper())),
+        ("reject-pairing-digest-base64url", "`pairingDigest` as base64url", check(pairingDigest=v.b64u(bytes.fromhex(pairing_digest)))),
+        ("reject-contact-checksummed", "`contact` in EIP-55 mixed case", check(contact=v.eip55(other_agent))),
+        ("reject-contact-check-unknown-param", "unknown key in contact.check params", op_body("contact.check", {"contact": other_agent, "pairingDigest": pairing_digest, "note": "x"})),
+    ]:
+        reject(case_id, why, signed_body(bad), pairing_ctx)
+
+    # Raw JSON text (04 §2.4.1: integer tokens must match 0|[1-9][0-9]*, checked on the token; I-JSON
+    # refuses duplicate keys). Each signature is valid over the JCS of the parsed value, so only the
+    # token or duplicate check can refuse it (IR-M1-1h-2 F-D).
+    good_signed = {"body": good, "sig": good_sig}
+    text = json.dumps(good_signed, separators=(",", ":"))
+    cases.append(v.case("verify-json-revoke", f"{SPEC}: the SignedOwnerAction as JSON text verifies", {"op": "verifyJson", "json": text, "context": context}, {"outcome": "accept"}))
+    for case_id, why, old, new in [
+        ("issued-at-fraction", "issuedAt spelled 1760000000.0", '"issuedAt":1760000000', '"issuedAt":1760000000.0'),
+        ("issued-at-exponent", "issuedAt spelled 1.76e9", '"issuedAt":1760000000', '"issuedAt":1.76e9'),
+        ("v-fraction", "v spelled 1.0", '"v":1', '"v":1.0'),
+        ("expires-at-minus-zero", "expiresAt spelled -0", '"expiresAt":0', '"expiresAt":-0'),
+        ("duplicate-op", "a duplicate `op` key", '"op":"agent.revoke"', '"op":"agent.revoke","op":"agent.revoke"'),
+    ]:
+        if old not in text:
+            v.fail(f"{case_id}: substitution")
+        cases.append(
+            v.case(
+                f"verify-json-reject-{case_id}",
+                f"{SPEC}, 04 §2.4.1: {why}; the signature is valid over the parsed value, so only the token check refuses it",
+                {"op": "verifyJson", "json": text.replace(old, new, 1), "context": context},
+                {"outcome": "reject"},
+            )
+        )
     return cases
 
 
@@ -275,6 +333,7 @@ CONTEXT = {
         "ownerNostr": {"type": "string", "pattern": "^0x[0-9a-f]{64}$"},
         "now": v.INTEGER,
         "pendingApproval": v.strict_object({"approvalId": v.STRING, "actionDigest": v.hexn(32), "expiresAt": v.INTEGER}),
+        "pairing": v.strict_object({"contact": v.ADDRESS, "pairingDigest": v.hexn(32)}),
     },
 }
 SCHEMA = v.case_schema(
@@ -288,6 +347,7 @@ SCHEMA = v.case_schema(
             [{"jcs": v.STRING, "bodyHash": v.hexn(32), "signatureInput": v.hexn(32), "sig": v.hexn(64)}],
         ),
         "verify": ({"signed": v.OBJECT, "context": CONTEXT}, [v.ACCEPT, v.REJECT]),
+        "verifyJson": ({"json": v.STRING, "context": CONTEXT}, [v.ACCEPT, v.REJECT]),
     },
 )
 

@@ -1,16 +1,57 @@
 {
   "description": "Suites whose vectors are committed before the code under test (M1-1h). Each runs no cases until its card adds the suite module and removes the entry. Fail closed: see test-vectors/README.md, Pending suites. The list may only shrink against main (tools/vectors/check-pending.mjs), and a release fails while a suite of a gated phase is pending.",
   "suites": {
-    "aead-envelope": { "card": "M1-1c", "phase": "M1a" },
-    "bip340": { "card": "M1-1b", "phase": "M1a" },
-    "eip712": { "card": "M1-1e", "phase": "M1a" },
-    "encodings": { "card": "M1-2a", "phase": "M1a" },
-    "hkdf-derive": { "card": "M1-1b", "phase": "M1a" },
-    "hpke": { "card": "M1-1c", "phase": "M1a" },
-    "keystore-file": { "card": "M1-1f", "phase": "M1a" },
-    "nip44": { "card": "M1-1g", "phase": "M1a" },
-    "owner-action": { "card": "M1-7d", "phase": "M1a" },
-    "owner-wrap": { "card": "M1-1f", "phase": "M1a" },
-    "pairing": { "card": "M1-1f", "phase": "M1a" }
+    "aead-envelope": {
+      "card": "M1-1c",
+      "phase": "M1a"
+    },
+    "bip340": {
+      "card": "M1-1b",
+      "phase": "M1a"
+    },
+    "eip712": {
+      "card": "M1-1e",
+      "phase": "M1a"
+    },
+    "encodings": {
+      "card": "M1-2a",
+      "phase": "M1a"
+    },
+    "fingerprint": {
+      "card": "M1-1b",
+      "phase": "M1a"
+    },
+    "hkdf-derive": {
+      "card": "M1-1b",
+      "phase": "M1a"
+    },
+    "hpke": {
+      "card": "M1-1c",
+      "phase": "M1a"
+    },
+    "keystore-file": {
+      "card": "M1-1f",
+      "phase": "M1a"
+    },
+    "nip44": {
+      "card": "M1-1g",
+      "phase": "M1a"
+    },
+    "owner-action": {
+      "card": "M1-7d",
+      "phase": "M1a"
+    },
+    "owner-wrap": {
+      "card": "M1-1f",
+      "phase": "M1a"
+    },
+    "pairing": {
+      "card": "M1-1f",
+      "phase": "M1a"
+    },
+    "safety-code": {
+      "card": "M1-1f",
+      "phase": "M1a"
+    }
   }
 }
