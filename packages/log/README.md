@@ -27,12 +27,14 @@ Always, at every level (debug included); there is no switch to turn it off.
   - `Bearer` and `Basic` credentials;
   - local-UI `?t=` tokens;
   - JWTs and `data:` URIs;
-  - `name=value`, `name: value` and `"name":"value"` pairs whose name is a sensitive key;
+  - `name=value`, `name: value` and `"name":"value"` pairs whose name is a sensitive key. The value may be quoted (an escaped quote does not end it), JSON-escaped once or more (`\"name\":\"value\"`), or an object or array (redacted up to the matching bracket); no value is redacted past 2 048 characters;
   - the recovery-code shape (24 base32 characters in equal groups; a heuristic until M1-1 pins the format).
-- **URLs**, plain or percent-encoded, are logged as their origin only (scheme, host, port): paths carry API keys and object IDs, queries carry signatures, fragments carry file keys.
+- **URLs**, plain or percent-encoded, are logged as their origin only (scheme, host, port): paths carry API keys and object IDs, queries carry signatures, fragments carry file keys. A backslash ends the host like a slash (`https://host\v2\key`), and a protocol-relative URL keeps only its host (`//host/v2/key` becomes `//host`). A scheme-less URL (`host.tld/v2/key`) is not recognised: an accepted residual risk, so never put one in a message.
 - **Structure:** nested objects, arrays, Maps and Sets; `Error` name, message, stack, `cause` chain and `AggregateError` members; cycles (`[Circular]`); throwing getters and Proxy traps lose only their own value. Byte arrays are never logged. Budgets per record: depth 8, 10 000 objects, 1 000 entries per object or array, 256 KiB of strings, 16 KiB per string; anything beyond becomes `[Truncated]` or is replaced whole.
 
 Pattern matching is a safety net. A secret with no recognisable shape is protected only by its key name, so put variable data in fields with honest names, never in the message.
+
+A `Map` with object keys is logged under the key `"[object Object]"`: its values get only the value-pattern layer, never the key-name rule. Use string keys, or a plain object, for anything that may hold a secret.
 
 ## Secret canaries: adding yours
 

@@ -189,9 +189,14 @@ function isAllowedCode(value: unknown): boolean {
 // cost stays linear in the (already capped) string length.
 
 // Absolute URLs: scheme://authority, then the rest (path, query, fragment), which is never logged.
-const URL_PATTERN = /\b([a-z][a-z0-9+.-]{0,30}):\/\/([^\s/?#"'<>`]*)[^\s"'<>`]*/gi;
+// A backslash ends the authority too: WHATWG parsers read it as '/' (`https://host\v2\key`).
+const URL_PATTERN = /\b([a-z][a-z0-9+.-]{0,30}):\/\/([^\s/\\?#"'<>`]*)[^\s"'<>`]*/gi;
 // A string that is exactly one absolute URL (for URL-named fields).
-const WHOLE_URL = /^\s*([a-z][a-z0-9+.-]{0,30}):\/\/([^\s/?#"'<>`]*)[^\s"'<>`]*\s*$/i;
+const WHOLE_URL = /^\s*([a-z][a-z0-9+.-]{0,30}):\/\/([^\s/\\?#"'<>`]*)[^\s"'<>`]*\s*$/i;
+// Protocol-relative URLs (`//host/path`). The character before must not be a word character, ':'
+// (that is an absolute URL), '/' or '\' (a longer run of slashes is a path). No lookbehind, for
+// older browsers. Scheme-less URLs (`host.tld/v2/key`) are an accepted residual risk.
+const PROTOCOL_RELATIVE = /(^|[^\w:/\\])\/\/([A-Za-z0-9.-]{1,253}(?::[0-9]{1,5})?)[^\s"'<>`]*/g;
 // Percent-encoded absolute URLs (a redirect target inside a query string), single or double encoded.
 const ENCODED_URL =
   /\b(https?|wss?)(%(?:25)?3A%(?:25)?2F%(?:25)?2F)([A-Za-z0-9.-]{1,253}(?:%(?:25)?3A[0-9]{1,5})?)[^\s"'<>`&]*/gi;
@@ -257,28 +262,99 @@ function redactGroups(run: string, separator: '-' | ' '): string {
   return out.join(separator);
 }
 
-/** A name followed by `:` or `=` (quoted names too: `"name":`). Only the name and separator. */
-const NAME_SEPARATOR = /(\b[A-Za-z][A-Za-z0-9_.-]{0,63})(["']?[ \t]{0,8}[:=][ \t]{0,8})/g;
+/**
+ * A name followed by `:` or `=` (quoted names too: `"name":`, and the escaped quotes of JSON that
+ * was encoded once or more: `\"name\":`). Only the name and separator.
+ */
+const NAME_SEPARATOR = /(\b[A-Za-z][A-Za-z0-9_.-]{0,63})(\\{0,8}["']?[ \t]{0,8}[:=][ \t]{0,8})/g;
 const MAX_QUOTED_VALUE = 2048;
 const MAX_BARE_VALUE = 512;
+const MAX_ESCAPES = 8;
 const BARE_VALUE_END = /[\s"'&,;}]/;
 
-/** End of the value that starts at `start`: a quoted string (closing quote included) or a bare word. */
-function valueEnd(text: string, start: number): number {
-  const quote = text[start];
-  if (quote === '"' || quote === "'") {
-    const limit = Math.min(text.length, start + 1 + MAX_QUOTED_VALUE);
-    for (let at = start + 1; at < limit; at += 1) {
-      const char = text[at];
-      if (char === quote) return at + 1;
-      if (char === '\n' || char === '\r') return at;
+/** Where a value ends, and the quoting that has to be kept around its replacement. */
+interface ScannedValue {
+  readonly end: number;
+  /** The opening quote with its escaping backslashes (`"`, `\"`), or "". */
+  readonly open: string;
+  /** The closing quote with its escaping backslashes, or "" when the value has none. */
+  readonly close: string;
+}
+
+/** Counts the characters the pair scanner reads, so tests can bound its cost without a clock. */
+interface Meter {
+  work: number;
+}
+
+/**
+ * A quoted value, JSON-aware. `slashes` backslashes before the opening quote mean JSON that was
+ * encoded `slashes` times (`\"x\"`). At level zero a backslash escapes the next character
+ * (`"ab\"cd"`). At a deeper level a quote closes the value only when it is preceded by exactly
+ * `slashes` backslashes: more is an escaped quote of the inner string. Stops at a line break, and
+ * at MAX_QUOTED_VALUE characters.
+ */
+function quotedValueEnd(text: string, start: number, slashes: number, meter: Meter): ScannedValue {
+  const quote = text[start + slashes]!;
+  const bodyStart = start + slashes + 1;
+  const open = text.slice(start, bodyStart);
+  const limit = Math.min(text.length, bodyStart + MAX_QUOTED_VALUE);
+  let run = 0;
+  for (let at = bodyStart; at < limit; at += 1) {
+    meter.work += 1;
+    const char = text[at]!;
+    if (char === '\n' || char === '\r') return { end: at, open, close: '' };
+    if (char === '\\') {
+      run += 1;
+      continue;
     }
-    return limit;
+    if (char === quote && (slashes === 0 ? run % 2 === 0 : run === slashes)) {
+      return { end: at + 1, open, close: text.slice(at - slashes, at + 1) };
+    }
+    run = 0;
   }
+  return { end: limit, open, close: '' };
+}
+
+/**
+ * An object or array: everything up to the matching bracket, skipping strings and escaped
+ * characters, but at most MAX_QUOTED_VALUE characters (an unclosed one is redacted up to there).
+ */
+function bracketedValueEnd(text: string, start: number, meter: Meter): ScannedValue {
+  const limit = Math.min(text.length, start + MAX_QUOTED_VALUE);
+  let depth = 0;
+  let inString = '';
+  for (let at = start; at < limit; at += 1) {
+    meter.work += 1;
+    const char = text[at]!;
+    if (char === '\\') {
+      at += 1;
+    } else if (inString !== '') {
+      if (char === inString) inString = '';
+    } else if (char === '"' || char === "'") {
+      inString = char;
+    } else if (char === '{' || char === '[') {
+      depth += 1;
+    } else if (char === '}' || char === ']') {
+      depth -= 1;
+      if (depth <= 0) return { end: at + 1, open: '', close: '' };
+    }
+  }
+  return { end: limit, open: '', close: '' };
+}
+
+/** The value that starts at `start`: quoted (also JSON-escaped), an object or array, or a bare word. */
+function scanValue(text: string, start: number, meter: Meter): ScannedValue {
+  let slashes = 0;
+  while (slashes < MAX_ESCAPES && text[start + slashes] === '\\') slashes += 1;
+  const next = text[start + slashes];
+  if (next === '"' || next === "'") return quotedValueEnd(text, start, slashes, meter);
+  const first = text[start];
+  if (first === '{' || first === '[') return bracketedValueEnd(text, start, meter);
   const limit = Math.min(text.length, start + MAX_BARE_VALUE);
   let at = start;
   while (at < limit && !BARE_VALUE_END.test(text[at]!)) at += 1;
-  return at;
+  meter.work += at - start;
+  return { end: at, open: '', close: '' };
 }
 
 /**
@@ -286,12 +362,16 @@ function valueEnd(text: string, start: number): number {
  * a sensitive key. One left-to-right scan; after a harmless pair the scan continues right after its
  * separator, so a pair inside its value ("failed: password=…") is still seen. Linear in the length.
  */
-function redactPairs(text: string): string {
+function scanPairs(text: string, meter: Meter): string {
   const finder = new RegExp(NAME_SEPARATOR.source, 'g');
   let out = '';
   let copied = 0;
   const kinds = new Map<string, KeyClass>();
-  for (let match = finder.exec(text); match !== null; match = finder.exec(text)) {
+  for (;;) {
+    const before = finder.lastIndex;
+    const match = finder.exec(text);
+    meter.work += match === null ? text.length - before : 1 + finder.lastIndex - before;
+    if (match === null) break;
     const name = match[1]!;
     let kind = kinds.get(name);
     if (kind === undefined) {
@@ -300,18 +380,29 @@ function redactPairs(text: string): string {
     }
     if (kind === 'none' || kind === 'url') continue;
     const start = match.index + match[0].length;
-    const end = valueEnd(text, start);
+    const { end, open, close } = scanValue(text, start, meter);
     if (end === start) continue;
-    const value = text.slice(start, end);
-    const quote = value[0] === '"' || value[0] === "'" ? value[0] : '';
-    const closing = quote !== '' && value.length > 1 && value.endsWith(quote) ? quote : '';
-    const bare = value.slice(quote.length, value.length - closing.length);
+    const bare = text.slice(start + open.length, end - close.length);
     if (kind === 'code' && (isAllowedCode(bare) || isAllowedCode(Number(bare)))) continue;
-    out += `${text.slice(copied, start)}${quote}${REDACTED}${closing}`;
+    out += `${text.slice(copied, start)}${open}${REDACTED}${close}`;
     copied = end;
     finder.lastIndex = end;
   }
   return copied === 0 ? text : out + text.slice(copied);
+}
+
+function redactPairs(text: string): string {
+  return scanPairs(text, { work: 0 });
+}
+
+/**
+ * The work the pair scanner does on `text`: finder iterations plus the characters the finder and
+ * the value scans read. Lets tests bound the cost per string deterministically, without a clock.
+ */
+export function pairScanWork(text: string): number {
+  const meter: Meter = { work: 0 };
+  scanPairs(text, meter);
+  return meter.work;
 }
 
 export const VALUE_PATTERNS: readonly ValuePattern[] = [
@@ -380,6 +471,7 @@ export const VALUE_PATTERNS: readonly ValuePattern[] = [
 export function stripUrls(text: string): string {
   return text
     .replace(URL_PATTERN, (_match, scheme: string, authority: string) => origin(scheme, authority))
+    .replace(PROTOCOL_RELATIVE, (_match, before: string, host: string) => `${before}//${host}`)
     .replace(ENCODED_URL, (_match, scheme: string, separator: string, host: string) => {
       return `${scheme}${separator}${host}`;
     });

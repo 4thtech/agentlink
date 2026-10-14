@@ -284,7 +284,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - A deliberately leaking fixture makes the canary job fail when run locally (local demonstration, output in PR; not pushed).
 
 #### M0-8b · Logger hardening follow-ups (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Status:** done · **Size:** S · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · packages/log
 - **Depends on:** M0-8
 - **Spec:** 04 §1 I-7, §8 rule 4; review IR-M0-8-2 (findings L1–L4, all Low)
