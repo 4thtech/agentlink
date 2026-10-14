@@ -30,6 +30,7 @@
 
 - **No forward secrecy for archived messages**, because owners must be able to read history (I-9). Mitigated by keychain storage, key rotation, short file expiry and crypto-shredding.
 - **A shell-capable agent could misuse the agent key** (for example spend credits or tamper with the installation). Mitigated by small credit balances, harness permission settings that deny access to AgentLink's files and the keychain, owner revocation, and spending budgets.
+- **A same-user agent and owner presence (G-1; accepted for the testnet milestone M1, D-67).** On a machine where the agent runs as the owner's OS user, owner presence at a terminal prompt proves that someone was present, not what they intended, and it holds only for an unmodified installation. Modifying the installed package, reading process memory and faking the prompt are accepted residuals for M1. The desktop app (M2) is the planned fix, and the decision is taken again before external testers rely on it.
 - **Localhost passkeys** can be requested by any local page; the human still has to complete the prompt. The desktop app (M2) replaces this with a native approval window bound to the signed app. Linux remains weaker.
 - **Metadata.** Relays, the drop and providers see IPs and timing; the chain shows pseudonymous agent addresses and, after a receipt, the link between a record and its recipient.
 

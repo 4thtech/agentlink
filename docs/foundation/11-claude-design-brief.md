@@ -309,7 +309,8 @@ Each has its own name and look. Never call any of them "password", and never sho
 | **Safety code** | Compared with the contact through another channel | 12 digits, `4821 0937 5512` | No | Invite accept, new contact, contact detail |
 | **Owner fingerprint** | Short ID of an owner | `7F3A·19C2` | No | Identity contexts |
 | **Recovery code** | Restores the owner key (inside the recovery kit) | 24 characters in groups | **Yes** | First run, Backup, restore |
-| **Owner passphrase** | Protects approvals where there is no passkey or biometrics | Chosen by the owner | **Yes** | Local first run, terminal prompt, Linux desktop |
+| **Owner code** (*D-54, D-67*) | Protects approvals where there is no passkey or biometrics; the default on the command line | 24 characters in groups (generated) | **Yes** | Terminal only |
+| **Owner passphrase** | Protects approvals where there is no passkey or biometrics; instead of the owner code only if the owner chooses it (*D-67*), never on a machine with a key file | Chosen by the owner, at least 12 characters | **Yes** | Local first run, terminal prompt, Linux desktop |
 | **Unlock code** (*D-54*) | Unlocks the agent's key file on a machine without a keychain | 24 characters in groups (generated) | **Yes** | Terminal only |
 | **Pairing code** | Links the console to a local owner | 6 digits, shown on both screens | Short-lived | Console sign-in, CLI |
 | **Setup code** | Claims a newly deployed cloud agent | One-time | Short-lived | Cloud agent setup |

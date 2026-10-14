@@ -17,7 +17,7 @@ Every **agent** and every **owner** is a principal with one 32-byte random maste
 
 | Packaging | Agent seed | Owner seed |
 |---|---|---|
-| Local | OS keychain | Never stored in plaintext on the agent machine: wrapped by a localhost passkey (WebAuthn PRF) or an owner passphrase (Argon2id), or absent (the owner uses the console) |
+| Local | OS keychain | Never stored in plaintext on the agent machine: a keychain item wrapped under a generated 120-bit owner code by default, or a chosen owner passphrase as an explicit opt-in (Argon2id, D-67); from M1b also by a localhost passkey (WebAuthn PRF); or absent (the owner uses the console) |
 | Desktop app (M2) | OS keychain | Wrapped by a key the OS releases only after a user-presence check and only to the signed app (macOS Keychain access control, Windows Hello); on Linux a passphrase or polkit, documented as weaker |
 | Headless machines (containers, WSL, SSH; D-54) | OS keychain if usable; otherwise, only after the user opts in at an interactive terminal, a passphrase-locked file (`ALKS` v1) | Own file (`owner.alko`), wrapped with a generated 120-bit owner code (no chosen passphrase) and created in a separate interactive owner step; unlocked only at an interactive prompt or with a passkey, never from an environment variable, file or argument (04 §2.8) |
 | Self-hosted Worker | Worker secrets in the user's own account | Not present |

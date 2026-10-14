@@ -759,7 +759,7 @@ Encodings follow 04 §2.4.1, and a verifier rejects a pack in any other form. `r
 
 ```
 agentlink init --keystore file             # opt-in; interactive terminal only; agent identity only (06 §7)
-agentlink owner init                     † # owner key on a file-KeyStore machine: generated owner code; run it yourself (04 §2.8)
+agentlink owner init                     † # owner key on a file-KeyStore machine (and on keychain machines until M1b, 04 §2.2): generated owner code; run it yourself (04 §2.8)
 agentlink keystore passphrase              # change the unlock code or passphrase; asks for the current one at the prompt
 agentlink doctor                           # backend, unlock source, owner-key location and their warnings
 ```

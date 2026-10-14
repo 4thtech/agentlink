@@ -347,7 +347,7 @@ A stdio server runs only while the harness runs, so nothing tells the user that 
 
 - **Interactive terminal:** a prompt.
 - **Run by an agent (no TTY):** `init` prints the diff and a one-time confirmation code, then exits without writing. The agent shows the diff to the user and re-runs `init --confirm <code>` only after the user agrees in chat. This confirmation is for transparency, not a security boundary: a shell-capable agent could edit its harness config anyway. Owner operations stay protected by owner presence (04 §2.5).
-- **Owner setup never goes through the agent:** `init` opens the local setup page (or the desktop app) where the user creates the passkey or owner passphrase. It never prints secrets and never accepts an owner passphrase as an argument or environment variable.
+- **Owner setup never goes through the agent:** `init` opens the local setup page (or the desktop app) where the user creates the passkey or owner passphrase. It never prints secrets and never accepts an owner passphrase as an argument or environment variable. Until the local setup page exists (M1b), the owner creates the owner key with `agentlink owner init` †, run personally, on keychain machines too (04 §2.2, D-67; proposed, owner confirms at merge).
 - **No OS keychain (containers, WSL, SSH; D-54):** `init` returns `needs_setup` and names the opt-in command. The passphrase-locked file KeyStore is created only by `agentlink init --keystore file` in an interactive terminal, never by an agent-run `init`; the owner key there is a separate step, `agentlink owner init` †, which the user runs personally (04 §2.8, 07 §9). Both are UX guards: an agent that fakes a terminal can run them, and owner presence then depends on the owner doing the owner step personally.
 - The **desktop app** (M2) runs the same detection and confirmation from its setup screen, pointing harness configs to its bundled CLI shim (08 §8).
 
@@ -394,7 +394,7 @@ Commands marked † are owner operations: they require owner presence (passkey v
 
 ```
 agentlink init [--agent <name>] [--keystore file]   # create identity, configure harnesses; file KeyStore only without an OS keychain (07 §9)
-agentlink owner init                   † # file-KeyStore machines: create the owner key with a generated owner code (run it yourself)
+agentlink owner init                   † # create the owner key with a generated owner code (run it yourself): file-KeyStore machines; keychain machines until the M1b setup page
 agentlink keystore passphrase            # file KeyStore only: change its passphrase or unlock code (terminal only)
 agentlink ui                             # open local approval/settings UI
 agentlink status [--brief]               # same data as agentlink_status; --brief prints only unread counts and contact names under the §2.1 rule (§6.1)

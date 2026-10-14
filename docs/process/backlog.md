@@ -1846,7 +1846,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Node runtime (`@agentlink/node`)
 
 #### M1-8a · node: OS keychain KeyStore
-- **Status:** in review (branch `feat/M1-8a-keychain-keystore`; IR-M1-8a-1 PASS WITH FINDINGS, fix round 1 done) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#54, merged 2026-10-14; the CI matrix acceptance M-1 is open in M1-8a-b) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/node
 - **Depends on:** M1-1g; gap G-23 resolved (G-31 resolved by D-54)
 - **Spec:** 04 §2.2 (service `agentlink`, account `<agentId>`), §2.8 (selection); 07 §9.1; 03 §6 (`@napi-rs/keyring`); 10 M1-8
@@ -1904,21 +1904,21 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Two processes writing concurrently cause no corruption; migrations run from empty and from the previous schema version.
 
 #### M1-8c · node: OwnerKeyStore with the owner passphrase (CLI prompt)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** ready (D-67: G-1 accepted for M1, owner-blob location pinned in 04 §2.2) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/node
-- **Depends on:** M1-1f, M1-8a; gap G-1 resolved (at least documented and accepted by the owner)
-- **Spec:** 04 §2.2, §2.5; 08 §1; 06 §8 (†); D-16, D-33
+- **Depends on:** M1-1f, M1-8a; gap G-1 accepted as a documented M1 residual (D-67; G-1 stays open, re-decided at M2-GATE)
+- **Spec:** 04 §2.2 (owner seed on keychain machines), §2.5 (same-user agents, D-67), §2.8; 08 §1; 06 §7, §8 (†); 07 §9.3; D-16, D-33, D-66 (3), D-67
 - **Invariants:** I-1, I-4
 - **Scope:**
-  - Owner seed stored only wrapped with the Argon2id owner passphrase (the M1a owner-presence minimum, D-33); unwrapped only inside one owner operation, then wiped. The localhost passkey (PRF) path is M1-8e (M1b).
+  - Owner seed stored only wrapped (`ALKO` v1, Argon2id) under the generated owner code by default, or under a chosen owner passphrase only after an explicit opt-in (the M1a owner-presence minimum, D-33); unwrapped only inside one owner operation, then wiped. The localhost passkey (PRF) path is M1-8e (M1b).
   - CLI passphrase prompt reads from a TTY only; no reusable bearer token on disk. The same holds on headless machines with the file KeyStore (D-54, 04 §2.8): no environment variable, file, argument or piped stdin can supply the owner passphrase; `AGENTLINK_OWNER_*` variables are ignored. On file-KeyStore machines (04 §2.8): the owner seed lives in `~/.agentlink/keystore/owner.alko`, is created by the separate `owner init` step, and requires a generated 120-bit owner code (no chosen passphrase); creating or changing the owner secret refuses a candidate that opens any agent's `.alks` file. `owner init` per 04 §2.8: it refuses when an owner exists and never overwrites; it shows the owner fingerprint; the code is display-only; it states what a lost code means.
-  - **Owner-blob location on keychain machines (follow-up from IR-D54-2, F03):** pin where the owner-wrapped seed lives on machines with a keychain. Either it is a keychain item, or, wherever it is a file, the generated-code rule of 04 §2.8 applies. A chosen owner passphrase protecting a file that copies of the machine carry is open to offline guessing. Record the choice in 04 §2.2 through a spec change before this card is `ready`.
+  - **Owner-blob location on keychain machines (IR-D54-2 F03; pinned in 04 §2.2 by D-67 (2)):** a keychain item, service `agentlink`, account `owner`, whose value is the 90-byte `ALKO` v1 blob. Generated 120-bit owner code by default; a chosen owner passphrase (at least 12 code points after NFKC, D-66 (3)) only after an explicit opt-in that states the offline-guessing exposure to same-user programs. Created by `agentlink owner init` † under the 04 §2.8 rules until the M1b setup page exists (04 §2.2, proposed, owner confirms at merge); never overwrites an existing `owner` item.
   - Produces `SignedOwnerAction` signatures (04 §2.5.1) and EIP-712 card/registration signatures.
-  - Full threat note covering G-1 (shared `localhost` RP ID; same-user installation tampering).
+  - Full threat note covering G-1 as accepted for M1 in 04 §2.5 (D-67): presence, not intent; package modification, same-user memory reads, fake prompts, opted-in passphrase guessing; shared `localhost` RP ID.
 - **Acceptance:**
-  - Build-plan test (10 M1-8): a script running as the same OS user, with read access to `~/.agentlink`, the agent's keychain items and the DB, cannot produce a valid approval or policy change without the passphrase. The test's stated scope excludes modifying the installed package (G-1).
+  - Build-plan test (10 M1-8): a script running as the same OS user, with read access to `~/.agentlink`, the agent's keychain items (the `owner` item included) and the DB, cannot produce a valid approval or policy change without the owner code or passphrase. The test's stated scope (G-1, D-67): the script does not modify the installed package and does not read process memory.
   - No owner-seed bytes on disk (scan after setup and after an operation); the unlock handle's buffers are zeroed after use (test).
-  - The owner blob is at the pinned location on keychain machines; if it is a file, a chosen passphrase is refused (test).
+  - On keychain machines the owner blob is the `agentlink`/`owner` item holding `ALKO` v1; without the opt-in, `secretKind` is 1; with it, a chosen passphrase under 12 code points is refused; an existing `owner` item is never overwritten; on file-KeyStore machines a chosen passphrase is refused (tests).
 
 #### M1-8d · node: local approval server
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -1937,7 +1937,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-8e · node: OwnerKeyStore localhost passkey (PRF) path (new, split from M1-8c)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node
-- **Depends on:** M1-8c, M1-8d, M1-1k; gap G-1 resolved (at least documented and accepted by the owner)
+- **Depends on:** M1-8c, M1-8d, M1-1k; gap G-1 accepted as a documented M1 residual (D-67)
 - **Spec:** 04 §2.2, §2.3, §2.5; 08 §1; D-16
 - **Invariants:** I-1, I-4
 - **Scope:**
@@ -2304,12 +2304,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-12b · quickstart and harness permission guidance
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · docs-site/guide/get-started/, docs-site/technical/reference/harness-configuration.md (published to GitBook through Git Sync, DOCS-PUB)
-- **Depends on:** M1-9a, M1-9b; gap G-1 resolved
-- **Spec:** 04 §2.5 (residual risk, harness permissions); 06 §7; 02 J1; 10 M1-12
+- **Depends on:** M1-9a, M1-9b; gap G-1 accepted as a documented M1 residual (D-67)
+- **Spec:** 04 §2.2 (owner code, opt-in passphrase), §2.5 (residual risk; same-user agents, D-67); 06 §7; 02 J1; 10 M1-12; 11 §5
 - **Invariants:** I-4
 - **Scope:**
   - Per-harness install steps (the agent-assisted install prompts come from M1-25).
-  - Harness permission settings that deny the agent access to `~/.agentlink`, the installed AgentLink package / npx cache and the keychain (Claude Code permission deny rules, Codex sandbox, Gemini CLI sandbox; syntax verified at build time).
+  - Harness permission settings that deny the agent access to `~/.agentlink`, keychain access through command-line tools (`security` on macOS, `secret-tool` on Linux, `cmdkey` and `vaultcmd` on Windows), the installed AgentLink package directory and the npx cache (Claude Code permission deny rules, Codex sandbox, Gemini CLI sandbox; syntax verified at build time). The copy says plainly that these rules are guards, not a security boundary (04 §2.5, D-67), and keeps to 11 §5 in the user guide.
+  - **Claude Code examples (D-67; starting point, verify against the current Claude Code permissions and sandboxing docs at build time).** In `~/.claude/settings.json`, `permissions.deny`: `Read(~/.agentlink/**)`, `Edit(~/.agentlink/**)`; `Bash(security *)` (macOS), `Bash(secret-tool *)` (Linux), `Bash(cmdkey *)`, `Bash(vaultcmd *)` (Windows); `Edit(~/.npm/_npx/**)` (macOS, Linux; on Windows the npx cache under `~/AppData/Local/npm-cache/_npx/**`); `Edit(//<npm root -g>/@4thtech/agentlink/**)` for a global install (absolute paths start with `//`); and `Edit(~/.claude/settings.json)`, so the edit tool cannot remove the rules. Because Read and Edit rules do not cover every way a shell command or script can open a file, and a Bash rule matches only the command text, also show the sandbox (macOS, Linux, WSL2): `sandbox.enabled` with `sandbox.filesystem.denyRead` for `~/.agentlink` and `denyWrite` for the npx cache and the package directory. Check at build time that the rules do not break the AgentLink MCP server (started by the harness, not through Bash) or an agent-run `init`, and state the order (install first, then add the rules) if they do.
   - Containers, devcontainers, WSL and SSH (D-54, 07 §9): opting in to the file KeyStore; mounting the unlock code as a run-time secret and pointing `AGENTLINK_KEYSTORE_PASSPHRASE_FILE` at it (never in the image, a committed `devcontainer.json` or a committed MCP config); why the environment variable is weaker; disabling core dumps; deny rules for `~/.agentlink/keystore` and the secret file; doing `owner init` personally and never letting the agent see the owner code; owner approvals over SSH or `docker exec -it`.
   - Run owner († ) commands in a terminal the agent does not control; `doctor` for troubleshooting. Local UI, storage and credits sections are M1-12d (M1b).
 - **Acceptance:**
@@ -3159,6 +3160,7 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
   - External testing: 20–50 early adopters on testnets; UX metric "install → first message < 5 minutes" (median) measured per G-21.
 - **Acceptance:**
   - Zero open Critical/High findings; per-invariant verdicts.
+  - **G-1 re-decided (D-67)** before external testers start: the owner records a new decision on the same-user residual (G-1, G-42), taking into account what the desktop apps deliver; until then no external tester relies on owner presence on an `npx` install.
   - README Status and roadmap updated to the state at this point; README never claims unimplemented features.
   - UX (D-39…D-41): no wallet, browser extension, gas or chain choice appears anywhere in the J1–J9 default flows (CLI, desktop apps, console, browser counterparty); install → first message stays under 5 minutes (median).
   - Adopter count and the measured median recorded; issues filed as cards; owner sign-off.
@@ -3621,7 +3623,7 @@ Concurrency guideline: no more than five or six S1/S2 cards `in-review`/`audit` 
 
 Found while decomposing. None is resolved here; each needs a spec-change PR (or an owner decision) before the blocked cards become `ready`. Priority: **H** blocks security-critical design, **M** blocks a card's acceptance, **L** cosmetic or late.
 
-1. **G-1 (H) Local owner presence vs a same-user agent.** 04 §1 I-4, §2.5; 08 §1; 10 M1-8. The WebAuthn RP ID `localhost` is shared by every local origin, and 04 §2.5 already accepts that a shell-capable agent can tamper with the installation. Either way the next owner passkey or passphrase use on that machine can be captured and the wrapped owner seed on disk unwrapped: local presence proves presence, not intent. The same holds for creating the owner key on such a machine: a tampered installation or a same-user process that reads memory can capture or predetermine the owner seed during setup (04 §2.8, D-54). The residual-risk text lists only tampering and credit spending, and I-4's "no agent process can produce one" holds only while the installation is intact. *Proposed:* state this in 04 §2.5; scope the M1-8 test to an unmodified installation; recommend owner operations from the console on a separate device when the harness has unrestricted shell; harness deny rules for the installed package and npx cache; consider not storing the owner seed on agent machines by default. *Blocks:* M1-8c, M1-8d, M1-8e, M1-11a, M1-12b. *Status:* stays open until the D-36 desktop app ships (G-42).
+1. **G-1 (H) Local owner presence vs a same-user agent.** 04 §1 I-4, §2.5; 08 §1; 10 M1-8. The WebAuthn RP ID `localhost` is shared by every local origin, and 04 §2.5 already accepts that a shell-capable agent can tamper with the installation. Either way the next owner passkey or passphrase use on that machine can be captured and the wrapped owner seed on disk unwrapped: local presence proves presence, not intent. The same holds for creating the owner key on such a machine: a tampered installation or a same-user process that reads memory can capture or predetermine the owner seed during setup (04 §2.8, D-54). The residual-risk text lists only tampering and credit spending, and I-4's "no agent process can produce one" holds only while the installation is intact. *Proposed:* state this in 04 §2.5; scope the M1-8 test to an unmodified installation; recommend owner operations from the console on a separate device when the harness has unrestricted shell; harness deny rules for the installed package and npx cache; consider not storing the owner seed on agent machines by default. *Blocks:* M1-8c, M1-8d, M1-8e, M1-11a, M1-12b. *Status:* **open; accepted as a documented residual for M1 (testnets only) by D-67** (owner decision, Tali, 2026-10-14, option A). 04 §2.5 now states presence, not intent, the unmodified-installation condition of I-4 and the residual attacks accepted for M1; the M1-8 test is scoped (10 M1-8, M1-8c); the quickstart deny rules are carded in M1-12b. The "G-1 resolved" precondition of the blocked M1 cards is met for M1 only. It stays open until the D-36 desktop app ships (G-42) and **must be re-decided at M2-GATE, before external testers rely on it**.
 2. **G-2 (H) `KeyStore` location and methods.** Resolved by 4thtech/agentlink#34 (merged 2026-10-14; D-62 accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34), in 04 §3.1.1, with 03 §3, 04 §2.6, §3.5 and 07 §1, §4.1, §4.2 aligned. Reviews IR-M1-1g-1 (M-1, M-2, L-1, L-2, I-4, I-5) and IR-M1-1c-1 (F3, F5) are folded in.
    - **Signature.** `sig` = BIP-340 by `from` over `taggedHash("agentlink/envelope/v1", envelopeHash)`, where `envelopeHash = sha256(JCS(envelope without sig))` over the strictly parsed envelope, with the 32 raw hash bytes inside the tagged hash. A table of every BIP-340 use of a Nostr key (envelope, owner action, NIP-01 seal and AUTH) fixes one message per object. A new use needs its own tag, and nothing signs an untagged digest.
    - **Keys.** Agent-sent types are signed by the agent Nostr key at the current epoch. `approval`, `policy` (owner → agent) and `revoke` are signed by the owner Nostr key, only in an `OwnerSession` from `unlock(presence)`, in the same gesture as the carried `SignedOwnerAction`. The envelope signature authorises nothing. Receivers enforce the type ↔ key table.
