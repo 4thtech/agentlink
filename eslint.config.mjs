@@ -13,6 +13,7 @@ import {
   ZONES,
   allowedWorkspaceNames,
   layerMessage,
+  libraryAllowed,
   libraryMessage,
   restrictedEntryMessage,
 } from './tools/deps-check/policy.mjs';
@@ -28,14 +29,14 @@ const SOURCE = '{ts,tsx,mts,cts}';
 // handled by no-restricted-imports; dynamic import(), require(), `import x = require()`, import()
 // types, cross-package relative paths and `crypto.subtle` by the local boundaries/no-bypass rule.
 
-function restrictionsFor(zone) {
+function restrictionsFor(zone, { test = false } = {}) {
   const nodeAllowed = NODE_ZONES.includes(zone);
   const paths = nodeAllowed
     ? ['crypto', 'node:crypto'].map((name) => ({ name, message: CRYPTO_MSG }))
     : BUILTINS.map((name) => ({ name, message: NODE_MSG }));
   const patterns = nodeAllowed ? [] : [{ group: ['node:*'], message: NODE_MSG }];
   for (const lib of LIBRARIES) {
-    if (zone !== null && lib.zones.includes(zone)) continue;
+    if (zone !== null && libraryAllowed(lib, zone, { test })) continue;
     patterns.push({ group: lib.group, message: libraryMessage(lib) });
   }
   // Restricted subpaths of packages this zone may otherwise import (IR-M1-1b-1 M-1).
@@ -117,6 +118,12 @@ export default tseslint.config(
   ...Object.keys(ZONES).map((zone) => ({
     files: [`${zone}/**/*.${SOURCE}`],
     rules: restrictionsFor(zone),
+  })),
+  // Test files of zones with test-only libraries (LIBRARIES testZones, IR-M1-1e-1 L-1). This block
+  // comes after the zone's own, so it is the one no-restricted-imports block that applies to them.
+  ...[...new Set(LIBRARIES.flatMap((lib) => lib.testZones ?? []))].map((zone) => ({
+    files: [`${zone}/**/*.test.${SOURCE}`],
+    rules: restrictionsFor(zone, { test: true }),
   })),
   {
     // Node-only code gets Node globals: build tooling, config files and tests (which run in Node).

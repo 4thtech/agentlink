@@ -12,7 +12,9 @@
 // - an address is `0x` + 40 hex, all lowercase or with a valid EIP-55 checksum (general typed data,
 //   such as a token's domain read from chain, uses checksums; protocol objects are parsed to
 //   lowercase before they get here, 04 §2.4.1);
-// - `bytesN` and `bytes` are `0x` + lowercase hex of the exact length, or a Uint8Array;
+// - `bytesN` and `bytes` are `0x` + lowercase hex of the exact length, or a Uint8Array (empty
+//   `bytes` only as an empty Uint8Array, since `0x` alone is not canonical; IR-M1-1e-1 I-3, for
+//   M1-1j to revisit if a type needs empty `bytes`);
 // - `uintN` is a safe-integer number or a bigint, within N bits; decimal strings are refused;
 // - the domain type uses the EIP's fields in the EIP's order with the EIP's types.
 //
@@ -22,6 +24,7 @@ import { encodeEcdsaSignature, signDigestEcdsa } from './ecdsa.js';
 import { decodeHex0x, encodeUtf8, isWellFormedText } from './encoding.js';
 import { CryptoInputError } from './errors.js';
 import { keccak256 } from './hash.js';
+import { evmAddressChecksummed } from './keys.js';
 
 /** One member of an EIP-712 struct type. */
 export interface TypedDataField {
@@ -237,25 +240,12 @@ function word(value: bigint): Uint8Array {
 const HEX_LOWER = /^0x[0-9a-f]{40}$/;
 const HEX_ANY = /^0x[0-9a-fA-F]{40}$/;
 
-/** EIP-55: a letter is upper case exactly when its nibble of keccak256(lowercase hex) is >= 8. */
-function hasValidChecksum(address: string): boolean {
-  const body = address.slice(2);
-  const hash = keccak256(encodeUtf8(body.toLowerCase()));
-  for (let i = 0; i < 40; i += 1) {
-    const char = body[i] as string;
-    const nibble = ((hash[i >> 1] as number) >> (i % 2 === 0 ? 4 : 0)) & 0x0f;
-    const upper = char !== char.toLowerCase();
-    const lower = char !== char.toUpperCase();
-    if ((upper && nibble < 8) || (lower && nibble >= 8)) return false;
-  }
-  return true;
-}
-
 function addressBytes(value: unknown): Uint8Array {
   if (typeof value !== 'string' || !HEX_ANY.test(value)) {
     throw invalid('EIP-712 address must be 0x + 40 hex');
   }
-  if (!HEX_LOWER.test(value) && !hasValidChecksum(value)) {
+  // A mixed-case address must equal its EIP-55 form (M1-1b's evmAddressChecksummed, L-2).
+  if (!HEX_LOWER.test(value) && evmAddressChecksummed(value.toLowerCase()) !== value) {
     throw invalid('EIP-712 address must be lowercase or carry a valid EIP-55 checksum');
   }
   return decodeHex0x(value.toLowerCase(), { length: 20 });

@@ -1,6 +1,7 @@
 // @agentlink/crypto: the only package that reaches crypto primitives (04 §8.1). M1-1a adds the
 // base layer: canonical encodings, hashing, JCS, randomness and wiping. M1-1e adds EIP-712 typed-data
-// hashing, canonical ECDSA and the AgentCard.
+// hashing, canonical ECDSA verification and the AgentCard; its signing functions are in
+// @agentlink/crypto/keystore.
 export const packageName = '@agentlink/crypto';
 
 export { CryptoInputError, type CryptoInputErrorCode } from './errors.js';
@@ -63,14 +64,12 @@ export {
   decodeEcdsaSignature,
   encodeEcdsaSignature,
   recoverEvmAddress,
-  signDigestEcdsa,
 } from './ecdsa.js';
 export {
   eip712EncodeType,
   eip712HashStruct,
   eip712TypeHash,
   hashTypedData,
-  signTypedData,
   type TypedData,
   type TypedDataField,
   type TypedDataHashes,
@@ -85,7 +84,6 @@ export {
   hashAgentCard,
   parseAgentCard,
   parseAgentCardJson,
-  signAgentCard,
   verifyAgentCard,
   verifyCardAgentSig,
   verifyCardOwnerSig,

@@ -121,6 +121,11 @@ function canonicalHex(value: unknown, length: number): Uint8Array {
  * non-plain object, EIP-55 or upper-case hex, a missing `0x` or `0X`, a wrong length, a non-integer,
  * negative, -0 or out-of-range integer, a `version` other than 1, and `agentEvm` equal to
  * `ownerEvm` (04 §2.9).
+ *
+ * An object no longer shows how its numbers were spelled, so this cannot refuse the tokens `1.0`,
+ * `1e3` or `-0` (04 §2.4.1; IR-M1-1e-1 I-2). A card read from JSON text must be parsed with
+ * parseAgentCardJson, or its enclosing payload with parseJson `integersOnly` (or another
+ * token-level check) before it gets here.
  */
 export function parseAgentCard(value: unknown): AgentCard {
   if (!isPlainObject(value)) throw invalidCard('a card must be a plain JSON object');
@@ -230,9 +235,10 @@ function signedBy(card: unknown, signature: unknown, field: 'ownerEvm' | 'agentE
       decodeEcdsaSignature(signature),
     );
     return equalBytes(signer, decodeHex0x(parsed[field], { length: 20 }));
-  } catch (error) {
-    if (error instanceof CryptoInputError) return false;
-    throw error;
+  } catch {
+    // Any failure is a refusal, including a throwing Proxy trap or getter (IR-M1-1e-1 I-1): a
+    // verification answers true or false and never throws on what it is given.
+    return false;
   }
 }
 

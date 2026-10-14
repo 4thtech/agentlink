@@ -7,9 +7,10 @@
 // Errors never contain the input (I-7): see errors.ts.
 import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { assertBytes } from './bytes.js';
-import { encodeHex0x } from './encoding.js';
+import { decodeHex0x, encodeHex0x } from './encoding.js';
 import { CryptoInputError } from './errors.js';
-import { keccak256 } from './hash.js';
+import { evmAddressFromPublicKey } from './keys.js';
+import { assertSecp256k1SecretKey } from './secp256k1-range.js';
 
 /** Length of a canonical ECDSA signature r || s || v (04 §2.4.1). */
 export const ECDSA_SIGNATURE_BYTES = 65;
@@ -59,9 +60,10 @@ function assertCanonical(signature: Uint8Array): void {
  */
 export function signDigestEcdsa(digest: Uint8Array, secretKey: Uint8Array): Uint8Array {
   assertDigest(digest, 'signDigestEcdsa: digest');
+  // The same check and codes as every secp256k1 signer (IR-M1-1e-1 L-2).
+  assertSecp256k1SecretKey(secretKey, 'signDigestEcdsa');
   let recovered: Uint8Array;
   try {
-    assertBytes(secretKey, 'secretKey');
     recovered = secp256k1.sign(digest, secretKey, {
       prehash: false,
       lowS: true,
@@ -69,11 +71,8 @@ export function signDigestEcdsa(digest: Uint8Array, secretKey: Uint8Array): Uint
       format: 'recovered',
     });
   } catch {
-    // The library's message may describe the key; replace it with a fixed sentence (I-7).
-    throw new CryptoInputError(
-      'invalid_secret_key',
-      'signing key must be 32 bytes encoding a scalar in [1, n - 1]',
-    );
+    // Unreachable after the range check; the library's message is never passed on (I-7).
+    throw new CryptoInputError('invalid_argument', 'signDigestEcdsa: signing failed');
   }
   // noble's recovered form is recovery || r || s; ours is r || s || (27 + recovery).
   const recovery = recovered[0] as number;
@@ -114,17 +113,6 @@ export function encodeEcdsaSignature(signature: Uint8Array): string {
 }
 
 /**
- * The 20-byte address of a public key: the last 20 bytes of keccak256 over the uncompressed point
- * without its 0x04 prefix (04 §2.9).
- *
- * TODO(M1-1b): M1-1b owns the agent ID derivation (04 §2.9). Replace this internal helper with its
- * exported one once M1-1b lands, and keep the M1-1e tests that pin both to viem.
- */
-function evmAddressFromUncompressed(publicKey: Uint8Array): Uint8Array {
-  return keccak256(publicKey.subarray(1)).slice(12);
-}
-
-/**
  * Recovers the signer's 20-byte EVM address from a 32-byte digest and a canonical 65-byte signature.
  * A non-canonical signature (including the malleated high-`s` twin of a valid one) is refused before
  * any recovery, as is one from which no public key can be recovered.
@@ -144,5 +132,6 @@ export function recoverEvmAddress(digest: Uint8Array, signature: Uint8Array): Ui
   } catch {
     throw new CryptoInputError('invalid_signature', 'no public key recovers from this signature');
   }
-  return evmAddressFromUncompressed(publicKey);
+  // The one address derivation (M1-1b, 04 §2.9; IR-M1-1e-1 L-2).
+  return decodeHex0x(evmAddressFromPublicKey(publicKey), { length: 20 });
 }
