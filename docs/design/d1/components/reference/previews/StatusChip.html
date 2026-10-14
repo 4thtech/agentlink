@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../../tokens/tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../../screens/lib/react.production.min.js"></script><script src="../../../screens/lib/react-dom.production.min.js"></script><script src="../bundle.js"></script><meta charset="utf-8"><title>StatusChip</title></head>
+<body>
+<div id="root" class="al-preview"></div>
+<script>
+  var A = window.AgentLink, h = React.createElement, F = React.Fragment;
+  ReactDOM.createRoot(document.getElementById('root')).render(h(F,null, ['sent','received','delivered','opened','accepted','rejected','recording','recorded','needs-approval','approved','denied','expired','needs-setup','needs-credits','failed','online','paused','offline'].map(function(s){return h(A.StatusChip,{key:s,status:s});}),
+ h(A.StatusChip,{status:'last-seen',detail:'2h ago'})));
+</script>
+</body>
+</html>

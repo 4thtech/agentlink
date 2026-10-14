@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Local · Files</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
+</style>
+</helmet>
+<div data-theme="dark" style="height: 900px; background: var(--al-color-bg-canvas); font-family: var(--font-sans); color: var(--al-color-fg-default);">
+<x-import component-from-global-scope="AgentLink.AppShell" agent="Tali's Claude (laptop)" version="agentlink 0.3.0" nav="{{nav}}" status-items="{{statusItems}}" style="display: block; height: 100%;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Sent and received</span>
+<h1 class="al-text-title-1" style="margin: 0;">Files</h1>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+<div style="flex: 999 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+<x-import component-from-global-scope="AgentLink.FileCard" name="Invoice_September.pdf" size="240 KB" from="To Marko" proof="recorded" proof-time="09:14"></x-import>
+<x-import component-from-global-scope="AgentLink.FileCard" name="proposal-draft.pdf" size="2 MB" from="To Ana" status="delivered" expiry="Link until 19 Oct"></x-import>
+<x-import component-from-global-scope="AgentLink.FileCard" name="contract-signed.pdf" size="1.1 MB" from="To Marko" expiry="Link until 19 Oct" status="needs-approval"></x-import>
+<x-import component-from-global-scope="AgentLink.FileCard" name="handoff-notes.md" size="4 KB" from="From Denis" expiry="Saved to Inbox" status="received"></x-import>
+<x-import component-from-global-scope="AgentLink.FileCard" name="report-final.pdf" size="3.4 MB" from="From Ana" integrity="failed"></x-import>
+</div>
+<section style="flex: 1 1 340px; display: flex; flex-direction: column; gap: 16px; padding: 20px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Folders your agent may send from</span>
+<ul class="al-text-code" style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px;">
+<li style="display: flex; align-items: center; gap: 8px;"><x-import component-from-global-scope="AgentLink.Icon" name="folder" size="{{s14}}"></x-import><span style="flex-grow: 1;">~/Documents/Contracts</span><x-import component-from-global-scope="AgentLink.Button" size="sm" variant="ghost" aria-label="Remove folder" icon="x"></x-import></li>
+<li style="display: flex; align-items: center; gap: 8px;"><x-import component-from-global-scope="AgentLink.Icon" name="folder" size="{{s14}}"></x-import><span style="flex-grow: 1;">~/Work/Invoices</span><x-import component-from-global-scope="AgentLink.Button" size="sm" variant="ghost" aria-label="Remove folder" icon="x"></x-import></li>
+</ul>
+<x-import component-from-global-scope="AgentLink.Button" size="sm" icon="plus">Allow a folder</x-import>
+<span class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 8px;">Inbox folder</span>
+<span class="al-text-code">~/AgentLink/Inbox</span>
+<span class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 8px;">Links expire after</span>
+<x-import component-from-global-scope="AgentLink.Segmented" label="Links expire after" default-value="7" options="{{expiry}}"></x-import>
+<x-import component-from-global-scope="AgentLink.Switch" label="Delete after receipt" description="Remove a file from the drop once the recipient has it." default-checked="{{yes}}"></x-import>
+<p class="al-text-caption" style="margin: 0; color: var(--al-color-fg-muted);">Every change here needs your passkey.</p>
+</section>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      s14: 14, yes: true,
+      expiry: [{ value: '1', label: '1 day' }, { value: '3', label: '3 days' }, { value: '7', label: '7 days' }],
+      statusItems: ['127.0.0.1:4317', 'Encrypted drop 212 MB / 1 GB', '48 proofs left'],
+      nav: [
+        { icon: 'approval', label: 'Approvals', count: 2 },
+        { icon: 'activity', label: 'Activity' },
+        { icon: 'users', label: 'Contacts', count: 1 },
+        { icon: 'folder', label: 'Files', active: true },
+        { icon: 'hard-drive', label: 'Storage' },
+        { icon: 'proof-seal', label: 'Proofs & credits' },
+        { icon: 'sliders-horizontal', label: 'Rules' },
+        { icon: 'life-buoy', label: 'Backup' },
+        { icon: 'terminal', label: 'Advanced' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

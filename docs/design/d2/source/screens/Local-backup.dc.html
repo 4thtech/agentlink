@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Local · Backup</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
+</style>
+</helmet>
+<div data-theme="dark" style="height: 900px; background: var(--al-color-bg-canvas); font-family: var(--font-sans); color: var(--al-color-fg-default);">
+<x-import component-from-global-scope="AgentLink.AppShell" agent="Tali's Claude (laptop)" version="agentlink 0.3.0" nav="{{nav}}" status-items="{{statusItems}}" style="display: block; height: 100%;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Recovery kit and restore</span>
+<h1 class="al-text-title-1" style="margin: 0;">Backup</h1>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; max-width: 980px; align-items: start;">
+<section style="display: flex; flex-direction: column; gap: 14px; padding: 24px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; align-items: center; gap: 10px;"><h2 class="al-text-title-3" style="margin: 0; flex-grow: 1;">Recovery kit</h2><x-import component-from-global-scope="AgentLink.StatusChip" status="approved">Saved 3 Oct</x-import></div>
+<p class="al-text-body" style="margin: 0; color: var(--al-color-fg-muted);">Your recovery code restores this agent and your approvals on a new device. It was shown once, when you set up.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<x-import component-from-global-scope="AgentLink.Button" icon="approval">Show recovery code</x-import>
+<x-import component-from-global-scope="AgentLink.Button" icon="download">Download kit</x-import>
+</div>
+<p class="al-text-caption" style="margin: 0; color: var(--al-color-fg-muted);">Both ask for your passkey first.</p>
+</section>
+<section style="display: flex; flex-direction: column; gap: 14px; padding: 24px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<h2 class="al-text-title-3" style="margin: 0;">Passkeys</h2>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px;">
+<li style="display: flex; align-items: center; gap: 10px;"><x-import component-from-global-scope="AgentLink.Icon" name="key-round" size="{{s16}}"></x-import><span class="al-text-body" style="flex-grow: 1;">This Mac · iCloud Keychain</span><span class="al-text-caption" style="color: var(--al-color-fg-muted);">added 3 Oct</span></li>
+</ul>
+<x-import component-from-global-scope="AgentLink.Button" icon="plus">Add another passkey</x-import>
+</section>
+<section style="display: flex; flex-direction: column; gap: 14px; padding: 24px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<h2 class="al-text-title-3" style="margin: 0;">Restore on this computer</h2>
+<p class="al-text-body" style="margin: 0; color: var(--al-color-fg-muted);">Replaces this agent with the one in your recovery kit. This is the only place AgentLink asks for the recovery code.</p>
+<x-import component-from-global-scope="AgentLink.TextField" label="Recovery code" mono="{{yes}}" placeholder="XXXX XXXX XXXX XXXX XXXX XXXX" autocomplete="off"></x-import>
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<div style="display: flex; justify-content: space-between;"><span class="al-text-body-sm">Restoring contacts and rules</span><span class="al-text-code" style="color: var(--al-color-fg-muted);">2 of 4</span></div>
+<div role="progressbar" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100" aria-label="Restore progress" style="height: 6px; border-radius: 2px; background: var(--al-color-bg-sunken); border: 1px solid var(--al-color-border-default); overflow: hidden;"><div style="width: 50%; height: 100%; background: var(--al-color-accent-default);"></div></div>
+</div>
+</section>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      s16: 16, yes: true,
+      statusItems: ['127.0.0.1:4317', 'Encrypted drop 212 MB / 1 GB', '48 proofs left'],
+      nav: [
+        { icon: 'approval', label: 'Approvals', count: 2 },
+        { icon: 'activity', label: 'Activity' },
+        { icon: 'users', label: 'Contacts', count: 1 },
+        { icon: 'folder', label: 'Files' },
+        { icon: 'hard-drive', label: 'Storage' },
+        { icon: 'proof-seal', label: 'Proofs & credits' },
+        { icon: 'sliders-horizontal', label: 'Rules' },
+        { icon: 'life-buoy', label: 'Backup', active: true },
+        { icon: 'terminal', label: 'Advanced' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Local · Contacts</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
+</style>
+</helmet>
+<div data-theme="dark" style="height: 900px; background: var(--al-color-bg-canvas); font-family: var(--font-sans); color: var(--al-color-fg-default);">
+<x-import component-from-global-scope="AgentLink.AppShell" agent="Tali's Claude (laptop)" version="agentlink 0.3.0" nav="{{nav}}" status-items="{{statusItems}}" style="display: block; height: 100%;">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px;">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">3 contacts · 1 request</span>
+<h1 class="al-text-title-1" style="margin: 0;">Contacts</h1>
+</div>
+<x-import component-from-global-scope="AgentLink.Button" variant="primary" icon="user-plus">Create invite</x-import>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+<div style="flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+<x-import component-from-global-scope="AgentLink.Banner" tone="info" icon="user-plus" title="Request from Contact 2B9E·04D1.">An unknown sender wants to connect. Review it in Requests.</x-import>
+<div style="border: 1px solid var(--al-color-border-default); border-radius: 6px; overflow: hidden;">
+<x-import component-from-global-scope="AgentLink.ContactCard" alias="Marko" label="verified" domain="novak-accounting.example" agent="Marko's agent" ai-app="Codex" fingerprint="7F3A·19C2" status="online"></x-import>
+<x-import component-from-global-scope="AgentLink.ContactCard" alias="Ana" label="selfdeclared" agent="Ana's agent" ai-app="Gemini CLI" fingerprint="4C21·A0F7" status="last-seen" status-detail="2h ago"></x-import>
+<x-import component-from-global-scope="AgentLink.ContactCard" alias="Denis" label="checked" agent="Denis's agent" ai-app="Codex" fingerprint="91DE·3B60" status="online"></x-import>
+</div>
+</div>
+<section style="flex: 999 1 440px; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 24px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+<h2 class="al-text-title-2" style="margin: 0; flex-grow: 1;">Marko</h2>
+<x-import component-from-global-scope="AgentLink.Button" size="sm" variant="ghost">Rename</x-import>
+<x-import component-from-global-scope="AgentLink.Button" size="sm" variant="danger" icon="ban">Block</x-import>
+</div>
+<dl style="margin: 0; display: grid; grid-template-columns: 140px 1fr; gap: 10px 16px;">
+<dt class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 3px;">Identity</dt><dd style="margin: 0; display: flex; flex-wrap: wrap; gap: 8px;"><x-import component-from-global-scope="AgentLink.IdentityLabel" kind="verified" domain="novak-accounting.example"></x-import><x-import component-from-global-scope="AgentLink.IdentityLabel" kind="checked"></x-import></dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 3px;">Their name</dt><dd class="al-text-body" style="margin: 0;">“Marko Novak” <span class="al-text-caption" style="color: var(--al-color-fg-muted);">chosen by its owner</span></dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 3px;">Agent</dt><dd class="al-text-body" style="margin: 0;">Marko's agent · Codex</dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 3px;">Fingerprint</dt><dd style="margin: 0;"><x-import component-from-global-scope="AgentLink.Fingerprint" value="7F3A·19C2"></x-import></dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 3px;">Paired</dt><dd class="al-text-body" style="margin: 0;">3 Oct 2026</dd>
+</dl>
+<x-import component-from-global-scope="AgentLink.SafetyCode" code="4821 0937 5512" contact-name="Marko" state="matched"></x-import>
+<x-import component-from-global-scope="AgentLink.Switch" label="Keep Marko's agent in sync" description="Your AI offers a handoff to Marko's agent when you wrap up. You approve each one before it's sent."></x-import>
+</section>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      statusItems: ['127.0.0.1:4317', 'Encrypted drop 212 MB / 1 GB', '48 proofs left'],
+      nav: [
+        { icon: 'approval', label: 'Approvals', count: 2 },
+        { icon: 'activity', label: 'Activity' },
+        { icon: 'users', label: 'Contacts', count: 1, active: true },
+        { icon: 'folder', label: 'Files' },
+        { icon: 'hard-drive', label: 'Storage' },
+        { icon: 'proof-seal', label: 'Proofs & credits' },
+        { icon: 'sliders-horizontal', label: 'Rules' },
+        { icon: 'life-buoy', label: 'Backup' },
+        { icon: 'terminal', label: 'Advanced' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

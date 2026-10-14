@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../../tokens/tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../../screens/lib/react.production.min.js"></script><script src="../../../screens/lib/react-dom.production.min.js"></script><script src="../bundle.js"></script><meta charset="utf-8"><title>Banner</title></head>
+<body>
+<div id="root" class="al-preview is-col"></div>
+<script>
+  var A = window.AgentLink, h = React.createElement, F = React.Fragment;
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div',{style:{display:'flex',flexDirection:'column',gap:8,width:'100%',maxWidth:720}},
+ h(A.Banner,{tone:'offline',icon:'wifi-off',action:h(A.Button,{size:'sm'},'Retry')},'Can\u2019t reach the message network. Showing what\u2019s saved here.'),
+ h(A.Banner,{tone:'warning',title:'Weaker setup.'},'The desktop app protects approvals more strongly.'),
+ h(A.Banner,{tone:'info',action:h(A.Button,{size:'sm',variant:'primary'},'Restart')},'Update ready, restart to apply. 0.3.1'),
+ h(A.Banner,{tone:'danger',title:'Not installed.'},'This update wasn\u2019t installed because its signature didn\u2019t match. You\u2019re still on 0.3.0.'),
+ h(A.Banner,{tone:'success'},'Credits added. $5.00 covers 50 proofs.')));
+</script>
+</body>
+</html>

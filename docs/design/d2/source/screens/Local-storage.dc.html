@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Local · Storage</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
+</style>
+</helmet>
+<div data-theme="dark" style="height: 900px; background: var(--al-color-bg-canvas); font-family: var(--font-sans); color: var(--al-color-fg-default);">
+<x-import component-from-global-scope="AgentLink.AppShell" agent="Tali's Claude (laptop)" version="agentlink 0.3.0" nav="{{nav}}" status-items="{{statusItems}}" style="display: block; height: 100%;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Where files travel</span>
+<h1 class="al-text-title-1" style="margin: 0;">Storage</h1>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+<div style="flex: 999 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+<section style="display: flex; flex-direction: column; gap: 14px; padding: 24px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; align-items: center; gap: 10px;">
+<x-import component-from-global-scope="AgentLink.Icon" name="encrypted-drop" size="{{s20}}" style="color: var(--al-color-accent-fg);"></x-import>
+<h2 class="al-text-title-3" style="margin: 0; flex-grow: 1;">Encrypted drop</h2>
+<x-import component-from-global-scope="AgentLink.StatusChip" status="online">In use</x-import>
+</div>
+<p class="al-text-body" style="margin: 0; color: var(--al-color-fg-muted);">Files are sent through AgentLink's encrypted drop. Nothing to set up. Only you and the recipient can open them.</p>
+<div style="display: flex; justify-content: space-between;"><span class="al-text-body-sm">This week</span><span class="al-text-code">212 MB of 1 GB</span></div>
+<div role="meter" aria-label="Encrypted drop used this week" aria-valuenow="212" aria-valuemin="0" aria-valuemax="1024" style="height: 8px; border-radius: 2px; background: var(--al-color-bg-sunken); border: 1px solid var(--al-color-border-default); overflow: hidden;"><div style="width: 21%; height: 100%; background: var(--al-color-accent-default);"></div></div>
+<dl style="margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 4px;"><dt class="al-text-label" style="color: var(--al-color-fg-muted);">Per file</dt><dd class="al-text-code" style="margin: 0;">100 MB</dd></div>
+<div style="display: flex; flex-direction: column; gap: 4px;"><dt class="al-text-label" style="color: var(--al-color-fg-muted);">Links expire</dt><dd class="al-text-body" style="margin: 0;">up to 7 days</dd></div>
+<div style="display: flex; flex-direction: column; gap: 4px;"><dt class="al-text-label" style="color: var(--al-color-fg-muted);">Resets</dt><dd class="al-text-body" style="margin: 0;">19 Oct</dd></div>
+</dl>
+</section>
+<section style="display: flex; flex-direction: column; gap: 12px; padding: 24px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<h2 class="al-text-title-3" style="margin: 0;">Cloud drives</h2>
+<p class="al-text-body" style="margin: 0; color: var(--al-color-fg-muted);">Google Drive, Dropbox and OneDrive connect from the desktop app, which signs in through your system browser.</p>
+<a href="#" class="al-text-body-sm">Get the desktop app</a>
+</section>
+<details style="padding: 16px 24px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<summary class="al-text-body" style="cursor: pointer;">Own storage (Advanced)</summary>
+<div style="display: flex; flex-direction: column; gap: 12px; padding-top: 14px;">
+<p class="al-text-body-sm" style="margin: 0; color: var(--al-color-fg-muted);">Send through any S3-compatible bucket you control. Credentials stay on this computer.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<x-import component-from-global-scope="AgentLink.Button" size="sm">Cloudflare R2</x-import>
+<x-import component-from-global-scope="AgentLink.Button" size="sm">Amazon S3</x-import>
+<x-import component-from-global-scope="AgentLink.Button" size="sm">Backblaze</x-import>
+<x-import component-from-global-scope="AgentLink.Button" size="sm">Hetzner</x-import>
+<x-import component-from-global-scope="AgentLink.Button" size="sm">Scaleway</x-import>
+<x-import component-from-global-scope="AgentLink.Button" size="sm">MinIO</x-import>
+<x-import component-from-global-scope="AgentLink.Button" size="sm">Other</x-import>
+</div>
+</div>
+</details>
+</div>
+<aside style="flex: 1 1 320px; display: flex; flex-direction: column; gap: 10px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">States</span>
+<x-import component-from-global-scope="AgentLink.Banner" tone="warning" compact="{{yes}}">You've used 900 MB of this week's 1 GB.</x-import>
+<x-import component-from-global-scope="AgentLink.Banner" tone="warning" compact="{{yes}}">You've used this week's free file allowance. It resets on 19 Oct.</x-import>
+<x-import component-from-global-scope="AgentLink.Banner" tone="info" compact="{{yes}}">This file is over the 100 MB limit. Connect your own storage to send it.</x-import>
+<x-import component-from-global-scope="AgentLink.Banner" tone="warning" compact="{{yes}}">Your settings keep files in your own storage, which isn't connected yet.</x-import>
+<x-import component-from-global-scope="AgentLink.Banner" tone="neutral" icon="refresh-cw" compact="{{yes}}">Google Drive needs you to sign in again.</x-import>
+</aside>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      s20: 20, yes: true,
+      statusItems: ['127.0.0.1:4317', 'Encrypted drop 212 MB / 1 GB', '48 proofs left'],
+      nav: [
+        { icon: 'approval', label: 'Approvals', count: 2 },
+        { icon: 'activity', label: 'Activity' },
+        { icon: 'users', label: 'Contacts', count: 1 },
+        { icon: 'folder', label: 'Files' },
+        { icon: 'hard-drive', label: 'Storage', active: true },
+        { icon: 'proof-seal', label: 'Proofs & credits' },
+        { icon: 'sliders-horizontal', label: 'Rules' },
+        { icon: 'life-buoy', label: 'Backup' },
+        { icon: 'terminal', label: 'Advanced' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

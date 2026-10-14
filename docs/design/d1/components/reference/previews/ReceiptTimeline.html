@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../../tokens/tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../../screens/lib/react.production.min.js"></script><script src="../../../screens/lib/react-dom.production.min.js"></script><script src="../bundle.js"></script><meta charset="utf-8"><title>ReceiptTimeline</title></head>
+<body>
+<div id="root" class="al-preview"></div>
+<script>
+  var A = window.AgentLink, h = React.createElement, F = React.Fragment;
+  ReactDOM.createRoot(document.getElementById('root')).render(h(F,null,
+ h('div',{style:{width:300}},h(A.ReceiptTimeline,{steps:[{key:'recorded',time:'12 Oct 2026 09:14',done:true},{key:'delivered',time:'09:20',done:true},{key:'opened',time:'11:02',done:true},{key:'accepted'}]})),
+ h('div',{style:{width:300}},h(A.ReceiptTimeline,{steps:[{key:'recorded',time:'14:02',done:true},{key:'delivered',time:'14:05',done:true},{key:'opened',time:'14:20',done:true},{key:'accepted',time:'15:10',done:true}]})),
+ h('div',{style:{width:300}},h(A.ReceiptTimeline,{steps:[{key:'received',label:'Received (free)',time:'10:05',done:true,free:true},{key:'opened'}]}))));
+</script>
+</body>
+</html>

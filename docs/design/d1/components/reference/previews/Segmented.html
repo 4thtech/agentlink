@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../../tokens/tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../../screens/lib/react.production.min.js"></script><script src="../../../screens/lib/react-dom.production.min.js"></script><script src="../bundle.js"></script><meta charset="utf-8"><title>Segmented</title></head>
+<body>
+<div id="root" class="al-preview"></div>
+<script>
+  var A = window.AgentLink, h = React.createElement, F = React.Fragment;
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div',{style:{display:'flex',flexDirection:'column',gap:12}},
+ h('div',{className:'al-text-body-sm al-muted'},'Accepting terms'),
+ h(A.Segmented,{label:'Accepting terms',defaultValue:'ask',options:[{value:'ask',label:'Ask me every time',hint:'recommended'},{value:'allow',label:'Allow'},{value:'never',label:'Never'}]}),
+ h('div',{className:'al-text-body-sm al-muted'},'Proof'),
+ h(A.Segmented,{label:'Proof',defaultValue:'allowed',options:[{value:'allowed',label:'Allowed'},{value:'ask',label:'Ask me'},{value:'never',label:'Never'}]})));
+</script>
+</body>
+</html>

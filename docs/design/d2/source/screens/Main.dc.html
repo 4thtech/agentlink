@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Approval on mobile</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="width: 390px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--al-color-bg-canvas); color: var(--al-color-fg-default); font-family: var(--font-sans);">
+<header style="display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid var(--al-color-border-subtle);">
+<x-import component-from-global-scope="AgentLink.Mark" size="{{s20}}"></x-import>
+<div style="display: flex; flex-direction: column; flex-grow: 1;">
+<span class="al-text-title-3">Approvals</span>
+<span class="al-text-caption" style="color: var(--al-color-fg-muted);">Tali's Claude (laptop)</span>
+</div>
+<span class="al-text-label" style="color: var(--al-color-accent-fg);">1 of 2</span>
+</header>
+<main style="flex-grow: 1; display: flex; flex-direction: column; gap: 16px; padding: 16px;">
+<x-import component-from-global-scope="AgentLink.ApprovalCard" type="proof" agent="Tali's Claude (laptop)" time="14:01" expires="9 min left" headline="Send contract-signed.pdf to Marko with proof" who="Marko" what="contract-signed.pdf · 1.1 MB" cost="$0.10 from credits" why="Your rule for proofs: Ask me" consequence="A public record shows this exact file was sent at this time. It doesn't prove its content is true." details="Record ID appears here after recording" method="Touch ID">
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+<span class="al-text-body-sm" style="color: var(--al-color-fg-muted);">Marko is</span>
+<x-import component-from-global-scope="AgentLink.IdentityLabel" kind="verified" domain="novak-accounting.example"></x-import>
+</div>
+</x-import>
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Also waiting</span>
+<a href="Commitment-mobile.dc.html" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface); color: var(--al-color-fg-default); text-decoration: none; min-height: 44px; box-sizing: border-box;">
+<x-import component-from-global-scope="AgentLink.Icon" name="commitment" size="{{s18}}"></x-import>
+<span class="al-text-body" style="flex-grow: 1;">Accepting terms from Ana</span>
+<span class="al-text-caption" style="color: var(--al-color-fg-muted);">until 20 Oct</span>
+<x-import component-from-global-scope="AgentLink.Icon" name="chevron-right" size="{{s16}}"></x-import>
+</a>
+</div>
+</main>
+<nav aria-label="Main" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--al-color-border-default); background: var(--al-color-bg-surface); padding: 6px 4px 24px;">
+<a href="#" style="display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; min-height: 44px; color: var(--al-color-fg-muted); text-decoration: none;"><x-import component-from-global-scope="AgentLink.Icon" name="activity" size="{{s20}}"></x-import><span class="al-text-caption">Home</span></a>
+<a href="#" aria-current="page" style="display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; min-height: 44px; color: var(--al-color-accent-fg); text-decoration: none; position: relative;"><x-import component-from-global-scope="AgentLink.Icon" name="approval" size="{{s20}}"></x-import><span class="al-text-caption">Approvals</span><span class="al-text-code" style="position: absolute; top: 0; left: 52%; min-width: 16px; padding: 0 4px; border-radius: 3px; background: var(--al-color-accent-default); color: var(--al-color-fg-on-accent); font-size: 10px; line-height: 16px; text-align: center;">2</span></a>
+<a href="#" style="display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; min-height: 44px; color: var(--al-color-fg-muted); text-decoration: none;"><x-import component-from-global-scope="AgentLink.Icon" name="inbox" size="{{s20}}"></x-import><span class="al-text-caption">Threads</span></a>
+<a href="#" style="display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; min-height: 44px; color: var(--al-color-fg-muted); text-decoration: none;"><x-import component-from-global-scope="AgentLink.Icon" name="proof-seal" size="{{s20}}"></x-import><span class="al-text-caption">Proofs</span></a>
+<a href="#" style="display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; min-height: 44px; color: var(--al-color-fg-muted); text-decoration: none;"><x-import component-from-global-scope="AgentLink.Icon" name="ellipsis" size="{{s20}}"></x-import><span class="al-text-caption">More</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light","dark-contrast","light-contrast"],"default":"dark"},"$preview":{"width":390,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { s16: 16, s18: 18, s20: 20, theme: this.props.theme ?? 'dark' };
+  }
+}
+</script>
+</body>
+</html>

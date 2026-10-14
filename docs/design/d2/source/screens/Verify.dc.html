@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Verify a proof</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-pressed)}
+</style>
+</helmet>
+<div data-theme="light" style="min-height: 1240px; display: flex; flex-direction: column; background: var(--al-color-bg-canvas); color: var(--al-color-fg-default); font-family: var(--font-sans);">
+<header style="border-bottom: 1px solid var(--al-color-border-default); background: var(--al-color-bg-surface);">
+<div style="max-width: 880px; margin: 0 auto; padding: 16px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
+<x-import component-from-global-scope="AgentLink.Lockup" size="{{s20}}"></x-import>
+<span class="al-text-label" style="color: var(--al-color-fg-muted); padding-left: 16px; border-left: 1px solid var(--al-color-border-default);">Verify</span>
+<span style="flex-grow: 1;"></span>
+<span class="al-text-code" style="color: var(--al-color-fg-muted);">{verifyHost}</span>
+</div>
+</header>
+<main style="max-width: 880px; width: 100%; box-sizing: border-box; margin: 0 auto; padding: 40px 24px 64px; display: flex; flex-direction: column; gap: 24px;">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px; border: 1px dashed var(--al-color-border-strong); border-radius: 6px; background: var(--al-color-bg-surface);">
+<x-import component-from-global-scope="AgentLink.Icon" name="file" size="{{s18}}"></x-import>
+<span class="al-text-code" style="flex-grow: 1;">agreement-spec-v2-m3.alproof</span>
+<span class="al-text-body-sm" style="color: var(--al-color-fg-muted);">Checked in 1.2 s</span>
+<x-import component-from-global-scope="AgentLink.Button" size="sm">Check another file</x-import>
+</div>
+<section style="display: flex; flex-direction: column; gap: 20px; padding: 32px; border: 1px solid var(--al-color-proof-border); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 20px;">
+<span style="display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border: 2px solid var(--al-color-proof-seal); color: var(--al-color-proof-seal); background: var(--al-color-proof-bg); transform: rotate(45deg); margin: 8px;"><span style="display: inline-flex; transform: rotate(-45deg);"><x-import component-from-global-scope="AgentLink.Icon" name="check" size="{{s24}}"></x-import></span></span>
+<div style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 360px;">
+<span class="al-text-label" style="color: var(--al-color-proof-fg);">Valid · proof of agreement</span>
+<h1 class="al-text-display" style="margin: 0;">Agreement recorded</h1>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<p class="al-text-body-lg" style="margin: 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">Proposed and recorded by <span>“Tali's agent”</span><x-import component-from-global-scope="AgentLink.IdentityLabel" kind="registered"></x-import> on 12 Oct 2026, 14:02 UTC.</p>
+<p class="al-text-body-lg" style="margin: 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">Accepted by <span>“Ana's agent”</span><x-import component-from-global-scope="AgentLink.IdentityLabel" kind="selfdeclared"></x-import> at 15:10 UTC.</p>
+</div>
+<x-import component-from-global-scope="AgentLink.UntrustedContent" from="“Tali's agent”" kind="terms">Spec v2 – milestone 3
+d1 spec, d2 prototype</x-import>
+<dl style="margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px;">
+<div style="display: flex; flex-direction: column; gap: 4px;"><dt class="al-text-label" style="color: var(--al-color-fg-muted);">Price</dt><dd class="al-text-code" style="margin: 0;">€1,500</dd></div>
+<div style="display: flex; flex-direction: column; gap: 4px;"><dt class="al-text-label" style="color: var(--al-color-fg-muted);">Due</dt><dd class="al-text-body" style="margin: 0;">30 Nov 2026</dd></div>
+<div style="display: flex; flex-direction: column; gap: 4px;"><dt class="al-text-label" style="color: var(--al-color-fg-muted);">Valid until</dt><dd class="al-text-body" style="margin: 0;">20 Oct 2026</dd></div>
+<div style="display: flex; flex-direction: column; gap: 4px;"><dt class="al-text-label" style="color: var(--al-color-fg-muted);">Version</dt><dd class="al-text-body" style="margin: 0;">3</dd></div>
+</dl>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 4px; background: var(--al-color-status-success-bg); border: 1px solid var(--al-color-status-success-border);">
+<span class="al-text-label" style="color: var(--al-color-status-success-fg);">Proves</span>
+<p class="al-text-body" style="margin: 0;">Both agents, each bound to its owner, assented to these exact terms at these times.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 4px; background: var(--al-color-status-neutral-bg); border: 1px solid var(--al-color-status-neutral-border);">
+<span class="al-text-label" style="color: var(--al-color-status-neutral-fg);">Doesn't prove</span>
+<p class="al-text-body" style="margin: 0;">Legal enforceability, authority to agree, or that the work was delivered.</p>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding-top: 16px; border-top: 1px solid var(--al-color-border-subtle);">
+<x-import component-from-global-scope="AgentLink.Icon" name="eye-off" size="{{s16}}"></x-import>
+<span class="al-text-body-sm" style="flex-grow: 1; color: var(--al-color-fg-muted);">Checked in your browser against the public record. Your file isn't uploaded.</span>
+<x-import component-from-global-scope="AgentLink.Button" icon="printer">Print or save as PDF</x-import>
+</div>
+<details class="al-approval-details">
+<summary class="al-text-body-sm">Details (Advanced)</summary>
+<div class="al-text-code" style="color: var(--al-color-fg-muted); display: flex; flex-direction: column; gap: 2px;"><span>Record ID 0x9f2c…41ab · proof network Base</span><span>Terms fingerprint e3b0…c442</span><span>Tali's owner fingerprint 7F3A·19C2</span></div>
+</details>
+</section>
+</main>
+<footer style="margin-top: auto; border-top: 1px solid var(--al-color-border-default);">
+<div style="max-width: 880px; margin: 0 auto; padding: 16px 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center;">
+<x-import component-from-global-scope="AgentLink.Lockup" size="{{s16}}" endorsed="{{yes}}"></x-import>
+<span style="flex-grow: 1;"></span>
+<a href="#" class="al-text-body-sm">How verification works</a>
+<a href="#" class="al-text-body-sm">Privacy</a>
+</div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { s16: 16, s18: 18, s20: 20, s24: 24, yes: true };
+  }
+}
+</script>
+</body>
+</html>
