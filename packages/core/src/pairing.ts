@@ -33,7 +33,6 @@ import {
   formatFingerprint,
   decodeHex,
   pairingProof,
-  parseJson,
   randomBytes,
   safetyCodeCommit,
   verifyPairingProof,
@@ -65,7 +64,7 @@ import { decodeInviteLink, encodeInviteLink } from './invite-link.js';
 import { restrictName } from './names.js';
 import { verifyPairingTranscript, type PairingTranscript } from './safety-code.js';
 import type { Row } from './store/schema.js';
-import { openStoredPairingMessage, ownKids } from './stored-envelope.js';
+import { openStoredPairingMessage, recomputeStoredPairing } from './stored-envelope.js';
 
 /** Seconds per day, for invite expiry. */
 const DAY_SECONDS = 86_400;
@@ -357,71 +356,19 @@ export class PairingService implements PairingHandler {
    * only: never in a tool result (06 §2.1).
    */
   async ownerSafetyCode(contactId: string): Promise<OwnerSafetyCode> {
-    const ctx = this.#ctx;
-    const notPaired: OwnerSafetyCode = { status: 'unavailable', reason: 'not_paired' };
-    const invalid: OwnerSafetyCode = { status: 'unavailable', reason: 'invalid' };
     let card: AgentCard;
     try {
       card = (await this.#contacts.get(contactId)).card;
     } catch (error) {
-      if (error instanceof CoreError && error.code === 'contact_not_found') return notPaired;
+      if (error instanceof CoreError && error.code === 'contact_not_found') {
+        return { status: 'unavailable', reason: 'not_paired' };
+      }
       throw error;
     }
-    const rows = await ctx.store.transaction((tx) => {
-      const row = tx.get('contacts', { contact_id: contactId });
-      if (
-        row?.pairing !== 'complete' ||
-        row.handshake_envelope_id === null ||
-        row.handshake_ack_envelope_id === null
-      ) {
-        return undefined;
-      }
-      return {
-        handshake: tx.get('envelopes', { envelope_id: row.handshake_envelope_id }),
-        ack: tx.get('envelopes', { envelope_id: row.handshake_ack_envelope_id }),
-        others: tx.select('envelopes', {
-          type: { in: ['handshake', 'handshake-ack'] },
-          state: 'ok',
-        }),
-      };
-    });
-    if (rows === undefined) return notPaired;
-    let transcript: PairingTranscript;
-    try {
-      const kids = await ownKids(ctx);
-      transcript = verifyPairingTranscript({
-        self: (await ctx.keyStore.getPublicBundle()).agentId,
-        contactCard: card,
-        handshake: await openStoredPairingMessage(ctx, rows.handshake?.envelope_json, kids),
-        ack: await openStoredPairingMessage(ctx, rows.ack?.envelope_json, kids),
-      });
-    } catch (error) {
-      if (error instanceof CoreError && error.code === 'safety_code_unavailable') return invalid;
-      throw error;
-    }
-    // Conflicting messages for one invite (04 §3.6.1): no code, and the owner is told to re-pair.
-    const inviteId = transcript.handshake.body.inviteId;
-    const used = new Set([transcript.handshake.hash, transcript.ack.hash]);
-    for (const other of rows.others) {
-      if (used.has(other.envelope_hash) || other.payload_json === null) continue;
-      let body: unknown;
-      try {
-        const text = await open(
-          ctx,
-          'envelopes',
-          'payload_json',
-          [other.envelope_id],
-          other.payload_json,
-        );
-        body = (parseJson(text) as { readonly body?: unknown }).body;
-      } catch {
-        continue;
-      }
-      if ((body as { readonly inviteId?: unknown } | undefined)?.inviteId === inviteId) {
-        return { status: 'unavailable', reason: 'conflict' };
-      }
-    }
-    return { status: 'ok', code: transcript.code, pairingDigest: transcript.pairingDigest };
+    const result = await recomputeStoredPairing(this.#ctx, contactId, card);
+    return result.status === 'ok'
+      ? { status: 'ok', code: result.code, pairingDigest: result.pairingDigest }
+      : result;
   }
 
   // --- Inbound (PairingHandler, called by EnvelopeService.processReceived) ----------------------

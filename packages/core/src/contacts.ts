@@ -25,6 +25,12 @@
 //   contact-name rule or inside the untrusted block (06 §2.1, §4). A name the owner chose is kept.
 // - The card is sealed at rest; only public lookup values stay clear: agent_nostr, nostr_keys,
 //   key_epoch and the owner fingerprint (a hash of the owner's public keys) (M-3).
+// - "Safety code checked" (04 §2.5.1, §3.6.1; M1-7c-b): applyContactCheck stores the owner's signed
+//   `contact.check` in `safety_check` only when its `pairingDigest` equals the digest recomputed from
+//   the stored signed `handshake` and `handshake-ack`; nonce, nonce record and write are one store
+//   transaction (07 §3.4). safetyCodeChecked re-verifies that object against a fresh recomputation on
+//   every read; the `safety_code_checked` column is a cache that is never read. A completed re-pair
+//   clears both.
 import {
   canonicalize,
   decodeBase64url,
@@ -32,6 +38,7 @@ import {
   encodeBase64url,
   encodeHex,
   formatFingerprint,
+  parseJson,
   randomBytes,
   type AgentCard,
   type JsonValue,
@@ -46,12 +53,24 @@ import {
   type CardInput,
   type StoredCard,
 } from './card.js';
+import {
+  storedContactCheckHolds,
+  verifyContactCheck,
+  type ContactCheckContext,
+  type ContactCheckRefusal,
+  type PairingDigestLookup,
+} from './contact-check.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import { restrictName } from './names.js';
 import { verifyPairingTranscript, type PairingTranscript } from './safety-code.js';
 import type { Row } from './store/schema.js';
-import { openStoredPairingMessage, ownKids } from './stored-envelope.js';
+import {
+  openStoredPairingMessage,
+  ownKids,
+  recomputeStoredPairing,
+  type StoredPairingCode,
+} from './stored-envelope.js';
 import type { StoreTx } from './store/store.js';
 
 export type ContactStatus = Row<'contacts'>['status'];
@@ -79,14 +98,23 @@ export interface ContactView {
   readonly status: ContactStatus;
   readonly pairing: PairingState;
   /**
-   * Derived on every read from the stored `contacts.safety_check` object, never from a flag. Its
-   * verification against a fresh recomputation is M1-7c-b (04 §2.5.1, §3.6.1, G-28); until then no
-   * stored object counts and this is false (fail closed).
+   * Derived on every read from the stored `contacts.safety_check` object, never from a flag: true
+   * only while that owner-signed `contact.check` verifies (`agent`, `owner`, `sig`), names this
+   * contact, and its `pairingDigest` equals the digest recomputed now from the stored signed
+   * `handshake` and `handshake-ack` (04 §2.5.1, §3.6.1, G-28; M1-7c-b).
    */
   readonly safetyCodeChecked: boolean;
   readonly createdAt: number;
   readonly updatedAt: number;
 }
+
+/**
+ * The result of applyContactCheck. A refusal carries a fixed code only (I-5) and changes nothing;
+ * the owner surface shows "not applied, sign again" (04 §2.5.1).
+ */
+export type ContactCheckOutcome =
+  | { readonly status: 'applied'; readonly contact: ContactView }
+  | { readonly status: 'refused'; readonly reason: ContactCheckRefusal };
 
 /** A received card to stage for pairing, with this side's role and the invite's expiry. */
 export interface StagePairingInput extends CardInput {
@@ -260,10 +288,10 @@ export class ContactBook {
     return keys;
   }
 
-  async #view(row: Row<'contacts'>): Promise<ContactView> {
-    const key = [row.contact_id];
+  /** The contact's stored card, re-verified and matched against the row's clear columns. */
+  async #card(row: Row<'contacts'>): Promise<AgentCard> {
     const stored = parseStoredCard(
-      await open(this.#ctx, 'contacts', 'agent_card_json', key, row.agent_card_json),
+      await open(this.#ctx, 'contacts', 'agent_card_json', [row.contact_id], row.agent_card_json),
     );
     const { card } = stored;
     if (
@@ -274,9 +302,58 @@ export class ContactBook {
     ) {
       return unreadable();
     }
+    return card;
+  }
+
+  /**
+   * Who may sign an owner action for this agent (04 §2.5.1): the agent's own ID from its KeyStore and
+   * `ownerNostr` from its own stored card, re-verified (cardSig by ownerEvm). Undefined before init.
+   */
+  async #ownAuthority(): Promise<Omit<ContactCheckContext, 'now'> | undefined> {
+    const ctx = this.#ctx;
+    const { agentId } = await ctx.keyStore.getPublicBundle();
+    const row = await ctx.store.transaction((tx) => tx.select('identity')[0]);
+    if (row?.agent_id !== agentId) return undefined;
+    const stored = parseStoredCard(
+      await open(ctx, 'identity', 'agent_card_json', [row.agent_id], row.agent_card_json),
+    );
+    // As IdentityService reads it: both signatures (cardAgentSig by the agent key) and the epoch.
+    if (
+      stored.cardAgentSig === null ||
+      stored.card.agentEvm !== agentId ||
+      stored.card.keyEpoch !== row.key_epoch
+    ) {
+      return undefined;
+    }
+    return { agent: agentId, ownerNostr: stored.card.ownerNostr };
+  }
+
+  /** 04 §3.6.1: the stored `contact.check` against a fresh recomputation; never a flag or digest. */
+  async #safetyCodeChecked(row: Row<'contacts'>, card: AgentCard): Promise<boolean> {
+    if (row.safety_check === null || row.pairing !== 'complete') return false;
+    let stored: unknown;
+    try {
+      stored = parseJson(row.safety_check);
+    } catch {
+      return false;
+    }
+    const own = await this.#ownAuthority();
+    if (own === undefined) return false;
+    const pair = await recomputeStoredPairing(this.#ctx, row.contact_id, card);
+    if (pair.status !== 'ok') return false;
+    return storedContactCheckHolds(stored, {
+      ...own,
+      contact: row.contact_id,
+      pairingDigest: pair.pairingDigest,
+    });
+  }
+
+  async #view(row: Row<'contacts'>): Promise<ContactView> {
+    const key = [row.contact_id];
+    const card = await this.#card(row);
     const name = await open(this.#ctx, 'contacts', 'name', key, row.name);
     const short = formatFingerprint(decodeHex(row.owner_fingerprint, { length: 32 }), 'short');
-    const safetyCodeChecked = false;
+    const safetyCodeChecked = await this.#safetyCodeChecked(row, card);
     const label: IdentityLabel = safetyCodeChecked ? 'safety-code-checked' : 'self-declared';
     const display: ContactDisplayName =
       row.name_source === 'owner'
@@ -327,6 +404,78 @@ export class ContactBook {
     const row = await this.#ctx.store.transaction((tx) => tx.get('contacts', { contact_id: id }));
     if (row === undefined || row.status === 'removed') return notFound();
     return this.#view(row);
+  }
+
+  /**
+   * Applies an owner-signed `contact.check` (04 §2.5.1, §3.6.1; G-28): "They match" on an owner
+   * surface (the local app, the desktop app, `agentlink contacts --verify` in the owner's terminal).
+   * Authority is the owner signature alone (I-4): no MCP tool produces or passes one.
+   *
+   * Refused, with nothing written, unless: the object is in its exact strict form; it is bound to
+   * this agent and signed by the owner key in this agent's own card; it is fresh (G-7: `issuedAt` at
+   * most S ahead, not expired, lifetime at most 24 h); `contact` is a contact with a completed
+   * pairing; its `pairingDigest` equals the digest recomputed now from that pairing's stored signed
+   * `handshake` and `handshake-ack`; and its nonce is unused. One store transaction then checks that
+   * the contact still points at the same pair, checks and records the nonce (07 §3.4) and stores the
+   * signed object in `safety_check`. A later check with a fresh nonce replaces it (idempotent).
+   */
+  async applyContactCheck(signed: unknown): Promise<ContactCheckOutcome> {
+    const ctx = this.#ctx;
+    const now = nowOf(ctx);
+    const refused = (reason: ContactCheckRefusal): ContactCheckOutcome => {
+      // A fixed code only: nothing from the object or the contact (I-5, I-7).
+      ctx.log.warn('owner action refused', { op: 'contact.check', reason });
+      return { status: 'refused', reason };
+    };
+    const own = await this.#ownAuthority();
+    if (own === undefined) return refused('identity_missing');
+    let pair: StoredPairingCode | undefined;
+    const lookup = async (contact: string): Promise<PairingDigestLookup> => {
+      const row = await ctx.store.transaction((tx) => {
+        const r = tx.get('contacts', { contact_id: contact });
+        return r === undefined || r.status === 'removed' || isRevoked(tx, contact, r)
+          ? undefined
+          : r;
+      });
+      if (row === undefined) return { status: 'unknown' };
+      pair = await recomputeStoredPairing(ctx, contact, await this.#card(row));
+      if (pair.status === 'ok') return { status: 'ok', pairingDigest: pair.pairingDigest };
+      return pair.reason === 'not_paired' ? { status: 'unknown' } : { status: 'unavailable' };
+    };
+    const verdict = await verifyContactCheck(signed, { ...own, now }, lookup);
+    if (!verdict.ok) return refused(verdict.reason);
+    const checked = pair;
+    if (checked?.status !== 'ok') return refused('pairing_unavailable');
+    const { body } = verdict.signed;
+    const text = canonicalize(verdict.signed as unknown as JsonValue);
+    const written = await ctx.store.transaction((tx): Row<'contacts'> | ContactCheckRefusal => {
+      const row = tx.get('contacts', { contact_id: body.params.contact });
+      if (
+        row === undefined ||
+        row.status === 'removed' ||
+        isRevoked(tx, row.contact_id, row) ||
+        row.pairing !== 'complete' ||
+        row.handshake_envelope_id !== checked.handshakeEnvelopeId ||
+        row.handshake_ack_envelope_id !== checked.ackEnvelopeId
+      ) {
+        return 'store_changed';
+      }
+      if (tx.get('owner_action_nonces', { nonce: body.nonce }) !== undefined) return 'nonce_used';
+      tx.insert('owner_action_nonces', {
+        nonce: body.nonce,
+        op: body.op,
+        action_hash: verdict.actionHash,
+        issued_at: body.issuedAt,
+        expires_at: body.expiresAt,
+        applied_at: now,
+      });
+      const patch = { safety_check: text, safety_code_checked: 1 as const, updated_at: now };
+      tx.update('contacts', { contact_id: row.contact_id }, patch);
+      return { ...row, ...patch };
+    });
+    if (typeof written === 'string') return refused(written);
+    ctx.log.info('safety code checked by the owner', { op: 'contact.check' });
+    return { status: 'applied', contact: await this.#view(written) };
   }
 
   /**
