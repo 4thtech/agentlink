@@ -19,6 +19,7 @@ import {
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
 import { payloadSchema } from '@agentlink/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SignedCard } from './card.js';
 import { checkRecipientWrap } from './envelope-wraps.js';
 import { MAX_WRAP_CHECKS, PROCESS_BATCH, UNOPENED_TYPE, type InboundReport } from './envelopes.js';
 import { FakeClock, passphrase, seed } from './testing/fixtures.js';
@@ -496,15 +497,7 @@ describe('04 §3.1.1 step 7: sender role', () => {
         { pk: await ownerEnc(ownerA) },
         { pk: await agentEnc(s) },
       ],
-      payload: {
-        type: 'handshake-ack',
-        body: {
-          inviteId: encodeBase64url(randomBytes(16)),
-          handshakeId: encodeBase64url(randomBytes(16)),
-        },
-        replyTo: null,
-        files: [],
-      },
+      payload: handshakeAckPayload(await s.client.identity.signedCard()),
       createdAt: clock.t,
     });
     // No pairing can exist before M1-7c, so it is dropped, never parked (IR-M1-7b-1 M-1).
@@ -1071,15 +1064,7 @@ describe('build: recipient set, signature and limits (04 §3.1–§3.2, §3.4.1)
     await expect(
       b.client.envelopes.build({
         to: { contact: a.id },
-        payload: {
-          type: 'handshake-ack',
-          body: {
-            inviteId: encodeBase64url(randomBytes(16)),
-            handshakeId: encodeBase64url(randomBytes(16)),
-          },
-          replyTo: null,
-          files: [],
-        },
+        payload: handshakeAckPayload(await b.client.identity.signedCard()),
       }),
     ).rejects.toMatchObject({ code: 'type_not_sendable' });
     await expect(
@@ -1131,11 +1116,17 @@ const approvalPayload = (): JsonValue => ({
   files: [],
 });
 
-const handshakeAckPayload = (): JsonValue => ({
+/** A schema-valid `handshake-ack` (04 §3.4.1) carrying `signed`'s card, with random pairing values. */
+const handshakeAckPayload = (signed: SignedCard): JsonValue => ({
   type: 'handshake-ack',
   body: {
     inviteId: encodeBase64url(randomBytes(16)),
     handshakeId: encodeBase64url(randomBytes(16)),
+    handshakeHash: `0x${encodeHex(randomBytes(32))}`,
+    codeReveal: encodeBase64url(randomBytes(32)),
+    card: signed.card as unknown as JsonValue,
+    cardSig: signed.cardSig,
+    relays: [...signed.relays],
   },
   replyTo: null,
   files: [],
@@ -1147,12 +1138,13 @@ describe('review IR-M1-7b-1', () => {
     const s = await makeAgent(clock, new MemoryKeyStore(seed(9)), ownerS, 'stranger');
     const signer = await agentSigner(s.keyStore);
     const entries = [{ pk: await agentEnc(a) }, { pk: await ownerEnc(ownerA) }];
+    const strangerCard = await s.client.identity.signedCard();
     // Fill the 1 000 `received` slots with signature-valid handshake-acks from an unknown key.
     for (let i = 0; i < 1_000; i += 1) {
       const env = await craft({
         signer,
         entries,
-        payload: handshakeAckPayload(),
+        payload: handshakeAckPayload(strangerCard),
         createdAt: clock.t,
       });
       expect((await a.client.envelopes.receive({ envelope: env })).status).toBe('verified');
