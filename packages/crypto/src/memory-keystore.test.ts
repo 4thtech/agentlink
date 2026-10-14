@@ -1,9 +1,13 @@
-// MemoryKeyStore and MemoryOwnerKeyStore (M1-1g): the KeyStore contract of 03 §3 with G-2's
-// additions (signEnvelopeHash, decryption epochs), owner presence (04 §2.5) and wiping (04 §8.3).
+// MemoryKeyStore and MemoryOwnerKeyStore (M1-1g): the KeyStore contract of 03 §3 and G-2 (04 §3.1.1:
+// EnvelopeKeys on the KeyStore and the OwnerSession, epochs only on lookups and decryption), owner
+// presence (04 §2.5) and wiping (04 §8.3).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bip340Verify } from './bip340.js';
+import { decodeEcdsaSignature, recoverEvmAddress } from './ecdsa.js';
+import { hashTypedData, type TypedData } from './eip712.js';
 import { decodeHex, encodeHex, encodeUtf8 } from './encoding.js';
 import { CryptoInputError } from './errors.js';
+import { createGiftWrap } from './gift-wrap.js';
 import { sha256, taggedHash, TAGS } from './hash.js';
 import { canonicalizeToBytes, type JsonObject } from './jcs.js';
 import {
@@ -16,7 +20,13 @@ import {
 import { KEY_LABELS, derivePublicIdentity, derivePublicKey, deriveSecretKey } from './keys.js';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from './testing.js';
 import { nip44ConversationKey, nip44DecryptWithKey, nip44EncryptWithKey } from './nip44.js';
-import { verifyNostrEvent } from './nostr-event.js';
+import {
+  NOSTR_KIND_AUTH,
+  NOSTR_KIND_GIFT_WRAP,
+  NOSTR_KIND_SEAL,
+  verifyNostrEvent,
+  type NostrEvent,
+} from './nostr-event.js';
 
 const SEED_A = Uint8Array.from({ length: 32 }, (_, i) => i + 1);
 const SEED_B = Uint8Array.from({ length: 32 }, (_, i) => 200 - i);
@@ -34,6 +44,46 @@ async function codeOf(fn: () => Promise<unknown>): Promise<string> {
   }
   return 'accepted';
 }
+
+/** The EIP-712 example ("Ether Mail"), as any typed data a KeyStore may be asked to sign. */
+const MAIL: TypedData = {
+  types: {
+    EIP712Domain: [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' },
+    ],
+    Person: [
+      { name: 'name', type: 'string' },
+      { name: 'wallet', type: 'address' },
+    ],
+    Mail: [
+      { name: 'from', type: 'Person' },
+      { name: 'to', type: 'Person' },
+      { name: 'contents', type: 'string' },
+    ],
+  },
+  primaryType: 'Mail',
+  domain: {
+    name: 'Ether Mail',
+    version: '1',
+    chainId: 1,
+    verifyingContract: '0xcccccccccccccccccccccccccccccccccccccccc',
+  },
+  message: {
+    from: { name: 'Cow', wallet: '0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826' },
+    to: { name: 'Bob', wallet: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
+    contents: 'Hello, Bob!',
+  },
+};
+
+/** The EVM address that produced a sign712 result. */
+const signerOf = (typedData: TypedData, sig: string): Uint8Array =>
+  recoverEvmAddress(hashTypedData(typedData).digest, decodeEcdsaSignature(sig));
+
+const ENVELOPE_ID = Uint8Array.from({ length: 16 }, (_, i) => i);
+const WRAPPED = { enc: new Uint8Array(32).fill(1), wk: new Uint8Array(48).fill(2) };
 
 const passphrase = (text: string): OwnerPresence => ({
   kind: 'passphrase',
@@ -69,6 +119,20 @@ describe('MemoryKeyStore', () => {
   it('getPublicBundle is the public identity at the current epoch', async () => {
     expect(await a.getPublicBundle()).toEqual(derivePublicIdentity(SEED_A, 0));
     expect(await b.getPublicBundle()).toEqual(derivePublicIdentity(SEED_B, 2));
+  });
+
+  it('getPublicBundle({epoch}) gives an older epoch, never a later one (G-2, 04 §3.1.1 step 5)', async () => {
+    expect(await b.getPublicBundle({ epoch: 0 })).toEqual(derivePublicIdentity(SEED_B, 0));
+    expect(await b.getPublicBundle({ epoch: 1 })).toEqual(derivePublicIdentity(SEED_B, 1));
+    expect(await b.getPublicBundle({ epoch: 2 })).toEqual(derivePublicIdentity(SEED_B, 2));
+    expect(await codeOf(() => b.getPublicBundle({ epoch: 3 }))).toBe('epoch_unavailable');
+    for (const epoch of [-1, 1.5, 2 ** 32, '0']) {
+      expect(await codeOf(() => b.getPublicBundle({ epoch } as never))).toBe('invalid_argument');
+    }
+  });
+
+  it('has no hpkeOpen: a KeyStore is never a general HPKE-open oracle (G-2, IR-M1-1c-1 F5)', () => {
+    expect('hpkeOpen' in a).toBe(false);
   });
 
   it('keeps the seed in a private field, unreachable by enumeration or JSON', () => {
@@ -156,13 +220,36 @@ describe('MemoryKeyStore', () => {
     });
   });
 
-  it('sign712 and hpkeOpen fail closed until their cards land (M1-1e, M1-1c)', async () => {
-    const typed = { domain: {}, types: {}, primaryType: 'X', message: {} };
-    expect(await codeOf(() => a.sign712(typed))).toBe('unsupported_operation');
-    const wrapped = { enc: new Uint8Array(32), wk: new Uint8Array(48) };
-    expect(await codeOf(() => a.hpkeOpen(wrapped, new Uint8Array(0)))).toBe(
-      'unsupported_operation',
-    );
+  describe('sign712', () => {
+    it('signs with the agent EVM key, which is always epoch 0 (04 §2.1)', async () => {
+      const sig = await b.sign712(MAIL);
+      expect(sig).toMatch(/^0x[0-9a-f]{130}$/);
+      expect(signerOf(MAIL, sig)).toEqual(derivePublicIdentity(SEED_B, 2).agentEvm);
+      expect(signerOf(MAIL, sig)).toEqual(derivePublicIdentity(SEED_B, 0).agentEvm);
+    });
+
+    it('refuses typed data that does not hash', async () => {
+      const typed = { domain: {}, types: {}, primaryType: 'X', message: {} };
+      expect(await codeOf(() => a.sign712(typed))).toBe('invalid_typed_data');
+    });
+  });
+
+  describe('unwrapCek (G-2)', () => {
+    it('fails closed until the HPKE CEK unwrap lands (M1-1c)', async () => {
+      expect(await codeOf(() => a.unwrapCek(WRAPPED, ENVELOPE_ID))).toBe('unsupported_operation');
+      expect(await codeOf(() => b.unwrapCek(WRAPPED, ENVELOPE_ID, { epoch: 1 }))).toBe(
+        'unsupported_operation',
+      );
+    });
+
+    it('refuses an epoch above the current one or a malformed epoch first', async () => {
+      expect(await codeOf(() => b.unwrapCek(WRAPPED, ENVELOPE_ID, { epoch: 3 }))).toBe(
+        'epoch_unavailable',
+      );
+      expect(await codeOf(() => b.unwrapCek(WRAPPED, ENVELOPE_ID, { epoch: -1 }))).toBe(
+        'invalid_argument',
+      );
+    });
   });
 
   describe('close', () => {
@@ -178,6 +265,8 @@ describe('MemoryKeyStore', () => {
         () => a.signEnvelopeHash(new Uint8Array(32)),
         () => a.nip44Encrypt(peer, 'x'),
         () => a.nip44Decrypt(peer, payload),
+        () => a.sign712(MAIL),
+        () => a.unwrapCek(WRAPPED, ENVELOPE_ID),
       ]) {
         expect(await codeOf(op)).toBe('keystore_closed');
       }
@@ -322,7 +411,7 @@ describe('MemoryOwnerKeyStore', () => {
     }
   });
 
-  it('expiry wipes the session key even if the handle is never used again', async () => {
+  it('expiry wipes every session key (Nostr and EVM) even if the handle is never used again', async () => {
     const filled: Uint8Array[] = [];
     const original = Uint8Array.prototype.fill;
     await owner.unlock(passphrase(CODE), { ttlMs: 1000 });
@@ -338,9 +427,11 @@ describe('MemoryOwnerKeyStore', () => {
     } finally {
       spy.mockRestore();
     }
-    expect(filled.some((buffer) => buffer.length === 32 && buffer.every((x) => x === 0))).toBe(
-      true,
+    const wiped = new Set(
+      filled.filter((buffer) => buffer.length === 32 && buffer.every((x) => x === 0)),
     );
+    // The owner Nostr key and the owner EVM key the session held, each its own buffer.
+    expect(wiped.size).toBe(2);
   });
 
   it('lock ends every session at once', async () => {
@@ -361,20 +452,133 @@ describe('MemoryOwnerKeyStore', () => {
     expect(await two.signOwnerAction(action())).toMatch(/^[0-9a-f]{128}$/);
   });
 
-  it('owner-channel operations fail closed until G-2 is decided (IR-M1-1g-1 M-1)', async () => {
-    const session = await owner.unlock(passphrase(CODE));
-    const peer = nostrHex(SEED_A);
-    const event = { kind: 13, created_at: 0, tags: [], content: '' };
-    const ops = [
-      () => session.signEnvelopeHash(new Uint8Array(32)),
-      () => session.signNostr(event),
-      () => session.nip44Decrypt(peer, 'A'.repeat(132)),
-      () =>
-        session.hpkeOpen({ enc: new Uint8Array(32), wk: new Uint8Array(48) }, new Uint8Array(0)),
-    ];
-    for (const op of ops) expect(await codeOf(op)).toBe('unsupported_operation');
-    await session.close();
-    for (const op of ops) expect(await codeOf(op)).toBe('owner_locked');
+  describe('owner channel (G-2, 04 §3.1.1)', () => {
+    const agent = new MemoryKeyStore(SEED_A);
+    const agentNostr = nostrHex(SEED_A);
+
+    it('signs an envelope hash under the envelope tag, with the owner Nostr key', async () => {
+      const session = await owner.unlock(passphrase(CODE));
+      const envelopeHash = sha256(encodeUtf8('owner envelope'));
+      const sig = await session.signEnvelopeHash(envelopeHash);
+      expect(sig).toMatch(/^[0-9a-f]{128}$/);
+      const pub = decodeHex(ownerNostr);
+      expect(bip340Verify(pub, taggedHash(TAGS.envelope, envelopeHash), decodeHex(sig))).toBe(true);
+      // Never valid as an owner action or as an untagged digest over the same 32 bytes.
+      expect(bip340Verify(pub, taggedHash(TAGS.ownerAction, envelopeHash), decodeHex(sig))).toBe(
+        false,
+      );
+      expect(bip340Verify(pub, envelopeHash, decodeHex(sig))).toBe(false);
+      expect(await codeOf(() => session.signEnvelopeHash(new Uint8Array(31)))).toBe(
+        'invalid_length',
+      );
+    });
+
+    it('signs a seal (kind 13) and a NIP-42 AUTH event (kind 22242) only', async () => {
+      const session = await owner.unlock(passphrase(CODE));
+      for (const kind of [NOSTR_KIND_SEAL, NOSTR_KIND_AUTH]) {
+        const event = await session.signNostr({
+          kind,
+          created_at: 1760000000,
+          tags: [],
+          content: '',
+        });
+        expect(event.kind).toBe(kind);
+        expect(event.pubkey).toBe(ownerNostr);
+        expect(verifyNostrEvent(event)).toBe(true);
+      }
+      // Any other kind is refused: a session is a bearer handle, not a general owner signer.
+      for (const kind of [0, 1, 3, 4, 14, NOSTR_KIND_GIFT_WRAP, 10002, 22241, 22243, 30078]) {
+        expect(
+          await codeOf(() => session.signNostr({ kind, created_at: 0, tags: [], content: '' })),
+        ).toBe('invalid_argument');
+      }
+      expect(await codeOf(() => session.signNostr(null as never))).toBe('invalid_argument');
+    });
+
+    it('the owner seal and the envelope both verify under the owner key (acceptance)', async () => {
+      const session = await owner.unlock(passphrase(CODE));
+      const envelopeHash = sha256(encodeUtf8('approval envelope'));
+      const sig = await session.signEnvelopeHash(envelopeHash);
+      // The seal carries the rumor NIP-44-encrypted to the agent; seal key = envelope `from`.
+      const seal = await session.signNostr({
+        kind: NOSTR_KIND_SEAL,
+        created_at: 1760000000,
+        tags: [],
+        content: await session.nip44Encrypt(agentNostr, '{"rumor":true}'),
+      });
+      expect(verifyNostrEvent(seal)).toBe(true);
+      expect(seal.pubkey).toBe(ownerNostr);
+      expect(
+        bip340Verify(
+          decodeHex(seal.pubkey),
+          taggedHash(TAGS.envelope, envelopeHash),
+          decodeHex(sig),
+        ),
+      ).toBe(true);
+      expect(await agent.nip44Decrypt(seal.pubkey, seal.content)).toBe('{"rumor":true}');
+    });
+
+    it('opens a gift wrap addressed to the owner: wrap, then seal, then rumor (04 §3.1.1)', async () => {
+      const rumor = '{"envelope":"copy"}';
+      const seal = await agent.signNostr({
+        kind: NOSTR_KIND_SEAL,
+        created_at: 1760000000,
+        tags: [],
+        content: await agent.nip44Encrypt(ownerNostr, rumor),
+      });
+      const wrap = createGiftWrap(seal, ownerNostr, 1760000000);
+      const session = await owner.unlock(passphrase(CODE));
+      const opened = JSON.parse(
+        await session.nip44Decrypt(wrap.pubkey, wrap.content),
+      ) as NostrEvent;
+      expect(verifyNostrEvent(opened)).toBe(true);
+      expect(opened.pubkey).toBe(agentNostr);
+      expect(await session.nip44Decrypt(opened.pubkey, opened.content)).toBe(rumor);
+    });
+
+    it('has epoch 0 only: a later epoch is unavailable, a malformed one refused', async () => {
+      const session = await owner.unlock(passphrase(CODE));
+      const payload = await agent.nip44Encrypt(ownerNostr, 'x');
+      expect(await session.nip44Decrypt(agentNostr, payload, { epoch: 0 })).toBe('x');
+      expect(await codeOf(() => session.nip44Decrypt(agentNostr, payload, { epoch: 1 }))).toBe(
+        'epoch_unavailable',
+      );
+      expect(await codeOf(() => session.nip44Decrypt(agentNostr, payload, { epoch: -1 }))).toBe(
+        'invalid_argument',
+      );
+      expect(await codeOf(() => session.unwrapCek(WRAPPED, ENVELOPE_ID, { epoch: 1 }))).toBe(
+        'epoch_unavailable',
+      );
+    });
+
+    it('unwrapCek fails closed until the HPKE CEK unwrap lands (M1-1c)', async () => {
+      const session = await owner.unlock(passphrase(CODE));
+      expect(await codeOf(() => session.unwrapCek(WRAPPED, ENVELOPE_ID))).toBe(
+        'unsupported_operation',
+      );
+    });
+
+    it('has no hpkeOpen (IR-M1-1c-1 F5)', async () => {
+      const session = await owner.unlock(passphrase(CODE));
+      expect('hpkeOpen' in session).toBe(false);
+    });
+
+    it('every session operation fails closed once the session ends', async () => {
+      const session = await owner.unlock(passphrase(CODE));
+      const payload = await agent.nip44Encrypt(ownerNostr, 'x');
+      const ops = [
+        () => session.signOwnerAction(action()),
+        () => session.sign712(MAIL),
+        () => session.signEnvelopeHash(new Uint8Array(32)),
+        () => session.signNostr({ kind: NOSTR_KIND_SEAL, created_at: 0, tags: [], content: '' }),
+        () => session.nip44Encrypt(agentNostr, 'x'),
+        () => session.nip44Decrypt(agentNostr, payload),
+        () => session.unwrapCek(WRAPPED, ENVELOPE_ID),
+      ];
+      expect(await codeOf(ops[5] as () => Promise<unknown>)).toBe('accepted');
+      await session.close();
+      for (const op of ops) expect(await codeOf(op)).toBe('owner_locked');
+    });
   });
 
   it('expiry is enforced on the monotonic clock too: a wall clock set back does not extend it (IR-M1-1g-1 L-1)', async () => {
@@ -414,10 +618,12 @@ describe('MemoryOwnerKeyStore', () => {
     expect(wrongKind.every((x) => x === 0)).toBe(true);
   });
 
-  it('owner sign712 fails closed until M1-1e', async () => {
+  it('owner sign712 signs with the owner EVM key (cardSig, Registration)', async () => {
     const session = await owner.unlock(passphrase(CODE));
+    const sig = await session.sign712(MAIL);
+    expect(signerOf(MAIL, sig)).toEqual((await owner.getPublicKeys()).ownerEvm);
     const typed = { domain: {}, types: {}, primaryType: 'AgentCard', message: {} };
-    expect(await codeOf(() => session.sign712(typed))).toBe('unsupported_operation');
+    expect(await codeOf(() => session.sign712(typed))).toBe('invalid_typed_data');
   });
 
   it('close locks and refuses any further unlock', async () => {

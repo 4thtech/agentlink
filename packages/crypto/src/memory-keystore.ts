@@ -8,10 +8,14 @@
 //
 // What it does guarantee: no method returns a seed or secret key; the seed lives in a private
 // field; secret keys are derived per operation and wiped in `finally`; close() wipes the seed copy;
-// owner sessions hold their own key copy, which lock, close and expiry wipe (04 §8.3, best effort).
+// owner sessions hold their own key copies, which lock, close and expiry wipe (04 §8.3, best effort).
+//
+// unwrapCek fails closed (`unsupported_operation`) until M1-1c's HPKE CEK unwrap lands; it checks
+// the store state and the epoch first, so the refusals around it are already final.
 import { bip340PublicKey, bip340Sign } from './bip340.js';
 import { assertBytes, equalBytes } from './bytes.js';
 import { decodeHex, encodeHex } from './encoding.js';
+import { signTypedData, type TypedData } from './eip712.js';
 import { CryptoInputError } from './errors.js';
 import { TAGS, sha256, taggedHash } from './hash.js';
 import { canonicalizeToBytes, type JsonObject } from './jcs.js';
@@ -28,18 +32,23 @@ import {
   KeyStoreError,
   OWNER_SESSION_DEFAULT_TTL_MS,
   OWNER_SESSION_MAX_TTL_MS,
-  type DecryptOptions,
-  type Eip712TypedData,
-  type HpkeWrappedKey,
+  type EpochOptions,
   type KeyStore,
   type OwnerKeyStore,
   type OwnerPresence,
   type OwnerPublicKeys,
   type OwnerSession,
   type UnlockOptions,
+  type WrappedKey,
 } from './keystore-api.js';
 import { nip44ConversationKey, nip44DecryptWithKey, nip44EncryptWithKey } from './nip44.js';
-import { signNostrEvent, type NostrEvent, type UnsignedNostrEvent } from './nostr-event.js';
+import {
+  NOSTR_KIND_AUTH,
+  NOSTR_KIND_SEAL,
+  signNostrEvent,
+  type NostrEvent,
+  type UnsignedNostrEvent,
+} from './nostr-event.js';
 import { wipe } from './wipe.js';
 
 function copySeed(seed: unknown, what: string): Uint8Array {
@@ -69,6 +78,29 @@ function unsupported(card: string): never {
     'unsupported_operation',
     `keystore: this operation is not implemented yet (${card})`,
   );
+}
+
+/** 04 §3.1.1: BIP-340 over taggedHash("agentlink/envelope/v1", envelopeHash), 128 lowercase hex. */
+function envelopeSig(secretKey: Uint8Array, envelopeHash: Uint8Array): string {
+  assertBytes(envelopeHash, 'signEnvelopeHash: envelopeHash');
+  if (envelopeHash.length !== 32) {
+    throw new CryptoInputError('invalid_length', 'signEnvelopeHash: envelopeHash must be 32 bytes');
+  }
+  return encodeHex(bip340Sign(secretKey, taggedHash(TAGS.envelope, envelopeHash)));
+}
+
+/** NIP-44 v2 under secretKey x peer; the conversation key is wiped afterwards. */
+function withConversationKey<T>(
+  secretKey: Uint8Array,
+  peer: string,
+  fn: (conversationKey: Uint8Array) => T,
+): T {
+  const conversationKey = nip44ConversationKey(secretKey, peerKey(peer));
+  try {
+    return fn(conversationKey);
+  } finally {
+    wipe(conversationKey);
+  }
 }
 
 /** Runs `fn` with a freshly derived secret key and wipes the key afterwards. */
@@ -113,7 +145,8 @@ export class MemoryKeyStore implements KeyStore {
     return this.#seed;
   }
 
-  #decryptEpoch(options: DecryptOptions | undefined): number {
+  /** The epoch of a lookup or decryption: default current, never above it (04 §3.1.1). */
+  #epochOf(options: EpochOptions | undefined): number {
     const epoch = options?.epoch ?? this.#keyEpoch;
     assertEpoch(epoch);
     if (epoch > this.#keyEpoch) {
@@ -122,8 +155,11 @@ export class MemoryKeyStore implements KeyStore {
     return epoch;
   }
 
-  getPublicBundle(): Promise<PublicIdentity> {
-    return Promise.resolve().then(() => derivePublicIdentity(this.#open(), this.#keyEpoch));
+  getPublicBundle(options?: EpochOptions): Promise<PublicIdentity> {
+    return Promise.resolve().then(() => {
+      const seed = this.#open();
+      return derivePublicIdentity(seed, this.#epochOf(options));
+    });
   }
 
   signNostr(event: UnsignedNostrEvent): Promise<NostrEvent> {
@@ -135,73 +171,53 @@ export class MemoryKeyStore implements KeyStore {
   }
 
   signEnvelopeHash(envelopeHash: Uint8Array): Promise<string> {
-    return Promise.resolve().then(() => {
-      const seed = this.#open();
-      assertBytes(envelopeHash, 'signEnvelopeHash: envelopeHash');
-      if (envelopeHash.length !== 32) {
-        throw new CryptoInputError(
-          'invalid_length',
-          'signEnvelopeHash: envelopeHash must be 32 bytes',
-        );
-      }
-      const digest = taggedHash(TAGS.envelope, envelopeHash);
-      return withSecret(seed, KEY_LABELS.nostr, this.#keyEpoch, (secretKey) =>
-        encodeHex(bip340Sign(secretKey, digest)),
-      );
-    });
+    return Promise.resolve().then(() =>
+      withSecret(this.#open(), KEY_LABELS.nostr, this.#keyEpoch, (secretKey) =>
+        envelopeSig(secretKey, envelopeHash),
+      ),
+    );
   }
 
   nip44Encrypt(peer: string, plaintext: string): Promise<string> {
     return Promise.resolve().then(() => {
       const seed = this.#open();
-      const peerPublicKey = peerKey(peer);
-      return withSecret(seed, KEY_LABELS.nostr, this.#keyEpoch, (secretKey) => {
-        const conversationKey = nip44ConversationKey(secretKey, peerPublicKey);
-        try {
-          return nip44EncryptWithKey(conversationKey, plaintext);
-        } finally {
-          wipe(conversationKey);
-        }
-      });
+      return withSecret(seed, KEY_LABELS.nostr, this.#keyEpoch, (secretKey) =>
+        withConversationKey(secretKey, peer, (key) => nip44EncryptWithKey(key, plaintext)),
+      );
     });
   }
 
-  nip44Decrypt(peer: string, payload: string, options?: DecryptOptions): Promise<string> {
+  nip44Decrypt(peer: string, payload: string, options?: EpochOptions): Promise<string> {
     return Promise.resolve().then(() => {
       const seed = this.#open();
-      const epoch = this.#decryptEpoch(options);
-      const peerPublicKey = peerKey(peer);
-      return withSecret(seed, KEY_LABELS.nostr, epoch, (secretKey) => {
-        const conversationKey = nip44ConversationKey(secretKey, peerPublicKey);
-        try {
-          return nip44DecryptWithKey(conversationKey, payload);
-        } finally {
-          wipe(conversationKey);
-        }
-      });
+      const epoch = this.#epochOf(options);
+      return withSecret(seed, KEY_LABELS.nostr, epoch, (secretKey) =>
+        withConversationKey(secretKey, peer, (key) => nip44DecryptWithKey(key, payload)),
+      );
     });
   }
 
-  sign712(typedData: Eip712TypedData): Promise<string> {
-    void typedData;
-    return Promise.resolve().then(() => {
-      this.#open();
-      return unsupported('EIP-712 hashing, M1-1e');
-    });
-  }
-
-  hpkeOpen(
-    wrapped: HpkeWrappedKey,
-    info: Uint8Array,
-    options?: DecryptOptions,
+  unwrapCek(
+    wrapped: WrappedKey,
+    envelopeId: Uint8Array,
+    options?: EpochOptions,
   ): Promise<Uint8Array> {
     void wrapped;
-    void info;
+    void envelopeId;
     return Promise.resolve().then(() => {
       this.#open();
-      this.#decryptEpoch(options);
-      return unsupported('HPKE, M1-1c');
+      this.#epochOf(options);
+      return unsupported('HPKE CEK unwrap, M1-1c');
     });
+  }
+
+  sign712(typedData: TypedData): Promise<string> {
+    // The EVM key exists only at epoch 0 (04 §2.1), whatever the current key epoch.
+    return Promise.resolve().then(() =>
+      withSecret(this.#open(), KEY_LABELS.evm, 0, (secretKey) =>
+        signTypedData(typedData, secretKey),
+      ),
+    );
   }
 
   close(): Promise<void> {
@@ -274,17 +290,26 @@ function monotonicNow(): number {
 /** Module-private: only MemoryOwnerKeyStore.unlock can construct a session. */
 const SESSION_TOKEN = Symbol('MemoryOwnerSession');
 
+/** The owner secret keys a session holds (epoch 0 only, 04 §3.1.1). */
+interface SessionKeys {
+  readonly nostr: Uint8Array;
+  readonly evm: Uint8Array;
+}
+
+/** The only Nostr kinds an owner session signs: the seal and NIP-42 AUTH (04 §3.1.1). */
+const OWNER_SESSION_KINDS: readonly number[] = [NOSTR_KIND_SEAL, NOSTR_KIND_AUTH];
+
 class MemoryOwnerSession implements OwnerSession {
   readonly expiresAt: number;
   readonly #deadline: number;
   readonly #ownerNostrHex: string;
-  #nostrSecret: Uint8Array | null;
+  #keys: SessionKeys | null;
   #timer: unknown;
   readonly #onEnd: (session: MemoryOwnerSession) => void;
 
   constructor(
     token: symbol,
-    nostrSecret: Uint8Array,
+    keys: SessionKeys,
     ownerNostrHex: string,
     ttlMs: number,
     onEnd: (session: MemoryOwnerSession) => void,
@@ -292,7 +317,7 @@ class MemoryOwnerSession implements OwnerSession {
     if (token !== SESSION_TOKEN) {
       throw new KeyStoreError('presence_required', 'owner keystore: a presence proof is required');
     }
-    this.#nostrSecret = nostrSecret;
+    this.#keys = keys;
     this.#ownerNostrHex = ownerNostrHex;
     this.#onEnd = onEnd;
     this.expiresAt = Date.now() + ttlMs;
@@ -307,25 +332,32 @@ class MemoryOwnerSession implements OwnerSession {
 
   isActive(): boolean {
     // Whichever clock says the session is over ends it: monotonic (authoritative) or wall clock.
-    if (
-      this.#nostrSecret !== null &&
-      (monotonicNow() >= this.#deadline || Date.now() >= this.expiresAt)
-    ) {
+    if (this.#keys !== null && (monotonicNow() >= this.#deadline || Date.now() >= this.expiresAt)) {
       this.end();
     }
-    return this.#nostrSecret !== null;
+    return this.#keys !== null;
   }
 
-  #secret(): Uint8Array {
-    if (!this.isActive() || this.#nostrSecret === null) {
+  #active(): SessionKeys {
+    if (!this.isActive() || this.#keys === null) {
       throw new KeyStoreError('owner_locked', 'owner keystore: the owner session has ended');
     }
-    return this.#nostrSecret;
+    return this.#keys;
+  }
+
+  /** Owner keys have epoch 0 only (owner-key rotation is P2, 04 §2.6, §3.1.1). */
+  #epochOf(options: EpochOptions | undefined): number {
+    const epoch = options?.epoch ?? 0;
+    assertEpoch(epoch);
+    if (epoch !== 0) {
+      throw new KeyStoreError('epoch_unavailable', 'keystore: that key epoch is not available');
+    }
+    return epoch;
   }
 
   signOwnerAction(body: JsonObject): Promise<string> {
     return Promise.resolve().then(() => {
-      const secretKey = this.#secret();
+      const { nostr } = this.#active();
       if (typeof body !== 'object' || body === null || Array.isArray(body)) {
         throw new CryptoInputError('invalid_argument', 'signOwnerAction: body must be an object');
       }
@@ -340,47 +372,58 @@ class MemoryOwnerSession implements OwnerSession {
         );
       }
       const digest = taggedHash(TAGS.ownerAction, sha256(canonicalizeToBytes(body)));
-      return encodeHex(bip340Sign(secretKey, digest));
+      return encodeHex(bip340Sign(nostr, digest));
     });
   }
 
-  sign712(typedData: Eip712TypedData): Promise<string> {
-    void typedData;
-    return Promise.resolve().then(() => {
-      this.#secret();
-      return unsupported('EIP-712 hashing, M1-1e');
-    });
+  sign712(typedData: TypedData): Promise<string> {
+    return Promise.resolve().then(() => signTypedData(typedData, this.#active().evm));
   }
-
-  // PENDING G-2 (IR-M1-1g-1 M-1): the owner-channel operations fail closed until gap G-2 decides
-  // whether they belong on this presence-gated session. An ended session still says owner_locked.
 
   signEnvelopeHash(envelopeHash: Uint8Array): Promise<string> {
-    void envelopeHash;
-    return this.#pendingG2();
+    return Promise.resolve().then(() => envelopeSig(this.#active().nostr, envelopeHash));
   }
 
   signNostr(event: UnsignedNostrEvent): Promise<NostrEvent> {
-    void event;
-    return this.#pendingG2();
-  }
-
-  nip44Decrypt(peer: string, payload: string): Promise<string> {
-    void peer;
-    void payload;
-    return this.#pendingG2();
-  }
-
-  hpkeOpen(wrapped: HpkeWrappedKey, info: Uint8Array): Promise<Uint8Array> {
-    void wrapped;
-    void info;
-    return this.#pendingG2();
-  }
-
-  #pendingG2(): Promise<never> {
     return Promise.resolve().then(() => {
-      this.#secret();
-      return unsupported('owner channel, gap G-2');
+      const { nostr } = this.#active();
+      // A session is a bearer handle, not a general owner signer: seals and AUTH only (04 §3.1.1).
+      const kind = typeof event === 'object' && event !== null ? event.kind : undefined;
+      if (typeof kind !== 'number' || !OWNER_SESSION_KINDS.includes(kind)) {
+        throw new CryptoInputError(
+          'invalid_argument',
+          'owner session: only seal (kind 13) and AUTH (kind 22242) events are signed',
+        );
+      }
+      return signNostrEvent(nostr, event);
+    });
+  }
+
+  nip44Encrypt(peer: string, plaintext: string): Promise<string> {
+    return Promise.resolve().then(() =>
+      withConversationKey(this.#active().nostr, peer, (key) => nip44EncryptWithKey(key, plaintext)),
+    );
+  }
+
+  nip44Decrypt(peer: string, payload: string, options?: EpochOptions): Promise<string> {
+    return Promise.resolve().then(() => {
+      const { nostr } = this.#active();
+      this.#epochOf(options);
+      return withConversationKey(nostr, peer, (key) => nip44DecryptWithKey(key, payload));
+    });
+  }
+
+  unwrapCek(
+    wrapped: WrappedKey,
+    envelopeId: Uint8Array,
+    options?: EpochOptions,
+  ): Promise<Uint8Array> {
+    void wrapped;
+    void envelopeId;
+    return Promise.resolve().then(() => {
+      this.#active();
+      this.#epochOf(options);
+      return unsupported('HPKE CEK unwrap, M1-1c');
     });
   }
 
@@ -389,13 +432,13 @@ class MemoryOwnerSession implements OwnerSession {
     return Promise.resolve();
   }
 
-  /** Ends the session: wipes its key and stops its timer. Idempotent. */
+  /** Ends the session: wipes its keys and stops its timer. Idempotent. */
   end(): void {
     if (this.#timer !== undefined) timers.clearTimeout(this.#timer);
     this.#timer = undefined;
-    if (this.#nostrSecret !== null) {
-      wipe(this.#nostrSecret);
-      this.#nostrSecret = null;
+    if (this.#keys !== null) {
+      wipe(this.#keys.nostr, this.#keys.evm);
+      this.#keys = null;
       this.#onEnd(this);
     }
   }
@@ -465,11 +508,20 @@ export class MemoryOwnerKeyStore implements OwnerKeyStore {
         if (generation !== this.#generation) {
           throw new KeyStoreError('owner_locked', 'owner keystore: locked while unlocking');
         }
-        const nostrSecret = deriveSecretKey(seed, KEY_LABELS.nostr, 0);
+        // The session's own copies of the owner keys, epoch 0 (04 §3.1.1); it wipes them when it
+        // ends. The enc key joins them when unwrapCek lands (M1-1c).
+        const nostr = deriveSecretKey(seed, KEY_LABELS.nostr, 0);
+        let evm: Uint8Array;
+        try {
+          evm = deriveSecretKey(seed, KEY_LABELS.evm, 0);
+        } catch (error) {
+          wipe(nostr);
+          throw error;
+        }
         const session = new MemoryOwnerSession(
           SESSION_TOKEN,
-          nostrSecret,
-          encodeHex(bip340PublicKey(nostrSecret)),
+          { nostr, evm },
+          encodeHex(bip340PublicKey(nostr)),
           ttlMs,
           (ended) => this.#sessions.delete(ended),
         );

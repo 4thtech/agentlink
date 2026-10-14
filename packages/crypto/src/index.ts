@@ -59,17 +59,16 @@ export {
   ownerFingerprint,
   type FingerprintForm,
 } from './fingerprint.js';
-// M1-1g: the KeyStore and OwnerKeyStore interfaces (types only; G-2 puts them here so transport-nostr
-// and core can name them), public NIP-44 helpers, Nostr events and the gift wrap. The in-memory
-// KeyStores and the NIP-44 functions that take a secret or conversation key are in
-// @agentlink/crypto/keystore.
+// M1-1g: the key interfaces (types only; G-2, 04 §3.1.1, puts them here so transport-nostr and core
+// can name them), public NIP-44 helpers, Nostr events and the gift wrap. The NIP-44 functions that
+// take a secret or conversation key are in @agentlink/crypto/keystore; the in-memory KeyStores are
+// in the test-only @agentlink/crypto/testing.
 export {
   KeyStoreError,
   OWNER_SESSION_DEFAULT_TTL_MS,
   OWNER_SESSION_MAX_TTL_MS,
-  type DecryptOptions,
-  type Eip712TypedData,
-  type HpkeWrappedKey,
+  type EnvelopeKeys,
+  type EpochOptions,
   type KeyStore,
   type KeyStoreErrorCode,
   type OwnerKeyStore,
@@ -77,6 +76,7 @@ export {
   type OwnerPublicKeys,
   type OwnerSession,
   type UnlockOptions,
+  type WrappedKey,
 } from './keystore-api.js';
 export {
   NIP44_MAX_PLAINTEXT_BYTES,
@@ -84,6 +84,7 @@ export {
   nip44PaddedLength,
 } from './nip44.js';
 export {
+  NOSTR_KIND_AUTH,
   NOSTR_KIND_GIFT_WRAP,
   NOSTR_KIND_SEAL,
   nostrEventId,

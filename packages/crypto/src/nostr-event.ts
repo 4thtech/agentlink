@@ -15,6 +15,8 @@ import { sha256 } from './hash.js';
 export const NOSTR_KIND_SEAL = 13;
 /** NIP-59 gift wrap. */
 export const NOSTR_KIND_GIFT_WRAP = 1059;
+/** NIP-42 client authentication (AUTH) to a relay. */
+export const NOSTR_KIND_AUTH = 22242;
 
 const MAX_KIND = 65535;
 const HEX_32 = /^[0-9a-f]{64}$/;

@@ -64,6 +64,7 @@ describe('@agentlink/crypto/keystore', () => {
       'nip44PaddedLength',
       'NOSTR_KIND_SEAL',
       'NOSTR_KIND_GIFT_WRAP',
+      'NOSTR_KIND_AUTH',
       'nostrEventId',
       'verifyNostrEvent',
       'createGiftWrap',

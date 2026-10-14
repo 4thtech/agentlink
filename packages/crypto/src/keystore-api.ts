@@ -1,19 +1,24 @@
-// The KeyStore and OwnerKeyStore interfaces (03 §3, with gap G-2's additions: signEnvelopeHash and
-// decryption epochs; 04 §2.5 owner presence; 04 §8.1 secret-key operations go through a KeyStore).
+// The key interfaces of 03 §3 and 04 §3.1.1 (G-2): EnvelopeKeys, KeyStore, OwnerKeyStore and
+// OwnerSession; 04 §2.5 owner presence; 04 §8.1 secret-key operations go through a KeyStore.
 //
 // G-2: the interfaces live in @agentlink/crypto, not core, so transport-nostr (which depends only on
-// crypto) can take a KeyStore without a dependency cycle. They are types only and hold no secret,
-// so they are in the main entry; the in-memory implementations, which hold a seed, are in the
-// restricted subpath @agentlink/crypto/keystore. Backends: Node keychain and file (packages/node,
-// M1-8a, M1-8f), the self-host Worker, and MemoryKeyStore for tests.
+// crypto) can take them without a dependency cycle. They are types only and hold no secret, so they
+// are in the main entry. The in-memory implementations, which hold a seed, are in the test-only
+// subpath @agentlink/crypto/testing. Backends: Node keychain and file (packages/node, M1-8a, M1-8f)
+// and the self-host Worker (M2-3a).
 //
 // Contract for every implementation:
-// - No method returns a private key or a seed. Signing, NIP-44 key agreement and HPKE unwrapping
-//   happen inside; callers get public keys, signatures, ciphertext or the plaintext they asked for.
+// - No method returns a private key or a seed. Signing, NIP-44 key agreement and the CEK unwrap
+//   happen inside; callers get public keys, signatures, ciphertext, the plaintext they asked for, or
+//   (unwrapCek) the one content key they wipe after use.
+// - Signing and encryption always use the current key epoch. Only the decrypting methods and the
+//   public-key lookup take an epoch; an epoch above the current one is `epoch_unavailable`.
+// - No method signs an untagged digest, and none opens HPKE under a caller-chosen info.
 // - Owner signatures exist only on an OwnerSession, and the only way to get one is
 //   OwnerKeyStore.unlock(presence). A session is short-lived, and lock, close and expiry wipe its
 //   key material.
 // - Errors are fixed sentences that never contain an input (I-7).
+import type { TypedData } from './eip712.js';
 import type { PublicIdentity } from './keys.js';
 import type { JsonObject } from './jcs.js';
 import type { NostrEvent, UnsignedNostrEvent } from './nostr-event.js';
@@ -44,30 +49,17 @@ export class KeyStoreError extends Error {
   }
 }
 
-/** Options for the decrypting operations: the key epoch to use (04 §2.6). */
-export interface DecryptOptions {
-  /**
-   * The key epoch whose key decrypts. Defaults to the current epoch. Older epochs stay usable so
-   * history remains readable after rotation; an epoch above the current one is refused.
-   */
+/**
+ * The key epoch for a decrypting method or the public-key lookup (04 §2.6, §3.1.1). Defaults to the
+ * current epoch. Older epochs stay usable so history remains readable after rotation; an epoch above
+ * the current one is refused (`epoch_unavailable`). Signing methods never take one.
+ */
+export interface EpochOptions {
   readonly epoch?: number;
 }
 
-/**
- * EIP-712 typed data. The exact shape and the hashing are M1-1e (via viem); this is the structural
- * placeholder the interface names until then.
- */
-export interface Eip712TypedData {
-  readonly domain: Readonly<Record<string, unknown>>;
-  readonly types: Readonly<
-    Record<string, readonly { readonly name: string; readonly type: string }[]>
-  >;
-  readonly primaryType: string;
-  readonly message: Readonly<Record<string, unknown>>;
-}
-
-/** One HPKE recipient wrap of a content key (04 §3.1 `recipients[i]`, raw bytes). M1-1c. */
-export interface HpkeWrappedKey {
+/** One recipient entry's CEK wrap (04 §3.1 `recipients[i]`, §3.3), raw bytes: `enc` 32, `wk` 48. */
+export interface WrappedKey {
   /** HPKE encapsulated key. */
   readonly enc: Uint8Array;
   /** HPKE ciphertext of the CEK. */
@@ -75,22 +67,23 @@ export interface HpkeWrappedKey {
 }
 
 /**
- * The agent's KeyStore (03 §3, G-2). All keys are the agent's own, derived per 04 §2.1. Signing and
- * encryption use the current `keyEpoch`; the EVM key is always epoch 0.
+ * The secret-key operations that build and open envelopes (04 §3.1.1, 07 §4.1). The agent's KeyStore
+ * and an owner's OwnerSession both implement it, so transport and core use one path for both.
  */
-export interface KeyStore {
-  /** The agent's public identity at the current key epoch (04 §2.4 card fields, agentId, kid). */
-  getPublicBundle(): Promise<PublicIdentity>;
-
-  /** Signs a Nostr event (NIP-01) with the Nostr key; sets pubkey, id and sig. Seals, NIP-42 AUTH. */
-  signNostr(event: UnsignedNostrEvent): Promise<NostrEvent>;
-
+export interface EnvelopeKeys {
   /**
-   * G-2: the envelope `sig` of 04 §3.1, BIP-340 by the Nostr key over
-   * taggedHash("agentlink/envelope/v1", envelopeHash), as 128 lowercase hex. `envelopeHash` is 32
-   * bytes (sha256(JCS(envelope without sig)), M1-1c).
+   * The envelope `sig` (04 §3.1.1): BIP-340 by the Nostr key over
+   * taggedHash("agentlink/envelope/v1", envelopeHash), as 128 lowercase hex. `envelopeHash` is the
+   * 32-byte sha256(JCS(envelope without sig)) of the parsed envelope (M1-1c). The tag is applied
+   * here, so no caller gets a signature over an untagged digest.
    */
   signEnvelopeHash(envelopeHash: Uint8Array): Promise<string>;
+
+  /**
+   * Signs a Nostr event (NIP-01) with the Nostr key; sets pubkey, id and sig. Seals (kind 13) and
+   * NIP-42 AUTH (kind 22242). An OwnerSession signs those two kinds only and refuses every other.
+   */
+  signNostr(event: UnsignedNostrEvent): Promise<NostrEvent>;
 
   /**
    * NIP-44 v2 to `peer` (64 lowercase hex x-only key) with the Nostr key; the conversation key is
@@ -99,24 +92,35 @@ export interface KeyStore {
   nip44Encrypt(peer: string, plaintext: string): Promise<string>;
 
   /** NIP-44 v2 from `peer`, with the Nostr key of `options.epoch` (default: current). */
-  nip44Decrypt(peer: string, payload: string, options?: DecryptOptions): Promise<string>;
+  nip44Decrypt(peer: string, payload: string, options?: EpochOptions): Promise<string>;
+
+  /**
+   * Opens one recipient entry (04 §3.3) with the enc key of `options.epoch` (default: current) and
+   * returns the 32-byte CEK, the one secret an EnvelopeKeys hands out: callers wipe it after the
+   * payload AEAD. The HPKE info is built inside from the 16-byte `envelopeId`
+   * ("agentlink/v1/cek" ‖ id), so this is never a general HPKE-open oracle (IR-M1-1c-1 F5).
+   */
+  unwrapCek(
+    wrapped: WrappedKey,
+    envelopeId: Uint8Array,
+    options?: EpochOptions,
+  ): Promise<Uint8Array>;
+}
+
+/**
+ * The agent's KeyStore (03 §3, 04 §3.1.1). All keys are the agent's own, derived per 04 §2.1, at the
+ * current `keyEpoch` for signing and encryption; the EVM key is always epoch 0. It never holds owner
+ * keys and never opens an owner entry.
+ */
+export interface KeyStore extends EnvelopeKeys {
+  /** The agent's public identity (04 §2.4 card fields, agentId, kid) at `options.epoch`. */
+  getPublicBundle(options?: EpochOptions): Promise<PublicIdentity>;
 
   /**
    * EIP-712 signature by the agent EVM key (records, receipts, `cardAgentSig`), in the canonical
-   * ECDSA form of 04 §2.4.1. Interface only until M1-1e: MemoryKeyStore fails closed.
+   * ECDSA form of 04 §2.4.1: `0x` + 130 lowercase hex.
    */
-  sign712(typedData: Eip712TypedData): Promise<string>;
-
-  /**
-   * Opens one HPKE wrap (04 §3.3) with the enc key of `options.epoch` (default: current) and returns
-   * the 32-byte CEK, the one secret a KeyStore hands out: callers wipe it after the payload AEAD.
-   * Interface only until M1-1c: MemoryKeyStore fails closed.
-   */
-  hpkeOpen(
-    wrapped: HpkeWrappedKey,
-    info: Uint8Array,
-    options?: DecryptOptions,
-  ): Promise<Uint8Array>;
+  sign712(typedData: TypedData): Promise<string>;
 
   /** Wipes what the store holds in memory; every later call fails with `keystore_closed`. */
   close(): Promise<void>;
@@ -182,8 +186,14 @@ export interface OwnerKeyStore {
 }
 
 /**
- * A short-lived owner handle from OwnerKeyStore.unlock. After expiry, close() or the store's lock()
- * or close(), every method fails with `owner_locked`.
+ * A short-lived owner handle from OwnerKeyStore.unlock (04 §2.5, §3.1.1). After expiry, close() or the
+ * store's lock() or close(), every method fails with `owner_locked`.
+ *
+ * As EnvelopeKeys it signs and opens the owner channel with the owner Nostr and enc keys: the
+ * envelope `sig` and the seal of `approval`, `policy` and `revoke` (in the same gesture as the
+ * SignedOwnerAction they carry), NIP-42 AUTH to DM relays, and reading the owner's copies. The owner
+ * keys have epoch 0 only (owner-key rotation is P2): any other epoch is `epoch_unavailable`.
+ * signNostr signs kinds 13 and 22242 only.
  *
  * A session is a bearer handle: whatever holds it can sign owner actions until it ends. The CLI and
  * the local UI keep it inside the owner flow and never pass it to MCP tools or other agent-reachable
@@ -192,7 +202,7 @@ export interface OwnerKeyStore {
  * Expiry is enforced on a monotonic clock (`performance.now`) and on the wall clock, whichever ends
  * the session first, so setting the system clock back never extends a session (IR-M1-1g-1 L-1).
  */
-export interface OwnerSession {
+export interface OwnerSession extends EnvelopeKeys {
   /** When the session ends, in milliseconds since the epoch (Date.now clock). For display only. */
   readonly expiresAt: number;
 
@@ -208,27 +218,10 @@ export interface OwnerSession {
   signOwnerAction(body: JsonObject): Promise<string>;
 
   /**
-   * EIP-712 by the owner EVM key: AgentCard `cardSig` (M1-1e), Registration (M1-1j). Interface only
-   * until M1-1e: MemoryOwnerKeyStore fails closed.
+   * EIP-712 by the owner EVM key: AgentCard `cardSig` (M1-1e), Registration (M1-1j). Canonical ECDSA,
+   * `0x` + 130 lowercase hex (04 §2.4.1).
    */
-  sign712(typedData: Eip712TypedData): Promise<string>;
-
-  // Owner-channel operations (04 §3.4.1: the owner is `from` on `approval`, `policy` and `revoke`
-  // envelopes and receives `approval-request`). PENDING G-2 (IR-M1-1g-1 M-1): whether these belong
-  // on the presence-gated session or on a separate console-side store is decided with gap G-2.
-  // Until then every implementation fails closed with `unsupported_operation`.
-
-  /** G-2 pending: the envelope `sig` of 04 §3.1 by the owner Nostr key. Fails closed. */
-  signEnvelopeHash(envelopeHash: Uint8Array): Promise<string>;
-
-  /** G-2 pending: a Nostr event (a seal) signed by the owner Nostr key. Fails closed. */
-  signNostr(event: UnsignedNostrEvent): Promise<NostrEvent>;
-
-  /** G-2 pending: NIP-44 v2 from `peer` with the owner Nostr key. Fails closed. */
-  nip44Decrypt(peer: string, payload: string): Promise<string>;
-
-  /** G-2 pending: opens an HPKE wrap with the owner enc key; returns the CEK. Fails closed. */
-  hpkeOpen(wrapped: HpkeWrappedKey, info: Uint8Array): Promise<Uint8Array>;
+  sign712(typedData: TypedData): Promise<string>;
 
   /** Ends this session now and wipes its key material. */
   close(): Promise<void>;
