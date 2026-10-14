@@ -29,6 +29,9 @@ const SEED_OR_SECRET = [
   'openKeystoreFileWithKek',
   'sealOwnerSeed',
   'openOwnerSeed',
+  // IR-M1-1f-1 L-3: the agent ≠ owner probes take a candidate secret (04 §2.8).
+  'ownerSecretUnlocks',
+  'keystoreSecretUnlocks',
 ];
 
 // M1-1f: the deterministic test seam (fixed nonce for ALKS and ALKO, Argon2id with K and X).
@@ -108,7 +111,23 @@ describe('@agentlink/crypto/keystore', () => {
     }
   });
 
-  it('never builds the test seam: tsconfig.json excludes src/testing.ts from dist', async () => {
+  // IR-M1-1f-1 L-2: the fixed-nonce sealers exist in the built keystore-file module (production
+  // seals call them with a fresh nonce), so they are kept unreachable instead: no entry point exports
+  // them, package.json `exports` has no path to dist/keystore-file.js, and deps-check and ESLint
+  // refuse deep imports into a workspace package's dist/ or src/ (tools/deps-check/policy.mjs).
+  it('exports the fixed-nonce sealers from no entry point', () => {
+    for (const name of [
+      'sealKeystoreFileWithNonceUnsafe',
+      'sealOwnerSeedWithNonceUnsafe',
+      'sealKeystoreFileWithNonce',
+      'sealOwnerSeedWithNonce',
+    ]) {
+      expect(Object.keys(main), name).not.toContain(name);
+      expect(Object.keys(keystore), name).not.toContain(name);
+    }
+  });
+
+  it('does not build the test seam file: tsconfig.json excludes src/testing.ts from dist', async () => {
     const config = (await import('../tsconfig.json', { with: { type: 'json' } })).default as {
       exclude: string[];
     };

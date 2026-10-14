@@ -476,3 +476,37 @@ describe('M1-1c, M1-1f: the crypto test seam @agentlink/crypto/testing', () => {
     ).not.toMatch(RESTRICTED);
   });
 });
+
+describe('IR-M1-1f-1 L-2: deep imports into a workspace package', () => {
+  const DEEP = /deep import/;
+
+  it('refuses dist/ and src/ subpaths of every workspace package, in every zone', () => {
+    for (const zone of Object.keys(ZONES)) {
+      for (const specifier of [
+        '@agentlink/crypto/dist/keystore-file.js',
+        '@agentlink/crypto/dist',
+        '@agentlink/crypto/src/testing.ts',
+        '@agentlink/types/dist/index.js',
+      ]) {
+        expect(violationFor(zone, specifier, `${zone}/src/a.ts`), `${zone} ${specifier}`).toMatch(
+          DEEP,
+        );
+      }
+    }
+    expect(
+      violationFor('test-vectors', '@agentlink/crypto/dist/keystore.js', 'test-vectors/a.ts'),
+    ).toMatch(DEEP);
+  });
+
+  it('finds a planted static import in packages/core', () => {
+    const code = `import { sealOwnerSeedWithNonceUnsafe } from '@agentlink/crypto/dist/keystore-file.js';\n`;
+    expect(src('packages/core', code).join('\n')).toMatch(DEEP);
+  });
+
+  it('leaves the declared entry points alone', () => {
+    expect(violationFor('packages/core', '@agentlink/crypto', 'packages/core/src/a.ts')).toBeNull();
+    expect(
+      violationFor('packages/node', '@agentlink/crypto/keystore', 'packages/node/src/a.ts') ?? '',
+    ).not.toMatch(DEEP);
+  });
+});

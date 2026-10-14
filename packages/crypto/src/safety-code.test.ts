@@ -60,6 +60,7 @@ const baseInput = {
   inviteId: INVITE_ID,
   nonceA: NONCE_A,
   nonceB: NONCE_B,
+  codeCommit: COMMIT,
 };
 
 function refusedWith(run: () => unknown, code: string): void {
@@ -184,7 +185,8 @@ describe('roles (property test)', () => {
       const inviteId = randomBytes(16);
       const nonceA = randomBytes(32);
       const nonceB = randomBytes(32);
-      const shared = { inviteId, nonceA, nonceB };
+      const codeCommit = safetyCodeCommit(inviteId, nonceA);
+      const shared = { inviteId, nonceA, nonceB, codeCommit };
       const atA = safetyCodeForRole({
         role: 'inviter',
         ownCard: CARD_A,
@@ -229,8 +231,55 @@ describe('roles (property test)', () => {
           inviteId: INVITE_ID,
           nonceA: NONCE_A,
           nonceB: NONCE_B,
+          codeCommit: COMMIT,
         }),
       'invalid_argument',
+    );
+  });
+});
+
+// IR-M1-1f-1 M-2: 04 §3.6.1 step 3. No digits without a codeReveal (nonceA) that opens codeCommit.
+describe('the commitment check before any code (step 3)', () => {
+  it('refuses a nonceA that does not open codeCommit, with no code', () => {
+    refusedWith(
+      () => computeSafetyCode({ ...baseInput, nonceA: NONCE_B }),
+      'commitment_mismatch',
+    );
+    const otherInvite = INVITE_ID.slice();
+    otherInvite[0] = (otherInvite[0] as number) ^ 1;
+    refusedWith(
+      () => computeSafetyCode({ ...baseInput, inviteId: otherInvite }),
+      'commitment_mismatch',
+    );
+    const flipped = COMMIT.slice();
+    flipped[0] = (flipped[0] as number) ^ 1;
+    refusedWith(() => computeSafetyCode({ ...baseInput, codeCommit: flipped }), 'commitment_mismatch');
+    for (const role of ['inviter', 'invitee'] as const) {
+      refusedWith(
+        () =>
+          safetyCodeForRole({
+            role,
+            ownCard: CARD_A,
+            peerCard: CARD_B,
+            inviteId: INVITE_ID,
+            nonceA: NONCE_B,
+            nonceB: NONCE_B,
+            codeCommit: COMMIT,
+          }),
+        'commitment_mismatch',
+      );
+    }
+  });
+
+  it('requires codeCommit: a missing or malformed commitment is refused', () => {
+    const { codeCommit: _omitted, ...withoutCommit } = baseInput;
+    refusedWith(
+      () => computeSafetyCode(withoutCommit as unknown as typeof baseInput),
+      'invalid_argument',
+    );
+    refusedWith(
+      () => computeSafetyCode({ ...baseInput, codeCommit: COMMIT.subarray(1) }),
+      'invalid_length',
     );
   });
 });

@@ -19,10 +19,12 @@ import {
   deriveKeystoreKek,
   derivePublicKey,
   generateSecretCode,
+  keystoreSecretUnlocks,
   newKeystoreKek,
   openKeystoreFile,
   openKeystoreFileWithKek,
   openOwnerSeed,
+  ownerSecretUnlocks,
   sealKeystoreFile,
   sealOwnerSeed,
 } from './keystore.js';
@@ -381,5 +383,70 @@ describe('ALKO v1 (owner seed wrap, local storage only)', () => {
         }),
       'invalid_length',
     );
+  });
+});
+
+// IR-M1-1f-1 L-4: 04 §2.8 "Passphrase strength": a chosen agent passphrase has at least 12 Unicode
+// code points, counted after NFKC. Checked when a kek is created, never on open.
+describe('chosen agent passphrase length', () => {
+  it('refuses fewer than 12 code points after NFKC on create', async () => {
+    for (const short of ['', 'a', 'elevenchars', 'ｅｌｅｖｅｎｃｈａｒｓ']) {
+      await refusedWith(
+        () =>
+          newKeystoreKek('ALKS', { secret: encodeUtf8(short), secretKind: 2, source: 'prompt' }, FLOOR),
+        'passphrase_too_short',
+      );
+    }
+  });
+
+  it('counts after NFKC: a ligature that expands reaches 12', async () => {
+    // 'ﬁ' (one code point) is 'fi' (two) after NFKC: 11 code points typed, 12 counted.
+    const kek = await newKeystoreKek(
+      'ALKS',
+      { secret: encodeUtf8('ﬁve plus six'.slice(0, 11)), secretKind: 2, source: 'prompt' },
+      FLOOR,
+    );
+    expect(kek.kek.length).toBe(32);
+    await newKeystoreKek(
+      'ALKS',
+      { secret: encodeUtf8('twelve chars'), secretKind: 2, source: 'prompt' },
+      FLOOR,
+    );
+  });
+});
+
+// IR-M1-1f-1 L-3: the owner secret comes only from a prompt (D-54, 04 §2.8); the agent ≠ owner
+// checks ("Passphrase strength") ask "does this candidate unlock it?" and never hand out a seed.
+describe('owner secret source and the agent ≠ owner probes', () => {
+  it('refuses an owner secret read from a file', async () => {
+    const kek = await newKeystoreKek('ALKO', { secret: PHRASE, secretKind: 2, source: 'prompt' }, FLOOR);
+    const blob = await sealOwnerSeed(kek, OWNER_SEED, { destination: 'local', fileKeystoreMachine: false });
+    await refusedWith(
+      () => openOwnerSeed(blob, { secret: PHRASE, source: 'file' }, OWNER, { fileKeystoreMachine: false }),
+      'invalid_argument',
+    );
+  });
+
+  it('ownerSecretUnlocks: true for the owner secret, false otherwise, with the owner wrap normalisation', async () => {
+    const code = generateSecretCode();
+    const kek = await newKeystoreKek('ALKO', { secret: code, secretKind: 1, source: 'prompt' }, FLOOR);
+    const blob = await sealOwnerSeed(kek, OWNER_SEED, { destination: 'local', fileKeystoreMachine: true });
+    const spelled = encodeUtf8(`${decodeUtf8(code).toLowerCase()}\n`);
+    expect(await ownerSecretUnlocks(blob, { secret: code, source: 'prompt' }, OWNER)).toBe(true);
+    expect(await ownerSecretUnlocks(blob, { secret: spelled, source: 'file' }, OWNER)).toBe(true);
+    // A candidate that is not a valid code for the blob's kind "does not unlock", never an error.
+    expect(await ownerSecretUnlocks(blob, { secret: PHRASE, source: 'prompt' }, OWNER)).toBe(false);
+    expect(await ownerSecretUnlocks(blob, { secret: generateSecretCode(), source: 'prompt' }, OWNER)).toBe(false);
+    expect(await ownerSecretUnlocks(blob, { secret: code, source: 'prompt' }, ownerOf(SEED_1))).toBe(false);
+    expect(await ownerSecretUnlocks(blob.subarray(1), { secret: code, source: 'prompt' }, OWNER)).toBe(false);
+  });
+
+  it('keystoreSecretUnlocks: true for the agent file secret, false otherwise', async () => {
+    const kek = await newKeystoreKek('ALKS', { secret: PHRASE, secretKind: 2, source: 'prompt' }, FLOOR);
+    const file = await sealKeystoreFile(kek, AGENT_1, entriesFor(SEED_1));
+    expect(await keystoreSecretUnlocks(file, { secret: PHRASE, source: 'prompt' }, AGENT_1)).toBe(true);
+    expect(await keystoreSecretUnlocks(file, { secret: OTHER_PHRASE, source: 'prompt' }, AGENT_1)).toBe(false);
+    expect(await keystoreSecretUnlocks(file, { secret: encodeUtf8('a\tb'), source: 'prompt' }, AGENT_1)).toBe(false);
+    expect(await keystoreSecretUnlocks(file, { secret: PHRASE, source: 'prompt' }, AGENT_2)).toBe(false);
   });
 });

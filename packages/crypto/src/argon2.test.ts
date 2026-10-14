@@ -2,11 +2,12 @@
 // file KeyStore and the recovery code (04 §2.3, §2.8). The cross-runtime vectors are in
 // test-vectors/owner-wrap; these tests pin the API rules.
 import { describe, expect, it } from 'vitest';
-import { CryptoInputError, encodeHex, encodeUtf8 } from './index.js';
+import { CryptoInputError, encodeHex, encodeUtf8, type Argon2idParams } from './index.js';
 import { argon2id } from './keystore.js';
 import { argon2idWithSecretAndAd } from './testing.js';
 
 const SMALL = { memoryKiB: 32, iterations: 3, parallelism: 4 } as const;
+const FLOOR = { memoryKiB: 19456, iterations: 2, parallelism: 1 } as const;
 
 async function refusedWith(run: () => Promise<unknown>, code: string): Promise<void> {
   try {
@@ -33,8 +34,8 @@ describe('argon2id', () => {
   it('is the same function with no secret and no associated data', async () => {
     const password = encodeUtf8('long phrase');
     const salt = new Uint8Array(16).fill(7);
-    const plain = await argon2id(password, salt, SMALL);
-    const seam = await argon2idWithSecretAndAd(password, salt, SMALL, {
+    const plain = await argon2id(password, salt, FLOOR);
+    const seam = await argon2idWithSecretAndAd(password, salt, FLOOR, {
       secret: new Uint8Array(0),
       ad: new Uint8Array(0),
       length: 32,
@@ -43,9 +44,33 @@ describe('argon2id', () => {
     expect(plain.length).toBe(32);
   });
 
-  it('refuses parameters outside RFC 9106 or above the 256 MiB cap, before running', async () => {
+  // IR-M1-1f-1 L-1: the production export applies the 04 §2.8 floor and cap (the RFC 9106 test
+  // parameters run only through the test seam).
+  it('refuses parameters outside the 04 §2.8 floor and cap, before running', async () => {
     const password = encodeUtf8('long phrase');
     const salt = new Uint8Array(16);
+    for (const params of [
+      SMALL,
+      { ...FLOOR, memoryKiB: 19455 },
+      { ...FLOOR, memoryKiB: 262145 },
+      { ...FLOOR, iterations: 1 },
+      { ...FLOOR, iterations: 9 },
+      { ...FLOOR, parallelism: 0 },
+      { ...FLOOR, parallelism: 5 },
+    ]) {
+      await refusedWith(() => argon2id(password, salt, params), 'invalid_argument');
+    }
+  });
+
+  it('the seam refuses parameters outside RFC 9106 or above the 256 MiB cap', async () => {
+    const password = encodeUtf8('long phrase');
+    const salt = new Uint8Array(16);
+    const seam = (pw: Uint8Array, sa: Uint8Array, params: Argon2idParams) =>
+      argon2idWithSecretAndAd(pw, sa, params, {
+        secret: new Uint8Array(0),
+        ad: new Uint8Array(0),
+        length: 32,
+      });
     for (const params of [
       { ...SMALL, memoryKiB: 31 },
       { ...SMALL, memoryKiB: 262145 },
@@ -53,11 +78,12 @@ describe('argon2id', () => {
       { ...SMALL, parallelism: 0 },
       { ...SMALL, iterations: 1.5 },
     ]) {
-      await refusedWith(() => argon2id(password, salt, params), 'invalid_argument');
+      await refusedWith(() => seam(password, salt, params), 'invalid_argument');
     }
-    await refusedWith(() => argon2id(password, new Uint8Array(7), SMALL), 'invalid_argument');
+    await refusedWith(() => seam(password, new Uint8Array(7), SMALL), 'invalid_argument');
+    await refusedWith(() => argon2id(password, new Uint8Array(7), FLOOR), 'invalid_argument');
     await refusedWith(
-      () => argon2id('x' as unknown as Uint8Array, salt, SMALL),
+      () => argon2id('x' as unknown as Uint8Array, salt, FLOOR),
       'invalid_argument',
     );
   });

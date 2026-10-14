@@ -21,8 +21,8 @@
       "card": "M1-7d",
       "phase": "M1a"
     },
-    "safety-code": {
-      "card": "M1-1f",
+    "safety-code-recompute": {
+      "card": "M1-1c",
       "phase": "M1a"
     }
   }

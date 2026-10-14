@@ -51,7 +51,8 @@ Vectors can land before the code they test (M1-1h, tests first). Such a suite is
 | `placeholder-sha256` | committed | SHA-256 over published NIST CAVP, FIPS 180-2 and RFC 6234 values. It proves the harness. Generator: `tools/vectors/generate_sha256.py` (CPython `hashlib`, cross-checked against the published digests). |
 | `encodings` | pending (M1-2a) | 04 §2.4.1 canonical encodings: every path of the table at its byte length, wrong lengths, the non-canonical forms, integer tokens, and the cross-class byte comparisons |
 | `fingerprint` | pending (M1-1b) | 04 §2.9 owner and agent fingerprints: digest, short and long forms |
-| `safety-code` | pending (M1-1f follow-up, after M1-1c: the steps 1-5 cases need the envelope helpers) | 04 §3.6.1: commitment, T, digest and 12-digit code with edge cases, role swap, labels, and a signed handshake/ack pair recomputed per steps 1-5 with one failing pair per step |
+| `safety-code` | committed (M1-1f) | 04 §3.6.1: commitment, reveal check, T, digest and 12-digit code with edge cases, role swap, labels |
+| `safety-code-recompute` | pending (M1-1c) | 04 §3.6.1 steps 1-5: a signed handshake/ack pair recomputed by both sides, with one failing pair per step 1-4. Split from `safety-code` (IR-M1-1f-1 M-1) because it needs the envelope helpers; same generator inputs, cases unchanged |
 | `jcs` | pending (M1-1a) | RFC 8785: the RFC's samples and Appendix B numbers, AgentLink shapes; lone surrogates, NaN, Infinity and duplicate keys rejected |
 | `tagged-hash` | pending (M1-1a) | BIP-340 tagged hashes under `agentlink/envelope/v1`, `agentlink/owner-action/v1` and BIP-340 tags |
 | `hkdf-derive` | pending (M1-1b) | RFC 5869; 04 §2.1 derivation (labels × epochs 0–2, counters, u32/u8 bounds, unknown labels); public identities (canonical and EIP-55 address, x-only keys, X25519 and `kid`); the agent ID (04 §2.9) |

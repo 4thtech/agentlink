@@ -8,6 +8,7 @@ import { keystoreFile } from './keystore-file';
 import { ownerWrap } from './owner-wrap';
 import { pairing } from './pairing';
 import { placeholderSha256 } from './placeholder-sha256';
+import { safetyCode } from './safety-code';
 import { taggedHashSuite } from './tagged-hash';
 
 /**
@@ -25,5 +26,6 @@ export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['owner-wrap', ownerWrap],
   ['pairing', pairing],
   ['placeholder-sha256', placeholderSha256],
+  ['safety-code', safetyCode],
   ['tagged-hash', taggedHashSuite],
 ]);
