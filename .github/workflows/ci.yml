@@ -188,6 +188,11 @@ jobs:
         if: needs.detect.outputs.needs_playwright == 'true'
         run: pnpm exec playwright install --with-deps chromium firefox webkit
 
+      # Provenance: every committed vector file must equal the output of the independent generator
+      # it names (a script under tools/vectors/, run in `--check FILE` mode, which writes nothing).
+      - name: Check committed vectors against their independent generators
+        run: node tools/vectors/check-generators.mjs
+
       # Crypto + EIP-712 vectors across Node, browsers (Playwright) and Workers (workerd).
       - name: Check test vectors across runtimes
         run: pnpm vectors:check

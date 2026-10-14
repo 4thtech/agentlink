@@ -20,7 +20,8 @@ export const REQUIRED_RUNTIMES = Object.freeze([
  * what the engine reported (test-vectors/harness/runtime.ts), not what the config asked for.
  *
  * @param {unknown} report Parsed Vitest JSON report.
- * @param {ReadonlyArray<{ suite: string, caseIds: readonly string[] }>} suites From the vector files.
+ * @param {ReadonlyArray<{ suite: string, caseIds: readonly string[] | null }>} suites From the vector
+ *   files; `caseIds` is null when a file has no `cases` array.
  * @param {readonly string[]} [required]
  * @returns {string[]} Problems; empty when every runtime passed its identity check and every case.
  */
@@ -51,6 +52,7 @@ export function checkCoverage(report, suites, required = REQUIRED_RUNTIMES) {
       problems.push(`${runtime}: no passing runtime identity test`);
     }
     for (const { suite, caseIds } of suites) {
+      if (!Array.isArray(caseIds)) continue;
       const missing = caseIds.filter((id) => !passed.has(`${runtime}\u0000${suite}\u0000${id}`));
       if (missing.length > 0) {
         problems.push(`${runtime}: ${suite}: no passing result for ${missing.join(', ')}`);

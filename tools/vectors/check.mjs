@@ -3,6 +3,8 @@
 //   1. every required runtime reported its own identity and passed every committed case;
 //   2. the run created, changed or deleted nothing under test-vectors/.
 // Extra command-line arguments are not forwarded on purpose: a filtered run is not a vectors check.
+// The root script calls this file directly, not through a package script and turbo, so no package
+// manifest can turn the check into a no-op (IR-M0-9-1 F01).
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -40,7 +42,11 @@ function readSuites(dir) {
     .filter((entry) => entry.isDirectory() && existsSync(join(dir, entry.name, 'vectors.json')))
     .map((entry) => {
       const file = JSON.parse(readFileSync(join(dir, entry.name, 'vectors.json'), 'utf8'));
-      return { suite: entry.name, caseIds: (file.cases ?? []).map((c) => c.id) };
+      // A missing or non-array `cases` yields caseIds = null, which checkCoverage rejects.
+      return {
+        suite: entry.name,
+        caseIds: Array.isArray(file.cases) ? file.cases.map((c) => c?.id) : null,
+      };
     });
 }
 
@@ -89,7 +95,7 @@ console.log('\nvectors:check runtime identities');
 for (const runtime of REQUIRED_RUNTIMES) {
   console.log(`  ${runtime.padEnd(9)} ${identities.get(runtime) ?? 'MISSING'}`);
 }
-const total = suites.reduce((n, s) => n + s.caseIds.length, 0);
+const total = suites.reduce((n, s) => n + (s.caseIds?.length ?? 0), 0);
 console.log(`  ${String(suites.length)} suite(s), ${String(total)} case(s) per runtime`);
 
 if (problems.length > 0) {

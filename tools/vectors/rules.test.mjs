@@ -81,6 +81,16 @@ describe('checkCoverage', () => {
     ]);
   });
 
+  it('rejects a suite with zero cases (IR-M0-9-1 F04)', () => {
+    const empty = [...suites, { suite: 'empty-suite', caseIds: [] }];
+    expect(checkCoverage(fullReport(), empty)).toEqual(['empty-suite: no cases']);
+  });
+
+  it('rejects a suite whose vector file has no cases array (IR-M0-9-1 F04)', () => {
+    const broken = [...suites, { suite: 'broken-suite', caseIds: null }];
+    expect(checkCoverage(fullReport(), broken)).toEqual(['broken-suite: no cases']);
+  });
+
   it('rejects a committed case that no runtime ran', () => {
     const more = [{ suite: 'placeholder-sha256', caseIds: ['a', 'b', 'c'] }];
     const problems = checkCoverage(fullReport(), more);

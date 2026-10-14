@@ -4,7 +4,8 @@
 // (runtime, suite, case) triple, so a project that silently runs somewhere else, or not at all,
 // fails `pnpm vectors:check`.
 import { describe, expect, inject, test } from 'vitest';
-import { vectorFiles } from './registry';
+import { compareToVector } from './compare';
+import { vectorFiles, type VectorCase } from './registry';
 import { observeRuntime, type RuntimeId } from './runtime';
 import { suiteModules } from './suites/index';
 
@@ -40,13 +41,19 @@ test('at least one vector suite is committed', () => {
 for (const { directory, file } of vectorFiles) {
   describe(`${directory} v${String(file.version)}`, () => {
     const suite = suiteModules.get(file.suite);
+    const cases: readonly VectorCase[] = Array.isArray(file.cases) ? file.cases : [];
 
     test('has a suite module and a matching directory', () => {
       expect(file.suite).toBe(directory);
       expect(suite, `no suite module registered for "${file.suite}"`).toBeDefined();
     });
 
-    for (const testCase of file.cases) {
+    // A suite with no cases proves nothing (IR-M0-9-1 F04).
+    test('has at least one case', () => {
+      expect(cases.length).toBeGreaterThan(0);
+    });
+
+    for (const testCase of cases) {
       test(testCase.id, async ({ task }) => {
         task.meta.vectors = {
           kind: 'case',
@@ -55,13 +62,9 @@ for (const { directory, file } of vectorFiles) {
           caseId: testCase.id,
         };
         if (suite === undefined) throw new Error(`no suite module for "${file.suite}"`);
-        const comparisons = await suite.evaluate(testCase);
-        // A suite that computes nothing must not pass.
-        expect(comparisons.length).toBeGreaterThan(0);
-        for (const { field, actual, expected } of comparisons) {
-          expect(expected, `${field}: empty expected value`).not.toBe('');
-          expect(actual, `${field} (${testCase.source})`).toBe(expected);
-        }
+        // Expected values come from the committed vector only; the suite returns what it computed.
+        const problems = compareToVector(testCase.expected, await suite.evaluate(testCase));
+        expect(problems, testCase.source).toEqual([]);
       });
     }
   });

@@ -11,8 +11,14 @@ Vectors are generated once and committed. Tests never regenerate them; CI fails 
 changes anything under test-vectors/ (docs/process/development-process.md §10, test-vectors/README.md).
 
 Usage (from the repository root):
-  python3 tools/vectors/generate_sha256.py --check   # compare with the committed file, write nothing
-  python3 tools/vectors/generate_sha256.py --write   # (re)write the committed file; needs a spec change
+  python3 tools/vectors/generate_sha256.py --check [FILE]  # compare FILE (default: the committed
+                                                           # suite file) with the generator output;
+                                                           # writes nothing, exits 1 on mismatch
+  python3 tools/vectors/generate_sha256.py --write         # (re)write the committed file; needs a
+                                                           # spec change
+
+Every generator under tools/vectors/ supports `--check FILE` the same way; CI runs it for every
+committed vectors.json (tools/vectors/check-generators.mjs, IR-M0-9-1 F02).
 """
 
 import argparse
@@ -110,7 +116,13 @@ def build():
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--check", action="store_true", help="compare with the committed file")
+    mode.add_argument(
+        "--check",
+        nargs="?",
+        const=str(OUT),
+        metavar="FILE",
+        help="compare FILE (default: the committed suite file) with the generator output",
+    )
     mode.add_argument("--write", action="store_true", help="write the committed file")
     args = parser.parse_args()
 
@@ -120,13 +132,14 @@ def main():
         print(f"wrote {OUT}")
         return
 
-    committed = json.loads(OUT.read_text(encoding="utf-8"))
+    target = Path(args.check)
+    committed = json.loads(target.read_text(encoding="utf-8"))
     # The generator's own version may differ between machines; everything else must match.
     committed.get("generator", {}).pop("version", None)
     document["generator"].pop("version")
     if committed != document:
-        sys.exit(f"{OUT} differs from the generator output")
-    print(f"{OUT}: matches the generator output ({len(document['cases'])} cases)")
+        sys.exit(f"{target} differs from the generator output")
+    print(f"{target}: matches the generator output ({len(document['cases'])} cases)")
 
 
 if __name__ == "__main__":

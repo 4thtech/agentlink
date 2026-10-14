@@ -6,7 +6,6 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "vectors:check": "node ../tools/vectors/check.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint ."
   }

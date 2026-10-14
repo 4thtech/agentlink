@@ -19,7 +19,7 @@
     "lint": "turbo run lint check && prettier --check .",
     "typecheck": "turbo run typecheck",
     "test:e2e": "turbo run test:e2e",
-    "vectors:check": "turbo run vectors:check",
+    "vectors:check": "node tools/vectors/check.mjs",
     "format": "prettier --write .",
     "changeset": "changeset"
   },

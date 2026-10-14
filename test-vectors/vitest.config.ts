@@ -16,7 +16,7 @@ export default defineConfig({
         test: {
           name: 'node',
           environment: 'node',
-          include: [SHARED, 'harness/schema.test.ts'],
+          include: [SHARED, 'harness/schema.test.ts', 'harness/compare.test.ts'],
           provide: { vectorsRuntime: 'node' },
         },
       },
