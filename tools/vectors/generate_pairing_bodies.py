@@ -23,6 +23,11 @@ reused. The reference parser is this generator's own reading of 04 (Python `re`)
 signatures come from the `eip712` generator, the proof from the `pairing` generator. Keys, nonces
 and the invite secret are synthetic, derived from labelled test seeds.
 
+Version 2 (IR-M1-2d-1 F02; 04 §3.4, §4 as merged in PR #70): a bare `0x` relay label is numeric
+(`0x` followed by zero or more hex digits), and `name` is a well-formed string (no lone surrogate)
+of at most 256 code points, counted as code points, not UTF-16 units. A lone surrogate has no
+vector: the harness JSON loader (Vite) refuses one in a vector file.
+
 Usage: python3 -I tools/vectors/generate_pairing_bodies.py --check [FILE] | --write
 """
 
@@ -37,7 +42,7 @@ import generate_pairing as pairing  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "pairing-bodies"
-VERSION = 1
+VERSION = 2
 COMMIT_TAG = "agentlink/safety-commit/v1"
 N = v.SECP256K1_N
 MAX_INT = 2**53 - 1
@@ -72,7 +77,7 @@ def parse_relay_url(url):
     for label in labels:
         if not re.fullmatch(r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?", label):
             raise ValueError("relay URL: bad label")
-        if re.fullmatch(r"[0-9]+|0x[0-9a-f]+", label):
+        if re.fullmatch(r"[0-9]+|0x[0-9a-f]*", label):
             raise ValueError("relay URL: numeric label")
     if not re.fullmatch(r"[a-z]{2,63}|xn--[a-z0-9-]{1,59}", labels[-1]):
         raise ValueError("relay URL: bad last label")
@@ -127,8 +132,13 @@ def exact_keys(body, fields):
 
 
 def parse_name(value):
+    """04 §3.4: a well-formed string (no lone surrogate) of at most 256 code points."""
     if not isinstance(value, str):
         raise ValueError("name: not a string")
+    if any(0xD800 <= ord(c) <= 0xDFFF for c in value):
+        raise ValueError("name: lone surrogate")
+    if len(value) > 256:
+        raise ValueError("name: over 256 code points")
 
 
 def parse_invite(body):
@@ -406,6 +416,24 @@ def build():
         ("parseInvite", "name", None, "as null", "null"),
         ("parseCardUpdate", "name", 7, "as a number", "number"),
     ]
+    # `name` (04 §3.4): a well-formed string of at most 256 code points, counted as code points
+    # (an astral character is one code point and two UTF-16 units).
+    def named(op, name):
+        if op == "parseHandshake":
+            return handshake_of(a, party("pairing-bodies-b", name, RELAYS_B), invite_id, secret, nonce_a, nonce_b)
+        other = party("pairing-bodies-a", name, RELAYS_A)
+        if op == "parseInvite":
+            return invite_of(other, invite_id, secret, nonce_a)
+        return {"card": other["card"], "cardSig": other["cardSig"], "name": other["name"], "relays": other["relays"]}
+
+    name_256 = "Agent \U0001d400\U0001d401 \u00e9 " + "x" * 245
+    if len(name_256) != 256 or len(name_256.encode("utf-16-le")) // 2 != 258:
+        v.fail("name_256")
+    for op in ("parseInvite", "parseHandshake", "parseCardUpdate"):
+        prefix, spec = bodies[op][0], bodies[op][1]
+        case(f"{prefix}-accept-name-256-code-points", op, f"{spec}: a name of exactly 256 code points (258 UTF-16 units; 04 §3.4)", named(op, name_256), True)
+        case(f"{prefix}-reject-name-257-code-points", op, f"{spec}: a name of 257 code points (04 §3.4: at most 256)", named(op, name_256 + "x"), False)
+
     for op, field, value, why, tag in spellings:
         slug = re.sub(r"([a-z])([A-Z])", r"\1-\2", field).lower()
         prefix, spec = bodies[op][0], bodies[op][1]
@@ -430,6 +458,7 @@ def build():
         ("reject-ipv4", [RELAYS_A[0], "wss://127.0.0.1"], False, "an IPv4 literal"),
         ("reject-ipv4-integer", [RELAYS_A[0], "wss://2130706433.example.com"], False, "an all-decimal label"),
         ("reject-hex-label", [RELAYS_A[0], "wss://0x7f.example.com"], False, "a 0x-hex label"),
+        ("reject-bare-0x-label", [RELAYS_A[0], "wss://0x.example.com"], False, "a bare 0x label (0x followed by zero hex digits is numeric)"),
         ("reject-numeric-first-label", [RELAYS_A[0], "wss://1.relay.example"], False, "an all-numeric first label"),
         ("reject-ipv6", [RELAYS_A[0], "wss://[::1]"], False, "a bracketed IPv6 literal"),
         ("reject-localhost", [RELAYS_A[0], "wss://localhost"], False, "localhost"),
