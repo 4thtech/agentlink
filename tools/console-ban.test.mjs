@@ -8,10 +8,17 @@ import { readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ESLint } from 'eslint';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const eslint = new ESLint({ cwd: root });
+let eslint;
+// The first lintText loads the config, the TypeScript parser and the plugins, which can take more
+// than a test's timeout on a cold CI runner (M0-10d). Warm up here, under an explicit hook timeout,
+// so every test measures only a warm lint.
+beforeAll(async () => {
+  eslint = new ESLint({ cwd: root });
+  await eslint.lintText('export {};\n', { filePath: join(root, 'packages/core/src/warmup.ts') });
+}, 60_000);
 
 const zones = ['packages', 'apps'].flatMap((top) =>
   readdirSync(join(root, top), { withFileTypes: true })

@@ -17,8 +17,8 @@ const BOUNDARY = new Set([
 
 let eslint;
 // The first lintText loads the config, the TypeScript parser and the plugins, which can take more
-// than a test's 5 s on a cold CI runner. Warm up here, under an explicit hook timeout, so every test
-// keeps its own default timeout.
+// than a test's timeout on a cold CI runner. Warm up here, under an explicit hook timeout, so every
+// test measures only a warm lint (the tools-wide test timeout is set in tools/vitest.config.mjs).
 beforeAll(async () => {
   eslint = new ESLint({ cwd: REPO, overrideConfigFile: join(REPO, 'eslint.config.mjs') });
   await eslint.lintText('export {};\n', { filePath: join(REPO, 'packages/core/src/warmup.ts') });
