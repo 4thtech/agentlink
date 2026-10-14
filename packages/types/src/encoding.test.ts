@@ -83,6 +83,16 @@ describe('base64url (no padding, canonical, exact byte length)', () => {
     bad(schema, b64u(15));
     bad(schema, b64u(101));
     bad(schema, `${b64u(30)}==`);
+    // Padded forms whose length is a multiple of 4 decode to an in-range length if '=' were
+    // treated as data; they must still be rejected for the character itself.
+    bad(schema, `${b64u(32)}=`);
+    bad(schema, `${b64u(31)}==`);
+    expect(base64urlByteLength(`${b64u(32)}=`)).toBe(null);
+  });
+
+  it('rejects = anywhere, even at a length that would otherwise fit', () => {
+    bad(base64url(16), `=${ID16.slice(1)}`);
+    bad(base64url(16), `${ID16.slice(0, 10)}=${ID16.slice(11)}`);
   });
 });
 
