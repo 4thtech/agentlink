@@ -10,11 +10,11 @@ All packages live in the public `agentlink` monorepo (see 09). Every package mus
 |---|---|---|
 | `@agentlink/types` | — | Shared types, zod schemas, constants (kinds, receipt types, fee types) |
 | `@agentlink/log` | — | Redacting structured logger used by every package (04 §8 rule 4, I-7); secret-canary test helper (`@agentlink/log/testing`) |
-| `@agentlink/crypto` | noble, hpke | Key derivation, HPKE seal/open, AES-GCM, STREAM file encryption, hashing, JCS, BIP-340 sign/verify, EIP-712 helpers |
+| `@agentlink/crypto` | noble, hpke | Key derivation, HPKE seal/open, AES-GCM, STREAM file encryption, hashing, JCS, BIP-340 sign/verify, EIP-712 helpers; `KeyStore`, `OwnerKeyStore` and `EnvelopeKeys` interfaces (G-2, 04 §3.1.1) |
 | `@agentlink/chain` | viem, types, crypto | Chain configs, contract ABIs, fee quotes, credits, record/receipt building, submitter client, proof verification |
 | `@agentlink/transport-nostr` | nostr-tools, types, crypto | `Transport` implementation: relay pool, gift wrap/unwrap, subscriptions, sync cursors |
 | `@agentlink/storage` | types, crypto | `StorageAdapter` interface; `inline`, `drop` (default, D-48) and `s3` adapters (P0); `gdrive`, `dropbox`, `onedrive` connectors (P1, M2, D-49); `ipfs-pinning` (P2); storage selection (§5.6) |
-| `@agentlink/core` | all above | `AgentLinkClient`: identity, contacts, envelopes, threads, files, proofs, policies, approvals; `KeyStore`, `Store`, `ApprovalChannel` interfaces |
+| `@agentlink/core` | all above | `AgentLinkClient`: identity, contacts, envelopes, threads, files, proofs, policies, approvals; `Store`, `ApprovalChannel` interfaces (the key interfaces are in crypto, G-2) |
 | `@agentlink/node` | core | Node implementations: keychain `KeyStore` and the opt-in passphrase-locked file `KeyStore` for headless machines (§9, D-54), SQLite `Store`, local approval server (Node only) |
 | `@4thtech/agentlink` | node, core | CLI + MCP server (stdio) (Node only) |
 
@@ -98,14 +98,16 @@ Every mutating call runs: **policy check → (approval) → action → store →
 
 ```ts
 interface Transport {
-  publish(envelope: Envelope, recipients: NostrRecipient[], keys: KeyStore): Promise<PublishResult>; // one gift wrap per recipient key
-  subscribe(keys: KeyStore, onEnvelope: (e: Envelope, meta) => void): Unsubscribe;
-  sync(keys: KeyStore, since: number): Promise<Envelope[]>;
+  publish(envelope: Envelope, recipients: NostrRecipient[], keys: EnvelopeKeys): Promise<PublishResult>; // one gift wrap per distinct recipient key
+  subscribe(keys: EnvelopeKeys, onEnvelope: (e: Envelope, meta) => void): Unsubscribe;
+  sync(keys: EnvelopeKeys, since: number): Promise<Envelope[]>;
 }
 
-// KeyStore (03 §3) exposes the secret-key operations the transport needs:
-//   signNostr(event), nip44Encrypt(peerPubkey, plaintext), nip44Decrypt(peerPubkey, ciphertext), hpkeOpen(wrapped)
-// Seal signing uses the agent key; gift-wrap encryption uses a fresh ephemeral key created inside @agentlink/crypto.
+// EnvelopeKeys (03 §3, 04 §3.1.1) exposes the secret-key operations the transport needs:
+//   signNostr(event), nip44Encrypt(peerPubkey, plaintext), nip44Decrypt(peerPubkey, ciphertext, {epoch})
+// It is the agent's KeyStore, or an OwnerSession on owner surfaces (owner-authored envelopes, owner copies).
+// Seal signing uses the sender's key (seal key = envelope `from`); gift-wrap encryption uses a fresh
+// ephemeral key created inside @agentlink/crypto. Size checks before JSON.parse: 04 §3.1.1.
 ```
 
 An XMTP adapter (P2) implements the same interface; envelopes are unchanged.
@@ -126,9 +128,9 @@ An XMTP adapter (P2) implements the same interface; envelopes are unchanged.
   **Residual risk.** A browser `WebSocket` (the console) cannot resolve or pin an address. There, the schema rule and the platform apply: browsers enforce Private Network Access where it has shipped, and Workers cannot open connections to private addresses. M1-5 tests the steps above with a stub resolver: a rebinding answer, a mixed public and private answer, a 6to4 answer and a NAT64 answer are all skipped.
 - **Delivery reliability:** publish to all listed relays, consider sent when ≥ 2 acknowledge (`OK`). Retry with backoff for up to 24 h from the local outbox.
 - **Sync:** `REQ` with `#p` = own Nostr pubkeys, `kinds: [1059]`, `since = lastSync − 48 h` (NIP-59 randomizes gift-wrap timestamps up to 2 days back, so `created_at` cursors alone miss messages). Deduplicate by envelope ID (keep a seen-set for ≥ 7 days). Support **NIP-42 AUTH**, since many DM relays serve kind 1059 only to the authenticated recipient.
-- **Size:** envelope ≤ 24 KB serialized; inline files ≤ 12 KB; check the final gift-wrap size against each relay's NIP-11 `max_message_length` and skip relays that cannot carry it.
+- **Size:** envelope ≤ 24 KB serialized (24 576 bytes; the relay-frame, envelope, recipient and `ct` limits and where each is enforced are in 04 §3.1.1); inline files ≤ 12 KB; check the final gift-wrap size against each relay's NIP-11 `max_message_length` and skip relays that cannot carry it.
 - **Relay retention:** public relays may drop events; agents should sync at least daily. The optional 4thTech relay keeps gift wraps for 30 days (it only ever sees ciphertext).
-- **Owner copies:** the owner console subscribes with the owner Nostr key and receives copies of all envelopes for its agents.
+- **Owner copies:** the owner console subscribes with the owner Nostr key and receives copies of all envelopes for its agents. Reading them, including NIP-42 AUTH, runs in an `OwnerSession` with presence (04 §3.1.1).
 
 ---
 

@@ -237,6 +237,7 @@ Owner-only operations: approve/deny, change policies, add/remove allowed folders
 ### 2.6 Key rotation
 
 - A new `keyEpoch` derives new Nostr and encryption keys (EVM key unchanged) and issues a new agent card. Old epoch keys are re-derivable from the seed, so history stays readable.
+- Signing and encryption always use the current epoch. Decryption picks the epoch from the recipient `kid` or the gift wrap's `p` tag. A new envelope is accepted only from the sender's current key, except a `card-update` (§3.1.1, G-2; proposed, owner confirms at merge).
 - Contacts update the card when they see a higher epoch signed by the same owner (envelope type `card-update`).
 - Owner key rotation (re-signing all agent cards) is P2.
 
@@ -550,7 +551,99 @@ All binary values are base64url **without padding** in JSON unless §2.4.1 puts 
 
 - `envelopeHash = sha256(JCS(envelope without "sig"))` (RFC 8785). This is the value notarized on-chain.
 - AEAD additional data = `sha256(JCS({v, id, thread, from, createdAt, recipients}))`.
-- `sig` = BIP-340 Schnorr by `from` over `taggedHash("agentlink/envelope/v1", envelopeHash)` (BIP-340 tagged hash), so envelope signatures can never be confused with Nostr event signatures.
+- `sig` = BIP-340 Schnorr by `from` over `taggedHash("agentlink/envelope/v1", envelopeHash)` (BIP-340 tagged hash), so envelope signatures can never be confused with Nostr event signatures. Exact bytes, keys, verification and size limits: §3.1.1.
+
+#### 3.1.1 Envelope signatures, keys and limits (G-2; proposed, owner confirms at merge)
+
+**What is signed.** One construction for every envelope and every sender:
+1. `E` is the strictly parsed envelope (M1-1c) with every key except `sig`: `v`, `id`, `thread`, `from`, `createdAt`, `recipients` (in the order sent) and `aead` (`alg`, `iv`, `ct`). The hash is computed from the parsed copy, so what is hashed is what was checked.
+2. `envelopeHash = sha256(JCS(E))`, 32 bytes.
+3. `m = taggedHash("agentlink/envelope/v1", envelopeHash) = sha256(sha256(t) ‖ sha256(t) ‖ envelopeHash)`. `t` is the 21 UTF-8 bytes of the tag, and `envelopeHash` enters as its 32 raw bytes, never as hex.
+4. `sig = BIP-340 Sign(sk, m, auxRand)`, with 32 fresh CSPRNG bytes as `auxRand` (vectors fix them). `sk` is the secret key of `from` (table below). `sig` is the 64-byte signature as 128 lowercase hex (§2.4.1).
+
+The AAD (§3.1) covers the header only. The hash also covers `aead`, so the signature commits to the ciphertext. It does not commit to the plaintext, because AES-GCM is not key-committing (G-46).
+
+**Domain separation.** A Nostr key signs several kinds of object. Each has its own 32-byte message:
+
+| Object | Message that BIP-340 signs | Key |
+|---|---|---|
+| Envelope `sig` (this section) | `taggedHash("agentlink/envelope/v1", envelopeHash)` | agent or owner Nostr key |
+| `SignedOwnerAction` `sig` (§2.5.1) | `taggedHash("agentlink/owner-action/v1", sha256(JCS(OwnerAction)))` | owner Nostr key |
+| Nostr events: seal (kind 13), NIP-42 AUTH (kind 22242) | the NIP-01 event id: `sha256` of the JSON text `[0,"<pubkey>",…]` | agent or owner Nostr key |
+| Drop requests (§4, 07 §5.4) | as fixed there | drop key only |
+
+- The two tagged messages start with different 64-byte prefixes, and a NIP-01 id hashes a JSON text that starts with `[0,"`. A signature valid for one object is valid for another only through a SHA-256 collision. The owner-action tag and the envelope tag are never interchangeable, even over the same 32 bytes.
+- **Rule.** A new BIP-340 use of an agent or owner Nostr key gets its own tag `agentlink/<name>/v1` and a row in this table. No key signs a raw, untagged digest. A verifier checks a signature only under the tag of the object it verifies.
+- The EVM key (ECDSA, EIP-712) never signs an envelope, and the drop key signs only drop requests.
+
+**Which key signs.**
+
+| Envelope types | `from` and signing key | Signed through |
+|---|---|---|
+| Every type an agent sends: the 02 F-22 types, `handshake`, `handshake-ack`, `card-update`, `proof`, `ack`, `approval-request` and the `policy` echo | The agent's Nostr key at its current `keyEpoch` (§2.6) | `KeyStore.signEnvelopeHash` |
+| `approval`, `policy` (owner → agent) and `revoke` (§3.4.1) | The owner's Nostr key (epoch 0; owner-key rotation is P2, §2.6) | `OwnerSession.signEnvelopeHash`, in a session from `OwnerKeyStore.unlock(presence)` (§2.5) |
+
+- **Owner signing.** The owner key signs an envelope only for those three types, only in a session opened with presence, and in the same gesture as the `SignedOwnerAction` it carries. Its seal (kind 13) is signed by the same session, because §3.5 requires the seal key to equal `from`.
+- **The owner's envelope signature authorises nothing.** It lets the receiver attribute the envelope to the owner key. Authority comes only from the carried `SignedOwnerAction` (§2.5, §3.4.1).
+- **Receivers enforce the table.** `approval` and `policy` are accepted only from the agent's own owner key (§3.4.1). `revoke` follows §3.4.1: authority comes from the carried object, whatever the `from`. Any other type whose `from` is the agent's own owner key, or the `ownerNostr` of a contact's card, is dropped.
+
+**Key interfaces (G-2).**
+- **Location.** `KeyStore`, `OwnerKeyStore`, `OwnerSession` and the shared `EnvelopeKeys` interface are types in `@agentlink/crypto`'s main entry, so `transport-nostr` and `core` both use them without a dependency cycle (03 §3, 07 §1). The implementations that hold a seed live in the restricted subpath `@agentlink/crypto/keystore` and in `@agentlink/node` (keychain and file backends). Test doubles (`MemoryKeyStore`, `MemoryOwnerKeyStore`) are in an entry point that deps-check allows only in tests, `test-vectors` and e2e, never in production `src` (IR-M1-1g-1 M-2). The self-host Worker gets its own backend (M2-3a), not the test double.
+- **`EnvelopeKeys`** is the set of methods that build and open envelopes. `KeyStore` (the agent's keys) and `OwnerSession` (the owner's keys) both implement it, so the transport and core paths are the same for both:
+  - `signEnvelopeHash(envelopeHash)`: takes the 32-byte `envelopeHash` and returns `sig`. It applies the tag itself, so no method signs an untagged digest. Hash-in gives the holder nothing new: the agent key signs every envelope anyway, and a session can sign any owner action. The caller computes the hash from the parsed envelope with M1-1c's `envelopeHash`.
+  - `signNostr(event)`: seals and NIP-42 AUTH. On an `OwnerSession`, only kinds 13 and 22242 are signed, and any other kind is refused. A session is a bearer handle (IR-M1-1g-1 I-5), and a general owner signer could replace the owner-backup event (§2.3). That event gets its own method when G-36 is resolved.
+  - `nip44Encrypt(peer, plaintext)` and `nip44Decrypt(peer, payload, {epoch?})`.
+  - `unwrapCek(wrapped, envelopeId, {epoch?})`: opens one recipient entry and returns the 32-byte CEK, which the caller wipes after the payload AEAD. It builds `info = "agentlink/v1/cek" ‖ id` itself from the 16-byte envelope id. This replaces `hpkeOpen(wrapped, info)`, so a KeyStore is never a general HPKE-open oracle for other contexts (IR-M1-1c-1 F5).
+- **`KeyStore`** adds `getPublicBundle({epoch?})` (public keys and `kid` at that epoch) and `sign712`. **`OwnerSession`** adds `signOwnerAction` and `sign712`.
+- **Epochs.** Signing and encryption always use the current epoch. `{epoch}` exists only on the decrypting methods and on the public-key lookup. An epoch above the current one is refused (`epoch_unavailable`). An `OwnerSession` has epoch 0 only.
+- **Owner sessions.** A production surface collects presence itself, from the owner's own input: an interactive terminal prompt, a WebAuthn ceremony or the native approval window. It never takes presence from an environment variable, a file, a command-line argument or a tool input (§2.5, §2.8, D-54). A session is never handed to MCP-reachable or agent-reachable code. Its expiry is enforced on a monotonic clock, and `lock()` also stops an `unlock` that is still in flight (IR-M1-1g-1 I-4, I-5, L-1, L-2).
+
+**Recipient entries (sender, core).**
+- The sender writes exactly the set of §3.2, or of §3.4.1 for the owner channel, with **one entry per distinct `enc` key**. When both agents have the same owner, that owner has a single entry. Gift wraps follow the same rule: one per distinct Nostr key (§3.5).
+- The order of the entries is the sender's choice. The hash and the AAD cover it, and receivers compare the entries as a set.
+
+**The owner reads its envelopes (I-9).** The owner is a recipient of its agents' envelopes (§3.2 entries 2 and 3) and of the owner channel (§3.4.1). It also reads back its own `approval`, `policy` and `revoke` on another device. Senders take `ownerEnc` (the CEK wrap) and `ownerNostr` (the gift wrap) from the cards. All steps run inside one `OwnerSession`:
+1. `nip44Decrypt` of the gift wrap (from its ephemeral key) under the owner Nostr key gives the seal. The seal's signature is verified, and `nip44Decrypt` of its content (from the seal key) gives the rumor.
+2. The envelope is checked as in the verification rules below, steps 1–4.
+3. The core finds the one entry whose `kid` is the `kid` of `ownerEnc`.
+4. `unwrapCek(entry, id)` gives the CEK. The payload is decrypted with the AAD (§3.1), and the CEK is wiped.
+
+- **Reading needs presence.** The gift wrap is addressed to `ownerNostr`, the key that signs owner actions, so no read-only owner key exists. A read session gets the same protections as a signing session. Receiving owner copies from DM relays also needs NIP-42 AUTH with the owner key (kind 22242) in the same session. How long the console keeps a read session open is decided in M2-2d, and it never outlives the console's own unlock. A separate owner inbox key would need a new card field and is not proposed.
+- A surface may keep the plaintext it read under its own at-rest rules (07 §3, 08). It never keeps the owner keys.
+- An agent's `KeyStore` never holds owner keys and never opens an owner entry.
+
+**Verification (fail closed).** Inbound envelopes are checked in this order. A failure at any step drops the envelope, with nothing processed in part. Errors never echo the input (I-7).
+1. **Size before parsing** (transport): the limits below.
+2. **Transport** (§3.5, M1-5a): the gift wrap and seal signatures verify, the rumor key equals the seal key, the seal key equals `from` (as bytes), and the `agentlink` tag is present.
+3. **Strict parse** (M1-1c): exact keys and encodings (§2.4.1); 1 to 8 recipients with distinct `kid`s; the `ct` limit.
+4. **Signature.** `from` lifts to a curve point (BIP-340 `lift_x`), and `sig` verifies under `from` over `m` above. Only the envelope tag is tried. An untagged `envelopeHash` and a NIP-01 check are never accepted.
+5. **Own entry.** The core looks for an entry whose `kid` matches one of its own `enc` keys, at any epoch (`getPublicBundle({epoch})`). With none, the envelope is not for this agent. With one, there is exactly one `unwrapCek`, at that entry's epoch, so an envelope never makes the core try more than one HPKE open per local key. A failed open or AEAD is dropped (`open_failed`).
+6. **Payload.** The payload passes its strict schema (`@agentlink/types`, M1-2a; `terms` limits M1-21).
+7. **Sender role.** `from` must be the key that the type requires:
+   - a contact's agent key: the `agentNostr` of the contact's **current** card. A superseded epoch key is refused, except for `card-update` (§3.4.1), so a key replaced after a compromise cannot keep sending. The refused envelope is stored as refused and shown in the activity feed, never in `agentlink_inbox`. Owner copies stay readable.
+   - pairing types: as §3.6 and §3.4.1 state;
+   - owner types: as the table above;
+   - an unknown agent key goes to the requests queue (06), and only after steps 1–6.
+8. **Own owner (I-9).** The recipients must include the `kid` of the agent's own owner's `ownerEnc`. Without it, the envelope is stored as refused and shown in the activity feed, because the agent's owner could not read it. The check shows that an entry is present, not that it opens.
+9. **Freshness and uniqueness.** A `createdAt` more than 300 s in the future (`S`, §2.5.1) is refused. An `id` already stored with a different `envelopeHash` is refused, and the contact is flagged in the activity feed.
+
+Decrypting stored history with an older epoch key stays allowed (§2.6). Only accepting a new envelope from a superseded sender key is refused.
+
+**Size limits and where each one is enforced.** "24 KB" in §3.5 and 07 §4.2 means 24 576 bytes.
+
+| Limit | Value | Enforced in | Why |
+|---|---|---|---|
+| Inbound relay frame | ≤ 131 072 bytes (128 KiB), checked on the raw WebSocket message **before** `JSON.parse` | `transport-nostr` (M1-5b) | The largest valid gift wrap (NIP-44 payload at its maximum of 87 472 characters) is about 88 KB as an `EVENT` frame. The 128 KiB proposed in IR-M1-1c-1 F3 fits here, at the outermost layer |
+| NIP-44 payload | 132 to 87 472 characters, plaintext ≤ 65 535 bytes | `@agentlink/crypto` (M1-1g) | NIP-44 v2 |
+| Envelope (rumor `content`) | ≤ 24 576 bytes of UTF-8, checked on the string **before** `JSON.parse`. On send: the JCS envelope is checked before wrapping | `transport-nostr` (M1-5a), on both send and receive | §3.5. At this size the worst-case seal is 38 663 bytes (under the NIP-44 limit) and the `EVENT` frame is 55 131 bytes (under the common 64 KiB relay cap) |
+| `recipients` | 1 to 8 entries, distinct `kid`s | `@agentlink/crypto` parser (M1-1c), so every caller gets it | §3.2 needs at most 5 (with the P2 arbitrator), and the owner channel needs 2. 8 leaves room for one more role without a new version. It also caps the publish fan-out (one gift wrap per key) and the parse work, at about 157 bytes per entry |
+| `aead.ct` | 16 to 17 152 bytes decoded, so the payload plaintext is ≤ 17 136 bytes. Checked on the base64url length (≤ 22 870 characters) **before** decoding | `@agentlink/crypto` parser (M1-1c) | The largest multiple of 64 that keeps the worst-case envelope (8 entries, `createdAt` = 2^53 − 1) at or under 24 576 bytes as JCS (24 509 bytes). So every envelope that passes the parser fits §3.5 |
+| Exact recipient set; one HPKE open | per type (§3.2, §3.4.1) | `core` (M1-7b) | I-9, and bounded work per envelope |
+| Payload fields | payload schema (M1-2a), `terms` limits (M1-21), inline files per G-27 | `core` and `@agentlink/types` | |
+
+- **The IR-M1-1c-1 F3 values were checked and not adopted for `ct`.** A `ct` of 64 KiB + 16 gives an envelope of about 89 KB, above the 65 535-byte NIP-44 plaintext limit of the seal, so it could never be sent. D-48 sends files through the encrypted drop or the owner's storage, not inline, so the inline payload can stay small. The 1–8 recipient cap and a raw cap before `JSON.parse` are adopted, the second at both layers above.
+- A 12 KB inline file (16 384 base64url characters) still fits, with about 750 bytes left for the rest of the payload. G-27 ("inline only if the final envelope ≤ 24 KB") decides.
+- Raising a limit means older receivers refuse the larger envelopes. It is a spec change with a compatibility note, never a silent default change.
 
 ### 3.2 Recipient set (always)
 
@@ -742,7 +835,7 @@ The terms fingerprint is under Advanced. Tool summaries name only the contact, t
 - The envelope JSON is the `content` of an unsigned **rumor** (kind 14, tag `["agentlink","1"]`), sealed (kind 13) with the sender's Nostr key, then **gift-wrapped** (kind 1059) with an ephemeral key to each recipient Nostr pubkey, per NIP-59 / NIP-17 with NIP-44 v2 encryption.
 - The receiver requires the seal's pubkey to equal `envelope.from`.
 - One gift wrap per recipient Nostr key (recipient agent, recipient owner, sender owner).
-- **Size limits:** serialized envelope ≤ **24 KB**; inline files ≤ **12 KB**. Nesting (seal + gift wrap, NIP-44 padding, base64) roughly doubles size, and NIP-44 caps plaintext at 65,535 bytes; many relays cap events at 64 KB. Before publishing, check the final gift-wrap size against each relay's NIP-11 `max_message_length`.
+- **Size limits:** serialized envelope ≤ **24 KB** (24 576 bytes; every limit and where it is enforced: §3.1.1); inline files ≤ **12 KB**. Nesting (seal + gift wrap, NIP-44 padding, base64) roughly doubles size, and NIP-44 caps plaintext at 65,535 bytes; many relays cap events at 64 KB. Before publishing, check the final gift-wrap size against each relay's NIP-11 `max_message_length`.
 - Gift-wrap timestamps are randomized up to 2 days in the past (NIP-59), so inbox sync must use a ≥ 48 h look-back window and deduplicate by envelope ID (see 07 §4.2).
 
 ### 3.6 Pairing protocol
