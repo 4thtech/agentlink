@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/4thtech/agentlink/test-vectors/owner-action/case.schema.json",
   "title": "owner-action case",
-  "description": "04 \u00a72.5.1 SignedOwnerAction. `sign`: JCS text, sha256 body hash, tagged signature input and sig for a body. `verify`: accept or reject a SignedOwnerAction for a receiving core whose agent address, card ownerNostr and clock are given in `context` (nonce store empty).",
+  "description": "04 \u00a72.5.1 SignedOwnerAction. `sign`: JCS text, sha256 body hash, tagged signature input and sig for a body. `verify`: accept or reject a SignedOwnerAction for a receiving core whose agent address, card ownerNostr and clock are given in `context` (nonce store empty; `appliedPolicyVersion` absent means 0).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -160,6 +160,9 @@
                       "pattern": "^[0-9a-f]{64}$"
                     }
                   }
+                },
+                "appliedPolicyVersion": {
+                  "type": "integer"
                 }
               }
             }
@@ -271,6 +274,9 @@
                       "pattern": "^[0-9a-f]{64}$"
                     }
                   }
+                },
+                "appliedPolicyVersion": {
+                  "type": "integer"
                 }
               }
             }

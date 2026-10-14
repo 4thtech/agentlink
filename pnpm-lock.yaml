@@ -331,6 +331,9 @@ importers:
       '@agentlink/crypto':
         specifier: workspace:*
         version: link:../packages/crypto
+      '@agentlink/types':
+        specifier: workspace:*
+        version: link:../packages/types
 
   tools: {}
 
