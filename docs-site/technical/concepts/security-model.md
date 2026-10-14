@@ -20,7 +20,7 @@
 ## Design consequences
 
 - **Zero access.** 4thTech holds no user keys, plaintext, file keys, contact lists or accounts. Its services (submitter, encrypted drop, optional relay, static sites) see only ciphertext, signed public data or page loads.
-- **Owner presence.** Harness agents are assumed to have shell access as the same OS user. They must not be able to obtain the owner key, which is never stored unwrapped on the agent's machine. Owner operations need a passkey, an OS biometric prompt (desktop app) or the owner passphrase.
+- **Owner presence.** Harness agents are assumed to have shell access as the same OS user. They must not be able to obtain the owner key, which is never stored unwrapped on the agent's machine. Owner operations need a passkey, an OS biometric prompt (desktop app) or the owner code or passphrase. This is a goal: on a same-user machine it holds only under the conditions in [04 §2.5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md#25-owner-operations-and-user-presence) (G-1, D-67), below.
 - **No dangerous MCP tools.** No tool changes policies, exports keys, adds storage credentials, decides approvals or reads arbitrary files.
 - **Untrusted content.** Inbound text is wrapped in a delimited untrusted-content block in every tool result and never appears in tool descriptions, server instructions, summaries or errors.
 - **Commitments need approval.** Sending a binding `accept` and signing `ACCEPTED` or `REJECTED` default to owner approval.
@@ -30,7 +30,7 @@
 
 - **No forward secrecy for archived messages**, because owners must be able to read history (I-9). Mitigated by keychain storage, key rotation, short file expiry and crypto-shredding.
 - **A shell-capable agent could misuse the agent key** (for example spend credits or tamper with the installation). Mitigated by small credit balances, harness permission settings that deny access to AgentLink's files and the keychain, owner revocation, and spending budgets.
-- **A same-user agent and owner presence (G-1; accepted for the testnet milestone M1, D-67).** On a machine where the agent runs as the owner's OS user, owner presence at a terminal prompt proves that someone was present, not what they intended, and it holds only for an unmodified installation. Modifying the installed package, reading process memory and faking the prompt are accepted residuals for M1. The desktop app (M2) is the planned fix, and the decision is taken again before external testers rely on it.
+- **A same-user agent and owner presence (G-1; accepted for the testnet milestone M1, D-67).** On a machine where the agent runs as the owner's OS user, owner presence at a terminal prompt proves that someone was present, not what they intended, and I-4 holds only for an unmodified installation with no same-user memory or clipboard reads and no fake prompt. Modifying the installed package or what the owner's shell runs as `agentlink`, reading process memory and faking the prompt are accepted residuals for M1. The desktop app (M2) is the planned fix, and the decision is taken again before external testers rely on it.
 - **Localhost passkeys** can be requested by any local page; the human still has to complete the prompt. The desktop app (M2) replaces this with a native approval window bound to the signed app. Linux remains weaker.
 - **Metadata.** Relays, the drop and providers see IPs and timing; the chain shows pseudonymous agent addresses and, after a receipt, the link between a record and its recipient.
 

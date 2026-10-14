@@ -133,7 +133,7 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 | M2-13 Browser counterparty view-and-accept (D-35, P1) | web client | A counterparty without an agent opens the invite link, views the offer and accepts in the browser; keys generated in the browser, same identity model as the console; design in D2 |
 | M2-15 Consumer storage connectors (D-49, P1) | packages/storage, apps/desktop | Google Drive, Dropbox and OneDrive adapters behind the same `StorageAdapter` interface; Settings → Storage → Connect in the desktop apps with OAuth (PKCE, loopback redirect), minimal scopes and tokens only in the OS keychain; only ciphertext with random names in an app folder; time-limited share links, or the owner's decision per provider (07 §5.5); round trips against each provider |
 
-**Gate M2:** 20–50 early adopters (external) on testnets; UX metric "install → first message < 5 min" met; no wallet, browser extension, gas or chain choice in any J1–J9 default flow, including the desktop apps and the browser counterparty (D-39).
+**Gate M2:** 20–50 early adopters (external) on testnets; UX metric "install → first message < 5 min" met; no wallet, browser extension, gas or chain choice in any J1–J9 default flow, including the desktop apps and the browser counterparty (D-39); G-1 (same-user agent vs owner presence) re-decided by the owner (D-67) before external testers start.
 
 ## M3 — Mainnet beta (≈ 4 weeks, includes audit)
 

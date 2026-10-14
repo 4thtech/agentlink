@@ -8,7 +8,7 @@
 
 - Option 1 (v0.2.0): the one-click Claude Desktop extension
 - Option 2 (v0.1.0): ask Claude to install it with the install prompt, then restart Claude Desktop
-- Protecting your approvals (passkey or passphrase) and the recovery kit
+- Protecting your approvals (owner code or passphrase, in a terminal you opened yourself; passkey from v0.2.0) and the recovery kit
 - Checking it works: ask "What's my AgentLink status?"
 - From v0.3.0: the [desktop app](../apps/desktop-app.md) can connect Claude Desktop for you
 - Next: [Pair with someone](pair-with-someone.md)

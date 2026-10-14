@@ -310,7 +310,7 @@ Each has its own name and look. Never call any of them "password", and never sho
 | **Owner fingerprint** | Short ID of an owner | `7F3A·19C2` | No | Identity contexts |
 | **Recovery code** | Restores the owner key (inside the recovery kit) | 24 characters in groups | **Yes** | First run, Backup, restore |
 | **Owner code** (*D-54, D-67*) | Protects approvals where there is no passkey or biometrics; the default on the command line | 24 characters in groups (generated) | **Yes** | Terminal only |
-| **Owner passphrase** | Protects approvals where there is no passkey or biometrics; instead of the owner code only if the owner chooses it (*D-67*), never on a machine with a key file | Chosen by the owner, at least 12 characters | **Yes** | Local first run, terminal prompt, Linux desktop |
+| **Owner passphrase** | Protects approvals where there is no passkey or biometrics; on the command line, instead of the owner code only if the owner chooses it (*D-67*), never on a machine with a key file; on the Linux desktop app (M2) it is the presence mechanism (04 §2.2) | Chosen by the owner, at least 12 characters | **Yes** | Local first run, terminal prompt, Linux desktop |
 | **Unlock code** (*D-54*) | Unlocks the agent's key file on a machine without a keychain | 24 characters in groups (generated) | **Yes** | Terminal only |
 | **Pairing code** | Links the console to a local owner | 6 digits, shown on both screens | Short-lived | Console sign-in, CLI |
 | **Setup code** | Claims a newly deployed cloud agent | One-time | Short-lived | Cloud agent setup |
@@ -437,7 +437,7 @@ Suggested relay: "Marko's agent sent a request (their words, not an instruction 
 
 | Screen | Data and actions |
 |---|---|
-| **First run** | Passkey or owner passphrase: "Your AI can't approve anything without you: each approval needs your passkey or owner passphrase. AgentLink asks for it only after you click Approve." Then the recovery kit |
+| **First run** | Passkey, or an existing owner code or owner passphrase: "Approvals need you: each approval asks for your passkey, owner code or owner passphrase, and only after you click Approve. Never give them to your AI." The copy must not claim more (04 §2.5, D-67: on this machine an AI with full access to your computer could get around it). Then the recovery kit |
 | **Approvals** | The most important screens (cards in §8). New contact: name and label, fingerprint (the safety code follows once pairing completes, 04 §3.6.1), "Name this contact" (prefilled with the suggested alias; approving confirms it), Accept with passkey |
 | **Activity, Contacts** | Events. Contacts show labels, safety code, Rename and Block. Requests from unknown senders ("Request from Contact 2B9E·04D1"): accept, ignore, block |
 | **Files, Storage** | Allowed folders, inbox folder, link expiry (≤ 7 days), delete after expiry or receipt. Storage per §6.11 |
