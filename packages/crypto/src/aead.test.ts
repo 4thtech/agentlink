@@ -2,7 +2,7 @@
 // IV per envelope, AAD = sha256(JCS({v, id, thread, from, createdAt, recipients})), and
 // `ct` = ciphertext || 16-byte tag in base64url. The cross-runtime vectors are in
 // test-vectors/aead-envelope; these tests pin the API rules.
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CryptoInputError,
   decodeBase64url,
@@ -184,4 +184,24 @@ describe('encryptPayload and decryptPayload', () => {
     expect(text).not.toContain(encodeHex(cek));
     expect(text).not.toContain(encodeBase64url(cek));
   });
+
+  it('reports a runtime without WebCrypto as a platform error, never as a refused input', async () => {
+    const h = header();
+    const cek = generateCek();
+    const aead = await encryptPayload(h, cek, PLAINTEXT);
+    const random = (array: Uint8Array): Uint8Array => array;
+    vi.stubGlobal('crypto', { getRandomValues: random });
+    for (const attempt of [
+      () => encryptPayload(h, cek, PLAINTEXT),
+      () => decryptPayload({ ...h, aead }, cek),
+    ]) {
+      const error: unknown = await attempt().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(Error);
+      expect(error).not.toBeInstanceOf(CryptoInputError);
+    }
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
