@@ -18,6 +18,7 @@ agentlink/
 ├─ docs/process/                 # development process, audit rules, release & deployment, CI/CD, backlog
 ├─ packages/
 │  ├─ types/                     # shared types + zod schemas
+│  ├─ log/                       # redacting logger + secret-canary test helper (zero dependencies)
 │  ├─ crypto/                    # key derivation, HPKE, AES-GCM, STREAM, JCS, BIP-340, EIP-712
 │  ├─ chain/                     # viem clients, OCC v2 bindings (ABIs from @agentlink/occ-v2-abi)
 │  ├─ transport-nostr/           # NIP-17/59 gift wraps, relay pool, sync

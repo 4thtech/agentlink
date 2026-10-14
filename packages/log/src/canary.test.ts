@@ -39,12 +39,17 @@ function shapes(): string[] {
     `https://agentlink.example/drop/abc#${byName('url-fragment')}`,
     `https://user:${byName('url-userinfo')}@relay.example/`,
     `data:text/plain;base64,${byName('data-uri')}`,
+    `https://rpc.example/v2/${byName('url-path')}`,
+    `next=https%3A%2F%2Fdrop.example%2Fo%2F${byName('url-encoded')}&x=1`,
+    `next=%2Fo%3FX-Amz-Security-Token%3D${byName('sigv4-encoded')}%26X-Amz-Date%3D1`,
+    `["authorization-scheme","Basic ${byName('basic')}"]`,
+    `request failed: password=${byName('key-value')}`,
   ];
 }
 
 /** Drives every public path of the logger with every canary, at every level. */
 function exercise({ logger }: CanaryRun): void {
-  const child = logger.child({ session: shapes(), token: KEY_ONLY_CANARY.value });
+  const child = logger.child({ context: shapes(), token: KEY_ONLY_CANARY.value });
   for (const level of LEVELS) {
     for (const shape of shapes()) {
       // In the message, in a plain field, nested, in arrays, Maps and Sets, as an object key.
@@ -67,6 +72,15 @@ function exercise({ logger }: CanaryRun): void {
       logger[level]('error path', error);
       logger[level]('aggregate', { err: new AggregateError([error], `many ${shape}`) });
       child[level]('child', { shape });
+      // Non-object fields: a thrown string, an array, a number-like (F01 of IR-M0-8-1).
+      try {
+        throw `thrown ${shape}`;
+      } catch (thrown) {
+        logger[level]('caught', thrown as Error);
+      }
+      logger[level]('array fields', [shape] as unknown as Error);
+      // A URL-named field keeps only the origin.
+      logger[level]('url field', { relayUrl: `wss://relay.example/${shape}`, url: shape });
     }
     // The shapeless canary under every sensitive key name, in several spellings.
     for (const key of SENSITIVE_KEYS) {

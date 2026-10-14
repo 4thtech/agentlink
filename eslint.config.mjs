@@ -74,7 +74,13 @@ const CONSOLE_SYNTAX = [
   "ObjectPattern > Property[key.name='console']",
   // import console from 'node:console'
   'ImportDeclaration[source.value=/^(node:)?console$/]',
+  // process.stdout.write(…), globalThis.process.stderr.write(…)
+  "MemberExpression[property.name=/^(stdout|stderr)$/][object.name='process']",
+  "MemberExpression[property.name=/^(stdout|stderr)$/][object.property.name='process']",
 ].map((selector) => ({ selector, message: CONSOLE_MESSAGE }));
+// Flat config replaces a rule's options instead of merging them: a later block that sets
+// `no-restricted-syntax` for some files silently drops CONSOLE_SYNTAX there. Such a block must
+// include ...CONSOLE_SYNTAX in its own list. tools/console-ban.test.mjs checks every zone.
 
 const ZONES_WITH_EXEMPTIONS = [
   ...new Set([...NODE_ZONES, ...LIBRARIES.flatMap(({ zones }) => zones)]),
@@ -106,6 +112,8 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node } },
   },
   {
+    // The console channels and the repository scripts. This turns off ALL no-restricted-syntax
+    // selectors for these files, not only CONSOLE_SYNTAX: keep the list to these exact paths.
     files: ['tools/**', ...CONSOLE_CHANNELS],
     rules: { 'no-console': 'off', 'no-restricted-syntax': 'off' },
   },

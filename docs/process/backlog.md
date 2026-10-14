@@ -269,14 +269,14 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - `grep -rn "09-repositories\|09 §" docs/ AGENTS.md` shows only references marked private, none required to complete a public task.
 
 #### M0-8 · Shared redacting logger and secret-canary CI test (new)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1
-- **Repo/path:** agentlink · packages/log (proposed name, gap G-11)
+- **Status:** done · **Size:** M · **Tier:** Opus · **Security:** S1
+- **Repo/path:** agentlink · packages/log (`@agentlink/log`, resolves gap G-11)
 - **Depends on:** M0-2d
 - **Spec:** 04 §1 I-7, §8.4; 07 §7 (submitter logging); `audit-rules.md` §6
 - **Invariants:** I-7
 - **Scope:**
   - Zero-dependency structured logger for Node, browsers and Workers; debug level still redacts.
-  - Redaction by key name (seed, secret, privateKey, fileKey, cek, salt, url, presigned, payload, plaintext, body, authorization, token, code) and by value pattern (64-hex scalars, bech32 `nsec`/`ncryptsec`, SigV4 `X-Amz-Signature`/`X-Amz-Credential`, `Authorization: AWS4-HMAC-SHA256`, local-UI `?t=` tokens, recovery-code shape, JWTs); URLs logged without query strings; `Error` messages and stacks scrubbed.
+  - Redaction by key name (seed, secret, privateKey, fileKey, cek, salt, url, presigned, payload, plaintext, body, authorization, token, code) and by value pattern (64-hex scalars, bech32 `nsec`/`ncryptsec`, SigV4 `X-Amz-Signature`/`X-Amz-Credential`, `Authorization: AWS4-HMAC-SHA256`, local-UI `?t=` tokens, recovery-code shape, JWTs); every URL logged as its origin only (scheme, host, port: paths carry API keys and object IDs, 04 §4), including under `url`-named keys (decided in review IR-M0-8-1); `code`-named keys keep only HTTP status and system error codes; `Error` messages and stacks scrubbed. The recovery-code rule is a heuristic until M1-1 pins the format.
   - ESLint `no-console` repo-wide (documented exception: the CLI's user-output channel).
   - Canary test helper: injects known canary secrets through public APIs and fails if any captured log line (all levels) contains one. Every later package adds its canaries.
 - **Acceptance:**
@@ -2994,7 +2994,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 8. **G-8 (H) CREATE3 salts and deployer lifecycle.** 05 §9; `release-and-deployment.md` §4.2. CreateX guarded salts bind addresses to the deployer; identical addresses for the Registry (M2) and M4 chains need the same deployer and salt scheme; proxies must be deployed and initialised atomically; testnet and mainnet deployers differ, so testnet and mainnet addresses differ. *Proposed:* specify salt layout (deployer-guarded, no cross-chain redeploy protection), deploy-and-init, and cold-storage retention of the mainnet deployer key until all planned chains are deployed. *Blocks:* M1-3g, M3-2b, M3-2c, M4-EPIC.
 9. **G-9 (M) Store schema gaps.** 07 §3 lacks the outbox (07 §4.2, 24 h retry), the ≥ 7-day seen-set (07 §4.2), idempotency results (06 §1 rule 6), budget ledger and rate counters (06 §3) and OwnerAction nonces (04 §2.5). *Proposed:* extend 07 §3. *Blocks:* M1-5b, M1-5c, M1-7a, M1-8b.
 10. **G-10 (M) Where `@agentlink/occ-v2-abi` is published.** 05 §9; D-19. npm provenance is not generated for private source repos (verify). *Proposed* (`development-process.md` §9.2): import release artifacts into public `packages/occ-v2-abi` and publish from there. *Blocks:* M1-3f.
-11. **G-11 (L) Logger package missing from the package map.** 04 §8.4 vs 07 §1. *Proposed:* add `@agentlink/log` (zero dependencies). *Blocks:* M0-8.
+11. **G-11 (L) Logger package missing from the package map.** RESOLVED by M0-8: `@agentlink/log` (zero dependencies) is in the 07 §1 package map and `repo-reference.md`. *Was:* 04 §8.4 vs 07 §1. *Blocked:* M0-8.
 12. **G-12 (M) JCS and invite compression.** 04 §3.1, §3.6; `AGENTS.md` dependency allowlist. No JCS implementation is allowlisted although `envelopeHash` depends on it; "deflate" does not say raw DEFLATE or zlib. *Proposed:* approve a vetted RFC 8785 implementation (or in-repo code with RFC vectors); specify `deflate-raw` via `CompressionStream`. *Blocks:* M1-1a, M1-7c.
 13. **G-13 (L) Record kind ↔ payload type.** 05 §3.1 kinds vs 04 §3.4 payload types; no mapping. *Blocks:* M1-7g.
 14. **G-14 (M) `agentlink_fetch_file` and SSRF in Workers.** 06 §2.3 (`savedTo`, inbox folder) vs 08 §3 (no filesystem); 04 §4 DNS checks are not possible in Workers. *Proposed:* cloud `agentlink_fetch_file` stores the decrypted file in the user's R2 and returns a short-lived link; Workers SSRF = https + IP-literal and hostname checks, documented reliance on Workers egress. *Blocks:* M1-15, M2-3b.

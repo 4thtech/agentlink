@@ -243,33 +243,33 @@ describe('redaction by value pattern', () => {
   });
 });
 
-describe('URLs', () => {
+describe('URLs (origin only)', () => {
   it('drops the query string', () => {
     expect(stripUrls('https://r2.example/bucket/obj?X-Amz-Signature=s&X-Amz-Credential=c')).toBe(
-      'https://r2.example/bucket/obj',
+      'https://r2.example',
     );
   });
 
   it('drops the fragment', () => {
-    expect(stripUrls('https://verify.example/p#filekey')).toBe('https://verify.example/p');
+    expect(stripUrls('https://verify.example/p#filekey')).toBe('https://verify.example');
   });
 
-  it('drops user info and keeps host, port and path', () => {
+  it('drops user info and the path, keeps scheme, host and port', () => {
     expect(stripUrls('wss://user:pass@relay.example:7447/path/x?y=1')).toBe(
-      'wss://relay.example:7447/path/x',
+      'wss://relay.example:7447',
     );
   });
 
   it('handles several URLs in one string and leaves other text alone', () => {
     expect(redactString('from http://127.0.0.1:4242/?t=abc to https://a.example/b?c=d done')).toBe(
-      'from http://127.0.0.1:4242/ to https://a.example/b done',
+      'from http://127.0.0.1:4242 to https://a.example done',
     );
   });
 
   it('handles URL objects', () => {
     const URLCtor = (globalThis as unknown as { URL: new (input: string) => object }).URL;
     expect(redact({ link: new URLCtor('https://u:p@a.example/b?q=secret#f') })).toEqual({
-      link: 'https://a.example/b',
+      link: 'https://a.example',
     });
   });
 });
@@ -300,7 +300,11 @@ describe('errors', () => {
       body: KEY_ONLY,
       config: { url: 'https://x' },
     });
-    expect(redact(error)).toMatchObject({ status: 500, body: REDACTED, config: { url: REDACTED } });
+    expect(redact(error)).toMatchObject({
+      status: 500,
+      body: REDACTED,
+      config: { url: 'https://x' },
+    });
   });
 });
 

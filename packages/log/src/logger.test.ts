@@ -112,11 +112,11 @@ describe('createLogger', () => {
 });
 
 describe('consoleSink', () => {
-  it('uses the console method for the level', () => {
+  it('uses the console method for the level with { stderr: false } (browsers, Workers)', () => {
     const calls: string[] = [];
     const restore = captureConsole((method, data) => calls.push(`${method}:${String(data[0])}`));
     try {
-      const logger = createLogger({ level: 'debug', sink: consoleSink() });
+      const logger = createLogger({ level: 'debug', sink: consoleSink({ stderr: false }) });
       logger.debug('d');
       logger.info('i');
       logger.warn('w');

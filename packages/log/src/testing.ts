@@ -62,6 +62,11 @@ export const PATTERN_CANARIES: readonly Canary[] = [
   { name: 'url-query', value: 'canary-presigned-query-secret' },
   { name: 'url-fragment', value: 'canary-fragment-file-key' },
   { name: 'url-userinfo', value: 'canary-url-password' },
+  { name: 'url-path', value: 'canary-rpc-path-api-key' },
+  { name: 'url-encoded', value: 'canary-encoded-object-id' },
+  { name: 'sigv4-encoded', value: 'canary-encoded-session-token' },
+  { name: 'basic', value: 'Y2FuYXJ5OmJhc2ljLWF1dGg=' },
+  { name: 'key-value', value: 'canary-key-value-password' },
   { name: 'data-uri', value: 'Y2FuYXJ5LWRhdGEtdXJp' },
 ];
 

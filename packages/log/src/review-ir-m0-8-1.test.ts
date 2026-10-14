@@ -7,6 +7,22 @@ import { createLogger, type Fields, type Level } from './logger.js';
 import { isSensitiveKey, redact, REDACTED, redactString, stripUrls } from './redact.js';
 
 const HEX64 = 'ef56'.repeat(16);
+const performance = (globalThis as unknown as { performance: { now(): number } }).performance;
+
+describe('F08: string budget per record', () => {
+  it('stops scrubbing after 256 KiB of strings in one record', () => {
+    const worst = 'a:'.repeat(8 * 1024);
+    const start = performance.now();
+    const out = redact(Array.from({ length: 200 }, () => worst)) as string[];
+    expect(performance.now() - start).toBeLessThan(1000);
+    expect(out.at(-1)).toBe('[Truncated]');
+  });
+
+  it('long keys are shown as their length, never their text', () => {
+    const out = redact({ ['k'.repeat(300)]: 1 });
+    expect(out).toEqual({ [`${REDACTED} (key of 300 characters)`]: REDACTED });
+  });
+});
 
 function capture() {
   const lines: string[] = [];
@@ -104,6 +120,9 @@ describe('F04: key=value secrets inside strings', () => {
     ['{"privateKey":"shapeless-secret"}', `{"privateKey":"${REDACTED}"}`],
     ["token: 'two words' end", `token: '${REDACTED}' end`],
     ['agentPrivateKey = abc', `agentPrivateKey = ${REDACTED}`],
+    // Found by the extended canary test: a pair hidden inside the value of a harmless pair.
+    ['request failed: password=hunter2hunter2', `request failed: password=${REDACTED}`],
+    ['a:b:c:token=abc', `a:b:c:token=${REDACTED}`],
   ])('%s', (input, output) => {
     expect(redactString(input)).toBe(output);
   });
