@@ -48,6 +48,33 @@ function restrictionsFor(zone) {
   };
 }
 
+// --- Console ban (M0-8) -------------------------------------------------------------------------
+// The deliberate console channels; adding one is a reviewed change to this file (S1).
+// - packages/log/src/console.ts: the logger's console sink. It only ever receives redacted lines.
+// - apps/cli/src/output.ts: the CLI's user-output channel (command results such as `--version`).
+//   It prints only what the user asked to see and is never used for logging.
+const CONSOLE_CHANNELS = ['packages/log/src/console.ts', 'apps/cli/src/output.ts'];
+const CONSOLE_MESSAGE =
+  'No console output: log through @agentlink/log (redacting). Deliberate channels: eslint.config.mjs CONSOLE_CHANNELS.';
+const CONSOLE_SYNTAX = [
+  // globalThis.console, window.console, (globalThis as T).console
+  "MemberExpression[computed=false][property.name='console']",
+  // globalThis['console']
+  "MemberExpression[computed=true][property.value='console']",
+  // declare const console: …; const console = …
+  "VariableDeclarator[id.name='console']",
+  // const { console } = globalThis
+  "ObjectPattern > Property[key.name='console']",
+  // import console from 'node:console'
+  'ImportDeclaration[source.value=/^(node:)?console$/]',
+  // process.stdout.write(…), globalThis.process.stderr.write(…)
+  "MemberExpression[property.name=/^(stdout|stderr)$/][object.name='process']",
+  "MemberExpression[property.name=/^(stdout|stderr)$/][object.property.name='process']",
+].map((selector) => ({ selector, message: CONSOLE_MESSAGE }));
+// Flat config replaces a rule's options instead of merging them: a later block that sets
+// `no-restricted-syntax` for some files silently drops CONSOLE_SYNTAX there. Such a block must
+// include ...CONSOLE_SYNTAX in its own list. tools/console-ban.test.mjs checks every zone.
+
 export default tseslint.config(
   {
     // Build output is ignored only where a build writes it (the root of a workspace), never at any
@@ -62,10 +89,11 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    // Never log secrets (AGENTS.md): no stray console output. Use the redacting logger.
-    // TODO(M0-8): apps/cli needs a narrow exception for deliberate user-facing output (for example
-    // `--version`), added together with the redacting logger.
-    rules: { 'no-console': 'error' },
+    // Never log secrets (AGENTS.md, 04 §8.4): no console output; log through @agentlink/log, which
+    // redacts. Shared packages compile without DOM or Node types, so code reaches the console only
+    // through globalThis or a local `declare const console`, and no-console sees neither:
+    // CONSOLE_SYNTAX closes those routes. The only exceptions are the channels in CONSOLE_CHANNELS.
+    rules: { 'no-console': 'error', 'no-restricted-syntax': ['error', ...CONSOLE_SYNTAX] },
   },
   {
     // Directories the policy does not know get the strictest set until they get an entry.
@@ -90,7 +118,9 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node } },
   },
   {
-    files: ['tools/**'],
-    rules: { 'no-console': 'off' },
+    // The console channels and the repository scripts. This turns off ALL no-restricted-syntax
+    // selectors for these files, not only CONSOLE_SYNTAX: keep the list to these exact paths.
+    files: ['tools/**', ...CONSOLE_CHANNELS],
+    rules: { 'no-console': 'off', 'no-restricted-syntax': 'off' },
   },
 );

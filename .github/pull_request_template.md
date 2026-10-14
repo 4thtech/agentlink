@@ -68,7 +68,7 @@ S0: N/A.
 
 
 ## Tests-first evidence
-<!-- S2: the commit adding the failing tests (before the implementation commit) and the red CI run. S0/S1: N/A. -->
+<!-- S2: the RED commit SHA (before the implementation commit), the exact command and a short output excerpt from your local red run. S0/S1: N/A. -->
 
 
 ## Open questions

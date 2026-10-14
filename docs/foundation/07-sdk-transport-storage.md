@@ -9,6 +9,7 @@ All packages live in the public `agentlink` monorepo (see 09). Every package mus
 | Package | Depends on | Exposes |
 |---|---|---|
 | `@agentlink/types` | — | Shared types, zod schemas, constants (kinds, receipt types, fee types) |
+| `@agentlink/log` | — | Redacting structured logger used by every package (04 §8 rule 4, I-7); secret-canary test helper (`@agentlink/log/testing`) |
 | `@agentlink/crypto` | noble, hpke | Key derivation, HPKE seal/open, AES-GCM, STREAM file encryption, hashing, JCS, BIP-340 sign/verify, EIP-712 helpers |
 | `@agentlink/chain` | viem, types, crypto | Chain configs, contract ABIs, fee quotes, credits, record/receipt building, submitter client, proof verification |
 | `@agentlink/transport-nostr` | nostr-tools, types, crypto | `Transport` implementation: relay pool, gift wrap/unwrap, subscriptions, sync cursors |
