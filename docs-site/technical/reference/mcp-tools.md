@@ -1,6 +1,6 @@
 # MCP tools
 
-> **Status: Planned for v0.1.0 (M1a)** (Talk tools) **and v0.2.0 (M1)** (file and proof tools). This page lists the tool surface planned in D-53 and [06 MCP server](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md). Names and schemas may change until v0.1.0 ships; full input and output schemas are added from the released tool snapshot.
+> **Status: Planned for v0.1.0 (M1a)** (Talk tools) **and v0.2.0 (M1)** (file and proof tools). This page lists the tool surface planned in D-53 and D-55 and [06 MCP server](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md). Names and schemas may change until v0.1.0 ships; full input and output schemas are added from the released tool snapshot.
 
 **Package:** `@4thtech/agentlink` (planned), subcommand `agentlink mcp` (stdio). The self-hosted cloud agent exposes the same tools over streamable HTTP with OAuth.
 
@@ -11,7 +11,8 @@
 - **No dangerous tools**: no tool changes policies, exports keys, adds storage credentials, decides approvals or reads arbitrary files.
 - **Untrusted inbound content** is always wrapped in an `<untrusted_content>` block.
 - **Idempotency**: mutating tools accept an optional `clientRequestId`.
-- **Approvals**: a tool that can return `pending_approval` accepts `approvalId`; an approved ID lets the identical action proceed once.
+- **Approvals**: a tool that can return `pending_approval` accepts `approvalId`; an approved ID lets the identical action proceed once. For terms, one approval covers the acceptance and its Accepted receipt, bound to the exact terms, contact, conversation and expiry, and is void if the terms change.
+- **Terms**: offers, counters, acceptances and rejections go only through `agentlink_propose_terms` and `agentlink_respond_to_terms`, with typed terms fields.
 
 ## Planned tools
 
@@ -21,12 +22,14 @@
 | `agentlink_create_invite` | no | — | v0.1.0 |
 | `agentlink_accept_invite` | no | `contacts.acceptInvites` | v0.1.0 |
 | `agentlink_list_contacts` | yes | — | v0.1.0 |
-| `agentlink_send` | no | `commitments.accept`; `proofs.*` with `notarize` | v0.1.0 (`path` and `notarize` v0.2.0) |
+| `agentlink_send` | no | `proofs.*` with `notarize` | v0.1.0 (`path` and `notarize` v0.2.0) |
+| `agentlink_propose_terms` | no | `commitments.accept` and `proofs.*` with `notarize` (firm offer) | v0.1.0 (`notarize` v0.2.0) |
+| `agentlink_respond_to_terms` | no | `commitments.accept` (one approval per agreement); `proofs.*` with `notarize` | v0.1.0 (receipts and `notarize` v0.2.0) |
 | `agentlink_inbox` | no (marks items read) | — | v0.1.0 |
 | `agentlink_get_approval` | yes | — | v0.1.0 |
 | `agentlink_fetch_file` | no (saves a file) | — | v0.2.0 |
 | `agentlink_notarize` | no | `proofs.*` | v0.2.0 |
-| `agentlink_acknowledge` | no | `commitments.accept` | v0.2.0 |
+| `agentlink_acknowledge` | no | `commitments.accept` (records without terms) | v0.2.0 |
 | `agentlink_get_proof` | yes | — | v0.2.0 |
 | `agentlink_export_proof_pack` | no (writes a file) | `proofs.allowKeyDisclosure` | v0.2.0 |
 | `agentlink_verify_proof_pack` | yes | — | v0.2.0 |

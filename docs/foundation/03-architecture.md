@@ -153,7 +153,7 @@ sequenceDiagram
 
 Direct mode: any core may call the contract itself (paying gas in the chain's native coin and the fee in an allowlisted stablecoin, D-46). The submitter is a convenience, never a requirement.
 
-`ACCEPTED` and `REJECTED` receipts are commitments: before MB signs one, its core requires an owner approval under policy `commitments.accept` (default `approval`, 06 §3, D-31) and, for records carrying `terms`, checks them (04 §3.4). The chain is picked automatically (07 §6.3).
+`ACCEPTED` and `REJECTED` receipts are commitments: before MB signs one, its core requires an owner approval under policy `commitments.accept` (default `approval`, 06 §3, D-31) and, for records carrying `terms`, checks them (04 §3.4). For terms, the approval that covers MB's `accept` also covers this receipt, once, until its expiry (04 §3.4.2, D-55). The chain is picked automatically (07 §6.3).
 
 ### 4.4 Credits top-up
 
