@@ -1,0 +1,38 @@
+{
+  "name": "@agentlink/chain",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Chain clients and OCC v2 bindings.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/4thtech/agentlink.git",
+    "directory": "packages/chain"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agentlink/types": "workspace:*",
+    "@agentlink/crypto": "workspace:*"
+  }
+}

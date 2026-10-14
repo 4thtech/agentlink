@@ -1,0 +1,46 @@
+{
+  "name": "@4thtech/agentlink",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AgentLink command line, MCP server (stdio) and local UI bundle.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/4thtech/agentlink.git",
+    "directory": "apps/cli"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agentlink/node": "workspace:*",
+    "@agentlink/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@agentlink/types": "workspace:*",
+    "@agentlink/crypto": "workspace:*",
+    "@agentlink/chain": "workspace:*",
+    "@agentlink/transport-nostr": "workspace:*",
+    "@agentlink/storage": "workspace:*",
+    "@agentlink/ui": "workspace:*"
+  }
+}

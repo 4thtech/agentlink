@@ -1,0 +1,15 @@
+packages:
+  - packages/*
+  - apps/*
+  - test-vectors
+  - e2e
+  - tools
+
+# Cooldown (minutes) before a freshly published version may be installed or locked.
+# 4320 = 3 days, the same cooldown as renovate.json, so lockfile maintenance agrees with Renovate.
+minimumReleaseAge: 4320
+
+# Dependency install scripts never run unless a package is listed here. Empty on purpose: no
+# dependency of this skeleton needs a build step. packages/node adds better-sqlite3 when it lands
+# (M1), together with `rebuild: better-sqlite3` in ci.yml (docs/process/ci-cd.md).
+onlyBuiltDependencies: []

@@ -1,0 +1,12 @@
+# Not formatted by Prettier: prose, lockfile, CI configuration (owner-reviewed as written), build output.
+*.md
+docs/
+.github/
+.claude/
+.changeset/
+.curator-project
+renovate.json
+pnpm-lock.yaml
+**/dist/
+**/.turbo/
+**/coverage/
