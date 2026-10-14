@@ -1498,6 +1498,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Card with a signature not from `ownerEvm` rejected; rotation yields epoch + 1 and old-epoch keys still open old envelopes.
   - Envelopes from a blocked contact are dropped (test).
 
+#### M1-7a-b · core: test-only subpath for the in-memory Store (new, IR-M1-7a-1 L-6)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 (boundary policy, `tools/deps-check/policy.mjs`) · **Phase:** M1a
+- **Repo/path:** agentlink · packages/core, tools/deps-check/, eslint.config.mjs
+- **Depends on:** M1-7a
+- **Spec:** 07 §3.1 (in-memory Store for tests); 04 §2.5.1 (nonce retention)
+- **Invariants:** I-4
+- **Scope:**
+  - `MemoryStore` is exported from the `@agentlink/core` root, documented as NOT FOR PRODUCTION. A host that wires it in production forgets `owner_action_nonces`, `seen` and `idempotency` on restart, which reopens replay windows for signed owner actions until they expire.
+  - Move it to a `@agentlink/core/testing` export (package `exports`) and let the boundary guards allow that entry only in `*.test.ts` files, `e2e/` and the M1-8b store conformance tests, as for `@agentlink/crypto/testing`.
+- **Acceptance:**
+  - deps-check and ESLint regressions: production source importing `@agentlink/core/testing` fails both tools; test files pass. The root entry no longer exports `MemoryStore`.
+
 #### M1-7b · core: envelope build/open and threads
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
@@ -1524,6 +1536,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Rotation order (04 §3.1.1, step 7): an envelope from a contact's new key that arrives before its `card-update` is held, then processed as from the contact once the `card-update` is applied, and is never shown as a new contact request. A held envelope with no `card-update` goes to requests after 48 h (fake clock), and one from a stranger key is never accepted as the contact's.
   - Two own entries at different epochs: exactly one `unwrapCek`, at the highest epoch. The same `id` with the same hash is dropped silently; with a different hash it is refused and flagged.
   - G-2: when both agents have the same owner, there are 3 entries and the owner opens one. Each refusal path has a test: a superseded epoch key, a missing own-owner `kid`, a duplicate `id` with a different hash, a future `createdAt`, and a `text` from the own owner key.
+  - (IR-M1-7a-1 R2-M1) A blocked or removed contact that rotates keys: its `card-update` is dropped, so its new key stays unknown. An envelope from an unknown key whose recipients include the `ownerEnc` `kid` of a **blocked or removed** contact's owner is dropped (recorded in `seen` after step 4), never held and never queued as a request, also after 48 h. Only active contacts' owner kids hold. Test, replacing the `it.todo` in `packages/core/src/contacts.test.ts`.
 
 #### M1-7c · core: pairing protocol (invite, accept, handshake)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1538,6 +1551,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Contact names (D-53, 06 §2.1 contact-name rule): the invite `label` is stored as A's suggested alias for B and shown restricted until A's owner confirms it (it is agent-written); B's owner types or confirms an alias on the pairing approval, prefilled with the restricted self-declared name. Only owner-set aliases are shown unrestricted. A shared `restrictName` helper exactly per 06 §2.1 (NFKC; only `[\p{L}\p{N} .'-]`; spaces collapsed; ≤ 32 code points; fallback "Contact" plus short owner fingerprint for empty, mixed-script or confusable names beyond UTS #39 moderately restrictive, or names containing a reserved label word) renders names quoted, followed by the identity label, with `nameSource`; the raw self-declared name is stored as untrusted data.
   - A accepts a `handshake` from an unknown sender only for an unused, unexpired invite; marks it used, adds B, replies `handshake-ack`. This processing runs in the background loop or on `agentlink_inbox`, never in a read-only status call (06 §2.0, §6). A completes on accepting the handshake and B on a verified ack. Each keeps the signed `handshake` and `handshake-ack` and recomputes the safety code from them on every display, never from a stored digest (04 §3.6.1). `createInvite` returns `{inviteUrl, ownerFingerprint, expiresAt}` and no safety code. No tool result carries the code; `acceptInvite` and `listContacts` return `pairing` and `safetyCodeChecked`. Contacts are keyed by `agentId`; a re-pair takes effect only on completion, and concurrent pairings converge per 04 §2.9.
   - (hand-off from M1-7a, IR-M1-7a-1 M-2) Use the core's two-step pairing: `contacts.stagePairing` when a card arrives (nothing in `contacts` changes), `contacts.completePairing` with both stored pairing envelopes on completion (one transaction; the counterparty's envelope must be stored as received from the card's key), and `contacts.abortPairing` for a pairing that fails. Decide where the pending pairing data (`codeCommit`, `nonceB`) lives for a first pairing, since no contact row exists before completion (07 §3 `pairings`).
+  - (IR-M1-7a-1 R2-L1) Tie the completion evidence to its pairing: `completePairing` today checks only that a `handshake` and a `handshake-ack` with the right directions and sender key are stored. M1-7c must bind them to the staged pairing (the invite ID, `handshakeHash` in the ack, `inviterCardHash`), so another pairing's envelopes cannot complete this one. Add the binding to the core check and test it.
+  - (IR-M1-7a-1 R2-L2) Crossed invites: today the pairing that finishes later wins. Apply the 04 §2.9 tie-break: keep the completed pairing whose `handshake` has the later `createdAt`, with ties broken by the larger `envelopeHash`, so both sides converge on the same pairing. Test with two crossed pairings completing in both orders.
   - G-23/G-28 additions (04 §2.9, §3.6, §3.6.1, §3.4.1): the invite also carries `cardAgentSig` and `codeCommit`, and A keeps `nonceA` with it. B also verifies `cardAgentSig` and refuses `agentEvm = ownerEvm`. Its approval shows name, label and owner fingerprint, and no safety code. The `handshake` adds `cardAgentSig`, `codeNonce`, `codeCommit` (copied) and `inviterCardHash`, and A accepts it only if the envelope `from` and seal key equal `card.agentNostr`. The `handshake-ack` adds `handshakeHash`, `codeReveal`, `card` and `cardSig`, and B completes only if `codeReveal` opens `codeCommit`. A second valid answer to a used invite is refused and reported to A's owner.
 - **Acceptance:**
   - In-process two-client test over a local relay: pairing completes and both safety codes match.

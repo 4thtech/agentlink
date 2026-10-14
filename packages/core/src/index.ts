@@ -59,5 +59,5 @@ export {
 } from './store/store.js';
 // NOT FOR PRODUCTION (IR-M1-7a-1 L-6): for tests and development only. It persists nothing, so a
 // restart would forget owner-action nonces, the seen-set and idempotency results. Moving it to a
-// test-only subpath needs a boundary-policy change (S1) and is deferred.
+// test-only subpath needs a boundary-policy change (S1): backlog M1-7a-b.
 export { MemoryStore, type MemoryStoreOptions } from './store/memory-store.js';

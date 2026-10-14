@@ -600,6 +600,14 @@ describe('block and remove (02 F-14) and the inbound screen', () => {
     ).rejects.toMatchObject({ code: 'repair_owner_changed' });
   });
 
+  // IR-M1-7a-1 R2-M1, owned by M1-7b (backlog acceptance item): a blocked or removed contact that
+  // rotates keys has its card-update dropped, so its new key stays unknown. An envelope from an
+  // unknown key whose recipients include the ownerEnc kid of a blocked or removed contact's owner
+  // must be dropped: never held, never queued as a request, also after 48 h.
+  it.todo(
+    'M1-7b: drops (never holds or queues) an envelope from an unknown key carrying the owner kid of a blocked or removed contact',
+  );
+
   it('a blocked contact stays blocked across a re-pair', async () => {
     const s = await self();
     const v0 = await peerCard(2, ownerB);
