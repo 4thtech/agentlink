@@ -49,7 +49,7 @@ Contents: §1 How to read a card · §2 M0 Foundations (incl. legacy OPS-L items
 | `done` | Definition of Done met; owner merged |
 | `done (setup)` | Produced in the 12 Oct 2026 setup session; becomes `done` when the bootstrap commit is on `main` (M0-2b) |
 
-In this file a card's Status changes in only two places: `backlog → ready` (orchestrator, planning PR or the task's own first commit) and `→ done` **in the PR that completes the task**. `in-progress`, `in-review` and `audit` are tracked live on the sync board, not here.
+In this file a card's Status changes in only two places: `backlog → ready` (orchestrator, planning PR or the task's own first commit) and `→ done` **in the PR that completes the task** (a bookkeeping `DOCS` PR may catch up cards whose PRs have merged, citing each PR). `in-progress`, `in-review` and `audit` are tracked live on the sync board, not here.
 
 ### Deploy acceptance (applies to every card that deploys an app)
 
@@ -63,11 +63,11 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 
 | Section | Cards |
 |---|---|
-| M0 Foundations | 31 (incl. 7 in the D-25 group; 9 `done (setup)`) |
+| M0 Foundations | 34 (incl. 7 in the D-25 group; 9 `done (setup)`; 3 follow-ups from CI findings: M0-2h, M0-10d, M0-26) |
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 89 (M1a 42, M1b 47; incl. 11 split-off, 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1 and 1 from D-55) |
+| M1 Local beta | 91 (M1a 42, M1b 49; incl. 11 split-off, 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review and M1-3i as a follow-up to M1-3d) |
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 21 (incl. 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
@@ -170,7 +170,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - `gh secret list` (repo and org) shows no npm token.
 
 #### M0-2f · occ-v2-contracts private repository bootstrap
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Status:** done (private repo, 4thtech/occ-v2-contracts#1, merged 2026-10-14) · **Size:** S · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** occ-v2-contracts · / (fresh `forge init`)
 - **Depends on:** M0-2a
 - **Spec:** 05 header (toolchain), §8; 03 §6; D-19, D-20, D-27; `development-process.md` §9; `audit-rules.md` §2.3, §6.1
@@ -202,6 +202,19 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - `curl -sI` against a hello-world Worker on each hostname returns a valid certificate chain and 200 (output in PR).
   - Token scopes listed (names and permissions only, never values); the R2 test token cannot list or write any other bucket (demonstrated).
   - Account decision recorded in the decision log.
+
+#### M0-2h · contracts CI: Slither `--include-paths` instead of filter-paths (new)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`.github/**`)
+- **Repo/path:** occ-v2-contracts · .github/workflows (Slither job)
+- **Depends on:** M0-2f
+- **Spec:** `ci-cd.md`; `audit-rules.md` §2 (sensitive paths); the related path-filter item (IR-M1-3a-1 L-4) is under M1-3e
+- **Invariants:** I-6
+- **Scope:**
+  - Replace the Slither filter-paths exclusion with `--include-paths "^${GITHUB_WORKSPACE}/src/[^/]"`, in its own PR (not bundled with contract changes). The pattern is anchored, so `lib/forge-std/src` is not matched.
+  - Reconcile with the `OCCRoleSetup` move and the path-filter item under M1-3e.
+- **Acceptance:**
+  - Slither analyses every file under `src/` (including a nested folder such as `src/libraries/`) and nothing under `lib/`, `test/` or `script/`; shown by a CI run that lists the analysed files.
+  - A deliberately planted finding under `src/` turns the job red (negative control recorded in the PR).
 
 #### M0-3 · Foundation and process docs in the repository
 - **Status:** done (setup) · **Size:** S · **Tier:** Sonnet · **Security:** S1
@@ -284,7 +297,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - A deliberately leaking fixture makes the canary job fail when run locally (local demonstration, output in PR; not pushed).
 
 #### M0-8b · Logger hardening follow-ups (new)
-- **Status:** done · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Status:** done (4thtech/agentlink#40, merged 2026-10-14) · **Size:** S · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · packages/log
 - **Depends on:** M0-8
 - **Spec:** 04 §1 I-7, §8 rule 4; review IR-M0-8-2 (findings L1–L4, all Low)
@@ -313,7 +326,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - The M0-8b worst-case work bounds and the no-unbounded-quantifier test still pass.
 
 #### M0-9 · Cross-runtime test-vector harness (new)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Status:** done (4thtech/agentlink#13, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/
 - **Depends on:** M0-2d
 - **Spec:** 04 §8.2; 07 header (Node, browsers, Workers); 10 M1-1; `development-process.md` §9.1 (canonical vectors are public)
@@ -328,7 +341,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - Each runtime reports its identity, so a silent fallback to Node fails the run.
 
 #### M0-10 · Architecture boundary guards (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Status:** done (4thtech/agentlink#9, merged 2026-10-14) · **Size:** S · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · eslint config, tools/deps-check/
 - **Depends on:** M0-2d
 - **Spec:** 04 §8.1; 07 header; `AGENTS.md` Hard rules; `development-process.md` §11
@@ -356,7 +369,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - Each item has a failing fixture test; `pnpm lint` stays green on the real tree.
 
 #### M0-10c · deps-check eslint-rules test: deterministic timeout (new)
-- **Status:** in progress · **Size:** XS · **Tier:** Sonnet · **Security:** S1
+- **Status:** done (4thtech/agentlink#39, merged 2026-10-14) · **Size:** XS · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · tools/deps-check/eslint-rules.test.mjs
 - **Depends on:** M0-10
 - **Spec:** `audit-rules.md` §2 (`tools/**` is S0; this card is S1 because it edits `docs/process/**`); `ci-cd.md`
@@ -365,6 +378,18 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - The first `lintText` call pays the cold ESLint start (config and plugin load), which exceeded the 5 s default test timeout under CI load, so the first test flaked and a rerun passed. Do the cold start once in `beforeAll`, with its own generous hook timeout; the per-test timeout stays at the default for warm runs.
 - **Acceptance:**
   - No assertion changes; the suite passes repeatedly, also in parallel with the crypto tests.
+
+#### M0-10d · console-ban test: deterministic cold-start timeout (new)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 (`tools/**`; S1 only if the PR also edits `docs/process/**`, as M0-10c did)
+- **Repo/path:** agentlink · tools/console-ban.test.mjs
+- **Depends on:** M0-8, M0-10c
+- **Spec:** `audit-rules.md` §2 (`tools/**` is S0); `ci-cd.md`; same pattern as M0-10c
+- **Invariants:** I-7
+- **Scope:**
+  - Observed on push CI of 14 Oct 2026: the test "packages/chain/src/m08-probe.ts: globalThis.console is flagged" timed out at the 5 s default (cold ESLint start under CI load); a rerun passed. Do the cold start once in `beforeAll` with its own generous hook timeout, as M0-10c did for the eslint-rules test; the per-test timeout stays at the default.
+  - Card only so far; no fix has been made.
+- **Acceptance:**
+  - No assertion changes; the suite passes repeatedly, also in parallel with the crypto tests, and a deliberately slow first `lintText` no longer fails the first test.
 
 #### M0-11 · Curator project context (new)
 - **Status:** done (setup) · **Size:** S · **Tier:** Owner · **Security:** S0
@@ -565,6 +590,19 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - A fixture PR touching only `GEMINI.md` is derived as S1 by `review-gate`.
   - The §2.2 table, `review-gate.yml` and CODEOWNERS agree (checked by the independent review).
 
+#### M0-26 · CodeQL alert: `actions/untrusted-checkout` in `secret-scan.yml` (new)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`.github/**`, sensitive path)
+- **Repo/path:** agentlink · .github/workflows/secret-scan.yml
+- **Depends on:** M0-2c
+- **Spec:** `ci-cd.md`; `audit-rules.md` §2 (sensitive paths); D-52
+- **Invariants:** I-7
+- **Scope:**
+  - Open medium alert `actions/untrusted-checkout` in `.github/workflows/secret-scan.yml`. Triage it, then either fix the workflow so that untrusted code is never checked out in a privileged context, or dismiss the alert with a written reason in the PR.
+  - A workflow change here is a sensitive-path PR: it merges only after the independent review and the owner's "merge" in chat.
+- **Acceptance:**
+  - The alert is closed (fixed or dismissed with a reason recorded in the PR), and `security-gate` stays green.
+  - If the workflow is changed, the secret scan still fails on a planted fake secret (negative control recorded in the PR).
+
 ### Documentation (DOCS) (new)
 
 #### DOCS-RB · Runbooks, lessons and onboarding map (new)
@@ -716,7 +754,7 @@ Goal (10 M1): two people on different harnesses exchange messages and files and 
 The owner designs in Claude Design and delivers in three drops (10 "Design deliveries"; intake and live status in `docs/design/README.md`). Until a surface's drop has landed, every UI card builds it **functional and unstyled, strings externalized, no invented visual design**. A late D2 slips M2: the M2 critical path starts from DESIGN-D2.
 
 #### DESIGN-D1 · Design drop D1: foundations and M1 surfaces
-- **Status:** backlog · **Size:** — · **Tier:** Owner · **Security:** S0 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#33, merged 2026-10-14; partial points listed in `docs/design/README.md`) · **Size:** — · **Tier:** Owner · **Security:** S0 · **Phase:** M1a
 - **Repo/path:** Claude Design links or `docs/design/d1/` (+ `MANIFEST.md`); private material to `agentlink-ops`
 - **Depends on:** — · **Due:** week 3 of M1
 - **Spec:** 11 §6.1, §6.2, §8, §9, §11, §13; 10 "Design deliveries"; D-30
@@ -751,7 +789,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 ### Crypto (`@agentlink/crypto`)
 
 #### M1-1h · Independent test vectors for all protocol suites
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** in-progress (vectors merged in 4thtech/agentlink#25; the G-2 follow-up vectors, including `envelope-sig`, are outstanding) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/generators/
 - **Depends on:** M0-9; gap G-46 resolved before the `aead-envelope` and `envelope-sig` suites freeze (the other suites do not wait)
 - **Spec:** 04 §2.1, §2.3, §2.4, §2.4.1, §2.5.1, §2.8, §3.1, §3.3, §3.6, §4, §5, §8.2; 05 §3.1, §4, §8; `development-process.md` §9.1
@@ -801,7 +839,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - The spec line lands first. Vectors come from the M1-1h generators, and the suites stay pending until their modules land.
 
 #### M1-1h-c · Regenerate the `sign-policy-set` vector for the post-G-32 policy form (new, IR-M1-2b-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#35, merged 2026-10-14) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/generate_owner_action.py
 - **Depends on:** M1-1h; M1-2b; proposed, owner confirms at merge
 - **Spec:** 04 §2.5.1, §2.4.1; 06 §3 (policy JSON form, G-32)
@@ -827,7 +865,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Every case records generator, version and inputs; regeneration reproduces the files byte for byte; the contracts repo's parity job runs against the pinned commit.
 
 #### M1-1a · crypto: encodings, hashing, JCS, randomness, wiping
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#27, merged 2026-10-14) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/crypto
 - **Depends on:** M0-9, M0-10
 - **Spec:** 04 §3.1 (base64url without padding, JCS, tagged hash), §8.1–§8.3; 07 §1
@@ -843,7 +881,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Strict base64url tests (padded, `+`/`/`, trailing bits) rejected.
 
 #### M1-1b · crypto: key derivation and public identities
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#29, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/crypto
 - **Depends on:** M1-1a, M1-1h
 - **Spec:** 04 §2.1, §2.4, §2.6, §3.1 (`kid`), §4 (drop key)
@@ -862,7 +900,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - The derivation vectors cover `agentlink/v1/drop`; the drop public key never appears in the public bundle or agent card (test).
 
 #### M1-1c · crypto: HPKE CEK wrapping, payload AEAD, envelope hash and signature helpers
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** in-progress (code merged in 4thtech/agentlink#38; recompute vectors follow under M1-1c, see Acceptance) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/crypto
 - **Depends on:** M1-1b
 - **Spec:** 04 §3.1, §3.3; 03 §4.1
@@ -876,6 +914,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - Vector suites `hpke` and `aead-envelope`: their harness modules are registered and the suites are removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - Vector suite `safety-code-recompute` (04 §3.6.1 steps 1–5 from the signed handshake and ack; split from `safety-code` by IR-M1-1f-1 M-1): a recompute function on top of the envelope helpers and M1-1f's safety code, its harness module registered and the suite removed from `test-vectors/pending-suites.json`; every case passes in every runtime.
+    - M1-1c (follow-up): the PR that merged as 4thtech/agentlink#38 did not deliver this criterion. It stays pending in `test-vectors/pending-suites.json` under M1-1c; the pending entry's card ID is frozen. A follow-up PR under the same ID M1-1c adds the recompute function and the harness module, and removes the entry.
   - RFC 9180 vectors for suite (KEM 0x0020, KDF 0x0001, AEAD 0x0002, mode 0) and M1-1h envelope vectors pass in all runtimes.
   - Changing any covered field (incl. recipient order or `createdAt`) changes the hash and fails verification; wrong-recipient open and tampered `ct`/AAD fail.
 
@@ -894,7 +933,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - 1 GiB encrypt + decrypt in Node with RSS growth < 64 MiB (slow-tagged benchmark test).
 
 #### M1-1e · crypto: EIP-712 typed-data hashing and AgentCard
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#32, merged 2026-10-14) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/crypto
 - **Depends on:** M1-1a, M1-1h, M1-2a
 - **Spec:** 04 §2.4, §5; 05 §4, §8
@@ -920,7 +959,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - EIP-712 vectors from M1-1i pass in all runtimes; the contracts repo's parity job passes against the same commit (M1-3d).
 
 #### M1-1f · crypto: owner passphrase wrapping, pairing proof, safety code
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#37, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/crypto
 - **Depends on:** M1-1b, M1-1h; gap G-28 resolved
 - **Spec:** 04 §2.3, §2.5, §3.6
@@ -953,9 +992,9 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - M1-1i wrapKey vectors pass in all runtimes; recovery-code round trip and format tests (grouping, alphabet); a mistyped code fails cleanly without partial output.
 
 #### M1-1g · crypto: KeyStore / OwnerKeyStore interfaces, MemoryKeyStore, NIP-44 helpers
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#41, merged 2026-10-14; the `envelope-sig` vector suite is registered here once the M1-1h G-2 follow-up has committed it as pending) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/crypto (interfaces location per gap G-2)
-- **Depends on:** M1-1b, M1-1c; gap G-2 resolved (branch `docs/G-2-envelope-signatures`, pending owner)
+- **Depends on:** M1-1b, M1-1c; gap G-2 resolved (4thtech/agentlink#34, merged 2026-10-14)
 - **Spec:** 03 §3; 04 §2.5, §2.6, §3.1.1, §8.1; 07 §4.1
 - **Invariants:** I-1, I-4, I-8
 - **Scope:**
@@ -1004,7 +1043,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 ### Types (`@agentlink/types`)
 
 #### M1-2a · types: constants and envelope, payload, card, invite schemas
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** in-progress (code merged in 4thtech/agentlink#23; the `encodings` vector suite is still pending under M1-2a) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types
 - **Depends on:** M0-2d; gap G-29 resolved for owner-operation bodies
 - **Spec:** 04 §2.4, §2.5.1, §3.1, §3.4, §3.4.1, §3.6; 05 §2.1, §3.1; 07 §1
@@ -1022,7 +1061,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Wrong lengths, padded base64, oversized fields rejected (tests); schemas run in all three runtimes.
 
 #### M1-2b · types: policy, approvals, owner actions, proof pack, tool results
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#31, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types
 - **Depends on:** M1-2a; gaps G-7, G-32 resolved (branch `docs/G-7-G-32`, pending owner)
 - **Spec:** 06 §1 rule 3, §2 (`ProofStatus`), §2.5, §3 (incl. the policy JSON form and per-contact rules); 04 §2.4.1, §2.5, §2.5.1 (lifetimes, skew and nonces), §3.4.1 (approval TTL); 07 §8; 03 §3
@@ -1038,7 +1077,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Policy rejects: a missing key, an unknown key at any level, a JSON number for a USD field, the USD amounts `"01"`, `"1."`, `"1.0"`, `"0.10"`, `"1e3"`, `"-1"`, `"1.0000001"` and `"1000000000"` (and the same strings in `fee.usd` and `maxFeeUsd`), `allowKeyDisclosure: "allow"`, an unsorted or duplicate contact list, an uppercase or checksummed agent ID, a `ContactRule` with empty `proofs`, 257 rules, and integers out of range (`maxEnvelopeKB: 25`, `defaultExpiryDays: 8`).
 
 #### M1-2c · types: run the schema tests in browsers and Workers; review follow-ups (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#36, merged 2026-10-14) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types (Vitest config, tests), docs/foundation (spec lines)
 - **Depends on:** M1-2a, M0-9
 - **Spec:** 07 header (Node, browsers, Workers); 04 §3.4, §3.5, §4; 07 §1; review IR-M1-2a-1
@@ -1125,7 +1164,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A front-run of the same authorization cannot redirect funds; a replayed nonce reverts; below minimum reverts `BelowMinDeposit()`.
 
 #### M1-3d · contracts: OCCNotary (records, receipts, freeze)
-- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (private repo, 4thtech/occ-v2-contracts#4, merged 2026-10-14) · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · src/OCCNotary.sol, test/unit
 - **Depends on:** M1-3a (uses `IOCCFeeVault` with a mock until M1-3b lands), M1-1i; gap G-4 resolved (owner decision, 14 Oct 2026; 05 §3.3)
 - **Spec:** 05 §3.1–§3.4, §5 (freeze), §5.2, §6, §7; 04 §5
@@ -1137,7 +1176,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Owner decisions of 14 Oct 2026:
     - G-4 batches (05 §3.3): an identical existing record or receipt is skipped and emits `RecordSkipped` or `ReceiptSkipped`; every other failure reverts the batch.
     - Pause blocks `acknowledge` and `acknowledgeBatch` (05 §5.1, D-61).
-  - Proposed (owner confirms at merge, D-62): pause and unpause still work after `freezeUpgrades`; a receipt batch item is skipped only after its deadline, signature and commitment checks pass (05 §3.3).
+  - Accepted (D-62, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34): pause and unpause still work after `freezeUpgrades`; a receipt batch item is skipped only after its deadline, signature and commitment checks pass (05 §3.3).
   - CI parity job: EIP-712 hashes equal the canonical public vectors at the pinned commit.
   - Open Low (IR-M1-3a-1 L-3): the Notary's freeze goes through a `_beforeUpgrade` hook, not an override of `_authorizeUpgrade` (see M1-3b), so the role check stays in the base.
   - Follow-up (IR-M1-3b-1 I-3): the Notary's direct-payment functions call `depositFromModule` with `payer = msg.sender`, never a signer or payer taken from calldata; a module charges only the payer's own credits.
@@ -1172,6 +1211,35 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Invariant suite runs in `contracts-gate` with the CI fuzz profile and nightly with a deep profile (runs/depth recorded).
   - ERC-1271 record and receipt paths pass; every static-analysis finding has a disposition.
+
+#### M1-3h · contracts: fuzz, invariant and ERC-1271 coverage for `depositWithAuthorization` (new, M1-3e review L-3)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** occ-v2-contracts · test/fuzz, test/invariant
+- **Depends on:** M1-3c, M1-3e
+- **Spec:** 05 §2.5, §8; 03 §4.4
+- **Invariants:** I-6, I-10
+- **Scope:**
+  - Added once M1-3c merges; M1-3e's suites cover the vault without the EIP-3009 deposit path, so this card closes the gap (M1-3e review L-3).
+  - Fuzz: `depositWithAuthorization` amounts, validity windows and nonces (replayed, front-run and below-minimum cases).
+  - Invariant: the credit and vault-balance invariants of M1-3e hold with `depositWithAuthorization` in the handler's action set.
+  - ERC-1271: a smart-account `from` where the token's authorization check reaches `isValidSignature`, including a reverting and an invalid signer.
+- **Acceptance:**
+  - Fuzz and invariant suites include the deposit path and pass with the CI fuzz profile and the nightly deep profile.
+  - Removing the measured-delta credit or the nonce check in a local mutant turns a test red (negative control recorded in the PR).
+
+#### M1-3i · contracts: OCCNotary NatSpec and a narrower `unimplemented-functions` suppression (new, follow-up to M1-3d)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** occ-v2-contracts · src/OCCNotary.sol, audits/static-analysis.md
+- **Depends on:** M1-3d
+- **Spec:** 05 §3.3; D-61 (G-4 resolved)
+- **Invariants:** I-6
+- **Scope:**
+  - The NatSpec still calls G-4 "pending"; state the resolved batch semantics (05 §3.3) instead.
+  - The `unimplemented-functions` suppression covers the whole contract. Narrow it to the specific declarations that need it, or remove it if the contract implements its interface.
+  - Re-run Slither and record the disposition in `audits/static-analysis.md`.
+- **Acceptance:**
+  - No NatSpec in `src/OCCNotary.sol` describes a resolved gap as pending.
+  - The suppression sits at the narrowest scope that keeps Slither clean; no new finding appears.
 
 #### M1-3f · contracts: ABI release artifacts and `@agentlink/occ-v2-abi`
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
@@ -3291,7 +3359,7 @@ Concurrency guideline: no more than five or six S1/S2 cards `in-review`/`audit` 
 Found while decomposing. None is resolved here; each needs a spec-change PR (or an owner decision) before the blocked cards become `ready`. Priority: **H** blocks security-critical design, **M** blocks a card's acceptance, **L** cosmetic or late.
 
 1. **G-1 (H) Local owner presence vs a same-user agent.** 04 §1 I-4, §2.5; 08 §1; 10 M1-8. The WebAuthn RP ID `localhost` is shared by every local origin, and 04 §2.5 already accepts that a shell-capable agent can tamper with the installation. Either way the next owner passkey or passphrase use on that machine can be captured and the wrapped owner seed on disk unwrapped: local presence proves presence, not intent. The same holds for creating the owner key on such a machine: a tampered installation or a same-user process that reads memory can capture or predetermine the owner seed during setup (04 §2.8, D-54). The residual-risk text lists only tampering and credit spending, and I-4's "no agent process can produce one" holds only while the installation is intact. *Proposed:* state this in 04 §2.5; scope the M1-8 test to an unmodified installation; recommend owner operations from the console on a separate device when the harness has unrestricted shell; harness deny rules for the installed package and npx cache; consider not storing the owner seed on agent machines by default. *Blocks:* M1-8c, M1-8d, M1-8e, M1-11a, M1-12b. *Status:* stays open until the D-36 desktop app ships (G-42).
-2. **G-2 (H) `KeyStore` location and methods.** Resolved by branch `docs/G-2-envelope-signatures` (pending owner; proposed, owner confirms at merge), in 04 §3.1.1, with 03 §3, 04 §2.6, §3.5 and 07 §1, §4.1, §4.2 aligned. Reviews IR-M1-1g-1 (M-1, M-2, L-1, L-2, I-4, I-5) and IR-M1-1c-1 (F3, F5) are folded in.
+2. **G-2 (H) `KeyStore` location and methods.** Resolved by 4thtech/agentlink#34 (merged 2026-10-14; D-62 accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34), in 04 §3.1.1, with 03 §3, 04 §2.6, §3.5 and 07 §1, §4.1, §4.2 aligned. Reviews IR-M1-1g-1 (M-1, M-2, L-1, L-2, I-4, I-5) and IR-M1-1c-1 (F3, F5) are folded in.
    - **Signature.** `sig` = BIP-340 by `from` over `taggedHash("agentlink/envelope/v1", envelopeHash)`, where `envelopeHash = sha256(JCS(envelope without sig))` over the strictly parsed envelope, with the 32 raw hash bytes inside the tagged hash. A table of every BIP-340 use of a Nostr key (envelope, owner action, NIP-01 seal and AUTH) fixes one message per object. A new use needs its own tag, and nothing signs an untagged digest.
    - **Keys.** Agent-sent types are signed by the agent Nostr key at the current epoch. `approval`, `policy` (owner → agent) and `revoke` are signed by the owner Nostr key, only in an `OwnerSession` from `unlock(presence)`, in the same gesture as the carried `SignedOwnerAction`. The envelope signature authorises nothing. Receivers enforce the type ↔ key table.
    - **Interfaces.** The interfaces are types in `@agentlink/crypto`, and the seed holders are in `/keystore` and `@agentlink/node`. Test doubles are unreachable from production `src`. `EnvelopeKeys` (`signEnvelopeHash`, `signNostr`, `nip44Encrypt`/`nip44Decrypt`, `unwrapCek(wrapped, envelopeId, {epoch})`, which replaces `hpkeOpen(wrapped, info)`) is shared by `KeyStore` and `OwnerSession` (IR-M1-1g-1 M-1). An `OwnerSession` signs only Nostr kinds 13 and 22242. `{epoch}` is accepted only on decrypting methods and `getPublicBundle`.
@@ -3305,7 +3373,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
    - Batches are all-or-nothing. The exception is an item that is already on-chain in identical form: a Record with the same `recordStructHash`, or a receipt type already set by the committed recipient. Such an item is skipped, with no charge and no revert, and emits `RecordSkipped` or `ReceiptSkipped`. Any other failure reverts the whole batch. Single calls still revert.
    - **Submitter (M1-10a):** simulate per item and then as a batch, and leave out every failing item. If a sent batch reverts, resubmit once without the failing items; an item that fails twice is `failed`. A signer that caused a revert is submitted alone for a while. Per-item status is `recorded`, `skipped` or `failed`.
    - Same decision (D-61): the `notarize` gas target is ≤ 170k (05 §3.4). Pause also blocks receipts (05 §5.1). Every Record has a fresh random salt (04 §5).
-   - Proposed with it (owner confirms at merge, D-62): pause and unpause still work after freeze; a signed item that did not land is replaced only when the chain shows it never can (04 §5); a receipt item is skipped only after its own checks pass (05 §3.3).
+   - Accepted with it (D-62, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34): pause and unpause still work after freeze; a signed item that did not land is replaced only when the chain shows it never can (04 §5); a receipt item is skipped only after its own checks pass (05 §3.3).
 
    *Was:* 05 §3.2; 07 §7. Whether one failing item reverts `notarizeBatch`/`acknowledgeBatch` was unspecified. The submitter batches across signers, so one item (for example credits spent between simulation and inclusion) could grief the rest. *Blocks:* M1-3d, M1-10a.
 5. **G-5 (M) J1 key storage wording.** RESOLVED by 02 §5 J1 steps 2–3: `init` puts only the agent keys in the OS keychain (step 2); the owner key is created and wrapped in the setup step (step 3, 04 §2.2). *Was:* J1 step 2 stored "owner and agent keys" in the OS keychain, against 04 §2.2. *Blocked:* M1-9a, M1-12b.
@@ -3364,7 +3432,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 44. **G-44 (M) Drop delete on receipt vs owner access.** RESOLVED: the drop follows `files.deleteAfter` like any storage (default `expiry`, `receipt` as an owner option; D-48, 04 §4), so I-9 holds as written: owners keep access to file contents until expiry. *Was:* D-48 deleted drop objects on receipt, ending owner access before expiry. *Blocked:* M1-7f.
 45. **G-45 (M) Consumer providers without expiring public links.** 07 §5.5; D-18 (links expire after at most 7 days); D-49. Google Drive "anyone with the link" permissions cannot expire; Dropbox link expiry needs a paid plan; Microsoft Graph documents `Files.ReadWrite` (broader than the app folder) as the least-privileged permission for `createLink` on personal accounts. Sender-side revocation works only while the sender's device is online. *Proposed:* accept sender-side revocation, run by the desktop tray app at expiry and at start-up, as the expiry mechanism where a provider has no expiring link; ship OneDrive only if `createLink` works with the app-folder scope. Owner decides per provider. A scope broader than the app folder (e.g. OneDrive `Files.ReadWrite`) voids the 04 §7 "stolen token reaches only AgentLink ciphertext" mitigation on Windows and Linux, where same-user processes can read keychain tokens. *Blocks:* M2-15b, M2-15c, M2-15d.
 
-46. **G-46 (H) One plaintext for every recipient.** Recorded as a requirement by the owner (D-61, 14 Oct 2026), stated normatively in 04 §3.3; the construction is open. *Timing (proposed, build plan; owner confirms at merge, D-62):* the construction is fixed before M1-7b becomes `ready` and before the `aead-envelope` and `envelope-sig` vectors freeze. 04 §3.1, §3.1.1, §3.3; 07 §8. Found while resolving G-2. *Requirement:* the payload AEAD must be key-committing, or the recipients must be bound to one content key, so that every recipient, every owner (I-9) and a proof-pack verifier who opens an envelope gets the same plaintext under its signed, notarized `envelopeHash`. Options include a key-committing construction, or a commitment to the CEK in the signed header that is checked before decrypting. Either option changes the envelope header, hence the timing above. *Blocks:* freezing the `aead-envelope` and `envelope-sig` vectors (M1-1h), M1-7b, M1-7g (proof of agreement); each lists it under Depends on.
+46. **G-46 (H) One plaintext for every recipient.** Recorded as a requirement by the owner (D-61, 14 Oct 2026), stated normatively in 04 §3.3; the construction is open. *Timing (build plan; D-62, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34):* the construction is fixed before M1-7b becomes `ready` and before the `aead-envelope` and `envelope-sig` vectors freeze. 04 §3.1, §3.1.1, §3.3; 07 §8. Found while resolving G-2. *Requirement:* the payload AEAD must be key-committing, or the recipients must be bound to one content key, so that every recipient, every owner (I-9) and a proof-pack verifier who opens an envelope gets the same plaintext under its signed, notarized `envelopeHash`. Options include a key-committing construction, or a commitment to the CEK in the signed header that is checked before decrypting. Either option changes the envelope header, hence the timing above. *Blocks:* freezing the `aead-envelope` and `envelope-sig` vectors (M1-1h), M1-7b, M1-7g (proof of agreement); each lists it under Depends on.
 
 ---
 
