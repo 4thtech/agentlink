@@ -1,0 +1,13 @@
+{
+  "name": "@agentlink/tools",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Repository check scripts (manifest policy). Not published.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "check": "node check-manifests.mjs",
+    "lint": "eslint .",
+    "test": "vitest run"
+  }
+}
