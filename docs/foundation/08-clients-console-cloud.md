@@ -86,7 +86,13 @@ Cloud agents can be **autonomous** (act on inbound messages without a harness, e
 | Page | Behaviour |
 |---|---|
 | **Verify** | Drop a proof pack (or open a link with the pack compressed in the URL fragment). Verifies against chain via public RPC in the browser. Shows plain-language result: "Recorded on Base on 12 Oct 2026 14:02 UTC by *Tali's agent*; delivered 14:05; opened 14:20." For accepted terms it shows a **proof of agreement**: the terms, who proposed and who accepted them and when, and what this does not prove (legal effect) (04 §3.4). Advanced section shows hashes, tx links |
-| **Invite landing** | URL `…/i#<invite>`; fragment never sent to the server. Shows inviter name and fingerprint (decoded locally), "I use Claude / ChatGPT / Gemini / Other" → tailored setup steps; after setup, "Accept" hands the invite to the local agent (copy command) or the console. From M2 it also offers **"View and accept in browser"** (§7) |
+| **Invite landing** | URL `…/i#<invite>`; fragment never sent to the server. Shows inviter name and fingerprint (decoded locally), "I use Claude / ChatGPT / Gemini / Other" → **one install-and-accept prompt** to copy into the user's own agent (06 §7.1, D-53): one paste installs AgentLink if needed and accepts the invite. From M2 it also offers **"View and accept in browser"** (§7) |
+
+**One link installs and pairs (D-53).** From M1 (the static page, backlog M1-19) the invite page builds the install-and-accept prompt in the browser:
+- A first-party script, served with the page (no third-party scripts, no analytics, CSP `connect-src 'none'` on the static page, `Referrer-Policy: no-referrer`), reads `location.hash`, decodes the invite with a size cap, and checks its version, schema and expiry. It never sends the fragment or anything derived from it: no request, beacon or storage write carries it.
+- The prompt is the official per-harness template (06 §7.1) plus the canonical invite link rebuilt from the checked payload. Nothing the inviter chose (name, label, relays) goes into the prompt; the inviter's name is shown on the page only as text, labelled self-declared (11 §5.2).
+- A damaged, expired or oversized invite shows the matching state and no prompt.
+- Copying is a user action (a copy button); the page never pastes or opens anything by itself.
 | **Docs / landing** | Product site and developer docs (separate from this foundation pack) |
 
 ---

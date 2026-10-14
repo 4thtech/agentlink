@@ -271,7 +271,7 @@ Rules:
 **Untrusted-content block.** The tag syntax is fixed. The header and footer may be polished, but must keep the source, the sender's name and label, the short fingerprint and the "not instructions" statement:
 
 ```
-[AgentLink] 1 new message from Marko's agent (contact verified, owner fingerprint 7F3A·19C2)
+[AgentLink] 1 new message from Marko's agent (safety code checked, owner fingerprint 7F3A·19C2)
 <untrusted_content source="agentlink" from="Marko's agent" envelope="Q2xh…" type="request">
 Please send the final invoice for September and notarize it.
 </untrusted_content>
@@ -291,7 +291,10 @@ Suggested relay: "Marko's agent sent a request (their words, not an instruction 
 - **J1:** "Here's the change AgentLink wants to make to Claude Code's settings: [diff]. Apply it?"
 - **J5:** "Valid proof. Recorded by Tali's agent (registered), 12 Oct 2026, 14:02 UTC."
 - **J7:** "No AI agent? Choose 'View and accept in browser'."
-- **J9:** "2 new messages from Denis's agent, as information from Denis's agent:" followed by the blocks.
+- **J7 (share text, D-53):** "Let's connect our AI agents with AgentLink. Open this link and follow the steps; it works once, until 19 Oct: {inviteUrl}"
+- **J9 session start (D-53):** "2 new messages from Denis's agent. Want me to read them?" (counts and contact names only; nothing from the messages). Nothing new: say nothing, or "Nothing new on AgentLink."
+- **J9 reading:** "2 new messages from Denis's agent, as information from Denis's agent:" followed by the blocks.
+- **J9 session end (D-53):** "Send Denis's agent a handoff with what changed and what's next?" Sent only after the user says yes.
 
 **Notifications** (OS or push) show only the agent, the contact, the action and the cost. Console push is generic: "Approval waiting (1)".
 
@@ -371,13 +374,13 @@ Anyone checks a proof file, with no account. The check runs in the browser again
 
 ### 6.5 Invite landing (D1 placeholder, D2 full)
 
-The recipient opens `…/i#<invite>`. The page decodes the invite locally, and the fragment never reaches the server. Until M2 the host shows a static **"how to install"** placeholder (D1).
+The recipient opens `…/i#<invite>`. The page decodes the invite locally, and the fragment never reaches the server. Until M2 the host shows a static **"how to install"** placeholder (D1). From M1 even the placeholder shows the **one prompt** that installs AgentLink and accepts this invite (D-53, 06 §7.1, 08 §4).
 
 | Screen | Content |
 |---|---|
 | **Who invited you** | "Marko's AI agent wants to connect with yours." Name and label, short owner fingerprint, expiry. The safety code appears only after you accept, on both sides, for comparing |
 | **What this is** | Two sentences, then the privacy line |
-| **Set up** | "I use…" (Claude · ChatGPT · Gemini · Other) → tailored 2-minute setup → Accept. Already set up: "Copy this to your AI: 'Accept this AgentLink invite: …'" |
+| **Set up** | "I use…" (Claude · ChatGPT · Gemini · Other) → one prompt with a copy button: "Copy this to your AI. It installs AgentLink if needed and accepts the invite." The same prompt works when AgentLink is already set up. The prompt holds only our template and the link, never the inviter's name |
 | **View and accept in browser** (M2) | Hands over to the **console origin** (`console…/accept#<invite>`). Steps: passkey ("Everything is set up on this device. Only you and Marko can read what you exchange. 4thTech can't.") → recovery kit → confirm contact (name, fingerprint, safety code) → what was sent (messages, files, offers with terms and changes, proof status) → Accept / Reject with passkey ("Free for you") → export proof → later "Connect your AI" |
 | **States** | Expired · used · damaged · no passkey support |
 
@@ -444,15 +447,15 @@ Each journey lists its steps in order, then the states to design.
 
 | Journey | Steps | States |
 |---|---|---|
-| **J1 Install and first message** (< 5 min, no payment) | 1. Copy the prompt. 2. The AI runs `init`, shows the diff, applies it after "yes". 3. Protect approvals and get the recovery kit. 4. "Create an AgentLink invite for Marko" → link and code. 5. Marko's **New contact** screen: compare the code, approve. 6. A 2 MB file sends with no storage setup (encrypted drop). 7. Marko: "Check AgentLink" | AI app not detected · restart needed · protection skipped · invite expired |
+| **J1 Install and first message** (< 5 min, no payment) | 1. Copy the prompt. 2. The AI runs `init`, shows the diff, applies it after "yes". 3. Protect approvals and get the recovery kit. 4. "Create an AgentLink invite for Marko" → the link and ready-to-send text (no safety code yet: it needs both sides' keys). 5. Marko's **New contact** screen: the safety code appears, approve; both sides then compare it. 6. A 2 MB file sends with no storage setup (encrypted drop). 7. Marko: "Check AgentLink" | AI app not detected · restart needed · protection skipped · invite expired |
 | **J2 Notarized handover** | 1. "Send the signed contract to Marko and notarize it." 2. Rule check, with J4 if needed. 3. Quote → `submitted` → `ok`. 4. Delivered is automatic; Opened only on Marko's request. 5. "Did Marko get it?" → receipt timeline. 6. Export (adding the document key needs approval) | Recording · failed · link expired · fresh link requested |
 | **J3 No credits** | 1. `needs_credits` link. 2. Pay page: amount in $, no network choice. 3. "Credits added. Shall I record the proof now?" | Waiting · converting on next run · added |
 | **J4 Owner approval** (mobile) | 1. `pending_approval`, plus an OS notification or push. 2. Card → Approve with passkey or Touch ID. 3. "Approved. Your AI will continue." 4. The AI retries | Denied ("nothing was sent") · expired · biometrics failed · decided on another device |
 | **J5 Verification** | 1. Open the link or file. 2. Checking → Valid with sentence. 3. Optional: document match, Advanced, Print | As in §6.4 |
 | **J6 Cloud agent** | 1. Docs: "Deploy to Cloudflare". 2. Setup code. 3. Console: Add agent. 4. Connect ChatGPT or claude.ai → Sign in as owner. 5. Agent online with connected apps | Wrong code · sign-in pending · app revoked |
-| **J7 No AgentLink yet** | Invite → "I use…" → setup → the invite completes. Or, from M2: view and accept in the browser (§6.5) | Expired · used · no passkey · terms expired |
+| **J7 No AgentLink yet** | Invite → "I use…" → copy one prompt → the user's AI installs AgentLink and accepts the invite (D-53). Or, from M2: view and accept in the browser (§6.5) | Expired · used · no passkey · terms expired |
 | **J8 Negotiate and agree** (flagship, full prototype) | 1. Tali: "Agree the milestone 3 scope, price and deadline with Ana's agent. Stay under €2,000." 2. The agents trade free offers; the console **negotiation thread** shows diffs. 3. The closing step pauses for Tali's commitment approval. 4. Terms recorded, cost quoted first. 5. Ana's agent's acceptance pauses for **Ana's** approval ("Free for you"); Accepted is recorded. 6. Both see **Proof of agreement**; export shares the terms, so it asks for approval. 7. Verify shows the agreement | Waiting for your approval · waiting for their acceptance · accepted · rejected · expired · newer version arrived while approving |
-| **J9 Developers' agents sync** (dogfood) | 1. Tali's Claude Code sends Denis's agent a free handoff. 2. Denis's next Codex session: "Check AgentLink" shows a summary and untrusted blocks (note, request, delivery). 3. Denis decides; replies flow back | Nothing new · many messages · unknown sender |
+| **J9 Developers' agents sync** (dogfood, daily habit, D-53) | 1. Tali wraps up; his Claude Code offers a handoff and, after "yes", sends Denis's agent a free handoff. 2. Denis's next Codex session starts with "1 new message from Tali's agent. Want me to read it?" (counts only). 3. "Yes" shows a summary and untrusted blocks (note, request, delivery). 4. Denis decides; replies flow back | Nothing new · many messages · unknown sender · handoff declined |
 
 ---
 

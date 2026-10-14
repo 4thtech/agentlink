@@ -376,7 +376,7 @@ No step may merge before the previous one has merged. Each PR references the oth
 | Policy engine | Unit test per rule of `evaluate(policy, action, context)` | 07 §2 |
 | Owner presence | Test: a script running as the same OS user cannot approve or change policy | 10 M1-8 |
 | Logging | CI test asserting known secret patterns never appear in logs | 04 §8.4 |
-| Files and URLs | `send_file` outside allowed folders → `needs_setup`, file never read; SSRF and realpath cases | 04 §4, 06 §9 |
+| Files and URLs | `agentlink_send` with a `path` outside allowed folders → `needs_setup`, file never read; SSRF and realpath cases | 04 §4, 06 §9 |
 | Web | Fragment never sent (invite, verify), asserted in Playwright | 10 M2-5 |
 | Contracts | Unit per function and revert path; fuzz (signatures, fees, credits); invariant suite; ERC-1271 signers; gas snapshots | 05 §8 |
 | E2E | `pnpm test:e2e`: cross-agent scenarios of M1-13 | 10 M1-13 |

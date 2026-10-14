@@ -69,8 +69,8 @@ Priority: **P0** = beta must-have · **P1** = beta should-have · **P2** = post-
 | ID | Feature | Detail | Priority |
 |---|---|---|---|
 | F-20 | **Send message** | End-to-end encrypted to the contact's agent; copies wrapped for both owners | P0 |
-| F-21 | **Inbox** | `check_inbox` returns new messages; persisted locally; threads per contact | P0 |
-| F-22 | **Structured messages** | Typed payloads: `text`, `request`, `offer`, `accept`, `reject`, `delivery`, `note`, with optional JSON body. `offer`, `accept` and `reject` carry a structured `terms` object (parties, subject, deliverables, optional price, deadlines, validity, link to the previous version); an `accept` quotes the `termsHash` it accepts (04 §3.4, D-32). Sending `accept` needs owner approval by default (F-61) | P0 (`offer` / `accept` / `reject` with `terms`) / P1 (other types) |
+| F-21 | **Inbox** | `agentlink_inbox` returns new messages; persisted locally; threads per contact. At session start `agentlink_status` reports who sent something new, with counts only (J9, D-53) | P0 |
+| F-22 | **Structured messages** | Typed payloads: `text`, `request`, `offer`, `accept`, `reject`, `delivery`, `note`, with optional JSON body. `offer`, `accept` and `reject` carry a structured `terms` object (parties, subject, deliverables, optional price, deadlines, validity, link to the previous version); an `accept` quotes the `termsHash` it accepts (04 §3.4, D-32). Sending `accept` needs owner approval by default (F-61) | P0 (`offer` / `accept` / `reject` with `terms`; `note`, `request` and `delivery` for J9, the M1a gate) / P1 (other types) |
 | F-23 | **Delivery status (off-chain)** | Free, signed "received" acknowledgement over Talk (not on-chain) | P1 |
 | F-24 | **Group threads** | 3+ participants | P2 |
 
@@ -90,7 +90,7 @@ Priority: **P0** = beta must-have · **P1** = beta should-have · **P2** = post-
 
 | ID | Feature | Detail | Priority |
 |---|---|---|---|
-| F-40 | **Notarize** | Records the envelope hash on-chain with sender signature, recipient commitment, kind, timestamp. One flag on `send_message` / `send_file`, or later on any past message | P0 |
+| F-40 | **Notarize** | Records the envelope hash on-chain with sender signature, recipient commitment, kind, timestamp. One flag on `agentlink_send`, or later on any past message | P0 |
 | F-41 | **Verified registration** | On-chain agent card registration (agent ↔ owner binding), shown as a verified badge; ERC-8004 link later | P1 |
 | F-42 | **Receipts** | Recipient signs `DELIVERED`, `OPENED`, `ACCEPTED` or `REJECTED`; recorded on-chain against the record. Recipient pays nothing (prepaid by sender's fee). `ACCEPTED` and `REJECTED` are commitments and need owner approval by default (F-61) | P0 |
 | F-43 | **Proof pack export** | JSON (+ human-readable PDF later) with record, receipts, chain, envelope hash, optional disclosed content key. For a record carrying `terms` with an `ACCEPTED` receipt, the pack is a **proof of agreement**: it shows both agents assented to the exact same terms (by `termsHash`) and when (J8). It does not by itself establish legal enforceability | P0 |
@@ -152,19 +152,19 @@ Prices are the planned beta prices (D-45), the same in USD on every chain, paid 
 1. User asks their agent to install AgentLink: "Install AgentLink for me", or pastes the install prompt for their harness from the docs (F-09). The agent runs `npx @4thtech/agentlink init`. (Alternatives: the user runs `init` themselves, installs the Claude Desktop extension, or, from M2, the desktop app.)
 2. `init` creates the agent keys in the OS keychain and asks for a display name. It detects the harness (Claude Code, Claude Desktop, Codex, Gemini CLI…), shows the exact config change and applies it only after the user confirms (06 §7).
 3. `init` opens the local setup page: the user protects approvals with a passkey (Touch ID / Windows Hello) or an owner passphrase, which creates and wraps the owner key (04 §2.2), and is offered the recovery kit. The user restarts the harness if it needs it.
-4. User says to their agent: "Create an AgentLink invite for Marko." The agent calls `create_invite` and returns a link with its expiry and the user's own owner fingerprint. There is no safety code yet, because it is derived from both sides' keys (04 §3.6).
-5. Marko (already set up) tells his agent: "Accept this invite." His local approval page asks him to confirm the contact (name, fingerprint, safety code) with his passkey. Contact paired: once the handshake completes, both sides show the same safety code, and the two owners can compare it by phone or in person (F-12).
+4. User says to their agent: "Create an AgentLink invite for Marko." The agent calls `agentlink_create_invite` and returns a link with its expiry, ready-to-send text and the user's own owner fingerprint. There is no safety code yet, because it is derived from both sides' keys (04 §3.6).
+5. Marko opens the link. The invite page gives him one prompt to paste into his own agent, which installs AgentLink if needed and accepts the invite (J7, D-53); if he is already set up, he can simply tell his agent "Accept this invite." His local approval page asks him to confirm the contact (name, fingerprint, safety code) with his passkey. Contact paired: once the handshake completes, both sides show the same safety code, and the two owners can compare it by phone or in person (F-12).
 6. User: "Send Marko's agent the draft proposal from ~/Documents/proposal.pdf." The file is 2 MB: it is encrypted on the device and sent through the encrypted drop (F-31, D-48), with no storage setup. The only prompt is a one-time owner approval to allow that folder, if it isn't allowed yet (`files.allowedFolders`, 06 §3).
-7. Message arrives; Marko asks his agent "check AgentLink"; the agent reads the message.
+7. Message arrives; at the start of Marko's next session his agent says a new message is waiting (J9), and reads it when Marko asks.
 
 ### J2 — Notarized document handover
 
 1. "Send the signed contract to Marko and notarize it."
-2. Agent calls `send_file` with `notarize: true`. Policy check: notarization allowed? Under daily fee budget? If not, approval requested (J4).
+2. Agent calls `agentlink_send` with the file's `path` and `notarize: true`. Policy check: notarization allowed? Under daily fee budget? If not, approval requested (J4).
 3. Fee quote shown in the tool result ("Proof costs $0.10, paid from credits").
 4. File encrypted, uploaded, envelope sent over Talk, record submitted on-chain.
-5. Marko's agent fetches the file, verifies the hashes and automatically signs `DELIVERED`. Only when Marko asks it to open or summarize the document does it call `acknowledge` with `OPENED` (never automatic by default).
-6. User asks later: "Did Marko get the contract?" → `get_proof` shows record and receipts with timestamps.
+5. Marko's agent fetches the file, verifies the hashes and automatically signs `DELIVERED`. Only when Marko asks it to open or summarize the document does it call `agentlink_acknowledge` with `OPENED` (never automatic by default).
+6. User asks later: "Did Marko get the contract?" → `agentlink_get_proof` shows record and receipts with timestamps.
 7. User exports the proof pack for their records.
 
 ### J3 — First paid action without credits
@@ -179,7 +179,7 @@ Prices are the planned beta prices (D-45), the same in USD on every chain, paid 
 1. Agent requests an action outside policy (e.g. notarize while "approval required" is set, unknown contact, file above size limit, accepting an offer's terms).
 2. The tool returns `pending_approval` with an approval ID; the local MCP shows an OS notification and the local approval page (or a console push notification).
 3. Owner reviews a plain-language summary (who, what, cost) and approves with passkey or local confirmation.
-4. The agent polls `get_approval` or retries; the action proceeds.
+4. The agent polls `agentlink_get_approval` or retries; the action proceeds.
 
 ### J5 — Third-party verification
 
@@ -197,27 +197,27 @@ Prices are the planned beta prices (D-45), the same in USD on every chain, paid 
 ### J7 — Recipient who doesn't have AgentLink
 
 1. Recipient opens an invite link → invite landing page.
-2. Page explains in one paragraph and offers: "I use Claude / ChatGPT / Gemini / Other" → tailored 2-minute setup.
-3. After setup, the invite completes automatically (the invite data lives in the URL fragment). The safety code appears on both sides once pairing completes, not on the landing page, which holds no keys.
+2. Page explains in one paragraph and offers: "I use Claude / ChatGPT / Gemini / Other" → one prompt to copy into the recipient's own agent, built in the browser from the link (D-53, 06 §7.1).
+3. One paste: the agent installs AgentLink (config diff confirmed by the user, owner setup on the local setup page) and accepts the invite, which the owner approves (`contacts.acceptInvites`). The invite data lives in the URL fragment and never reaches a server. The safety code appears on both sides once pairing completes, not on the landing page, which holds no keys. The safety code appears on both sides once pairing completes, not on the landing page, which holds no keys.
 4. From M2, the recipient can instead choose **"View and accept in browser"** (F-15): no install, keys generated in the browser, recovery kit offered. The safety code is shown on the confirm-contact screen once the browser identity exists, and on both sides after the handshake.
 
 ### J8 — Negotiate and agree (flagship)
 
-1. Tali tells her agent: "Agree the milestone 3 scope, price and deadline with Ana's agent. Stay under €2,000."
+1. Tali tells his agent: "Agree the milestone 3 scope, price and deadline with Ana's agent. Stay under €2,000."
 2. The agents negotiate **free over Talk** with typed `offer` messages carrying `terms` (F-22, 04 §3.4). Each counter-offer increases `version` and links the version it replaces (`previousTermsHash`). Plain offers cost nothing and need no approval.
 3. When the agents converge, the closing step pauses for the owner (J4): sending `accept` returns `pending_approval` under the `commitments` policy (F-61). (Whether a final notarized `offer` also needs it: `DECISION NEEDED (owner)`, see 06 §3.) The owner sees the terms and what changed since the previous version, and approves with passkey (or the desktop app's biometric prompt).
 4. Agent A notarizes the final terms: the envelope carrying them is recorded (kind `OFFER` or `ACCEPT`, 05 §3.1). Fee quote first (F-47); A pays, receipts included (§4).
-5. Agent B receives it. Signing the `ACCEPTED` receipt (`acknowledge`) also pauses for **B's owner**; after approval the receipt is recorded against A's record. (A recipient without an agent can do this in the browser, F-15.)
+5. Agent B receives it. Signing the `ACCEPTED` receipt (`agentlink_acknowledge`) also pauses for **B's owner**; after approval the receipt is recorded against A's record. (A recipient without an agent can do this in the browser, F-15.)
 6. Both sides export a **proof of agreement** pack (F-43): the final terms, the record, the `ACCEPTED` receipt and the content key of the terms envelope, so a verifier (J5) can match the terms to the record: "Terms recorded by Tali's agent on 12 Oct 2026 14:02. Accepted by Ana's agent 15:10."
 7. What it proves: both agents, each bound to its owner by an owner-signed agent card (verified if registered, F-41; domain verified if F-07), assented to the exact same terms at the recorded times. What it does not prove by itself: that the agreement is legally binding, the signatory's authority, or that the terms were fulfilled. AgentLink records the agreement; it does not move money (§6).
 
 ### J9 — Collaborating developers' agents sync project state (dogfood)
 
 1. Tali and Denis each run a coding agent (e.g. Claude Code and Codex) with AgentLink, paired once (J1).
-2. At the end of a session, Tali's agent sends Denis's agent a status update, a question or a handoff over Talk as typed messages (`note`, `request`, `delivery`): what changed, what is blocked, what Denis should pick up.
-3. At the start of his next session, Denis asks his agent to check AgentLink. The agent reads the inbox and summarizes it as information from Tali's agent, not as instructions (I-5); Denis decides what to act on.
+2. When Tali wraps up a session, his agent offers a handoff and, after he agrees, sends Denis's agent a status update, a question or a handoff over Talk as typed messages (`note`, `request`, `delivery`): what changed, what is blocked, what Denis should pick up.
+3. At the start of Denis's next session, his agent calls `agentlink_status` (by habit from the skill, or through an optional SessionStart hook) and says "1 new message from Tali's agent": counts and contact names only, never the text (06 §6.1, D-53). When Denis asks, the agent reads the inbox and summarizes it as information from Tali's agent, not as instructions (I-5); Denis decides what to act on.
 4. Replies and handoffs flow back the same way. Everything is free, and both owners can read everything (F-60).
-5. This is the M1a walking skeleton and the team's dogfood test: it needs only identity, pairing, Talk, the minimal policy engine and approvals (D-33).
+5. This is the M1a walking skeleton and the team's dogfood test: it needs only identity, pairing, Talk, the minimal policy engine and approvals (D-33). The bar is the team's own git sync branch: for the M1a gate the dogfood replaces the personal handoff part of it for Tali and Denis (backlog M1-23). AgentLink has to beat git where git cannot help: across organisations, in private, typed, visible to both owners and provable.
 
 ---
 

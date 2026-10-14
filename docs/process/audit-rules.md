@@ -234,12 +234,12 @@ Reviewers apply every checklist the diff touches. Item IDs are stable; new items
 - IN-9 Display names labelled self-declared unless registered; cloud autonomy off by default.
 
 **Files, URLs, SSRF and realpath (FS)**: 04 §4, 06 §2.3
-- FS-1 `fetch_file`: `https` only; hosts resolving to loopback, private, link-local (incl. `169.254.169.254`), unique-local, unspecified or IPv4-mapped forms of these are rejected; the checked address is the one connected to.
+- FS-1 `agentlink_fetch_file`: `https` only; hosts resolving to loopback, private, link-local (incl. `169.254.169.254`), unique-local, unspecified or IPv4-mapped forms of these are rejected; the checked address is the one connected to.
 - FS-2 Redirects ≤ 2, each re-checked; download capped at declared size plus overhead, enforced while streaming.
 - FS-3 `ciphertextSha256` checked before decrypting, `plaintextSha256` after.
 - FS-4 Downloads only into the inbox folder; never executed; names sanitized (no paths, control characters or hidden files); no write outside the inbox.
-- FS-5 `send_file`: `realpath` resolved; inside an allowed folder after resolution; hidden files, `~/.ssh`, `~/.agentlink` and keychain directories refused; outside → `needs_setup` without reading the file; the file read is the file checked.
-- FS-6 Every path or URL from tool arguments or inbound content (incl. relay URLs from contact cards and `verify_proof_pack.path`) gets the same rules.
+- FS-5 `agentlink_send` with `path`: `realpath` resolved; inside an allowed folder after resolution; hidden files, `~/.ssh`, `~/.agentlink` and keychain directories refused; outside → `needs_setup` without reading the file; the file read is the file checked.
+- FS-6 Every path or URL from tool arguments or inbound content (incl. relay URLs from contact cards and `agentlink_verify_proof_pack.path`) gets the same rules.
 - FS-7 Expiry ≤ 7 days; crypto-shred on `deleteAfter`; object keys contain no names.
 - FS-8 Storage credentials only in keychain or Worker secrets.
 
@@ -256,7 +256,7 @@ Reviewers apply every checklist the diff touches. Item IDs are stable; new items
 - MCP-3 `inputSchema` and `outputSchema` declared; `structuredContent` plus text; `status` within the enum; `nextStep` and `url` on non-`ok`; a behaviour test per status.
 - MCP-4 `approvalId` valid once, for the identical action only, with expiry; `clientRequestId` idempotent.
 - MCP-5 Server instructions match 06 §5 verbatim and are static; summaries follow 11 §5 vocabulary.
-- MCP-6 Policy checks (budgets, `perActionMaxUSD`, `allowKeyDisclosure`) run in core, not in the model; `OPENED` only via explicit `acknowledge`.
+- MCP-6 Policy checks (budgets, `perActionMaxUSD`, `allowKeyDisclosure`) run in core, not in the model; `OPENED` only via explicit `agentlink_acknowledge`.
 - MCP-7 Cloud: OAuth tokens scoped per agent and revocable; authorize requires owner proof.
 
 **Contracts (CT)**: 05, esp. §8
