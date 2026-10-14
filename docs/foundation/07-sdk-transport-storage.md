@@ -73,8 +73,8 @@ Every mutating call runs: **policy check → (approval) → action → store →
 
 | Table | Key columns |
 |---|---|
-| `identity` | agent_id (the agent's EVM address, 04 §2.9), agent_card_json, key_epoch, storage_prefix (04 §2.9), revoked_at (set only together with a `revoked_agents` row for the own agent, §3.4), created_at |
-| `contacts` | contact_id, name, agent_card_json, owner_fingerprint, verified, status (active / blocked / revoked; `revoked` is final, §3.4), created_at |
+| `identity` | agent_id (the agent's EVM address, 04 §2.9), agent_card_json, key_epoch, storage_prefix (04 §2.9), relays, prev_relays, prev_relays_until (§4.3), revoked_at (set only together with a `revoked_agents` row for the own agent, §3.4), created_at |
+| `contacts` | contact_id, name, agent_card_json, relays (§4.3), owner_fingerprint, verified, status (active / blocked / revoked; `revoked` is final, §3.4), created_at |
 | `invites` | invite_id, proof_key (encrypted at rest; never the raw secret, 04 §3.6), label, expires_at, used_at |
 | `envelopes` | envelope_id (unique), envelope_hash, thread_id, direction, contact_id (null for a request), from_key (the sender's Nostr key), type, state (received \| ok \| request \| refused, §3.2), refused_reason, created_at, envelope_json (ciphertext; not kept for `refused`), payload_json (decrypted, optional per setting; never kept for `refused`), read_at, delivery (outbound only: queued \| sent \| not_delivered, §3.2) |
 | `files` | envelope_id, idx, name, size, sha256, locator, url, file_key (encrypted at rest with a keychain-held local key), expires_at, deleted_at |
@@ -93,6 +93,10 @@ Every mutating call runs: **policy check → (approval) → action → store →
 **Pairing and identity columns (04 §2.9, §3.6.1; proposed, G-23 and G-28; owner confirms at merge).**
 - `contacts.contact_id` is the contact's agent ID, unique per store. `contacts` also holds `pairing` (`pending`, `complete` or `mismatch`), the envelope IDs of the pairing's signed `handshake` and `handshake-ack` (kept for as long as the contact exists; every display of the safety code recomputes it from them, never from a stored digest), the pending pairing data until completion (`codeCommit`, `nonceB`), and `safety_check`: the owner's signed `contact.check`, re-verified on load. `safety_code_checked` is only a cache of `safety_check`. A re-pair replaces these columns only when it completes (04 §2.9).
 - `invites` also holds `nonce_a`, encrypted at rest. After pairing it is in the signed ack, as `codeReveal`.
+
+**Relay columns (§4.3; G-24, proposed, owner confirms at merge).**
+- `identity.relays` and `contacts.relays` are `enc` `json`: the verbatim `relays` array whose hash is the `relaysHash` of the card in the same row. They are written in the store transaction that writes that card, never on their own, and are checked against the card's `relaysHash` when read. A mismatch or a value that does not open makes the row's list unreadable (§3.1, fail closed): nothing is published to that agent.
+- `identity.prev_relays` (`enc` `json`) and `identity.prev_relays_until` (`int`) hold the previous list for the 30-day overlap after a relay change (§4.3), or null. Once `now` passes prev_relays_until, pruning clears both.
 
 ### 3.1 Conventions (G-9; proposed, owner confirms at merge)
 
@@ -352,6 +356,23 @@ The console and the desktop app keep the owner's own store, never an agent's. Th
 
 **`owner_policy_echo`**: agent_id → the highest `version` seen in a verified `policy` echo. It is never lowered (04 §3.4.1).
 
+**`owner_agents`**: the surface's authenticated relay list for each of its agents (§4.3; G-24, proposed, owner confirms at merge).
+
+| Column | Type and meaning |
+|---|---|
+| agent_id | `id`: the agent's EVM address (04 §2.9) |
+| card_json, card_sig | `json`: the agent's current card and its `cardSig`, as received or signed |
+| key_epoch | `int`: the card's `keyEpoch` |
+| relays | `enc` `json`: the verbatim list matching the card's `relaysHash` |
+| prev_relays, prev_relays_until | `enc` `json` and `int`: the previous list and the end of its 30-day overlap, or null |
+| source | `signed` \| `copy` \| `link`: this surface signed the card, an owner copy carried it, or the owner link (M2-2c) did |
+| revoked_at | `int` or null; the list stays in the union for 30 days after it, then serves only revoke re-publishing |
+
+- **Keys.** agent_id is the primary key. A row is replaced only by a card with a strictly greater key_epoch for the same agent_id, as a compare-and-set in one store transaction that also moves the old list to prev_relays.
+- **Checks on write and on read.** `cardSig` recovers to the surface's own `ownerEvm`, the card's `ownerNostr` and `ownerEnc` are the surface's own, and relays hashes to the card's `relaysHash`. A row that fails a check or does not open is not used, and the agent is shown as possibly incomplete (§4.3). It is never deleted for that reason.
+- **The bootstrap set** is a release constant plus the owner's own Settings entries, kept `enc` in the surface's settings and never published.
+- **`sync_cursors`** in the owner store work as in the agent's store, one per relay of the union.
+
 ### 3.7 What the Store interface needs
 
 - **One logical schema** with the tables, keys and unique constraints above, enforced by the storage itself and not only by the core.
@@ -362,7 +383,7 @@ The console and the desktop app keep the owner's own store, never an agent's. Th
 - **Compare-and-set** as an update that reports how many rows it changed.
 - **`now` passed in**, and a pruning operation per table with its retention.
 - **Forward migrations only.** A store whose schema version is newer than the code refuses to open (fail closed) and is never downgraded.
-- **Proposed values for the owner to confirm at merge (G-9):** the held-envelope cap and its own pool (§3.2, amends D-62); the requests-queue limits, with refusals shown only to the owner (§3.2); dropping envelopes over `rateLimitPerContactPerHour` (§3.2); `IDEMPOTENCY_KEY_REUSED` for a reused `clientRequestId` (§3.3); idempotency retention and the execution lease (§3.3); the store committing before the KeyStore policy-version mark (§3.4).
+- **Proposed values for the owner to confirm at merge (G-9):** the held-envelope cap and its own pool (§3.2, amends D-62); the requests-queue limits, with refusals shown only to the owner (§3.2); dropping envelopes over `rateLimitPerContactPerHour` (§3.2); `IDEMPOTENCY_KEY_REUSED` for a reused `clientRequestId` (§3.3); idempotency retention and the execution lease (§3.3); the store committing before the KeyStore policy-version mark (§3.4). G-24 adds: the relay columns of `identity` and `contacts` (§3) and `owner_agents` (§3.6), with the values of §4.3.
 
 ---
 
@@ -389,7 +410,7 @@ An XMTP adapter (P2) implements the same interface; envelopes are unchanged.
 ### 4.2 Nostr implementation
 
 - **Wrapping:** NIP-59 gift wrap (kind 1059) of a NIP-59 seal (kind 13) containing an unsigned rumor (kind 14, tag `["agentlink","1"]`, `content` = envelope JSON). NIP-44 v2 encryption. Randomized `created_at` per NIP-59.
-- **Relays:** each agent card lists 3–5 relays (default: a curated set of reliable public relays + the optional 4thTech relay). Publish to the **recipient's** relays and the sender's own relays. Relay URLs from cards, invites and bodies are inbound content. They pass the raw-string relay URL schema at parse (04 §4, relay URLs). A relay host name with an all-numeric or `0x`-hex label anywhere (for example `1.relay.example`) is rejected, so relay operators, the 4thTech relay included, avoid such names.
+- **Relays:** each agent card lists 3–5 relays by default (a curated set of reliable public relays + the optional 4thTech relay); the bounds are in §4.3. Each gift wrap goes to the relays of the agent it concerns: the recipient's relays for the recipient's agent and owner, the sender's own relays for the sender's agent and owner (§4.3, G-24). Relay URLs from cards, invites and bodies are inbound content. They pass the raw-string relay URL schema at parse (04 §4, relay URLs). A relay host name with an all-numeric or `0x`-hex label anywhere (for example `1.relay.example`) is rejected, so relay operators, the 4thTech relay included, avoid such names.
 - **Relay connections (M1-5; proposed, owner confirms at merge).** These rules close DNS rebinding and SSRF at connect time, on runtimes that control their own sockets (Node; the desktop app):
   1. Resolve the validated host string (A and AAAA).
   2. Accept the relay only if **every** resolved address is globally routable. Any other address skips the relay, and the activity log names it without the address.
@@ -404,7 +425,72 @@ An XMTP adapter (P2) implements the same interface; envelopes are unchanged.
 - **Sync:** `REQ` with `#p` = own Nostr pubkeys, `kinds: [1059]`, `since = lastSync − 48 h` (NIP-59 randomizes gift-wrap timestamps up to 2 days back, so `created_at` cursors alone miss messages). Deduplicate by envelope ID (keep a seen-set for ≥ 7 days). Support **NIP-42 AUTH**, since many DM relays serve kind 1059 only to the authenticated recipient.
 - **Size:** envelope ≤ 24 KB serialized (24 576 bytes; the relay-frame, envelope, recipient and `ct` limits and where each is enforced are in 04 §3.1.1); inline files ≤ 12 KB; check the final gift-wrap size against each relay's NIP-11 `max_message_length` and skip relays that cannot carry it.
 - **Relay retention:** public relays may drop events; agents should sync at least daily. The optional 4thTech relay keeps gift wraps for 30 days (it only ever sees ciphertext).
-- **Owner copies:** the owner console subscribes with the owner Nostr key and receives copies of all envelopes for its agents. Reading them, including NIP-42 AUTH, runs in an `OwnerSession` with presence (04 §3.1.1).
+- **Owner copies:** the owner console subscribes with the owner Nostr key on the relays of all its agents and receives copies of all envelopes for its agents (§4.3). Reading them, including NIP-42 AUTH, runs in an `OwnerSession` with presence (04 §3.1.1).
+
+### 4.3 Relay lists and owner copies (G-24; proposed, owner confirms at merge)
+
+An owner has no relay list of its own: a card carries only the agent's `relaysHash` (04 §2.4), and no sender knows where an owner reads. So every wrap goes to the relays of the agent it concerns, and an owner surface reads on the relays of all its agents. Every value in this section is proposed; the owner confirms at merge.
+
+**The rule.**
+- **Publishing.** Each gift wrap is published to the relay list of the agent its recipient key belongs to, or, for an owner key, of the agent whose owner it is in this envelope. When one owner key is the owner of both the sending and the receiving agent (one entry, 04 §3.1.1), its wrap goes to the union of both lists.
+- **Reading.** An owner surface (the console, the desktop app) subscribes with `#p` = its own `ownerNostr` on the union of the bootstrap set and the authenticated lists of all its agents, below.
+
+| Wrap for (04 §3.2, §3.4.1) | Published to |
+|---|---|
+| The contact's agent, and the contact's owner (§3.2 entries 1 and 2) | The contact's list (the `relays` of its current card) |
+| The sender's owner and the sender agent (entries 3 and 4) | The sending agent's own list |
+| Owner channel, agent → own owner (`approval-request`, the `policy` echo, the owner `card-update` below) | The agent's own list |
+| Owner channel, owner → agent (`approval`, `policy`) | That agent's list, as the surface holds it |
+| `revoke` | The revoked agent and its owner: the revoked agent's list. Each contact's agent and owner: that contact's list, from the owner's copies (04 §3.4.1, "Revoke delivery"). A contact whose list the owner does not hold (below) gets its wraps on the bootstrap set, and the console marks it as possibly not told |
+| Pairing (`handshake`, `handshake-ack`) | As the first two rows; the invitee takes the inviter's list from the invite, the inviter the invitee's from the `handshake` |
+
+- **Sent.** A row of `outbox` (§3.2) is `sent` once 2 relays of the list it was published to returned `OK`, for `owner` rows as for `contact` rows. Per-key routing means each relay sees only the wraps of the agents that use it.
+- **Placement is unaffected.** The relay a copy arrived on confers nothing. An owner surface places every copy only by the attribution rules of 04 §3.1.1 ("Where the owner shows a copy") and stores it in `owner_copies` (§3.6), deduplicated across relays by its key.
+
+**Where a list comes from, and how it is authenticated.** A relay list is the verbatim `relays` array whose `keccak256(JCS(relays))` equals the `relaysHash` of a card. The card's `cardSig` binds it to the owner (04 §2.4), so the list is as authentic as the card. No other source is used.
+- **The agent's own list.** The list in the agent's current card, kept in `identity` (§3) when the card is built.
+- **A contact's list.** From the invite, `handshake` or `card-update` that carried the contact's current card. The list passes the relay URL rule at parse (04 §4; the whole body is rejected on one bad URL) and must match `relaysHash`, as 04 §3.4.1 and §3.6 already require.
+- **An owner surface's list for one of its agents.** A card that passes the card checks (04 §2.4), whose `cardSig` recovers to the surface's own `ownerEvm`, and whose `ownerNostr` and `ownerEnc` equal its own keys. The list comes from one of:
+  - the surface's own signing of that card (add agent, key rotation; M2-2e);
+  - the owner's copy of that agent's own `handshake` or `card-update` (agent → contact), or of the owner `card-update` (below), once the copy is placed as sent by that agent (04 §3.1.1);
+  - the owner link from the CLI (M2-2c), which carries `{card, cardSig, name, relays}` for each agent the CLI holds, inside the same encrypted, code-checked transfer.
+
+  A list replaces the stored one only with a card of strictly greater `keyEpoch` for the same `agentEvm` (compare-and-set). A revoked agent stays revoked.
+- **Contacts of an invitee.** When the owner's agent was the invitee, the owner's copies hold the inviter's card (`handshake-ack`) but not its list, because the invite is not an envelope and `handshake-ack` has no `relays`. The owner learns that list only from a later `card-update` of the contact. Adding `relays` to `handshake-ack` would close this; it changes a D-58 body and is left to the owner.
+- **The bootstrap set.** The release's default relay set (the list that `init` picks from, §4.2), plus relays the owner enters under Settings. The owner's entries are local settings, pass the relay URL rule and are never published.
+- **Never a source:** NIP-65 or NIP-17 relay-list events (kinds 10002 and 10050), relay hints in event tags, NIP-11 documents, redirects, or any list from a contact about another party. No public relay-list event is published for an agent or an owner. An `OwnerSession` cannot sign one anyway (04 §3.1.1).
+- **SSRF.** Every list from any source is checked by the raw-string schema at parse (04 §4), and every connection by the connect-time rules of §4.2 on runtimes that own their sockets (Node, the desktop app). The console keeps the browser residual risk stated in §4.2.
+
+**Owner `card-update` (owner channel; proposed, amends D-58, 04 §3.4.1).** Each time the agent's core applies a new card, it sends one `card-update` (body unchanged) on the owner channel: recipients exactly the agent and its own owner, published to the union of the old and the new list. It does so even when the agent has no contacts, so an owner surface that did not sign the card still learns the new list. The surface accepts it only under the rules above: from the `agentNostr` of the stored card or of the new card, `cardSig` by its own `ownerEvm`, its own owner keys, `keyEpoch` strictly greater, `relaysHash` matching `relays`, and every URL passing the relay URL rule. Otherwise it is dropped. No MCP tool can create it (04 §3.4.1, "Who may create these bodies").
+
+**Counts.**
+
+| What | Value |
+|---|---|
+| The agent's own list, as signed into its card | 3 to 5 relays by default; 2 to 8 under Advanced. The core refuses to build a card outside 2 to 8 (M1-7a). Below 2, no wrap could reach `sent` |
+| A list received from another party | 1 to 16 entries, unique (04 §3.4, unchanged). A contact whose list has fewer than 2 usable relays can never reach `sent`: its rows end `not_delivered` (§3.2), and the activity feed says why |
+| Relays per wrap | At most 32: a received list has at most 16 entries, an own list at most 8 (16 during its overlap), and the union for one owner of both agents at most 32 |
+| Owner surface, live connections | At most 32 at once. The remaining relays of the union are synced in turns, each at least every 15 minutes while the surface is open, with the 48 h look-back (§4.2), and the agents they serve show that updates may be late |
+
+**Relay changes and key rotation.**
+- **A relay change is a key rotation.** `relaysHash` is in the card, and a contact applies a new card only with a strictly greater `keyEpoch` (04 §3.4.1). An agent therefore changes relays only by rotating (04 §2.6): new card, `card-update` to each contact, owner `card-update` to its owner.
+- **The agent's overlap.** For 30 days (2 592 000 s, the longest relay retention, §4.2) after it applies the new card, the agent keeps syncing and subscribing on the old list as well, because contacts that have not yet applied the `card-update` still publish there, and publishes the wraps routed to its own list to the old and the new list. The old list is kept in `identity` with its end time (§3). Time is the store's `now` (§3.1).
+- **Contacts.** A contact switches to the new list when it applies the `card-update` (in each sync pass `card-update` first, 04 §3.1.1 step 7). It publishes to the new list only. Envelopes it sent before then are on the old list, which the agent still reads.
+- **Owner surfaces.** When a surface accepts a new card for one of its agents, it keeps the old list in the union for the same 30 days. The owner copy of the `card-update` itself reaches the old list, which the surface already reads. Arrival order does not matter: the new card is applied whatever relay delivered it, and copies from the new key are placed by 04 §3.1.1 once it is.
+- **Revoked agents.** An owner surface keeps a revoked agent's list in the union for 30 days after the revoke, then uses it only to re-publish the revoke (04 §3.4.1).
+- **Residual.** A contact that stays offline longer than its own relays keep the `card-update`, and longer than the 30-day overlap, never sees the new list. What it later publishes goes to the old list, which the agent no longer reads. This is the existing rotation limit (04 §2.6, 24 h outbox retry), made visible by the relay change; it is not closed here.
+- **Owner-key rotation** is P2 (04 §2.6) and outside this section.
+
+**Fail closed.**
+- A list that fails the schema, does not match `relaysHash` or comes with a card that fails its checks is refused as a whole, with the card or body that carried it. The previous list stays in use.
+- If the list for any recipient key of an envelope cannot be read, nothing is published and the send returns `error` before the outbox write (§3.2, "On failure"). A wrap is never published to relays other than those its row lists.
+- An owner surface that cannot read or authenticate an agent's list, or that has fewer than 2 usable relays for it, shows that agent's activity as possibly incomplete. It never shows such an agent as up to date, and it never falls back to an unauthenticated source.
+- All owner-surface subscriptions, including NIP-42 AUTH with the owner key, run inside the `OwnerSession` (04 §3.1.1, "Reading needs presence"). When the session ends, the surface closes them.
+
+**Privacy.**
+- **What relays learn.** As 03 §5 states: ciphertext, the recipient key in the `p` tag, randomised timestamps and the connecting IP. A relay that serves kind 1059 only after NIP-42 AUTH also learns the key that logs in.
+- **Linkability between an owner's agents.** Every card names its `ownerNostr`, so anyone holding two cards (a contact of both agents, or the public Registry for registered agents) links them anyway. Relays add one path: the owner's subscription, its AUTH and the `p` tag of its wraps carry the same `ownerNostr` on the relays of every agent. A relay used by two agents of the owner, operators that collude, or one that sees the console's IP link those agents to one owner. Per-key routing limits what a relay sees of the owner's other agents' traffic, but not the subscription. Unlinking them needs one owner key per agent, a new card field, which is not proposed (04 §3.1.1).
+- **Mitigations.** An owner surface's filter holds only `ownerNostr`, never agent keys. No relay-list event is published for owners or agents, and the owner's own relay settings never leave the device. Agents share the default set unless the owner chooses otherwise, so a relay set is rarely a fingerprint. The IP is not hidden: a proxy or Tor option is a later owner decision (§4.2).
 
 ---
 

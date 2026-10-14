@@ -1388,11 +1388,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-5b · transport-nostr: relay pool, publish, NIP-11, NIP-42, outbox
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/transport-nostr
-- **Depends on:** M1-5a; gap G-24 resolved; gap G-9 resolved (branch `docs/G-9-store-schema`, pending owner)
-- **Spec:** 07 §4.2 (relays, reliability, size, NIP-42), §3.2 (`outbox`); 04 §3.5; 06 §6
+- **Depends on:** M1-5a; gap G-24 resolved (branch `docs/G-24-owner-copy-relays`, pending owner); gap G-9 resolved (branch `docs/G-9-store-schema`, pending owner)
+- **Spec:** 07 §4.2 (relays, reliability, size, NIP-42), §4.3 (relay routing and owner copies, G-24), §3.2 (`outbox`); 04 §3.5; 06 §6
 - **Invariants:** I-3, I-7
 - **Scope:**
-  - WebSocket relay pool for Node, browsers and Workers; publish to the recipient's relays and the sender's own relays (owner copies per G-24); "sent" when ≥ 2 relays return `OK`.
+  - WebSocket relay pool for Node, browsers and Workers; each gift wrap is published to the relay list the core gives for its recipient key (07 §4.3: the recipient's list for the recipient's agent and owner, the sender's own list for the sender's agent and owner, the union when one owner owns both, old and new list during an overlap); "sent" when ≥ 2 relays of that list return `OK`, for owner rows as for contact rows.
   - Outbox retry with backoff for up to 24 h through an injected persistence interface (implemented by core/node) over the `outbox` table (07 §3.2): the stored gift wrap is republished, never re-wrapped.
   - NIP-11 fetch and cache; skip relays whose `max_message_length` is below the wrap size. NIP-42 AUTH signed via `EnvelopeKeys.signNostr`.
   - Inbound relay frames above 131 072 bytes are dropped before `JSON.parse` (04 §3.1.1, G-2).
@@ -1400,6 +1400,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (hand-off from M1-2c, IR-M1-2a-1 M-1 part 2) Re-check every relay host at connect time, and again on every reconnect: resolve it, and refuse the relay if any address is private, loopback, link-local, CGNAT, unique-local or a metadata address, because a DNS name can resolve to one (04 §4, 07 §4.2). The schema in `@agentlink/types` checks only the string.
 - **Acceptance:**
   - Tests against 2–3 local relays in Docker (one requiring AUTH, one with a small `max_message_length`): success only with ≥ 2 `OK`; the small relay is skipped.
+  - Routing (07 §4.3): with disjoint sender and recipient lists, the recipient owner's wrap reaches only the recipient's relays and the sender owner's only the sender's; a wrap is never published to a relay outside its row's list.
   - Outbox survives a restart (persistence fake) and gives up after 24 h (fake clock); canary test shows no content in logs.
   - An inbound frame of 131 073 bytes is dropped before `JSON.parse` and one of 131 072 bytes is parsed (spy test).
 
@@ -1480,7 +1481,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-1, I-4, I-9
 - **Scope:**
   - `AgentLinkClient.create(...)` wiring; `Store` interface covering 07 §3 with the G-9 tables and rules of 07 §3.1–§3.7 (outbox, seen-set, held envelopes, rate counters, idempotency results, owner-action nonces, revoked agents, budget ledger and state, commitment parts) and the §3.7 transaction contract; `ApprovalChannel`; in-memory Store for tests.
-  - Identity: agent card build (04 §2.4) signed via `OwnerKeyStore`, plus `cardAgentSig` by the agent key (04 §2.9); key rotation to `keyEpoch + 1` with a new card; `agentId` = the agent's EVM address, derived from the seed and recorded with a random `storagePrefix` (04 §2.9, G-23).
+  - Identity: agent card build (04 §2.4) signed via `OwnerKeyStore`, plus `cardAgentSig` by the agent key (04 §2.9), refused for an own relay list outside 2–8 relays, with the list kept in `identity.relays` (07 §3, §4.3, G-24); key rotation to `keyEpoch + 1` with a new card; `agentId` = the agent's EVM address, derived from the seed and recorded with a random `storagePrefix` (04 §2.9, G-23).
   - Contacts keyed by `agentId`: at most one per `agentId`, never the own one; re-pair only with unchanged owner keys and a `keyEpoch` that is not lower; refused for a revoked `agentId` (04 §2.9).
   - Contacts: add from a verified card, list, block/remove (F-14: later envelopes dropped); display names marked self-declared.
 - **Acceptance:**
@@ -1636,6 +1637,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - `syncInbox`: transport sync → unwrap → open → classify (contact, request, handshake) → store; idempotent across restarts.
   - Per-contact rate limit (`contacts.rateLimitPerContactPerHour`); `card-update` accepted only for a higher epoch signed by the same owner; after it, a new envelope from the superseded key is stored as refused and shown in the activity feed, never in `agentlink_inbox` (04 §3.1.1, G-2); `revoke` envelopes; F-23 signed off-chain "received" ack (P1, behind a flag).
+  - Relay changes (07 §4.3, G-24): the owner-channel `card-update` to the own owner on every new card, even with no contacts; the 30-day overlap on the old list (sync, subscribe and own-list publishing); `contacts.relays` replaced with the card on `card-update`.
   - Metadata for the untrusted-content wrapper (sender name under the 06 §2.1 contact-name rule, identity label per 11 §5.2, owner fingerprint; never "verified" alone).
 - **Acceptance:**
   - `card-update` with the same epoch or a different owner rejected; a revoked contact's later envelopes dropped.
@@ -2453,6 +2455,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Invariants:** I-1, I-4
 - **Scope:**
   - Protocol written up first (G-16): the console page generates an ephemeral X25519 key; key exchange via QR plus a 6-digit code shown on both sides; the CLI (owner presence required) encrypts the owner seed to the console key; the console wraps it with a new passkey.
+  - The same transfer carries `{card, cardSig, name, relays}` for each agent the CLI holds, and the console stores them in `owner_agents` only after the 07 §3.6 checks (G-24, 07 §4.3; proposed).
 - **Acceptance:**
   - A substituted ephemeral key is detected by the code comparison (MITM test); the transfer blob is single-use and expires.
   - Network capture shows the seed (or its transfer ciphertext) reaches no 4thTech service.
@@ -2460,17 +2463,18 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 #### M2-2d · console: activity, threads, files, proofs, credits view
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2
 - **Repo/path:** agentlink · apps/console
-- **Depends on:** M2-2b, M1-7h, M1-4d; gap G-24 resolved
-- **Spec:** 08 §2.2 (Activity, Threads, Proofs, Credits); 07 §4.2 (owner copies); 04 §3.1.1 (owner read path, where the owner shows a copy); 11 §6.3
+- **Depends on:** M2-2b, M1-7h, M1-4d; gap G-24 resolved (branch `docs/G-24-owner-copy-relays`, pending owner)
+- **Spec:** 08 §2.2 (Activity, Threads, Proofs, Credits); 07 §4.2 (owner copies), §4.3 (relay lists, G-24), §3.6 (`owner_agents`); 04 §3.1.1 (owner read path, where the owner shows a copy); 11 §6.3
 - **Invariants:** I-2, I-5, I-9
 - **Scope:**
-  - Core in the browser with an IndexedDB Store; subscribe with the owner Nostr key on the relays fixed by G-24; decrypt all envelope copies; unified timeline; threads with typed cards.
+  - Core in the browser with an IndexedDB Store; subscribe with the owner Nostr key only (never agent keys) on the bootstrap set and the authenticated lists of all the owner's agents (07 §4.3, `owner_agents`), inside the `OwnerSession`; at most 32 live connections, the rest synced in turns; the 30-day overlap after a relay change; an agent whose list cannot be read or authenticated is shown as possibly incomplete; decrypt all envelope copies; unified timeline; threads with typed cards.
   - Files downloaded and decrypted in the browser with both hash checks; proof list and detail, export, link to the verify page; credit balances per agent and chain.
   - Untrusted content shown as text with its label.
 - **Acceptance:**
   - Two agents' sent and received envelopes appear for their owner (e2e with local relays).
   - File decryption verifies both hashes; captured network traffic contains no decrypted content.
   - Zero-amount `Deposited`, `Swept` and `IntegratorWithdrawn` events are not shown in the credits view (IR-M1-3b-1 I-2).
+  - Relays (07 §4.3): a list whose hash does not match an owner-signed card, or that comes from a card signed by another owner, is never subscribed to; after a relay change, copies on both the old and the new list appear; no relay-list event is published.
   - Owner copies (04 §3.1.1): reading runs in an `OwnerSession` opened with presence. A forged copy addressed only to the owner, from a key that is not a contact of the agent, is shown outside the threads as not from a known contact. Two copies with the same `id` and different hashes are shown as a conflict, neither as the thread's message. A payload that fails its schema is not rendered.
 
 #### M2-2e · console: approvals, policies, agent management
@@ -3415,7 +3419,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 21. **G-21 (M) Measuring beta metrics without analytics.** 02 §7 and 10 gates vs 08 §2.3 and zero access. *Proposed:* moderated sessions plus opt-in, local-only timing exported by testers. *Blocks:* M1-GATE, M2-GATE.
 22. **G-22 (M) Owner archive mechanics.** 04 §4; 02 F-33; 06 §3: whose storage credentials, how the file key reaches the owner, who deletes. *Blocks:* M2-9.
 23. **G-23 (M) `agentId` undefined.** Resolved by branch `docs/G-23-G-28-agentid-safety-code` (pending owner; proposed, owner confirms at merge), with G-28: `agentId` is the agent's EVM address (`agentlink/v1/evm`, epoch 0), `0x` + 40 lowercase hex, the same value as card `agentEvm`, owner-action `agent` (D-58), `terms.parties` and the commitment scope, so never a second binding (04 §2.9). Derived from the seed and checked on every seed load (keychain and `ALKS`). Invites and handshakes carry `cardAgentSig`, and a handshake is accepted only from the card's own `agentNostr`, so an owner cannot claim another agent's address and a replayed card completes nothing. One contact per `agentId`; a re-pair needs unchanged owner keys and takes effect only on completion. Object keys use a random per-agent `storagePrefix`, never the address (07 §5.2). Owner and agent fingerprints are tagged hashes, short form `7F3A·19C2`, display only and never an authenticator. *Was:* Used in 04 §2.2 (keychain account), 06 §6, 07 §3, 07 §5.2 (object key). The object-key path also gives every recipient of a presigned URL a stable per-agent identifier. *Proposed:* define `agentId`; use a random per-agent prefix in object keys. Owner actions bind the canonical EVM address, not `agentId` (G-29), and `agentId` must not become a second binding. *Blocks:* M1-6a, M1-7a, M1-8a.
-24. **G-24 (M) Relays for owner copies.** 04 §3.5; 07 §4.2; 08 §2.2. AgentCard carries only the agent's `relaysHash`; owners have no relay list. *Proposed:* each owner copy goes to the relays of the agent it concerns; the console subscribes to all its agents' relays. *Blocks:* M1-5b, M2-2d.
+24. **G-24 (M) Relays for owner copies.** Resolved by branch `docs/G-24-owner-copy-relays` (pending owner; proposed, owner confirms at merge), in 07 §4.3, with pointers in 04 §3.1.1, §3.4.1, §3.5 and §4, the relay columns in 07 §3 and §3.6, and 08 §2.2. Each gift wrap goes to the relay list of the agent it concerns (the recipient's agent and owner to the recipient's list, the sender's agent and owner to the sender's own list, the union when one owner owns both agents), and an owner surface subscribes with `ownerNostr` on the bootstrap set (the release's default relays plus the owner's own Settings entries) and the lists of all its agents, inside the `OwnerSession`. A list counts only if it hashes to the `relaysHash` of a card whose `cardSig` is the owner's own; the surface learns it by signing the card, from owner copies of the agent's `handshake` or `card-update`, or from the owner link. A new owner-channel `card-update` (amends D-58) tells the owner of every new card, even with no contacts. Own lists hold 2–8 relays (3–5 by default), received lists 1–16 (unchanged); a relay change is a rotation, and the old list stays in use for 30 days. The console keeps at most 32 live connections and syncs the rest in turns. Kinds 10002 and 10050, relay hints and NIP-11 are never sources. Linkability through `ownerNostr` is stated, not removed. Open for the owner: `relays` in `handshake-ack` (an invitee's owner cannot otherwise reach the inviter for a revoke), raising the received minimum to 2, and an owner-held agent directory for a new device whose agents use only custom relays. *Was:* 04 §3.5; 07 §4.2; 08 §2.2. AgentCard carries only the agent's `relaysHash`; owners have no relay list. *Proposed:* each owner copy goes to the relays of the agent it concerns; the console subscribes to all its agents' relays. *Blocks:* M1-5b, M2-2d.
 25. **G-25 (M) `agentlink_verify_proof_pack {path}`.** 06 §2.4 lets a tool read a caller-chosen file, against 06 §1 rule 4. *Proposed:* `json` only, or `path` restricted to `proofs.exportFolder`/inbox with realpath checks. *Blocks:* M1-9d.
 26. **G-26 (L) STREAM header not authenticated.** 04 §4: AAD is `u8(isFinal)` only; header fields rely on `ciphertextSha256`. *Proposed:* AAD = header ‖ isFinal, decided before vectors freeze. *Blocks:* M1-1d, M1-1i.
 27. **G-27 (L) Inline file vs envelope size.** 04 §3.5; 02 F-30; 06 §2.3. A 12 KB file, base64-encoded inside an encrypted, base64-encoded payload with four recipient wraps, is already near 24 KB before any text. *Proposed:* "inline only if the final envelope ≤ 24 KB". *Blocks:* M1-7f.
