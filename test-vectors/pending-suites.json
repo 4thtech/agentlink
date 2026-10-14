@@ -5,10 +5,6 @@
       "card": "M1-2a",
       "phase": "M1a"
     },
-    "keystore-file": {
-      "card": "M1-1f",
-      "phase": "M1a"
-    },
     "nip44": {
       "card": "M1-1g",
       "phase": "M1a"
@@ -17,16 +13,8 @@
       "card": "M1-7d",
       "phase": "M1a"
     },
-    "owner-wrap": {
-      "card": "M1-1f",
-      "phase": "M1a"
-    },
-    "pairing": {
-      "card": "M1-1f",
-      "phase": "M1a"
-    },
-    "safety-code": {
-      "card": "M1-1f",
+    "safety-code-recompute": {
+      "card": "M1-1c",
       "phase": "M1a"
     }
   }

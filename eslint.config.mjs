@@ -16,6 +16,8 @@ import {
   libraryAllowed,
   libraryMessage,
   restrictedEntryMessage,
+  deepImportGroup,
+  deepImportMessage,
 } from './tools/deps-check/policy.mjs';
 
 const SOURCE = '{ts,tsx,mts,cts}';
@@ -43,6 +45,10 @@ function restrictionsFor(zone, { test = false } = {}) {
   for (const entry of RESTRICTED_ENTRY_POINTS) {
     if (zone !== null && entry.zones.includes(zone)) continue;
     patterns.push({ group: entry.group, message: restrictedEntryMessage(entry) });
+  }
+  // Deep imports into any workspace package's dist/ or src/, in every zone (IR-M1-1f-1 L-2).
+  for (const name of WORKSPACE_NAMES) {
+    patterns.push({ group: deepImportGroup(name), message: deepImportMessage(name) });
   }
   // Package layering: every workspace package this zone may not import (apps are never importable).
   const allowed = allowedWorkspaceNames(zone);

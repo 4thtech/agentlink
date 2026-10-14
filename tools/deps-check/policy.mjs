@@ -92,16 +92,36 @@ export const RESTRICTED_ENTRY_POINTS = [
     via: 'the KeyStore interface (04 §8.1)',
     reason: 'master seeds and secret keys stay inside KeyStore backends (04 §8.1, §2.5)',
   },
-  // M1-1c: the deterministic test seam (fixed HPKE ephemeral key, fixed AES-GCM IV, raw RFC 9180
-  // suite). It is never built and has no package export; only the vector harness's Vitest alias
-  // resolves it. This entry also refuses it by name everywhere else.
+  // M1-1c, M1-1f: the deterministic test seam (fixed AES-GCM nonce or IV, fixed HPKE ephemeral key,
+  // Argon2id with a secret value and associated data). It is never built and has no package export;
+  // only the vector harness's Vitest alias resolves it. This entry also refuses it by name elsewhere.
   {
     group: ['@agentlink/crypto/testing', '@agentlink/crypto/testing/*'],
     zones: ['test-vectors'],
     via: 'the public entry points (the test seam is never built)',
-    reason: 'a fixed ephemeral key or IV must never reach production code (M1-1c)',
+    reason: 'a fixed nonce, IV or ephemeral key must never reach production code (M1-1c, M1-1f)',
   },
 ];
+
+/**
+ * The test seam's source file (M1-1c, M1-1f), without extension. RESTRICTED_ENTRY_POINTS refuses
+ * `@agentlink/crypto/testing` by name; inside packages/crypto a relative path reaches the file too.
+ * Only test files may import it: tsc builds every file that a built module imports (tsconfig
+ * `exclude` only limits the roots), so one production import would also put the seam into dist/.
+ */
+export const TEST_SEAM_SOURCE = 'packages/crypto/src/testing';
+
+export const TEST_SEAM_MESSAGE =
+  'packages/crypto/src/testing.ts (the test seam) may be imported only by test files and test-vectors; production code uses the public functions (M1-1c, M1-1f)';
+
+/**
+ * The message for a relative import from `file` (repo path) that resolves to `target` (repo path),
+ * or null when it is not the test seam or `file` is a test file.
+ */
+export function testSeamViolation(file, target) {
+  if (target.replace(/\.[cm]?[jt]sx?$/, '') !== TEST_SEAM_SOURCE) return null;
+  return isTestFile(file) ? null : TEST_SEAM_MESSAGE;
+}
 
 /**
  * Files that may import `node:module` (createRequire can resolve code from another package's
@@ -289,6 +309,28 @@ export const libraryMessage = (lib) =>
     : `${lib.group[0]} may be imported only in ${lib.zones.join(', ')}${
         lib.testZones?.length ? ` (and in test files of ${lib.testZones.join(', ')})` : ''
       }; everything else uses ${lib.via} (AGENTS.md).`;
+/**
+ * Deep imports into a workspace package (IR-M1-1f-1 L-2): `<package>/dist…` or `<package>/src…`
+ * reach modules the package's `exports` map does not publish (for example the fixed-nonce sealers in
+ * dist/keystore-file.js, or the restricted keystore functions by another path), so they are refused
+ * in every zone. Packages are imported by their name and their declared subpaths only.
+ */
+export const DEEP_IMPORT_DIRS = ['dist', 'src'];
+
+/** The ESLint `group` patterns for the deep imports of one workspace package. */
+export const deepImportGroup = (name) =>
+  DEEP_IMPORT_DIRS.flatMap((dir) => [`${name}/${dir}`, `${name}/${dir}/*`]);
+
+/** True when `specifier` is a deep import into the workspace package `name`. */
+export function isDeepImport(name, specifier) {
+  if (!specifier.startsWith(`${name}/`)) return false;
+  const first = specifier.slice(name.length + 1).split('/')[0];
+  return DEEP_IMPORT_DIRS.includes(first) || first === '..' || first === '.';
+}
+
+export const deepImportMessage = (name) =>
+  `${name}: deep import into the package's build or sources is not allowed; import ${name} or a subpath its package.json "exports" declares (IR-M1-1f-1 L-2).`;
+
 export const restrictedEntryMessage = (entry) =>
   `${entry.group[0]} may be imported only in ${entry.zones.join(', ')}; everything else uses ${entry.via}.`;
 export const layerMessage = (zone, name) =>
@@ -314,6 +356,8 @@ export function violationFor(zone, specifier, file) {
     }
     return null;
   }
+  const workspace = workspaceNameOf(specifier);
+  if (workspace !== null && isDeepImport(workspace, specifier)) return deepImportMessage(workspace);
   for (const entry of RESTRICTED_ENTRY_POINTS) {
     if (matchesGroup(specifier, entry.group) && !entry.zones.includes(zone)) {
       return restrictedEntryMessage(entry);

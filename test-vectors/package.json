@@ -10,6 +10,7 @@
     "lint": "eslint ."
   },
   "devDependencies": {
-    "@agentlink/crypto": "workspace:*"
+    "@agentlink/crypto": "workspace:*",
+    "@agentlink/types": "workspace:*"
   }
 }

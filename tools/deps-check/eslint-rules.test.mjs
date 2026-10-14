@@ -100,6 +100,15 @@ describe('boundaries/no-bypass (forms no-restricted-imports cannot see)', () => 
     ).toEqual(['boundaries/no-bypass']);
   });
 
+  it('refuses the crypto test seam source by a relative path, except in test files', async () => {
+    const code = `import { hpkeOpen } from './testing.js';\nvoid hpkeOpen;\n`;
+    expect(rules(await lint('packages/crypto/src/a.ts', code))).toEqual(['boundaries/no-bypass']);
+    expect(rules(await lint('packages/crypto/src/a.ts', `await import('./testing.js');`))).toEqual([
+      'boundaries/no-bypass',
+    ]);
+    expect(await lint('packages/crypto/src/a.test.ts', code)).toEqual([]);
+  });
+
   it('rejects a relative import that leaves the package', async () => {
     const messages = await lint(
       'packages/chain/src/a.ts',
@@ -227,5 +236,31 @@ describe('IR-M1-1e-1 L-1: viem only in packages/crypto test files', () => {
     expect(rules(await lint('packages/core/src/a.test.ts', code))).toEqual([
       'no-restricted-imports',
     ]);
+  });
+});
+
+describe('IR-M1-1f-1 L-2: no deep imports into a workspace package (dist/, src/)', () => {
+  it.each([
+    `import { sealOwnerSeedWithNonceUnsafe } from '@agentlink/crypto/dist/keystore-file.js';`,
+    `import { deriveSecretKey } from '@agentlink/crypto/dist/keystore.js';`,
+    `import * as m from '@agentlink/crypto/dist';`,
+    `import { argon2idRaw } from '@agentlink/crypto/src/argon2.js';`,
+    `import * as m from '@agentlink/crypto/src/testing';`,
+  ])('rejects %s in packages/core and packages/node', async (code) => {
+    for (const filePath of ['packages/core/src/a.ts', 'packages/node/src/a.ts']) {
+      const messages = await lint(filePath, `${code}\n`);
+      expect(rules(messages), filePath).toContain('no-restricted-imports');
+      expect(messages.map((m) => m.message).join('\n')).toMatch(/deep import/);
+    }
+  });
+
+  it('rejects a dynamic deep import', async () => {
+    const code = `const m = await import('@agentlink/crypto/dist/keystore-file.js');\n`;
+    expect(rules(await lint('packages/core/src/a.ts', code))).toContain('boundaries/no-bypass');
+  });
+
+  it('keeps the package entry points open', async () => {
+    const main = `import { bip340Verify } from '@agentlink/crypto';\nvoid bip340Verify;\n`;
+    expect(await lint('packages/core/src/a.ts', main)).toEqual([]);
   });
 });
