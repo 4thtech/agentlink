@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/4thtech/agentlink/test-vectors/owner-action/case.schema.json",
   "title": "owner-action case",
-  "description": "04 \u00a72.5.1 SignedOwnerAction. `sign`: JCS text, sha256 body hash, tagged signature input and sig for a body. `verify`: accept or reject a SignedOwnerAction for a receiving core whose agent address, card ownerNostr and clock are given in `context` (nonce store empty; `appliedPolicyVersion` absent means 0).",
+  "description": "04 \u00a72.5.1 SignedOwnerAction. `sign`: JCS text, sha256 body hash, tagged signature input and sig for a body. `verify`: accept or reject a SignedOwnerAction for a receiving core whose agent address, card ownerNostr and clock are given in `context` (nonce store empty; `appliedPolicyVersion` absent means 0; `pendingApprovals` lists the pending requests an approval.decideBatch names).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -143,6 +143,30 @@
                     }
                   }
                 },
+                "pendingApprovals": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "approvalId",
+                      "actionDigest",
+                      "expiresAt"
+                    ],
+                    "properties": {
+                      "approvalId": {
+                        "type": "string"
+                      },
+                      "actionDigest": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                      },
+                      "expiresAt": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                },
                 "pairing": {
                   "type": "object",
                   "additionalProperties": false,
@@ -254,6 +278,30 @@
                     },
                     "expiresAt": {
                       "type": "integer"
+                    }
+                  }
+                },
+                "pendingApprovals": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "approvalId",
+                      "actionDigest",
+                      "expiresAt"
+                    ],
+                    "properties": {
+                      "approvalId": {
+                        "type": "string"
+                      },
+                      "actionDigest": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                      },
+                      "expiresAt": {
+                        "type": "integer"
+                      }
                     }
                   }
                 },

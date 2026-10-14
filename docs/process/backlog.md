@@ -1178,7 +1178,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Lands before M1-7c freezes pairing.
 
 #### M1-2e · types: `approval.decideBatch` schema and vectors (new, D-68)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** ready · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types, tools/vectors/generate_owner_action.py, test-vectors
 - **Depends on:** M1-2b, M1-1h; D-68 (derived encoding proposed, owner confirms at merge)
 - **Spec:** 04 §2.5.1 (op table, `L(op)`), §2.5.2, §2.4.1; D-31, D-68
@@ -1189,6 +1189,8 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - Regeneration reproduces the files byte for byte; the schema accepts every signing vector and rejects every rejection vector in every runtime the suite declares.
   - Lands before M1-7d unpends the `owner-action` suite.
+- **Split (orchestrator):** the vectors come from an independent generator session (M1-1h rules) that does not write `packages/types`; a separate session writes the schema and constants against the committed vectors.
+- **Threat note (draft):** a malformed or forged batch encoding could (a) give one signed batch two readings, if a verifier sorted, deduplicated or dropped unknown keys before checking, so the owner's reviewed list differs from what is applied; (b) widen what one signature covers, with more than 20 items or a single item outside `approval.decide`; (c) let an `approval.decide` be read as a batch or the reverse; (d) carry an `actionDigest` in a second spelling that compares unequal to the request's digest, or equal after normalising. Stopped by: the strict schema, which rejects instead of normalising (04 §2.5.1, §2.5.2); `op` and `params` inside the signed body under the owner-action tag; the recomputed `actionDigest` on use and whole-or-nothing application with the nonce burnt (M1-7d, M1-7e); I-4 (no MCP tool creates or passes a batch). Residual: a modified installation can show one list and have another signed (G-1, D-67).
 
 ### Contracts (`occ-v2-contracts`, private)
 

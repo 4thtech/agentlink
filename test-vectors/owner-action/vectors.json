@@ -1,10 +1,10 @@
 {
   "$schema": "../schema/vector-file.schema.json",
   "suite": "owner-action",
-  "version": 2,
+  "version": 3,
   "generator": {
     "tool": "python (hashlib, coincurve 21.0.0, pycryptodome 3.23.0, rfc8785 0.1.4)",
-    "version": "cpython 3.12.13",
+    "version": "cpython 3.13.11",
     "script": "tools/vectors/generate_owner_action.py"
   },
   "cases": [
@@ -1911,6 +1911,2649 @@
             "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
             "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
             "expiresAt": 1760086400
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "sign-batch-2",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68) SignedOwnerAction, approval.decideBatch with 2 items (the minimum), approve and deny, ascending approvalId by bytes",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "approval.decideBatch",
+          "params": {
+            "items": [
+              {
+                "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+                "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+                "decision": "approve"
+              },
+              {
+                "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+                "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+                "decision": "deny"
+              }
+            ]
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 1760000600
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"approval.decideBatch\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"items\":[{\"actionDigest\":\"99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309\",\"approvalId\":\"apr_Ekbevt6AZtQnPmuZVCEoRA\",\"decision\":\"approve\"},{\"actionDigest\":\"a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d\",\"approvalId\":\"apr__N-BH37C93Hj_SfQ6h0DXw\",\"decision\":\"deny\"}]},\"v\":1}",
+        "bodyHash": "82fd0c5fbcf0683326cc1743e37e0427233416d46f953a72379bc4caace5f7c8",
+        "signatureInput": "9387514a8ebe1f2e2d581003b7bfab4353081716ef50a9fbc6d36d5e772cf6f3",
+        "sig": "b587769c5dd054bcddc6e2a96b56b88156a849e901a91fce36bcc39155238571fd509eff922fcd10105ebdcdd4e3f537063a852f8ee76b507eae3e9727fcf185"
+      }
+    },
+    {
+      "id": "sign-batch-20",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68) SignedOwnerAction, approval.decideBatch with 20 items (the maximum), mixed decisions",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "approval.decideBatch",
+          "params": {
+            "items": [
+              {
+                "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+                "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+                "decision": "approve"
+              },
+              {
+                "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+                "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+                "decision": "deny"
+              },
+              {
+                "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+                "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+                "decision": "approve"
+              },
+              {
+                "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+                "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+                "decision": "approve"
+              },
+              {
+                "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+                "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+                "decision": "deny"
+              },
+              {
+                "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+                "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+                "decision": "approve"
+              },
+              {
+                "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+                "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+                "decision": "approve"
+              },
+              {
+                "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+                "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+                "decision": "deny"
+              },
+              {
+                "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+                "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+                "decision": "approve"
+              },
+              {
+                "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+                "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+                "decision": "approve"
+              },
+              {
+                "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+                "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+                "decision": "deny"
+              },
+              {
+                "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+                "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+                "decision": "approve"
+              },
+              {
+                "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+                "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+                "decision": "approve"
+              },
+              {
+                "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+                "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+                "decision": "deny"
+              },
+              {
+                "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+                "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+                "decision": "approve"
+              },
+              {
+                "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+                "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+                "decision": "approve"
+              },
+              {
+                "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+                "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+                "decision": "deny"
+              },
+              {
+                "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+                "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+                "decision": "approve"
+              },
+              {
+                "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+                "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+                "decision": "approve"
+              },
+              {
+                "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+                "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+                "decision": "deny"
+              }
+            ]
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 1760000600
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"approval.decideBatch\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"items\":[{\"actionDigest\":\"f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b\",\"approvalId\":\"apr_0hz-2TK--s4nD4FlSkVDWw\",\"decision\":\"approve\"},{\"actionDigest\":\"f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3\",\"approvalId\":\"apr_4GDoaKq1H69E2jOoEsKzww\",\"decision\":\"deny\"},{\"actionDigest\":\"99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309\",\"approvalId\":\"apr_Ekbevt6AZtQnPmuZVCEoRA\",\"decision\":\"approve\"},{\"actionDigest\":\"092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a\",\"approvalId\":\"apr_KhzMolHq9eFjbjLebE9f_A\",\"decision\":\"approve\"},{\"actionDigest\":\"d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5\",\"approvalId\":\"apr_MWXKk7IMgXnBuOQURpqHNw\",\"decision\":\"deny\"},{\"actionDigest\":\"d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd\",\"approvalId\":\"apr_NNgA-qfprynTXfeSpyHoXA\",\"decision\":\"approve\"},{\"actionDigest\":\"e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff\",\"approvalId\":\"apr_RCGGdZ2756BIc7zlMx84xg\",\"decision\":\"approve\"},{\"actionDigest\":\"361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2\",\"approvalId\":\"apr_SkFatRvBYWqEmo1nuCmqpw\",\"decision\":\"deny\"},{\"actionDigest\":\"72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4\",\"approvalId\":\"apr_SoO2BypTQcGep-SoZZ--hw\",\"decision\":\"approve\"},{\"actionDigest\":\"2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904\",\"approvalId\":\"apr_TkpSsHLawINGCZQefXd_ag\",\"decision\":\"approve\"},{\"actionDigest\":\"58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df\",\"approvalId\":\"apr_Ydm_CmiyMN_W7tDOjvtxIg\",\"decision\":\"deny\"},{\"actionDigest\":\"a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d\",\"approvalId\":\"apr__N-BH37C93Hj_SfQ6h0DXw\",\"decision\":\"approve\"},{\"actionDigest\":\"e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba\",\"approvalId\":\"apr__TbF3uTKjoIGmLokf5fxlw\",\"decision\":\"approve\"},{\"actionDigest\":\"e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b\",\"approvalId\":\"apr__uIZfj0guW2w_SO5Ec4RJg\",\"decision\":\"deny\"},{\"actionDigest\":\"73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6\",\"approvalId\":\"apr_axcYH2qxf-GHGlIfsGKV4w\",\"decision\":\"approve\"},{\"actionDigest\":\"a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6\",\"approvalId\":\"apr_iWTUKeEkMswIh_qlfQTexw\",\"decision\":\"approve\"},{\"actionDigest\":\"bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d\",\"approvalId\":\"apr_oGCetyMQ11LXNAkx46xcLg\",\"decision\":\"deny\"},{\"actionDigest\":\"e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403\",\"approvalId\":\"apr_oU4Xse59bgotR-n232yVQw\",\"decision\":\"approve\"},{\"actionDigest\":\"0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a\",\"approvalId\":\"apr_p5_29aLFuO1hlJqQl0K6WQ\",\"decision\":\"approve\"},{\"actionDigest\":\"95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009\",\"approvalId\":\"apr_qqhHWdxm-Zwq2OV6K8xo2Q\",\"decision\":\"deny\"}]},\"v\":1}",
+        "bodyHash": "268ad010ebb3bb494c887e4c16d3e926f003c4f27a7181d159d05d526e13d4e5",
+        "signatureInput": "49e2b51dedd64c567d8a5014ffd2397735b9dbf2b9c62df6448d977e702ad4c8",
+        "sig": "37e388c77e5081fdb11c2289ef756bc944a72092e428e03238e661920d684780a7cf42d3e2b4cd5c7c0026475be804989b0c360175708e2744f6522e068a24d5"
+      }
+    },
+    {
+      "id": "verify-batch-2",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68): a 2-item batch of pending requests verifies",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decideBatch",
+            "params": {
+              "items": [
+                {
+                  "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+                  "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+                  "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+                  "decision": "deny"
+                }
+              ]
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "b587769c5dd054bcddc6e2a96b56b88156a849e901a91fce36bcc39155238571fd509eff922fcd10105ebdcdd4e3f537063a852f8ee76b507eae3e9727fcf185"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApprovals": [
+            {
+              "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+              "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+              "expiresAt": 1760007200
+            },
+            {
+              "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+              "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+              "expiresAt": 1760010800
+            },
+            {
+              "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+              "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+              "expiresAt": 1760075600
+            },
+            {
+              "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+              "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+              "expiresAt": 1760021600
+            },
+            {
+              "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+              "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+              "expiresAt": 1760064800
+            },
+            {
+              "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+              "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+              "expiresAt": 1760025200
+            },
+            {
+              "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+              "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+              "expiresAt": 1760068400
+            },
+            {
+              "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+              "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+              "expiresAt": 1760072000
+            },
+            {
+              "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+              "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+              "expiresAt": 1760057600
+            },
+            {
+              "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+              "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+              "expiresAt": 1760014400
+            },
+            {
+              "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+              "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+              "expiresAt": 1760046800
+            },
+            {
+              "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+              "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+              "expiresAt": 1760043200
+            },
+            {
+              "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+              "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+              "expiresAt": 1760028800
+            },
+            {
+              "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+              "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+              "expiresAt": 1760039600
+            },
+            {
+              "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+              "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+              "expiresAt": 1760003600
+            },
+            {
+              "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+              "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+              "expiresAt": 1760050400
+            },
+            {
+              "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+              "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+              "expiresAt": 1760054000
+            },
+            {
+              "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+              "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+              "expiresAt": 1760018000
+            },
+            {
+              "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+              "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+              "expiresAt": 1760061200
+            },
+            {
+              "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+              "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+              "expiresAt": 1760032400
+            },
+            {
+              "approvalId": "apr_wY272ahYC179DLlu4wzY5g",
+              "actionDigest": "3de6e5aa4f72918e03a64380257a6401b27a903ff24e36ce3a0852520398c5fd",
+              "expiresAt": 1760036000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "verify-batch-20",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68): a 20-item batch of pending requests verifies",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decideBatch",
+            "params": {
+              "items": [
+                {
+                  "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+                  "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+                  "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+                  "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+                  "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+                  "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+                  "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+                  "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+                  "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+                  "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+                  "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+                  "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+                  "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+                  "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+                  "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+                  "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+                  "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+                  "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+                  "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+                  "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+                  "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+                  "decision": "deny"
+                }
+              ]
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "37e388c77e5081fdb11c2289ef756bc944a72092e428e03238e661920d684780a7cf42d3e2b4cd5c7c0026475be804989b0c360175708e2744f6522e068a24d5"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApprovals": [
+            {
+              "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+              "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+              "expiresAt": 1760007200
+            },
+            {
+              "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+              "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+              "expiresAt": 1760010800
+            },
+            {
+              "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+              "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+              "expiresAt": 1760075600
+            },
+            {
+              "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+              "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+              "expiresAt": 1760021600
+            },
+            {
+              "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+              "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+              "expiresAt": 1760064800
+            },
+            {
+              "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+              "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+              "expiresAt": 1760025200
+            },
+            {
+              "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+              "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+              "expiresAt": 1760068400
+            },
+            {
+              "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+              "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+              "expiresAt": 1760072000
+            },
+            {
+              "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+              "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+              "expiresAt": 1760057600
+            },
+            {
+              "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+              "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+              "expiresAt": 1760014400
+            },
+            {
+              "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+              "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+              "expiresAt": 1760046800
+            },
+            {
+              "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+              "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+              "expiresAt": 1760043200
+            },
+            {
+              "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+              "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+              "expiresAt": 1760028800
+            },
+            {
+              "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+              "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+              "expiresAt": 1760039600
+            },
+            {
+              "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+              "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+              "expiresAt": 1760003600
+            },
+            {
+              "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+              "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+              "expiresAt": 1760050400
+            },
+            {
+              "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+              "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+              "expiresAt": 1760054000
+            },
+            {
+              "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+              "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+              "expiresAt": 1760018000
+            },
+            {
+              "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+              "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+              "expiresAt": 1760061200
+            },
+            {
+              "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+              "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+              "expiresAt": 1760032400
+            },
+            {
+              "approvalId": "apr_wY272ahYC179DLlu4wzY5g",
+              "actionDigest": "3de6e5aa4f72918e03a64380257a6401b27a903ff24e36ce3a0852520398c5fd",
+              "expiresAt": 1760036000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "reject-batch-1-item",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68): a batch of 1 item (one decision is always an approval.decide); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decideBatch",
+            "params": {
+              "items": [
+                {
+                  "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+                  "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+                  "decision": "approve"
+                }
+              ]
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "bdf6cbe1ea879d720b90ed6f77053e063266c39a2a0a2aea2134e656d1816749868b13e6fc760514d501619b41d09b9c204b6b3ad9fc66fb40e3a6a6eeff834f"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApprovals": [
+            {
+              "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+              "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+              "expiresAt": 1760007200
+            },
+            {
+              "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+              "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+              "expiresAt": 1760010800
+            },
+            {
+              "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+              "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+              "expiresAt": 1760075600
+            },
+            {
+              "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+              "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+              "expiresAt": 1760021600
+            },
+            {
+              "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+              "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+              "expiresAt": 1760064800
+            },
+            {
+              "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+              "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+              "expiresAt": 1760025200
+            },
+            {
+              "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+              "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+              "expiresAt": 1760068400
+            },
+            {
+              "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+              "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+              "expiresAt": 1760072000
+            },
+            {
+              "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+              "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+              "expiresAt": 1760057600
+            },
+            {
+              "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+              "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+              "expiresAt": 1760014400
+            },
+            {
+              "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+              "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+              "expiresAt": 1760046800
+            },
+            {
+              "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+              "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+              "expiresAt": 1760043200
+            },
+            {
+              "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+              "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+              "expiresAt": 1760028800
+            },
+            {
+              "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+              "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+              "expiresAt": 1760039600
+            },
+            {
+              "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+              "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+              "expiresAt": 1760003600
+            },
+            {
+              "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+              "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+              "expiresAt": 1760050400
+            },
+            {
+              "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+              "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+              "expiresAt": 1760054000
+            },
+            {
+              "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+              "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+              "expiresAt": 1760018000
+            },
+            {
+              "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+              "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+              "expiresAt": 1760061200
+            },
+            {
+              "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+              "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+              "expiresAt": 1760032400
+            },
+            {
+              "approvalId": "apr_wY272ahYC179DLlu4wzY5g",
+              "actionDigest": "3de6e5aa4f72918e03a64380257a6401b27a903ff24e36ce3a0852520398c5fd",
+              "expiresAt": 1760036000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-batch-21-items",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68): a batch of 21 items (above the maximum of 20); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decideBatch",
+            "params": {
+              "items": [
+                {
+                  "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+                  "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+                  "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+                  "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+                  "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+                  "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+                  "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+                  "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+                  "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+                  "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+                  "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+                  "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+                  "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+                  "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+                  "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+                  "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+                  "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+                  "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+                  "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+                  "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+                  "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_wY272ahYC179DLlu4wzY5g",
+                  "actionDigest": "3de6e5aa4f72918e03a64380257a6401b27a903ff24e36ce3a0852520398c5fd",
+                  "decision": "approve"
+                }
+              ]
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "721f0da456ea7dace8c08916d73ef1b010d5f85b453a4af466d15ce153a4d6dfb98892a513122a6bf4a4d9090d4099b30426018db9a4c970528950a31c859c60"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApprovals": [
+            {
+              "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+              "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+              "expiresAt": 1760007200
+            },
+            {
+              "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+              "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+              "expiresAt": 1760010800
+            },
+            {
+              "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+              "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+              "expiresAt": 1760075600
+            },
+            {
+              "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+              "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+              "expiresAt": 1760021600
+            },
+            {
+              "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+              "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+              "expiresAt": 1760064800
+            },
+            {
+              "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+              "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+              "expiresAt": 1760025200
+            },
+            {
+              "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+              "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+              "expiresAt": 1760068400
+            },
+            {
+              "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+              "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+              "expiresAt": 1760072000
+            },
+            {
+              "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+              "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+              "expiresAt": 1760057600
+            },
+            {
+              "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+              "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+              "expiresAt": 1760014400
+            },
+            {
+              "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+              "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+              "expiresAt": 1760046800
+            },
+            {
+              "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+              "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+              "expiresAt": 1760043200
+            },
+            {
+              "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+              "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+              "expiresAt": 1760028800
+            },
+            {
+              "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+              "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+              "expiresAt": 1760039600
+            },
+            {
+              "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+              "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+              "expiresAt": 1760003600
+            },
+            {
+              "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+              "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+              "expiresAt": 1760050400
+            },
+            {
+              "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+              "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+              "expiresAt": 1760054000
+            },
+            {
+              "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+              "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+              "expiresAt": 1760018000
+            },
+            {
+              "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+              "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+              "expiresAt": 1760061200
+            },
+            {
+              "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+              "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+              "expiresAt": 1760032400
+            },
+            {
+              "approvalId": "apr_wY272ahYC179DLlu4wzY5g",
+              "actionDigest": "3de6e5aa4f72918e03a64380257a6401b27a903ff24e36ce3a0852520398c5fd",
+              "expiresAt": 1760036000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-batch-0-items",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68): a batch with an empty `items`; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decideBatch",
+            "params": {
+              "items": []
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "0dcf3180c2d4421868e94ff99cd765e99a96cdb80171caeb3a10cae9060caff26a5a9442aa81a2efff0ba33e396f9a0b35435ea55ef24e163eb74d7633dba1ae"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApprovals": [
+            {
+              "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+              "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+              "expiresAt": 1760007200
+            },
+            {
+              "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+              "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+              "expiresAt": 1760010800
+            },
+            {
+              "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+              "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+              "expiresAt": 1760075600
+            },
+            {
+              "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+              "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+              "expiresAt": 1760021600
+            },
+            {
+              "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+              "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+              "expiresAt": 1760064800
+            },
+            {
+              "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+              "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+              "expiresAt": 1760025200
+            },
+            {
+              "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+              "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+              "expiresAt": 1760068400
+            },
+            {
+              "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+              "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+              "expiresAt": 1760072000
+            },
+            {
+              "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+              "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+              "expiresAt": 1760057600
+            },
+            {
+              "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+              "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+              "expiresAt": 1760014400
+            },
+            {
+              "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+              "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+              "expiresAt": 1760046800
+            },
+            {
+              "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+              "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+              "expiresAt": 1760043200
+            },
+            {
+              "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+              "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+              "expiresAt": 1760028800
+            },
+            {
+              "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+              "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+              "expiresAt": 1760039600
+            },
+            {
+              "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+              "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+              "expiresAt": 1760003600
+            },
+            {
+              "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+              "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+              "expiresAt": 1760050400
+            },
+            {
+              "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+              "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+              "expiresAt": 1760054000
+            },
+            {
+              "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+              "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+              "expiresAt": 1760018000
+            },
+            {
+              "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+              "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+              "expiresAt": 1760061200
+            },
+            {
+              "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+              "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+              "expiresAt": 1760032400
+            },
+            {
+              "approvalId": "apr_wY272ahYC179DLlu4wzY5g",
+              "actionDigest": "3de6e5aa4f72918e03a64380257a6401b27a903ff24e36ce3a0852520398c5fd",
+              "expiresAt": 1760036000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-batch-unsorted",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68): the 2 items in descending approvalId order (they are in ascending order case-insensitively); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decideBatch",
+            "params": {
+              "items": [
+                {
+                  "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+                  "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+                  "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+                  "decision": "approve"
+                }
+              ]
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "384002e519edc2cdd1518678c638ad2d619ff86c24a9ea34cdc301b48a82c2296087f957f07c1a3475fc13b1ea4ca625680398259b33c08679a9427ce3741462"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApprovals": [
+            {
+              "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+              "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+              "expiresAt": 1760007200
+            },
+            {
+              "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+              "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+              "expiresAt": 1760010800
+            },
+            {
+              "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+              "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+              "expiresAt": 1760075600
+            },
+            {
+              "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+              "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+              "expiresAt": 1760021600
+            },
+            {
+              "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+              "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+              "expiresAt": 1760064800
+            },
+            {
+              "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+              "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+              "expiresAt": 1760025200
+            },
+            {
+              "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+              "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+              "expiresAt": 1760068400
+            },
+            {
+              "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+              "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+              "expiresAt": 1760072000
+            },
+            {
+              "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+              "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+              "expiresAt": 1760057600
+            },
+            {
+              "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+              "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+              "expiresAt": 1760014400
+            },
+            {
+              "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+              "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+              "expiresAt": 1760046800
+            },
+            {
+              "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+              "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+              "expiresAt": 1760043200
+            },
+            {
+              "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+              "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+              "expiresAt": 1760028800
+            },
+            {
+              "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+              "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+              "expiresAt": 1760039600
+            },
+            {
+              "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+              "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+              "expiresAt": 1760003600
+            },
+            {
+              "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+              "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+              "expiresAt": 1760050400
+            },
+            {
+              "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+              "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+              "expiresAt": 1760054000
+            },
+            {
+              "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+              "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+              "expiresAt": 1760018000
+            },
+            {
+              "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+              "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+              "expiresAt": 1760061200
+            },
+            {
+              "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+              "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+              "expiresAt": 1760032400
+            },
+            {
+              "approvalId": "apr_wY272ahYC179DLlu4wzY5g",
+              "actionDigest": "3de6e5aa4f72918e03a64380257a6401b27a903ff24e36ce3a0852520398c5fd",
+              "expiresAt": 1760036000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-batch-unsorted-middle",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68): items 10 and 11 of a 20-item batch swapped; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decideBatch",
+            "params": {
+              "items": [
+                {
+                  "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+                  "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+                  "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+                  "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+                  "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+                  "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+                  "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+                  "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+                  "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+                  "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+                  "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+                  "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+                  "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+                  "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+                  "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+                  "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+                  "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+                  "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+                  "decision": "deny"
+                },
+                {
+                  "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+                  "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+                  "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+                  "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+                  "decision": "deny"
+                }
+              ]
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "6fc85e462cde150a528fa92fc4e882811b36eedef3f9e3a74532f14de720dbd04e4985248857c3d65beb95eb5e6a99f3500b7907796133d926c75c9e76c4d0f3"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApprovals": [
+            {
+              "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+              "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+              "expiresAt": 1760007200
+            },
+            {
+              "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+              "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+              "expiresAt": 1760010800
+            },
+            {
+              "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+              "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+              "expiresAt": 1760075600
+            },
+            {
+              "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+              "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+              "expiresAt": 1760021600
+            },
+            {
+              "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+              "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+              "expiresAt": 1760064800
+            },
+            {
+              "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+              "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+              "expiresAt": 1760025200
+            },
+            {
+              "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+              "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+              "expiresAt": 1760068400
+            },
+            {
+              "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+              "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+              "expiresAt": 1760072000
+            },
+            {
+              "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+              "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+              "expiresAt": 1760057600
+            },
+            {
+              "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+              "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+              "expiresAt": 1760014400
+            },
+            {
+              "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+              "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+              "expiresAt": 1760046800
+            },
+            {
+              "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+              "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+              "expiresAt": 1760043200
+            },
+            {
+              "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+              "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+              "expiresAt": 1760028800
+            },
+            {
+              "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+              "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+              "expiresAt": 1760039600
+            },
+            {
+              "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+              "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+              "expiresAt": 1760003600
+            },
+            {
+              "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+              "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+              "expiresAt": 1760050400
+            },
+            {
+              "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+              "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+              "expiresAt": 1760054000
+            },
+            {
+              "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+              "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+              "expiresAt": 1760018000
+            },
+            {
+              "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+              "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+              "expiresAt": 1760061200
+            },
+            {
+              "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+              "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+              "expiresAt": 1760032400
+            },
+            {
+              "approvalId": "apr_wY272ahYC179DLlu4wzY5g",
+              "actionDigest": "3de6e5aa4f72918e03a64380257a6401b27a903ff24e36ce3a0852520398c5fd",
+              "expiresAt": 1760036000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-batch-duplicate-item",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68): the same item twice; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decideBatch",
+            "params": {
+              "items": [
+                {
+                  "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+                  "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+                  "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+                  "decision": "approve"
+                }
+              ]
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "1ced78ff463d4264cabd63b3113dba1974946ecd6fa41125daf59380756f2c8cd4693eaf4ea070f0097cd1a8570dacad9bb0d388e5e28703260d65027c466fb4"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApprovals": [
+            {
+              "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+              "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+              "expiresAt": 1760007200
+            },
+            {
+              "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+              "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+              "expiresAt": 1760010800
+            },
+            {
+              "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+              "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+              "expiresAt": 1760075600
+            },
+            {
+              "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+              "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+              "expiresAt": 1760021600
+            },
+            {
+              "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+              "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+              "expiresAt": 1760064800
+            },
+            {
+              "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+              "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+              "expiresAt": 1760025200
+            },
+            {
+              "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+              "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+              "expiresAt": 1760068400
+            },
+            {
+              "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+              "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+              "expiresAt": 1760072000
+            },
+            {
+              "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+              "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+              "expiresAt": 1760057600
+            },
+            {
+              "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+              "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+              "expiresAt": 1760014400
+            },
+            {
+              "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+              "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+              "expiresAt": 1760046800
+            },
+            {
+              "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+              "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+              "expiresAt": 1760043200
+            },
+            {
+              "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+              "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+              "expiresAt": 1760028800
+            },
+            {
+              "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+              "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+              "expiresAt": 1760039600
+            },
+            {
+              "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+              "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+              "expiresAt": 1760003600
+            },
+            {
+              "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+              "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+              "expiresAt": 1760050400
+            },
+            {
+              "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+              "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+              "expiresAt": 1760054000
+            },
+            {
+              "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+              "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+              "expiresAt": 1760018000
+            },
+            {
+              "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+              "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+              "expiresAt": 1760061200
+            },
+            {
+              "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+              "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+              "expiresAt": 1760032400
+            },
+            {
+              "approvalId": "apr_wY272ahYC179DLlu4wzY5g",
+              "actionDigest": "3de6e5aa4f72918e03a64380257a6401b27a903ff24e36ce3a0852520398c5fd",
+              "expiresAt": 1760036000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-batch-duplicate-approval-id",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68): one approvalId twice, approved and denied; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decideBatch",
+            "params": {
+              "items": [
+                {
+                  "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+                  "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+                  "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+                  "decision": "deny"
+                }
+              ]
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "6d4e9cada27c75393e9d2fcfdb43f6cb67f82eac818efc7f721d70313b826f8ae6004a0c3ebf5433f695d839f5a34dcb043a611349d57add7116e39a9f586b94"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApprovals": [
+            {
+              "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+              "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+              "expiresAt": 1760007200
+            },
+            {
+              "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+              "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+              "expiresAt": 1760010800
+            },
+            {
+              "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+              "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+              "expiresAt": 1760075600
+            },
+            {
+              "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+              "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+              "expiresAt": 1760021600
+            },
+            {
+              "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+              "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+              "expiresAt": 1760064800
+            },
+            {
+              "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+              "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+              "expiresAt": 1760025200
+            },
+            {
+              "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+              "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+              "expiresAt": 1760068400
+            },
+            {
+              "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+              "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+              "expiresAt": 1760072000
+            },
+            {
+              "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+              "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+              "expiresAt": 1760057600
+            },
+            {
+              "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+              "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+              "expiresAt": 1760014400
+            },
+            {
+              "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+              "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+              "expiresAt": 1760046800
+            },
+            {
+              "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+              "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+              "expiresAt": 1760043200
+            },
+            {
+              "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+              "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+              "expiresAt": 1760028800
+            },
+            {
+              "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+              "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+              "expiresAt": 1760039600
+            },
+            {
+              "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+              "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+              "expiresAt": 1760003600
+            },
+            {
+              "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+              "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+              "expiresAt": 1760050400
+            },
+            {
+              "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+              "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+              "expiresAt": 1760054000
+            },
+            {
+              "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+              "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+              "expiresAt": 1760018000
+            },
+            {
+              "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+              "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+              "expiresAt": 1760061200
+            },
+            {
+              "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+              "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+              "expiresAt": 1760032400
+            },
+            {
+              "approvalId": "apr_wY272ahYC179DLlu4wzY5g",
+              "actionDigest": "3de6e5aa4f72918e03a64380257a6401b27a903ff24e36ce3a0852520398c5fd",
+              "expiresAt": 1760036000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-batch-item-unknown-key",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68): an unknown key in an item; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decideBatch",
+            "params": {
+              "items": [
+                {
+                  "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+                  "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+                  "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+                  "decision": "deny",
+                  "note": "x"
+                }
+              ]
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "709ad0ca2e7d6a1fdebaeec44337bfd8fca7c8a33338216d0c45a741ab33edba619c25d223a2b24bb23023666890807577f56cd8291498a287be95c2ab702c48"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApprovals": [
+            {
+              "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+              "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+              "expiresAt": 1760007200
+            },
+            {
+              "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+              "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+              "expiresAt": 1760010800
+            },
+            {
+              "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+              "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+              "expiresAt": 1760075600
+            },
+            {
+              "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+              "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+              "expiresAt": 1760021600
+            },
+            {
+              "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+              "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+              "expiresAt": 1760064800
+            },
+            {
+              "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+              "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+              "expiresAt": 1760025200
+            },
+            {
+              "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+              "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+              "expiresAt": 1760068400
+            },
+            {
+              "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+              "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+              "expiresAt": 1760072000
+            },
+            {
+              "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+              "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+              "expiresAt": 1760057600
+            },
+            {
+              "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+              "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+              "expiresAt": 1760014400
+            },
+            {
+              "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+              "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+              "expiresAt": 1760046800
+            },
+            {
+              "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+              "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+              "expiresAt": 1760043200
+            },
+            {
+              "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+              "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+              "expiresAt": 1760028800
+            },
+            {
+              "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+              "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+              "expiresAt": 1760039600
+            },
+            {
+              "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+              "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+              "expiresAt": 1760003600
+            },
+            {
+              "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+              "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+              "expiresAt": 1760050400
+            },
+            {
+              "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+              "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+              "expiresAt": 1760054000
+            },
+            {
+              "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+              "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+              "expiresAt": 1760018000
+            },
+            {
+              "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+              "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+              "expiresAt": 1760061200
+            },
+            {
+              "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+              "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+              "expiresAt": 1760032400
+            },
+            {
+              "approvalId": "apr_wY272ahYC179DLlu4wzY5g",
+              "actionDigest": "3de6e5aa4f72918e03a64380257a6401b27a903ff24e36ce3a0852520398c5fd",
+              "expiresAt": 1760036000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-batch-params-unknown-key",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68): an unknown key next to `items` in params; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decideBatch",
+            "params": {
+              "items": [
+                {
+                  "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+                  "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+                  "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+                  "decision": "deny"
+                }
+              ],
+              "note": "x"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "cd8d4e4954b1308df07d343d254981b15f65c01ecc6bb73ad791672aec7ab341653eba1a9e270773fb364f7f2bd41b2aeccf221201a9880e485b9b9bf27f3e32"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApprovals": [
+            {
+              "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+              "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+              "expiresAt": 1760007200
+            },
+            {
+              "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+              "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+              "expiresAt": 1760010800
+            },
+            {
+              "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+              "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+              "expiresAt": 1760075600
+            },
+            {
+              "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+              "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+              "expiresAt": 1760021600
+            },
+            {
+              "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+              "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+              "expiresAt": 1760064800
+            },
+            {
+              "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+              "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+              "expiresAt": 1760025200
+            },
+            {
+              "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+              "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+              "expiresAt": 1760068400
+            },
+            {
+              "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+              "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+              "expiresAt": 1760072000
+            },
+            {
+              "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+              "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+              "expiresAt": 1760057600
+            },
+            {
+              "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+              "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+              "expiresAt": 1760014400
+            },
+            {
+              "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+              "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+              "expiresAt": 1760046800
+            },
+            {
+              "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+              "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+              "expiresAt": 1760043200
+            },
+            {
+              "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+              "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+              "expiresAt": 1760028800
+            },
+            {
+              "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+              "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+              "expiresAt": 1760039600
+            },
+            {
+              "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+              "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+              "expiresAt": 1760003600
+            },
+            {
+              "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+              "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+              "expiresAt": 1760050400
+            },
+            {
+              "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+              "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+              "expiresAt": 1760054000
+            },
+            {
+              "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+              "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+              "expiresAt": 1760018000
+            },
+            {
+              "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+              "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+              "expiresAt": 1760061200
+            },
+            {
+              "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+              "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+              "expiresAt": 1760032400
+            },
+            {
+              "approvalId": "apr_wY272ahYC179DLlu4wzY5g",
+              "actionDigest": "3de6e5aa4f72918e03a64380257a6401b27a903ff24e36ce3a0852520398c5fd",
+              "expiresAt": 1760036000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-batch-digest-uppercase",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68): an item's `actionDigest` in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decideBatch",
+            "params": {
+              "items": [
+                {
+                  "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+                  "actionDigest": "99B3201613789B050ED32B637902201864F87D66FFD98AB88E660DB07AD6C309",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+                  "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+                  "decision": "deny"
+                }
+              ]
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "a2f3b8e6c3fa8c2298d80c786ee341493f75d54c47fe9f031c4e8ee33e75d178f8eb601a78f3048afdd4b740ac89acff4a77964a91cd38356effe391059d84f6"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApprovals": [
+            {
+              "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+              "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+              "expiresAt": 1760007200
+            },
+            {
+              "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+              "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+              "expiresAt": 1760010800
+            },
+            {
+              "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+              "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+              "expiresAt": 1760075600
+            },
+            {
+              "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+              "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+              "expiresAt": 1760021600
+            },
+            {
+              "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+              "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+              "expiresAt": 1760064800
+            },
+            {
+              "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+              "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+              "expiresAt": 1760025200
+            },
+            {
+              "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+              "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+              "expiresAt": 1760068400
+            },
+            {
+              "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+              "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+              "expiresAt": 1760072000
+            },
+            {
+              "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+              "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+              "expiresAt": 1760057600
+            },
+            {
+              "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+              "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+              "expiresAt": 1760014400
+            },
+            {
+              "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+              "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+              "expiresAt": 1760046800
+            },
+            {
+              "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+              "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+              "expiresAt": 1760043200
+            },
+            {
+              "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+              "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+              "expiresAt": 1760028800
+            },
+            {
+              "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+              "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+              "expiresAt": 1760039600
+            },
+            {
+              "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+              "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+              "expiresAt": 1760003600
+            },
+            {
+              "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+              "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+              "expiresAt": 1760050400
+            },
+            {
+              "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+              "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+              "expiresAt": 1760054000
+            },
+            {
+              "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+              "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+              "expiresAt": 1760018000
+            },
+            {
+              "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+              "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+              "expiresAt": 1760061200
+            },
+            {
+              "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+              "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+              "expiresAt": 1760032400
+            },
+            {
+              "approvalId": "apr_wY272ahYC179DLlu4wzY5g",
+              "actionDigest": "3de6e5aa4f72918e03a64380257a6401b27a903ff24e36ce3a0852520398c5fd",
+              "expiresAt": 1760036000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-batch-digest-0x-prefix",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68): an item's `actionDigest` with a 0x prefix (bare hex, \u00a72.4.1); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decideBatch",
+            "params": {
+              "items": [
+                {
+                  "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+                  "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+                  "actionDigest": "0xa815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+                  "decision": "deny"
+                }
+              ]
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "b680480fddb4bddabe3dee260a3289c45976ef37ce6a55d0f1e77cd41cccc484610074d27abd96a6c7617f92145c6dbc11538e2378e8deb82a89058be0d4ddf9"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApprovals": [
+            {
+              "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+              "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+              "expiresAt": 1760007200
+            },
+            {
+              "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+              "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+              "expiresAt": 1760010800
+            },
+            {
+              "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+              "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+              "expiresAt": 1760075600
+            },
+            {
+              "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+              "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+              "expiresAt": 1760021600
+            },
+            {
+              "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+              "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+              "expiresAt": 1760064800
+            },
+            {
+              "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+              "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+              "expiresAt": 1760025200
+            },
+            {
+              "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+              "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+              "expiresAt": 1760068400
+            },
+            {
+              "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+              "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+              "expiresAt": 1760072000
+            },
+            {
+              "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+              "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+              "expiresAt": 1760057600
+            },
+            {
+              "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+              "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+              "expiresAt": 1760014400
+            },
+            {
+              "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+              "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+              "expiresAt": 1760046800
+            },
+            {
+              "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+              "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+              "expiresAt": 1760043200
+            },
+            {
+              "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+              "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+              "expiresAt": 1760028800
+            },
+            {
+              "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+              "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+              "expiresAt": 1760039600
+            },
+            {
+              "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+              "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+              "expiresAt": 1760003600
+            },
+            {
+              "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+              "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+              "expiresAt": 1760050400
+            },
+            {
+              "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+              "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+              "expiresAt": 1760054000
+            },
+            {
+              "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+              "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+              "expiresAt": 1760018000
+            },
+            {
+              "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+              "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+              "expiresAt": 1760061200
+            },
+            {
+              "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+              "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+              "expiresAt": 1760032400
+            },
+            {
+              "approvalId": "apr_wY272ahYC179DLlu4wzY5g",
+              "actionDigest": "3de6e5aa4f72918e03a64380257a6401b27a903ff24e36ce3a0852520398c5fd",
+              "expiresAt": 1760036000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-batch-with-decide-params",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68): op approval.decideBatch carrying approval.decide params; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decideBatch",
+            "params": {
+              "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+              "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+              "decision": "approve"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "3de3e8102c0d0d39828c1efc47536eb1de3b01929bd81fbed6ca47584e8c012a0f05d4466d0c4424febc48261e7d026260b5e0f7e885cfa36f1607aa7cf55379"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApprovals": [
+            {
+              "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+              "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+              "expiresAt": 1760007200
+            },
+            {
+              "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+              "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+              "expiresAt": 1760010800
+            },
+            {
+              "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+              "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+              "expiresAt": 1760075600
+            },
+            {
+              "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+              "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+              "expiresAt": 1760021600
+            },
+            {
+              "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+              "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+              "expiresAt": 1760064800
+            },
+            {
+              "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+              "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+              "expiresAt": 1760025200
+            },
+            {
+              "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+              "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+              "expiresAt": 1760068400
+            },
+            {
+              "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+              "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+              "expiresAt": 1760072000
+            },
+            {
+              "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+              "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+              "expiresAt": 1760057600
+            },
+            {
+              "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+              "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+              "expiresAt": 1760014400
+            },
+            {
+              "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+              "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+              "expiresAt": 1760046800
+            },
+            {
+              "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+              "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+              "expiresAt": 1760043200
+            },
+            {
+              "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+              "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+              "expiresAt": 1760028800
+            },
+            {
+              "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+              "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+              "expiresAt": 1760039600
+            },
+            {
+              "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+              "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+              "expiresAt": 1760003600
+            },
+            {
+              "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+              "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+              "expiresAt": 1760050400
+            },
+            {
+              "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+              "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+              "expiresAt": 1760054000
+            },
+            {
+              "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+              "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+              "expiresAt": 1760018000
+            },
+            {
+              "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+              "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+              "expiresAt": 1760061200
+            },
+            {
+              "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+              "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+              "expiresAt": 1760032400
+            },
+            {
+              "approvalId": "apr_wY272ahYC179DLlu4wzY5g",
+              "actionDigest": "3de6e5aa4f72918e03a64380257a6401b27a903ff24e36ce3a0852520398c5fd",
+              "expiresAt": 1760036000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-decide-with-batch-params",
+      "source": "04 \u00a72.5.1, \u00a72.5.2 (D-68): op approval.decide carrying approval.decideBatch params; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decide",
+            "params": {
+              "items": [
+                {
+                  "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+                  "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+                  "decision": "approve"
+                },
+                {
+                  "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+                  "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+                  "decision": "deny"
+                }
+              ]
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "066dc12a72d4260873756ede780f2645c589c7d1df0271848609f227d624366b3685420242338fac205d9bc2958f0064648bd5bc8754654eec3d8c6185d6527d"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApprovals": [
+            {
+              "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+              "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+              "expiresAt": 1760007200
+            },
+            {
+              "approvalId": "apr_4GDoaKq1H69E2jOoEsKzww",
+              "actionDigest": "f8a67c900da6028f2d8883c01f21a3127387f063883f15d1964f6198b310bdf3",
+              "expiresAt": 1760010800
+            },
+            {
+              "approvalId": "apr_Ekbevt6AZtQnPmuZVCEoRA",
+              "actionDigest": "99b3201613789b050ed32b637902201864f87d66ffd98ab88e660db07ad6c309",
+              "expiresAt": 1760075600
+            },
+            {
+              "approvalId": "apr_KhzMolHq9eFjbjLebE9f_A",
+              "actionDigest": "092d881682c9741d6a46b3ce9939f3ea107a7ad0dff4ddd8efe6a8736971825a",
+              "expiresAt": 1760021600
+            },
+            {
+              "approvalId": "apr_MWXKk7IMgXnBuOQURpqHNw",
+              "actionDigest": "d0b6286a020462c890049b04db35dc033a35938df9a7202020e199dedb8ad0b5",
+              "expiresAt": 1760064800
+            },
+            {
+              "approvalId": "apr_NNgA-qfprynTXfeSpyHoXA",
+              "actionDigest": "d4a8fb5edffd2fec16a99d7bec4bf2fdcc110efdd51667be6244e908f7be2efd",
+              "expiresAt": 1760025200
+            },
+            {
+              "approvalId": "apr_RCGGdZ2756BIc7zlMx84xg",
+              "actionDigest": "e2c0b3da580c7aa503c4e8e706bbd2d79c4de30e370ae2bd99a8b9113cd842ff",
+              "expiresAt": 1760068400
+            },
+            {
+              "approvalId": "apr_SkFatRvBYWqEmo1nuCmqpw",
+              "actionDigest": "361125611f4a604c29a47494c8cc94b014aa5da33179e841fbdbdf06f4d9c3d2",
+              "expiresAt": 1760072000
+            },
+            {
+              "approvalId": "apr_SoO2BypTQcGep-SoZZ--hw",
+              "actionDigest": "72c9c42b71f6c157e88fbfe6d203f8d9b36d1e6e3e8367366ce7b515763c7ad4",
+              "expiresAt": 1760057600
+            },
+            {
+              "approvalId": "apr_TkpSsHLawINGCZQefXd_ag",
+              "actionDigest": "2aa438bff8abe0c856b888a12687dfcde0a62ecd4acf18f6b8e1d365c212b904",
+              "expiresAt": 1760014400
+            },
+            {
+              "approvalId": "apr_Ydm_CmiyMN_W7tDOjvtxIg",
+              "actionDigest": "58d92d1ad82753a9edf483dc1ac15deafa11d443b16096d69e2e7a6c2167b7df",
+              "expiresAt": 1760046800
+            },
+            {
+              "approvalId": "apr__N-BH37C93Hj_SfQ6h0DXw",
+              "actionDigest": "a815bd6a2e59abc6f8273c69770f7daca784ecacd09b7812b20c51a9b6fece3d",
+              "expiresAt": 1760043200
+            },
+            {
+              "approvalId": "apr__TbF3uTKjoIGmLokf5fxlw",
+              "actionDigest": "e174701105f6a05117df8297b022372ce2d6e60236011f86fc43bae1586cd3ba",
+              "expiresAt": 1760028800
+            },
+            {
+              "approvalId": "apr__uIZfj0guW2w_SO5Ec4RJg",
+              "actionDigest": "e9b8c3c84717fa990f0fe8395ac27fa721cd887f3e2e0b6503719f3d2a168e2b",
+              "expiresAt": 1760039600
+            },
+            {
+              "approvalId": "apr_axcYH2qxf-GHGlIfsGKV4w",
+              "actionDigest": "73d786b6d26cc42f2295a416104f67cf731e30c7ac5e6bcb06b3142f5a91e0d6",
+              "expiresAt": 1760003600
+            },
+            {
+              "approvalId": "apr_iWTUKeEkMswIh_qlfQTexw",
+              "actionDigest": "a94f1d1a0b9203c0c4de8cb6fd484d86b087fc907efce2c1896d111ecd4a8af6",
+              "expiresAt": 1760050400
+            },
+            {
+              "approvalId": "apr_oGCetyMQ11LXNAkx46xcLg",
+              "actionDigest": "bb3b53d3935ff5c276271a47adce07e5779c02f2b32cd00d2220887ed6f8631d",
+              "expiresAt": 1760054000
+            },
+            {
+              "approvalId": "apr_oU4Xse59bgotR-n232yVQw",
+              "actionDigest": "e99d878679855edb069f3c65a3cb48271d325578e57dac12cb41e93c01745403",
+              "expiresAt": 1760018000
+            },
+            {
+              "approvalId": "apr_p5_29aLFuO1hlJqQl0K6WQ",
+              "actionDigest": "0c0f8f9cbafd0c4dbdff05378e3408f756ca30bc3299a64dc76623b14983869a",
+              "expiresAt": 1760061200
+            },
+            {
+              "approvalId": "apr_qqhHWdxm-Zwq2OV6K8xo2Q",
+              "actionDigest": "95efc68769fcfb750ab54949499ae429c9d1119816c7f9b6a97c1677a2fb9009",
+              "expiresAt": 1760032400
+            },
+            {
+              "approvalId": "apr_wY272ahYC179DLlu4wzY5g",
+              "actionDigest": "3de6e5aa4f72918e03a64380257a6401b27a903ff24e36ce3a0852520398c5fd",
+              "expiresAt": 1760036000
+            }
+          ],
+          "pendingApproval": {
+            "approvalId": "apr_0hz-2TK--s4nD4FlSkVDWw",
+            "actionDigest": "f8adfeaa5fe181f0a947d36f52353aa370dd0fbee43f4dc34a19084f169ff42b",
+            "expiresAt": 1760007200
           }
         }
       },
