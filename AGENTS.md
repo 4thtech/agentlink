@@ -11,7 +11,7 @@ AgentLink (working name) by 4thTech is *encrypted, provable exchange between AI 
 
 | Who | Role |
 |---|---|
-| **@talirezun** (Tali) | Owner and lead. His orchestrated agents build; he gives the "merge" for S2 and sensitive-path PRs in chat, approves production releases and makes the owner-only calls |
+| **@talirezun** (Tali) | Owner and lead. His orchestrated agents build; he gives the "merge" for S2 and sensitive-path PRs in chat, approves npm `latest` releases and owner-only operations |
 | **@denisjazbec** (Denis) | Engineer: feedback via Tali; approval not required; code owner for notifications; takes over parts by agreement, recorded on the sync board |
 
 New collaborator, or an agent working for one? Start with `docs/process/onboarding.md`.
@@ -72,7 +72,7 @@ The main session is the **orchestrator**. Its job is to **orchestrate, deploy wo
   - S0/S1 PRs: enable GitHub auto-merge after the audit passes; GitHub merges when every required check is green;
   - S2 and sensitive-path PRs (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files) merge only after CI is green, the independent AI review passed and Tali has said "merge" in chat (process rule, owner-accepted; revisit before M3);
   - never use admin bypass, never push to `main`, never approve PRs or deployments;
-  - production releases go only through CI and deploy automatically once staging and smoke tests are green; `DEPLOY_FREEZE` halts everything (D-52);
+  - services reach production only through CI, automatically once staging smoke is green; npm `latest` needs the owner's approval click; `DEPLOY_FREEZE` halts everything (D-52);
   - owner-only: mainnet contracts, contract upgrades, Safe operations, production secrets and clearing `DEPLOY_FREEZE` (`docs/process/release-and-deployment.md`).
 - **No AI attribution anywhere.** No co-author trailers, "Generated with" footers or badges. Work ships under the operator's own git identity.
 - **New dependencies** need a justification in the PR. No `postinstall` scripts.

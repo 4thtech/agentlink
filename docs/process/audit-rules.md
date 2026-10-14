@@ -94,7 +94,7 @@ Merging is continuous (D-25, amended by D-51 and D-52): agents work under Tali's
 |---|---|---|---|---|
 | CI gates (public) | `ci-gate`, `security-gate`, `pr-hygiene`, `review-gate` | same | same | Ruleset (required checks) |
 | CI gates (contracts repo) | `contracts-gate` | same | same | Owner, before merging (Free plan, §6.1) |
-| Owner's merge go-ahead | — | ✅ on sensitive paths only (§2.2) | ✅ Tali's explicit "merge" in chat, recorded in the PR (D-51) | Process control (D-51, simplified). Code-owner review is off. The owner MAY review any PR and MAY disable its auto-merge. Production deploys automatically once staging smoke tests are green (D-52, `release-and-deployment.md` §3) |
+| Owner's merge go-ahead | — | ✅ on sensitive paths only (§2.2) | ✅ Tali's explicit "merge" in chat, recorded in the PR (D-51) | Process control (D-51, simplified). Code-owner review is off. The owner MAY review any PR and MAY disable its auto-merge. Services deploy to production automatically once staging smoke tests are green; npm `latest` needs the owner's approval click (D-52, `release-and-deployment.md` §3) |
 | Independent AI review session (Opus 5.5, §4) | — (a Sonnet non-security review MAY be used) | ✅ checklists for the areas touched | ✅ all applicable checklists + invariant walkthrough | `review-gate` (c): report ID referenced in the PR, no FAIL verdict. Attested by the orchestrator: CI sees the reference, not the review. Automated PRs: a code-owner approval on the head commit instead (below) |
 | Feedback from `@denisjazbec` | — | MAY | Usually relayed through the owner and logged with a disposition (`development-process.md` §14); review comments welcome; his GitHub approval is optional (D-51) | Process |
 | Tests-first evidence | — | Regression test for every fix | ✅ failing-test commit precedes implementation; red run in PR | `review-gate` (d): section filled. Content: independent reviewer |
@@ -292,10 +292,10 @@ DECISION NEEDED (owner): pause behaviour of `withdrawIntegrator` and `sweep` (05
 - SC-1 Actions pinned to full SHAs; `zizmor` clean; top-level `permissions: {}` with minimal job permissions; `persist-credentials: false`.
 - SC-2 No `pull_request_target` checkout of PR code; no secrets reachable from PR workflows; no event data interpolated into shell.
 - SC-3 Frozen lockfile; install scripts disabled except the reviewed allowlist; Renovate cooldowns intact (3 d, 7 d crypto).
-- SC-4 Release only via `release.yml`: Changesets, npm trusted publishing with provenance, bound to Environment `npm-next` (unattended, `main` only) for `next` and `npm-publish` (owner approval) for `latest`; no long-lived npm token; no registry override in `.npmrc` or `publishConfig`.
+- SC-4 Release only via `release.yml`: Changesets, npm trusted publishing with provenance, bound to Environment `npm-next` (unattended, `main` only) for `next` and `npm-publish` (owner approval click, required reviewer with no removal date, D-52) for `latest`; no long-lived npm token; no registry override in `.npmrc` or `publishConfig`.
 - SC-5 Caches written by untrusted workflows are never read by release workflows.
 - SC-6 CODEOWNERS covers every S2 path plus `.github/`, `AGENTS.md`, `CLAUDE.md`, `.claude/`, the root `package.json` and `pnpm-workspace.yaml`, and `.npmrc` and `.pnpmfile.*` at any depth, and nothing else; its paths and the `review-gate` class rules match §2.2; new dependencies carry a justification.
-- SC-7 Every publish and deploy job is guarded by `DEPLOY_FREEZE` (job condition and a re-check at start); production jobs run only in an Environment restricted to `main` and tags (the owner removes its required reviewer at M1b, D-52).
+- SC-7 Every publish and deploy job is guarded by `DEPLOY_FREEZE` (job condition and a re-check at start); production jobs run only in an Environment restricted to `main` and tags (the owner removes the `production` required reviewer at M1b; `npm-publish` keeps its required reviewer, D-52).
 - SC-8 No job holding `id-token: write` or deploy credentials runs build or package code beyond the publish or deploy tool itself; health checks in those jobs read only; smoke tests that run published code have no credentials.
 - SC-9 `review-gate`: no event data in scripts; logic still mirrors §2.2 and §3.3; automated PRs are identified only by the PR author, never by commit metadata, and meet (c) only through a code-owner approval on the head commit; no other exemption exists.
 
@@ -351,7 +351,7 @@ Run by a fresh Opus 5.5 audit session over everything merged in the milestone, t
 | C. Dependency and licence audit | Full tree; new dependencies since the last gate with justifications; licences vs allowlist; install scripts; advisories; unmaintained packages | Lockfile diff, report |
 | D. Findings register | Every finding: state, disposition, verification; accepted risks reaffirmed by the owner | Tracker export |
 | E. Boundary sweep | Public repo full history (incl. `sync`) scanned for secrets and private items (`development-process.md` §12) | gitleaks report |
-| F. Process | Gate-bypass (break-glass) log; ruleset bypass list empty; required-check list; strict mode; CODEOWNERS and `review-gate` rules match §2.2; Environment reviewers and branch restrictions; every production deployment preceded by a green staging smoke test (D-52); `DEPLOY_FREEZE` history; review evidence on a sample of S1/S2 PRs; scope register complete | — |
+| F. Process | Gate-bypass (break-glass) log; ruleset bypass list empty; required-check list; strict mode; CODEOWNERS and `review-gate` rules match §2.2; Environment reviewers and branch restrictions; every production deployment preceded by a green staging smoke test and every npm `latest` publish approved by the owner (D-52); `DEPLOY_FREEZE` history; review evidence on a sample of S1/S2 PRs; scope register complete | — |
 
 Milestone additions: **M1**: same-OS-user test, prompt-injection suite, testnet contracts and faucet. **M2**: web checklist on console, verify and invite; cloud agent; Registry. **M3**: M3-1 closed (§8); release prerequisites of `release-and-deployment.md` §4.3.
 

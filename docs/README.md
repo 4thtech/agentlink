@@ -29,8 +29,9 @@ When code, process or any other document disagrees with a spec, the spec wins. S
 | Doc | Purpose |
 |---|---|
 | [`development-process.md`](process/development-process.md) | Roles, orchestration of AI agents, task flow, verification and the spec-change process |
+| [`delivery-process.md`](process/delivery-process.md) | The end-to-end delivery process: roles, 14-step lifecycle, safety nets, owner go-ahead model and definition of done |
 | [`audit-rules.md`](process/audit-rules.md) | Security classes S0/S1/S2, review requirements, independent reviews and external audits |
-| [`release-and-deployment.md`](process/release-and-deployment.md) | Environments, releases, owner-approved production step, rollback and secrets handling |
+| [`release-and-deployment.md`](process/release-and-deployment.md) | Environments, releases, automatic service deploys, owner-approved npm `latest`, rollback and secrets handling |
 | [`ci-cd.md`](process/ci-cd.md) | GitHub Actions workflows, required checks and repository settings |
 | [`versioning.md`](process/versioning.md) | SemVer, milestone-to-version mapping, changesets and compatibility |
 | [`sync-protocol.md`](process/sync-protocol.md) | How collaborators and their agents coordinate on the shared `sync` branch |

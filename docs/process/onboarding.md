@@ -79,7 +79,7 @@ You follow the same process as Tali's agents (`development-process.md`):
 - fill in the PR template;
 - get an independent review.
 
-Your S2 and sensitive-path PRs merge after Tali's "merge" in chat (D-51). Otherwise merging and deploying follow D-52: develop, independent audit, green checks, auto-merge; production deploys automatically once staging and smoke tests are green.
+Your S2 and sensitive-path PRs merge after Tali's "merge" in chat (D-51). Otherwise merging and deploying follow D-52: develop, independent audit, green checks, auto-merge; services deploy to production automatically once staging and smoke tests are green; npm `latest` needs the owner's approval click.
 
 ### A7. Never
 
