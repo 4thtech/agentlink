@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Specification (D-50): phased revenue operations: a monthly revenue report from on-chain events in beta, an internal read-only finance dashboard later, and invoices on request through opt-in billing profiles.
 - Specification (review IR-D48-1): the encrypted drop uses a dedicated drop signing key, encrypts each file once and sends the ciphertext hash at commit, keeps no request URLs or signatures in logs, and follows `files.deleteAfter` (default: keep until expiry); consumer-connector links are revoked at expiry on a best-effort basis; `apps/drop/**` is S2.
 - Process (D-51, simplified): agents work under the owner's GitHub account; code-owner review is not required and Denis's approval is optional. S0/S1 pull requests auto-merge when all checks are green; S2 and sensitive-path pull requests merge only after CI, the independent AI review and the owner's explicit go-ahead (a process control, revisited before mainnet).
+- Specification (D-53): the MCP tool surface is frozen before 0.1.0 at 13 `agentlink_`-prefixed tools with MCP annotations and `approvalId` on every tool that can need approval; one invite link installs AgentLink and pairs; agents check AgentLink at session start (counts only) and offer a handoff at session end.
 
 ## [0.0.1] - 2026-10-12
 
