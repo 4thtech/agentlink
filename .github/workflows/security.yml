@@ -79,6 +79,12 @@ jobs:
             Python-2.0,
             Unlicense,
             Zlib
+          # Owner-reviewed exemptions, one package each, pinned to the version reviewed:
+          # - pycryptodome 3.23.0 (M1-1h vector generators only, tools/vectors/requirements.txt;
+          #   nothing ships): BSD-2-Clause AND BSD-3-Clause AND Unlicense, plus public-domain
+          #   files (LicenseRef-scancode-public-domain) that the allowlist cannot name. It is
+          #   the generators' independent Keccak-256.
+          allow-dependencies-licenses: pkg:pypi/pycryptodome@3.23.0
 
   # Full-history gitleaks scan; the implementation is the reusable workflow secret-scan.yml
   # (official release binary, checksum-verified; see that file).
