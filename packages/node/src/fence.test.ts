@@ -10,11 +10,16 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
   it('exports exactly the opaque entry points', () => {
     expect(Object.keys(entry).sort()).toEqual([
       'KEYCHAIN_SERVICE',
+      'LOCAL_APPROVAL_LIFETIME_S',
+      'MAX_APPROVAL_BATCH_ITEMS',
       'NodeKeyStoreError',
       'assertAgentId',
       'createOsKeychainAgent',
+      'decideReviewedApprovals',
+      'initOwner',
       'openAgentKeyStore',
       'packageName',
+      'performOwnerOperation',
       'probeOsKeychain',
       'selectKeyStoreBackend',
     ]);
@@ -29,6 +34,14 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'createKeychainAgent',
       'openRecordedKeyStore',
       'KeychainKeyStore',
+      // M1-8c: no owner store, session, owner item, seed or prompt seam (I-4).
+      'KeychainOwnerKeyStore',
+      'storeOwnerSeed',
+      'readOwnerItem',
+      'runOwnerOperation',
+      'decideReviewedWith',
+      'initOwnerWith',
+      'ttyOwnerTerminal',
     ]) {
       expect(names).not.toContain(name);
     }

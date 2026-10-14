@@ -77,7 +77,7 @@ export const KEYCHAIN_CALL_TIMEOUT_MS = 30_000;
 /**
  * Every keychain call, with native errors and timeouts replaced by a fixed sentence (I-7).
  */
-async function guarded<T>(call: () => Promise<T>, timeoutMs: number): Promise<T> {
+export async function guarded<T>(call: () => Promise<T>, timeoutMs: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let timedOut = false;
   // Bytes that arrive after the timeout are wiped: nobody will use them.
@@ -100,7 +100,7 @@ async function guarded<T>(call: () => Promise<T>, timeoutMs: number): Promise<T>
   }
 }
 
-function assertEpoch(epoch: unknown): asserts epoch is number {
+export function assertEpoch(epoch: unknown): asserts epoch is number {
   if (typeof epoch !== 'number' || !Number.isInteger(epoch) || epoch < 0 || epoch > MAX_KEY_EPOCH) {
     throw new CryptoInputError(
       'invalid_argument',
@@ -110,7 +110,7 @@ function assertEpoch(epoch: unknown): asserts epoch is number {
 }
 
 /** A plain copy of caller bytes, read once (IR-M1-1g-G2-1 M-1). Lengths are checked by the callee. */
-function bytesCopy(value: unknown, what: string): Uint8Array {
+export function bytesCopy(value: unknown, what: string): Uint8Array {
   if (!(value instanceof Uint8Array)) {
     throw new CryptoInputError('invalid_argument', `${what} must be a Uint8Array`);
   }
@@ -118,7 +118,7 @@ function bytesCopy(value: unknown, what: string): Uint8Array {
 }
 
 /** A frozen plain copy of the four signed NIP-01 fields, each read once; validated when signed. */
-function eventSnapshot(event: unknown): UnsignedNostrEvent {
+export function eventSnapshot(event: unknown): UnsignedNostrEvent {
   if (typeof event !== 'object' || event === null) {
     throw new CryptoInputError('invalid_argument', 'nostr event: must be an object');
   }

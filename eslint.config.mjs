@@ -73,7 +73,13 @@ function restrictionsFor(zone, { test = false } = {}) {
 // - packages/log/src/console.ts: the logger's console sink. It only ever receives redacted lines.
 // - apps/cli/src/output.ts: the CLI's user-output channel (command results such as `--version`).
 //   It prints only what the user asked to see and is never used for logging.
-const CONSOLE_CHANNELS = ['packages/log/src/console.ts', 'apps/cli/src/output.ts'];
+// - packages/node/src/owner-terminal.ts: the owner prompt (M1-8c, 04 §2.8). It reads the owner code
+//   from the process's own TTY and writes fixed copy and a newly generated code, once; never logs.
+const CONSOLE_CHANNELS = [
+  'packages/log/src/console.ts',
+  'apps/cli/src/output.ts',
+  'packages/node/src/owner-terminal.ts',
+];
 const CONSOLE_MESSAGE =
   'No console output: log through @agentlink/log (redacting). Deliberate channels: eslint.config.mjs CONSOLE_CHANNELS.';
 const CONSOLE_SYNTAX = [
