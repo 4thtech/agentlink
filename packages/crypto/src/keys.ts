@@ -2,9 +2,12 @@
 // Every purpose key comes from the 32-byte master seed through HKDF-SHA256; the curves are
 // @noble/curves (04 §8.1), so nothing here implements a primitive (I-8).
 //
-// Secret keys returned here are for KeyStore implementations only (04 §8.1): every other caller
-// works with the public values. Callers wipe returned secrets (`wipe`) when done. The master seed
-// is never modified or returned. Errors are fixed sentences that never echo an input (I-7).
+// Every function that takes the master seed (deriveKey, deriveSecretKey, derivePublicKey,
+// deriveAgentId, derivePublicIdentity) is for KeyStore implementations and `init` only (04 §8.1):
+// the package exports them only from the restricted subpath @agentlink/crypto/keystore. Every
+// other caller gets public values from the KeyStore. Callers wipe returned secrets (`wipe`) when
+// done. The master seed is never modified or returned. Errors are fixed sentences that never echo
+// an input (I-7).
 import { x25519 } from '@noble/curves/ed25519.js';
 import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js';
 import { assertBytes } from './bytes.js';
@@ -12,6 +15,7 @@ import { decodeHex0x, encodeHex0x, encodeUtf8 } from './encoding.js';
 import { CryptoInputError } from './errors.js';
 import { keccak256, sha256 } from './hash.js';
 import { hkdfSha256 } from './hkdf.js';
+import { isSecp256k1SecretKey } from './secp256k1-range.js';
 import { wipe } from './wipe.js';
 
 /** The derivation labels of 04 §2.1, and no others. Frozen. */
@@ -135,7 +139,7 @@ export function deriveKey(
 export function selectSecp256k1SecretKey(okmFor: (counter: number) => Uint8Array): Uint8Array {
   for (let counter = 0; counter <= MAX_COUNTER; counter += 1) {
     const okm = okmFor(counter);
-    if (secp256k1.utils.isValidSecretKey(okm)) return okm;
+    if (isSecp256k1SecretKey(okm)) return okm;
     wipe(okm);
   }
   throw new CryptoInputError(

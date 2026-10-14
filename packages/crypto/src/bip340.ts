@@ -1,16 +1,18 @@
 // BIP-340 Schnorr signatures over secp256k1 (04 §2.1 Nostr and drop keys, §3.1 envelope `sig`,
 // §2.5.1 owner-action `sig`). The scheme is @noble/curves (04 §8.1); nothing here implements it
 // (I-8). Signing takes a secret key, so bip340Sign and bip340PublicKey are for KeyStore
-// implementations only; every other caller signs through the KeyStore.
+// implementations only and are exported only from @agentlink/crypto/keystore; every other caller
+// signs through the KeyStore. bip340Verify and isBip340PublicKey are public.
 //
 // BIP-340 has no high-s/low-s pair as ECDSA does: R is fixed to an even y, and verification
 // requires r < p and s < n, so there is one valid encoding per (key, message, nonce). The low-s
 // rule of 04 §2.4.1 is for ECDSA only.
-import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js';
+import { schnorr } from '@noble/curves/secp256k1.js';
 import { assertBytes } from './bytes.js';
 import { encodeHex } from './encoding.js';
 import { CryptoInputError } from './errors.js';
 import { randomBytes } from './random.js';
+import { isSecp256k1SecretKey } from './secp256k1-range.js';
 import { wipe } from './wipe.js';
 
 export const BIP340_PUBLIC_KEY_LENGTH = 32;
@@ -21,7 +23,7 @@ function assertSecretKey(secretKey: unknown): asserts secretKey is Uint8Array {
   if (secretKey.length !== 32) {
     throw new CryptoInputError('invalid_length', 'bip340: the secret key must be 32 bytes');
   }
-  if (!secp256k1.utils.isValidSecretKey(secretKey)) {
+  if (!isSecp256k1SecretKey(secretKey)) {
     throw new CryptoInputError('invalid_argument', 'bip340: the secret key is out of range');
   }
 }
@@ -40,7 +42,7 @@ export function bip340PublicKey(secretKey: Uint8Array): Uint8Array {
 /**
  * BIP-340 signature (64 bytes) over `message` of any length. `auxRand` is the 32 bytes of
  * auxiliary randomness; by default fresh bytes from the platform CSPRNG, which BIP-340 recommends.
- * Pass it only to reproduce test vectors. Inputs are not modified.
+ * Pass it only to reproduce test vectors; production callers omit it. Inputs are not modified.
  */
 export function bip340Sign(
   secretKey: Uint8Array,

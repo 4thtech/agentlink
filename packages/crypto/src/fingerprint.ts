@@ -4,13 +4,7 @@
 import { assertBytes, concatBytes } from './bytes.js';
 import { encodeHex } from './encoding.js';
 import { CryptoInputError } from './errors.js';
-import { taggedHash } from './hash.js';
-
-/** The BIP-340 tags of 04 §2.9. Frozen. */
-export const FINGERPRINT_TAGS = Object.freeze({
-  owner: 'agentlink/owner-fingerprint/v1',
-  agent: 'agentlink/agent-fingerprint/v1',
-} as const);
+import { TAGS, taggedHash } from './hash.js';
 
 /**
  * - `short`: first 4 bytes, 8 upper-case hex digits in two groups joined by U+00B7 (default views).
@@ -27,7 +21,7 @@ function assertLength(value: unknown, length: number, what: string): asserts val
   }
 }
 
-/** taggedHash(FINGERPRINT_TAGS.owner, ownerEvm ‖ ownerNostr ‖ ownerEnc), raw 20, 32 and 32 bytes. */
+/** taggedHash(TAGS.ownerFingerprint, ownerEvm ‖ ownerNostr ‖ ownerEnc), raw 20, 32 and 32 bytes. */
 export function ownerFingerprint(
   ownerEvm: Uint8Array,
   ownerNostr: Uint8Array,
@@ -36,13 +30,13 @@ export function ownerFingerprint(
   assertLength(ownerEvm, 20, 'ownerFingerprint: ownerEvm');
   assertLength(ownerNostr, 32, 'ownerFingerprint: ownerNostr');
   assertLength(ownerEnc, 32, 'ownerFingerprint: ownerEnc');
-  return taggedHash(FINGERPRINT_TAGS.owner, concatBytes(ownerEvm, ownerNostr, ownerEnc));
+  return taggedHash(TAGS.ownerFingerprint, concatBytes(ownerEvm, ownerNostr, ownerEnc));
 }
 
-/** taggedHash(FINGERPRINT_TAGS.agent, agentId) over the raw 20-byte address. */
+/** taggedHash(TAGS.agentFingerprint, agentId) over the raw 20-byte address. */
 export function agentFingerprint(agentId: Uint8Array): Uint8Array {
   assertLength(agentId, 20, 'agentFingerprint: agentId');
-  return taggedHash(FINGERPRINT_TAGS.agent, agentId);
+  return taggedHash(TAGS.agentFingerprint, agentId);
 }
 
 function groups(hex: string): string {
