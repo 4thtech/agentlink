@@ -220,9 +220,10 @@ Reviewers apply every checklist the diff touches. Item IDs are stable; new items
 - CR-11 Owner seed wrap per 04 §2.3 (PRF salt, HKDF info, AES-256-GCM); recovery code 120 bits with Argon2id m=64 MiB, t=3, p=1; no user-chosen passphrase for relay-published blobs.
 - CR-12 Secrets zeroed with `fill(0)` where the platform allows; decrypt failures give uniform errors.
 - CR-13 Vectors exist for every new use and pass in Node, Playwright and Miniflare; existing vectors unchanged unless the spec changed.
+- CR-14 Safety code and agent ID (04 §2.9, §3.6.1; G-23, G-28): `codeReveal` must open the invite's `codeCommit` (constant-time compare) before B shows a code; transcript role-ordered, inviter first; digits never in MCP results, logs or `nextStep`; "Safety code checked" only through a verified `contact.check` bound to the stored `pairingDigest`; `cardAgentSig` must recover `card.agentEvm`; at most one contact per `agentId`.
 
 **Keys and owner presence (KY)**: 04 §2, 08 §1, §3.2
-- KY-1 Agent seed only in the OS keychain (service `agentlink`, account `<agentId>`), or Worker secret / DO storage in the user's account.
+- KY-1 Agent seed only in the OS keychain (service `agentlink`, account `<agentId>`, the agent's EVM address, 04 §2.9; the loaded seed must derive it), or Worker secret / DO storage in the user's account.
 - KY-2 Owner seed never stored unwrapped on the agent machine; unlock only by localhost passkey PRF or owner passphrase.
 - KY-3 Every owner operation (04 §2.5 list) is an owner-signed object verified against the owner key in the agent card before it applies; nonce and `issuedAt` prevent replay.
 - KY-4 Policies are signed documents re-verified on load; unsigned or tampered → defaults.
