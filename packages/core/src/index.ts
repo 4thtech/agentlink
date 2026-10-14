@@ -21,6 +21,7 @@ export {
   ContactBook,
   type CardUpdateInput,
   type CompletePairingInput,
+  type ContactCheckOutcome,
   type ContactStatus,
   type ContactView,
   type InboundCard,
@@ -77,6 +78,16 @@ export {
   type OpenedPairingMessage,
   type PairingTranscript,
 } from './safety-code.js';
+// M1-7c-b: `contact.check` verification (04 §2.5.1, §3.6.1); applied by contacts.applyContactCheck.
+export {
+  checkContactCheckObject,
+  storedContactCheckHolds,
+  verifyContactCheck,
+  type ContactCheckContext,
+  type ContactCheckRefusal,
+  type ContactCheckVerdict,
+  type PairingDigestLookup,
+} from './contact-check.js';
 export { renderContactName, restrictName } from './names.js';
 export { CoreError, StoreConstraintError, StoreUsageError, type CoreErrorCode } from './errors.js';
 export * from './constants.js';
