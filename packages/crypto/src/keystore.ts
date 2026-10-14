@@ -12,6 +12,15 @@ export {
   deriveSecretKey,
 } from './keys.js';
 export { bip340PublicKey, bip340Sign } from './bip340.js';
+// M1-1g: NIP-44 v2 under a given secret key or conversation key (KeyStore backends and the vector
+// harness). The in-memory KeyStores are in the test-only subpath @agentlink/crypto/testing.
+export {
+  nip44ConversationKey,
+  nip44DecryptWithKey,
+  nip44EncryptWithKey,
+  nip44MessageKeys,
+  type Nip44MessageKeys,
+} from './nip44.js';
 // M1-1c: opening one recipient entry's CEK with the recipient's X25519 secret key, by envelope id
 // (EnvelopeKeys.unwrapCek), and BIP-340 signing of an envelopeHash under the envelope tag
 // (EnvelopeKeys.signEnvelopeHash), 04 §3.1.1 (G-2).

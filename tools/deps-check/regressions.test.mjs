@@ -7,7 +7,13 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { checkManifest, checkSource, runChecks, specProblem } from './check.mjs';
-import { LIBRARIES, SUBTLE_EXEMPT_FILES, ZONES, violationFor } from './policy.mjs';
+import {
+  LIBRARIES,
+  RESTRICTED_ENTRY_POINTS,
+  SUBTLE_EXEMPT_FILES,
+  ZONES,
+  violationFor,
+} from './policy.mjs';
 
 const ROOT = '/repo';
 const src = (zone, code, name = 'src/a.ts') =>
@@ -407,6 +413,44 @@ describe('IR-M1-1b-1 M-1: the restricted @agentlink/crypto/keystore subpath', ()
     // test-vectors has no layering entry (its own ESLint config governs its imports, and pnpm lint
     // passes with the suites importing the subpath); this rule must not name it.
     expect(ruleFor('test-vectors')).not.toMatch(RESTRICTED);
+  });
+});
+
+describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', () => {
+  const RESTRICTED = /@agentlink\/crypto\/testing may be imported only in test-vectors/;
+  const SEAM_SOURCE = /test seam\) may be imported only by test files/;
+  const forms = [
+    `import { MemoryKeyStore } from '@agentlink/crypto/testing';\n`,
+    `export { MemoryOwnerKeyStore } from '@agentlink/crypto/testing';\n`,
+    `const m = await import('@agentlink/crypto/testing');\n`,
+    `type T = import('@agentlink/crypto/testing').MemoryKeyStore;\n`,
+  ];
+
+  it('is refused by name in production source of every zone, in every form', () => {
+    for (const zone of Object.keys(ZONES)) {
+      for (const code of forms) {
+        expect(src(zone, code).join('\n'), `${zone}: ${code}`).toMatch(RESTRICTED);
+      }
+    }
+  });
+
+  it('is refused by name in test files outside test-vectors too: one seam, one rule', () => {
+    expect(src('packages/core', forms[0], 'src/a.test.ts').join('\n')).toMatch(RESTRICTED);
+    expect(src('packages/node', forms[0], 'src/a.test.ts').join('\n')).toMatch(RESTRICTED);
+  });
+
+  it('is refused by relative path from crypto production code and allowed from crypto tests', () => {
+    const code = `import { MemoryKeyStore } from './testing.js';\n`;
+    expect(src('packages/crypto', code, 'src/keystore-api.ts').join('\n')).toMatch(SEAM_SOURCE);
+    expect(src('packages/crypto', code, 'src/memory-keystore.test.ts')).toEqual([]);
+  });
+
+  it('has no second policy entry: exactly one restricted entry names the testing subpath', () => {
+    const entries = RESTRICTED_ENTRY_POINTS.filter((entry) =>
+      entry.group.includes('@agentlink/crypto/testing'),
+    );
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.zones).toEqual(['test-vectors']);
   });
 });
 

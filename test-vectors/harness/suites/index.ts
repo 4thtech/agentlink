@@ -7,6 +7,7 @@ import { hkdfDerive } from './hkdf-derive';
 import { hpke } from './hpke';
 import { jcs } from './jcs';
 import { keystoreFile } from './keystore-file';
+import { nip44 } from './nip44';
 import { ownerWrap } from './owner-wrap';
 import { pairing } from './pairing';
 import { placeholderSha256 } from './placeholder-sha256';
@@ -27,6 +28,7 @@ export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['hpke', hpke],
   ['jcs', jcs],
   ['keystore-file', keystoreFile],
+  ['nip44', nip44],
   ['owner-wrap', ownerWrap],
   ['pairing', pairing],
   ['placeholder-sha256', placeholderSha256],

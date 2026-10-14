@@ -214,6 +214,34 @@ describe('IR-M1-1b-1 M-1: @agentlink/crypto/keystore is for KeyStore backends on
   });
 });
 
+describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', () => {
+  const byName = `import { MemoryKeyStore } from '@agentlink/crypto/testing';\nvoid MemoryKeyStore;\n`;
+  const relative = `import { MemoryKeyStore } from './testing.js';\nvoid MemoryKeyStore;\n`;
+
+  it.each(['packages/core/src/a.ts', 'packages/node/src/a.ts', 'apps/cli/src/a.ts'])(
+    'rejects it by name in production source %s',
+    async (filePath) => {
+      const messages = await lint(filePath, byName);
+      expect(messages.map((m) => m.message).join('\n')).toMatch(
+        /@agentlink\/crypto\/testing may be imported only in test-vectors/,
+      );
+    },
+  );
+
+  it('rejects it by name in a test file outside test-vectors', async () => {
+    expect(rules(await lint('packages/core/src/a.test.ts', byName))).toContain(
+      'no-restricted-imports',
+    );
+  });
+
+  it('rejects a relative import from crypto production code, allows it in crypto tests', async () => {
+    expect(rules(await lint('packages/crypto/src/keystore-api.ts', relative))).toEqual([
+      'boundaries/no-bypass',
+    ]);
+    expect(await lint('packages/crypto/src/memory-keystore.test.ts', relative)).toEqual([]);
+  });
+});
+
 describe('IR-M1-1e-1 L-1: viem only in packages/crypto test files', () => {
   const code = `import { keccak256 } from 'viem';\nvoid keccak256;\n`;
 

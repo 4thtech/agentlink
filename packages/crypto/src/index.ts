@@ -94,6 +94,39 @@ export {
 } from './envelope.js';
 export { CEK_INFO_LABEL, cekInfo, wrapCek, type WrappedCek } from './hpke.js';
 export { decryptPayload, encryptPayload, generateCek } from './aead.js';
+// M1-1g: the key interfaces (types only; G-2, 04 §3.1.1, puts them here so transport-nostr and core
+// can name them), public NIP-44 helpers, Nostr events and the gift wrap. The NIP-44 functions that
+// take a secret or conversation key are in @agentlink/crypto/keystore; the in-memory KeyStores are
+// in the test-only @agentlink/crypto/testing.
+export {
+  KeyStoreError,
+  OWNER_SESSION_DEFAULT_TTL_MS,
+  OWNER_SESSION_MAX_TTL_MS,
+  type EnvelopeKeys,
+  type EpochOptions,
+  type KeyStore,
+  type KeyStoreErrorCode,
+  type OwnerKeyStore,
+  type OwnerPresence,
+  type OwnerPublicKeys,
+  type OwnerSession,
+  type UnlockOptions,
+} from './keystore-api.js';
+export {
+  NIP44_MAX_PLAINTEXT_BYTES,
+  NIP44_MIN_PLAINTEXT_BYTES,
+  nip44PaddedLength,
+} from './nip44.js';
+export {
+  NOSTR_KIND_AUTH,
+  NOSTR_KIND_GIFT_WRAP,
+  NOSTR_KIND_SEAL,
+  nostrEventId,
+  verifyNostrEvent,
+  type NostrEvent,
+  type UnsignedNostrEvent,
+} from './nostr-event.js';
+export { createGiftWrap } from './gift-wrap.js';
 export {
   ECDSA_SIGNATURE_BYTES,
   decodeEcdsaSignature,
