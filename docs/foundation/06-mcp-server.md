@@ -160,6 +160,8 @@ type ProofStatus = {
 };
 ```
 
+Binary values in tool inputs and results use the canonical encodings of 04 §2.4.1, and an input in any other form is rejected with an error naming the expected form, never normalised. For example, `recordId`, `txHash`, `envelopeHash` and agent IDs are `0x` + lowercase hex; `termsHash` and `plaintextSha256` are 64 lowercase hex characters; `envelopeId` is base64url.
+
 ### 2.5 Approvals
 
 | Tool | Input | Output |

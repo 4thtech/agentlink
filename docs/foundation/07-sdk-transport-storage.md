@@ -75,7 +75,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 |---|---|
 | `identity` | agent_id (the agent's EVM address, 04 §2.9), agent_card_json, key_epoch, storage_prefix (04 §2.9), created_at |
 | `contacts` | contact_id, name, agent_card_json, owner_fingerprint, verified, status (active/blocked), created_at |
-| `invites` | invite_id, secret_hash, label, expires_at, used_at |
+| `invites` | invite_id, proof_key (encrypted at rest; never the raw secret, 04 §3.6), label, expires_at, used_at |
 | `envelopes` | envelope_id, thread_id, direction, contact_id, type, created_at, envelope_json (ciphertext), payload_json (decrypted, optional per setting), read_at |
 | `files` | envelope_id, idx, name, size, sha256, locator, url, file_key (encrypted at rest with a keychain-held local key), expires_at, deleted_at |
 | `proofs` | envelope_id, chain_id, record_id, tx_hash, status, fee_token, fee_amount, salt, created_at |
@@ -84,7 +84,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | `policies` | key, value_json, updated_at |
 | `sync_cursors` | relay_url, last_seen |
 
-**At rest:** all sensitive columns (decrypted payloads, contact names, file names, URLs, file keys, salts, policies' parameters) are encrypted with a local **store key** (random, kept in the keychain, or in the file KeyStore on headless machines, §9). Non-sensitive columns (IDs, timestamps, statuses) stay in clear for indexing. Without the store key, the database reveals only activity timing and counts.
+**At rest:** all sensitive columns (decrypted payloads, contact names, file names, URLs, file keys, salts, invite proof keys, policies' parameters) are encrypted with a local **store key** (random, kept in the keychain, or in the file KeyStore on headless machines, §9). Non-sensitive columns (IDs, timestamps, statuses) stay in clear for indexing. Without the store key, the database reveals only activity timing and counts.
 
 **Pairing and identity columns (04 §2.9, §3.6.1; proposed, G-23 and G-28; owner confirms at merge).**
 - `contacts.contact_id` is the contact's agent ID, unique per store. `contacts` also holds `pairing` (`pending`, `complete` or `mismatch`), `pairing_digest`, the pending pairing data until the ack (`codeCommit`, `nonceB`), and `safety_check`: the owner's signed `contact.check`, re-verified on load. `verified` is only a cache of `safety_check`.
@@ -113,7 +113,17 @@ An XMTP adapter (P2) implements the same interface; envelopes are unchanged.
 ### 4.2 Nostr implementation
 
 - **Wrapping:** NIP-59 gift wrap (kind 1059) of a NIP-59 seal (kind 13) containing an unsigned rumor (kind 14, tag `["agentlink","1"]`, `content` = envelope JSON). NIP-44 v2 encryption. Randomized `created_at` per NIP-59.
-- **Relays:** each agent card lists 3–5 relays (default: a curated set of reliable public relays + the optional 4thTech relay). Publish to the **recipient's** relays and the sender's own relays.
+- **Relays:** each agent card lists 3–5 relays (default: a curated set of reliable public relays + the optional 4thTech relay). Publish to the **recipient's** relays and the sender's own relays. Relay URLs from cards, invites and bodies are inbound content. They pass the raw-string relay URL schema at parse (04 §4, relay URLs). A relay host name with an all-numeric or `0x`-hex label anywhere (for example `1.relay.example`) is rejected, so relay operators, the 4thTech relay included, avoid such names.
+- **Relay connections (M1-5; proposed, owner confirms at merge).** These rules close DNS rebinding and SSRF at connect time, on runtimes that control their own sockets (Node; the desktop app):
+  1. Resolve the validated host string (A and AAAA).
+  2. Accept the relay only if **every** resolved address is globally routable. Any other address skips the relay, and the activity log names it without the address.
+     - **IPv4:** not in any block that the IANA IPv4 Special-Purpose Address Registry marks as not globally reachable. This includes `0.0.0.0/8`, `10/8`, `100.64/10`, `127/8`, `169.254/16`, `172.16/12`, `192.0.0/24`, `192.168/16`, `198.18/15`, `224/4` and `240/4`, plus `255.255.255.255`.
+     - **IPv6:** inside `2000::/3`, outside every block that the IANA IPv6 Special-Purpose Address Registry marks as not globally reachable, and outside the blocks that embed IPv4 addresses: `2002::/16` (6to4), `2001::/32` (Teredo), `64:ff9b::/96` and `64:ff9b:1::/48` (NAT64). IPv4-mapped (`::ffff:0:0/96`), `::/128` and `::1` fall outside `2000::/3`.
+  3. Open the TCP connection to the **checked address itself**, never to the host name again. TLS SNI, certificate verification and the HTTP `Host` header use the host name.
+  4. Never follow a redirect on the upgrade, and repeat steps 1–3 on every reconnect.
+  5. Ignore `HTTPS_PROXY`, `ALL_PROXY` and similar settings for relay connections: a proxy would resolve the name itself and bypass the check. A proxy option is a later owner decision.
+
+  **Residual risk.** A browser `WebSocket` (the console) cannot resolve or pin an address. There, the schema rule and the platform apply: browsers enforce Private Network Access where it has shipped, and Workers cannot open connections to private addresses. M1-5 tests the steps above with a stub resolver: a rebinding answer, a mixed public and private answer, a 6to4 answer and a NAT64 answer are all skipped.
 - **Delivery reliability:** publish to all listed relays, consider sent when ≥ 2 acknowledge (`OK`). Retry with backoff for up to 24 h from the local outbox.
 - **Sync:** `REQ` with `#p` = own Nostr pubkeys, `kinds: [1059]`, `since = lastSync − 48 h` (NIP-59 randomizes gift-wrap timestamps up to 2 days back, so `created_at` cursors alone miss messages). Deduplicate by envelope ID (keep a seen-set for ≥ 7 days). Support **NIP-42 AUTH**, since many DM relays serve kind 1059 only to the authenticated recipient.
 - **Size:** envelope ≤ 24 KB serialized; inline files ≤ 12 KB; check the final gift-wrap size against each relay's NIP-11 `max_message_length` and skip relays that cannot carry it.
@@ -261,11 +271,13 @@ Cloudflare Worker; stateless except rate-limit counters (Durable Object). It nev
 
 | Endpoint | Body | Behaviour |
 |---|---|---|
-| `POST /v1/notarize` | `{chainId, records: [{record, sig}]}` | Validate signature and credits via `eth_call` simulation; submit (batched when possible); return tx hash and record IDs |
-| `POST /v1/receipt` | `{chainId, receipts: [{receipt, sig}]}` | Same for receipts |
+| `POST /v1/notarize` | `{chainId, records: [{record, signature}]}` | Validate signature and credits via `eth_call` simulation; submit (batched when possible); return tx hash and record IDs |
+| `POST /v1/receipt` | `{chainId, receipts: [{receipt, signature}]}` | Same for receipts |
 | `POST /v1/deposit-authorization` | `{chainId, token, auth: EIP-3009 fields}` | Check `value ≥ minDeposit` and token EIP-3009 support; submit `depositWithAuthorization` (vault calls `receiveWithAuthorization`) |
 | `GET /v1/status/:txHash` | — | Inclusion status |
 | `GET /v1/health` | — | Per-chain gas wallet balances, queue depth |
+
+Requests and responses use the JSON form of 05 §3.1 (04 §2.4.1): `0x` + lowercase hex for addresses, `bytes32`, canonical ECDSA signatures and transaction hashes, and decimal strings for `uint256`.
 
 - Gas wallets per chain (hot keys in Workers secrets, low balances, auto-alerts). Gas costs are recovered through protocol fees.
 - Per-signer and per-IP rate limits; reject if simulated credits are insufficient.
@@ -283,19 +295,21 @@ Cloudflare Worker; stateless except rate-limit counters (Durable Object). It nev
   "chainId": 8453,
   "notary": "0x…",
   "recordId": "0x…",
-  "record": { /* Record struct fields */ },
+  "record": { /* Record struct fields, JSON form of 05 §3.1 */ },
   "signature": "0x…",
-  "signer": { "evm": "0x…", "agentCard": { /* optional, signed by owner */ } },
+  "signer": { "evm": "0x…", "agentCard": { /* optional, signed by owner; card JSON form, 04 §2.4 */ } },
   "envelopeHash": "0x…",
   "envelope": { /* optional ciphertext envelope */ },
   "recipient": { "evm": "0x…", "salt": "0x…" },          // optional disclosure
   "receipts": [ { "type": "DELIVERED", "signer": "0x…", "txHash": "0x…", "at": "…" } ],
   "disclosure": { "contentKey": "base64url" } | null,  // only if owner approved
   "ownerApproval": { "signed": { /* SignedOwnerAction, approval.decide */ }, "action": { /* commitment approval-request.action incl. context.scope */ } }
-                 | { "standingRule": true, "policyHash": "hex" } | null,  // proof of agreement: included by default, owner may leave it out (04 §3.4, D-55)
+                 | { "standingRule": true, "policyHash": "<64 lowercase hex>" } | null,  // proof of agreement: included by default, owner may leave it out (04 §3.4, D-55)
   "exportedAt": "…"
 }
 ```
+
+Encodings follow 04 §2.4.1, and a verifier rejects a pack in any other form. `recordId`, `envelopeHash` and `recipient.salt` are `0x` + 64 lowercase hex. `recordId` and `salt` are the same strings as in the `proof` envelope body (04 §3.4), and `envelopeHash` the same as in a commitment scope (04 §3.4.2), so a value never has two spellings.
 
 ---
 
