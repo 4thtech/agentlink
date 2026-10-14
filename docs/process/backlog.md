@@ -67,7 +67,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 96 (M1a 43, M1b 53; incl. 11 split-off, 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, and M1-1l and M1-3l from D-66) |
+| M1 Local beta | 101 (M1a 47, M1b 54; incl. 11 split-off, 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, and M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews) |
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 21 (incl. 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
@@ -1430,6 +1430,25 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first (local red run): a delegated signer whose delegate does not validate the key is accepted through the fallback; one whose delegate rejects and whose ECDSA signature is wrong is refused; a 23-byte code that is not a designator gets no fallback; the gas bound holds.
   - In M3-1a scope; independent review.
 
+#### M1-3n · contracts: stabilise the batch invariant suite's non-vacuity checks (new, follow-up to M1-3e)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`test/**` in `occ-v2-contracts`, audit-rules §2.3, as M1-3e and M1-3h) · **Phase:** M1b
+- **Repo/path:** occ-v2-contracts · test/invariant/**
+- **Depends on:** M1-3e
+- **Spec:** `audit-rules.md` CT-1 (the invariant tests) and §3.4 (the local red run); 05 §3.3 (batch outcomes)
+- **Invariants:** I-6
+- **Scope:** a test-harness flake only; no contract change and no change to what the suite proves.
+  - **Symptom.** `test (invariant)` in the contracts CI can occasionally fail with a non-vacuity message from the batch invariant suite, with no code change between a green run and the red one: the invariant job uses a random fuzz seed.
+  - **Cause.** The suite checks once per run that each kind of event it relies on happened at least once. Most are driven by actions that restore normal operation first and have wide margins. Two kinds depend only on random choices inside the receipt-batch action and can be absent from a run by chance. The measurements are in the contracts repository, not in this file.
+  - **Fix, in order of preference (never weaken or remove a check, never lower the 300-call threshold, never pin the fuzz seed to hide it):**
+    1. Bias the handler: add actions that first restore normal operation and then submit a receipt batch built to be rejected for each reason (wrong salt, a signer who is not the recipient, an expired receipt), the pattern the suite already uses for the under-funded batch. Give them the selector weight needed for a safe margin.
+    2. Add ghost counters of the attempts made and keep every existing floor as it is, then raise the `ci` profile's invariant depth only if the margin measured after step 1 needs it. Report the extra CI time, because the suite is already the longest invariant job.
+  - Audit the sibling suites' floors the same way. Fix only a floor whose measured margin is under the target below.
+- **Acceptance:**
+  - Tests first (local red run per `audit-rules.md` §3.4): show that the new or changed floors fail when the biasing action is removed.
+  - Every non-vacuity floor has a measured minimum event count of at least 10 per run over at least 10,000 runs at the `ci` profile (10 or more seeds, no pinned seed in the workflow); the measurement table is in the PR.
+  - All suites green for the same runs; the `deep` profile's runs and depth are unchanged or higher, and every existing floor and threshold is unchanged or stricter; no contract file is touched.
+  - Independent review; the sibling-suite audit is recorded (changed or "margin adequate" per suite).
+
 #### M1-14 · Testnet chain and fee configuration verification, stablecoin allowlist (D-45, D-46) (new)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · script/config, script/verify-chain; agentlink · packages/chain/src/config
@@ -1548,11 +1567,46 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Event contents never logged; per-relay health and timeouts.
   - (hand-off from M1-2c, IR-M1-2a-1 M-1 part 2) Re-check every relay host at connect time, and again on every reconnect: resolve it, and refuse the relay if any address is private, loopback, link-local, CGNAT, unique-local or a metadata address, because a DNS name can resolve to one (04 §4, 07 §4.2). The schema in `@agentlink/types` checks only the string.
 - **Acceptance:**
-  - Tests against 2–3 local relays in Docker (one requiring AUTH, one with a small `max_message_length`): success only with ≥ 2 `OK`; the small relay is skipped.
+  - Against in-memory fake relays behind the injected `RelayConnector`: success only with ≥ 2 `OK`; a relay whose `max_message_length` is below the wrap size is skipped; AUTH is answered on a challenge. The Docker suite against real local relays (one requiring AUTH, one with a small `max_message_length`) moves to M1-5b-b, because it needs the Node connector.
   - Routing (07 §4.3): with disjoint sender and recipient lists, the recipient owner's wrap reaches only the recipient's relays and the sender owner's only the sender's; a wrap is never published to a relay outside its row's list.
   - Outbox survives a restart (persistence fake) and gives up after 24 h (fake clock); canary test shows no content in logs.
   - An inbound frame of 131 073 bytes is dropped before `JSON.parse` and one of 131 072 bytes is parsed (spy test).
   - Relay pool bounds (07 §4.3, IR-G-24-1 L-8): at most 64 open connections, idle connections closed after 5 minutes, a relay that does not connect within 10 s skipped for that attempt (fake clock; 16-relay black-hole contacts do not stall other sends).
+
+#### M1-5b-b · node: relay connector, resolver and NIP-11 fetcher; Docker relay suite (new, IR-M1-5b-1 M-1)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (path default for `packages/node/**`; the content is network and SSRF handling, S1 by nature, and only the owner may lower the class). The CI job edits `.github/**`, a sensitive path: that part merges only on Tali's "merge" · **Phase:** M1a (before M1-23)
+- **Repo/path:** agentlink · packages/node (connector), packages/transport-nostr (tests only, if the Docker suite lives there), .github/workflows/ci.yml (the Docker job)
+- **Depends on:** M1-5b
+- **Spec:** 07 §4.2 (relays, size, NIP-42), §4.3 (relay routing); 04 §4 (relay URL rule, SSRF)
+- **Invariants:** I-3, I-5
+- **Scope:**
+  - The Node implementations of the `RelayConnector`, `HostResolver` and `Nip11Fetcher` interfaces of `@agentlink/transport-nostr`.
+  - The connector connects to the address that the checks approved (the pinned address), never to a second lookup of the name.
+  - Redirects are refused, for the socket upgrade and for NIP-11. Proxy environment settings are ignored.
+  - Inbound socket messages are capped at 131 072 bytes in the socket layer itself, so an oversized message never reaches the pool.
+  - The NIP-11 read is size-capped and has its own timeout, separate from the connect timeout.
+  - Only `packages/node` may use these network primitives (boundary guards); the connector is injected into the pool by the CLI wiring (M1-9a).
+- **Acceptance:**
+  - Unit tests with a fake name server and a local socket server: the connection goes to the approved address even when a later lookup of the same name answers differently; a redirect is refused; a proxy variable in the environment is ignored; a 131 073-byte message closes the socket and a 131 072-byte one is delivered; an oversized or slow NIP-11 response is abandoned within its own timeout.
+  - Docker integration suite against 2–3 real local relays (one requiring NIP-42 AUTH, one with a small `max_message_length`): publish succeeds only with ≥ 2 `OK`, the small relay is skipped, AUTH completes, and an outbox row survives a restart and is republished. Runs in a CI job where Docker is available and is skipped locally with a clear message.
+  - A require-Docker flag set in CI makes the suite impossible to skip silently: with the flag set and Docker removed, the job fails (as `AGENTLINK_REQUIRE_KEYCHAIN=1` does for M1-8a-b).
+  - Lands before M1-23 (the J9 dogfood, M1a gate), which runs on real relays through this connector.
+
+#### M1-5b-c · transport-nostr: hardening follow-ups (new, IR-M1-5b-1 L-2, L-6, I-1…I-3)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/transport-nostr
+- **Depends on:** M1-5b
+- **Spec:** 07 §4.2, §4.3 (an owner row with fewer than 2 usable relays; relay health); 04 §4
+- **Invariants:** I-3, I-7
+- **Scope:**
+  - A hanging NIP-11 fetch must not make a working relay time out for the publish: the NIP-11 wait has its own bound, after which the relay is used with the default limits for that attempt (this is new behaviour: the PR adds a line to 07 §4.2 first).
+  - A row with fewer than 2 usable relays reports why in the activity feed (07 §4.3), for example "no relay with a large enough message limit".
+  - A closed pool returns its own error code, not `invalid_url`.
+  - Relay health output avoids full URLs: it follows the logger's URL rule (origin only) and 07 §4.3 (the activity log names a relay without its address).
+  - Jitter on the outbox backoff, so that many queued rows do not retry in step.
+- **Acceptance:**
+  - Fake-clock tests: a NIP-11 fetch that never answers does not delay a publish to a working relay beyond its own bound; a row with one usable relay stays unsent and the activity entry names the reason; a publish on a closed pool returns the closed-pool code; health output contains no path or query; with an injected random source, the retry times of two rows differ and stay within the 24 h bound.
+  - Existing M1-5b tests stay green; no test is weakened.
 
 #### M1-5c · transport-nostr: subscribe and sync with cursors and dedup
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
@@ -1846,7 +1900,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Node runtime (`@agentlink/node`)
 
 #### M1-8a · node: OS keychain KeyStore
-- **Status:** in review (branch `feat/M1-8a-keychain-keystore`; IR-M1-8a-1 PASS WITH FINDINGS, fix round 1 done) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#54, merged 2026-10-14; the CI matrix acceptance M-1 is open in M1-8a-b) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/node
 - **Depends on:** M1-1g; gap G-23 resolved (G-31 resolved by D-54)
 - **Spec:** 04 §2.2 (service `agentlink`, account `<agentId>`), §2.8 (selection); 07 §9.1; 03 §6 (`@napi-rs/keyring`); 10 M1-8
@@ -1889,6 +1943,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - One conformance suite runs against every backend; the node package keeps no copy of the sign and decrypt logic.
 
+#### M1-8a-d · CI: pin the keychain job's runner images; gating decision (new, IR-M1-8a-b-1 notes)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (sensitive path `.github/**`: merges only on Tali's "merge") · **Phase:** M1a
+- **Repo/path:** agentlink · .github/workflows/ci.yml
+- **Depends on:** M1-8a-b (PR #57, open: the `keychain` job does not exist on `main` yet). Pinning can start only after #57 merges; the gating decision needs 5–10 green PR runs of the job after that
+- **Spec:** M1-8a-b; docs/process/ci-cd.md
+- **Invariants:** I-1
+- **Scope:**
+  - Pin the macOS, Windows and Ubuntu runner image versions of the `keychain` job (no `*-latest`), so a runner image change cannot silently change the keychain behaviour under test. A bump is its own reviewed change.
+  - After 5–10 green PR runs, **the owner decides** whether `keychain` joins the `needs` of `ci-gate`. Until he does, it is not a required check. `continue-on-error` is never used.
+- **Acceptance:**
+  - The workflow names an exact image per runner; `zizmor` and the workflow lint stay green.
+  - The run history used for the decision (run count, failures, causes) is recorded in the PR; the owner's decision is recorded in this card or in `ci-cd.md`.
+
 #### M1-8b · node: SQLite Store with encrypted sensitive columns
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/node
@@ -1903,22 +1970,37 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Scanning the raw DB file finds none of the canary plaintexts; without the store key only the columns 07 §3 marks as clear are readable.
   - Two processes writing concurrently cause no corruption; migrations run from empty and from the previous schema version.
 
-#### M1-8c · node: OwnerKeyStore with the owner passphrase (CLI prompt)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+#### M1-8b-b · store: schema, cipher and key-label follow-ups (new, draft: confirm after IR-M1-8b-1)
+- **Status:** backlog (draft: confirm after IR-M1-8b-1; the items come from the M1-8b worker's open questions and may change or drop once the review reports) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/core (schema, `StoreCipher`), packages/node (SQLite store), docs/foundation/07-sdk-transport-storage.md, test-vectors/**
+- **Depends on:** M1-8b
+- **Spec:** 07 §3 (`identity` columns, at-rest encryption); 04 §2.1 (key labels)
+- **Invariants:** I-2, I-7
+- **Scope:**
+  - Core's schema gains `identity.prev_relays` and `identity.prev_relays_until` as 07 §3 already lists them, with a forward migration in the SQLite store.
+  - The `StoreCipher` interface in core gains a keyed-digest method, so the request digest and other index values are computed through the interface and not inside one store implementation.
+  - 07 specifies the store key labels (`agentlink/v1/store-column` and `agentlink/v1/store-index`) and the `v1.` sealed-column format, with test vectors, so that the M2 Durable Object store (M2-3a) produces and reads the same bytes.
+- **Acceptance:**
+  - Tests first (local red run): a relay change records the previous list and its end time and survives a restart; the keyed digest of a fixed input equals the committed vector; a sealed column from the vectors opens in the SQLite store, and a column sealed under the wrong label or column does not.
+  - The vectors are registered with the harness (M0-9) and pass in every runtime.
+  - 07 text and the vectors agree; independent review; M2-3a lists these vectors as its conformance suite.
+
+#### M1-8c · node: OwnerKeyStore with the owner code or passphrase (CLI prompt)
+- **Status:** ready (D-67: G-1 accepted for M1, owner-blob location pinned in 04 §2.2) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/node
-- **Depends on:** M1-1f, M1-8a; gap G-1 resolved (at least documented and accepted by the owner)
-- **Spec:** 04 §2.2, §2.5; 08 §1; 06 §8 (†); D-16, D-33
+- **Depends on:** M1-1f, M1-8a; gap G-1 accepted as a documented M1 residual (D-67; G-1 stays open, re-decided at M2-GATE)
+- **Spec:** 04 §2.2 (owner seed on keychain machines), §2.5 (same-user agents, D-67), §2.8; 08 §1; 06 §7, §8 (†); 07 §9.3; D-16, D-33, D-66 (3), D-67
 - **Invariants:** I-1, I-4
 - **Scope:**
-  - Owner seed stored only wrapped with the Argon2id owner passphrase (the M1a owner-presence minimum, D-33); unwrapped only inside one owner operation, then wiped. The localhost passkey (PRF) path is M1-8e (M1b).
+  - Owner seed stored only wrapped (`ALKO` v1, Argon2id) under the generated owner code by default, or under a chosen owner passphrase only after an explicit opt-in (the M1a owner-presence minimum, D-33); unwrapped only inside one owner operation, then wiped. The localhost passkey (PRF) path is M1-8e (M1b).
   - CLI passphrase prompt reads from a TTY only; no reusable bearer token on disk. The same holds on headless machines with the file KeyStore (D-54, 04 §2.8): no environment variable, file, argument or piped stdin can supply the owner passphrase; `AGENTLINK_OWNER_*` variables are ignored. On file-KeyStore machines (04 §2.8): the owner seed lives in `~/.agentlink/keystore/owner.alko`, is created by the separate `owner init` step, and requires a generated 120-bit owner code (no chosen passphrase); creating or changing the owner secret refuses a candidate that opens any agent's `.alks` file. `owner init` per 04 §2.8: it refuses when an owner exists and never overwrites; it shows the owner fingerprint; the code is display-only; it states what a lost code means.
-  - **Owner-blob location on keychain machines (follow-up from IR-D54-2, F03):** pin where the owner-wrapped seed lives on machines with a keychain. Either it is a keychain item, or, wherever it is a file, the generated-code rule of 04 §2.8 applies. A chosen owner passphrase protecting a file that copies of the machine carry is open to offline guessing. Record the choice in 04 §2.2 through a spec change before this card is `ready`.
+  - **Owner-blob location on keychain machines (IR-D54-2 F03; pinned in 04 §2.2 by D-67 (2)):** a keychain item, service `agentlink`, account `owner`, whose value is the 90-byte `ALKO` v1 blob. Generated 120-bit owner code by default; a chosen owner passphrase (at least 12 code points after NFKC, D-66 (3)) only after an explicit opt-in that states the offline-guessing exposure to same-user programs. Created by `agentlink owner init` † under the 04 §2.8 rules until the M1b setup page exists (04 §2.2, proposed, owner confirms at merge); never overwrites an existing `owner` item.
   - Produces `SignedOwnerAction` signatures (04 §2.5.1) and EIP-712 card/registration signatures.
-  - Full threat note covering G-1 (shared `localhost` RP ID; same-user installation tampering).
+  - Full threat note covering G-1 as accepted for M1 in 04 §2.5 (D-67): presence, not intent; package modification, same-user memory reads, fake prompts, opted-in passphrase guessing; shared `localhost` RP ID.
 - **Acceptance:**
-  - Build-plan test (10 M1-8): a script running as the same OS user, with read access to `~/.agentlink`, the agent's keychain items and the DB, cannot produce a valid approval or policy change without the passphrase. The test's stated scope excludes modifying the installed package (G-1).
+  - Build-plan test (10 M1-8): a script running as the same OS user, with read access to `~/.agentlink`, the agent's keychain items (the `owner` item included) and the DB, cannot produce a valid approval or policy change without the owner code or passphrase. The test's stated scope (G-1, D-67): the script does not modify the installed package and does not read process memory.
   - No owner-seed bytes on disk (scan after setup and after an operation); the unlock handle's buffers are zeroed after use (test).
-  - The owner blob is at the pinned location on keychain machines; if it is a file, a chosen passphrase is refused (test).
+  - On keychain machines the owner blob is the `agentlink`/`owner` item holding `ALKO` v1; without the opt-in, `secretKind` is 1; with it, a chosen passphrase under 12 code points is refused; an existing `owner` item is never overwritten; on file-KeyStore machines a chosen passphrase is refused (tests).
 
 #### M1-8d · node: local approval server
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -1937,7 +2019,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-8e · node: OwnerKeyStore localhost passkey (PRF) path (new, split from M1-8c)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node
-- **Depends on:** M1-8c, M1-8d, M1-1k; gap G-1 resolved (at least documented and accepted by the owner)
+- **Depends on:** M1-8c, M1-8d, M1-1k; gap G-1 accepted as a documented M1 residual (D-67)
 - **Spec:** 04 §2.2, §2.3, §2.5; 08 §1; D-16
 - **Invariants:** I-1, I-4
 - **Scope:**
@@ -1973,7 +2055,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-9a · CLI: init, harness setup, everyday commands
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli
-- **Depends on:** M1-8a, M1-8b, M1-8c, M1-7c; gap G-5 resolved. Only the `--keystore file` branch waits for M1-8f (off the critical path)
+- **Depends on:** M1-8a, M1-8b, M1-8c, M1-7c, M1-5b-b (relay connector wiring); gap G-5 resolved. Only the `--keystore file` branch waits for M1-8f (off the critical path)
 - **Spec:** 06 §7, §8; 07 §9; 02 F-01, J1; 04 §2.2, §2.8; D-39, D-54
 - **Invariants:** I-1, I-4
 - **Scope:**
@@ -2304,12 +2386,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-12b · quickstart and harness permission guidance
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · docs-site/guide/get-started/, docs-site/technical/reference/harness-configuration.md (published to GitBook through Git Sync, DOCS-PUB)
-- **Depends on:** M1-9a, M1-9b; gap G-1 resolved
-- **Spec:** 04 §2.5 (residual risk, harness permissions); 06 §7; 02 J1; 10 M1-12
+- **Depends on:** M1-9a, M1-9b; gap G-1 accepted as a documented M1 residual (D-67)
+- **Spec:** 04 §2.2 (owner code, opt-in passphrase), §2.5 (residual risk; same-user agents, D-67); 06 §7; 02 J1; 10 M1-12; 11 §5
 - **Invariants:** I-4
 - **Scope:**
   - Per-harness install steps (the agent-assisted install prompts come from M1-25).
-  - Harness permission settings that deny the agent access to `~/.agentlink`, the installed AgentLink package / npx cache and the keychain (Claude Code permission deny rules, Codex sandbox, Gemini CLI sandbox; syntax verified at build time).
+  - Harness permission settings that deny the agent access to `~/.agentlink`, keychain access through command-line tools (`security` on macOS, `secret-tool` on Linux, `cmdkey` and `vaultcmd` on Windows), the installed AgentLink package directory and the npx cache, plus writes to shell startup files, `~/.npmrc` and user `PATH` directories where the harness allows it (Claude Code permission deny rules, Codex sandbox, Gemini CLI sandbox; syntax verified at build time). The copy says plainly that these rules are guards, not a security boundary (04 §2.5, D-67), and keeps to 11 §5 in the user guide.
+  - **Claude Code examples (D-67; starting point, verify against the current Claude Code permissions and sandboxing docs at build time).** In `~/.claude/settings.json`, `permissions.deny`: `Read(~/.agentlink/**)`, `Edit(~/.agentlink/**)`; `Bash(security *)` (macOS), `Bash(secret-tool *)` (Linux), `Bash(cmdkey *)`, `Bash(vaultcmd *)` (Windows); `Edit(~/.npm/_npx/**)` (macOS, Linux; on Windows the npx cache under `~/AppData/Local/npm-cache/_npx/**`); `Edit(//<npm root -g>/@4thtech/agentlink/**)` for a global install (absolute paths start with `//`); `Edit(~/.claude/settings.json)`, so the edit tool cannot remove the rules; and, so the agent cannot redirect what the owner's own terminal runs as `agentlink` or `npx` (04 §2.5, D-67), `Edit(~/.zshrc)`, `Edit(~/.zprofile)`, `Edit(~/.bashrc)`, `Edit(~/.bash_profile)`, `Edit(~/.profile)`, `Edit(~/.config/fish/**)`, `Edit(~/.npmrc)`, `Edit(~/.local/bin/**)` and the npm global prefix's `bin` directory (on Windows the PowerShell profile under `~/Documents/PowerShell/**`); the sandbox `denyWrite` covers the same paths for Bash. The copy states that these are guards only. Because Read and Edit rules do not cover every way a shell command or script can open a file, and a Bash rule matches only the command text, also show the sandbox (macOS, Linux, WSL2): `sandbox.enabled` with `sandbox.filesystem.denyRead` for `~/.agentlink` and `denyWrite` for the npx cache and the package directory. Check at build time that the rules do not break the AgentLink MCP server (started by the harness, not through Bash) or an agent-run `init`, and state the order (install first, then add the rules) if they do.
   - Containers, devcontainers, WSL and SSH (D-54, 07 §9): opting in to the file KeyStore; mounting the unlock code as a run-time secret and pointing `AGENTLINK_KEYSTORE_PASSPHRASE_FILE` at it (never in the image, a committed `devcontainer.json` or a committed MCP config); why the environment variable is weaker; disabling core dumps; deny rules for `~/.agentlink/keystore` and the secret file; doing `owner init` personally and never letting the agent see the owner code; owner approvals over SSH or `docker exec -it`.
   - Run owner († ) commands in a terminal the agent does not control; `doctor` for troubleshooting. Local UI, storage and credits sections are M1-12d (M1b).
 - **Acceptance:**
@@ -3159,6 +3242,7 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
   - External testing: 20–50 early adopters on testnets; UX metric "install → first message < 5 minutes" (median) measured per G-21.
 - **Acceptance:**
   - Zero open Critical/High findings; per-invariant verdicts.
+  - **G-1 re-decided (D-67)** before external testers start: the owner records a new decision on the same-user residual (G-1, G-42), taking into account what the desktop apps deliver; until then no external tester relies on owner presence on an `npx` install.
   - README Status and roadmap updated to the state at this point; README never claims unimplemented features.
   - UX (D-39…D-41): no wallet, browser extension, gas or chain choice appears anywhere in the J1–J9 default flows (CLI, desktop apps, console, browser counterparty); install → first message stays under 5 minutes (median).
   - Adopter count and the measured median recorded; issues filed as cards; owner sign-off.
@@ -3578,7 +3662,7 @@ Converging M1a chains that must arrive in time:
 
 - **Policy and commitments:** M1-2a → {M1-2b, M1-21}; M1-7a + M1-2b → M1-7d → {M1-7e, M1-20 (+ M1-21)} → M1-9b → (M1-9c); M1-7b + M1-7e + M1-20 + M1-21 → M1-32 → (M1-9c, M1-22), beside M1-7c → M1-7h.
 - **Pairing and card crypto:** M1-1f (after G-28, resolved by branch `docs/G-23-G-28-agentid-safety-code`, pending owner) → (M1-7c); M1-1e → (M1-7a).
-- **Transport:** M1-5a → M1-5b → M1-5c → (M1-7h); M1-18 before the dogfood.
+- **Transport:** M1-5a → M1-5b → {M1-5b-b, M1-5c} → (M1-7h); M1-5b-b → (M1-9a); M1-18 before the dogfood.
 - **Owner presence (passphrase):** M1-8a → {M1-8b, M1-8c} → M1-9a → M1-9b. Headless (off the critical path): M1-1f + M1-8a + M1-8b + M1-8c → M1-8f → M1-9a's `--keystore file` branch.
 - **Install and dogfood:** M1-16 + M1-9a + M1-12a + M1-12b → M1-25 → (M1-23); M1-13b → (M1-23); M1-19 (+ M1-25 prompt templates) for invite links; M1-9a + M1-12a → M1-29 → (M1-23).
 
@@ -3621,7 +3705,7 @@ Concurrency guideline: no more than five or six S1/S2 cards `in-review`/`audit` 
 
 Found while decomposing. None is resolved here; each needs a spec-change PR (or an owner decision) before the blocked cards become `ready`. Priority: **H** blocks security-critical design, **M** blocks a card's acceptance, **L** cosmetic or late.
 
-1. **G-1 (H) Local owner presence vs a same-user agent.** 04 §1 I-4, §2.5; 08 §1; 10 M1-8. The WebAuthn RP ID `localhost` is shared by every local origin, and 04 §2.5 already accepts that a shell-capable agent can tamper with the installation. Either way the next owner passkey or passphrase use on that machine can be captured and the wrapped owner seed on disk unwrapped: local presence proves presence, not intent. The same holds for creating the owner key on such a machine: a tampered installation or a same-user process that reads memory can capture or predetermine the owner seed during setup (04 §2.8, D-54). The residual-risk text lists only tampering and credit spending, and I-4's "no agent process can produce one" holds only while the installation is intact. *Proposed:* state this in 04 §2.5; scope the M1-8 test to an unmodified installation; recommend owner operations from the console on a separate device when the harness has unrestricted shell; harness deny rules for the installed package and npx cache; consider not storing the owner seed on agent machines by default. *Blocks:* M1-8c, M1-8d, M1-8e, M1-11a, M1-12b. *Status:* stays open until the D-36 desktop app ships (G-42).
+1. **G-1 (H) Local owner presence vs a same-user agent.** 04 §1 I-4, §2.5; 08 §1; 10 M1-8. The WebAuthn RP ID `localhost` is shared by every local origin, and 04 §2.5 already accepts that a shell-capable agent can tamper with the installation. Either way the next owner passkey or passphrase use on that machine can be captured and the wrapped owner seed on disk unwrapped: local presence proves presence, not intent. The same holds for creating the owner key on such a machine: a tampered installation or a same-user process that reads memory can capture or predetermine the owner seed during setup (04 §2.8, D-54). The residual-risk text (before D-67) listed only tampering and credit spending, and I-4's "no agent process can produce one" holds only while the installation is intact. *Proposed:* state this in 04 §2.5; scope the M1-8 test to an unmodified installation; recommend owner operations from the console on a separate device when the harness has unrestricted shell; harness deny rules for the installed package and npx cache; consider not storing the owner seed on agent machines by default. *Blocks:* M1-8c, M1-8d, M1-8e, M1-11a, M1-12b. *Status:* **open; accepted as a documented residual for M1 (testnets only) by D-67** (owner decision, Tali, 2026-10-14, option A). 04 §2.5 now states presence, not intent, the unmodified-installation condition of I-4 and the residual attacks accepted for M1; the M1-8 test is scoped (10 M1-8, M1-8c); the quickstart deny rules are carded in M1-12b. The *Proposed* items not adopted for M1 (owner operations from the console on a separate device; no owner seed on agent machines by default) are deferred to the M2-GATE re-decision. The "G-1 resolved" precondition of the blocked M1 cards is met for M1 only. It stays open until the D-36 desktop app ships (G-42) and **must be re-decided at M2-GATE, before external testers rely on it**.
 2. **G-2 (H) `KeyStore` location and methods.** Resolved by 4thtech/agentlink#34 (merged 2026-10-14; D-62 accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34), in 04 §3.1.1, with 03 §3, 04 §2.6, §3.5 and 07 §1, §4.1, §4.2 aligned. Reviews IR-M1-1g-1 (M-1, M-2, L-1, L-2, I-4, I-5) and IR-M1-1c-1 (F3, F5) are folded in.
    - **Signature.** `sig` = BIP-340 by `from` over `taggedHash("agentlink/envelope/v1", envelopeHash)`, where `envelopeHash = sha256(JCS(envelope without sig))` over the strictly parsed envelope, with the 32 raw hash bytes inside the tagged hash. A table of every BIP-340 use of a Nostr key (envelope, owner action, NIP-01 seal and AUTH) fixes one message per object. A new use needs its own tag, and nothing signs an untagged digest.
    - **Keys.** Agent-sent types are signed by the agent Nostr key at the current epoch. `approval`, `policy` (owner → agent) and `revoke` are signed by the owner Nostr key, only in an `OwnerSession` from `unlock(presence)`, in the same gesture as the carried `SignedOwnerAction`. The envelope signature authorises nothing. Receivers enforce the type ↔ key table.

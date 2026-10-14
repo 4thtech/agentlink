@@ -27,9 +27,12 @@ export const recipientSchema = z.strictObject({
   wk: base64url(BYTE_LENGTHS.wrappedCek),
 });
 
+// 04 §3.1 (G-46, D-66): exactly {alg, iv, kc, ct}; alg A256GCM-KC and a 32-byte key commitment, so
+// the earlier form (alg A256GCM, no kc) is refused.
 export const aeadSchema = z.strictObject({
-  alg: z.literal('A256GCM'),
+  alg: z.literal('A256GCM-KC'),
   iv: base64url(BYTE_LENGTHS.iv),
+  kc: base64url(BYTE_LENGTHS.keyCommitment),
   // ciphertext ‖ 16-byte tag; the envelope size cap bounds the rest.
   ct: base64urlBounded(BYTE_LENGTHS.tag, MAX_ENVELOPE_BYTES),
 });

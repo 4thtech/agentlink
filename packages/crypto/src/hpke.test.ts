@@ -1,11 +1,20 @@
 // M1-1c: 04 §3.3 CEK wrapping with RFC 9180 HPKE, mode Base, DHKEM(X25519, HKDF-SHA256),
 // HKDF-SHA256, AES-256-GCM (suite 0x0020/0x0001/0x0002) through @hpke/core. info =
 // utf8("agentlink/v1/cek") || the envelope id's 16 raw bytes, empty AAD, one seal per recipient.
+// M1-1l (G-46, D-66): every wrap is derived from the CEK. The ephemeral secret key of entry j is
+// ikm_j = HKDF-SHA256(CEK, "", "agentlink/v1/cek-eph" ‖ id ‖ pk_j, 32), used as a raw X25519
+// secret key (never through RFC 9180 DeriveKeyPair), and checkWrap recomputes an entry.
 // The published RFC 9180 vector, fixed-ephemeral wraps and every small-order point sealed under the
 // all-zero key schedule run cross-runtime in test-vectors/hpke; these tests pin the API rules.
+import { Aes256Gcm, CipherSuite, DhkemX25519HkdfSha256, HkdfSha256 } from '@hpke/core';
+import { x25519 } from '@noble/curves/ed25519.js';
+import { hkdf } from '@noble/hashes/hkdf.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { describe, expect, it } from 'vitest';
 import {
+  CEK_EPH_LABEL,
   CEK_INFO_LABEL,
+  checkWrap,
   CryptoInputError,
   KEY_LABELS,
   cekInfo,
@@ -18,7 +27,12 @@ import {
   wrapCek,
 } from './index.js';
 import { derivePublicKey, deriveSecretKey, unwrapCek } from './keystore.js';
-import { hpkeOpen, hpkeSealSequence, wrapCekWithEphemeralKey } from './testing.js';
+import {
+  deriveWrapEphemeralKey,
+  hpkeOpen,
+  hpkeSealSequence,
+  wrapCekWithEphemeralKey,
+} from './testing.js';
 
 function x25519Pair(): { secretKey: Uint8Array; publicKey: Uint8Array } {
   const seed = randomBytes(32);
@@ -97,14 +111,72 @@ describe('wrapCek and unwrapCek', () => {
     );
   });
 
-  it('uses a fresh ephemeral key for every seal', async () => {
+  it('derives the ephemeral key from the CEK: the same (pk, id, cek) gives identical bytes (04 §3.3)', async () => {
     const recipient = x25519Pair();
     const id = randomBytes(16);
     const cek = randomBytes(32);
     const a = await wrapCek(recipient.publicKey, id, cek);
     const b = await wrapCek(recipient.publicKey, id, cek);
-    expect(encodeHex(a.enc)).not.toBe(encodeHex(b.enc));
-    expect(encodeHex(a.wk)).not.toBe(encodeHex(b.wk));
+    expect(a).toEqual(b);
+    // A changed pk, id or CEK gives a different enc (a different ephemeral key).
+    const otherPk = await wrapCek(x25519Pair().publicKey, id, cek);
+    const otherId = await wrapCek(recipient.publicKey, randomBytes(16), cek);
+    const otherCek = await wrapCek(recipient.publicKey, id, randomBytes(32));
+    for (const other of [otherPk, otherId, otherCek]) {
+      expect(encodeHex(other.enc)).not.toBe(encodeHex(a.enc));
+    }
+  });
+
+  it('uses ikm_j = HKDF-SHA256(CEK, "", "agentlink/v1/cek-eph" ‖ id ‖ pk_j, 32) as the raw X25519 secret', async () => {
+    expect(CEK_EPH_LABEL).toBe('agentlink/v1/cek-eph');
+    const recipient = x25519Pair();
+    const id = randomBytes(16);
+    const cek = randomBytes(32);
+    const info = concatBytes(encodeUtf8('agentlink/v1/cek-eph'), id, recipient.publicKey);
+    const ikm = hkdf(sha256, cek, new Uint8Array(0), info, 32);
+    expect(deriveWrapEphemeralKey(recipient.publicKey, id, cek)).toEqual(ikm);
+    const wrapped = await wrapCek(recipient.publicKey, id, cek);
+    // enc is X25519(ikm_j, basepoint): ikm_j itself is the (clamped) secret key.
+    expect(wrapped.enc).toEqual(x25519.getPublicKey(ikm));
+    expect(wrapped).toEqual(await wrapCekWithEphemeralKey(recipient.publicKey, id, cek, ikm));
+    expect(await unwrapCek(recipient.secretKey, wrapped, id)).toEqual(cek);
+  });
+
+  it('never routes ikm_j through RFC 9180 DeriveKeyPair: that path gives different bytes (IR-D-66-1 L-5)', async () => {
+    const recipient = x25519Pair();
+    const id = randomBytes(16);
+    const cek = randomBytes(32);
+    const ikm = deriveWrapEphemeralKey(recipient.publicKey, id, cek);
+    // The library's own path for `ekm` bytes: DeriveKeyPair(ikm), then the same seal.
+    const suite = new CipherSuite({
+      kem: new DhkemX25519HkdfSha256(),
+      kdf: new HkdfSha256(),
+      aead: new Aes256Gcm(),
+    });
+    const sender = await suite.createSenderContext({
+      recipientPublicKey: await suite.kem.importKey(
+        'raw',
+        recipient.publicKey.slice().buffer,
+        true,
+      ),
+      ekm: ikm.slice().buffer,
+      info: cekInfo(id),
+    });
+    const viaDeriveKeyPair = new Uint8Array(sender.enc);
+    const wrapped = await wrapCek(recipient.publicKey, id, cek);
+    expect(encodeHex(viaDeriveKeyPair)).not.toBe(encodeHex(wrapped.enc));
+    expect(wrapped.enc).toEqual(x25519.getPublicKey(ikm));
+  });
+
+  it('refuses a derivation with a key, id or CEK of the wrong length', () => {
+    const r = x25519Pair();
+    for (const run of [
+      () => deriveWrapEphemeralKey(randomBytes(31), randomBytes(16), randomBytes(32)),
+      () => deriveWrapEphemeralKey(r.publicKey, randomBytes(15), randomBytes(32)),
+      () => deriveWrapEphemeralKey(r.publicKey, randomBytes(16), randomBytes(33)),
+    ]) {
+      expect(run).toThrow(expect.objectContaining({ code: 'invalid_length' }));
+    }
   });
 
   it('seals mode Base with info = label || raw id and an empty AAD', async () => {
@@ -229,6 +301,95 @@ describe('wrapCek and unwrapCek', () => {
         expect(text).not.toContain(encodeBase64url(secret));
       }
     }
+  });
+});
+
+describe('checkWrap: the wrap check of 04 §3.3 (G-46, D-66)', () => {
+  const flip = (bytes: Uint8Array, index: number): Uint8Array => {
+    const copy = bytes.slice();
+    copy[index] = (copy[index] as number) ^ 1;
+    return copy;
+  };
+
+  it('accepts the recomputed entry with the public key and the CEK only', async () => {
+    const recipient = x25519Pair();
+    const id = randomBytes(16);
+    const cek = randomBytes(32);
+    const entry = await wrapCek(recipient.publicKey, id, cek);
+    expect(checkWrap.length).toBe(4);
+    expect(await checkWrap(recipient.publicKey, id, cek, entry)).toBe(true);
+  });
+
+  it('refuses an entry that seals another CEK, even one its recipient opens', async () => {
+    const recipient = x25519Pair();
+    const id = randomBytes(16);
+    const cek = randomBytes(32);
+    const other = randomBytes(32);
+    // Built through the CEK-derived path for another CEK, and through a free ephemeral key for
+    // this CEK: the recipient opens both, but neither is the entry this CEK commits to.
+    const forOther = await wrapCek(recipient.publicKey, id, other);
+    expect(await unwrapCek(recipient.secretKey, forOther, id)).toEqual(other);
+    expect(await checkWrap(recipient.publicKey, id, cek, forOther)).toBe(false);
+    const free = await wrapCekWithEphemeralKey(
+      recipient.publicKey,
+      id,
+      cek,
+      x25519Pair().secretKey,
+    );
+    expect(await unwrapCek(recipient.secretKey, free, id)).toEqual(cek);
+    expect(await checkWrap(recipient.publicKey, id, cek, free)).toBe(false);
+  });
+
+  it('refuses an entry for another key or another id, and any changed byte', async () => {
+    const recipient = x25519Pair();
+    const id = randomBytes(16);
+    const cek = randomBytes(32);
+    const entry = await wrapCek(recipient.publicKey, id, cek);
+    expect(await checkWrap(x25519Pair().publicKey, id, cek, entry)).toBe(false);
+    expect(await checkWrap(recipient.publicKey, randomBytes(16), cek, entry)).toBe(false);
+    for (const changed of [
+      { enc: flip(entry.enc, 0), wk: entry.wk },
+      { enc: flip(entry.enc, 31), wk: entry.wk },
+      { enc: entry.enc, wk: flip(entry.wk, 0) },
+      { enc: entry.enc, wk: flip(entry.wk, 47) },
+    ]) {
+      expect(await checkWrap(recipient.publicKey, id, cek, changed)).toBe(false);
+    }
+  });
+
+  it('refuses wrong lengths and non-byte arguments, and leaves its inputs unchanged', async () => {
+    const r = x25519Pair();
+    const id = randomBytes(16);
+    const cek = randomBytes(32);
+    const entry = await wrapCek(r.publicKey, id, cek);
+    const copies = [
+      r.publicKey.slice(),
+      id.slice(),
+      cek.slice(),
+      entry.enc.slice(),
+      entry.wk.slice(),
+    ];
+    for (const attempt of [
+      () => checkWrap(randomBytes(31), id, cek, entry),
+      () => checkWrap(r.publicKey, randomBytes(15), cek, entry),
+      () => checkWrap(r.publicKey, id, randomBytes(33), entry),
+      () => checkWrap(r.publicKey, id, cek, { enc: randomBytes(31), wk: entry.wk }),
+      () => checkWrap(r.publicKey, id, cek, { enc: entry.enc, wk: randomBytes(49) }),
+    ]) {
+      expect((await refusal(attempt)).code).toBe('invalid_length');
+    }
+    const notBytes = 'x' as unknown as Uint8Array;
+    for (const attempt of [
+      () => checkWrap(notBytes, id, cek, entry),
+      () => checkWrap(r.publicKey, id, cek, null as unknown as typeof entry),
+      () => checkWrap(r.publicKey, id, cek, { enc: notBytes, wk: entry.wk }),
+    ]) {
+      expect((await refusal(attempt)).code).toBe('invalid_argument');
+    }
+    expect((await refusal(() => checkWrap(SMALL_ORDER[0]!, id, cek, entry))).code).toBe(
+      'invalid_public_key',
+    );
+    expect([r.publicKey, id, cek, entry.enc, entry.wk]).toEqual(copies);
   });
 });
 

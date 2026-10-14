@@ -8,8 +8,8 @@
 
 - The install prompt to paste into Claude Code
 - What Claude will run, and the settings change it will show you
-- Protecting your approvals (passkey or passphrase) and the recovery kit
-- Recommended permission settings, to keep Claude away from AgentLink's private files
+- Protecting your approvals (owner code or passphrase, in a terminal you opened yourself; passkey from v0.2.0) and the recovery kit
+- Recommended permission settings, to keep Claude away from AgentLink's private files, its saved keys in your system keychain and its installed program files, and what these settings can and cannot stop
 - Optional: a check at the start of each session that tells you who sent something new
 - Checking it works: ask "What's my AgentLink status?"
 - Next: [Pair with someone](pair-with-someone.md)

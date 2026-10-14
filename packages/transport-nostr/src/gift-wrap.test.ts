@@ -106,7 +106,7 @@ function makeEnvelope(
       enc: b64(32),
       wk: b64(48),
     })),
-    aead: { alg: 'A256GCM', iv: b64(12), ct: b64(ctBytes) },
+    aead: { alg: 'A256GCM-KC', iv: b64(12), kc: b64(32), ct: b64(ctBytes) },
     sig: encodeHex(randomBytes(64)),
   };
 }
@@ -415,10 +415,12 @@ describe('wrapEnvelope', () => {
     expect(wrap.frameBytes).toBe(utf8Length(JSON.stringify(['EVENT', wrap.event])));
   });
 
-  it('the largest envelope the parser accepts (24 509 bytes as JCS) yields gift wraps under 64 KiB', async () => {
+  it('the largest envelope the parser accepts (24 563 bytes as JCS) yields gift wraps under 64 KiB', async () => {
     const sender = referenceKeys();
     const envelope = largestEnvelope(sender.pubkey);
     const size = utf8Length(canonicalize(envelope));
+    // 04 §3.1.1 size table: 24 563 bytes with kc and alg A256GCM-KC (G-46, D-66).
+    expect(size).toBe(24_563);
     expect(size).toBeLessThanOrEqual(ENVELOPE_MAX_BYTES);
     expect(size).toBeGreaterThan(24_000);
     const { wraps } = await wrapEnvelope(envelope, [referenceKeys().pubkey], sender);
