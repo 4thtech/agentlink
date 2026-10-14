@@ -55,7 +55,7 @@ describe('@agentlink/crypto/keystore', () => {
       'formatFingerprint',
       'KEY_LABELS',
       // M1-1c: envelope structure, hashes and verification, and the CEK and payload operations,
-      // which take a per-envelope CEK but no long-term secret (03 §3: hpkeOpen returns the CEK).
+      // which take a per-envelope CEK but no long-term secret (04 §3.1.1: unwrapCek returns the CEK).
       'parseEnvelope',
       'parseUnsignedEnvelope',
       'parseEnvelopeHeader',

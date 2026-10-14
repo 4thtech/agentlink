@@ -59,13 +59,16 @@ export {
   ownerFingerprint,
   type FingerprintForm,
 } from './fingerprint.js';
-// M1-1c: the envelope (04 §3.1, §3.3). Public: structure and encodings, envelopeHash, the AEAD
-// additional data, the signature input and verification, and the CEK and payload operations, which
-// take a per-envelope CEK but no long-term secret (03 §3: KeyStore.hpkeOpen hands the CEK to core).
+// M1-1c: the envelope (04 §3.1, §3.1.1, §3.3). Public: structure, encodings and limits,
+// envelopeHash, the AEAD additional data, the signature input and verification, and the CEK and
+// payload operations, which take a per-envelope CEK but no long-term secret (04 §3.1.1:
+// EnvelopeKeys.unwrapCek hands the CEK to core).
 // Unwrapping a CEK with a recipient's secret key and signing an envelopeHash are in
 // @agentlink/crypto/keystore. The deterministic test seam (testing.ts) is not exported from any entry.
 export {
   AEAD_ALG,
+  AEAD_CT_MAX_ENCODED_LENGTH,
+  AEAD_CT_MAX_LENGTH,
   AEAD_IV_LENGTH,
   AEAD_TAG_LENGTH,
   CEK_LENGTH,
@@ -73,6 +76,7 @@ export {
   ENVELOPE_VERSION,
   HPKE_ENC_LENGTH,
   KID_LENGTH,
+  MAX_RECIPIENTS,
   THREAD_ID_LENGTH,
   WRAPPED_CEK_LENGTH,
   envelopeAad,

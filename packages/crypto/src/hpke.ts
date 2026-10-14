@@ -182,24 +182,28 @@ export async function wrapCek(
 }
 
 /**
- * KeyStore implementations only (@agentlink/crypto/keystore; KeyStore.hpkeOpen, 03 §3): opens one
- * recipient's wrap with that recipient's X25519 secret key and returns the 32-byte CEK. Every
- * failure to open (another recipient, another envelope id, a tampered enc or wk, an all-zero shared
- * secret) is the same `open_failed`. Wipe the CEK when done. Inputs are not modified.
+ * KeyStore implementations only (@agentlink/crypto/keystore): opens one recipient entry with that
+ * recipient's X25519 secret key and returns the 32-byte CEK. The argument order follows
+ * `EnvelopeKeys.unwrapCek(wrapped, envelopeId, {epoch?})` (04 §3.1.1, G-2): it takes the 16-byte
+ * envelope id and builds `info` itself, never an `info` from the caller, so it cannot open an HPKE
+ * seal made for another context (IR-M1-1c-1 F5). It has no epoch: the KeyStore picks the secret key
+ * for the entry's epoch. Every failure to open (another recipient, another envelope id, a tampered
+ * enc or wk, an all-zero shared secret) is the same `open_failed`. Wipe the CEK after the payload
+ * AEAD. Inputs are not modified.
  */
 export async function unwrapCek(
   recipientEncSecretKey: Uint8Array,
-  envelopeId: Uint8Array,
   wrapped: WrappedCek,
+  envelopeId: Uint8Array,
 ): Promise<Uint8Array> {
   assertLength(recipientEncSecretKey, X25519_KEY_LENGTH, 'unwrapCek: recipientEncSecretKey');
-  assertLength(envelopeId, ENVELOPE_ID_LENGTH, 'unwrapCek: envelopeId');
   if (typeof wrapped !== 'object' || wrapped === null) {
     throw new CryptoInputError('invalid_argument', 'unwrapCek: wrapped must be {enc, wk}');
   }
   const { enc, wk } = wrapped;
   assertLength(enc, HPKE_ENC_LENGTH, 'unwrapCek: enc');
   assertLength(wk, WRAPPED_CEK_LENGTH, 'unwrapCek: wk');
+  assertLength(envelopeId, ENVELOPE_ID_LENGTH, 'unwrapCek: envelopeId');
   const cek = await hpkeOpen(recipientEncSecretKey, enc, cekInfo(envelopeId), EMPTY, wk);
   if (cek.length !== CEK_LENGTH) {
     wipe(cek);
@@ -307,7 +311,8 @@ async function sealSequence(
 /**
  * Test seam and the opening core: single-shot open (mode Base, sequence number 0) with the
  * recipient's raw X25519 secret key. Refuses an all-zero shared secret before any HPKE work. Every
- * failure to open is `open_failed`. Not exported from any entry; unwrapCek is the public path.
+ * failure to open is `open_failed`. Not exported from any entry (it takes any info); unwrapCek
+ * is the only path a KeyStore exposes.
  */
 export async function hpkeOpen(
   recipientSecretKey: Uint8Array,

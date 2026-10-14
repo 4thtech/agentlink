@@ -3,7 +3,9 @@
 //
 // Every function that reads an envelope first parses it strictly (04 §2.4.1): unknown or missing
 // keys, a wrong type, a non-canonical encoding or a wrong byte length is refused with
-// `invalid_envelope`, never normalised. Parsing reads each value once into a fresh frozen copy, and
+// `invalid_envelope`, never normalised. The parser also enforces the 04 §3.1.1 limits it owns
+// (G-2): 1 to 8 recipients with distinct `kid`s, checked before any entry is read, and `aead.ct` of
+// at most 17 152 bytes, checked on the string before decoding. Parsing reads each value once into a fresh frozen copy, and
 // the hash, the AAD and the signature check all work on that copy, so an input changed afterwards
 // (or a getter) cannot make what is checked differ from what is hashed.
 //
@@ -38,6 +40,15 @@ export const AEAD_ALG = 'A256GCM';
 export const AEAD_IV_LENGTH = 12;
 /** Raw byte length of the GCM tag at the end of `aead.ct`. */
 export const AEAD_TAG_LENGTH = 16;
+/** 04 §3.1.1 (G-2): at most 8 recipient entries, each with a distinct `kid`. */
+export const MAX_RECIPIENTS = 8;
+/**
+ * 04 §3.1.1 (G-2): `aead.ct` decodes to at most 17 152 bytes (payload plaintext ≤ 17 136 bytes), so
+ * every envelope that passes the parser fits the 24 576-byte envelope limit as JCS.
+ */
+export const AEAD_CT_MAX_LENGTH = 17_152;
+/** The base64url length (no padding) of AEAD_CT_MAX_LENGTH bytes, checked before decoding. */
+export const AEAD_CT_MAX_ENCODED_LENGTH = 22_870;
 
 /** One recipient entry; every value base64url without padding (04 §2.4.1). */
 export interface EnvelopeRecipient {
@@ -64,7 +75,7 @@ export interface EnvelopeHeader {
   readonly from: string;
   /** Unix seconds: an integer in [0, 2^53 - 1]. */
   readonly createdAt: number;
-  /** At least one; the order is covered by the AAD and the hash. */
+  /** 1 to 8, with distinct `kid`s; the order is covered by the AAD and the hash. */
   readonly recipients: readonly EnvelopeRecipient[];
 }
 
@@ -118,11 +129,11 @@ function readObject<K extends string>(
   return out;
 }
 
-/** A base64url string (no padding) that decodes to exactly `length` bytes, or at least `minimum`. */
+/** A base64url string (no padding) that decodes to exactly `length` bytes, or minimum..maximum. */
 function readBase64url(
   value: unknown,
   what: string,
-  size: { length: number } | { minimum: number },
+  size: { length: number } | { minimum: number; maximum: number },
 ): string {
   if (typeof value !== 'string') refuse(`${what} must be a string`);
   let bytes: Uint8Array;
@@ -131,7 +142,11 @@ function readBase64url(
   } catch {
     refuse(`${what} must be base64url without padding`);
   }
-  if ('length' in size ? bytes.length !== size.length : bytes.length < size.minimum) {
+  if (
+    'length' in size
+      ? bytes.length !== size.length
+      : bytes.length < size.minimum || bytes.length > size.maximum
+  ) {
     refuse(`${what} has the wrong byte length`);
   }
   return value;
@@ -148,28 +163,44 @@ function readHex(value: unknown, what: string, length: number): string {
   return value;
 }
 
+/**
+ * `aead.ct`: 16 to 17 152 decoded bytes (04 §3.1.1, G-2). The length of the string is checked before
+ * it is decoded, so an oversized `ct` costs no decoding. The envelope's own 24 576-byte limit, and
+ * the relay frame limit, are checked on the raw text before JSON.parse by the transport (M1-5a/b).
+ */
+function readCiphertext(value: unknown): string {
+  if (typeof value !== 'string') refuse('aead.ct must be a string');
+  if (value.length > AEAD_CT_MAX_ENCODED_LENGTH) refuse('aead.ct is longer than 17152 bytes');
+  // 22 870 characters decode to at most 17 152 bytes; the maximum is the rule itself.
+  return readBase64url(value, 'aead.ct', { minimum: AEAD_TAG_LENGTH, maximum: AEAD_CT_MAX_LENGTH });
+}
+
 function readRecipients(value: unknown): readonly EnvelopeRecipient[] {
   if (!Array.isArray(value)) refuse('recipients must be an array');
   const prototype: unknown = Object.getPrototypeOf(value);
   if (prototype !== Array.prototype) refuse('recipients must be a plain JSON array');
   const length = value.length;
-  // TODO(G-2): an upper bound on the recipient count comes from the G-2 spec work; none is
-  // invented here (IR-M1-1c-1 F3).
-  if (length === 0) refuse('recipients must not be empty');
+  // 04 §3.1.1 (G-2): checked on the length before any entry is read.
+  if (length < 1 || length > MAX_RECIPIENTS) refuse('recipients must have 1 to 8 entries');
   // Own index properties 0..length-1 and `length`, nothing else: no holes, no extra properties.
   if (Object.getOwnPropertyNames(value).length !== length + 1) {
     refuse('recipients must be a dense JSON array');
   }
   const out: EnvelopeRecipient[] = [];
+  const kids = new Set<string>();
   for (let index = 0; index < length; index += 1) {
     const descriptor = Object.getOwnPropertyDescriptor(value, index);
     if (descriptor === undefined || !('value' in descriptor)) {
       refuse('recipients must be a dense JSON array');
     }
     const entry = readObject(descriptor.value, RECIPIENT_KEYS, 'a recipient');
+    const kid = readBase64url(entry.kid, 'kid', { length: KID_LENGTH });
+    // The canonical encoding is unique (04 §2.4.1), so equal bytes are equal strings.
+    if (kids.has(kid)) refuse('recipients must have distinct kids');
+    kids.add(kid);
     out.push(
       Object.freeze({
-        kid: readBase64url(entry.kid, 'kid', { length: KID_LENGTH }),
+        kid,
         enc: readBase64url(entry.enc, 'enc', { length: HPKE_ENC_LENGTH }),
         wk: readBase64url(entry.wk, 'wk', { length: WRAPPED_CEK_LENGTH }),
       }),
@@ -200,9 +231,7 @@ function readAead(value: unknown): EnvelopeAead {
   return Object.freeze({
     alg: AEAD_ALG,
     iv: readBase64url(raw.iv, 'aead.iv', { length: AEAD_IV_LENGTH }),
-    // TODO(G-2): the maximum `ct` size (and the raw envelope byte cap, checked before JSON.parse)
-    // comes from the G-2 spec work; none is invented here (IR-M1-1c-1 F3).
-    ct: readBase64url(raw.ct, 'aead.ct', { minimum: AEAD_TAG_LENGTH }),
+    ct: readCiphertext(raw.ct),
   });
 }
 
@@ -250,8 +279,9 @@ function headerPart(header: EnvelopeHeader): EnvelopeHeader {
 }
 
 /**
- * 04 §3.1: envelopeHash = sha256(JCS(envelope without "sig")), the value notarized on-chain.
- * Takes a signed or an unsigned envelope; either is parsed strictly first.
+ * 04 §3.1, §3.1.1: envelopeHash = sha256(JCS(envelope without "sig")), the value notarized on-chain.
+ * Takes a signed or an unsigned envelope; either is parsed strictly first, and the hash is computed
+ * from the parsed copy, so what is hashed is what was checked.
  */
 export function envelopeHash(envelope: UnsignedEnvelope | Envelope): Uint8Array {
   return sha256(canonicalizeToBytes(unsignedPart(parseSignedOrUnsignedEnvelope(envelope))));
@@ -287,10 +317,12 @@ export function envelopeSignatureInput(envelopeHash: Uint8Array): Uint8Array {
 }
 
 /**
- * Verifies `sig` as BIP-340 by `from` over envelopeSignatureInput(envelopeHash(envelope)) (04 §3.1).
- * Throws `invalid_envelope` for an envelope that does not parse strictly; returns false for a
- * signature that does not verify, including a `from` that is not an x-only key on the curve.
- * Binding `from` to an agent card (04 §3.4.1) is the caller's step.
+ * Verifies `sig` as BIP-340 by `from` over envelopeSignatureInput(envelopeHash(envelope)): steps 3
+ * and 4 of 04 §3.1.1. Throws `invalid_envelope` for an envelope that does not parse strictly
+ * (including the recipient and `ct` limits); returns false for a signature that does not verify,
+ * including a `from` that does not lift to a curve point. Only the envelope tag is tried: a
+ * signature over the untagged envelopeHash, another tag or a NIP-01 id never verifies. Binding
+ * `from` to a card, the type ↔ key table and steps 5 to 9 are the caller's (core, M1-7b).
  */
 export function verifyEnvelope(envelope: Envelope): boolean {
   const parsed = parseEnvelope(envelope);
@@ -299,9 +331,13 @@ export function verifyEnvelope(envelope: Envelope): boolean {
 }
 
 /**
- * KeyStore implementations only (@agentlink/crypto/keystore): the 64-byte BIP-340 signature of
- * envelopeSignatureInput(envelopeHash) under the agent's Nostr secret key. `auxRand` is for test
- * vectors only; production callers omit it. Attach it as `sig: encodeHex(signature)`.
+ * KeyStore and OwnerSession implementations only (@agentlink/crypto/keystore;
+ * EnvelopeKeys.signEnvelopeHash, 04 §3.1.1): the 64-byte BIP-340 signature of
+ * envelopeSignatureInput(envelopeHash) under the Nostr secret key of `from` (the agent key at its
+ * current epoch, or the owner key for `approval`, `policy` and `revoke`). It applies the tag itself,
+ * so it never signs an untagged digest. Compute envelopeHash from the parsed envelope. `auxRand` is
+ * for test vectors only; production callers omit it and get 32 fresh CSPRNG bytes. Attach the
+ * result as `sig: encodeHex(signature)`.
  */
 export function signEnvelopeHash(
   secretKey: Uint8Array,

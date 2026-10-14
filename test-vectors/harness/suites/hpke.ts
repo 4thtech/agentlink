@@ -120,11 +120,11 @@ async function evaluateInput(input: HpkeInput): Promise<readonly Comparison[]> {
     case 'unwrapCek': {
       const cek = await unwrapCek(
         hexToBytes(input.recipientSecretKey),
-        decodeBase64url(input.envelopeId),
         {
           enc: decodeBase64url(input.enc),
           wk: decodeBase64url(input.wk),
         },
+        decodeBase64url(input.envelopeId),
       );
       return [{ field: 'cek', actual: bytesToHex(cek) }];
     }

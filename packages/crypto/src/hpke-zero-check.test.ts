@@ -104,10 +104,10 @@ describe('RFC 9180 §7.1.4: our all-zero shared-secret check', () => {
     const id = randomBytes(16);
     const wrapped = await wrapCek(recipient.publicKey, id, randomBytes(32));
     // The wrap is valid: without the shim it opens.
-    expect(await unwrapCek(recipient.secretKey, id, wrapped)).toHaveLength(32);
+    expect(await unwrapCek(recipient.secretKey, wrapped, id)).toHaveLength(32);
     vi.mocked(x25519.getSharedSecret).mockReturnValueOnce(new Uint8Array(32));
     watchHpkeAndWebCrypto();
-    const error = await refusal(() => unwrapCek(recipient.secretKey, id, wrapped));
+    const error = await refusal(() => unwrapCek(recipient.secretKey, wrapped, id));
     expect(error.code).toBe('open_failed');
     expectNoHpkeOrWebCryptoWork();
   });
@@ -143,7 +143,7 @@ describe('RFC 9180 §7.1.4: our all-zero shared-secret check', () => {
       const wrapError = await refusal(() => wrapCek(point, randomBytes(16), randomBytes(32)));
       expect(wrapError.code).toBe('invalid_public_key');
       const unwrapError = await refusal(() =>
-        unwrapCek(recipient.secretKey, randomBytes(16), { enc: point, wk: randomBytes(48) }),
+        unwrapCek(recipient.secretKey, { enc: point, wk: randomBytes(48) }, randomBytes(16)),
       );
       expect(unwrapError.code).toBe('open_failed');
       expectNoHpkeOrWebCryptoWork();

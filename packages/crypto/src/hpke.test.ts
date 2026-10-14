@@ -77,7 +77,24 @@ describe('wrapCek and unwrapCek', () => {
     const wrapped = await wrapCek(recipient.publicKey, id, cek);
     expect(wrapped.enc).toHaveLength(32);
     expect(wrapped.wk).toHaveLength(48);
-    expect(await unwrapCek(recipient.secretKey, id, wrapped)).toEqual(cek);
+    expect(await unwrapCek(recipient.secretKey, wrapped, id)).toEqual(cek);
+  });
+
+  it('takes (secretKey, wrapped, envelopeId) and builds info itself (04 §3.1.1, IR-M1-1c-1 F5)', async () => {
+    const recipient = x25519Pair();
+    const id = randomBytes(16);
+    const wrapped = await wrapCek(recipient.publicKey, id, randomBytes(32));
+    // The argument order of EnvelopeKeys.unwrapCek(wrapped, envelopeId), after the raw key; no
+    // info and no epoch (the KeyStore picks the key for an epoch, M1-1g).
+    expect(unwrapCek.length).toBe(3);
+    // @ts-expect-error the envelope id comes last; the old (secretKey, id, wrapped) order is refused
+    const error = await refusal(() => unwrapCek(recipient.secretKey, id, wrapped));
+    expect(error.code).toBe('invalid_argument');
+    // An info in place of the id is refused before any HPKE work: it is not 16 bytes.
+    const info = cekInfo(id);
+    expect((await refusal(() => unwrapCek(recipient.secretKey, wrapped, info))).code).toBe(
+      'invalid_length',
+    );
   });
 
   it('uses a fresh ephemeral key for every seal', async () => {
@@ -117,7 +134,7 @@ describe('wrapCek and unwrapCek', () => {
     const b = await wrapCekWithEphemeralKey(recipient.publicKey, id, cek, ephemeral.secretKey);
     expect(a.enc).toEqual(ephemeral.publicKey);
     expect(a).toEqual(b);
-    expect(await unwrapCek(recipient.secretKey, id, a)).toEqual(cek);
+    expect(await unwrapCek(recipient.secretKey, a, id)).toEqual(cek);
   });
 
   it('fails for another recipient, another envelope id and any tampered byte', async () => {
@@ -130,11 +147,11 @@ describe('wrapCek and unwrapCek', () => {
       return copy;
     };
     const attempts: (() => Promise<unknown>)[] = [
-      () => unwrapCek(x25519Pair().secretKey, id, wrapped),
-      () => unwrapCek(recipient.secretKey, randomBytes(16), wrapped),
-      () => unwrapCek(recipient.secretKey, id, { enc: flip(wrapped.enc, 0), wk: wrapped.wk }),
-      () => unwrapCek(recipient.secretKey, id, { enc: wrapped.enc, wk: flip(wrapped.wk, 0) }),
-      () => unwrapCek(recipient.secretKey, id, { enc: wrapped.enc, wk: flip(wrapped.wk, 47) }),
+      () => unwrapCek(x25519Pair().secretKey, wrapped, id),
+      () => unwrapCek(recipient.secretKey, wrapped, randomBytes(16)),
+      () => unwrapCek(recipient.secretKey, { enc: flip(wrapped.enc, 0), wk: wrapped.wk }, id),
+      () => unwrapCek(recipient.secretKey, { enc: wrapped.enc, wk: flip(wrapped.wk, 0) }, id),
+      () => unwrapCek(recipient.secretKey, { enc: wrapped.enc, wk: flip(wrapped.wk, 47) }, id),
     ];
     for (const attempt of attempts) expect((await refusal(attempt)).code).toBe('open_failed');
   });
@@ -150,7 +167,7 @@ describe('wrapCek and unwrapCek', () => {
     const recipient = x25519Pair();
     for (const point of SMALL_ORDER) {
       const wrapped = { enc: point, wk: randomBytes(48) };
-      const error = await refusal(() => unwrapCek(recipient.secretKey, randomBytes(16), wrapped));
+      const error = await refusal(() => unwrapCek(recipient.secretKey, wrapped, randomBytes(16)));
       expect(error.code).toBe('open_failed');
     }
   });
@@ -166,20 +183,20 @@ describe('wrapCek and unwrapCek', () => {
       () => wrapCek(r.publicKey, randomBytes(17), cek),
       () => wrapCek(r.publicKey, id, randomBytes(31)),
       () => wrapCek(r.publicKey, id, randomBytes(33)),
-      () => unwrapCek(randomBytes(31), id, ok),
-      () => unwrapCek(r.secretKey, randomBytes(15), ok),
-      () => unwrapCek(r.secretKey, id, { enc: randomBytes(31), wk: ok.wk }),
-      () => unwrapCek(r.secretKey, id, { enc: ok.enc, wk: ok.wk.subarray(0, 47) }),
-      () => unwrapCek(r.secretKey, id, { enc: ok.enc, wk: concatBytes(ok.wk, new Uint8Array(1)) }),
+      () => unwrapCek(randomBytes(31), ok, id),
+      () => unwrapCek(r.secretKey, ok, randomBytes(15)),
+      () => unwrapCek(r.secretKey, { enc: randomBytes(31), wk: ok.wk }, id),
+      () => unwrapCek(r.secretKey, { enc: ok.enc, wk: ok.wk.subarray(0, 47) }, id),
+      () => unwrapCek(r.secretKey, { enc: ok.enc, wk: concatBytes(ok.wk, new Uint8Array(1)) }, id),
     ];
     for (const attempt of lengthCases) expect((await refusal(attempt)).code).toBe('invalid_length');
     const notBytes = 'x' as unknown as Uint8Array;
     for (const attempt of [
       () => wrapCek(notBytes, id, cek),
       () => wrapCek(r.publicKey, id, notBytes),
-      () => unwrapCek(notBytes, id, ok),
-      () => unwrapCek(r.secretKey, id, { enc: notBytes, wk: ok.wk }),
-      () => unwrapCek(r.secretKey, id, null as unknown as typeof ok),
+      () => unwrapCek(notBytes, ok, id),
+      () => unwrapCek(r.secretKey, { enc: notBytes, wk: ok.wk }, id),
+      () => unwrapCek(r.secretKey, null as unknown as typeof ok, id),
     ]) {
       expect((await refusal(attempt)).code).toBe('invalid_argument');
     }
@@ -191,7 +208,7 @@ describe('wrapCek and unwrapCek', () => {
     const cek = randomBytes(32);
     const [skCopy, cekCopy] = [r.secretKey.slice(), cek.slice()];
     const wrapped = await wrapCek(r.publicKey, id, cek);
-    await unwrapCek(r.secretKey, id, wrapped);
+    await unwrapCek(r.secretKey, wrapped, id);
     expect(r.secretKey).toEqual(skCopy);
     expect(cek).toEqual(cekCopy);
   });
@@ -201,8 +218,8 @@ describe('wrapCek and unwrapCek', () => {
     const id = randomBytes(16);
     const wrapped = await wrapCek(r.publicKey, id, randomBytes(32));
     const errors = [
-      await refusal(() => unwrapCek(x25519Pair().secretKey, id, wrapped)),
-      await refusal(() => unwrapCek(r.secretKey, id, { enc: SMALL_ORDER[0]!, wk: wrapped.wk })),
+      await refusal(() => unwrapCek(x25519Pair().secretKey, wrapped, id)),
+      await refusal(() => unwrapCek(r.secretKey, { enc: SMALL_ORDER[0]!, wk: wrapped.wk }, id)),
       await refusal(() => wrapCek(r.publicKey, id, randomBytes(31))),
     ];
     for (const error of errors) {

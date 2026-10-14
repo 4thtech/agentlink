@@ -4,11 +4,16 @@
 // test-vectors/aead-envelope; these tests pin the API rules around them.
 import { describe, expect, it } from 'vitest';
 import {
+  AEAD_CT_MAX_ENCODED_LENGTH,
+  AEAD_CT_MAX_LENGTH,
   CryptoInputError,
+  MAX_RECIPIENTS,
   TAGS,
+  canonicalize,
   canonicalizeToBytes,
   encodeBase64url,
   encodeHex,
+  encodeUtf8,
   envelopeAad,
   envelopeHash,
   envelopeSignatureInput,
@@ -189,6 +194,95 @@ describe('parseEnvelope: 04 §3.1 structure and §2.4.1 encodings', () => {
   });
 });
 
+describe('parser limits: 1 to 8 recipients with distinct kids, ct ≤ 17 152 bytes (04 §3.1.1, G-2)', () => {
+  const entry = (): Json => ({ kid: b64(16), enc: b64(32), wk: b64(48) });
+  const entries = (count: number): Json[] => Array.from({ length: count }, entry);
+  const base = sampleSigned();
+
+  it('fixes the limits of the 04 §3.1.1 table', () => {
+    expect(MAX_RECIPIENTS).toBe(8);
+    expect(AEAD_CT_MAX_LENGTH).toBe(17_152);
+    // The base64url length of 17 152 bytes, without padding.
+    expect(AEAD_CT_MAX_ENCODED_LENGTH).toBe(22_870);
+    expect(b64(AEAD_CT_MAX_LENGTH)).toHaveLength(AEAD_CT_MAX_ENCODED_LENGTH);
+  });
+
+  it('accepts the worst case: 8 recipients, a ct of 17 152 bytes, createdAt 2^53 - 1 (24 509 bytes as JCS)', () => {
+    let worst = changed(base, ['recipients'], entries(8));
+    worst = changed(worst, ['aead', 'ct'], b64(17_152));
+    worst = changed(worst, ['createdAt'], 2 ** 53 - 1);
+    const parsed = parseEnvelope(worst);
+    expect(parsed.recipients).toHaveLength(8);
+    const jcs = canonicalizeToBytes(parsed);
+    expect(jcs.length).toBe(24_509);
+    expect(jcs.length).toBeLessThanOrEqual(24_576);
+    expect(() => parseUnsignedEnvelope(withoutSig(worst))).not.toThrow();
+    expect(() => envelopeHash(worst as unknown as Envelope)).not.toThrow();
+  });
+
+  const twins = entries(4);
+  twins[3] = { ...twins[3], kid: twins[0]!.kid };
+  const limitCases: [string, Json][] = [
+    ['9 recipients', changed(base, ['recipients'], entries(9))],
+    ['100 recipients', changed(base, ['recipients'], entries(100))],
+    ['a ct of 17 153 bytes', changed(base, ['aead', 'ct'], b64(17_153))],
+    ['a ct of 22 871 characters', changed(base, ['aead', 'ct'], 'A'.repeat(22_871))],
+    ['two recipients with the same kid', changed(base, ['recipients'], twins)],
+    [
+      'two identical recipients',
+      changed(base, ['recipients'], [twins[0], twins[1], { ...twins[0] }]),
+    ],
+  ];
+  it.each(limitCases)('rejects %s', (_name, envelope) => {
+    expect(refusal(() => parseEnvelope(envelope)).code).toBe('invalid_envelope');
+    expect(refusal(() => parseUnsignedEnvelope(withoutSig(envelope))).code).toBe(
+      'invalid_envelope',
+    );
+    expect(refusal(() => envelopeHash(envelope as unknown as Envelope)).code).toBe(
+      'invalid_envelope',
+    );
+    expect(refusal(() => verifyEnvelope(envelope as unknown as Envelope)).code).toBe(
+      'invalid_envelope',
+    );
+  });
+
+  it('applies the recipient limits to the header alone too', () => {
+    const header = withoutSig(changed(base, ['recipients'], entries(9)));
+    delete header.aead;
+    expect(refusal(() => parseEnvelopeHeader(header)).code).toBe('invalid_envelope');
+    expect(refusal(() => envelopeAad(header as unknown as EnvelopeHeader)).code).toBe(
+      'invalid_envelope',
+    );
+    const twinHeader = withoutSig(changed(base, ['recipients'], twins));
+    delete twinHeader.aead;
+    expect(refusal(() => parseEnvelopeHeader(twinHeader)).code).toBe('invalid_envelope');
+  });
+
+  it('checks the ct length on the string, before decoding it', () => {
+    // Not base64url at all: a parser that decoded first would report the encoding instead.
+    for (const ct of ['!'.repeat(22_871), '!'.repeat(1_000_000)]) {
+      const error = refusal(() => parseEnvelope(changed(base, ['aead', 'ct'], ct)));
+      expect(error.code).toBe('invalid_envelope');
+      expect(error.message).toMatch(/aead\.ct is longer than 17152 bytes/);
+    }
+    // At the limit, the encoding is still checked.
+    const error = refusal(() => parseEnvelope(changed(base, ['aead', 'ct'], '!'.repeat(22_870))));
+    expect(error.message).toMatch(/aead\.ct must be base64url/);
+  });
+
+  it('checks the recipient count before reading any entry', () => {
+    const nine = changed(
+      base,
+      ['recipients'],
+      Array.from({ length: 9 }, () => null),
+    );
+    expect(refusal(() => parseEnvelope(nine)).message).toMatch(/recipients must have 1 to 8/);
+    const huge = changed(base, ['recipients'], []);
+    (huge.recipients as unknown[]).length = 1_000_000;
+    expect(refusal(() => parseEnvelope(huge)).message).toMatch(/recipients must have 1 to 8/);
+  });
+});
+
 describe('parseUnsignedEnvelope and parseEnvelopeHeader', () => {
   it('parseUnsignedEnvelope accepts an envelope without sig and refuses one with sig', () => {
     const unsigned = sampleUnsigned();
@@ -329,14 +423,20 @@ describe('envelope signature: BIP-340 over taggedHash("agentlink/envelope/v1", e
     }
   });
 
-  it('rejects another signer, the untagged hash and the owner-action tag', () => {
+  it('rejects another signer, the untagged hash, the owner-action tag and a NIP-01 id', () => {
     const other = randomBytes(32);
     const unsigned = sampleUnsigned(encodeHex(bip340PublicKey(SECRET)));
     const digest = envelopeHash(unsigned as unknown as UnsignedEnvelope);
+    // The NIP-01 id of a kind 14 rumor carrying this envelope (04 §3.1.1 domain table).
+    const from = unsigned.from as string;
+    const content = canonicalize(unsigned);
+    const event = [0, from, unsigned.createdAt, 14, [['agentlink', '1']], content];
+    const nip01Id = sha256(encodeUtf8(JSON.stringify(event)));
     const sigs = [
       bip340Sign(other, envelopeSignatureInput(digest)),
       bip340Sign(SECRET, digest),
       bip340Sign(SECRET, taggedHash(TAGS.ownerAction, digest)),
+      bip340Sign(SECRET, nip01Id),
     ];
     for (const sig of sigs) {
       expect(verifyEnvelope({ ...unsigned, sig: encodeHex(sig) } as unknown as Envelope)).toBe(
