@@ -247,6 +247,93 @@ jobs:
             exit 1
           fi
 
+  # M1-8a-b: the real-keychain suite (packages/node/src/keychain-native.test.ts) on the three OS
+  # keychains: macOS Keychain, Windows Credential Manager and the Linux Secret Service
+  # (gnome-keyring in a headless D-Bus session). AGENTLINK_REQUIRE_KEYCHAIN=1 turns a failed
+  # keychain probe into a failed test instead of a skip, so a runner without a working keychain
+  # cannot pass green. The suite writes only under a random `agentlink-test-*` service on the
+  # ephemeral runner and deletes it afterwards. Not part of `ci-gate` on purpose: adding it to the
+  # required checks is the owner's call (backlog M1-8a-b); the way to do it is to list `keychain`
+  # in `ci-gate`'s `needs` (the ruleset keeps naming only the four gates).
+  keychain:
+    name: keychain (${{ matrix.os }})
+    needs: detect
+    if: needs.detect.outputs.has_skeleton == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    env:
+      AGENTLINK_REQUIRE_KEYCHAIN: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Choose the test report path
+        shell: bash
+        run: echo "KEYCHAIN_REPORT=$RUNNER_TEMP/keychain-vitest.json" >> "$GITHUB_ENV"
+
+      # Secret Service for @napi-rs/keyring (libsecret): gnome-keyring and a session bus. The
+      # keyring itself is started and unlocked in the test step, inside the D-Bus session.
+      - name: Install gnome-keyring and D-Bus (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 dbus
+
+      # The workspace dependencies of @agentlink/node (core, crypto) are consumed from dist/.
+      - name: Build the workspace dependencies of @agentlink/node
+        shell: bash
+        run: pnpm exec turbo run build --filter='@agentlink/node^...'
+
+      - name: Run the @agentlink/node tests against the real keychain (macOS, Windows)
+        if: runner.os != 'Linux'
+        shell: bash
+        run: pnpm --filter @agentlink/node exec vitest run --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
+
+      # A fresh D-Bus session, then gnome-keyring started with --unlock, which creates and unlocks
+      # the default ("login") collection from a throwaway password read on stdin (random per run,
+      # never printed; the runner is ephemeral).
+      - name: Run the @agentlink/node tests against the real keychain (Linux, gnome-keyring)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          export KEYRING_PASSWORD="$(openssl rand -hex 16)"
+          dbus-run-session -- bash -euo pipefail -c '
+            eval "$(printf "%s" "$KEYRING_PASSWORD" | gnome-keyring-daemon --unlock --components=secrets)"
+            export GNOME_KEYRING_CONTROL
+            unset KEYRING_PASSWORD
+            pnpm --filter @agentlink/node exec vitest run --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
+          '
+
+      # "Runs with no skipped test" (M1-8a-b acceptance): the keychain suite must have run and
+      # passed in full on this OS. Other files of the package may skip tests of their own; the
+      # keychain file may not.
+      - name: Check that keychain-native.test.ts ran in full, with no skipped test
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e '
+            const report = JSON.parse(require("node:fs").readFileSync(process.env.KEYCHAIN_REPORT, "utf8"));
+            const files = report.testResults.filter((f) => /keychain-native\.test\.ts$/.test(f.name.replace(/\\/g, "/")));
+            if (files.length !== 1) { console.error("::error::keychain-native.test.ts did not run"); process.exit(1); }
+            const tests = files[0].assertionResults;
+            const bad = tests.filter((t) => t.status !== "passed");
+            console.log(`keychain-native.test.ts: ${tests.length} tests, ${bad.length} not passed`);
+            if (tests.length < 3 || bad.length > 0) { console.error("::error::keychain-native.test.ts must run at least 3 tests, all passed (none skipped)"); process.exit(1); }
+          '
+
   # AGENTS.md and CLAUDE.md are auto-loaded into every agent session, so they have hard
   # size budgets to keep context lean. Plain shell, no Node skeleton needed: this job runs
   # on a docs-only repository too and does not depend on `detect`. A missing file passes.
