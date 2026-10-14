@@ -298,6 +298,20 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - A regression test per item, red before the fix (negative control recorded in the PR).
   - A quadratic mutant of the scanner turns the L3 test red.
 
+#### M0-8c · Logger hardening, round 2 follow-ups (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · packages/log
+- **Depends on:** M0-8b
+- **Spec:** 04 §1 I-7, §8 rule 4; review IR-M0-8b-1, round 2 (findings R2-L2 and R2-L4, both Low)
+- **Invariants:** I-7
+- **Scope:**
+  - R2-L2: an apostrophe inside an object or array value (`secret=[don't ...]`) opens a string that never closes, so the rest of the string is redacted (over-redaction; it fails safe). Track `'` as a string quote only where JSON-like input can have one: after a `{`, `[`, `,` or `:` (a Python-style repr), not inside running text. Keep the fail-closed end of the value when a real string is unclosed.
+  - R2-L4: a JSON-escaped protocol-relative URL (`\/\/host\/v2\/KEY`) is not reduced to its host. Handle it with the same rules as `//host/path`, keeping the escaped-quote and drive-letter guards from M0-8b.
+  - Optional, from the same review: scheme-less URLs under a URL-named key inside strings (`rpcUrl=host.tld/v2/KEY`) get the field rule (origin or `[REDACTED]`); `upload` joins the capability words that redact a URL-named field whole (`uploadUrl`).
+- **Acceptance:**
+  - A regression test per item, red before the fix.
+  - The M0-8b worst-case work bounds and the no-unbounded-quantifier test still pass.
+
 #### M0-9 · Cross-runtime test-vector harness (new)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/

@@ -206,6 +206,28 @@ const PROTOCOL_RELATIVE = /(^|[^\w:/\\])\/\/([^\s/\\?#"'<>`]+)[^\s"'<>`]*/g;
 const ENCODED_URL =
   /\b(https?|wss?)(%(?:25)?3A%(?:25)?2F%(?:25)?2F)([A-Za-z0-9.-]{1,253}(?:%(?:25)?3A[0-9]{1,5})?)[^\s"'<>`&]*/gi;
 
+// Schemes whose parsers read a backslash as '/' (the WHATWG special schemes).
+const BACKSLASH_SCHEMES: ReadonlySet<string> = new Set([
+  'http',
+  'https',
+  'ws',
+  'wss',
+  'ftp',
+  'file',
+]);
+
+/**
+ * Whether `scheme` + `separator` (as URL_PATTERN found them) is a URL and not other text that has a
+ * colon and backslashes: "failed:\\nretry", or a Windows path ("C:\\Users"). `://` always is;
+ * JSON-escaped slashes (`:\/\/`) are for any scheme but a drive letter; a separator of backslashes
+ * alone is only for the web schemes.
+ */
+function isUrlSeparator(scheme: string, separator: string): boolean {
+  if (separator === '://') return true;
+  if (scheme.length === 1) return false;
+  return separator.includes('/') || BACKSLASH_SCHEMES.has(scheme.toLowerCase());
+}
+
 /** The host part of an authority: user info (everything up to the last '@') is dropped. */
 function host(authority: string): string {
   const at = authority.lastIndexOf('@');
@@ -369,7 +391,8 @@ function bracketedValueEnd(text: string, start: number, level: number, meter: Me
         if (inString === '') inString = char;
         else if (char === inString) inString = '';
       }
-    } else if (inString === '') {
+    } else if (inString === '' && run === 0) {
+      // A bracket after a backslash is escaped (`[a\]b]`): it does not count.
       if (char === '{' || char === '[') {
         depth += 1;
       } else if (char === '}' || char === ']') {
@@ -515,8 +538,7 @@ export const VALUE_PATTERNS: readonly ValuePattern[] = [
 export function stripUrls(text: string): string {
   return text
     .replace(URL_PATTERN, (match, scheme: string, separator: string, authority: string) => {
-      // "C:\\Users": a drive letter and backslashes are a Windows path, not a URL.
-      if (scheme.length === 1 && separator !== '://') return match;
+      if (!isUrlSeparator(scheme, separator)) return match;
       return origin(scheme, authority) + trailingBackslashes(match);
     })
     .replace(
@@ -584,7 +606,8 @@ function urlOrigin(value: unknown): JsonValue {
     return REDACTED;
   }
   const match = WHOLE_URL.exec(text);
-  return match === null ? REDACTED : redactString(origin(match[1]!, match[3]!));
+  if (match === null || !isUrlSeparator(match[1]!, match[2]!)) return REDACTED;
+  return redactString(origin(match[1]!, match[3]!));
 }
 
 /** One named field: the key rule first, then the value (never throws). */
