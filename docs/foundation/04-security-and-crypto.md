@@ -616,7 +616,7 @@ The AAD (§3.1) covers the header only. The hash also covers `aead`, so the sign
    - every entry of a contact's agent or owner whose card the surface holds, as the attribution rules below establish it.
 
    An entry whose key the surface does not hold is not checked and causes no refusal. A mismatch here, or a `kc` mismatch at step 4, means that the sender signed entries that carry different keys. The copy is then shown outside the threads, as refused, and the contact is flagged. The CEK is wiped after this step.
-6. The payload passes step 6 (strict schema) before anything is rendered.
+6. The payload passes verification step 6 below (strict schema) before anything is rendered.
 7. The copy is placed by the attribution rules below. Nothing is shown on an agent's thread before they hold.
 
 **Where the owner shows a copy (I-9).** Anyone can address an envelope to `ownerNostr`, so a decrypted copy is not proof that the owner's agent sent or received it. A surface (the console, the desktop app) shows a copy on one of its agents' threads only when:
@@ -636,8 +636,8 @@ The AAD (§3.1) covers the header only. The hash also covers `aead`, so the sign
 3. **Strict parse** (M1-1c): exact keys and encodings (§2.4.1); 1 to 8 recipients with distinct `kid`s; the `ct` limit.
 4. **Signature.** `from` lifts to a curve point (BIP-340 `lift_x`), and `sig` verifies under `from` over `m` above. Only the envelope tag is tried. An untagged `envelopeHash` and a NIP-01 check are never accepted.
 5. **Own entry.** The core looks for an entry whose `kid` matches one of its own `enc` keys, at any epoch (`getPublicBundle({epoch})`). With none, the envelope is not for this agent. With one, there is exactly one `unwrapCek`, at that entry's epoch, so an envelope never makes the core try more than one HPKE open per local key. If entries match own keys at more than one epoch, the core uses the highest epoch, still with exactly one `unwrapCek`. A failed open or AEAD is dropped (`open_failed`).
-   - The payload decryption checks `kc` before AES-GCM (§3.3). A `kc` mismatch on an envelope whose signature passed step 4 shows that the sender signed a commitment that its own wrap for this agent does not carry. It is treated like a wrap mismatch at step 8: stored as refused, shown in the activity feed, and the contact is flagged. The crypto layer reports a `kc` mismatch and a failed tag as the same `open_failed`; the core tells them apart with the separate commitment check (§3.3).
-   - The core keeps the CEK until step 8 and wipes it there, or at the first failure.
+   - The payload decryption checks `kc` before AES-GCM (§3.3). A `kc` mismatch on an envelope whose signature passed step 4 shows that the sender signed a commitment that its own wrap for this agent does not carry. It is treated like a wrap mismatch at step 8: stored as refused, shown in the activity feed, and the contact is flagged. When `from` is not a contact's key, the refusal is recorded under the requests-queue and spam limits (06; §7), and no contact is flagged. The crypto layer reports a `kc` mismatch and a failed tag as the same `open_failed`; the core tells them apart with the separate commitment check (§3.3).
+   - The core keeps the CEK until step 8 and wipes it there, or at the first failure, or when the envelope is held (step 7). A held envelope never keeps its CEK; the re-run derives it again with a new `unwrapCek`.
 6. **Payload.** The payload passes its strict schema (`@agentlink/types`, M1-2a; `terms` limits M1-21).
 7. **Sender role.** `from` must be the key that the type requires:
    - a contact's agent key: the `agentNostr` of the contact's **current** card. A superseded epoch key is refused, except for `card-update` (§3.4.1), so a key replaced after a compromise cannot keep sending. The refused envelope is stored as refused and shown in the activity feed, never in `agentlink_inbox`. Owner copies stay readable.
@@ -656,7 +656,7 @@ The AAD (§3.1) covers the header only. The hash also covers `aead`, so the sign
    - **always:** its own owner's entry (the `ownerEnc` of its own card), so the check shows that the entry is present **and** carries the committed CEK;
    - **when it holds the sender's card:** the entries of the sender's agent (`agentEnc` at the card's epoch) and of the sender's owner (`ownerEnc`). The sender's card is a contact's current card, or for a `card-update` the card it carries once it has passed §3.4.1, or for the pairing types the card in the body once it has passed §3.6.
 
-   An entry whose key the core does not hold (an arbitrator, or a sender whose card is not yet known) is not checked and causes no refusal. Held envelopes are checked again on a `card-update` (step 7). A mismatch means that the sender signed entries that carry different keys: the envelope is stored as refused, shown in the activity feed, and the contact is flagged. The CEK is then wiped.
+   An entry whose key the core does not hold (an arbitrator, or a sender whose card is not yet known) is not checked and causes no refusal. Held envelopes are checked again on a `card-update` (step 7). A mismatch means that the sender signed entries that carry different keys: the envelope is stored as refused, shown in the activity feed, and the contact is flagged. When `from` is not a contact's key, the refusal is recorded under the requests-queue and spam limits (06; §7), and no contact is flagged. The CEK is then wiped.
 9. **Freshness and uniqueness.** A `createdAt` more than 300 s in the future (`S`, §2.5.1) is refused. An `id` already stored with the same `envelopeHash` is a duplicate and is dropped silently (07 §4.2). An `id` already stored with a different `envelopeHash` is refused, and the contact is flagged in the activity feed. This check covers every envelope still in the store, with no retention cutoff; the 07 §4.2 seen-set only saves work during sync.
 
 Decrypting stored history with an older epoch key stays allowed (§2.6). Only accepting a new envelope from a superseded sender key is refused.
@@ -703,7 +703,7 @@ Decrypting stored history with an older epoch key stays allowed (§2.6). Only ac
 | `agentlink/v1/payload-commit` | `utf8(label) ‖ id` | `kc` | The key commitment, carried in `aead.kc` |
 | `agentlink/v1/cek-eph` | `utf8(label) ‖ id ‖ pk_j` | `ikm_j` | The ephemeral secret key of entry `j` |
 
-The labels are distinct, none is a prefix of another, and every suffix has a fixed length, so `info` is unambiguous. No other derivation takes the CEK as `ikm`. Each derivation has vector cases (M1-1h).
+The labels are distinct, none is a prefix of another, and every suffix has a fixed length, so `info` is unambiguous. No other derivation takes the CEK as `ikm`. Each derivation has vector cases (M1-1l, under the M1-1h rules).
 
 **Payload encryption.** `aead.ct = AES-256-GCM(encKey, iv, AAD, payload)`, with `iv` 12 fresh random bytes and the AAD of §3.1. `aead.kc = kc` and `aead.alg = "A256GCM-KC"`.
 
@@ -727,7 +727,7 @@ The labels are distinct, none is a prefix of another, and every suffix has a fix
 - `kc` is exactly 32 bytes. The sender chooses both keys in an equivocation, so the commitment needs collision resistance; 32 bytes give about 2^128 work.
 
 **Library dependency.**
-- The wraps hand the derived ephemeral key to `@hpke/core` through its `ekm` sender parameter, which the library labels as for debugging and testing only. The code path is the library's standard encapsulation with only the key source replaced, and the merged `wrapCek` already uses it.
+- The wraps hand the derived ephemeral key to `@hpke/core` through its `ekm` sender parameter. `ekm` is given the imported key pair of `skE_j`, never the bytes of `ikm_j`, which the library would route through `DeriveKeyPair`. The library labels this parameter as for debugging and testing only. The code path is the library's standard encapsulation with only the key source replaced, and the merged `wrapCek` already uses it.
 - `@hpke/core` is pinned exactly at 1.9.0, with `@hpke/common` 1.10.1 in the lockfile.
 - **Regression guard.** The `hpke` vector suite guards this path. Its RFC 9180 cases supply the ephemeral key through the same parameter, and its AgentLink derived-ephemeral cases cover the `cek-eph` derivation. Any `@hpke/*` update runs `hpke` and `aead-envelope` in every runtime before it merges.
 - **No fallback.** An update that breaks them stays unmerged until a replacement is reviewed. A hand-built DHKEM would be a custom primitive (I-8).

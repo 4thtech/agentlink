@@ -438,7 +438,7 @@ An XMTP adapter (P2) implements the same interface; envelopes are unchanged.
 
 ### 4.3 Relay lists and owner copies (G-24; D-65, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#51)
 
-An owner has no relay list of its own: a card carries only the agent's `relaysHash` (04 §2.4), and no sender knows where an owner reads. So every wrap goes to the relays of the agent it concerns, and an owner surface reads on the relays of all its agents. Every value in this section is proposed; the owner confirms at merge.
+An owner has no relay list of its own: a card carries only the agent's `relaysHash` (04 §2.4), and no sender knows where an owner reads. So every wrap goes to the relays of the agent it concerns, and an owner surface reads on the relays of all its agents. Every value in this section was accepted by the owner at the merge of 4thtech/agentlink#51 (D-65).
 
 **The rule.**
 - **Publishing.** Each gift wrap is published to the relay list of the agent its recipient key belongs to, or, for an owner key, of the agent whose owner it is in this envelope. When one owner key is the owner of both the sending and the receiving agent (one entry, 04 §3.1.1), its wrap goes to the union of both lists.
