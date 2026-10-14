@@ -13,9 +13,22 @@ const SCRIPT = /^tools\/vectors\/[A-Za-z0-9_-]+\.py$/;
  * @returns {{ problems: string[], argv: string[] | null }} The command to run, or the reasons not to.
  */
 export function generatorCheck(vectorsPath, file, exists) {
-  // RED (expected): implemented in the next commit.
-  void SCRIPT;
-  void file;
-  void exists;
-  throw new Error(`generatorCheck: not implemented yet (${vectorsPath})`);
+  const script = /** @type {{ generator?: { script?: unknown } } | null} */ (file)?.generator
+    ?.script;
+  if (typeof script !== 'string' || script === '') {
+    return { problems: [`${vectorsPath}: generator.script is missing`], argv: null };
+  }
+  if (!SCRIPT.test(script)) {
+    return {
+      problems: [
+        `${vectorsPath}: generator.script must be a Python script directly under tools/vectors/`,
+      ],
+      argv: null,
+    };
+  }
+  if (!exists(script)) {
+    return { problems: [`${vectorsPath}: generator.script does not exist`], argv: null };
+  }
+  // -I: isolated mode, so nothing from the working directory or the environment is imported.
+  return { problems: [], argv: ['python3', '-I', script, '--check', vectorsPath] };
 }

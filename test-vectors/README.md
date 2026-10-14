@@ -6,11 +6,11 @@ Canonical test vectors for AgentLink's crypto and EIP-712 code, and the harness 
 pnpm vectors:check
 ```
 
-This runs every suite in five runtimes: Node (Vitest), Chromium, Firefox and WebKit (Vitest browser mode on Playwright), and workerd (`@cloudflare/vitest-plugin`, the renamed `@cloudflare/vitest-pool-workers`). It fails unless every runtime passes every case. Install the browsers once with `pnpm exec playwright install chromium firefox webkit`.
+This runs `tools/vectors/check.mjs` directly (not through a package script, so no manifest can turn it into a no-op). It runs every suite in five runtimes: Node (Vitest), Chromium, Firefox and WebKit (Vitest browser mode on Playwright), and workerd (`@cloudflare/vitest-plugin`, the renamed `@cloudflare/vitest-pool-workers`). It fails unless every runtime passes every case. Install the browsers once with `pnpm exec playwright install chromium firefox webkit`.
 
 ## Rules
 
-1. **An independent generator produces the vectors.** The generator is a script under `tools/vectors/` that does not use the TypeScript code under test, for example Python's `hashlib`, `openssl`, or a reference implementation in another language. Each file records it in `generator`.
+1. **An independent generator produces the vectors.** The generator is a Python script directly under `tools/vectors/` that does not use the TypeScript code under test, for example Python's `hashlib`, `openssl`, or a reference implementation in another language. Each file records it in `generator.script`. Every generator supports `--check [FILE]`, which writes nothing and exits non-zero unless FILE equals its output. CI runs `node tools/vectors/check-generators.mjs`, which does that for every committed `vectors.json`.
 2. **Vectors are committed, and tests only read them.** No test writes or regenerates a vector file. `pnpm vectors:check` fails if a run creates, changes or deletes anything under `test-vectors/`, and CI checks the same with `git status` afterwards.
 3. **Vectors change only together with a spec change.** Bump the file's `version` in the same PR.
 4. **Every runtime reports its own identity.** Each project in `vitest.config.ts` states the runtime it expects. `harness/runtime.ts` reads the actual runtime from the engine (`navigator.userAgent`, `process.versions.node`, workerd's `WebSocketPair`). A project that silently falls back to Node fails its identity test. `tools/vectors/check.mjs` then requires a passing identity test and a passing result for every committed case in each of `node`, `chromium`, `firefox`, `webkit` and `workerd`. So dropping a runtime from the config also fails the check.
@@ -23,7 +23,7 @@ Each suite has its own directory, `<suite>/`, which holds:
 - `vectors.json`: `{ suite, version, generator: { tool, version, script }, cases[] }`. This is validated against `schema/vector-file.schema.json`. Every case has a unique `id`, a `source` (the publication or spec section), an `input` and an `expected`.
 - `case.schema.json`: the exact shape of this suite's cases.
 
-Each suite also has a module in `harness/suites/`, registered in `harness/suites/index.ts`. The module runs one case through the code under test and returns the computed values. `harness/vectors.test.ts` compares them with `expected` in the same way for every suite.
+Each suite also has a module in `harness/suites/`, registered in `harness/suites/index.ts`. The module runs one case through the code under test and returns `{ field, actual }` for every field of the case's `expected`. It never supplies expected values. `harness/compare.ts` reads them from the committed vector and requires exactly the expected fields, no more and no fewer, in the same way for every suite. A suite with no cases fails.
 
 ## Suites
 
@@ -44,7 +44,7 @@ Each suite also has a module in `harness/suites/`, registered in `harness/suites
 
 ## Adding a suite
 
-1. Write the generator under `tools/vectors/`. It must not import repository TypeScript. Where published values exist, cross-check against them.
+1. Write the generator under `tools/vectors/`, with `--write` and `--check [FILE]`. It must not import repository TypeScript. Where published values exist, cross-check against them.
 2. Run it once to write `<suite>/vectors.json`. Add `<suite>/case.schema.json`.
 3. Add the suite module under `harness/suites/` and register it.
-4. Commit the failing tests first (S2), then the implementation. Record the negative control: mutate one vector, and every runtime fails.
+4. Commit the failing tests first (S2), then the implementation. Record the negative control: mutate one vector, and every runtime fails. Step-by-step: runbook RB-06 (`docs/runbooks/test-vectors.md`).

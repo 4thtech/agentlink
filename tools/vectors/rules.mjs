@@ -47,6 +47,11 @@ export function checkCoverage(report, suites, required = REQUIRED_RUNTIMES) {
     }
   }
 
+  // A suite with no cases (or no readable cases array) proves nothing (IR-M0-9-1 F04).
+  for (const { suite, caseIds } of suites) {
+    if (!Array.isArray(caseIds) || caseIds.length === 0) problems.push(`${suite}: no cases`);
+  }
+
   for (const runtime of required) {
     if (!passed.has(`${runtime}\u0000identity`)) {
       problems.push(`${runtime}: no passing runtime identity test`);

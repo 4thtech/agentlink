@@ -62,8 +62,12 @@ for (const { directory, file } of vectorFiles) {
           caseId: testCase.id,
         };
         if (suite === undefined) throw new Error(`no suite module for "${file.suite}"`);
-        // Expected values come from the committed vector only; the suite returns what it computed.
-        const problems = compareToVector(testCase.expected, await suite.evaluate(testCase));
+        // The suite gets only the id and input; the expected values come from the committed vector
+        // and are compared here (IR-M0-9-1 F03).
+        const computed = await suite.evaluate(
+          Object.freeze({ id: testCase.id, input: testCase.input }),
+        );
+        const problems = compareToVector(testCase.expected, computed);
         expect(problems, testCase.source).toEqual([]);
       });
     }
