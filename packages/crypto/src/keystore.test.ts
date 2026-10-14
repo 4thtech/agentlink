@@ -13,6 +13,9 @@ const SEED_OR_SECRET = [
   'derivePublicIdentity',
   'bip340Sign',
   'bip340PublicKey',
+  // M1-1c: HPKE open of a CEK with the recipient's secret key, and envelope-hash signing.
+  'unwrapCek',
+  'signEnvelopeHash',
   // M1-1e (IR-M1-1e-1 M-1): ECDSA signing with a secret key.
   'signDigestEcdsa',
   'signTypedData',
@@ -34,8 +37,14 @@ const SEED_OR_SECRET = [
   'keystoreSecretUnlocks',
 ];
 
-// M1-1f: the deterministic test seam (fixed nonce for ALKS and ALKO, Argon2id with K and X).
+// The one deterministic test seam (@agentlink/crypto/testing, never built or exported).
 const TEST_SEAM = [
+  // M1-1c: fixed HPKE ephemeral key or AES-GCM IV, and the raw RFC 9180 suite.
+  'wrapCekWithEphemeralKey',
+  'encryptPayloadWithIv',
+  'hpkeSealSequence',
+  'hpkeOpen',
+  // M1-1f: fixed nonce for ALKS and ALKO, Argon2id with K and X.
   'argon2idWithSecretAndAd',
   'sealKeystoreFileWithNonce',
   'sealOwnerSeedWithNonce',
@@ -67,6 +76,20 @@ describe('@agentlink/crypto/keystore', () => {
       'agentFingerprint',
       'formatFingerprint',
       'KEY_LABELS',
+      // M1-1c: envelope structure, hashes and verification, and the CEK and payload operations,
+      // which take a per-envelope CEK but no long-term secret (04 §3.1.1: unwrapCek returns the CEK).
+      'parseEnvelope',
+      'parseUnsignedEnvelope',
+      'parseEnvelopeHeader',
+      'envelopeHash',
+      'envelopeAad',
+      'envelopeSignatureInput',
+      'verifyEnvelope',
+      'cekInfo',
+      'wrapCek',
+      'generateCek',
+      'encryptPayload',
+      'decryptPayload',
       'recoverEvmAddress',
       'decodeEcdsaSignature',
       'hashTypedData',
@@ -101,7 +124,7 @@ describe('@agentlink/crypto/keystore', () => {
     });
   });
 
-  it('exports the deterministic test seam from no entry point (M1-1f)', async () => {
+  it('exports the deterministic test seam from no entry point (M1-1c, M1-1f)', async () => {
     const seam = await import('./testing.js');
     expect(Object.keys(seam).sort()).toEqual([...TEST_SEAM].sort());
     for (const name of TEST_SEAM) {

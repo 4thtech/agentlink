@@ -16,9 +16,13 @@ const BOUNDARY = new Set([
 ]);
 
 let eslint;
-beforeAll(() => {
+// The first lintText loads the config, the TypeScript parser and the plugins, which can take more
+// than a test's 5 s on a cold CI runner. Warm up here, under an explicit hook timeout, so every test
+// keeps its own default timeout.
+beforeAll(async () => {
   eslint = new ESLint({ cwd: REPO, overrideConfigFile: join(REPO, 'eslint.config.mjs') });
-});
+  await eslint.lintText('export {};\n', { filePath: join(REPO, 'packages/core/src/warmup.ts') });
+}, 60_000);
 
 async function lint(filePath, code) {
   const [result] = await eslint.lintText(code, { filePath: join(REPO, filePath) });
@@ -94,6 +98,15 @@ describe('boundaries/no-bypass (forms no-restricted-imports cannot see)', () => 
     expect(
       rules(await lint('packages/crypto/src/a.ts', `await import('@agentlink/core');`)),
     ).toEqual(['boundaries/no-bypass']);
+  });
+
+  it('refuses the crypto test seam source by a relative path, except in test files', async () => {
+    const code = `import { hpkeOpen } from './testing.js';\nvoid hpkeOpen;\n`;
+    expect(rules(await lint('packages/crypto/src/a.ts', code))).toEqual(['boundaries/no-bypass']);
+    expect(rules(await lint('packages/crypto/src/a.ts', `await import('./testing.js');`))).toEqual([
+      'boundaries/no-bypass',
+    ]);
+    expect(await lint('packages/crypto/src/a.test.ts', code)).toEqual([]);
   });
 
   it('rejects a relative import that leaves the package', async () => {

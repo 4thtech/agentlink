@@ -21,7 +21,7 @@
 
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { LOADER_MEMBERS, SUBTLE_ZONES, violationFor } from './policy.mjs';
+import { LOADER_MEMBERS, SUBTLE_ZONES, testSeamViolation, violationFor } from './policy.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -99,6 +99,9 @@ const rule = {
         if (rel.startsWith('..') || isAbsolute(rel)) {
           context.report({ node, messageId: 'escapes', data: { specifier, zone } });
         }
+        const seam = testSeamViolation(file, relative(ROOT, target).split(sep).join('/'));
+        if (seam !== null)
+          context.report({ node, messageId: 'forbidden', data: { message: seam } });
         return;
       }
       const message = violationFor(zone, specifier, file);

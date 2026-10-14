@@ -456,7 +456,10 @@ describe('IR-M1-1e-1 L-1: viem is a test-only library in packages/crypto', () =>
 });
 
 describe('M1-1c, M1-1f: the crypto test seam @agentlink/crypto/testing', () => {
-  const seam = `import { sealOwnerSeedWithNonce } from '@agentlink/crypto/testing';\n`;
+  const seams = [
+    `import { encryptPayloadWithIv } from '@agentlink/crypto/testing';\n`,
+    `import { sealOwnerSeedWithNonce } from '@agentlink/crypto/testing';\n`,
+  ];
   const RESTRICTED = /@agentlink\/crypto\/testing may be imported only in test-vectors/;
 
   it('fails in every zone, packages/node and packages/crypto included', () => {
@@ -465,7 +468,7 @@ describe('M1-1c, M1-1f: the crypto test seam @agentlink/crypto/testing', () => {
         RESTRICTED,
       );
     }
-    for (const code of [seam, `const m = await import('@agentlink/crypto/testing');\n`]) {
+    for (const code of [...seams, `const m = await import('@agentlink/crypto/testing');\n`]) {
       expect(src('packages/core', code).join('\n')).toMatch(RESTRICTED);
     }
   });
@@ -474,6 +477,36 @@ describe('M1-1c, M1-1f: the crypto test seam @agentlink/crypto/testing', () => {
     expect(
       violationFor('test-vectors', '@agentlink/crypto/testing', 'test-vectors/a.ts') ?? '',
     ).not.toMatch(RESTRICTED);
+  });
+
+  // Inside packages/crypto the seam source is reachable by a relative path, which the entry above
+  // (by package name) does not see. tsc builds every file a built module imports, so one production
+  // import would also put the seam into dist/.
+  const SEAM_SOURCE = /test seam\) may be imported only by test files/;
+
+  it('refuses a relative import of the seam source from crypto production code, in every form', () => {
+    for (const code of [
+      `import { hpkeOpen } from './testing.js';\n`,
+      `import { pairingDigest } from './testing';\n`,
+      `export * from './testing.js';\n`,
+      `const m = await import('./testing.js');\n`,
+      `type T = import('./testing.js').HpkeSealed;\n`,
+    ]) {
+      expect(src('packages/crypto', code, 'src/hpke.ts').join('\n')).toMatch(SEAM_SOURCE);
+    }
+    expect(
+      src('packages/crypto', `export * from '../testing.js';\n`, 'src/x/a.ts').join('\n'),
+    ).toMatch(SEAM_SOURCE);
+  });
+
+  it('allows the seam source in crypto test files, and other relative imports everywhere', () => {
+    expect(
+      src('packages/crypto', `import { hpkeOpen } from './testing.js';\n`, 'src/hpke.test.ts'),
+    ).toEqual([]);
+    expect(src('packages/crypto', `import { wrapCek } from './hpke.js';\n`, 'src/a.ts')).toEqual(
+      [],
+    );
+    expect(src('packages/core', `import { x } from './testing.js';\n`, 'src/a.ts')).toEqual([]);
   });
 });
 

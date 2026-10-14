@@ -104,6 +104,26 @@ export const RESTRICTED_ENTRY_POINTS = [
 ];
 
 /**
+ * The test seam's source file (M1-1c, M1-1f), without extension. RESTRICTED_ENTRY_POINTS refuses
+ * `@agentlink/crypto/testing` by name; inside packages/crypto a relative path reaches the file too.
+ * Only test files may import it: tsc builds every file that a built module imports (tsconfig
+ * `exclude` only limits the roots), so one production import would also put the seam into dist/.
+ */
+export const TEST_SEAM_SOURCE = 'packages/crypto/src/testing';
+
+export const TEST_SEAM_MESSAGE =
+  'packages/crypto/src/testing.ts (the test seam) may be imported only by test files and test-vectors; production code uses the public functions (M1-1c, M1-1f)';
+
+/**
+ * The message for a relative import from `file` (repo path) that resolves to `target` (repo path),
+ * or null when it is not the test seam or `file` is a test file.
+ */
+export function testSeamViolation(file, target) {
+  if (target.replace(/\.[cm]?[jt]sx?$/, '') !== TEST_SEAM_SOURCE) return null;
+  return isTestFile(file) ? null : TEST_SEAM_MESSAGE;
+}
+
+/**
  * Files that may import `node:module` (createRequire can resolve code from another package's
  * directory). Each entry needs a reason. Empty: nothing needs it today.
  */

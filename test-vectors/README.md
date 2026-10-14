@@ -57,8 +57,8 @@ Vectors can land before the code they test (M1-1h, tests first). Such a suite is
 | `tagged-hash` | pending (M1-1a) | BIP-340 tagged hashes under `agentlink/envelope/v1`, `agentlink/owner-action/v1` and BIP-340 tags |
 | `hkdf-derive` | pending (M1-1b) | RFC 5869; 04 §2.1 derivation (labels × epochs 0–2, counters, u32/u8 bounds, unknown labels); public identities (canonical and EIP-55 address, x-only keys, X25519 and `kid`); the agent ID (04 §2.9) |
 | `bip340` | pending (M1-1b) | The 19 official BIP-340 vectors (sign and verify) |
-| `hpke` | pending (M1-1c) | The CFRG RFC 9180 vector for X25519/HKDF-SHA256/AES-256-GCM; 04 §3.3 CEK wrap with fixed ephemeral keys; its rejections, including every small-order point under the all-zero key schedule (RFC 9180 §7.1.4) |
-| `aead-envelope` | pending (M1-1c) | 04 §3.1 envelope hash, AAD, payload AEAD, envelope signature, changes to covered fields, and strict structure and encodings |
+| `hpke` | committed (M1-1c) | The CFRG RFC 9180 vector for X25519/HKDF-SHA256/AES-256-GCM; 04 §3.3 CEK wrap with fixed ephemeral keys (through the crypto test seam, `@agentlink/crypto/testing`); its rejections, including every small-order point under the all-zero key schedule (RFC 9180 §7.1.4) |
+| `aead-envelope` | committed (M1-1c) | 04 §3.1 envelope hash, AAD, payload AEAD, envelope signature, changes to covered fields, and strict structure and encodings |
 | `eip712` | pending (M1-1e) | The EIP-712 "Ether Mail" example; AgentCard in the card JSON form under the chain-agnostic domain, nameHash/relaysHash, `cardSig` and `cardAgentSig` and their rejections, card JSON text |
 | `pairing` | committed (M1-1f) | RFC 4231 HMAC-SHA256 and the 04 §3.6 pairing proof |
 | `owner-wrap` | committed (M1-1f) | Argon2id: RFC 9106 (secret value and associated data through the crypto test seam, `@agentlink/crypto/testing`) and the owner-wrap and KeyStore parameters, both secret kinds |
