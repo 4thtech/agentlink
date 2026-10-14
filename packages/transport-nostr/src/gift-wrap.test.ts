@@ -2,10 +2,11 @@
 // (04 §3.1.1 verification step 2, §3.5; 07 §4.1, §4.2). Interop runs both directions against the
 // nostr-tools NIP-59 reference. Every key is generated at runtime; no key material is committed.
 //
-// The sender and recipient keys here are an EnvelopeKeys double over nostr-tools (the reference),
-// because the in-memory KeyStore (@agentlink/crypto/testing) is not yet allowed in this package's
-// tests. The code under test (rumor, size checks, seal, createGiftWrap from @agentlink/crypto and
-// every unwrap rule) is ours either way.
+// Interop and the KeyStore paths use the in-memory KeyStore and OwnerSession from the crypto test
+// seam (@agentlink/crypto/testing, M1-1g-b). The rule tests use an EnvelopeKeys double over
+// nostr-tools (referenceKeys), which can build the malformed and hostile events a real KeyStore
+// never would. The code under test (rumor, size checks, seal, createGiftWrap from
+// @agentlink/crypto and every unwrap rule) is ours either way.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AEAD_CT_MAX_LENGTH,
@@ -17,13 +18,16 @@ import {
   encodeBase64url,
   encodeHex,
   encodeUtf8,
+  envelopeHash,
   randomBytes,
+  verifyEnvelope,
   verifyNostrEvent,
   type Envelope,
   type EnvelopeKeys,
   type NostrEvent,
   type UnsignedNostrEvent,
 } from '@agentlink/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
 import { finalizeEvent, generateSecretKey, getPublicKey, verifyEvent } from 'nostr-tools/pure';
 import { v2 as nip44 } from 'nostr-tools/nip44';
 import { createRumor, createSeal, createWrap, unwrapEvent, wrapEvent } from 'nostr-tools/nip59';
@@ -171,16 +175,45 @@ describe('constants (04 §3.1.1, §3.5)', () => {
 });
 
 // --- interop with nostr-tools ---------------------------------------------------------------------
+//
+// Our side is the real in-memory KeyStore and OwnerSession (@agentlink/crypto/testing): seal
+// signing and both NIP-44 layers go through @agentlink/crypto. The other side is nostr-tools.
 
-describe('interop with the nostr-tools NIP-59 reference', () => {
+/** A MemoryKeyStore over a fresh random seed, with its Nostr key as 64 lowercase hex. */
+async function memoryKeys(keyEpoch = 0) {
+  const store = new MemoryKeyStore(randomBytes(32), { keyEpoch });
+  const pubkey = encodeHex((await store.getPublicBundle()).agentNostr);
+  return { store, pubkey };
+}
+
+/** An open OwnerSession over a fresh owner seed, with the owner Nostr key as hex. */
+async function ownerSession() {
+  const secret = randomBytes(32);
+  const owner = new MemoryOwnerKeyStore(randomBytes(32), {
+    kind: 'passphrase',
+    secret: secret.slice(),
+  });
+  const pubkey = encodeHex((await owner.getPublicKeys()).ownerNostr);
+  const session = await owner.unlock({ kind: 'passphrase', secret });
+  return { owner, session, pubkey };
+}
+
+/** A v1 envelope from `keys`, signed with its real envelope signature (04 §3.1.1). */
+async function signedEnvelope(keys: EnvelopeKeys, from: string): Promise<Envelope> {
+  const { sig: _unused, ...unsigned } = makeEnvelope(from);
+  void _unused;
+  return { ...unsigned, sig: await keys.signEnvelopeHash(envelopeHash(unsigned)) };
+}
+
+describe('interop with the nostr-tools NIP-59 reference (our side: MemoryKeyStore)', () => {
   it('ours -> reference: the reference unwraps every wrap; the rumor content is JCS(envelope) byte for byte', async () => {
-    const sender = referenceKeys();
+    const sender = await memoryKeys();
     const recipients = [referenceKeys(), referenceKeys(), referenceKeys()];
-    const envelope = makeEnvelope(sender.pubkey);
+    const envelope = await signedEnvelope(sender.store, sender.pubkey);
     const result = await wrapEnvelope(
       envelope,
       recipients.map((r) => r.pubkey),
-      sender,
+      sender.store,
     );
     expect(result.wraps).toHaveLength(3);
     for (const [index, recipient] of recipients.entries()) {
@@ -198,10 +231,14 @@ describe('interop with the nostr-tools NIP-59 reference', () => {
 
   it('reference -> ours: a reference gift wrap of JCS(envelope) unwraps to the parsed envelope', async () => {
     const sender = referenceKeys();
-    const recipient = referenceKeys();
+    const recipient = await memoryKeys();
     const envelope = makeEnvelope(sender.pubkey);
-    const wrap = referenceWrap(sender, recipient, { content: canonicalize(envelope) });
-    const opened = await unwrapGiftWrap(wrap, recipient);
+    const wrap = wrapEvent(
+      { kind: NOSTR_KIND_RUMOR, tags: [[...AGENTLINK_TAG]], content: canonicalize(envelope) },
+      sender.secretKey,
+      recipient.pubkey,
+    );
+    const opened = await unwrapGiftWrap(wrap, recipient.store);
     expect(opened.envelope).toEqual(envelope);
     expect(opened.giftWrapId).toBe(wrap.id);
     expect(opened.giftWrapCreatedAt).toBe(wrap.created_at);
@@ -209,21 +246,110 @@ describe('interop with the nostr-tools NIP-59 reference', () => {
 
   it('reference -> ours: a JSON round trip of the wrap (as a relay delivers it) unwraps too', async () => {
     const sender = referenceKeys();
-    const recipient = referenceKeys();
+    const recipient = await memoryKeys();
     const envelope = makeEnvelope(sender.pubkey);
     const wrap = JSON.parse(
-      JSON.stringify(referenceWrap(sender, recipient, { content: canonicalize(envelope) })),
+      JSON.stringify(
+        wrapEvent(
+          { kind: NOSTR_KIND_RUMOR, tags: [[...AGENTLINK_TAG]], content: canonicalize(envelope) },
+          sender.secretKey,
+          recipient.pubkey,
+        ),
+      ),
     ) as unknown;
-    expect((await unwrapGiftWrap(wrap, recipient)).envelope).toEqual(envelope);
+    expect((await unwrapGiftWrap(wrap, recipient.store)).envelope).toEqual(envelope);
   });
 
-  it('ours -> ours round trip, through a JSON round trip of the event', async () => {
-    const sender = referenceKeys();
-    const recipient = referenceKeys();
-    const envelope = makeEnvelope(sender.pubkey);
-    const { wraps } = await wrapEnvelope(envelope, [recipient.pubkey], sender);
+  it('ours -> ours round trip through a JSON round trip; the envelope signature still verifies', async () => {
+    const sender = await memoryKeys();
+    const recipient = await memoryKeys();
+    const envelope = await signedEnvelope(sender.store, sender.pubkey);
+    const { wraps } = await wrapEnvelope(envelope, [recipient.pubkey], sender.store);
     const relayed = JSON.parse(JSON.stringify(wraps[0]!.event)) as unknown;
-    expect((await unwrapGiftWrap(relayed, recipient)).envelope).toEqual(envelope);
+    const opened = await unwrapGiftWrap(relayed, recipient.store);
+    expect(opened.envelope).toEqual(envelope);
+    expect(verifyEnvelope(opened.envelope)).toBe(true);
+  });
+});
+
+describe('OwnerSession and key epochs (04 §3.1.1)', () => {
+  it('an OwnerSession seals an owner-authored envelope; the agent and the reference both open it', async () => {
+    const { owner, session, pubkey: ownerPub } = await ownerSession();
+    const agent = await memoryKeys();
+    const reference = referenceKeys();
+    const envelope = await signedEnvelope(session, ownerPub);
+    const { wraps } = await wrapEnvelope(envelope, [agent.pubkey, reference.pubkey], session);
+    expect((await unwrapGiftWrap(wraps[0]!.event, agent.store)).envelope).toEqual(envelope);
+    const rumor = unwrapEvent(plain(wraps[1]!.event), reference.secretKey);
+    expect(rumor.pubkey).toBe(ownerPub);
+    expect(rumor.content).toBe(canonicalize(envelope));
+    await owner.close();
+  });
+
+  it('an OwnerSession reads the owner copy of an agent envelope (I-9)', async () => {
+    const { owner, session, pubkey: ownerPub } = await ownerSession();
+    const agent = await memoryKeys();
+    const envelope = await signedEnvelope(agent.store, agent.pubkey);
+    const { wraps } = await wrapEnvelope(envelope, [ownerPub], agent.store);
+    expect((await unwrapGiftWrap(wraps[0]!.event, session)).envelope).toEqual(envelope);
+    await owner.close();
+  });
+
+  it('an OwnerSession cannot seal for an agent key: the seal key is not envelope.from', async () => {
+    const { owner, session } = await ownerSession();
+    const agent = await memoryKeys();
+    const envelope = await signedEnvelope(agent.store, agent.pubkey);
+    expect(await codeOf(wrapEnvelope(envelope, [referenceKeys().pubkey], session))).toBe(
+      'sender_mismatch',
+    );
+    await owner.close();
+  });
+
+  it('an older epoch key opens a wrap addressed to it when that epoch is asked for', async () => {
+    const seed = randomBytes(32);
+    const atEpoch0 = new MemoryKeyStore(seed);
+    const atEpoch1 = new MemoryKeyStore(seed, { keyEpoch: 1 });
+    const oldPub = encodeHex((await atEpoch0.getPublicBundle()).agentNostr);
+    const sender = await memoryKeys();
+    const envelope = await signedEnvelope(sender.store, sender.pubkey);
+    const { wraps } = await wrapEnvelope(envelope, [oldPub], sender.store);
+    expect(await codeOf(unwrapGiftWrap(wraps[0]!.event, atEpoch1))).toBe('decrypt_failed');
+    expect((await unwrapGiftWrap(wraps[0]!.event, atEpoch1, { epoch: 0 })).envelope).toEqual(
+      envelope,
+    );
+  });
+
+  it('passes KeyStoreError epoch_unavailable through unchanged (KeyStore and OwnerSession)', async () => {
+    const recipient = await memoryKeys();
+    const { owner, session, pubkey: ownerPub } = await ownerSession();
+    const sender = await memoryKeys();
+    const envelope = await signedEnvelope(sender.store, sender.pubkey);
+    const { wraps } = await wrapEnvelope(envelope, [recipient.pubkey, ownerPub], sender.store);
+    for (const [event, keys] of [
+      [wraps[0]!.event, recipient.store],
+      [wraps[1]!.event, session],
+    ] as const) {
+      const error = await unwrapGiftWrap(event, keys, { epoch: 1 }).then(
+        () => null,
+        (caught: unknown) => caught,
+      );
+      expect(error).toBeInstanceOf(KeyStoreError);
+      expect(error).not.toBeInstanceOf(TransportError);
+      expect((error as KeyStoreError).code).toBe('epoch_unavailable');
+    }
+    await owner.close();
+  });
+
+  it('passes keystore_closed through unchanged', async () => {
+    const recipient = await memoryKeys();
+    const sender = await memoryKeys();
+    const envelope = await signedEnvelope(sender.store, sender.pubkey);
+    const { wraps } = await wrapEnvelope(envelope, [recipient.pubkey], sender.store);
+    await recipient.store.close();
+    await expect(unwrapGiftWrap(wraps[0]!.event, recipient.store)).rejects.toMatchObject({
+      name: 'KeyStoreError',
+      code: 'keystore_closed',
+    });
   });
 });
 
