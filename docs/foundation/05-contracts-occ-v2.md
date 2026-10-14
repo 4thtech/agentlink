@@ -1,7 +1,7 @@
 # 05 — OCC v2 Smart Contracts
 
 **Repository:** `occ-v2-contracts` (private during beta; verified source under BUSL-1.1 at mainnet; see §10).
-**Toolchain:** Solidity 0.8.2x (pin exact), Foundry, OpenZeppelin Contracts v5 (+ upgradeable), Solady where gas matters.
+**Toolchain:** Solidity 0.8.x, exact pin in the contracts repo (currently 0.8.37), Foundry, OpenZeppelin Contracts v5 (+ upgradeable), Solady where gas matters.
 
 OCC v2 is a **new codebase**. It reuses ideas from OCC v1 (Mails' record + `setOpenedAt` receipts, AppFeeManager's integrator fees) but no v1 contract is upgraded or extended. v1 stays deployed for legacy apps.
 
