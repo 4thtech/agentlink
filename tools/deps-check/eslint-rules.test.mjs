@@ -16,9 +16,12 @@ const BOUNDARY = new Set([
 ]);
 
 let eslint;
-beforeAll(() => {
+beforeAll(async () => {
   eslint = new ESLint({ cwd: REPO, overrideConfigFile: join(REPO, 'eslint.config.mjs') });
-});
+  // The first lintText loads the config and every plugin. Do that cold start here, under the
+  // hook timeout, so the per-test timeout (5 s default) only ever covers warm runs (M0-10c).
+  await eslint.lintText('export {};\n', { filePath: join(REPO, 'packages/core/src/warmup.ts') });
+}, 60_000);
 
 async function lint(filePath, code) {
   const [result] = await eslint.lintText(code, { filePath: join(REPO, filePath) });
