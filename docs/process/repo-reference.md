@@ -44,7 +44,7 @@ agentlink/
 ```
 pnpm install
 pnpm build            # turbo build
-pnpm test             # unit tests (all packages)
+pnpm test             # unit tests (all packages); packages/types also runs in Chromium, Firefox, WebKit and workerd (needs `pnpm exec playwright install chromium firefox webkit` once; `pnpm test:node` inside the package runs Node only)
 pnpm test:e2e         # multi-agent end-to-end (requires testnet RPC + relays)
 pnpm lint && pnpm typecheck
 pnpm vectors:check    # crypto + EIP-712 test vectors across runtimes

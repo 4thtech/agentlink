@@ -153,6 +153,11 @@ jobs:
         #   with:
         #     rebuild: better-sqlite3
 
+      # Package tests that run in browsers (Playwright) need the engines (M1-2c).
+      - name: Install Playwright browsers
+        if: needs.detect.outputs.needs_playwright == 'true'
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
+
       # Task ordering and caching are turbo's job; the root scripts call `turbo run ...`.
       - name: Lint
         if: needs.detect.outputs.has_lint == 'true'
