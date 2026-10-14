@@ -91,7 +91,7 @@ AgentCard {
 
 Display names are **self-declared** unless the agent is registered (F-41); UIs must label them accordingly.
 
-**Card JSON form.** The card travels (invite, `handshake`, `card-update`, proof pack) and is hashed (`sha256(JCS(card))`, §3.6) as its EIP-712 message object: exactly the twelve fields above, with these names and no others, encoded per §2.4.1. Every address and `bytes32` field, including `agentNostr`, `ownerNostr`, `agentEnc` and `ownerEnc`, is `0x` + lowercase hex; `version`, `issuedAt`, `expiresAt` and `keyEpoch` are JSON integers. `cardSig` is the owner's EIP-712 signature, `0x` + 130 lowercase hex.
+**Card JSON form.** The card travels (invite, `handshake`, `card-update`, proof pack) and is hashed (`sha256(JCS(card))`, §3.6) as its EIP-712 message object: exactly the twelve fields above, with these names and no others, encoded per §2.4.1. Every address and `bytes32` field, including `agentNostr`, `ownerNostr`, `agentEnc` and `ownerEnc`, is `0x` + lowercase hex; `version`, `issuedAt`, `expiresAt` and `keyEpoch` are JSON integers. `cardSig` is the owner's EIP-712 signature, `0x` + 130 lowercase hex (proposed; owner confirms at merge). It is the 65 bytes `r || s || v` over the EIP-712 digest of the card under the domain above, with `v` ∈ {27, 28} and `s` in the lower half of the curve order (EIP-2). Any other `v`, a high `s`, or another length is rejected.
 
 #### 2.4.1 Canonical binary encodings (proposed; owner confirms at merge)
 
@@ -193,7 +193,7 @@ Owner-only operations: approve/deny, change policies, add/remove allowed folders
 |---|---|---|---|
 | `approval.decide` | `{approvalId, actionDigest, decision: "approve" \| "deny"}` | Local UI, CLI, console (`approval` envelope) | Applies only to a pending request with the same `approvalId` and `actionDigest` (§3.4.1); single use. Its maximum lifetime is the request's `expiresAt`. A deny is signed too, so a forged deny cannot cancel a request |
 | `approval.cancel` (D-55) | `{approvalId}` | Local UI, CLI (`agentlink cancel`), console (`approval` envelope), desktop app | Voids the unused parts of an approved commitment scope (§3.4.2), for example a receipt still waiting for the offer's record; single use. It can only void: it never approves, revives or widens anything |
-| `policy.set` | `{version, policy}` | Local UI, CLI, console (`policy` envelope) | `policy` is the complete 06 §3 document, never a partial patch. `version` must be greater than the highest applied version, so an older signed policy cannot be replayed to roll back. After applying, the core echoes the signed object to its owner on the owner channel (§3.4.1), so the console always knows the current version, including one set from the local UI or the CLI. Fail-closed behaviour on a missing or invalid policy stays with G-6 |
+| `policy.set` | `{version, policy}` | Local UI, CLI, console (`policy` envelope) | `policy` is the complete 06 §3 document, never a partial patch. Its JSON form has the keys and value types of the 06 §3 listing. The strict schema is built in M1-2b (`@agentlink/types`), and until then signing vectors use the 06 §3 defaults as `policy` (proposed; owner confirms at merge). `version` must be greater than the highest applied version, so an older signed policy cannot be replayed to roll back. After applying, the core echoes the signed object to its owner on the owner channel (§3.4.1), so the console always knows the current version, including one set from the local UI or the CLI. Fail-closed behaviour on a missing or invalid policy stays with G-6 |
 | `agent.revoke` | `{reason: "compromised" \| "retired" \| "other"}` | Console (any reason); CLI only on an uncompromised machine (`revoke` envelope) | Permanent per `agent` EVM address, for every epoch, with no un-revoke (decided, D-58). A revoked agent returns only as a new identity (new seed) with new pairings, and the UI asks for explicit confirmation. `reason` is a fixed value, never free text. Delivery to contacts: §3.4.1 |
 
 ### 2.6 Key rotation
@@ -255,14 +255,49 @@ agentId     idLen B             [A-Za-z0-9_-]
 ct          ciphertext || 16-byte tag
 ```
 
-- `kek = HKDF-SHA256(ikm = Argon2id(normalise(secret, secretKind), salt, m, t, p, L = 32), salt = "", info = utf8("agentlink/v1/keystore-file"), L = 32)`.
-- The owner passphrase wrap pins its own label, `agentlink/v1/owner-passphrase-wrap`, and its own magic, `ALKO` (M1-1f). The two blob types are therefore never interchangeable in either direction, and a test covers both directions.
+- `kek = HKDF-SHA256(ikm = Argon2id(password(secret, secretKind), salt, m, t, p, L = 32), salt = "", info = utf8("agentlink/v1/keystore-file"), L = 32)`. Argon2id is version 0x13, with no secret value (K) and no associated data (X); `salt` is the 16 header bytes.
+- **`password(secret, secretKind)`** (proposed; owner confirms at merge). The same rule applies to `ALKS`, `ALKO` and the recovery code (§2.3):
+  - **Both kinds.** A secret read from a file first loses exactly one trailing `\n` or `\r\n`. Prompt and environment input lose nothing.
+  - **Kind 1, generated code.** The steps below run on the input in order:
+    1. Refuse any byte outside ASCII.
+    2. Remove every space (U+0020) and dash (U+002D).
+    3. Convert to upper case (ASCII only).
+    4. Map `0`, `1` and `8` to `O`, `I` and `B`.
+    5. Require exactly 24 characters, all from the RFC 4648 base32 alphabet `A–Z2–7`. Anything else is refused before the KDF runs.
+    6. Decode them to 15 bytes: 24 characters are exactly 120 bits, with no padding and no leftover bits.
+
+    `password` is **those 15 bytes**, not the characters. Normalisation is fully specified above, so two spellings of one code always give the same bytes.
+  - **Kind 2, chosen passphrase.** `password` is the UTF-8 bytes of the NFKC form of the input. Nothing else changes, and spaces are kept.
+- The owner passphrase wrap pins its own label, `agentlink/v1/owner-passphrase-wrap`, and its own magic, `ALKO` (M1-1f). The two blob types are therefore never interchangeable in either direction, and a test covers both directions. The `ALKO` layout is below.
 - **AAD = every header byte** from `magic` through `agentId`. A changed parameter, secret kind, salt, nonce or agent ID, a truncated file or a changed ciphertext all fail authentication.
 - **Expected agent ID.** Before the KDF runs, the reader refuses a file whose header `agentId` differs from the agent being opened, that is, the file name and the recorded config. After decryption, the `seed` entry must derive the expected agent ID. A file copied over another agent's file therefore fails **even when both agents use the same passphrase**.
 - **Plaintext:** a list of entries `u16be nameLen | name (UTF-8) | u32be valueLen | value`, one per keychain item that the keychain backend would hold for this agent. Names are the keychain account suffixes, for example `seed`, `store-key`, `s3:<id>`. Duplicate names, length overflows, trailing bytes and plaintext above 64 KiB are refused. Values stay in `Uint8Array` and never become JS strings.
-- **Generated unlock code:** 15 CSPRNG bytes, exactly 120 bits, encoded as 24 RFC 4648 base32 characters with no bias, shown in groups of four. Input is case-insensitive. Spaces and dashes are removed, and `0`, `1` and `8` are read as `O`, `I` and `B`. Anything other than 24 valid characters after normalisation is refused before the KDF runs.
-- **Chosen passphrase:** UTF-8 and Unicode NFKC, otherwise unchanged. A passphrase file loses exactly one trailing `\n` or `\r\n`. The header's `secretKind` tells the reader which normalisation to apply.
+- **Generated unlock code:** 15 CSPRNG bytes, exactly 120 bits, encoded as 24 RFC 4648 base32 characters with no bias, shown in groups of four. Input follows `password` kind 1 above.
+- **Chosen passphrase:** follows `password` kind 2 above. The header's `secretKind` tells the reader which rule to apply.
 - All of this runs through `@agentlink/crypto` (Argon2id and HKDF from `@noble/hashes`, AES-256-GCM via WebCrypto or `@noble/ciphers`) and the `KeyStore` interface (§8.1). `@agentlink/node` handles only files and never calls a primitive itself.
+
+**Owner wrap format `ALKO` v1** (proposed; owner confirms at merge). It mirrors `ALKS`. It is used for the owner seed wrapped under an owner code or passphrase, both as the file `owner.alko` and as the keychain value on machines with a keychain (§2.2). The passkey PRF wrap (§2.3, M1-1k) is a different format.
+
+```
+magic       "ALKO"              4 B
+version     u8 = 1
+secretKind  u8                  1 = generated owner code, 2 = chosen owner passphrase
+kdf         u8 = 1              Argon2id v1.3 (RFC 9106)
+m           u32be               memory in KiB
+t           u8                  iterations
+p           u8                  lanes
+salt        16 B                random; new on create and on every re-wrap
+aead        u8 = 1              AES-256-GCM
+nonce       12 B                random; new on every write
+ct          ciphertext || 16-byte tag
+```
+
+- `kek = HKDF-SHA256(ikm = Argon2id(password(secret, secretKind), salt, m, t, p, L = 32), salt = "", info = utf8("agentlink/v1/owner-passphrase-wrap"), L = 32)`. `password` and the Argon2id settings are as for `ALKS`, and the KDF defaults, floor and cap are the `ALKS` values below.
+- **AAD = every header byte** from `magic` through `nonce`. There is no `agentId`, because one owner can own several agents.
+- **Plaintext** is exactly the owner seed: 32 bytes. The blob is therefore exactly 90 bytes (42 header, 32 seed, 16 tag). Any other size is refused before the KDF runs.
+- **Expected owner.** After decryption, the seed must derive the owner keys named in the card of the agent being served (`ownerNostr` and `ownerEvm`). Otherwise the seed is wiped and the file refused.
+- On file-KeyStore machines, `secretKind` must be 1. A kind 2 file is refused there before the KDF runs (below).
+- M1-1h carries `ALKO` v1 vectors for both kinds, plus the cross-type cases: an `ALKO` blob under the `ALKS` label, and the reverse, both fail.
 
 **KDF choice and parameters.** The KDF is Argon2id because the spec already uses it for the owner passphrase and the recovery code (§2.3, M1-1f). That means one implementation, one vector suite and one review instead of two. Argon2id is memory-hard, resists side-channel attacks and is standardised (RFC 9106). scrypt (`@noble/hashes`, N = 2^17, r = 8, p = 1) was the alternative; it was rejected only for this consistency.
 
@@ -536,7 +571,7 @@ All binary values are base64url **without padding** in JSON unless §2.4.1 puts 
 - **On-chain.** For a registered agent, the console also submits the Registry `revoke` (05 §4, M2-4b). Contacts and the verify page treat either one as revocation.
 
 **`approval-request` fields.**
-- `approvalId`: `apr_` followed by 16 random bytes (base64url). `agent`: the requesting agent's EVM address in the canonical form (§2.5.1). `actionDigest`: 64 lowercase hex, no prefix (§2.4.1).
+- `approvalId`: `apr_` followed by 16 random bytes (base64url). `agent`: the requesting agent's EVM address in the canonical form (§2.5.1). `actionDigest`: the 32-byte SHA-256 output as 64 lowercase hex, no prefix (§2.4.1). It is signed only under the owner's Nostr key, so it is never `0x` (proposed; owner confirms at merge).
 - `action`: the exact action the owner approves, `{tool, args, context}`. `tool` is the MCP tool name (06 §2.0). `args` is the tool input after defaults are applied, without `approvalId` and `clientRequestId`, with paths resolved by `realpath`. `context` holds the facts the core bound when it evaluated policy (for example the contact's agent EVM address, the file's `plaintextSha256`, and for paid actions the fee `{token, amount, usd}`), so the digest covers them. Its per-tool fields are fixed in M1-2b.
 - `actionDigest` = `sha256(JCS(action))` (M1-7e). The console recomputes it and refuses a mismatch, and the owner's `approval.decide` signs this digest. An approval therefore cannot be reused for any other action, even one the agent describes the same way.
 - `summary`: core-generated template text (≤ 200 characters) naming the contact (under the contact-name rule, 06 §2.1) and the action, never inbound text (06 §4). The console treats it as a label only and renders the approval card from `action`.
@@ -653,7 +688,13 @@ The terms fingerprint is under Advanced. Tool summaries name only the contact, t
 
 1. Verify `cardSig` and expiry.
 2. Apply policy `contacts.acceptInvites` (default `approval`: owner confirms in local UI or console, seeing name, owner fingerprint and safety code).
-3. Send a `handshake` envelope to A (recipients: A agent, A owner, B owner, B agent) with body `{inviteId, card: B's AgentCard, cardSig, name, relays, proof}`, where `proof = HMAC-SHA256(secret, utf8("agentlink-handshake") || inviteId || sha256(JCS(B card)))`. `secret` and `inviteId` enter as their raw bytes, the card in its JSON form (§2.4), and `proof` travels as base64url.
+3. Send a `handshake` envelope to A (recipients: A agent, A owner, B owner, B agent) with body `{inviteId, card: B's AgentCard, cardSig, name, relays, proof}`, where `proof = HMAC-SHA256(secret, utf8("agentlink-handshake") || inviteId || sha256(JCS(B card)))`. Byte-exact input (proposed; owner confirms at merge):
+   - The HMAC key is the 32 raw bytes of `secret`, decoded from base64url.
+   - The message is the concatenation, with no separators and no length prefixes, of:
+     - `utf8("agentlink-handshake")` (19 bytes);
+     - `inviteId` as its 16 raw bytes, decoded from base64url (never its base64url text);
+     - `sha256(JCS(card))` as 32 raw bytes, where `JCS(card)` is the RFC 8785 serialisation, in UTF-8, of B's card in the card JSON form (§2.4).
+   - `proof` is the 32-byte HMAC output, sent as base64url (43 characters).
 
 **Complete** (agent A):
 
