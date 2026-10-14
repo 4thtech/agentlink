@@ -803,7 +803,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Drop key (`agentlink/v1/drop`, secp256k1/BIP-340, current `keyEpoch`; D-48): signs only encrypted-drop requests and is never part of the public bundle or agent card, so it stays unlinkable to the agent's public identity.
   - Intermediate secrets wiped.
 - **Acceptance:**
-  - Vector suites `hkdf-derive` and `bip340`: their harness modules are registered and the suites are removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
+  - Vector suites `hkdf-derive`, `bip340` and `fingerprint`: their harness modules are registered and the suites are removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - M1-1h derivation vectors pass in all runtimes.
   - Rejection loop covered by a unit test that injects an out-of-range okm (a natural vector is infeasible).
   - Requesting the EVM key with epoch ≠ 0 is rejected by the API (test).
@@ -879,7 +879,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Owner passphrase wrap pins HKDF label `agentlink/v1/owner-passphrase-wrap` and file magic `ALKO` (D-54, 04 §2.8), with a `secretKind` header byte (1 = generated owner code, 2 = chosen passphrase) covered by the AAD and the same normalisation by kind as `ALKS` (04 §2.8); vectors for both kinds (M1-1h).
   - File KeyStore seal/open for `ALKS` v1 (D-54, 04 §2.8): Argon2id with the header's parameters (floor and cap checked before the KDF runs), HKDF label `agentlink/v1/keystore-file`, AES-256-GCM with the whole header (including `secretKind` and `agentId`) as AAD; entry parser with the 04 §2.8 refusals; entries as `Uint8Array`; 120-bit code generation (15 CSPRNG bytes, RFC 4648 base32) and normalisation by `secretKind`.
 - **Acceptance:**
-  - Vector suites `keystore-file`, `owner-wrap` and `pairing`: their harness modules are registered and the suites are removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
+  - Vector suites `keystore-file`, `owner-wrap`, `pairing` and `safety-code`: their harness modules are registered and the suites are removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - M1-1h vectors for Argon2id (plus RFC 9106 vectors), HMAC proof and safety code pass in all runtimes.
   - Property test: inviter and invitee compute the same code from the same transcript; swapping the roles changes it; a `codeReveal` that does not open `codeCommit` is refused.
   - The API refuses passphrase wrapping for blobs flagged for relay publication (test).

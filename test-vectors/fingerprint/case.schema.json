@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/fingerprint/case.schema.json",
+  "title": "fingerprint case",
+  "description": "04 \u00a72.9 fingerprints: the 32-byte digest (hex), the short form (8 upper-case hex digits in two groups joined by U+00B7), the long form (64 upper-case hex digits) and the domain claim `fp` (the long form in lower case).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "ownerEvm",
+            "ownerNostr",
+            "ownerEnc"
+          ],
+          "properties": {
+            "op": {
+              "const": "ownerFingerprint"
+            },
+            "ownerEvm": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{40}$"
+            },
+            "ownerNostr": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{64}$"
+            },
+            "ownerEnc": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "digest",
+            "short",
+            "long",
+            "domainClaimFp"
+          ],
+          "properties": {
+            "digest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "short": {
+              "type": "string",
+              "pattern": "^[0-9A-F]{4}\u00b7[0-9A-F]{4}$"
+            },
+            "long": {
+              "type": "string",
+              "pattern": "^[0-9A-F]{64}$"
+            },
+            "domainClaimFp": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "agentId"
+          ],
+          "properties": {
+            "op": {
+              "const": "agentFingerprint"
+            },
+            "agentId": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{40}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "digest",
+            "short",
+            "long",
+            "domainClaimFp"
+          ],
+          "properties": {
+            "digest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "short": {
+              "type": "string",
+              "pattern": "^[0-9A-F]{4}\u00b7[0-9A-F]{4}$"
+            },
+            "long": {
+              "type": "string",
+              "pattern": "^[0-9A-F]{64}$"
+            },
+            "domainClaimFp": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

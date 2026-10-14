@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkPendingGate, checkPendingShrinks } from './rules.mjs';
+import { cardPhases, checkPendingCards, checkPendingGate, checkPendingShrinks } from './rules.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const PENDING = 'test-vectors/pending-suites.json';
@@ -42,6 +42,7 @@ if ((base === undefined && gate === undefined) || args.length % 2 !== 0) {
 }
 
 const problems = [];
+const cards = cardPhases(readFileSync(join(root, 'docs/process/backlog.md'), 'utf8'));
 const headPath = join(root, PENDING);
 const head = {
   pending: existsSync(headPath) ? parsePending(readFileSync(headPath, 'utf8')) : new Map(),
@@ -67,6 +68,7 @@ if (base !== undefined) {
       .filter((suite) => suite !== undefined),
   );
   problems.push(...checkPendingShrinks(head, { pending: basePending, suites: baseSuites }));
+  problems.push(...checkPendingCards(head, cards));
   const committed = new Set(
     readdirSync(join(root, 'test-vectors'), { withFileTypes: true })
       .filter(
@@ -83,7 +85,7 @@ if (base !== undefined) {
 }
 
 if (gate !== undefined) {
-  problems.push(...checkPendingGate(head, gate.split(',').filter(Boolean)));
+  problems.push(...checkPendingGate(head, gate.split(',').filter(Boolean), cards));
 }
 
 if (problems.length > 0) {
