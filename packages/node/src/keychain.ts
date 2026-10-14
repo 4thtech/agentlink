@@ -114,7 +114,7 @@ function keychainFix(platform: string): string {
 
 /**
  * 04 §2.8: writes, reads and deletes a random probe item, with a timeout. Any failure, wrong bytes
- * or a timeout means no usable keychain. The probe item is deleted even after a timeout.
+ * or a timeout means no usable keychain.
  */
 export async function probeKeychain(
   keychain: KeychainBackend,
@@ -122,10 +122,14 @@ export async function probeKeychain(
 ): Promise<KeychainProbe> {
   const account = `probe:${encodeHex(randomBytes(16))}`;
   const value = randomBytes(16);
+  // The item is deleted before the attempt settles, whatever the read did, so a failed probe leaves
+  // nothing behind. After a timeout the attempt keeps running and still deletes it when the keychain
+  // answers.
   const attempt = (async () => {
     await keychain.set(account, value);
-    const read = await keychain.get(account);
-    const same = read !== null && equalBytes(read, value);
+    // Nothing between set and delete may throw: a failed read is null, a non-byte value is unequal.
+    const read: unknown = await keychain.get(account).catch(() => null);
+    const same = read instanceof Uint8Array && equalBytes(read, value);
     return (await keychain.delete(account)) && same;
   })().catch(() => false);
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -135,7 +139,6 @@ export async function probeKeychain(
   const result = await Promise.race([attempt, timeout]);
   clearTimeout(timer);
   if (result === true) return { ok: true };
-  void attempt.then(() => keychain.delete(account)).catch(() => undefined);
   return {
     ok: false,
     reason: result === 'timeout' ? 'timeout' : 'unavailable',

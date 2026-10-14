@@ -376,6 +376,17 @@ describe('probeKeychain and backend selection at init (04 §2.8, 07 §9.1)', () 
     const keychain = new FakeKeychain();
     keychain.get = () => Promise.resolve(new Uint8Array(16));
     expect(await probeKeychain(keychain)).toMatchObject({ ok: false, reason: 'unavailable' });
+    expect(keychain.items.size).toBe(0);
+  });
+
+  it('deletes the probe item before answering, even when the read fails', async () => {
+    const keychain = new FakeKeychain();
+    keychain.get = () => Promise.resolve([1, 2] as unknown as Uint8Array);
+    expect(await probeKeychain(keychain)).toMatchObject({ ok: false, reason: 'unavailable' });
+    expect(keychain.items.size).toBe(0);
+    keychain.get = () => Promise.reject(new Error('locked'));
+    expect(await probeKeychain(keychain)).toMatchObject({ ok: false, reason: 'unavailable' });
+    expect(keychain.items.size).toBe(0);
   });
 
   it('selects the keychain whenever the probe succeeds, and refuses the file KeyStore then', () => {
