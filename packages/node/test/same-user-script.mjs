@@ -8,7 +8,7 @@
 // The parent test verifies that none of it is a valid owner signature.
 //
 // Usage: node same-user-script.mjs <job.json>; the result is written to job.outFile as JSON.
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import process from 'node:process';
 import { TextDecoder, TextEncoder } from 'node:util';
@@ -44,11 +44,11 @@ const expected = {
 /** Every file under HOME, as bytes: what a same-user script can read. */
 function readAll(dir) {
   const files = [];
-  for (const name of readdirSync(dir)) {
-    const path = join(dir, name);
-    const info = statSync(path);
-    if (info.isDirectory()) files.push(...readAll(path));
-    else files.push({ path, bytes: readFileSync(path) });
+  // Directory entries carry their type, so there is no stat-then-read race (CodeQL js/file-system-race).
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) files.push(...readAll(path));
+    else if (entry.isFile()) files.push({ path, bytes: readFileSync(path) });
   }
   return files;
 }

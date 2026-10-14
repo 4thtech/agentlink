@@ -13,15 +13,7 @@
 // exactly as the OS keychain is readable by any same-user process. The script runs as a separate
 // Node process (test/same-user-script.mjs).
 import { execFile } from 'node:child_process';
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -131,9 +123,10 @@ function ownerSigValid(body: JsonObject, sig: string, owner: OwnerPublicKeys): b
 }
 
 function filesUnder(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    return statSync(path).isDirectory() ? filesUnder(path) : [path];
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return filesUnder(path);
+    return entry.isFile() ? [path] : [];
   });
 }
 
