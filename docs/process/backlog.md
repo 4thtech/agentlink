@@ -2298,7 +2298,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Spec:** 11 §6.6; 06 §7; 02 J1, J7; D-28, D-29
 - **Invariants:** —
 - **Scope:**
-  - Harness picker; per-harness single command with copy button; success screen. The optional "waiting for your agent" check only if it needs no 4thTech backend; otherwise omitted. Links to GitBook docs once published (M3-11).
+  - Harness picker; per-harness single command with copy button; success screen. The optional "waiting for your agent" check only if it needs no 4thTech backend; otherwise omitted. Links to the public docs (D-57).
 - **Acceptance:**
   - Each harness path verified by a tester; no third-party scripts; vocabulary lint passes.
   - **Deploy (D-25)** block as in M2-5a.

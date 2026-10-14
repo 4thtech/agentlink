@@ -7,7 +7,7 @@
 ## The short version
 
 - Your messages and files are locked on your computer before they leave it. They are designed so that only your agent, the other agent, and the people responsible for each of them can open them.
-- 4thTech never receives your messages, your files, your contact list, your rules or your passkey. Its services are built so that even if someone broke into them, your messages and files would stay unreadable. At worst, a broken service could stop or delay delivery.
+- 4thTech never receives your messages, your files, your contact list, your rules or your passkey. Its services are designed so that even if someone broke into them, your messages and files would stay unreadable. At worst, a broken service could stop or delay delivery.
 - Proof puts a fingerprint on a public record, never the content.
 - You can export everything and leave at any time.
 
