@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Independent generator for the `safety-code` suite: the pairing safety code (M1-1h; G-28).
 
+The signed H/K recomputation cases (04 §3.6.1 steps 1-5) are built here too but written to their own
+suite, `safety-code-recompute`, by generate_safety_code_recompute.py: they need the envelope helpers
+of M1-1c, while the cases of this suite need only M1-1f (IR-M1-1f-1 M-1). The cases themselves are
+unchanged.
+
 04 §3.6.1, exactly:
   codeCommit = taggedHash("agentlink/safety-commit/v1", inviteId || nonceA)
   T          = sha256(JCS(cardA)) || sha256(JCS(cardB)) || inviteId || nonceA || nonceB   (144 bytes)
@@ -151,7 +156,7 @@ def recompute(self_id, contact_card, h_item, k_item):
     return digest, shown
 
 
-def build():
+def build_all():
     a, b = party("safety-a", "Inviter A"), party("safety-b", "Invitee B")
     card_a, card_b = a["card"], b["card"]
     invite_id = v.det("safety-code/invite-id", 16)
@@ -299,8 +304,7 @@ SCHEMA = v.case_schema(
     SUITE,
     "04 §3.6.1 safety code. `commit`: codeCommit. `checkReveal`: whether codeReveal opens codeCommit. "
     "`code`: T, pairingDigest, the 64-bit integer (decimal) and the shown code. `labels`: the two "
-    "tagged hashes of the same input. `recompute`: steps 1-5 from the surface's own agent ID, the "
-    "contact's current card and the signed H and K (with their CEKs), or a rejection.",
+    "tagged hashes of the same input. The steps 1-5 recomputation is the `safety-code-recompute` suite.",
     {
         "commit": ({"inviteId": v.B64U, "nonceA": v.B64U}, [{"codeCommit": v.B64U}]),
         "checkReveal": ({"inviteId": v.B64U, "codeCommit": v.B64U, "codeReveal": v.B64U}, [v.ACCEPT, v.REJECT]),
@@ -309,12 +313,24 @@ SCHEMA = v.case_schema(
             [{"transcript": v.HEX, "pairingDigest": v.hexn(32), "integer": {"type": "string", "pattern": "^(0|[1-9][0-9]*)$"}, "code": {"type": "string", "pattern": "^[0-9]{4} [0-9]{4} [0-9]{4}$"}}],
         ),
         "labels": ({"input": v.HEX}, [{"safetyCommit": v.hexn(32), "safetyCode": v.hexn(32)}]),
-        "recompute": (
-            {"self": v.ADDRESS, "contactCard": v.OBJECT, "handshake": ITEM, "ack": ITEM},
-            [{"pairingDigest": v.hexn(32), "code": {"type": "string", "pattern": "^[0-9]{4} [0-9]{4} [0-9]{4}$"}}, v.REJECT],
-        ),
     },
 )
+
+RECOMPUTE_SCHEMA_OP = (
+    {"self": v.ADDRESS, "contactCard": v.OBJECT, "handshake": ITEM, "ack": ITEM},
+    [{"pairingDigest": v.hexn(32), "code": {"type": "string", "pattern": "^[0-9]{4} [0-9]{4} [0-9]{4}$"}}, v.REJECT],
+)
+
+
+def build():
+    """The cases that need only M1-1f: commit, checkReveal, code and labels."""
+    return [c for c in build_all() if c["input"]["op"] != "recompute"]
+
+
+def build_recompute():
+    """The 04 §3.6.1 steps 1-5 cases (suite `safety-code-recompute`)."""
+    return [c for c in build_all() if c["input"]["op"] == "recompute"]
+
 
 if __name__ == "__main__":
     v.main(

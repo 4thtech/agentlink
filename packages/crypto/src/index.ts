@@ -90,3 +90,46 @@ export {
   type AgentCard,
   type AgentCardHashes,
 } from './agent-card.js';
+// M1-1f: the pairing proof and the safety code (04 §3.6, §3.6.1; only the commit-checked functions
+// produce digits, IR-M1-1f-1 L-7), and the public constants of the
+// file KeyStore and owner wrap (04 §2.8). Argon2id, password() and the ALKS / ALKO seal and open
+// functions are in @agentlink/crypto/keystore.
+export {
+  INVITE_ID_LENGTH,
+  INVITE_SECRET_LENGTH,
+  PAIRING_HANDSHAKE_LABEL,
+  PAIRING_PROOF_INFO,
+  PAIRING_PROOF_LENGTH,
+  derivePairingProofKey,
+  hmacSha256,
+  pairingProof,
+  verifyPairingProof,
+} from './pairing.js';
+export {
+  SAFETY_CODE_MODULUS,
+  SAFETY_NONCE_LENGTH,
+  SAFETY_TRANSCRIPT_LENGTH,
+  checkSafetyCodeReveal,
+  computeSafetyCode,
+  safetyCodeCommit,
+  safetyCodeForRole,
+  type SafetyCode,
+  type SafetyCodeInput,
+} from './safety-code.js';
+export type { Argon2idParams } from './argon2.js';
+export {
+  SECRET_CODE_LENGTH,
+  SECRET_KINDS,
+  type SecretKind,
+  type SecretSource,
+} from './secret-code.js';
+export { KEYSTORE_KDF_BOUNDS, KEYSTORE_KDF_DEFAULTS } from './argon2.js';
+export {
+  type ExpectedOwner,
+  type KeystoreEntry,
+  type KeystoreFormat,
+  type KeystoreKek,
+  type KeystoreSecret,
+  type KeystoreUnlockSecret,
+  type SealOwnerSeedOptions,
+} from './keystore-file.js';

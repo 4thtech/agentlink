@@ -850,6 +850,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - G-2 (04 §3.1.1; once branch `docs/G-2-envelope-signatures` merges): the parser refuses fewer than 1 or more than 8 recipients and duplicate `kid`s. It refuses `aead.ct` above 17 152 decoded bytes, checked on the base64url length (≤ 22 870 characters) before decoding (IR-M1-1c-1 F3). The keystore helpers become `unwrapCek(…, envelopeId)` with `info` built inside, and `signEnvelopeHash` applies the tag inside (F5). G-46 may change the header before the vectors freeze.
 - **Acceptance:**
   - Vector suites `hpke` and `aead-envelope`: their harness modules are registered and the suites are removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
+  - Vector suite `safety-code-recompute` (04 §3.6.1 steps 1–5 from the signed handshake and ack; split from `safety-code` by IR-M1-1f-1 M-1): a recompute function on top of the envelope helpers and M1-1f's safety code, its harness module registered and the suite removed from `test-vectors/pending-suites.json`; every case passes in every runtime.
   - RFC 9180 vectors for suite (KEM 0x0020, KDF 0x0001, AEAD 0x0002, mode 0) and M1-1h envelope vectors pass in all runtimes.
   - Changing any covered field (incl. recipient order or `createdAt`) changes the hash and fails verification; wrong-recipient open and tampered `ct`/AAD fail.
 
