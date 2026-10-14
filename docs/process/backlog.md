@@ -1274,7 +1274,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Resolved (D-11, D-19): no explorer or Sourcify source verification on testnets; the source stays private until mainnet verification (M3-6). Testnet deploys publish ABIs and addresses only (`release-and-deployment.md` §4.2).
   - Follow-up (IR-M1-3b-1 choice 12): promote the one-transaction deployer pattern to the script with CreateX CREATE3 deploy-and-init, keep the one-transaction property, and include the post-deploy implementation-slot check.
   - Config assertions (IR-M1-3b-1 L-2; shared with M1-14): the script refuses to deploy or configure unless every allowlisted fee token has a nonzero `NOTARIZE` and `REGISTER` fee and cap, the native coin is allowlisted only on Gnosis chain IDs (D-46), and no allowlisted token is fee-on-transfer or rebasing.
-  - Runbook step (IR-M1-3b-1 L-2, choice 11): adding a fee token to the allowlist follows a fixed order, with its fees and caps effective before the allowlisting executes; the runbook also notes that a second `pause` or `unpause` that changes nothing reverts (`EnforcedPause()` / `ExpectedPause()`).
+  - Runbook step (IR-M1-3b-1 L-2, choice 11): adding a fee token to the allowlist follows a fixed order, with its fees and caps effective before the allowlisting executes; the runbook also notes that a second `pause` or `unpause` that changes nothing reverts (`EnforcedPause()` / `ExpectedPause()`). The fee-token order is written in occ-v2-contracts `docs/add-fee-token.md` (M1-14).
 - **Acceptance:**
   - Identical proxy addresses on Base Sepolia and Gnosis Chiado (script output in PR).
   - `deployer-holds-no-role` passes on both chains; fork dry-run in CI before broadcast.
