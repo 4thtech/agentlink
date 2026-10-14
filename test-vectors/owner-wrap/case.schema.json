@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/owner-wrap/case.schema.json",
+  "title": "owner-wrap case",
+  "description": "Argon2id v1.3 (RFC 9106): password, salt, secret and associated data as hex (empty = none), memory in KiB, iterations, parallelism, output length; expected tag hex.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "password",
+            "salt",
+            "secret",
+            "ad",
+            "memoryKiB",
+            "iterations",
+            "parallelism",
+            "length"
+          ],
+          "properties": {
+            "op": {
+              "const": "argon2id"
+            },
+            "password": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "salt": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "secret": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "ad": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "memoryKiB": {
+              "type": "integer"
+            },
+            "iterations": {
+              "type": "integer"
+            },
+            "parallelism": {
+              "type": "integer"
+            },
+            "length": {
+              "type": "integer"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tag"
+          ],
+          "properties": {
+            "tag": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

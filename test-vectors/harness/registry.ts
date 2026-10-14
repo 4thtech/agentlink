@@ -12,6 +12,8 @@ export interface VectorFile {
   readonly suite: string;
   readonly version: number;
   readonly generator: { readonly tool: string; readonly version: string; readonly script: string };
+  /** Only these runtimes run the suite (all five when absent); `source` cites the spec table. */
+  readonly runtimes?: { readonly only: readonly string[]; readonly source: string };
   readonly cases: readonly VectorCase[];
 }
 

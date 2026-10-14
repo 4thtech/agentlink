@@ -1,0 +1,560 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/encodings/case.schema.json",
+  "title": "encodings case",
+  "description": "04 \u00a72.4.1 canonical encodings. `decode`: the value at a schema path, decoded by that path's row, as hex bytes (uint256 as 32 big-endian bytes, approvalId as its 16 bytes), or a rejection. `parseInteger`: a JSON number token as text, its value as a decimal string, or a rejection. `equalBytes`: `equal` true or false when both values parse, or a rejection when either does not. Base64url paths have the byte length their field has (fixed, minimum, maximum, or none).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "path",
+            "value"
+          ],
+          "properties": {
+            "op": {
+              "const": "decode"
+            },
+            "path": {
+              "enum": [
+                "AgentCard.agentEnc",
+                "AgentCard.agentEvm",
+                "AgentCard.agentNostr",
+                "AgentCard.nameHash",
+                "AgentCard.ownerEnc",
+                "AgentCard.ownerEvm",
+                "AgentCard.ownerNostr",
+                "AgentCard.relaysHash",
+                "CommitmentScope.agentId",
+                "CommitmentScope.answers.envelopeHash",
+                "CommitmentScope.answers.envelopeId",
+                "CommitmentScope.counterparty.agentId",
+                "CommitmentScope.counterparty.ownerKey",
+                "CommitmentScope.termsHash",
+                "CommitmentScope.termsId",
+                "CommitmentScope.thread",
+                "DomainClaim.ownerNostr",
+                "EIP3009.auth.from",
+                "EIP3009.auth.nonce",
+                "EIP3009.auth.r",
+                "EIP3009.auth.s",
+                "EIP3009.auth.to",
+                "EIP3009.auth.validAfter",
+                "EIP3009.auth.validBefore",
+                "EIP3009.auth.value",
+                "OwnerAction.agent",
+                "OwnerAction.nonce",
+                "OwnerAction.owner",
+                "ProofPack.disclosure.contentKey",
+                "ProofPack.envelopeHash",
+                "ProofPack.notary",
+                "ProofPack.ownerApproval.policyHash",
+                "ProofPack.receipts[].signer",
+                "ProofPack.recipient.evm",
+                "ProofPack.recipient.salt",
+                "ProofPack.recordId",
+                "ProofPack.signature",
+                "ProofPack.signer.evm",
+                "ProofStatus.recordId",
+                "ProofStatus.signer",
+                "ProofStatus.txHash",
+                "Receipt.recordId",
+                "Receipt.salt",
+                "Receipt.signer",
+                "Record.appId",
+                "Record.envelopeHash",
+                "Record.feeToken",
+                "Record.maxFee",
+                "Record.nonce",
+                "Record.parentRecordId",
+                "Record.recipientCommitment",
+                "Record.signer",
+                "SignedOwnerAction.sig",
+                "approval-request.actionDigest",
+                "approval-request.agent",
+                "approval.decide.params.actionDigest",
+                "approvalId",
+                "card-update.cardSig",
+                "contact.check.params.contact",
+                "contact.check.params.pairingDigest",
+                "drop-commit.ciphertextSha256",
+                "drop-request.nonce",
+                "envelope.aead.ct",
+                "envelope.aead.iv",
+                "envelope.from",
+                "envelope.id",
+                "envelope.recipients[].enc",
+                "envelope.recipients[].kid",
+                "envelope.recipients[].wk",
+                "envelope.sig",
+                "envelope.thread",
+                "handshake-ack.cardSig",
+                "handshake-ack.codeReveal",
+                "handshake-ack.handshakeHash",
+                "handshake-ack.handshakeId",
+                "handshake-ack.inviteId",
+                "handshake.cardAgentSig",
+                "handshake.cardSig",
+                "handshake.codeCommit",
+                "handshake.codeNonce",
+                "handshake.inviteId",
+                "handshake.inviterCardHash",
+                "handshake.proof",
+                "invite.cardAgentSig",
+                "invite.cardSig",
+                "invite.codeCommit",
+                "invite.inviteId",
+                "invite.secret",
+                "nostr.eventId",
+                "payload.files[].ciphertextSha256",
+                "payload.files[].fileKey",
+                "payload.files[].inline",
+                "payload.files[].plaintextSha256",
+                "payload.replyTo",
+                "proof.envelopeId",
+                "proof.recordId",
+                "proof.salt",
+                "recordStructHash",
+                "submitter.receipts[].signature",
+                "submitter.records[].signature",
+                "terms-body.termsHash",
+                "terms.deliverables[].by",
+                "terms.deliverables[].plaintextSha256",
+                "terms.parties[]",
+                "terms.previousTermsHash",
+                "terms.price.payer",
+                "terms.termsId",
+                "tool.agent.id",
+                "tool.contact.id",
+                "tool.envelopeId",
+                "tool.termsHash",
+                "txHash",
+                "verify_proof_pack.envelopeHash",
+                "verify_proof_pack.recordId"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "bytes"
+              ],
+              "properties": {
+                "bytes": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "json"
+          ],
+          "properties": {
+            "op": {
+              "const": "parseInteger"
+            },
+            "json": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "a",
+            "b"
+          ],
+          "properties": {
+            "op": {
+              "const": "equalBytes"
+            },
+            "a": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path",
+                "value"
+              ],
+              "properties": {
+                "path": {
+                  "enum": [
+                    "AgentCard.agentEnc",
+                    "AgentCard.agentEvm",
+                    "AgentCard.agentNostr",
+                    "AgentCard.nameHash",
+                    "AgentCard.ownerEnc",
+                    "AgentCard.ownerEvm",
+                    "AgentCard.ownerNostr",
+                    "AgentCard.relaysHash",
+                    "CommitmentScope.agentId",
+                    "CommitmentScope.answers.envelopeHash",
+                    "CommitmentScope.answers.envelopeId",
+                    "CommitmentScope.counterparty.agentId",
+                    "CommitmentScope.counterparty.ownerKey",
+                    "CommitmentScope.termsHash",
+                    "CommitmentScope.termsId",
+                    "CommitmentScope.thread",
+                    "DomainClaim.ownerNostr",
+                    "EIP3009.auth.from",
+                    "EIP3009.auth.nonce",
+                    "EIP3009.auth.r",
+                    "EIP3009.auth.s",
+                    "EIP3009.auth.to",
+                    "EIP3009.auth.validAfter",
+                    "EIP3009.auth.validBefore",
+                    "EIP3009.auth.value",
+                    "OwnerAction.agent",
+                    "OwnerAction.nonce",
+                    "OwnerAction.owner",
+                    "ProofPack.disclosure.contentKey",
+                    "ProofPack.envelopeHash",
+                    "ProofPack.notary",
+                    "ProofPack.ownerApproval.policyHash",
+                    "ProofPack.receipts[].signer",
+                    "ProofPack.recipient.evm",
+                    "ProofPack.recipient.salt",
+                    "ProofPack.recordId",
+                    "ProofPack.signature",
+                    "ProofPack.signer.evm",
+                    "ProofStatus.recordId",
+                    "ProofStatus.signer",
+                    "ProofStatus.txHash",
+                    "Receipt.recordId",
+                    "Receipt.salt",
+                    "Receipt.signer",
+                    "Record.appId",
+                    "Record.envelopeHash",
+                    "Record.feeToken",
+                    "Record.maxFee",
+                    "Record.nonce",
+                    "Record.parentRecordId",
+                    "Record.recipientCommitment",
+                    "Record.signer",
+                    "SignedOwnerAction.sig",
+                    "approval-request.actionDigest",
+                    "approval-request.agent",
+                    "approval.decide.params.actionDigest",
+                    "approvalId",
+                    "card-update.cardSig",
+                    "contact.check.params.contact",
+                    "contact.check.params.pairingDigest",
+                    "drop-commit.ciphertextSha256",
+                    "drop-request.nonce",
+                    "envelope.aead.ct",
+                    "envelope.aead.iv",
+                    "envelope.from",
+                    "envelope.id",
+                    "envelope.recipients[].enc",
+                    "envelope.recipients[].kid",
+                    "envelope.recipients[].wk",
+                    "envelope.sig",
+                    "envelope.thread",
+                    "handshake-ack.cardSig",
+                    "handshake-ack.codeReveal",
+                    "handshake-ack.handshakeHash",
+                    "handshake-ack.handshakeId",
+                    "handshake-ack.inviteId",
+                    "handshake.cardAgentSig",
+                    "handshake.cardSig",
+                    "handshake.codeCommit",
+                    "handshake.codeNonce",
+                    "handshake.inviteId",
+                    "handshake.inviterCardHash",
+                    "handshake.proof",
+                    "invite.cardAgentSig",
+                    "invite.cardSig",
+                    "invite.codeCommit",
+                    "invite.inviteId",
+                    "invite.secret",
+                    "nostr.eventId",
+                    "payload.files[].ciphertextSha256",
+                    "payload.files[].fileKey",
+                    "payload.files[].inline",
+                    "payload.files[].plaintextSha256",
+                    "payload.replyTo",
+                    "proof.envelopeId",
+                    "proof.recordId",
+                    "proof.salt",
+                    "recordStructHash",
+                    "submitter.receipts[].signature",
+                    "submitter.records[].signature",
+                    "terms-body.termsHash",
+                    "terms.deliverables[].by",
+                    "terms.deliverables[].plaintextSha256",
+                    "terms.parties[]",
+                    "terms.previousTermsHash",
+                    "terms.price.payer",
+                    "terms.termsId",
+                    "tool.agent.id",
+                    "tool.contact.id",
+                    "tool.envelopeId",
+                    "tool.termsHash",
+                    "txHash",
+                    "verify_proof_pack.envelopeHash",
+                    "verify_proof_pack.recordId"
+                  ]
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            },
+            "b": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path",
+                "value"
+              ],
+              "properties": {
+                "path": {
+                  "enum": [
+                    "AgentCard.agentEnc",
+                    "AgentCard.agentEvm",
+                    "AgentCard.agentNostr",
+                    "AgentCard.nameHash",
+                    "AgentCard.ownerEnc",
+                    "AgentCard.ownerEvm",
+                    "AgentCard.ownerNostr",
+                    "AgentCard.relaysHash",
+                    "CommitmentScope.agentId",
+                    "CommitmentScope.answers.envelopeHash",
+                    "CommitmentScope.answers.envelopeId",
+                    "CommitmentScope.counterparty.agentId",
+                    "CommitmentScope.counterparty.ownerKey",
+                    "CommitmentScope.termsHash",
+                    "CommitmentScope.termsId",
+                    "CommitmentScope.thread",
+                    "DomainClaim.ownerNostr",
+                    "EIP3009.auth.from",
+                    "EIP3009.auth.nonce",
+                    "EIP3009.auth.r",
+                    "EIP3009.auth.s",
+                    "EIP3009.auth.to",
+                    "EIP3009.auth.validAfter",
+                    "EIP3009.auth.validBefore",
+                    "EIP3009.auth.value",
+                    "OwnerAction.agent",
+                    "OwnerAction.nonce",
+                    "OwnerAction.owner",
+                    "ProofPack.disclosure.contentKey",
+                    "ProofPack.envelopeHash",
+                    "ProofPack.notary",
+                    "ProofPack.ownerApproval.policyHash",
+                    "ProofPack.receipts[].signer",
+                    "ProofPack.recipient.evm",
+                    "ProofPack.recipient.salt",
+                    "ProofPack.recordId",
+                    "ProofPack.signature",
+                    "ProofPack.signer.evm",
+                    "ProofStatus.recordId",
+                    "ProofStatus.signer",
+                    "ProofStatus.txHash",
+                    "Receipt.recordId",
+                    "Receipt.salt",
+                    "Receipt.signer",
+                    "Record.appId",
+                    "Record.envelopeHash",
+                    "Record.feeToken",
+                    "Record.maxFee",
+                    "Record.nonce",
+                    "Record.parentRecordId",
+                    "Record.recipientCommitment",
+                    "Record.signer",
+                    "SignedOwnerAction.sig",
+                    "approval-request.actionDigest",
+                    "approval-request.agent",
+                    "approval.decide.params.actionDigest",
+                    "approvalId",
+                    "card-update.cardSig",
+                    "contact.check.params.contact",
+                    "contact.check.params.pairingDigest",
+                    "drop-commit.ciphertextSha256",
+                    "drop-request.nonce",
+                    "envelope.aead.ct",
+                    "envelope.aead.iv",
+                    "envelope.from",
+                    "envelope.id",
+                    "envelope.recipients[].enc",
+                    "envelope.recipients[].kid",
+                    "envelope.recipients[].wk",
+                    "envelope.sig",
+                    "envelope.thread",
+                    "handshake-ack.cardSig",
+                    "handshake-ack.codeReveal",
+                    "handshake-ack.handshakeHash",
+                    "handshake-ack.handshakeId",
+                    "handshake-ack.inviteId",
+                    "handshake.cardAgentSig",
+                    "handshake.cardSig",
+                    "handshake.codeCommit",
+                    "handshake.codeNonce",
+                    "handshake.inviteId",
+                    "handshake.inviterCardHash",
+                    "handshake.proof",
+                    "invite.cardAgentSig",
+                    "invite.cardSig",
+                    "invite.codeCommit",
+                    "invite.inviteId",
+                    "invite.secret",
+                    "nostr.eventId",
+                    "payload.files[].ciphertextSha256",
+                    "payload.files[].fileKey",
+                    "payload.files[].inline",
+                    "payload.files[].plaintextSha256",
+                    "payload.replyTo",
+                    "proof.envelopeId",
+                    "proof.recordId",
+                    "proof.salt",
+                    "recordStructHash",
+                    "submitter.receipts[].signature",
+                    "submitter.records[].signature",
+                    "terms-body.termsHash",
+                    "terms.deliverables[].by",
+                    "terms.deliverables[].plaintextSha256",
+                    "terms.parties[]",
+                    "terms.previousTermsHash",
+                    "terms.price.payer",
+                    "terms.termsId",
+                    "tool.agent.id",
+                    "tool.contact.id",
+                    "tool.envelopeId",
+                    "tool.termsHash",
+                    "txHash",
+                    "verify_proof_pack.envelopeHash",
+                    "verify_proof_pack.recordId"
+                  ]
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "equal"
+              ],
+              "properties": {
+                "equal": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,2139 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "owner-action",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib, coincurve 21.0.0, pycryptodome 3.23.0, rfc8785 0.1.4)",
+    "version": "cpython 3.12.13",
+    "script": "tools/vectors/generate_owner_action.py"
+  },
+  "cases": [
+    {
+      "id": "sign-revoke-compromised",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, op agent.revoke",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "agent.revoke",
+          "params": {
+            "reason": "compromised"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 0
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":0,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"agent.revoke\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"reason\":\"compromised\"},\"v\":1}",
+        "bodyHash": "6c3b48e83d962245da9bb7ed5626ffa2f6253f9c0f49a8c4da8b39fab5c09b66",
+        "signatureInput": "157d8cd88d834cf95f619ae9ed7beba38417c0147b8df75bb02558835b0a0573",
+        "sig": "eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a"
+      }
+    },
+    {
+      "id": "verify-revoke-compromised",
+      "source": "04 \u00a72.5.1 verification passes (agent.revoke skips expiry and lifetime checks)",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "sign-revoke-retired",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, op agent.revoke",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "agent.revoke",
+          "params": {
+            "reason": "retired"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 0
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":0,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"agent.revoke\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"reason\":\"retired\"},\"v\":1}",
+        "bodyHash": "34e12103b251686fec20359b5a3d38e60c8f8f01de3eb8064a5052868de4141d",
+        "signatureInput": "314b5a8e09380f5eaa6e939a762223d4a9035b1a0875f1f970a0f76f12a8ac4e",
+        "sig": "c9ccb83a82a307b0b08c112a3f12164aa2b6f812adcaadc357b71b7d9dc272d118cf07b5f652aec5e35f914c52a5ff74372567498d5a06654417b0fa0f75b3e6"
+      }
+    },
+    {
+      "id": "verify-revoke-retired",
+      "source": "04 \u00a72.5.1 verification passes (agent.revoke skips expiry and lifetime checks)",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "retired"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "c9ccb83a82a307b0b08c112a3f12164aa2b6f812adcaadc357b71b7d9dc272d118cf07b5f652aec5e35f914c52a5ff74372567498d5a06654417b0fa0f75b3e6"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "sign-revoke-other",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, op agent.revoke",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "agent.revoke",
+          "params": {
+            "reason": "other"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 0
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":0,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"agent.revoke\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"reason\":\"other\"},\"v\":1}",
+        "bodyHash": "15344c194c11e8f1553a06ccb4605fb24ea4f783621d54aeb44ceccca6aed729",
+        "signatureInput": "704d68a269c43c7ad4c7ff5c738dc9536ea532d759d3ee773d738c204508ee9b",
+        "sig": "573301c2ae87d00e12cbb71d82c6e5f916f9002fc054634634e6658db9acb820fcaf63b1a7c8edc266be03d41b31440e986205da415f27c938c9cd8ea6544e02"
+      }
+    },
+    {
+      "id": "verify-revoke-other",
+      "source": "04 \u00a72.5.1 verification passes (agent.revoke skips expiry and lifetime checks)",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "other"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "573301c2ae87d00e12cbb71d82c6e5f916f9002fc054634634e6658db9acb820fcaf63b1a7c8edc266be03d41b31440e986205da415f27c938c9cd8ea6544e02"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "reject-agent-checksummed",
+      "source": "04 \u00a72.5.1: `agent` in EIP-55 mixed case; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701A34563f0EE406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "f607ea724ba63c5a5468f13eb8553fe2215c229d3e5f8a1ecfe8bfd14bbe342b6ec369646856fd7e274a3cd5addeaafba38943f8e556269a1d9168e375fed9db"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-agent-uppercase-hex",
+      "source": "04 \u00a72.5.1: `agent` hex digits in upper case; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7B92AFB3701A34563F0EE406F285FA7731E8F415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "569f7b0a348b42cecf96a00c1942cc89b5bdb005cb929581210d921b0a3bfab90af472d15828ac3580f03ec7a72ab06ca132f6a4dca802999a407d06e9392696"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-agent-uppercase-prefix",
+      "source": "04 \u00a72.5.1: `agent` with a 0X prefix; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0X7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "839bef4af0db9babb0c7b6db12f3987688dff5cb6d7c05dc11f4c45b05ea806ca3f09eb651619a909f6d375d0152153f0cd5e1bd8c2cb93f7de671c0ae33a0ca"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-agent-no-prefix",
+      "source": "04 \u00a72.5.1: `agent` without 0x; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "2e2400e22c25992b64aa887765c41acdd17b616e3c921c8a083180167a27633195abd0a11f40194b0067fad9885b0eb9e728e419bbe0b9928964491562393b14"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-agent-short",
+      "source": "04 \u00a72.5.1: `agent` with 39 hex digits; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f41",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "982d0bbf88c6de6f3f100e541ffd44886d8040edc80e95525ac621885be11466c21b8d43d264bc416354ef3842adad5fade7e10bb0ae69c703f57bd2048f27d8"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-owner-uppercase-hex",
+      "source": "04 \u00a72.5.1: `owner` hex digits in upper case; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241D788931FF6CA35F3F03DE0AADDF05044016ED3B4DF91E626DD537A6352FC0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "708e4048667de84305e931921a44fb359fc4f9da0295a71be41737685aa38fe5f5e7afc2c31fcb925b8887e4358cb82eef4356226c66343c22da81efcf718a13"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-owner-0x-prefix",
+      "source": "04 \u00a72.5.1: `owner` with a 0x prefix, i.e. spelled as the card spells ownerNostr (\u00a72.4.1); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "a5109b1fca8a9b5ef60d556c5654ce2cf95b23aa982d03104d41164174c547439e9b5c2d80319879bc1b66fcf3ec40baac351a218844d57dfbc520b61de058ba"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-sig-uppercase-hex",
+      "source": "04 \u00a72.5.1: `sig` hex digits in upper case (the signature is otherwise valid); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "EEEAE1616990A86F96C65F64A0950393E59526B087DCD653D046E8DA3FF290D89C78A8F25050C8E8121A8B4A420391BFF3190E3A913AFC1B39A1F4A8EF63698A"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-sig-short",
+      "source": "04 \u00a72.5.1: `sig` of 127 hex digits; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-sig-0x-prefix",
+      "source": "04 \u00a72.5.1: `sig` with a 0x prefix (Nostr-native, \u00a72.4.1); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "0xeeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-nonce-padded",
+      "source": "04 \u00a72.5.1: `nonce` base64url with padding; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g==",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "0e921edbfe0f151f1208d0de0b0c27a818ad820a0f002156a0efb82ddffa16e865d069e25e4f264da3b922cd2f4325e40859cc8783c1c1ba51bba3d77351b7f7"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-nonce-standard-alphabet",
+      "source": "04 \u00a72.5.1: `nonce` in the standard base64 alphabet ('+', '/'); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "+/8+DwD/EOD4/n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "96d590cf5ad43a378171e0e22a273a4100fd827bf3ff237536e5b3f0101904adb87aea1437e77a36ccc3affc2dbbb096f3723ea6d5de42f1249f00bac9d1a8a8"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-nonce-nonzero-trailing-bits",
+      "source": "04 \u00a72.5.1: `nonce` with non-zero trailing bits (decodes to the same 16 bytes); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7h",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "43807bf3312b6246efa695d0911dc74ecbda4407f26654490a11aa1c82cc085976fe64afd80ec6ccf293cd367d156c89e1dfe4f858cd705b5dbf603a59733784"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-nonce-15-bytes",
+      "source": "04 \u00a72.5.1: `nonce` of 15 bytes; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "c4339cdf28b97e0fb83bdf50f62e7a931452059d506378249e4009627c065a4b13f7b345f6b6a4ff0370871afa2f5a1101b0a1ed27010602af52f38db32ca95d"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-nonce-17-bytes",
+      "source": "04 \u00a72.5.1: `nonce` of 17 bytes; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7gA",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "b516b82a447cea51106e08ce9a2006efda47ff989dcafe92d8f5287f290ffab6342755f5b0fb6a834a7f92ee1138c6a154c87ccfd54b927946f3b70644e09261"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-issued-at-2-pow-53",
+      "source": "04 \u00a72.5.1: `issuedAt` = 2^53, outside [0, 2^53 - 1]; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 9007199254740992,
+            "expiresAt": 0
+          },
+          "sig": "66c1753a20fe794eecf5f2250dca5fbe8899a189f5505e2ce37499583e7385a720f79635438d0f2b7794ffb9dcfed1faeb5c1989d75b6e265e78c5f905b5aebf"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-issued-at-negative",
+      "source": "04 \u00a72.5.1: `issuedAt` = -1, outside [0, 2^53 - 1]; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": -1,
+            "expiresAt": 0
+          },
+          "sig": "1e887e6d3fa1fb1c0e21daf1b10aaf1da7dca0fdd0ba80317eee1131d7f44cbcfb267965df66c7ef3a3d98df5ba33677e37203de29ec3ba5b689b5477108a6b1"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-issued-at-fraction",
+      "source": "04 \u00a72.5.1: `issuedAt` not an integer; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000.5,
+            "expiresAt": 0
+          },
+          "sig": "1f155c11a8e775656ac69458e57a7a9780b7ac04d01fd44fcb4df042414bb7c1bbaa35e03d5705c699f8a6c71c436e46122d947cb317b8df3c968717a5ce8e35"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-issued-at-string",
+      "source": "04 \u00a72.5.1: `issuedAt` as a string; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": "1760000000",
+            "expiresAt": 0
+          },
+          "sig": "b7e4feeeaf8f29a99c6471ae05d66497684a13603976980ea9795b291db468361aa5744c5fe1888081de46a6f9a8117390e87c7147c9368ea46ebc4877148a9f"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-v-string",
+      "source": "04 \u00a72.5.1: `v` as a string; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": "1",
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "dd6a9855385a718a57565ff7263867e66b305e722da43b9649941776711cb962f872a3af8ea9f484ce3919d2aba2f7aec54a80938434f45c30fa94285a4a2926"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-v-2",
+      "source": "04 \u00a72.5.1: `v` other than 1; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 2,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "9da6bffd0e682ed9b04fe9fe8d66f21c3070ff5a807e8cf6cc2ef8188b4536519ac231e5b289385e15798162e0c25423af62e145c56a3b2956a4373099415d72"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-unknown-key-signed-owner-action",
+      "source": "04 \u00a72.5.1: unknown key in SignedOwnerAction; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a",
+          "note": "x"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-unknown-key-owner-action",
+      "source": "04 \u00a72.5.1: unknown key in OwnerAction; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "memo": "x"
+          },
+          "sig": "41091fccd78010e242edcae098d9fba28d1e514de6bd4d17e90bb06854c4263145a58df52b44fe7d27ec068bf478d81fa47570ec151e04df01f993023055d831"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-unknown-key-params",
+      "source": "04 \u00a72.5.1: unknown key in params; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised",
+              "detail": "x"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "ab602392b12c538aaa7d0eafb5596ab7618b0390afe4a27fe9fc3bc6450a55232c95160e397831ec1fbc70431582a952df48b1e408203ed2fd618904e3e012ac"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-missing-nonce",
+      "source": "04 \u00a72.5.1: required key `nonce` missing; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "8483a5bc9b36681d88347eb76a16ea69cfb7b80e3c8dec079b0acd2dd22b931521b03eda4954ae2cdeb5fc5193f50522c4eede3cfc0bff50278a17f5ef681e04"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-reason-free-text",
+      "source": "04 \u00a72.5.1: `reason` outside the fixed values; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "hacked"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "349c577556fecdd0d76d01765a95e5b8ad088bd5bb96f7accccab93a36b369afa5b9ba924e72a43a089281d9632bfd7338e681a7f774a43c892d4245bf824644"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-revoke-expiry-nonzero",
+      "source": "04 \u00a72.5.1: agent.revoke requires expiresAt = 0; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "2d932803115228851059ae80d09b60809b3323174ea7edaa1c3ca76496c780e226653c857238a3f5372ebd76142a061f99acbee485db501f4d3b6f4fe8d0e810"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-unknown-op",
+      "source": "04 \u00a72.5.1: unknown `op`; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.unrevoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "4df7975dc43dd31e5ea3d79c1a57a68cc4a3b4105ae096137e4f1d782b96b8f82c154d4cf54dc4de9366d6060cea18e283dddf221c768e5eedb3f342a8306b8f"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-wrong-agent",
+      "source": "04 \u00a72.5.1: `agent` is not this agent's EVM address; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "d76eae847ddcd02b169e402ef91a48d28c721677b88eff1c939bf61e4bd69d831e56105fd3258e9a13abf76261b4ca40f67e34042b4bdd56f5a1c299df3238ab"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-wrong-owner",
+      "source": "04 \u00a72.5.1: `owner` differs from ownerNostr in the agent's card; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "09644e38ef0c3834a05198194d892b26d988fd74d497be2f11a261975317acec",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "bb1c6a33fc897f3c04ffa85144f04ecdfc25991d23fd7e54fd19591f2a2551bb04cd2d41649a1cf596f23d1ec6cef4a19839676aa6b8ec574ad05cdb2fb89dde"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-other-signer",
+      "source": "04 \u00a72.5.1: signed by another key than `owner`; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "d0ba797e78d1ec6aa61f9c1daf2c2245971d4948701c479b953bdae316b992c407024c712911727ac6e910de76626efcacd53dec77bb16e9093137c1d96f95e0"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-envelope-tag",
+      "source": "04 \u00a72.5.1: signed under agentlink/envelope/v1; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "dc8cf5f7500d997240c6222b0ca5824dc80bac11e1ec4358f425afeec1a6d1c5a5878544c4695e560068969da915d737b4e0421abad9c0451f163148d30a8138"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-untagged",
+      "source": "04 \u00a72.5.1: signed over sha256(JCS(body)) without the tag; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "compromised"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "3c1f5443399c99ed382b283524214bfc3cb2a985fad25ea38df573dcdf49f2134560c9ad010117df5ba68523794531547fd4ee6b3e6e6e20d4a574eaba416697"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-body-changed",
+      "source": "04 \u00a72.5.1: body changed after signing; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "agent.revoke",
+            "params": {
+              "reason": "retired"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "sign-approval-approve",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, approval.decide, approve",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "approval.decide",
+          "params": {
+            "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+            "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+            "decision": "approve"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 1760000600
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"approval.decide\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"actionDigest\":\"5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128\",\"approvalId\":\"apr_Cp0pgI8w64jHbD4g1DGDGA\",\"decision\":\"approve\"},\"v\":1}",
+        "bodyHash": "814983599fdc27de9dff41bc67ace4ecb17de11ff4c010c3fc5c8403b9a0b220",
+        "signatureInput": "5ff759f834388fd23139b37269aa5e8053889f57f80cfd7ec0a8cb21df9f3059",
+        "sig": "b22f4cfa0a4706d1c28f217e48c78c65912b6d4e06f5d148c0c81cc32045f58ae61e163e0be42a9f0ecbfcd7cf7808058acc66cd9cd980e8cdfdf950e0cccfa2"
+      }
+    },
+    {
+      "id": "sign-approval-deny",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, approval.decide, deny (a deny is signed too)",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "approval.decide",
+          "params": {
+            "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+            "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+            "decision": "deny"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 1760000600
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"approval.decide\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"actionDigest\":\"5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128\",\"approvalId\":\"apr_Cp0pgI8w64jHbD4g1DGDGA\",\"decision\":\"deny\"},\"v\":1}",
+        "bodyHash": "340920066b8ffdb13c8431f55f96d0c8810fba357796397644b4a3eb92d503c9",
+        "signatureInput": "78f588d8a3c1d7dbf3e412bc3e8c588a03276009c252a5c1b6e36be65bdf866f",
+        "sig": "2a6962cdacf0987cde796b34187c117c194a96e6ae1b71bd7c31207d8d8364644d19be69733a40546c7b018cdfeb4dc7eb1c0a3956532fadcb8eeee233262311"
+      }
+    },
+    {
+      "id": "sign-approval-cancel",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, approval.cancel (D-55)",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "approval.cancel",
+          "params": {
+            "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 1760000600
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"approval.cancel\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"approvalId\":\"apr_Cp0pgI8w64jHbD4g1DGDGA\"},\"v\":1}",
+        "bodyHash": "5282cb8e806bc68e97e6e4f22a76c579d7be54ac9b226122a6101094e4c1bdb7",
+        "signatureInput": "c4ea4d0cb15dcfe8c1c04a7c74ed5b5f0e70d1416d2d23bfcbc1cc1a9345852c",
+        "sig": "38d096372d8e8b88b215ad985cef08acbf4a07e198aed301e837b440f209ac4e9fe33c4d25af9006cc61d0bf7c593c99d5c57503085571b2a6defe243a2bce2a"
+      }
+    },
+    {
+      "id": "sign-policy-set",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, policy.set with the 06 \u00a73 defaults as policy (proposed until M1-2b)",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "policy.set",
+          "params": {
+            "version": 1,
+            "policy": {
+              "contacts": {
+                "acceptInvites": "approval",
+                "unknownSenders": "queue",
+                "allowed": "paired",
+                "rateLimitPerContactPerHour": 120
+              },
+              "files": {
+                "allowedFolders": [],
+                "inboxFolder": "~/AgentLink/Inbox",
+                "maxSendSizeMB": 100,
+                "maxReceiveSizeMB": 200,
+                "storage": "auto",
+                "defaultExpiryDays": 7,
+                "deleteAfter": "expiry",
+                "ownerArchive": false
+              },
+              "envelopes": {
+                "maxEnvelopeKB": 24
+              },
+              "proofs": {
+                "notarize": "allow",
+                "dailyBudgetUSD": 5,
+                "perActionMaxUSD": 1,
+                "allowKeyDisclosure": "approval",
+                "exportFolder": "~/AgentLink/Proofs",
+                "defaultChain": "base"
+              },
+              "receipts": {
+                "autoDelivered": true,
+                "autoOpened": false
+              },
+              "commitments": {
+                "accept": "approval",
+                "autoAcceptContacts": [],
+                "autoAcceptMaxUSD": 0,
+                "autoAcceptDirection": "buy",
+                "autoAcceptMinUSD": null
+              }
+            }
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 1760000600
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"policy.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"policy\":{\"commitments\":{\"accept\":\"approval\",\"autoAcceptContacts\":[],\"autoAcceptDirection\":\"buy\",\"autoAcceptMaxUSD\":0,\"autoAcceptMinUSD\":null},\"contacts\":{\"acceptInvites\":\"approval\",\"allowed\":\"paired\",\"rateLimitPerContactPerHour\":120,\"unknownSenders\":\"queue\"},\"envelopes\":{\"maxEnvelopeKB\":24},\"files\":{\"allowedFolders\":[],\"defaultExpiryDays\":7,\"deleteAfter\":\"expiry\",\"inboxFolder\":\"~/AgentLink/Inbox\",\"maxReceiveSizeMB\":200,\"maxSendSizeMB\":100,\"ownerArchive\":false,\"storage\":\"auto\"},\"proofs\":{\"allowKeyDisclosure\":\"approval\",\"dailyBudgetUSD\":5,\"defaultChain\":\"base\",\"exportFolder\":\"~/AgentLink/Proofs\",\"notarize\":\"allow\",\"perActionMaxUSD\":1},\"receipts\":{\"autoDelivered\":true,\"autoOpened\":false}},\"version\":1},\"v\":1}",
+        "bodyHash": "a7df043256fa03f1f3f681aea054d39cefb5a99dd2b725cc543f5ce6f44fa9a3",
+        "signatureInput": "b3c187355db5fea7107657b44345f85361209a87df896bc759bb290a70bb50f2",
+        "sig": "d8962fca5baa92337b18e75ef9b0f3a18ebc5c799ffbe86c270f3af58b702bdbfe1ee1f32429476b351808d66d2e84c9dfb1f87be7161a0a9e75582bd8b5f177"
+      }
+    },
+    {
+      "id": "verify-approval-approve",
+      "source": "04 \u00a72.5.1: approval.decide for the pending request verifies",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decide",
+            "params": {
+              "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+              "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+              "decision": "approve"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "b22f4cfa0a4706d1c28f217e48c78c65912b6d4e06f5d148c0c81cc32045f58ae61e163e0be42a9f0ecbfcd7cf7808058acc66cd9cd980e8cdfdf950e0cccfa2"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApproval": {
+            "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+            "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+            "expiresAt": 1760086400
+          }
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "reject-digest-0x-prefix",
+      "source": "04 \u00a72.5.1: `actionDigest` with a 0x prefix (bare hex, \u00a72.4.1); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decide",
+            "params": {
+              "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+              "actionDigest": "0x5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+              "decision": "approve"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "e47e9d9dd596d143294ff6e0fa7312a9ede5d4e39b0375c2aa6c88816714425844a6566df5cdd782427a5fb3c2a123bed39861e90b51ce1a71992599a3a6e413"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApproval": {
+            "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+            "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+            "expiresAt": 1760086400
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-digest-uppercase",
+      "source": "04 \u00a72.5.1: `actionDigest` in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decide",
+            "params": {
+              "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+              "actionDigest": "5FCD7DD307F2695F6D4E27C23E77BB0546D9891D0AB5BB9E4AFFE0FD3931F128",
+              "decision": "approve"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "726d4ec2c868238b8c7030eac3582aea1521deb25f78fcabb04cd5373a0c8b4b80b6a81de746dc1db9259ef9c37eeba70dddcff970c490a17b18a2a0def316fa"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApproval": {
+            "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+            "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+            "expiresAt": 1760086400
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-digest-base64url",
+      "source": "04 \u00a72.5.1: `actionDigest` as base64url; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decide",
+            "params": {
+              "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+              "actionDigest": "X8190wfyaV9tTifCPne7BUbZiR0KtbueSv_g_Tkx8Sg",
+              "decision": "approve"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "d6d388e97e83b9e3c81e5287b347de124f2a485f1cc12fe8839c744be64c2aab27f309728c3de8e10fcd96b2d5edf09169d9ecc8add54f3e3eb729fe8b59de6f"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApproval": {
+            "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+            "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+            "expiresAt": 1760086400
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-digest-mismatch",
+      "source": "04 \u00a72.5.1: `actionDigest` of another action; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decide",
+            "params": {
+              "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+              "actionDigest": "d9298a10d1b0735837dc4bd85dac641b0f3cef27a47e5d53a54f2f3f5b2fcffa",
+              "decision": "approve"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "430c102052e11397fd3a69ae29d6413e5b06f43e5559e3a0ac8eb15ed1c9915fb790fa07ea9b7ae04587e27bdcce34d681ca18eba7a59f52d84b180cf6103205"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApproval": {
+            "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+            "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+            "expiresAt": 1760086400
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-approval-id-unknown",
+      "source": "04 \u00a72.5.1: an approvalId that is not pending; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decide",
+            "params": {
+              "approvalId": "apr_ss-9L7--XEiRLQXXYTcr_A",
+              "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+              "decision": "approve"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "88e37c411f3b4aaca65f410b3af9202ecb748ae0ca15f98b59aeaf9fb3ba2bad8d88e9b7622c64e90f107cfd6094fea8e8739f407944c873a4477785b0d90dfe"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApproval": {
+            "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+            "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+            "expiresAt": 1760086400
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-approval-id-no-prefix",
+      "source": "04 \u00a72.5.1: approvalId without apr_; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decide",
+            "params": {
+              "approvalId": "Cp0pgI8w64jHbD4g1DGDGA",
+              "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+              "decision": "approve"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "f4be7025c2565f743250f8225d334d7bba48f6224f4822bf8ef19e7855f0577937783740ee745806d21dd6f180de84f9f68266af33c23844deb5fa9ec12756f8"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApproval": {
+            "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+            "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+            "expiresAt": 1760086400
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-approval-id-padded",
+      "source": "04 \u00a72.5.1: approvalId with padded base64url; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decide",
+            "params": {
+              "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA==",
+              "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+              "decision": "approve"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "144a80f5d1bb5873fbd7882330893bfc7e0310276a023635ad3d147d16f283860c4096d7c58f2965572014d55d75baeb4b12b814a093f50e160bd3884e661328"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApproval": {
+            "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+            "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+            "expiresAt": 1760086400
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-decision-free-text",
+      "source": "04 \u00a72.5.1: `decision` outside approve | deny; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decide",
+            "params": {
+              "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+              "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+              "decision": "maybe"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "2d18b08a6a5317036eb7a7cfa76101e9f9d11dcde41a39d60a5cdc24f1b21c3e5ff8cb666044248fd827e857c693b5a014a47aa4e61cb15fae2d032cdaed5469"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApproval": {
+            "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+            "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+            "expiresAt": 1760086400
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-decide-unknown-param",
+      "source": "04 \u00a72.5.1: unknown key in approval.decide params; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decide",
+            "params": {
+              "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+              "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+              "decision": "approve",
+              "note": "x"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "ffb1eea3537ab287e4280315f3fad27780e3f07c04cfc01192ce4e52030c04252822aa3316d4b64851550a2de309f689a1e7d4b731de57839183f6e97cb6cc09"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApproval": {
+            "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+            "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+            "expiresAt": 1760086400
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-decide-expiry-zero",
+      "source": "04 \u00a72.5.1: expiresAt = 0 is allowed only for agent.revoke; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decide",
+            "params": {
+              "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+              "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+              "decision": "approve"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "454ece6919362de7834dd4d7bed89ddae1ad1124a99284b85a615cd11b258af5933482d716ab6b1cd4b37fba7fb0520cfd1222d6f95acf77cf31e951fb1b3565"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApproval": {
+            "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+            "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+            "expiresAt": 1760086400
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-decide-beyond-request",
+      "source": "04 \u00a72.5.1: expiresAt after the request's expiresAt (its maximum lifetime); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decide",
+            "params": {
+              "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+              "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+              "decision": "approve"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760086401
+          },
+          "sig": "d65ea5b5d3a9800ff0dd026c868fcfbc3f4bbfa7f4f8b27a5adf9a3c90d8160717114076e61d406e92dd1d2f41165ee3a99f92d68d3fdb1cf3424d66eed895a7"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApproval": {
+            "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+            "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+            "expiresAt": 1760086400
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-decide-expired",
+      "source": "04 \u00a72.5.1: now is after expiresAt; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "approval.decide",
+            "params": {
+              "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+              "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+              "decision": "approve"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000030
+          },
+          "sig": "6f881f48f55d633e04768f186b4c722b4384d5ea2061ed8455b15b30ca1a214a1f2880d845ecdad4d2820d651d9e29160ce0e25f3383f3e700bc53868fef8d59"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pendingApproval": {
+            "approvalId": "apr_Cp0pgI8w64jHbD4g1DGDGA",
+            "actionDigest": "5fcd7dd307f2695f6d4e27c23e77bb0546d9891d0ab5bb9e4affe0fd3931f128",
+            "expiresAt": 1760086400
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "sign-contact-check",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, contact.check (04 \u00a73.6.1)",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "contact.check",
+          "params": {
+            "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+            "pairingDigest": "579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 1760000600
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"contact.check\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"contact\":\"0x879e48ea18a3dd814b18b51e5e6e665f87c1e613\",\"pairingDigest\":\"579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c\"},\"v\":1}",
+        "bodyHash": "76dc9b7afc596dcd9ed573428a16d40dfa382a710652b14d9cea06da63a57ae0",
+        "signatureInput": "cc072679e9679cc7ca39c7f78f86d9f1d3dd7009b326a4598669022c399a95cd",
+        "sig": "60d0f796ab536be65e10991a9ce539124fb35f0782d4c3983ca37924dd72fde5eda4f2356af8bb6e07091b1ce7e3893a67297a408387387ada6f22320ae1cf49"
+      }
+    },
+    {
+      "id": "reject-pairing-digest-0x",
+      "source": "04 \u00a72.5.1: `pairingDigest` with 0x (bare hex, 04 \u00a72.4.1); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.check",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+              "pairingDigest": "0x579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "be68f870019723acccfd8081e8682d100ee324cca47de69668c647d9e5b0a219fbaf70c9735e9a90250906bccbde3ebf051e3db0388082785b6a6ac2eecffe51"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pairing": {
+            "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+            "pairingDigest": "579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c"
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-pairing-digest-uppercase",
+      "source": "04 \u00a72.5.1: `pairingDigest` in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.check",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+              "pairingDigest": "579BD4909B9A9C8399802D72A0060770AC34CA5E107B58E468AA6857DBEFC69C"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "63630b720dad29e708e8f0397ec44578c244b076f5101fd99143eaabd20bd89aa3cf818b832dc2854f85d24c80676f06756968897cba992b108e1aed21111f52"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pairing": {
+            "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+            "pairingDigest": "579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c"
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-pairing-digest-base64url",
+      "source": "04 \u00a72.5.1: `pairingDigest` as base64url; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.check",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+              "pairingDigest": "V5vUkJuanIOZgC1yoAYHcKw0yl4Qe1jkaKpoV9vvxpw"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "8d7178941d1df1ea3020f137b36cd99a3068ef8eaf2faf27b3aa3c928247f523c2b75d76d7a9c50a69695b564a82394287ae9b2fdf98674631bbcb98c71210f8"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pairing": {
+            "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+            "pairingDigest": "579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c"
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-contact-checksummed",
+      "source": "04 \u00a72.5.1: `contact` in EIP-55 mixed case; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.check",
+            "params": {
+              "contact": "0x879E48eA18A3DD814b18b51E5E6E665f87C1e613",
+              "pairingDigest": "579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "fd9a4a07aca8ee1c523a8130ba6fc4ad1cedd712b1f8d28c1b07b5b75ded5e6f41f567fddc5d6efbc4a2cb15e32e0a10f70a21959dea535441a2216a1c56c4c2"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pairing": {
+            "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+            "pairingDigest": "579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c"
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-contact-check-unknown-param",
+      "source": "04 \u00a72.5.1: unknown key in contact.check params; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.check",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+              "pairingDigest": "579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c",
+              "note": "x"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "951fac01d2c7c5d3650ee53ed00799d1e178970fae85f3c060fb62054aa75f28726df8a38a3e7d9d81796964ebd4602eb01097db17129d1fedc62862b2e17477"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060,
+          "pairing": {
+            "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+            "pairingDigest": "579bd4909b9a9c8399802d72a0060770ac34ca5e107b58e468aa6857dbefc69c"
+          }
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-json-revoke",
+      "source": "04 \u00a72.5.1: the SignedOwnerAction as JSON text verifies",
+      "input": {
+        "op": "verifyJson",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "verify-json-reject-issued-at-fraction",
+      "source": "04 \u00a72.5.1, 04 \u00a72.4.1: issuedAt spelled 1760000000.0; the signature is valid over the parsed value, so only the token check refuses it",
+      "input": {
+        "op": "verifyJson",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000.0,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-json-reject-issued-at-exponent",
+      "source": "04 \u00a72.5.1, 04 \u00a72.4.1: issuedAt spelled 1.76e9; the signature is valid over the parsed value, so only the token check refuses it",
+      "input": {
+        "op": "verifyJson",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1.76e9,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-json-reject-v-fraction",
+      "source": "04 \u00a72.5.1, 04 \u00a72.4.1: v spelled 1.0; the signature is valid over the parsed value, so only the token check refuses it",
+      "input": {
+        "op": "verifyJson",
+        "json": "{\"body\":{\"v\":1.0,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-json-reject-expires-at-minus-zero",
+      "source": "04 \u00a72.5.1, 04 \u00a72.4.1: expiresAt spelled -0; the signature is valid over the parsed value, so only the token check refuses it",
+      "input": {
+        "op": "verifyJson",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":-0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-json-reject-duplicate-op",
+      "source": "04 \u00a72.5.1, 04 \u00a72.4.1: a duplicate `op` key; the signature is valid over the parsed value, so only the token check refuses it",
+      "input": {
+        "op": "verifyJson",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    }
+  ]
+}

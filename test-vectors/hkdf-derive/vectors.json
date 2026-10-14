@@ -1,0 +1,1009 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "hkdf-derive",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib, cryptography 50.0.2, coincurve 21.0.0, pycryptodome 3.23.0)",
+    "version": "cpython 3.12.13",
+    "script": "tools/vectors/generate_hkdf_derive.py"
+  },
+  "cases": [
+    {
+      "id": "rfc5869-1",
+      "source": "RFC 5869 Appendix A.1 (published)",
+      "input": {
+        "op": "hkdf",
+        "ikm": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+        "salt": "000102030405060708090a0b0c",
+        "info": "f0f1f2f3f4f5f6f7f8f9",
+        "length": 42
+      },
+      "expected": {
+        "okm": "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865"
+      }
+    },
+    {
+      "id": "rfc5869-2",
+      "source": "RFC 5869 Appendix A.2 (published)",
+      "input": {
+        "op": "hkdf",
+        "ikm": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+        "salt": "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+        "info": "b0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+        "length": 82
+      },
+      "expected": {
+        "okm": "b11e398dc80327a1c8e7f78c596a49344f012eda2d4efad8a050cc4c19afa97c59045a99cac7827271cb41c65e590e09da3275600c2f09b8367793a9aca3db71cc30c58179ec3e87c14c01d5c1f3434f1d87"
+      }
+    },
+    {
+      "id": "rfc5869-3",
+      "source": "RFC 5869 Appendix A.3 (published)",
+      "input": {
+        "op": "hkdf",
+        "ikm": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+        "salt": "",
+        "info": "",
+        "length": 42
+      },
+      "expected": {
+        "okm": "8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d9d201395faa4b61a96c8"
+      }
+    },
+    {
+      "id": "derive-evm-e0-seed-a",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/evm",
+        "epoch": 0,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "8c30ba481f8dd080a2adcf9d7a618c3b1cecfd544789fe12b16fef3417ed9679"
+      }
+    },
+    {
+      "id": "derive-nostr-e0-seed-a",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/nostr",
+        "epoch": 0,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "de704412e37f60421498775c8097b4083880d13dde22a53ebd6a5ed9467f6f18"
+      }
+    },
+    {
+      "id": "derive-nostr-e1-seed-a",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/nostr",
+        "epoch": 1,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "8e8bf60e0be7cd864f9e3a1425746341f8e0e36998972ba0e329c58594ba04ea"
+      }
+    },
+    {
+      "id": "derive-nostr-e2-seed-a",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/nostr",
+        "epoch": 2,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "6917537daf4fc107f12c7c00ac89a0b3a3d4283f4db4b6cc52ced559317cb335"
+      }
+    },
+    {
+      "id": "derive-enc-e0-seed-a",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/enc",
+        "epoch": 0,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "3613fda31b0abd9cdde94668e25b71fbc9488cd3534fc34ecd3ac5825ab07851"
+      }
+    },
+    {
+      "id": "derive-enc-e1-seed-a",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/enc",
+        "epoch": 1,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "40c1521b632b5e71b394d36bd639856d062f0552c3cdae220694c934f167c5ac"
+      }
+    },
+    {
+      "id": "derive-enc-e2-seed-a",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/enc",
+        "epoch": 2,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "d0941e29a7d2f2b6f5eba29e910ac9ffd1ce5fadcace0accd3f0790b534ca205"
+      }
+    },
+    {
+      "id": "derive-drop-e0-seed-a",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/drop",
+        "epoch": 0,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "01f0c53cf22e028e68e196572c851aff6aebd916c0cc9e0b71bf721a24949175"
+      }
+    },
+    {
+      "id": "derive-drop-e1-seed-a",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/drop",
+        "epoch": 1,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "adca2c503f1b0f7b41be6ecc0c75848db684ce79bdf90f942fa78844e751388b"
+      }
+    },
+    {
+      "id": "derive-drop-e2-seed-a",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/drop",
+        "epoch": 2,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "f92a7205f410c826e56a232c70ae5b97872ae78eb5069988e4fea7f95813e063"
+      }
+    },
+    {
+      "id": "derive-evm-e0-seed-b",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/evm",
+        "epoch": 0,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "01d006c073d551eaee4fde048c584bc683e929c75b378817a7b9ad54e802de22"
+      }
+    },
+    {
+      "id": "derive-nostr-e0-seed-b",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/nostr",
+        "epoch": 0,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "e68f0018cafea5cff7f3f535529efc710fe8ccf31603f0111dca61137409e7ed"
+      }
+    },
+    {
+      "id": "derive-nostr-e1-seed-b",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/nostr",
+        "epoch": 1,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "f9b8f252e1065740026986ece63d19061c62a731eef5608e1cb4701cddf19014"
+      }
+    },
+    {
+      "id": "derive-nostr-e2-seed-b",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/nostr",
+        "epoch": 2,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "12d4cc2961f8ca458e9c8941ddec03ed1148aef8ada7d0c4f72e95934374d2bd"
+      }
+    },
+    {
+      "id": "derive-enc-e0-seed-b",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/enc",
+        "epoch": 0,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "bb43d35fd53757c01a1fd07d9893a6f9e7c30ed860e0eea2d0469acf667b0025"
+      }
+    },
+    {
+      "id": "derive-enc-e1-seed-b",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/enc",
+        "epoch": 1,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "f38086cce8cc76dbe63cdb555afa654759dc545dad21939734e379d7e059445d"
+      }
+    },
+    {
+      "id": "derive-enc-e2-seed-b",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/enc",
+        "epoch": 2,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "6710b4a618488e5f55efd65ca40cc03ce698dfbfd1d49ba6201089b16026ff75"
+      }
+    },
+    {
+      "id": "derive-drop-e0-seed-b",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/drop",
+        "epoch": 0,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "6e4b9706dec14710869448c837c27f74479d13d2c0db4f9d7ae1fab1d8686f0a"
+      }
+    },
+    {
+      "id": "derive-drop-e1-seed-b",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/drop",
+        "epoch": 1,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "3b966699df69cbb7c4f3344e417fd70d81936a6a9adf2d728cd46fbe11196e91"
+      }
+    },
+    {
+      "id": "derive-drop-e2-seed-b",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/drop",
+        "epoch": 2,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "9a7b3a372835011b43d5bf5654877f55c099e08e765cbb534b240d0ea34e1eb4"
+      }
+    },
+    {
+      "id": "derive-evm-e0-seed-c",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "label": "agentlink/v1/evm",
+        "epoch": 0,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "4f70820e6fed386a23d76e4ab55231d1d14f7b44b01171236d18159240363bbe"
+      }
+    },
+    {
+      "id": "derive-nostr-e0-seed-c",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "label": "agentlink/v1/nostr",
+        "epoch": 0,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "ede768b56fbd17aa782813f734e0cebdfa89e5460185d2011ded5878b225082c"
+      }
+    },
+    {
+      "id": "derive-nostr-e1-seed-c",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "label": "agentlink/v1/nostr",
+        "epoch": 1,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "28cdc32944d1e9081e7fdb638823347c0f42c4ca365a9376975d7617432dced2"
+      }
+    },
+    {
+      "id": "derive-nostr-e2-seed-c",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "label": "agentlink/v1/nostr",
+        "epoch": 2,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "66274b84453e64a0deb3fb38bb76283a93ff7b7d3be7637c27966dda2c828f5d"
+      }
+    },
+    {
+      "id": "derive-enc-e0-seed-c",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "label": "agentlink/v1/enc",
+        "epoch": 0,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "c1dae432071a820d7124b1663bc60eaf18bde1f61a98618f2c9848482886594e"
+      }
+    },
+    {
+      "id": "derive-enc-e1-seed-c",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "label": "agentlink/v1/enc",
+        "epoch": 1,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "fcd299441e3058308689ae2b21226022c7fe06f1c69698e03276c3ca2d9ba954"
+      }
+    },
+    {
+      "id": "derive-enc-e2-seed-c",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "label": "agentlink/v1/enc",
+        "epoch": 2,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "afb39524998da1ab7ff58a185900e4aba0594c1a14a33e1cff735342bdb26562"
+      }
+    },
+    {
+      "id": "derive-drop-e0-seed-c",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "label": "agentlink/v1/drop",
+        "epoch": 0,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "69b715f0e155a8fc1af1d783afaeba5f79d1608863034c4caab0ffbe08e44c68"
+      }
+    },
+    {
+      "id": "derive-drop-e1-seed-c",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "label": "agentlink/v1/drop",
+        "epoch": 1,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "e40985962a7a5d82894315b96c1da8cea5ef12b1fe780c0228b752cc507e0405"
+      }
+    },
+    {
+      "id": "derive-drop-e2-seed-c",
+      "source": "04 \u00a72.1",
+      "input": {
+        "op": "derive",
+        "masterSeed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "label": "agentlink/v1/drop",
+        "epoch": 2,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "a9e5ab245088bd04bf210008ed7176f2d50770e8552de42dd3068945996edfd7"
+      }
+    },
+    {
+      "id": "derive-evm-counter-1",
+      "source": "04 \u00a72.1 (u8 counter = 1, as after one rejection)",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/evm",
+        "epoch": 0,
+        "counter": 1
+      },
+      "expected": {
+        "okm": "63e0cd3ed6bf386aacd165c7913d2acf45083c9f3e421b561ee334e5b9c9f322"
+      }
+    },
+    {
+      "id": "derive-nostr-counter-1",
+      "source": "04 \u00a72.1 (u8 counter = 1, as after one rejection)",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/nostr",
+        "epoch": 0,
+        "counter": 1
+      },
+      "expected": {
+        "okm": "1b9a924c8f2d61d305b57b418556f892ad1cdfc36afff4ff2167cdb96e2d6482"
+      }
+    },
+    {
+      "id": "derive-enc-counter-1",
+      "source": "04 \u00a72.1 (u8 counter = 1, as after one rejection)",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/enc",
+        "epoch": 0,
+        "counter": 1
+      },
+      "expected": {
+        "okm": "20d8787e7237bd18455f1e5b1ffecb0e4fdb6630322c61c7777a6089a591106a"
+      }
+    },
+    {
+      "id": "derive-drop-counter-1",
+      "source": "04 \u00a72.1 (u8 counter = 1, as after one rejection)",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/drop",
+        "epoch": 0,
+        "counter": 1
+      },
+      "expected": {
+        "okm": "f33259b83856545b4b4f779464437e784692f166f5594d1cf52d81c12fdc3425"
+      }
+    },
+    {
+      "id": "derive-nostr-epoch-256",
+      "source": "04 \u00a72.1 (u32be epoch byte order)",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/nostr",
+        "epoch": 256,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "5eb294faa96a6eb89f77303138c2de75c93b2cc2644d25483b5f01e4a3c6ecf1"
+      }
+    },
+    {
+      "id": "derive-nostr-epoch-max",
+      "source": "04 \u00a72.1 (largest u32 epoch)",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/nostr",
+        "epoch": 4294967295,
+        "counter": 0
+      },
+      "expected": {
+        "okm": "65dde95fdc36d150d0dde8780a32876f38baef01518afdabd887b872c6f517f9"
+      }
+    },
+    {
+      "id": "derive-enc-counter-255",
+      "source": "04 \u00a72.1 (largest u8 counter)",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/enc",
+        "epoch": 0,
+        "counter": 255
+      },
+      "expected": {
+        "okm": "9559d6c6e91eb5fb6416d1a649975618c785f4ffc415a0c35634533116eb6394"
+      }
+    },
+    {
+      "id": "derive-reject-epoch-2-pow-32",
+      "source": "04 \u00a72.1: epoch does not fit u32be",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/nostr",
+        "epoch": 4294967296,
+        "counter": 0
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "derive-reject-epoch-negative",
+      "source": "04 \u00a72.1: epoch does not fit u32be",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/nostr",
+        "epoch": -1,
+        "counter": 0
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "derive-reject-counter-256",
+      "source": "04 \u00a72.1: counter does not fit u8",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/nostr",
+        "epoch": 0,
+        "counter": 256
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "derive-reject-counter-negative",
+      "source": "04 \u00a72.1: counter does not fit u8",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/nostr",
+        "epoch": 0,
+        "counter": -1
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "derive-reject-seed-31-bytes",
+      "source": "04 \u00a72.1: the master seed is 32 bytes (04 \u00a72)",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e",
+        "label": "agentlink/v1/nostr",
+        "epoch": 0,
+        "counter": 0
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "derive-reject-seed-33-bytes",
+      "source": "04 \u00a72.1: the master seed is 32 bytes (04 \u00a72)",
+      "input": {
+        "op": "derive",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f00",
+        "label": "agentlink/v1/nostr",
+        "epoch": 0,
+        "counter": 0
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "key-evm-e0-seed-a",
+      "source": "04 \u00a72.1 secp256k1 EVM address: canonical 0x + lowercase hex (04 \u00a72.4.1) and its EIP-55 display form",
+      "input": {
+        "op": "key",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/evm",
+        "epoch": 0
+      },
+      "expected": {
+        "address": "0xe8118b7407afbd4a12c0df832c67ce0e2eb20cd6",
+        "addressChecksummed": "0xE8118B7407afbd4A12C0df832C67CE0E2Eb20Cd6"
+      }
+    },
+    {
+      "id": "key-nostr-e0-seed-a",
+      "source": "04 \u00a72.1 secp256k1, BIP-340 x-only public key",
+      "input": {
+        "op": "key",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/nostr",
+        "epoch": 0
+      },
+      "expected": {
+        "publicKey": "bef8e4f8d2bf4cb71d9ec7aecd45ee52b4e6297d8aaea3dceea2ae860d6b7bcb"
+      }
+    },
+    {
+      "id": "key-nostr-e1-seed-a",
+      "source": "04 \u00a72.1 secp256k1, BIP-340 x-only public key",
+      "input": {
+        "op": "key",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/nostr",
+        "epoch": 1
+      },
+      "expected": {
+        "publicKey": "ae742057f3556aa1435f4c4ab52350f3881c1b57f3b3c1b58a1708ddc9ab6ee4"
+      }
+    },
+    {
+      "id": "key-nostr-e2-seed-a",
+      "source": "04 \u00a72.1 secp256k1, BIP-340 x-only public key",
+      "input": {
+        "op": "key",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/nostr",
+        "epoch": 2
+      },
+      "expected": {
+        "publicKey": "eeca8ae4d087ff4bb86be63399f5c96e6d6ca0136bc5e23d4273fca38290ff8b"
+      }
+    },
+    {
+      "id": "key-enc-e0-seed-a",
+      "source": "04 \u00a72.1 X25519 (RFC 7748 clamping by the library), \u00a73.1 kid",
+      "input": {
+        "op": "key",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/enc",
+        "epoch": 0
+      },
+      "expected": {
+        "publicKey": "246c0c42c2ffb128f7e17a8a103bf6514b9a5ce86f3104ccc8839199487be828",
+        "kid": "iR63ZmYD_Lr9E5wI4RoYvw"
+      }
+    },
+    {
+      "id": "key-enc-e1-seed-a",
+      "source": "04 \u00a72.1 X25519 (RFC 7748 clamping by the library), \u00a73.1 kid",
+      "input": {
+        "op": "key",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/enc",
+        "epoch": 1
+      },
+      "expected": {
+        "publicKey": "a98b9842c18f595b5b245ec2fb0959fba5d2c27f679cf3b227edc8eaef5f8a70",
+        "kid": "O0i-8jnV5CTe6ut3YJJofw"
+      }
+    },
+    {
+      "id": "key-enc-e2-seed-a",
+      "source": "04 \u00a72.1 X25519 (RFC 7748 clamping by the library), \u00a73.1 kid",
+      "input": {
+        "op": "key",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/enc",
+        "epoch": 2
+      },
+      "expected": {
+        "publicKey": "947b9fda4fb507b4d1c738ee1efedc3de051467552c73fcad826e1c9b9e63578",
+        "kid": "k4LFkdrai0jLJyheqQuU_Q"
+      }
+    },
+    {
+      "id": "key-drop-e0-seed-a",
+      "source": "04 \u00a72.1 secp256k1, BIP-340 x-only public key",
+      "input": {
+        "op": "key",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/drop",
+        "epoch": 0
+      },
+      "expected": {
+        "publicKey": "f3401c014d207e22a23ec4d4d3c60fb929c6ed2bc3a93032087c6ccd110b43cb"
+      }
+    },
+    {
+      "id": "key-drop-e1-seed-a",
+      "source": "04 \u00a72.1 secp256k1, BIP-340 x-only public key",
+      "input": {
+        "op": "key",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/drop",
+        "epoch": 1
+      },
+      "expected": {
+        "publicKey": "f4352a6609c319211ad3c6496e5ef502abcf0ddb58c8f338a9d8ff4e04e0eefa"
+      }
+    },
+    {
+      "id": "key-drop-e2-seed-a",
+      "source": "04 \u00a72.1 secp256k1, BIP-340 x-only public key",
+      "input": {
+        "op": "key",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/drop",
+        "epoch": 2
+      },
+      "expected": {
+        "publicKey": "50fe3e439434f82b7570f04d240e4171ccf5d52687a793d16464e975a1c53beb"
+      }
+    },
+    {
+      "id": "key-evm-e0-seed-b",
+      "source": "04 \u00a72.1 secp256k1 EVM address: canonical 0x + lowercase hex (04 \u00a72.4.1) and its EIP-55 display form",
+      "input": {
+        "op": "key",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/evm",
+        "epoch": 0
+      },
+      "expected": {
+        "address": "0x441e5fe96afae9130411dabd2304e4bcc77e78bc",
+        "addressChecksummed": "0x441e5fe96aFAE9130411dAbD2304E4bCc77E78bC"
+      }
+    },
+    {
+      "id": "key-nostr-e0-seed-b",
+      "source": "04 \u00a72.1 secp256k1, BIP-340 x-only public key",
+      "input": {
+        "op": "key",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/nostr",
+        "epoch": 0
+      },
+      "expected": {
+        "publicKey": "e7b04d3c88005d54ec99f79931111a9c51729b268c24e179865be0dcfe684a56"
+      }
+    },
+    {
+      "id": "key-nostr-e1-seed-b",
+      "source": "04 \u00a72.1 secp256k1, BIP-340 x-only public key",
+      "input": {
+        "op": "key",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/nostr",
+        "epoch": 1
+      },
+      "expected": {
+        "publicKey": "f91fb9b84f10dd0c7b503411f410b0a10f24e8be542d23e52213e0a28bc32938"
+      }
+    },
+    {
+      "id": "key-nostr-e2-seed-b",
+      "source": "04 \u00a72.1 secp256k1, BIP-340 x-only public key",
+      "input": {
+        "op": "key",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/nostr",
+        "epoch": 2
+      },
+      "expected": {
+        "publicKey": "eb7a27ec66f06130cd800e7a19b6edc31ad5d162b937aa7e2dea20b5c397b1a5"
+      }
+    },
+    {
+      "id": "key-enc-e0-seed-b",
+      "source": "04 \u00a72.1 X25519 (RFC 7748 clamping by the library), \u00a73.1 kid",
+      "input": {
+        "op": "key",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/enc",
+        "epoch": 0
+      },
+      "expected": {
+        "publicKey": "31a379914e37995d330e61023944353e08a9fb59fc8695cb14f11578d406401e",
+        "kid": "iQVwKNyRu0-CdqZK4oQ5IA"
+      }
+    },
+    {
+      "id": "key-enc-e1-seed-b",
+      "source": "04 \u00a72.1 X25519 (RFC 7748 clamping by the library), \u00a73.1 kid",
+      "input": {
+        "op": "key",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/enc",
+        "epoch": 1
+      },
+      "expected": {
+        "publicKey": "0bc958fce96b906947f50139d4cea5b41bd9ec660eb9172bdad9b9d490096064",
+        "kid": "2dclQ3f4__6CWRQdiSEqeg"
+      }
+    },
+    {
+      "id": "key-enc-e2-seed-b",
+      "source": "04 \u00a72.1 X25519 (RFC 7748 clamping by the library), \u00a73.1 kid",
+      "input": {
+        "op": "key",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/enc",
+        "epoch": 2
+      },
+      "expected": {
+        "publicKey": "d6cb8bf9176fcc3bf2c83a3a9fe0e30aa593bfec150a9e188a96a9b860047f14",
+        "kid": "8L3bZRf_jjx5vecARIPCXQ"
+      }
+    },
+    {
+      "id": "key-drop-e0-seed-b",
+      "source": "04 \u00a72.1 secp256k1, BIP-340 x-only public key",
+      "input": {
+        "op": "key",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/drop",
+        "epoch": 0
+      },
+      "expected": {
+        "publicKey": "9aea51af40f07febc66204717adf14c70a6c8e61c07ad1e84dbb56bb91f96c38"
+      }
+    },
+    {
+      "id": "key-drop-e1-seed-b",
+      "source": "04 \u00a72.1 secp256k1, BIP-340 x-only public key",
+      "input": {
+        "op": "key",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/drop",
+        "epoch": 1
+      },
+      "expected": {
+        "publicKey": "f03593ccb49f32e32dc7b348b234fcf0dc68e885677888ba0ec4ec88281d7312"
+      }
+    },
+    {
+      "id": "key-drop-e2-seed-b",
+      "source": "04 \u00a72.1 secp256k1, BIP-340 x-only public key",
+      "input": {
+        "op": "key",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88",
+        "label": "agentlink/v1/drop",
+        "epoch": 2
+      },
+      "expected": {
+        "publicKey": "e18263071079b64b52644a9c8656f304673ca482fb4197cbe79c5077654a1a85"
+      }
+    },
+    {
+      "id": "key-reject-evm-e1",
+      "source": "04 \u00a72.1: agentlink/v1/evm is always epoch 0 (M1-1b: the API rejects other epochs)",
+      "input": {
+        "op": "key",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/evm",
+        "epoch": 1
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "key-reject-evm-e2",
+      "source": "04 \u00a72.1: agentlink/v1/evm is always epoch 0 (M1-1b: the API rejects other epochs)",
+      "input": {
+        "op": "key",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/evm",
+        "epoch": 2
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "agent-id-seed-a",
+      "source": "04 \u00a72.9 agent ID: keccak256 of the uncompressed agentlink/v1/evm key (epoch 0), last 20 bytes, 0x + 40 lowercase hex",
+      "input": {
+        "op": "agentId",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+      },
+      "expected": {
+        "agentId": "0xe8118b7407afbd4a12c0df832c67ce0e2eb20cd6"
+      }
+    },
+    {
+      "id": "agent-id-seed-b",
+      "source": "04 \u00a72.9 agent ID: keccak256 of the uncompressed agentlink/v1/evm key (epoch 0), last 20 bytes, 0x + 40 lowercase hex",
+      "input": {
+        "op": "agentId",
+        "masterSeed": "e41941bf51f3a630b7645066dfb5e8cbeb7caa9683cb438566f608dc1feb2c88"
+      },
+      "expected": {
+        "agentId": "0x441e5fe96afae9130411dabd2304e4bcc77e78bc"
+      }
+    },
+    {
+      "id": "agent-id-seed-c",
+      "source": "04 \u00a72.9 agent ID: keccak256 of the uncompressed agentlink/v1/evm key (epoch 0), last 20 bytes, 0x + 40 lowercase hex",
+      "input": {
+        "op": "agentId",
+        "masterSeed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "expected": {
+        "agentId": "0xae25b161cc95859f152010ff4df6913895c780d6"
+      }
+    },
+    {
+      "id": "key-reject-unknown-label",
+      "source": "04 \u00a72.1: only the four labels of the table derive keys",
+      "input": {
+        "op": "key",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v1/unknown",
+        "epoch": 0
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "key-reject-label-v2",
+      "source": "04 \u00a72.1: only the four labels of the table derive keys",
+      "input": {
+        "op": "key",
+        "masterSeed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "label": "agentlink/v2/nostr",
+        "epoch": 0
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    }
+  ]
+}

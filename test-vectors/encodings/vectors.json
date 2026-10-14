@@ -1,0 +1,3024 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "encodings",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib, coincurve 21.0.0, pycryptodome 3.23.0)",
+    "version": "cpython 3.12.13",
+    "script": "tools/vectors/generate_encodings.py"
+  },
+  "cases": [
+    {
+      "id": "decode-owner-action-agent",
+      "source": "04 \u00a72.4.1: OwnerAction.agent in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.agent",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-contact-check-params-contact",
+      "source": "04 \u00a72.4.1: contact.check.params.contact in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "contact.check.params.contact",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-tool-contact-id",
+      "source": "04 \u00a72.4.1: tool.contact.id in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "tool.contact.id",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-tool-agent-id",
+      "source": "04 \u00a72.4.1: tool.agent.id in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "tool.agent.id",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-approval-request-agent",
+      "source": "04 \u00a72.4.1: approval-request.agent in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "approval-request.agent",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-terms-parties",
+      "source": "04 \u00a72.4.1: terms.parties[] in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "terms.parties[]",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-terms-deliverables-by",
+      "source": "04 \u00a72.4.1: terms.deliverables[].by in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "terms.deliverables[].by",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-terms-price-payer",
+      "source": "04 \u00a72.4.1: terms.price.payer in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "terms.price.payer",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-commitment-scope-agent-id",
+      "source": "04 \u00a72.4.1: CommitmentScope.agentId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.agentId",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-commitment-scope-counterparty-agent-id",
+      "source": "04 \u00a72.4.1: CommitmentScope.counterparty.agentId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.counterparty.agentId",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-agent-card-agent-evm",
+      "source": "04 \u00a72.4.1: AgentCard.agentEvm in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "AgentCard.agentEvm",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-agent-card-owner-evm",
+      "source": "04 \u00a72.4.1: AgentCard.ownerEvm in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "AgentCard.ownerEvm",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-proof-pack-notary",
+      "source": "04 \u00a72.4.1: ProofPack.notary in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.notary",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-proof-pack-signer-evm",
+      "source": "04 \u00a72.4.1: ProofPack.signer.evm in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.signer.evm",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-proof-pack-recipient-evm",
+      "source": "04 \u00a72.4.1: ProofPack.recipient.evm in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.recipient.evm",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-proof-pack-receipts-signer",
+      "source": "04 \u00a72.4.1: ProofPack.receipts[].signer in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.receipts[].signer",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-record-signer",
+      "source": "04 \u00a72.4.1: Record.signer in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Record.signer",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-receipt-signer",
+      "source": "04 \u00a72.4.1: Receipt.signer in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Receipt.signer",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-record-fee-token",
+      "source": "04 \u00a72.4.1: Record.feeToken in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Record.feeToken",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-eip3009-auth-from",
+      "source": "04 \u00a72.4.1: EIP3009.auth.from in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "EIP3009.auth.from",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-eip3009-auth-to",
+      "source": "04 \u00a72.4.1: EIP3009.auth.to in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "EIP3009.auth.to",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-proof-status-signer",
+      "source": "04 \u00a72.4.1: ProofStatus.signer in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofStatus.signer",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "bytes": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      }
+    },
+    {
+      "id": "decode-proof-record-id",
+      "source": "04 \u00a72.4.1: proof.recordId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "proof.recordId",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-proof-pack-record-id",
+      "source": "04 \u00a72.4.1: ProofPack.recordId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.recordId",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-handshake-ack-handshake-hash",
+      "source": "04 \u00a72.4.1: handshake-ack.handshakeHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake-ack.handshakeHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-proof-salt",
+      "source": "04 \u00a72.4.1: proof.salt in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "proof.salt",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-proof-pack-recipient-salt",
+      "source": "04 \u00a72.4.1: ProofPack.recipient.salt in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.recipient.salt",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-commitment-scope-answers-envelope-hash",
+      "source": "04 \u00a72.4.1: CommitmentScope.answers.envelopeHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.answers.envelopeHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-proof-pack-envelope-hash",
+      "source": "04 \u00a72.4.1: ProofPack.envelopeHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.envelopeHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-record-envelope-hash",
+      "source": "04 \u00a72.4.1: Record.envelopeHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Record.envelopeHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-record-recipient-commitment",
+      "source": "04 \u00a72.4.1: Record.recipientCommitment in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Record.recipientCommitment",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-record-parent-record-id",
+      "source": "04 \u00a72.4.1: Record.parentRecordId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Record.parentRecordId",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-record-app-id",
+      "source": "04 \u00a72.4.1: Record.appId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Record.appId",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-receipt-record-id",
+      "source": "04 \u00a72.4.1: Receipt.recordId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Receipt.recordId",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-receipt-salt",
+      "source": "04 \u00a72.4.1: Receipt.salt in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Receipt.salt",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-record-struct-hash",
+      "source": "04 \u00a72.4.1: recordStructHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "recordStructHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-tx-hash",
+      "source": "04 \u00a72.4.1: txHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "txHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-agent-card-agent-nostr",
+      "source": "04 \u00a72.4.1: AgentCard.agentNostr in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "AgentCard.agentNostr",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-agent-card-agent-enc",
+      "source": "04 \u00a72.4.1: AgentCard.agentEnc in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "AgentCard.agentEnc",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-agent-card-owner-nostr",
+      "source": "04 \u00a72.4.1: AgentCard.ownerNostr in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "AgentCard.ownerNostr",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-agent-card-owner-enc",
+      "source": "04 \u00a72.4.1: AgentCard.ownerEnc in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "AgentCard.ownerEnc",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-agent-card-name-hash",
+      "source": "04 \u00a72.4.1: AgentCard.nameHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "AgentCard.nameHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-agent-card-relays-hash",
+      "source": "04 \u00a72.4.1: AgentCard.relaysHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "AgentCard.relaysHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-domain-claim-owner-nostr",
+      "source": "04 \u00a72.4.1: DomainClaim.ownerNostr in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "DomainClaim.ownerNostr",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-eip3009-auth-nonce",
+      "source": "04 \u00a72.4.1: EIP3009.auth.nonce in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "EIP3009.auth.nonce",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-eip3009-auth-r",
+      "source": "04 \u00a72.4.1: EIP3009.auth.r in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "EIP3009.auth.r",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-eip3009-auth-s",
+      "source": "04 \u00a72.4.1: EIP3009.auth.s in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "EIP3009.auth.s",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-proof-status-record-id",
+      "source": "04 \u00a72.4.1: ProofStatus.recordId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofStatus.recordId",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-proof-status-tx-hash",
+      "source": "04 \u00a72.4.1: ProofStatus.txHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofStatus.txHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-verify-proof-pack-record-id",
+      "source": "04 \u00a72.4.1: verify_proof_pack.recordId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "verify_proof_pack.recordId",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-verify-proof-pack-envelope-hash",
+      "source": "04 \u00a72.4.1: verify_proof_pack.envelopeHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "verify_proof_pack.envelopeHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "bytes": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      }
+    },
+    {
+      "id": "decode-invite-card-sig",
+      "source": "04 \u00a72.4.1: invite.cardSig in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "bytes": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      }
+    },
+    {
+      "id": "decode-handshake-card-sig",
+      "source": "04 \u00a72.4.1: handshake.cardSig in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "bytes": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      }
+    },
+    {
+      "id": "decode-handshake-ack-card-sig",
+      "source": "04 \u00a72.4.1: handshake-ack.cardSig in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake-ack.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "bytes": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      }
+    },
+    {
+      "id": "decode-card-update-card-sig",
+      "source": "04 \u00a72.4.1: card-update.cardSig in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "card-update.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "bytes": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      }
+    },
+    {
+      "id": "decode-invite-card-agent-sig",
+      "source": "04 \u00a72.4.1: invite.cardAgentSig in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardAgentSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "bytes": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      }
+    },
+    {
+      "id": "decode-handshake-card-agent-sig",
+      "source": "04 \u00a72.4.1: handshake.cardAgentSig in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake.cardAgentSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "bytes": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      }
+    },
+    {
+      "id": "decode-proof-pack-signature",
+      "source": "04 \u00a72.4.1: ProofPack.signature in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.signature",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "bytes": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      }
+    },
+    {
+      "id": "decode-submitter-records-signature",
+      "source": "04 \u00a72.4.1: submitter.records[].signature in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "submitter.records[].signature",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "bytes": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      }
+    },
+    {
+      "id": "decode-submitter-receipts-signature",
+      "source": "04 \u00a72.4.1: submitter.receipts[].signature in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "submitter.receipts[].signature",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "bytes": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      }
+    },
+    {
+      "id": "decode-record-max-fee",
+      "source": "04 \u00a72.4.1: Record.maxFee in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Record.maxFee",
+        "value": "1500000"
+      },
+      "expected": {
+        "bytes": "000000000000000000000000000000000000000000000000000000000016e360"
+      }
+    },
+    {
+      "id": "decode-record-nonce",
+      "source": "04 \u00a72.4.1: Record.nonce in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "Record.nonce",
+        "value": "1500000"
+      },
+      "expected": {
+        "bytes": "000000000000000000000000000000000000000000000000000000000016e360"
+      }
+    },
+    {
+      "id": "decode-eip3009-auth-value",
+      "source": "04 \u00a72.4.1: EIP3009.auth.value in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "EIP3009.auth.value",
+        "value": "1500000"
+      },
+      "expected": {
+        "bytes": "000000000000000000000000000000000000000000000000000000000016e360"
+      }
+    },
+    {
+      "id": "decode-eip3009-auth-valid-after",
+      "source": "04 \u00a72.4.1: EIP3009.auth.validAfter in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "EIP3009.auth.validAfter",
+        "value": "1500000"
+      },
+      "expected": {
+        "bytes": "000000000000000000000000000000000000000000000000000000000016e360"
+      }
+    },
+    {
+      "id": "decode-eip3009-auth-valid-before",
+      "source": "04 \u00a72.4.1: EIP3009.auth.validBefore in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "EIP3009.auth.validBefore",
+        "value": "1500000"
+      },
+      "expected": {
+        "bytes": "000000000000000000000000000000000000000000000000000000000016e360"
+      }
+    },
+    {
+      "id": "decode-envelope-from",
+      "source": "04 \u00a72.4.1: envelope.from in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.from",
+        "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      },
+      "expected": {
+        "bytes": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      }
+    },
+    {
+      "id": "decode-owner-action-owner",
+      "source": "04 \u00a72.4.1: OwnerAction.owner in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.owner",
+        "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      },
+      "expected": {
+        "bytes": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      }
+    },
+    {
+      "id": "decode-commitment-scope-counterparty-owner-key",
+      "source": "04 \u00a72.4.1: CommitmentScope.counterparty.ownerKey in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.counterparty.ownerKey",
+        "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      },
+      "expected": {
+        "bytes": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      }
+    },
+    {
+      "id": "decode-nostr-event-id",
+      "source": "04 \u00a72.4.1: nostr.eventId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "nostr.eventId",
+        "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      },
+      "expected": {
+        "bytes": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      }
+    },
+    {
+      "id": "decode-envelope-sig",
+      "source": "04 \u00a72.4.1: envelope.sig in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.sig",
+        "value": "b1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760d6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f617823"
+      },
+      "expected": {
+        "bytes": "b1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760d6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f617823"
+      }
+    },
+    {
+      "id": "decode-signed-owner-action-sig",
+      "source": "04 \u00a72.4.1: SignedOwnerAction.sig in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "SignedOwnerAction.sig",
+        "value": "b1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760d6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f617823"
+      },
+      "expected": {
+        "bytes": "b1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760d6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f617823"
+      }
+    },
+    {
+      "id": "decode-approval-request-action-digest",
+      "source": "04 \u00a72.4.1: approval-request.actionDigest in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "approval-request.actionDigest",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-approval-decide-params-action-digest",
+      "source": "04 \u00a72.4.1: approval.decide.params.actionDigest in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "approval.decide.params.actionDigest",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-terms-body-terms-hash",
+      "source": "04 \u00a72.4.1: terms-body.termsHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "terms-body.termsHash",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-terms-previous-terms-hash",
+      "source": "04 \u00a72.4.1: terms.previousTermsHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "terms.previousTermsHash",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-commitment-scope-terms-hash",
+      "source": "04 \u00a72.4.1: CommitmentScope.termsHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.termsHash",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-payload-files-plaintext-sha256",
+      "source": "04 \u00a72.4.1: payload.files[].plaintextSha256 in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "payload.files[].plaintextSha256",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-terms-deliverables-plaintext-sha256",
+      "source": "04 \u00a72.4.1: terms.deliverables[].plaintextSha256 in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "terms.deliverables[].plaintextSha256",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-payload-files-ciphertext-sha256",
+      "source": "04 \u00a72.4.1: payload.files[].ciphertextSha256 in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "payload.files[].ciphertextSha256",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-drop-commit-ciphertext-sha256",
+      "source": "04 \u00a72.4.1: drop-commit.ciphertextSha256 in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "drop-commit.ciphertextSha256",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-proof-pack-owner-approval-policy-hash",
+      "source": "04 \u00a72.4.1: ProofPack.ownerApproval.policyHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.ownerApproval.policyHash",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-handshake-inviter-card-hash",
+      "source": "04 \u00a72.4.1: handshake.inviterCardHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake.inviterCardHash",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-contact-check-params-pairing-digest",
+      "source": "04 \u00a72.4.1: contact.check.params.pairingDigest in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "contact.check.params.pairingDigest",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-tool-terms-hash",
+      "source": "04 \u00a72.4.1: tool.termsHash in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "tool.termsHash",
+        "value": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "bytes": "9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      }
+    },
+    {
+      "id": "decode-envelope-id",
+      "source": "04 \u00a72.4.1: envelope.id in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.id",
+        "value": "0l59OtWOknW4bQ2sVUy4fw"
+      },
+      "expected": {
+        "bytes": "d25e7d3ad58e9275b86d0dac554cb87f"
+      }
+    },
+    {
+      "id": "decode-envelope-thread",
+      "source": "04 \u00a72.4.1: envelope.thread in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.thread",
+        "value": "83wv1dtdBBvnGbp5FWh8qQ"
+      },
+      "expected": {
+        "bytes": "f37c2fd5db5d041be719ba7915687ca9"
+      }
+    },
+    {
+      "id": "decode-envelope-recipients-kid",
+      "source": "04 \u00a72.4.1: envelope.recipients[].kid in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.recipients[].kid",
+        "value": "-DnlqRG7YpuIMcPUsF3I2w"
+      },
+      "expected": {
+        "bytes": "f839e5a911bb629b8831c3d4b05dc8db"
+      }
+    },
+    {
+      "id": "decode-envelope-recipients-enc",
+      "source": "04 \u00a72.4.1: envelope.recipients[].enc in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.recipients[].enc",
+        "value": "LzNdcFIaxd_1dUcd2bjAQ0ntayQ7xpu7R4BqFhV79nQ"
+      },
+      "expected": {
+        "bytes": "2f335d70521ac5dff575471dd9b8c04349ed6b243bc69bbb47806a16157bf674"
+      }
+    },
+    {
+      "id": "decode-envelope-recipients-wk",
+      "source": "04 \u00a72.4.1: envelope.recipients[].wk in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.recipients[].wk",
+        "value": "SILvzYgm76jwCzLR7VowRRKTobycFjTjrkCdofvFU3P0EyrUN6vVNeCmgVEcpjdy"
+      },
+      "expected": {
+        "bytes": "4882efcd8826efa8f00b32d1ed5a30451293a1bc9c1634e3ae409da1fbc55373f4132ad437abd535e0a681511ca63772"
+      }
+    },
+    {
+      "id": "decode-envelope-aead-iv",
+      "source": "04 \u00a72.4.1: envelope.aead.iv in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.aead.iv",
+        "value": "nzVvpTnGhU8O2Pod"
+      },
+      "expected": {
+        "bytes": "9f356fa539c6854f0ed8fa1d"
+      }
+    },
+    {
+      "id": "decode-envelope-aead-ct",
+      "source": "04 \u00a72.4.1: envelope.aead.ct in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "envelope.aead.ct",
+        "value": "IAm0s8jeG74OOEAa29mRig"
+      },
+      "expected": {
+        "bytes": "2009b4b3c8de1bbe0e38401adbd9918a"
+      }
+    },
+    {
+      "id": "decode-payload-reply-to",
+      "source": "04 \u00a72.4.1: payload.replyTo in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "payload.replyTo",
+        "value": "iIXv4PzygcwewCG84aXI3w"
+      },
+      "expected": {
+        "bytes": "8885efe0fcf281cc1ec021bce1a5c8df"
+      }
+    },
+    {
+      "id": "decode-payload-files-inline",
+      "source": "04 \u00a72.4.1: payload.files[].inline in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "payload.files[].inline",
+        "value": "WfMqYAYNX9sEbN742bKjbA"
+      },
+      "expected": {
+        "bytes": "59f32a60060d5fdb046cdef8d9b2a36c"
+      }
+    },
+    {
+      "id": "decode-payload-files-file-key",
+      "source": "04 \u00a72.4.1: payload.files[].fileKey in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "payload.files[].fileKey",
+        "value": "cBki8Fi-I_D0dGc1CF3mV9HSEM9SQDX97xVQ4W848KQ"
+      },
+      "expected": {
+        "bytes": "701922f058be23f0f4746735085de657d1d210cf524035fdef1550e16f38f0a4"
+      }
+    },
+    {
+      "id": "decode-proof-envelope-id",
+      "source": "04 \u00a72.4.1: proof.envelopeId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "proof.envelopeId",
+        "value": "zsMEt3aIZVZR0mm44vJBPQ"
+      },
+      "expected": {
+        "bytes": "cec304b77688655651d269b8e2f2413d"
+      }
+    },
+    {
+      "id": "decode-commitment-scope-answers-envelope-id",
+      "source": "04 \u00a72.4.1: CommitmentScope.answers.envelopeId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.answers.envelopeId",
+        "value": "s0yUSQhCoovfU99ZfHh9uA"
+      },
+      "expected": {
+        "bytes": "b34c94490842a28bdf53df597c787db8"
+      }
+    },
+    {
+      "id": "decode-commitment-scope-thread",
+      "source": "04 \u00a72.4.1: CommitmentScope.thread in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.thread",
+        "value": "nXD3xRvbEHB06D2HsxMfLw"
+      },
+      "expected": {
+        "bytes": "9d70f7c51bdb107074e83d87b3131f2f"
+      }
+    },
+    {
+      "id": "decode-commitment-scope-terms-id",
+      "source": "04 \u00a72.4.1: CommitmentScope.termsId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.termsId",
+        "value": "yAWyU2IRoCWDu44BuMAnZw"
+      },
+      "expected": {
+        "bytes": "c805b2536211a02583bb8e01b8c02767"
+      }
+    },
+    {
+      "id": "decode-terms-terms-id",
+      "source": "04 \u00a72.4.1: terms.termsId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "terms.termsId",
+        "value": "T3VatdwBJ68E6EIV9YLuvA"
+      },
+      "expected": {
+        "bytes": "4f755ab5dc0127af04e84215f582eebc"
+      }
+    },
+    {
+      "id": "decode-invite-invite-id",
+      "source": "04 \u00a72.4.1: invite.inviteId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "invite.inviteId",
+        "value": "U6vRSDPtKUVJtwegn0DR_w"
+      },
+      "expected": {
+        "bytes": "53abd14833ed294549b707a09f40d1ff"
+      }
+    },
+    {
+      "id": "decode-invite-secret",
+      "source": "04 \u00a72.4.1: invite.secret in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "invite.secret",
+        "value": "pdu2mn5ihiJ5yTd-A0QrbsXM04ds_H6TuQz3VhQalLs"
+      },
+      "expected": {
+        "bytes": "a5dbb69a7e62862279c9377e03442b6ec5ccd3876cfc7e93b90cf756141a94bb"
+      }
+    },
+    {
+      "id": "decode-invite-code-commit",
+      "source": "04 \u00a72.4.1: invite.codeCommit in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "invite.codeCommit",
+        "value": "cf381cFBSFT9-i3ce_FX6Iq4IBbyrSu4dzM15vaseyM"
+      },
+      "expected": {
+        "bytes": "71fdfcd5c1414854fdfa2ddc7bf157e88ab82016f2ad2bb8773335e6f6ac7b23"
+      }
+    },
+    {
+      "id": "decode-handshake-invite-id",
+      "source": "04 \u00a72.4.1: handshake.inviteId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake.inviteId",
+        "value": "BXQhYOyvzJRSNLsut0r7WA"
+      },
+      "expected": {
+        "bytes": "05742160ecafcc945234bb2eb74afb58"
+      }
+    },
+    {
+      "id": "decode-handshake-proof",
+      "source": "04 \u00a72.4.1: handshake.proof in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake.proof",
+        "value": "WMJVFuZt0dKghala9jj9Y66JlPGWM4BmNkP6pE0y85s"
+      },
+      "expected": {
+        "bytes": "58c25516e66dd1d2a085a95af638fd63ae8994f1963380663643faa44d32f39b"
+      }
+    },
+    {
+      "id": "decode-handshake-code-nonce",
+      "source": "04 \u00a72.4.1: handshake.codeNonce in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake.codeNonce",
+        "value": "OA0Dq2NnkI69fg3l7OWnx9r4hFVu0JLmvXthMO5Hh9w"
+      },
+      "expected": {
+        "bytes": "380d03ab6367908ebd7e0de5ece5a7c7daf884556ed092e6bd7b6130ee4787dc"
+      }
+    },
+    {
+      "id": "decode-handshake-code-commit",
+      "source": "04 \u00a72.4.1: handshake.codeCommit in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake.codeCommit",
+        "value": "opqDrfBZg5SJTEUw5Z2tpzU8CmZcSVJJVHrZRgQlB7U"
+      },
+      "expected": {
+        "bytes": "a29a83adf0598394894c4530e59dada7353c0a665c495249547ad946042507b5"
+      }
+    },
+    {
+      "id": "decode-handshake-ack-invite-id",
+      "source": "04 \u00a72.4.1: handshake-ack.inviteId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake-ack.inviteId",
+        "value": "MTIZndzDL90xoqaY4vKd5A"
+      },
+      "expected": {
+        "bytes": "3132199ddcc32fdd31a2a698e2f29de4"
+      }
+    },
+    {
+      "id": "decode-handshake-ack-handshake-id",
+      "source": "04 \u00a72.4.1: handshake-ack.handshakeId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake-ack.handshakeId",
+        "value": "6Ny6HKOaYMKemZb7fnbejQ"
+      },
+      "expected": {
+        "bytes": "e8dcba1ca39a60c29e9996fb7e76de8d"
+      }
+    },
+    {
+      "id": "decode-handshake-ack-code-reveal",
+      "source": "04 \u00a72.4.1: handshake-ack.codeReveal in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "handshake-ack.codeReveal",
+        "value": "YvsDa-ILlcAXQjmj9xDYAMK6cy-LQsYNyXdJGo3oWjo"
+      },
+      "expected": {
+        "bytes": "62fb036be20b95c0174239a3f710d800c2ba732f8b42c60dc977491a8de85a3a"
+      }
+    },
+    {
+      "id": "decode-owner-action-nonce",
+      "source": "04 \u00a72.4.1: OwnerAction.nonce in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.nonce",
+        "value": "5Qz9a9zhngrPJOF6SdM-BA"
+      },
+      "expected": {
+        "bytes": "e50cfd6bdce19e0acf24e17a49d33e04"
+      }
+    },
+    {
+      "id": "decode-drop-request-nonce",
+      "source": "04 \u00a72.4.1: drop-request.nonce in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "drop-request.nonce",
+        "value": "-iKLcd_eDyH0jl4IBnDsGQ"
+      },
+      "expected": {
+        "bytes": "fa228b71dfde0f21f48e5e080670ec19"
+      }
+    },
+    {
+      "id": "decode-proof-pack-disclosure-content-key",
+      "source": "04 \u00a72.4.1: ProofPack.disclosure.contentKey in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.disclosure.contentKey",
+        "value": "Vp02v1h0TN-5wvo2qf5IqURg_IpoPRyP_PDxOZ1vOZc"
+      },
+      "expected": {
+        "bytes": "569d36bf58744cdfb9c2fa36a9fe48a94460fc8a683d1c8ffcf0f1399d6f3997"
+      }
+    },
+    {
+      "id": "decode-tool-envelope-id",
+      "source": "04 \u00a72.4.1: tool.envelopeId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "tool.envelopeId",
+        "value": "Zhu_p8ZOk46Vk8zY8gHh1A"
+      },
+      "expected": {
+        "bytes": "661bbfa7c64e938e9593ccd8f201e1d4"
+      }
+    },
+    {
+      "id": "decode-approval-id",
+      "source": "04 \u00a72.4.1: approvalId in its canonical form",
+      "input": {
+        "op": "decode",
+        "path": "approvalId",
+        "value": "apr_-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "bytes": "fbff3e0f00ff10e0f8fe7d3c1b0a99ee"
+      }
+    },
+    {
+      "id": "reject-length-envelope-id-short",
+      "source": "04 \u00a72.4.1: envelope.id of 15 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.id",
+        "value": "0l59OtWOknW4bQ2sVUy4"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-envelope-id-long",
+      "source": "04 \u00a72.4.1: envelope.id of 17 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.id",
+        "value": "0l59OtWOknW4bQ2sVUy4f7E"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-envelope-thread-short",
+      "source": "04 \u00a72.4.1: envelope.thread of 15 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.thread",
+        "value": "83wv1dtdBBvnGbp5FWh8"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-envelope-thread-long",
+      "source": "04 \u00a72.4.1: envelope.thread of 17 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.thread",
+        "value": "83wv1dtdBBvnGbp5FWh8qbI"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-envelope-recipients-kid-short",
+      "source": "04 \u00a72.4.1: envelope.recipients[].kid of 15 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.recipients[].kid",
+        "value": "-DnlqRG7YpuIMcPUsF3I"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-envelope-recipients-kid-long",
+      "source": "04 \u00a72.4.1: envelope.recipients[].kid of 17 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.recipients[].kid",
+        "value": "-DnlqRG7YpuIMcPUsF3I26I"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-envelope-recipients-enc-short",
+      "source": "04 \u00a72.4.1: envelope.recipients[].enc of 31 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.recipients[].enc",
+        "value": "LzNdcFIaxd_1dUcd2bjAQ0ntayQ7xpu7R4BqFhV79g"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-envelope-recipients-enc-long",
+      "source": "04 \u00a72.4.1: envelope.recipients[].enc of 33 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.recipients[].enc",
+        "value": "LzNdcFIaxd_1dUcd2bjAQ0ntayQ7xpu7R4BqFhV79nQj"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-envelope-recipients-wk-short",
+      "source": "04 \u00a72.4.1: envelope.recipients[].wk of 47 bytes (it is 48); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.recipients[].wk",
+        "value": "SILvzYgm76jwCzLR7VowRRKTobycFjTjrkCdofvFU3P0EyrUN6vVNeCmgVEcpjc"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-envelope-recipients-wk-long",
+      "source": "04 \u00a72.4.1: envelope.recipients[].wk of 49 bytes (it is 48); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.recipients[].wk",
+        "value": "SILvzYgm76jwCzLR7VowRRKTobycFjTjrkCdofvFU3P0EyrUN6vVNeCmgVEcpjdyKw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-envelope-aead-iv-short",
+      "source": "04 \u00a72.4.1: envelope.aead.iv of 11 bytes (it is 12); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.aead.iv",
+        "value": "nzVvpTnGhU8O2Po"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-envelope-aead-iv-long",
+      "source": "04 \u00a72.4.1: envelope.aead.iv of 13 bytes (it is 12); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.aead.iv",
+        "value": "nzVvpTnGhU8O2PodaA"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-envelope-aead-ct-short",
+      "source": "04 \u00a72.4.1: envelope.aead.ct of 15 bytes (at least 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.aead.ct",
+        "value": "IAm0s8jeG74OOEAa29mR"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-payload-reply-to-short",
+      "source": "04 \u00a72.4.1: payload.replyTo of 15 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "payload.replyTo",
+        "value": "iIXv4PzygcwewCG84aXI"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-payload-reply-to-long",
+      "source": "04 \u00a72.4.1: payload.replyTo of 17 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "payload.replyTo",
+        "value": "iIXv4PzygcwewCG84aXI35s"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-length-payload-files-inline-max",
+      "source": "04 \u00a72.4.1: payload.files[].inline of 12288 bytes (at most 12288)",
+      "input": {
+        "op": "decode",
+        "path": "payload.files[].inline",
+        "value": "WfMqYAYNX9sEbN742bKjbBG-SqB4qce74my-V5DBojN902Ph3DILqCvmtmCOA9_Y8FBc8qMqozKegVL9jDihLRb3jzGp4jjv6eKVEQ0sChbYb3ZyBtzRxT80xQRAHvQnwevoJ9y130jdIzxpximsjCgcWieScA1k12DiAvNHoXZTNikbuRFzhrORGPmRhfhdGQDZf-Xb5H0SiM9dySQFreJLufeAQ-ACI5BlLb63C7HIF08cdLXXFjxnrKubydUR-BtVRQYXqnY56Ajo5IBYTrpwDWqo856Dc9ASGvMkdBxUc56VoLnOG69v1Gzod0uQNbrL1bc9jyw6fjgz5nwpR00j-DdlCmtOCjxF-upf05R4VXqmsgLRW3pskUCPdYoc_AJWPCFXk8CTx0bROLR31OLimrNyyh6By0nI10_sMVNQ6rkallDzrejiC8j3iN00amjSbG6Cfc-VyXvsBSp9rg1SFyeJ8yBHQUpdR4GJEY202BNfRIR5oQWL7LtkwaXkU2flNLT1KyyJIz0NxFtmU26UnFZdshTSnkfjzRw9Gz7GFc6WB1NzB2dPpEVkY6eZ57HM4ZyfZ-fuN9IRt7qVfcqBKFzLNpiXPcgtZlfTE94uQfgJs27S7-0wg0QKhmw4bKGIQcYUIge9csnGCM9JeTMrbYPsWR8nGsru4chZFyHWuCGt9h9aEIBzrmDmNFKSuiJENLpuX_EfCYUjVt1WvAJjcKdPSPyzVARYD0hEo2fJvBkcjerVkjt8iqAuKMmT2F1Traf0z-ESgr8e9Y9gAQTJD87nx9rkhO7uTITJwCiBicD_JT5bprvYuQ_ZG4Qt_UAbFmoIxAc489vpibnbAtB6GO0wBY81lP1PT3qeKXxNE3wIZ7h9vIZVQO9eEyM1Pmi38wXe4fzr-0jbVmIlIQQ2c1KETxLbvbx9z06d1_Wh_nLhA5cRxkcIyLp3zBN6hTWSBExTfNih9rMloQ8ZP4NSkzgUgkUhOh3AXfBfzAfJkW8VurvJ7HMS8wygYZvA-kjiK9AFTHIMRVcpImaFg8jeYC8KbJ3SgIfIgZEPXAodIoG3BZqXDeLZF3n1BIhdqHRCMYSfpDRMVW1p5voJ5c0T0a_EaxAXBWfjqIDlg7hCzWSGYsNL6I0lCFFdfBrIEQ9CCxUocXxKZffA5fmZlJ94YL1VndGqPy3mnGwEVAP5-Sh9xVS-8zOsyIs0dVSoe-3Ald7c4qRtUW6XxtKjyix52eHhjoA8PyLO5REbMlrXo4MnemBPy2lqumKpZMfiRt_7zQhXKjzOtvYIkD6O1jIKiSOxs5j15fzWOjcfj3xXKFZAgKq79MfZ7TGMcLqO7RMh59AI3pbQUYuTyGqtmBbNUUfm6z7d45S3Bfr4PKbuINz2wPkMD9UcHjp0IkePtcQYNdxgtVpOfkFFm-eJZ33jnKFkwez17FIGOgby8FsnVFLgJP6Vy_4npOoseky0flH4QzAVPm3tEWpMXfCu-FCoBKr1qE1oTTP47Z-tt1j7ZcRBgSz9Mto2y0cfH3RQnNUFCr_2KAYITgJd7pToMVEz_FIHXyYV1iFR_EkXrLIK3060y5V1Q5JYSgfoOOLXs2JOMR0WWD17rLylPMr8FcFOoCxziEfpQOy0OntDuiURUuoHWqY6dWQmEHFsa0T4SQ3z1a2ElYFAfj1IRLHfERXqwH3WaH8hwdKf12Bpj9fs0cIzmCbhRk6WyuyrxkeVXmyg44Nr4XhO5h-HJp1Ak6e4fFOvPbJ6XNCI0jy7hplSgf_-6zPfOESCLgy9imMvrLg2HZYgDlfPgJuUOTi7OqCIuOVf0GI4pi9U8yZ7Cjb5UGR74mBGqQD3mvrQTuqVfnzHKcXMYd3kuBUv-bX38of0EeZelP76X0pit8VUvbGQPs2LZRXUL-R2NMT4SrlonSthwDYLM5aw4GwvtyY6UdHzaNDp1yTuZFcYV0TOFnRWS_tL1_xROXlvJxmf11IyqYRX8Ap0hxixvw_Ko5EhLw7Xa62lQeEBODs8S1mc5I65uUlZeP_-TYhHTjFErPpm0hlNPKgSHS3nFI7nPdpe0c3NfO86grPCrNWSAQihNelQPkoJfj4TFfX-8NtTFHbfOBe5o7G7fAWa4_tZmgq3FPf9S2bA53mTyZad6KTzPkWagI8hFkLHsW14gn3_aRXRGwIpD2VbVTMRSiMASwMiqFG5YaM__8_lwvuK8XTAmAtyz6jrBL-svsmIzgddztPczSnnPwBETLFX4sJzkGD3s5p_xWYs3y9P4vZt_cITea2OaA39tFGNhohx6cgtI3fk3KVxVQqoZgjapB10Jf7IKMLLGDHwRLc9sarqAlmXfyo2Um1GWeYh3LpwCAxxBYswBYwxg35GnrQwnxTsbvsu-L_NlwqatGfNXyda5arHuPVVwz5Oh9GcQZIEnWBbvQ_6fNgIdwPzSWNOBAqSJk3GztIU4qZGV3qm8MRCqgU3hQE2hTvm5ZRpC6PzDT3o8-Tfjrk79t86vF3EZLsegiE8LK6yAPT7lrS08Y6ue-jTN5HwlXcEpI7PV27dlVIXB6PaLz2l2gKfZz0sTEwaiMOAKGFvPFTPDg5yZssIcVwr0lcJcp8cKTBI2Wnt6LnIS2LQ6HU_qg1eGOnQdv3Vhq2TZ6Gkbo5fYqGypXaJvT9UHJlyBVCWXUmNU2HjiPtU18pS-a6krK8Ppzn9Kad-YI9JOn3UXeMd5lAruHjyndIxaE_FLimETYsHvMqbT8y6MQFpFr0-0ZqFEU0dnXuxVN-GiMOH28FT3-WhU6WPsOXFTSLnk3zIiA6bs-O0VaTM2NjaVgKbZUs_bNpGeGhWnyHXzzKoPJa484ExJOBQ1dVTrlZgUEBLkXKHoKrtHaVBPbKkmyjpzEbxaqzAaEGtTmbhNb2vehGWS69fdNZC5jxG4Zhy5wc0h_Z94JVBLnk54CJMOIEqfr0UiaZokxxJWsD6Y0YewXUG5qu-rhsE3RoUNWpDnskilpHJp6CZoGnEPrLB8TAguiFBVONZUKU9BknwStWgZ8EqsQX4Q7Yu0_-kzNtOCgLr9nF4TxYTo-mzY-eXRVn4ar7c3zU9yiVr2QJlADOoCxsfd9NiPAHfHpChEGAsp2ENK6AdmHdfL23DwwUMDsEgKT5HRD-0KXGzVqlpP6f00GSp0SHqeaKKWocmTZ0l3--2Q50px5VmyMykOYczv_CFgfTYnV1zgp7vBxsNFZ6cubJnmrAI2ZqtWuSSyPntXKZ_k-Jc6N_wYnycNkoURQ7sps9IkdQwg8mtdE6KUPlbKipfeMFkqojufCLtQRh8KOW9GDIS5uE5tiK72-hghRSiSU8Sx80p1siP1304olOCBVJT2j22lfGoCrCZWGzwlhR8ssyD7f4SYZY0WTycCe69-0brWhXlm2NzbdkmvHdlfODFZ_crlXjSihDIGhwwX8IWLGlmS5oDAC-v7CUZwt_XSfeAA66XzV2MSBS455NMxIGbtQz22HhhDJ_5Bfcx5fVeT1WnjTx5FqG4OG-e_NnIeElBPhZKdsFKRD6Tiv4EPbaM2zd3f7TVmz4BBjjEQBBzQied9KzOvAwXrGMi75v7RyFoJzuAYULDSnnFNdGNNcrLnxR1NTL71MxuwDokBJQibOfT8EGCJxQdG9xBmcuUlVPoErtSsO2Avpl9sOCiIcyToha0RqiqXyUeDruvZ0tjSq0Y4dT-1PCkn08GXQ2tLd18iGmqHT8n3gkG6q9C67HffHu7_NxEQnFyDcnyo-q_HfjiHJ69ZG4MmQujjJfiGHrmRPoHEFglVFZFTSy_qXTyRDqSJqCm-4xEKIsu-Uov4nDLlE3nq4dskD1sTa9JjYLBBVru8EC0oxpcZx8Hc3knS0-GuNALn86ppR2yQ5sK7ucBFM-nEi0abKDhJ9AMshaOyFC69f9saGaQ1tB0xuia2MHgxaNF-b0Z5S2hM6t6_cg703DXUdMkPhC7Oi4MYoC1ua4xe2VMqgVM6oKg4NlGmywyK1sr1XQWMl6Mna-Qz0DeEVZmjp0aoxq5qWZHbHe2RVASPllPscWiYZggXD4so4NUFrQrjPjOUSIT8_EV-kaNrzH1O4wyauaWLYcdB08sr28GP4oS28vt7eMj3rayWiZdMJ_ovQkLYJzeNg6hlQUVf3U0iU_LtPzaXgRsAJPkg9x1eO8uFevouwDQT08v-MgFJquy-hOYD23rw0BTTQNfvDzPj-1YaDUHjG2uWYgxHAH4YWs2KrymnT6fLm_jLQKrCyhI-EsMrI9Z7cVupbh1U1__i0IweObulG8hB6grJWvbf55H44h-_mBoZQAS3xvLs48EasU_eP4RBTU6CXSPjuXTBb6OkigoqzEyQojS7FvMRFtzvrXNa13DNYO6T16TYDIWFoDFeLMT-jD0ZXmRdTGi1QFjqEi-sTg5kfstt5_vVh-oLGNhyzP26MmGuuakCtHfQco-vDtqVSl4n54UGam66l8zjL-D3CCqj5W0ATaGq7y4fFEJkNfl4ubIr2eUVpBDqgV669i4Ia0oQsxSCN7Pnvw3q2Z3Whax8aG7I1590OO15sw1q9vv-6PEf0ptY-wxDJJT5wbBrDYZG1MVECEYAtsixR5BKdhI4C-evi0_T4EjAXeP9Rs8BBG1WYvZhsspsajj1nH1HG0cWH5BOWfboexIm4rbze9bU0AudAa4ci6O4VCEWsD0qOAkpRpoBZpue3UpxCSPWNJ4Ek2FOMkBFbgBekll6NdDDi1XNzoDX7qa5DeJhgRB1O4uxVjeGhfZ2mzsz2U9b7Nu2Tfi55orwpNZuXBKp2z-PxZuwLUipKBpGM9exxq62EvP79ajpigNryDTgeRoiIp4no03Ju93Kdv2Ut-Y8o6pfgGZE_81G74qgeCyjJQg2C8VNo5M2uuGOfA0NogvREsSMKbStY3JlMTh0iU8Bx_BjT8bpXvgrLpVj8VXlbqI6Z76k2YTy2AiqAkt2zgGSZV4HMTeSuamrXTFFtPG027pkpAc8NZmgZH26hv_hG_8PQHmB5j9nWA9mALGXCSG6AcUPI87QPilt1N2ydxG6Jer6gdiFDsgOwvAzVmS3p9pGC-3CVsABaZ6apUmDvJ6ckJriZJOUcTMMHLW_h017QCY8Ep-HjWNi7c340o_UAJWVaqkd_7kfsZRbs4neKpTUtRCbozv_vVlTJRr08rcHxSi1AhHk7uN_jaTzvG4SpkIdxfYIG15nawILmjosbsiZXUXXl6eglad7WaQVIFHZXdVXU-Xg82q5OMIpH0mg6sHUPSPbN4k2s_ZVzZ5D_WnQnIB7PMccSiRIPQrZi6bDYUlsAP4ad2FZ1Rl7qv8vEsi4j96H46_288-ZtAzV7MuYmDuiEDs4O3Ohd8_cjQUySWtM6fPToZ0rc3foToyT2qyWV5OjjikgefICA-Opl09ssqgk1BhQHoDqYJicJbjqg7q7v9v3ayM40m58gh4WaE3gCkm3k0Exk72-SxwTcvpVC-eR-RCjoNc_LY5IUCdhxkeVxabdN9AiH_jUriF3SMmmhIT10KsR1f9j_kGnA7f8Cydwf11wCTzEERL6Mufo3KR2q9khFT3IKpu0TLqC-0elBNjehCVW1jaZ8rwY-vct7dhs-X-tVmNWEh8sS2aFTTsOnXWFPRBgS-Xim3VFuxUNw3bNAuN37iZmAyh4Xvj2jBDnLWPSDed4HXncwnYWWeRIzULADsKRzZxlZ987PggufGeJioqreBf0kGisB4Ix2t3vN0luTy38yRpWtpsCaESZUENNbanQwzhzohx4tkYngCMmzM8YYzT5Jc3pk7ERgUXB3EG4fpspI8BsAZuXgrpwxyiFtcNoAwpPfUs3ZWoF5VKIQM3aPlGMObOgMxdf5Kej77BURMqL71wpt6LPkhO-dbicoeWUq5dCxFFSxrkh2GjEtsj2nKu_wNoo4kcNBuPKOwebpVxlKqWL-eWeC1hmgea9mseWcpuZGdXkBUroG9uRuatTNXMzb6owxQKa3YI2PiJ9hEpeN0g0pLzHUjiOAHgYuFZ9mxpOz-fHx6gOm5sI3y1q61dfF_yeJFRxwtZTSGAv5kIXjUAkk6e9aH4K300VNSAtvCvr8bX9KrCrzNAu89p0dGAPZTHSOYmZDYiVQHu2JA10EauQVNY86Y9apymfNSf6ln5t6dWBoGfD15cBAXfHkz9u5nwwsbNQwmfFEgR6FAo5vLpiS-JrM5BFlpDMG6-6z2j_ZptKLPRpOcSHQV6Xvsk5olxlCvlyVKSOBtNb5DQSP3Iv7W1fg3LSxHvrg5w7HPmbGqaT7UCFg6KQDPPdpjqJavI3fU3NsqzzBf6jX8UkQtmAokJu8Eu09jNhI0pGZ2_M7EVJUVOX_n0e4p0EpfzPGFH8Kpc2mH6-M730lRlJZlpf229KWV5fTw-3UOhoQnirBiO5oEcPedlkKDczPXBU34Xb_vRMgoqJ5Iysujae4kHbkMZfD8WUWZXd5pmgmqNi5S5AEgCk44-LWASBOhLB42oM1ri-dppdkR6O3s4R04JEW9V14xbOdqd-haMPWPN6ZllaKKhYIpnBQArzJVDlK6Goxr4HI5sw1LqmI8c7faZ6c-pRMLvyuYIIvFw6iGJtyFd-7x5-oSB4UikfQ1tg-d3Hkanq8kzWyFRc-Txb6d1F6qJezr6m6cd5Il1UkgW89IPU0v7sk42I1vEJJIf-14rCk_K5z84RmeqZv3_Bi_khuB4SgaxXrsAAhiJ0Tivp-qUPTtyW7mkZi5hwsLU1TOUEAlwndSNIlUju3XevyVnlM4_HuYDeS8KG8Ui_xCPJIMzW3tyMclArHruhybr3w0tyxetBZLy04_N5c_t-MlOKfhJflB7SqE3dCi6L0bGWIO57qcnf_VS6suQI_JGlDbU0diNTGcOwOfq3xhN69vfPwJIJ2Y7aDrI-B58IVeZLkYmpKYbpxBQh2BaN18KE8nE_omsLrGLQ6LGbzGwc3AhMlN2o3YLPKKrmurhGIwiLfMGjzI1RcD_syXVf4cgGJ5fxMmeqQE5ECacP9B7l5u-y5SqU4FXgo1liq-3DahTmZ7rZy1Br8qKksVQbfTvjJcN3PokjzUoFRT5hwS_-DuS2Txap1UpPx1w3JrkMx1JwiZs9LtZY9dVusfy0ZJmy-3yWXajiDIE42RZaEdEOIRBDjnqOsgZwGqA7_wA1286ebgpPxVCopYvPIZfDw_3iX-CraGPd2l67MuNxn7uervYfzIvAdHr9K7-iXpNOTv5lv60ICBR-vJm49EULYmd7PayPMhwhGtDUy3FzPuOhgHQpj-Oa_3JFUQd4NfveyeUh0ME1LMgCR5WOK4GqvJXgIfXjXZ659mLsHA719wvRKV4oEC-QKsC3dx9_5Y7vNA698fQZlgvLmeKkb6NEtU5um4IAJx-JLVfBnR5AVr3qhqxC38G_U3MSabV2Nh9UCFole6Bya7KHMXAIB_dgDlcH9tj8JnRGDIGMzJCRG2pIMvmmIZn4XbJpQ71AeovPStQ3-K1PFLnYNgzB_8Orc28nEuJw1JEVTmWUEEj-iL1V5jgAbJcLH9Z-vIL6ht1gUUasOs8zYDCgPrgTqFa4gaQzoFKFUhy8yVmiHk5iasVdvqxmxmJApOWDf7APNspjrrI-L4PJ13Rh6i9G_6GuvGpoRvGR2kTzNrfqXXWa9aV3ZfqaTLWPI1m9pNrpa0ESsKwdizxQ2zcfAjn_3e9peOL5x5O3BqQpKPXWBl8HuzYGd39dwYYISdpGpRFiQPE8g8B5EmtnbjjuiINNm4jt2xe_fQC-rgP33tLk_0YREXA5CgRoxk1OYSGmu-6oxito8e5H4c8AXEZyXuAztyd-nti2IjXmWss4SSx8HiaNBjldyenBQ-1JI0eFW0YtEPMzuti00iIastSdP7SETSQhita5-iP2kcIhFEw5klfrWHcpZKSiSwZm8tNdOsILtfn5IfC_2P_6CUoXZ83OB3AiTPmB9SBbkaZaEaB4he6TcQaXOhd46m9MlCvpVTLNCfic8ujp3xmAyucV4FutED3_pfz4BCPyXDxbDqjAUILTW38y0mCHMfUDYpKCZ57XieJZjGnCjhPyV3Dfi2c4aF611l2HKnNXX0GnqEB9CSKvjsETsHNUlllrELc5sXRwJsknsOqX-CP7RVyuBz1m3pRQt298_ttm7Zcj6uFe29XqpeMhvODPzbGB2dNTjzYrBxfGfg3jAGDbjLqM6Jj2RkL9iTDQ-9oTPexdJZfGj3YIUqKIe3Y7EjbvaA6E5W2yV1yeID2hXsqsM7dmMpw2l4JSoWlvY3keaWlBXEgAlidfVMsQzWo95qp8rycNz76LJHsevy_X4LrT__3lY4L2n1rH6HiG1a0T7Gbs6eEvIK6yDl2XNTruEGGdUIXWYblbMhn8PQ042IpkIi9cx3RyHNqeYZhCBSJtOlPv5xno2VIO5kHGfuug7Uy8msAlIZcJSZI7xL33mfhXFIr0-r7_N3rla4wYPPETFUUrDBWve4Ct8CR58siRARN90Pv4UJHAVHn4WZd7JzoOO2VNLnETggcel6uNLu3Ukmamv43V_fVIUjVv0CFJTPESy0EBXSIE3MLwsUq_SUaN056e4eBSoFvadY5S-3GT5VSCGS9wWNg5RihkxmF1duXrqU2OJDrnRlvCTkIPDtFx7EuM8yvv1Ey6cgrj7m4doFZPH4JoegzfQr5Ayo1GmuEQVQeZQcorxuG8Kdk-RAQtQpWnifD6zV_YX2WW5PZvYyp8yXh0GsJm3C8rYu7Z6xpIPPGdfWNU2p5SkgYmlKK9feC_0Nc3eOburDHzPUehQuSx5Zal7Xz_dKfJh27bFpX4v9Z7qBBhzUQyLfuISteYMUI6VFRoU7S0vcOyOnttV4_UjZmFORP8GvCdeB0kgssmf7C3RupZSO8LQf6x416NJIvSvoKdA4fspYEpOBeuxZhcdV8mZXqUSoXg7plnJf1U3jo9A5SP_hO7nibXbzKeC94MINzJJMR534M2bj9I_ndr7-mRb5KI06l3XEYwgXVCue-FedrF5jeE2_n_bxlXu-qLgKGy2wD471zHGFj4c9qrmfc8TnnLhBfRih52SU3e1WC2JkUPy_pI7U7pH0rjYo2l4fx-zTW735F6ag2h4uI2vgASK4reb020EpEjIHQJI1Ffx8jRcjBmFDHA7oshrgJCEU8wyjkV5iUTEMfMeIx-KBePU_lU1ibKg0w0Etn9TZJGJ4rKg1UA6-7rFitoU_UY2r2EkE5ABagJ-v16pn4bNTfii8u26jR_lFaGFci-6MwPd2BEW6W0tbvpV882SQPAcll5auYRiMJVdRyiM1BNIRvB1n_6B7DdIOGUjFzCXtcgIx-_GrI5JXdGnxtAbeQv6KtPaauC9HQ9NIL48DYFGHCCs9mLpj0Z76VNFMEWXWwtR30z3oAOlBP0zdTFW0jQGOCVlvHPwuHvaW9_LpKGAYktFC8u0NI-iNi9wyR-P6QvZXRHO7xFWZ6-2wMj4v5dlzjR69wDUjY4Hg88n8Hlt0mdo3UavSSHc3zS7OMydxf7hqaS_sW6ACo5C0s8KOqMGCOhvAe17POuB07ysxSAssea0l-kztE8u0i2SAhwNQrgtj4OyqUIv-91gJ1EHFrrS5KQy-Jl_flWn-GMubeKsfyFKbhyRdHsUmb_vNfO8oxyjslVuxXuam0yma478lFQPXuIGGloOSdcIUMUqbgTXQoc0EyuPm9hlU4IArYeBDpnv6ShlCqtyV2vpyFKo9ybhHdYDwWbqIMBV1mC_XshMevhcNyB2M1UN7htAT7CNo3Jv7KMPIFajn7P_oPsIQkEYMFeEYY7QJC_oumUyf_0O-MULiIxQSCxDg_voSS6ylR0c0rMJc8oGi07M-ph2uNFKyDmpar9iIBZYLacr1_q8IyYHhu_IYBDZz8m3kCjZBeCQNlYLAMRfm2JgYaIMvS1mSBYGT8geXj-mZKr7uz_eWI98m1ASzJaGZZtf82KdOKA2sMhxyGRTQp1z6f_1Cwijt1JsKma9p2vuVRVGJq0BHMclrfL7GKEec2VQqtBuCaQ9M-xWOkI0FL7-Lbdn_qtHPSz7mSxC93wsIHB0S6vknQ3WdtdhwjRJiZIKY2rnW2QvaLmf8MPqEJBxAe05GTvysPAJTG400MzCNH3yF5VAaMd9d0e4xQao0F0w_PTAPZqx05gFJIDgNja1oyeudgJdiKYv3s1KEtuRSqWKDTGS3BAS_1V4WrvVsBngbmH5BtagdMHYZ880f2C9bwsIWNCyuWqyweuHk6lLD5BHcGXsBu-ja6NNMy4IA3DVi4jfLdabAL9gIjIUI8OuNzSuyoLhGVYL-Tt9QAZXTxdcxNg40D7AcTjFzT5jbAr2_aznuU7Pif3vB6a40-DQ_YZ67suHnNe_PDIgHwsQgSDlbsBjart2I0vyi5jjZXXSPNJinqd-seFO5EDaK4S7c3EY455eQOKZSdv-6XuB-CKFzsynX18JmbezkyyrzYIfAQz2uQxAZSxbfMaJt-cdHfCxiZkJ6Z7ecLv8_PCKhm2hTxkY2VnYEQjjOoGhC4NsN-8AocpbKpm5yCqo7FPC6YQlSup9ARK1RXWuPCsIhbr3hLEsuVFIR_eri2Nc8CmL-uL33HVXTr-gNP2hWpZwyISKfnRsm9c_hnq1p2-zR0yVzrurpBmb9_5sveZdrOg5KVHkkL3O7PZEIQm7uPytexIufw1517bDLNNXE1DRfi3UBg-AAhPoC1ZqLeUhPQ1uXF1iAxFdxIlOIKzdR8clsDdj7upp1fdKRvIElwJ-e1BCLRJMuDa4hEI62bCWqI6ffbTLTB4005WXo1Nc5P5cgqq0GQQqtJjmDaKr71x578aWhYigZxMxWrqcwBsPgeOO8SH6GCRFqJM8MwlaLvjKBSBLlAeWVEgXU7BY-64rtII22GKTDpqbIvobtraw42R76uC9tltGrLQIi3aEtk-sVsB18lt9WtDuy2Ak3Jq3b7leTzi09UM-SdVhXZFDFjyIUvH460bRniIZOK5eMFJCxTvARIc6kyMU9d_sINAfmZj_oHKZLN6avEWHi1iYuJgas32h29Mp3JYU3MEYpf9OAdB6_L66wx3kmhGSzlRuzuCDoARynlFwnJdFBdxkO6cIIUxrn0bVb_uKq05iSksLAlGd7Em6C4EQq6muZUC6MZTs781waofjWZcWlEyWHkDXjYgpFiUr2TgpcMkjvebdESCYqseA-BY3cGgFhdfWHqUc0YbF-yj6eoCWa_oj3kgRfT0vR-4VwlDvBilNZvyO6Dvl8jSAe_Tsa5PfMSekgtKv7wB3TVE_So_iKJKjTT3zc9cBLLnCH2SmU4lR8pKf6EUlDUbUFrdhhK5T0caKNIjL2Uo_V2SewkX564HJeeJQ4SBhCAdvH88KT6bofdKh5idRtmpk17fYFDmTaLmHXNP5JHHzqTFHgg7RCH-eNcPzrKPYfA2ImCuT9uXqT_AR4xAsPGpDf5K7cwbMdvkpuEB2K6grQgfvzvPoDvgVBFReCxNrD9Y_EE8e1AzGzAczLg6Uc10h8itC1XsJM7u8F4IwpGC37FMAkSe3lA4FK-uKS3GV4mYAZ1iLtEGDcXyhWYh5ISUXchUXwjbrdDZTWNsrNoNcanoJX7F4Dqco_xdzEhf8ZfJyBDtDHKI1cmzMRh7z3uonDeBRIWbgmYkWYauqw3ml346DNygFJvj1eOdeu0rOGOV_PJljvU9ErIP8xk2eqklOA_x8LMVTPHbIUhYjJcdiTNJDJpK1EmoU1uPb8JpTAqaBThrbDzipd6IX41tPBBFfT28DnXdSTgzGZ0sctOZPmM5RMMEIVdnpIuDz6tDc-bCONJrG4vAsopPtzfoyFKU0eyGctBcOn3HkMKTQDtUClQpj2FuCDfw7eFuOt6y7DKlhiIIm4LBz6InLF5Mq3BUseQy__2vY0hEOkHVEiGBZ-dzztBOKOxgaIAKzd6WgErriBMjZHEotE3sHKtc-5TiNc-UI06OKzB2KmoT4_I3WkUTgdgy7DT7TRxbfCxWeuixaFZWA3yBcOzwPmyXkO3v3XXRhgT5yp8naHMyxPgJsH9VmHEeT18a8L3RoCDAySEWRDYbt3eRgmZVIEI6_-dytOg6vJVNb7ilc3X7YymoVhgUSnkCPIMJCnM72ltJpyaisIEaZSi4B_UYjr04dWDOmNRIeGefyni9Kn0ip9l5DvxvUiCHTgSk5A2piHaPHws2xdT4YbPah_tihnvs7bpMdF4PPuWRBXn6dvMRSt-Axm_G28Z8AW7--QCaM-mruu86qzOr6s9DnDG56l9k8dFTnZuFdiY19pjPl4-mn3ctUWAs6ChikMlySlpL6JO8tarMS1yeFBZ8c-wO33gJdWb30NASKaBb2cpaxpIfWKY4K2c-7Gchq6fB_711PrAncuTlsAyKOoF8MI7vmeD2I9BOr2_etyB0dQV8i-sSgVsWnirOoqEZmrI48Zm2FcPcLqfd-0vLzGYrW8S87UqHwK65RuJS5jTmoonGKSeo3OsSHaDp-jzygKP-khM00zwd7IgoQXnxmS0mEBB4WymnmXlx_YFuQ40TBK9Ks4ELXxawTZX1sQ9lM5kClRXTf46To4K6pHz4GnrlC0FhHVxWYcfvDFqp5xG4kMT6Po1BsiJXASUYtYVLQugQfUuCKVrjgk0kDCeqHgDQMYWsiYceCUUVSvmnHoXbREdhm7CrT_uECrwkYKVNgBAcyZmPi6fnTtAs8Tpn8u0o-Yu0czetmqW6z4jbFGBiJ3qfkZmPwCA1PDLBW8WQhPzeuvwsRbLWPOEcKoQ5fCEkVa4HrHGwesL6_gj3TM0ljPEYbOMb3BE05ifLX3ph110tp66Vm_u0hV0UExHJgM5vtSJrLCFgiye2tLnBd5GZFjNBWayhJxCOf5SfNsadmQxsEsML548no4Yyl7Xle7VuhYLeYI4d5OWB7QJvZj0w3kZbTmkFdTihskk8Yci9rjMLRgBtTehVbZHXgDcUZZxS0_pBvLVu1JCqoidH7MdAGmBk0ieNdMIArjWyLccFfHYqUNUJ1EeDXp87DJi7SD_4DYN1gQ-yiiT0cDrBfUmadiAJYvK0q6z79mNdDZo_kyRi5Uy8xkz2TWSi2_rNWdIYp6MbLclyVxfhcTBhqD0tOhXo9Yj7bgnztuF95hmA6F_88vgBMpWfcq09GxjclEjZwDv3hklR9v3EEhidGixeOBr3I0TWyO1MOtTjhzc3I99JIjcVTI-OzY6Qh-i-2q2G66zppd-xJ5eMGPdxz2MFCyS23XZ0eVJTaQG6EjtBbp_452SK48wxoshQ4O9Xz5UAZpLmgNZhsi7HDNoMvMFJSvZMMsJcrLL7q2mERXJ0Dkhn2NE2eRByjpZQeU6unjUoUROzLDqqDP6fAA3Wh8n3txyZLP1Ab3qhd5cn__ICwabRP6wkDpc-NTLvUpUH5-t8pNhvl-2cuGVF2EjMfwN7xUst_Z6qN_qDD75Wt77McXnL8-lFc8YEtg7b-SZ4uI4o_S_Iw86CXbMfdIeA2lDpzlGSwJxzfShKC7Sc1GIrQIxGSBNJtGM_zjuzr-QLjpelMsbABLSPKQE-YRftL3U2dE3aEWbYqUA6xfxuIWhowkMXZygLzdZ1nSXixaFi9ImRSkZ0YpGysqY3233Q7qt5UNHWrkax9ooGDtNmjlj-9sqw8VTeIHpmFCjnQ25B7vPkVmaAJGFTjXVawdwvAqB_n1e2lgFSDfUFS1bMwK1K5bk28RK2xPXqY6utXAtZTeo0NXPXpOdi21zL2Fk03psnqHhGeZx_HWQ8XwcM4Zfk72TNWsJUDexxDgvxjyfbGmFNvWnsQ46hy2LmU5J7mz3lxUBzEpY7aNMvz1dtNnaogah838uL2qsjeePUkXigLsFfCnImvJT9Jvh3Py_JZE-uIbkSgQwKU2I9E8j_SCuwS0R5V2yd1IAOv4oo-DKy_DoIYCXQJdGQERWIms7CxTpyfOwp05tpe4zRvsqhGeZhpynMJLVYOVK309elJ8uaWgHNVQZ1Om6oad76siChrS92UDeFpZn_xSpsXnRlbq_7Hxhwvs-1-GDd0Fel-hn48_4NwFce5rqpuWESshHbSXx5Os18mQ7Tjq-wO9UdLeOkxaYSJNdCvqnwgH3OQ5Jtw58hUyeCy1VWsja4TmfJCj4mYRS4cAPyg1xqhdD8IvhEFzS0t-IUYkoPYS8XrVSyRPQn-9PWBpnBy6VNTQ-IC_r8PNxzc1P3g6vHjPgCUySjeWHwdrQLj4It9vo116Rl4K3G-_xNjWEYl6XWiU-0V01WFNhnY1kLT0ZDSJfP85KLQWx9T_sziODgy-cGg86T625Erxe7ogksBwrusRa664hKNzkCWycmCtmaoFpjlLKoWuwnqLiU8TK3sa5ZcXmjK-E2tChLfEFpqeNAU2HyUZbNdEusFAAK_gQVaF-6cm_-IZI03mJSeo9mrjZNc11ooB3ToT63lZ-MmHAnvdu9yQhs3BGpssfQpA549QcsYwBXS6QI9C3-cUYPpVXQLA-dvMzkocvbGKHqM_mxY5ECmWpyUPlxoLcssdbTI-eJocDQEzpwpmi6lP4lG26cvHHeJV6y5kilS6C3A3Bt04UZ3du7pfsTV1-EFW94IWpHwP7CNc_dA5RvVsqmqrBDAQ4sWR73bNpgeYuK05zEnus2MYh5nrht3_3Yhqm4YhFIXDsIqk54jfFnAppqfhFxmi24zsxTRVTarcs6CxghqhoQrab6X1JzavvnL9NweDkipXziBHi-1_JDtD49Nlbv9pIIyJEj4qarU6ynjV9yZs_gxNymReyJaG9Fd51lqfPPVQuyQtioT2tOK4dvsQeb-x-0bCqCuPLheFVIquVR8L1DuAtxLU7eJ-8SUFCyiU7SsxBhO_Zk0so-VRS4up-G3GBFMy4SoZMOxi9SU5QVtZvC1WiATlHkPPtIwMSN9kStU6cL9qzuiDVNwXfPzwjJ4XQywgZsRJTrqDqSr24GK1sqJTDbop496N1D12y7oz6nL2p7IwhlOTzgURn3aozB2IZgqqz6SH3nk9MNukStLiqoCoBYr7cacTYJlw126I3E44zAQ3_rbXOvWe4auABdbo8xomji1DXc_trbhge_Sat6guyn62JurG4yFFKMT_B66Qv2HMnQc3GStGEtOtq3n52opl4XYSzwamqdkgQ65H8ySRGZ0ZsualZ8QPv6Hf5IPrWDxEDdVsXyAfugOKh0kqcxQNaEdKVoKLnHYFPF20ExKjvu655ZViCDAbUEsUb5xKmBvMZ1bimnHPGIsfcyBr1YYBDQwQ0yhavQlZDw8qOMrilJmeRfEttC4uApx9J78VjuQrfanVcBu1_q3K-RZvtIhHftWPFhAjRRNhTNqcclUcakCwAbd20e3oddqTlovumJ7O6WTVqXxVw4csspavO-nFSGkt60inwRClIqH2ajfERxQSymIjKIeA9YHOR0OYq6S-tKPN0_QrreE1x2xRPQ8KvL5qOgz5Qs4TdH99EYB--HXd3-xHqPvbs7B0EwBNJwrrQhx8z_KMNES1NhYuoHQgtahHbXDJdsWdkxFH22Ybg-JCkR06I7t9SYUuX_R5d74TAJzTp6EWzjJ50yAdeqHQ-wGzTakg5khjsN1q7tf6TWUGhsq4nVZQuPoOoR9O6QVGfVkIBzpMA0ZKtPW6700Se0GFHRvyd3QKCKZb6AGissUVxUzZaI33mSOWer9pRCE_IfZNhx5T59N30UrT9RdHWBhPEO4yicBSJcCmdiZm1g8glv9vcBh6KAkDela-EvG_BVnNj7CSlr82JMFojFGz5BnKFpuGP6o0RJo-HdhiBWj9LIxjopcKQm_yPo7hRm1DuBjRCT83Vi5llHe_nx3MDbZQalSwARX261LzdMQwzcGGbXyzdaUGRH_x0ET-q5rJTYA6ZdDd4WzPNEAD37h7x4Zi5sAtvPBHybU0VJe58m4fe1ixsXdAPXnX8M7IYFBR1Zo1Hq6t5JY2B0VB8Z283S4-VJBtVcZsGS0v03vD5tdc7LLaCADo80nqMroihLU9k78MGlAFkvwTvop5XMOqlvUceBcvs2yb8ZuK66zXfSC0daAQP8GWV2ozM6XlNy9iwjAxVX36u0O0zLiyimpI2NRR_JcHa4t5faNLQvg8L2mXnQMwrPSZg2sj3igFR5nmbXrBf8W2qmjEQKmcX0TUSe8vw36-0ptBpiivWrvaOJkY8f639jvyiKlzo0Lvtw487m9Nur3zI4JjuHmNoN0s-b1y7K4P0f6xuH84HLu7YT8Zqsz12gjNKRCh9BYAA499zM8qB4k8kVefjPsCSEajkOKLrFKxwHE7SKfEe304-89NAJFqVTFNSPpbju-wztU425Sj9N4MW"
+      },
+      "expected": {
+        "bytes": "59f32a60060d5fdb046cdef8d9b2a36c11be4aa078a9c7bbe26cbe5790c1a2337dd363e1dc320ba82be6b6608e03dfd8f0505cf2a32aa3329e8152fd8c38a12d16f78f31a9e238efe9e295110d2c0a16d86f767206dcd1c53f34c504401ef427c1ebe827dcb5df48dd233c69c629ac8c281c5a2792700d64d760e202f347a1765336291bb9117386b39118f99185f85d1900d97fe5dbe47d1288cf5dc92405ade24bb9f78043e0022390652dbeb70bb1c8174f1c74b5d7163c67acab9bc9d511f81b55450617aa7639e808e8e480584eba700d6aa8f39e8373d0121af324741c54739e95a0b9ce1baf6fd46ce8774b9035bacbd5b73d8f2c3a7e3833e67c29474d23f837650a6b4e0a3c45faea5fd39478557aa6b202d15b7a6c91408f758a1cfc02563c215793c093c746d138b477d4e2e29ab372ca1e81cb49c8d74fec315350eab91a9650f3ade8e20bc8f788dd346a68d26c6e827dcf95c97bec052a7dae0d52172789f32047414a5d478189118db4d8135f448479a1058becbb64c1a5e45367e534b4f52b2c89233d0dc45b66536e949c565db214d29e47e3cd1c3d1b3ec615ce9607537307674fa4456463a799e7b1cce19c9f67e7ee37d211b7ba957dca81285ccb3698973dc82d6657d313de2e41f809b36ed2efed3083440a866c386ca18841c6142207bd72c9c608cf4979332b6d83ec591f271acaeee1c8591721d6b821adf61f5a108073ae60e6345292ba224434ba6e5ff11f09852356dd56bc026370a74f48fcb35404580f4844a367c9bc191c8dead5923b7c8aa02e28c993d85d53ada7f4cfe11282bf1ef58f600104c90fcee7c7dae484eeee4c84c9c0288189c0ff253e5ba6bbd8b90fd91b842dfd401b166a08c40738f3dbe989b9db02d07a18ed30058f3594fd4f4f7a9e297c4d137c0867b87dbc865540ef5e1323353e68b7f305dee1fcebfb48db5662252104367352844f12dbbdbc7dcf4e9dd7f5a1fe72e1039711c64708c8ba77cc137a853592044c537cd8a1f6b325a10f193f83529338148245213a1dc05df05fcc07c9916f15babbc9ec7312f30ca0619bc0fa48e22bd0054c720c45572922668583c8de602f0a6c9dd28087c881910f5c0a1d2281b7059a970de2d91779f504885da8744231849fa4344c556d69e6fa09e5cd13d1afc46b10170567e3a880e583b842cd648662c34be88d2508515d7c1ac8110f420b1528717c4a65f7c0e5f999949f7860bd559dd1aa3f2de69c6c045403f9f9287dc554bef333acc88b347554a87bedc095dedce2a46d516e97c6d2a3ca2c79d9e1e18e803c3f22cee5111b325ad7a383277a604fcb696aba62a964c7e246dffbcd08572a3cceb6f608903e8ed6320a8923b1b398f5e5fcd63a371f8f7c5728564080aabbf4c7d9ed318c70ba8eed1321e7d008de96d0518b93c86aad9816cd5147e6eb3edde394b705faf83ca6ee20dcf6c0f90c0fd51c1e3a7422478fb5c41835dc60b55a4e7e41459be789677de39ca164c1ecf5ec52063a06f2f05b275452e024fe95cbfe27a4ea2c7a4cb47e51f84330153e6ded116a4c5df0aef850a804aaf5a84d684d33f8ed9fadb758fb65c441812cfd32da36cb471f1f74509cd5050abff62806084e025dee94e8315133fc52075f2615d62151fc4917acb20adf4eb4cb95754392584a07e838e2d7b3624e311d16583d7bacbca53ccafc15c14ea02c738847e940ecb43a7b43ba251152ea075aa63a75642610716c6b44f8490df3d5ad849581407e3d4844b1df1115eac07dd6687f21c1d29fd760698fd7ecd1c2339826e1464e96caecabc647955e6ca0e3836be1784ee61f87269d4093a7b87c53af3db27a5cd088d23cbb86995281fffeeb33df3844822e0cbd8a632facb8361d96200e57cf809b943938bb3aa088b8e55fd06238a62f54f3267b0a36f950647be26046a900f79afad04eea957e7cc729c5cc61dde4b8152ff9b5f7f287f411e65e94fefa5f4a62b7c554bdb1903ecd8b6515d42fe47634c4f84ab9689d2b61c0360b3396b0e06c2fb7263a51d1f368d0e9d724ee6457185744ce1674564bfb4bd7fc5139796f27199fd75232a98457f00a748718b1bf0fcaa391212f0ed76bada541e101383b3c4b599ce48eb9b9495978fffe4d88474e3144acfa66d2194d3ca8121d2de7148ee73dda5ed1cdcd7cef3a82b3c2acd5920108a135e9503e4a097e3e1315f5fef0db531476df3817b9a3b1bb7c059ae3fb599a0ab714f7fd4b66c0e77993c9969de8a4f33e459a808f211642c7b16d78827dff6915d11b02290f655b5533114a23004b0322a851b961a33fffcfe5c2fb8af174c0980b72cfa8eb04bfacbec988ce075dced3dccd29e73f00444cb157e2c2739060f7b39a7fc5662cdf2f4fe2f66dfdc21379ad8e680dfdb4518d868871e9c82d2377e4dca571550aa86608daa41d7425fec828c2cb1831f044b73db1aaea0259977f2a36526d4659e621dcba70080c71058b30058c31837e469eb4309f14ec6efb2ef8bfcd970a9ab467cd5f275ae5aac7b8f555c33e4e87d19c4192049d605bbd0ffa7cd8087703f349634e040a92264dc6ced214e2a646577aa6f0c442aa0537850136853be6e594690ba3f30d3de8f3e4df8eb93bf6df3abc5dc464bb1e82213c2caeb200f4fb96b4b4f18eae7be8d33791f0957704a48ecf576edd95521707a3da2f3da5da029f673d2c4c4c1a88c38028616f3c54cf0e0e7266cb08715c2bd25709729f1c293048d969ede8b9c84b62d0e8753faa0d5e18e9d076fdd586ad9367a1a46e8e5f62a1b2a57689bd3f541c99720550965d498d5361e388fb54d7ca52f9aea4acaf0fa739fd29a77e608f493a7dd45de31de6502bb878f29dd231684fc52e29844d8b07bcca9b4fccba31016916bd3ed19a85114d1d9d7bb154df8688c387dbc153dfe5a153a58fb0e5c54d22e7937cc8880e9bb3e3b455a4ccd8d8da56029b654b3f6cda467868569f21d7cf32a83c96b8f3813124e050d5d553ae566050404b917287a0aaed1da5413db2a49b28e9cc46f16aacc06841ad4e66e135bdaf7a11964baf5f74d642e63c46e19872e7073487f67de095412e7939e0224c38812a7ebd1489a668931c495ac0fa63461ec17506e6abbeae1b04dd1a14356a439ec9229691c9a7a099a069c43eb2c1f13020ba214154e35950a53d0649f04ad5a067c12ab105f843b62ed3ffa4ccdb4e0a02ebf671784f1613a3e9b363e7974559f86abedcdf353dca256bd902650033a80b1b1f77d3623c01df1e90a110602ca7610d2ba01d98775f2f6dc3c3050c0ec120293e47443fb42971b356a9693fa7f4d064a9d121ea79a28a5a87264d9d25dfefb6439d29c79566c8cca4398733bff08581f4d89d5d73829eef071b0d159e9cb9b2679ab008d99aad5ae492c8f9ed5ca67f93e25ce8dff0627c9c364a14450eeca6cf4891d43083c9ad744e8a50f95b2a2a5f78c164aa88ee7c22ed41187c28e5bd183212e6e139b622bbdbe8608514a2494f12c7cd29d6c88fd77d38a25382055253da3db695f1a80ab099586cf096147cb2cc83edfe12619634593c9c09eebdfb46eb5a15e59b63736dd926bc77657ce0c567f72b9578d28a10c81a1c305fc2162c69664b9a03002fafec2519c2dfd749f78003ae97cd5d8c4814b8e7934cc4819bb50cf6d878610c9ff905f731e5f55e4f55a78d3c7916a1b8386f9efcd9c87849413e164a76c14a443e938afe043db68cdb37777fb4d59b3e010638c440107342279df4accebc0c17ac6322ef9bfb472168273b806142c34a79c535d18d35cacb9f14753532fbd4cc6ec03a240494226ce7d3f0418227141d1bdc4199cb949553e812bb52b0ed80be997db0e0a221cc93a216b446a8aa5f251e0ebbaf674b634aad18e1d4fed4f0a49f4f065d0dad2ddd7c8869aa1d3f27de0906eaaf42ebb1df7c7bbbfcdc444271720dc9f2a3eabf1df8e21c9ebd646e0c990ba38c97e2187ae644fa071058255456454d2cbfa974f2443a9226a0a6fb8c44288b2ef94a2fe270cb944de7ab876c903d6c4daf498d82c1055aeef040b4a31a5c671f077379274b4f86b8d00b9fcea9a51db2439b0aeee70114cfa7122d1a6ca0e127d00cb2168ec850baf5ff6c686690d6d074c6e89ad8c1e0c5a345f9bd19e52da133ab7afdc83bd370d751d3243e10bb3a2e0c6280b5b9ae317b654caa054cea82a0e0d9469b2c322b5b2bd57416325e8c9daf90cf40de1156668e9d1aa31ab9a966476c77b64550123e594fb1c5a26198205c3e2ca3835416b42b8cf8ce512213f3f115fa468daf31f53b8c326ae6962d871d074f2caf6f063f8a12dbcbedede323deb6b25a265d309fe8bd090b609cde360ea19505157f7534894fcbb4fcda5e046c0093e483dc7578ef2e15ebe8bb00d04f4f2ff8c80526abb2fa13980f6debc340534d035fbc3ccf8fed586835078c6dae5988311c01f8616b362abca69d3e9f2e6fe32d02ab0b2848f84b0cac8f59edc56ea5b875535fff8b423078e6ee946f2107a82b256bdb7f9e47e3887efe6068650012df1bcbb38f046ac53f78fe1105353a09748f8ee5d305be8e922828ab31324288d2ec5bcc445b73beb5cd6b5dc33583ba4f5e936032161680c578b313fa30f46579917531a2d50163a848beb1383991fb2db79fef561fa82c6361cb33f6e8c986bae6a40ad1df41ca3ebc3b6a5529789f9e1419a9baea5f338cbf83dc20aa8f95b4013686abbcb87c510990d7e5e2e6c8af6794569043aa057aebd8b821ad2842cc5208decf9efc37ab66775a16b1f1a1bb235e7dd0e3b5e6cc35abdbeffba3c47f4a6d63ec310c9253e706c1ac36191b531510211802db22c51e4129d848e02f9ebe2d3f4f812301778ff51b3c0411b5598bd986cb29b1a8e3d671f51c6d1c587e413967dba1ec489b8adbcdef5b53402e7406b8722e8ee150845ac0f4a8e024a51a68059a6e7b7529c4248f58d278124d8538c90115b8017a4965e8d7430e2d57373a035fba9ae43789860441d4ee2ec558de1a17d9da6ceccf653d6fb36ed937e2e79a2bc29359b9704aa76cfe3f166ec0b522a4a06918cf5ec71abad84bcfefd6a3a6280daf20d381e468888a789e8d3726ef7729dbf652df98f28ea97e019913ff351bbe2a81e0b28c9420d82f15368e4cdaeb8639f03436882f444b1230a6d2b58dc994c4e1d2253c071fc18d3f1ba57be0acba558fc55795ba88e99efa936613cb6022a8092ddb38064995781cc4de4ae6a6ad74c516d3c6d36ee992901cf0d6668191f6ea1bff846ffc3d01e60798fd9d603d9802c65c2486e807143c8f3b40f8a5b75376c9dc46e897abea0762143b203b0bc0cd5992de9f69182fb7095b0005a67a6a95260ef27a72426b89924e51c4cc3072d6fe1d35ed0098f04a7e1e358d8bb737e34a3f50025655aaa477fee47ec6516ece2778aa5352d4426e8ceffef5654c946bd3cadc1f14a2d4084793bb8dfe3693cef1b84a99087717d8206d799dac082e68e8b1bb226575175e5e9e82569ded66905481476577555d4f9783cdaae4e308a47d2683ab0750f48f6cde24dacfd95736790ff5a7427201ecf31c71289120f42b662e9b0d8525b003f869dd85675465eeabfcbc4b22e23f7a1f8ebfdbcf3e66d03357b32e6260ee8840ece0edce85df3f723414c925ad33a7cf4e8674adcddfa13a324f6ab2595e4e8e38a481e7c8080f8ea65d3db2caa0935061407a03a982627096e3aa0eeaeeff6fddac8ce349b9f2087859a137802926de4d04c64ef6f92c704dcbe9542f9e47e4428e835cfcb63921409d87191e57169b74df40887fe352b885dd23269a1213d742ac4757fd8ff9069c0edff02c9dc1fd75c024f310444be8cb9fa37291daaf648454f720aa6ed132ea0bed1e9413637a10955b58da67caf063ebdcb7b761b3e5feb5598d58487cb12d9a1534ec3a75d614f441812f978a6dd516ec54370ddb340b8ddfb899980ca1e17be3da30439cb58f48379de075e77309d859679123350b003b0a473671959f7cecf820b9f19e262a2aade05fd241a2b01e08c76b77bcdd25b93cb7f324695ada6c09a11265410d35b6a7430ce1ce8871e2d9189e008c9b333c618cd3e49737a64ec4460517077106e1fa6ca48f01b0066e5e0ae9c31ca216d70da00c293df52cdd95a817954a21033768f94630e6ce80cc5d7f929e8fbec151132a2fbd70a6de8b3e484ef9d6e272879652ae5d0b11454b1ae48761a312db23da72aeff0368a3891c341b8f28ec1e6e957194aa962fe796782d619a079af66b1e59ca6e64675790152ba06f6e46e6ad4cd5cccdbea8c3140a6b7608d8f889f6112978dd20d292f31d48e23801e062e159f66c693b3f9f1f1ea03a6e6c237cb5abad5d7c5ff2789151c70b594d2180bf99085e3500924e9ef5a1f82b7d3454d480b6f0afafc6d7f4aac2af3340bbcf69d1d1803d94c748e6266436225501eed89035d046ae415358f3a63d6a9ca67cd49fea59f9b7a75606819f0f5e5c0405df1e4cfdbb99f0c2c6cd43099f144811e85028e6f2e9892f89acce41165a43306ebeeb3da3fd9a6d28b3d1a4e7121d057a5efb24e68971942be5c95292381b4d6f90d048fdc8bfb5b57e0dcb4b11efae0e70ec73e66c6a9a4fb502160e8a4033cf7698ea25abc8ddf53736cab3cc17fa8d7f14910b66028909bbc12ed3d8cd848d29199dbf33b11525454e5ff9f47b8a741297f33c6147f0aa5cda61faf8cef7d254652599697f6dbd2965797d3c3edd43a1a109e2ac188ee6811c3de76590a0dcccf5c1537e176ffbd1320a2a279232b2e8da7b89076e43197c3f16516657779a66826a8d8b94b9004802938e3e2d601204e84b078da8335ae2f9da6976447a3b7b38474e09116f55d78c5b39da9dfa168c3d63cde9996568a2a1608a6705002bcc954394ae86a31af81c8e6cc352ea988f1cedf699e9cfa944c2efcae60822f170ea2189b7215dfbbc79fa8481e148a47d0d6d83e7771e46a7abc9335b215173e4f16fa77517aa897b3afa9ba71de48975524816f3d20f534bfbb24e36235bc424921ffb5e2b0a4fcae73f384667aa66fdff062fe486e0784a06b15ebb00021889d138afa7ea943d3b725bb9a4662e61c2c2d4d533941009709dd48d225523bb75debf256794ce3f1ee603792f0a1bc522ff108f2483335b7b7231c940ac7aee8726ebdf0d2dcb17ad0592f2d38fcde5cfedf8c94e29f8497e507b4aa1377428ba2f46c65883b9eea7277ff552eacb9023f2469436d4d1d88d4c670ec0e7eadf184debdbdf3f024827663b683ac8f81e7c2157992e4626a4a61ba7105087605a375f0a13c9c4fe89ac2eb18b43a2c66f31b0737021325376a3760b3ca2ab9aeae1188c222df3068f323545c0ffb325d57f8720189e5fc4c99ea9013910269c3fd07b979bbecb94aa538157828d658aafb70da853999eeb672d41afca8a92c5506df4ef8c970ddcfa248f35281514f98704bff83b92d93c5aa755293f1d70dc9ae4331d49c2266cf4bb5963d755bac7f2d19266cbedf25976a3883204e364596847443884410e39ea3ac819c06a80effc00d76f3a79b8293f1542a2962f3c865f0f0ff7897f82ada18f77697aeccb8dc67eee7abbd87f322f01d1ebf4aefe897a4d393bf996feb4202051faf266e3d1142d899decf6b23cc870846b43532dc5ccfb8e8601d0a63f8e6bfdc915441de0d7ef7b2794874304d4b320091e5638ae06aaf2578087d78d767ae7d98bb0703bd7dc2f44a578a040be40ab02dddc7dff963bbcd03af7c7d066582f2e678a91be8d12d539ba6e08009c7e24b55f067479015af7aa1ab10b7f06fd4dcc49a6d5d8d87d50216895ee81c9aeca1cc5c0201fdd80395c1fdb63f099d1183206333242446da920cbe6988667e176c9a50ef501ea2f3d2b50dfe2b53c52e760d83307ff0eadcdbc9c4b89c35244553996504123fa22f55798e001b25c2c7f59faf20bea1b7581451ab0eb3ccd80c280fae04ea15ae20690ce814a154872f3256688793989ab1576fab19b19890293960dfec03cdb298ebac8f8be0f275dd187a8bd1bfe86baf1a9a11bc6476913ccdadfa975d66bd695dd97ea6932d63c8d66f6936ba5ad044ac2b0762cf1436cdc7c08e7ff77bda5e38be71e4edc1a90a4a3d758197c1eecd819ddfd7706182127691a94458903c4f20f01e449ad9db8e3ba220d366e23b76c5efdf402fab80fdf7b4b93fd184445c0e42811a319353984869aefbaa318ada3c7b91f873c017119c97b80cedc9dfa7b62d888d7996b2ce124b1f0789a3418e57727a7050fb5248d1e156d18b443ccceeb62d348886acb5274fed2113490862b5ae7e88fda4708845130e6495fad61dca59292892c199bcb4d74eb082ed7e7e487c2ff63ffe825285d9f37381dc08933e607d4816e4699684681e217ba4dc41a5ce85de3a9bd3250afa554cb3427e273cba3a77c66032b9c57816eb440f7fe97f3e0108fc970f16c3aa301420b4d6dfccb49821cc7d40d8a4a099e7b5e27896631a70a384fc95dc37e2d9ce1a17ad759761ca9cd5d7d069ea101f4248abe3b044ec1cd525965ac42dce6c5d1c09b249ec3aa5fe08fed1572b81cf59b7a5142ddbdf3fb6d9bb65c8fab857b6f57aa978c86f3833f36c607674d4e3cd8ac1c5f19f8378c01836e32ea33a263d9190bf624c343ef684cf7b174965f1a3dd8214a8a21edd8ec48dbbda03a1395b6c95d727880f6857b2ab0cedd98ca70da5e094a85a5bd8de479a5a505712002589d7d532c4335a8f79aa9f2bc9c373efa2c91ec7afcbf5f82eb4ffff7958e0bda7d6b1fa1e21b56b44fb19bb3a784bc82bac839765cd4ebb841867542175986e56cc867f0f434e362299088bd731dd1c8736a798661081489b4e94fbf9c67a365483b990719fbae83b532f26b0094865c252648ef12f7de67e15c522bd3eafbfcddeb95ae3060f3c44c5514ac3056bdee02b7c091e7cb2244044df743efe142470151e7e1665dec9ce838ed9534b9c44e081c7a5eae34bbb752499a9afe3757f7d52148d5bf40852533c44b2d0405748813730bc2c52afd251a374e7a7b87814a816f69d6394bedc64f95520864bdc16360e518a1931985d5db97aea5363890eb9d196f0939083c3b45c7b12e33ccafbf5132e9c82b8fb9b87681593c7e09a1e8337d0af9032a351a6b8441541e650728af1b86f0a764f91010b50a569e27c3eb357f617d965b93d9bd8ca9f325e1d06b099b70bcad8bbb67ac6920f3c675f58d536a794a48189a528af5f782ff435cdde39bbab0c7ccf51e850b92c7965a97b5f3fdd29f261dbb6c5a57e2ff59eea041873510c8b7ee212b5e60c508e95151a14ed2d2f70ec8e9edb55e3f52366614e44ff06bc275e074920b2c99fec2dd1ba96523bc2d07fac78d7a34922f4afa0a740e1fb29604a4e05ebb166171d57c9995ea512a1783ba659c97f55378e8f40e523ff84eee789b5dbcca782f78308373249311e77e0cd9b8fd23f9ddafbfa645be4a234ea5dd7118c205d50ae7be15e76b1798de136fe7fdbc655eefaa2e0286cb6c03e3bd731c6163e1cf6aae67dcf139e72e105f462879d925377b5582d899143f2fe923b53ba47d2b8d8a369787f1fb34d6ef7e45e9a836878b88daf80048ae2b79bd36d04a448c81d0248d457f1f2345c8c19850c703ba2c86b80908453cc328e45798944c431f31e231f8a05e3d4fe553589b2a0d30d04b67f53649189e2b2a0d5403afbbac58ada14fd4636af61241390016a027ebf5ea99f86cd4df8a2f2edba8d1fe515a185722fba3303ddd81116e96d2d6efa55f3cd9240f01c965e5ab9846230955d47288cd4134846f0759ffe81ec3748386523173097b5c808c7efc6ac8e495dd1a7c6d01b790bfa2ad3da6ae0bd1d0f4d20be3c0d81461c20acf662e98f467be953453045975b0b51df4cf7a003a504fd33753156d23406382565bc73f0b87bda5bdfcba4a180624b450bcbb4348fa2362f70c91f8fe90bd95d11ceef115667afb6c0c8f8bf9765ce347af700d48d8e0783cf27f0796dd26768dd46af4921dcdf34bb38cc9dc5fee1a9a4bfb16e800a8e42d2cf0a3aa30608e86f01ed7b3ceb81d3bcacc5202cb1e6b497e933b44f2ed22d92021c0d42b82d8f83b2a9422ffbdd6027510716bad2e4a432f8997f7e55a7f8632e6de2ac7f214a6e1c91747b1499bfef35f3bca31ca3b2556ec57b9a9b4ca66b8efc94540f5ee2061a5a0e49d70850c52a6e04d7428734132b8f9bd865538200ad87810e99efe928650aab72576be9c852a8f726e11dd603c166ea20c055d660bf5ec84c7af85c37207633550dee1b404fb08da3726feca30f2056a39fb3ffa0fb08424118305784618ed0242fe8ba65327ffd0ef8c50b888c50482c4383fbe8492eb2951d1cd2b30973ca068b4eccfa9876b8d14ac839a96abf622016582da72bd7fabc23260786efc86010d9cfc9b79028d905e09036560b00c45f9b626061a20cbd2d664816064fc81e5e3fa664aafbbb3fde588f7c9b5012cc9686659b5ff3629d38a036b0c871c86453429d73e9fff50b08a3b7526c2a66bda76bee55154626ad011cc725adf2fb18a11e736550aad06e09a43d33ec563a423414befe2db767feab473d2cfb992c42f77c2c2070744babe49d0dd676d761c2344989920a636ae75b642f68b99ff0c3ea10907101ed39193bf2b0f0094c6e34d0ccc2347df217954068c77d7747b8c506a8d05d30fcf4c03d9ab1d398052480e03636b5a327ae76025d88a62fdecd4a12db914aa58a0d3192dc1012ff55785abbd5b019e06e61f906d6a074c1d867cf347f60bd6f0b0858d0b2b96ab2c1eb8793a94b0f90477065ec06efa36ba34d332e080370d58b88df2dd69b00bf6022321423c3ae3734aeca82e119560bf93b7d4006574f175cc4d838d03ec07138c5cd3e636c0af6fdace7b94ecf89fdef07a6b8d3e0d0fd867aeecb879cd7bf3c32201f0b108120e56ec0636abb76234bf28b98e36575d23cd2629ea77eb1e14ee440da2b84bb737118e39e5e40e29949dbfee97b81f82285cecca75f5f0999b7b3932cabcd821f010cf6b90c40652c5b7cc689b7e71d1df0b1899909e99ede70bbfcfcf08a866da14f1918d959d81108e33a81a10b836c37ef00a1ca5b2a99b9c82aa8ec53c2e984254aea7d0112b54575ae3c2b0885baf784b12cb9514847f7ab8b635cf0298bfae2f7dc75574ebfa034fda15a9670c8848a7e746c9bd73f867ab5a76fb3474c95cebbaba4199bf7fe6cbde65dace8392951e490bdceecf6442109bbb8fcad7b122e7f0d79d7b6c32cd3571350d17e2dd4060f800213e80b566a2de5213d0d6e5c5d6203115dc4894e20acdd47c725b03763eeea69d5f74a46f20497027e7b50422d124cb836b884423ad9b096a88e9f7db4cb4c1e34d39597a3535ce4fe5c82aab419042ab498e60da2abef5c79efc6968588a06713315aba9cc01b0f81e38ef121fa182445a8933c33095a2ef8ca05204b94079654481753b058fbae2bb48236d862930e9a9b22fa1bb6b6b0e3647beae0bdb65b46acb4088b7684b64fac56c075f25b7d5ad0eecb6024dc9ab76fb95e4f38b4f5433e49d5615d9143163c8852f1f8eb46d19e221938ae5e305242c53bc044873a932314f5dfec20d01f9998ffa072992cde9abc45878b5898b8981ab37da1dbd329dc9614dcc118a5ff4e01d07afcbebac31de49a1192ce546ecee083a004729e51709c974505dc643ba708214c6b9f46d56ffb8aab4e624a4b0b02519dec49ba0b8110aba9ae6540ba3194ecefcd706a87e3599716944c961e40d78d882916252bd9382970c923bde6dd112098aac780f8163770680585d7d61ea51cd186c5fb28fa7a80966bfa23de48117d3d2f47ee15c250ef06294d66fc8ee83be5f234807bf4ec6b93df3127a482d2afef00774d513f4a8fe22892a34d3df373d7012cb9c21f64a6538951f2929fe845250d46d416b76184ae53d1c68a3488cbd94a3f57649ec245f9eb81c979e250e1206108076f1fcf0a4fa6e87dd2a1e62751b66a64d7b7d814399368b9875cd3f92471f3a93147820ed1087f9e35c3f3aca3d87c0d88982b93f6e5ea4ff011e3102c3c6a437f92bb7306cc76f929b840762ba82b4207efcef3e80ef81504545e0b136b0fd63f104f1ed40cc6cc07332e0e94735d21f22b42d57b0933bbbc178230a460b7ec53009127b7940e052beb8a4b7195e2660067588bb44183717ca1598879212517721517c236eb74365358db2b36835c6a7a095fb1780ea728ff17731217fc65f272043b431ca235726ccc461ef3deea270de0512166e099891661abaac379a5df8e8337280526f8f578e75ebb4ace18e57f3c9963bd4f44ac83fcc64d9eaa494e03fc7c2cc5533c76c852162325c7624cd2432692b5126a14d6e3dbf09a5302a6814e1adb0f38a977a217e35b4f04115f4f6f039d77524e0cc6674b1cb4e64f98ce5130c10855d9e922e0f3ead0dcf9b08e349ac6e2f02ca293edcdfa3214a5347b219cb4170e9f71e430a4d00ed502950a63d85b820dfc3b785b8eb7acbb0ca961888226e0b073e889cb17932adc152c790cbfff6bd8d2110e907544886059f9dcf3b4138a3b181a2002b377a5a012bae204c8d91c4a2d137b072ad73ee5388d73e508d3a38acc1d8a9a84f8fc8dd69144e0760cbb0d3ed34716df0b159eba2c5a159580df205c3b3c0f9b25e43b7bf75d7461813e72a7c9da1cccb13e026c1fd5661c4793d7c6bc2f74680830324845910d86eddde460999548108ebff9dcad3a0eaf25535bee295cdd7ed8ca6a158605129e408f20c2429ccef696d269c9a8ac2046994a2e01fd4623af4e1d5833a635121e19e7f29e2f4a9f48a9f65e43bf1bd48821d3812939036a621da3c7c2cdb1753e186cf6a1fed8a19efb3b6e931d1783cfb964415e7e9dbcc452b7e0319bf1b6f19f005bbfbe40268cfa6aeebbceaacceafab3d0e70c6e7a97d93c7454e766e15d898d7da633e5e3e9a7ddcb54580b3a0a18a4325c929692fa24ef2d6ab312d72785059f1cfb03b7de025d59bdf434048a6816f67296b1a487d6298e0ad9cfbb19c86ae9f07fef5d4fac09dcb9396c03228ea05f0c23bbe6783d88f413abdbf7adc81d1d415f22fac4a056c5a78ab3a8a84666ac8e3c666d8570f70ba9f77ed2f2f3198ad6f12f3b52a1f02bae51b894b98d39a8a2718a49ea373ac487683a7e8f3ca028ffa484cd34cf077b220a105e7c664b4984041e16ca69e65e5c7f605b90e344c12bd2ace042d7c5ac13657d6c43d94ce640a54574dfe3a4e8e0aea91f3e069eb942d0584757159871fbc316aa79c46e24313e8fa3506c8895c049462d6152d0ba041f52e08a56b8e093490309ea8780340c616b2261c782514552be69c7a176d111d866ec2ad3fee102af09182953600407326663e2e9f9d3b40b3c4e99fcbb4a3e62ed1ccdeb66a96eb3e236c5181889dea7e46663f0080d4f0cb056f164213f37aebf0b116cb58f38470aa10e5f0849156b81eb1c6c1eb0bebf823dd33349633c461b38c6f7044d3989f2d7de9875d74b69eba566feed21574504c47260339bed489acb085822c9edad2e705de466458cd0566b2849c4239fe527cdb1a766431b04b0c2f9e3c9e8e18ca5ed795eed5ba160b79823877939607b409bd98f4c379196d39a415d4e286c924f18722f6b8cc2d1801b537a155b6475e00dc5196714b4fe906f2d5bb5242aa889d1fb31d00698193489e35d30802b8d6c8b71c15f1d8a9435427511e0d7a7cec3262ed20ffe0360dd6043eca2893d1c0eb05f52669d880258bcad2aeb3efd98d743668fe4c918b9532f31933d935928b6feb356748629e8c6cb725c95c5f85c4c186a0f4b4e857a3d623edb827cedb85f7986603a17ff3cbe004ca567dcab4f46c637251236700efde192547dbf71048627468b178e06bdc8d135b23b530eb538e1cdcdc8f7d2488dc55323e3b363a421fa2fb6ab61baeb3a6977ec49e5e3063ddc73d8c142c92db75d9d1e5494da406e848ed05ba7fe39d922b8f30c68b214383bd5f3e54019a4b9a035986c8bb1c336832f305252bd930cb0972b2cbeeada61115c9d039219f6344d9e441ca3a5941e53aba78d4a1444eccb0eaa833fa7c00375a1f27dedc7264b3f501bdea85de5c9fffc80b069b44feb0903a5cf8d4cbbd4a541f9fadf29361be5fb672e19517612331fc0def152cb7f67aa8dfea0c3ef95adefb31c5e72fcfa515cf1812d83b6fe499e2e238a3f4bf230f3a0976cc7dd21e036943a739464b0271cdf4a1282ed2735188ad023119204d26d18cff38eecebf902e3a5e94cb1b0012d23ca404f9845fb4bdd4d9d13768459b62a500eb17f1b885a1a3090c5d9ca02f3759d674978b16858bd226452919d18a46caca98df6df743baade543475ab91ac7da28183b4d9a3963fbdb2ac3c5537881e99850a39d0db907bbcf91599a0091854e35d56b0770bc0a81fe7d5eda58054837d4152d5b3302b52b96e4dbc44adb13d7a98eaeb5702d6537a8d0d5cf5e939d8b6d732f6164d37a6c9ea1e119e671fc7590f17c1c33865f93bd93356b095037b1c4382fc63c9f6c698536f5a7b10e3a872d8b994e49ee6cf7971501cc4a58eda34cbf3d5db4d9daa206a1f37f2e2f6aac8de78f5245e280bb057c29c89af253f49be1dcfcbf25913eb886e44a0430294d88f44f23fd20aec12d11e55db27752003afe28a3e0cacbf0e8218097409746404456226b3b0b14e9c9f3b0a74e6da5ee3346fb2a846799869ca73092d560e54adf4f5e949f2e696807355419d4e9baa1a77beac88286b4bdd940de169667ff14a9b179d195babfec7c61c2fb3ed7e18377415e97e867e3cff837015c7b9aeaa6e5844ac8476d25f1e4eb35f2643b4e3abec0ef5474b78e93169848935d0afaa7c201f7390e49b70e7c854c9e0b2d555ac8dae1399f2428f8998452e1c00fca0d71aa1743f08be1105cd2d2df885189283d84bc5eb552c913d09fef4f581a67072e9535343e202febf0f371cdcd4fde0eaf1e33e0094c928de587c1dad02e3e08b7dbe8d75e919782b71beff1363584625e975a253ed15d355853619d8d642d3d190d225f3fce4a2d05b1f53fecce2383832f9c1a0f3a4fadb912bc5eee8824b01c2bbac45aebae2128dce4096c9c982b666a81698e52caa16bb09ea2e253c4cadec6b965c5e68caf84dad0a12df105a6a78d014d87c9465b35d12eb050002bf81055a17ee9c9bff88648d3798949ea3d9ab8d935cd75a280774e84fade567e3261c09ef76ef72421b37046a6cb1f429039e3d41cb18c015d2e9023d0b7f9c5183e955740b03e76f33392872f6c6287a8cfe6c58e440a65a9c943e5c682dcb2c75b4c8f9e268703404ce9c299a2ea53f8946dba72f1c778957acb9922952e82dc0dc1b74e1467776eee97ec4d5d7e1055bde085a91f03fb08d73f740e51bd5b2a9aaac10c0438b1647bddb36981e62e2b4e73127bacd8c621e67ae1b77ff7621aa6e188452170ec22a939e237c59c0a69a9f845c668b6e33b314d15536ab72ce82c6086a86842b69be97d49cdabef9cbf4dc1e0e48a95f38811e2fb5fc90ed0f8f4d95bbfda482322448f8a9aad4eb29e357dc99b3f8313729917b225a1bd15de7596a7cf3d542ec90b62a13dad38ae1dbec41e6fec7ed1b0aa0ae3cb85e15522ab9547c2f50ee02dc4b53b789fbc494142ca253b4acc4184efd9934b28f95452e2ea7e1b718114ccb84a864c3b18bd494e5056d66f0b55a201394790f3ed23031237d912b54e9c2fdab3ba20d53705df3f3c232785d0cb0819b11253aea0ea4abdb818ad6ca894c36e8a78f7a3750f5db2ee8cfa9cbda9ec8c2194e4f3814467ddaa3307621982aab3e921f79e4f4c36e912b4b8aaa02a0162bedc69c4d8265c35dba237138e33010dffadb5cebd67b86ae00175ba3cc689a38b50d773fb6b6e181efd26adea0bb29fad89bab1b8c8514a313fc1eba42fd8732741cdc64ad184b4eb6ade7e76a299785d84b3c1a9aa764810eb91fcc9244667466cb9a959f103efe877f920fad60f1103755b17c807ee80e2a1d24a9cc5035a11d295a0a2e71d814f176d04c4a8efbbae796558820c06d412c51be712a606f319d5b8a69c73c622c7dcc81af5618043430434ca16af425643c3ca8e32b8a52667917c4b6d0b8b80a71f49efc563b90adf6a755c06ed7fab72be459bed2211dfb563c58408d144d85336a71c95471a902c006dddb47b7a1d76a4e5a2fba627b3ba59356a5f1570e1cb2ca5abcefa71521a4b7ad229f0442948a87d9a8df111c504b29888ca21e03d607391d0e62ae92fad28f374fd0aeb784d71db144f43c2af2f9a8e833e50b384dd1fdf44601fbe1d7777fb11ea3ef6ecec1d04c01349c2bad0871f33fca30d112d4d858ba81d082d6a11db5c325db16764c451f6d986e0f890a4474e88eedf52614b97fd1e5def84c02734e9e845b38c9e74c8075ea8743ec06cd36a48399218ec375abbb5fe935941a1b2ae2755942e3e83a847d3ba41519f564201ce9300d192ad3d6ebbd3449ed0614746fc9ddd02822996fa0068acb1457153365a237de648e59eafda51084fc87d9361c794f9f4ddf452b4fd45d1d60613c43b8ca270148970299d8999b583c825bfdbdc061e8a0240de95af84bc6fc1567363ec24a5afcd89305a23146cf9067285a6e18fea8d11268f877618815a3f4b2318e8a5c2909bfc8fa3b8519b50ee0634424fcdd58b99651defe7c773036d941a952c00457dbad4bcdd310c3370619b5f2cdd6941911ffc74113faae6b253600e997437785b33cd1000f7ee1ef1e198b9b00b6f3c11f26d4d1525ee7c9b87ded62c6c5dd00f5e75fc33b218141475668d47abab79258d81d1507c676f374b8f95241b55719b064b4bf4def0f9b5d73b2cb682003a3cd27a8cae88a12d4f64efc306940164bf04efa29e5730eaa5bd471e05cbecdb26fc66e2baeb35df482d1d68040ff06595da8ccce9794dcbd8b08c0c555f7eaed0ed332e2ca29a923635147f25c1dae2de5f68d2d0be0f0bda65e740cc2b3d2660dac8f78a0151e6799b5eb05ff16daa9a31102a6717d135127bcbf0dfafb4a6d0698a2bd6aef68e26463c7fadfd8efca22a5ce8d0bbedc38f3b9bd36eaf7cc8e098ee1e6368374b3e6f5cbb2b83f47fac6e1fce072eeed84fc66ab33d7682334a44287d058000e3df7333ca81e24f2455e7e33ec09211a8e438a2eb14ac701c4ed229f11edf4e3ef3d340245a954c53523e96e3bbec33b54e36e528fd378316"
+      }
+    },
+    {
+      "id": "reject-length-payload-files-inline-long",
+      "source": "04 \u00a72.4.1: payload.files[].inline of 12289 bytes (at most 12288); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "payload.files[].inline",
+        "value": "WfMqYAYNX9sEbN742bKjbBG-SqB4qce74my-V5DBojN902Ph3DILqCvmtmCOA9_Y8FBc8qMqozKegVL9jDihLRb3jzGp4jjv6eKVEQ0sChbYb3ZyBtzRxT80xQRAHvQnwevoJ9y130jdIzxpximsjCgcWieScA1k12DiAvNHoXZTNikbuRFzhrORGPmRhfhdGQDZf-Xb5H0SiM9dySQFreJLufeAQ-ACI5BlLb63C7HIF08cdLXXFjxnrKubydUR-BtVRQYXqnY56Ajo5IBYTrpwDWqo856Dc9ASGvMkdBxUc56VoLnOG69v1Gzod0uQNbrL1bc9jyw6fjgz5nwpR00j-DdlCmtOCjxF-upf05R4VXqmsgLRW3pskUCPdYoc_AJWPCFXk8CTx0bROLR31OLimrNyyh6By0nI10_sMVNQ6rkallDzrejiC8j3iN00amjSbG6Cfc-VyXvsBSp9rg1SFyeJ8yBHQUpdR4GJEY202BNfRIR5oQWL7LtkwaXkU2flNLT1KyyJIz0NxFtmU26UnFZdshTSnkfjzRw9Gz7GFc6WB1NzB2dPpEVkY6eZ57HM4ZyfZ-fuN9IRt7qVfcqBKFzLNpiXPcgtZlfTE94uQfgJs27S7-0wg0QKhmw4bKGIQcYUIge9csnGCM9JeTMrbYPsWR8nGsru4chZFyHWuCGt9h9aEIBzrmDmNFKSuiJENLpuX_EfCYUjVt1WvAJjcKdPSPyzVARYD0hEo2fJvBkcjerVkjt8iqAuKMmT2F1Traf0z-ESgr8e9Y9gAQTJD87nx9rkhO7uTITJwCiBicD_JT5bprvYuQ_ZG4Qt_UAbFmoIxAc489vpibnbAtB6GO0wBY81lP1PT3qeKXxNE3wIZ7h9vIZVQO9eEyM1Pmi38wXe4fzr-0jbVmIlIQQ2c1KETxLbvbx9z06d1_Wh_nLhA5cRxkcIyLp3zBN6hTWSBExTfNih9rMloQ8ZP4NSkzgUgkUhOh3AXfBfzAfJkW8VurvJ7HMS8wygYZvA-kjiK9AFTHIMRVcpImaFg8jeYC8KbJ3SgIfIgZEPXAodIoG3BZqXDeLZF3n1BIhdqHRCMYSfpDRMVW1p5voJ5c0T0a_EaxAXBWfjqIDlg7hCzWSGYsNL6I0lCFFdfBrIEQ9CCxUocXxKZffA5fmZlJ94YL1VndGqPy3mnGwEVAP5-Sh9xVS-8zOsyIs0dVSoe-3Ald7c4qRtUW6XxtKjyix52eHhjoA8PyLO5REbMlrXo4MnemBPy2lqumKpZMfiRt_7zQhXKjzOtvYIkD6O1jIKiSOxs5j15fzWOjcfj3xXKFZAgKq79MfZ7TGMcLqO7RMh59AI3pbQUYuTyGqtmBbNUUfm6z7d45S3Bfr4PKbuINz2wPkMD9UcHjp0IkePtcQYNdxgtVpOfkFFm-eJZ33jnKFkwez17FIGOgby8FsnVFLgJP6Vy_4npOoseky0flH4QzAVPm3tEWpMXfCu-FCoBKr1qE1oTTP47Z-tt1j7ZcRBgSz9Mto2y0cfH3RQnNUFCr_2KAYITgJd7pToMVEz_FIHXyYV1iFR_EkXrLIK3060y5V1Q5JYSgfoOOLXs2JOMR0WWD17rLylPMr8FcFOoCxziEfpQOy0OntDuiURUuoHWqY6dWQmEHFsa0T4SQ3z1a2ElYFAfj1IRLHfERXqwH3WaH8hwdKf12Bpj9fs0cIzmCbhRk6WyuyrxkeVXmyg44Nr4XhO5h-HJp1Ak6e4fFOvPbJ6XNCI0jy7hplSgf_-6zPfOESCLgy9imMvrLg2HZYgDlfPgJuUOTi7OqCIuOVf0GI4pi9U8yZ7Cjb5UGR74mBGqQD3mvrQTuqVfnzHKcXMYd3kuBUv-bX38of0EeZelP76X0pit8VUvbGQPs2LZRXUL-R2NMT4SrlonSthwDYLM5aw4GwvtyY6UdHzaNDp1yTuZFcYV0TOFnRWS_tL1_xROXlvJxmf11IyqYRX8Ap0hxixvw_Ko5EhLw7Xa62lQeEBODs8S1mc5I65uUlZeP_-TYhHTjFErPpm0hlNPKgSHS3nFI7nPdpe0c3NfO86grPCrNWSAQihNelQPkoJfj4TFfX-8NtTFHbfOBe5o7G7fAWa4_tZmgq3FPf9S2bA53mTyZad6KTzPkWagI8hFkLHsW14gn3_aRXRGwIpD2VbVTMRSiMASwMiqFG5YaM__8_lwvuK8XTAmAtyz6jrBL-svsmIzgddztPczSnnPwBETLFX4sJzkGD3s5p_xWYs3y9P4vZt_cITea2OaA39tFGNhohx6cgtI3fk3KVxVQqoZgjapB10Jf7IKMLLGDHwRLc9sarqAlmXfyo2Um1GWeYh3LpwCAxxBYswBYwxg35GnrQwnxTsbvsu-L_NlwqatGfNXyda5arHuPVVwz5Oh9GcQZIEnWBbvQ_6fNgIdwPzSWNOBAqSJk3GztIU4qZGV3qm8MRCqgU3hQE2hTvm5ZRpC6PzDT3o8-Tfjrk79t86vF3EZLsegiE8LK6yAPT7lrS08Y6ue-jTN5HwlXcEpI7PV27dlVIXB6PaLz2l2gKfZz0sTEwaiMOAKGFvPFTPDg5yZssIcVwr0lcJcp8cKTBI2Wnt6LnIS2LQ6HU_qg1eGOnQdv3Vhq2TZ6Gkbo5fYqGypXaJvT9UHJlyBVCWXUmNU2HjiPtU18pS-a6krK8Ppzn9Kad-YI9JOn3UXeMd5lAruHjyndIxaE_FLimETYsHvMqbT8y6MQFpFr0-0ZqFEU0dnXuxVN-GiMOH28FT3-WhU6WPsOXFTSLnk3zIiA6bs-O0VaTM2NjaVgKbZUs_bNpGeGhWnyHXzzKoPJa484ExJOBQ1dVTrlZgUEBLkXKHoKrtHaVBPbKkmyjpzEbxaqzAaEGtTmbhNb2vehGWS69fdNZC5jxG4Zhy5wc0h_Z94JVBLnk54CJMOIEqfr0UiaZokxxJWsD6Y0YewXUG5qu-rhsE3RoUNWpDnskilpHJp6CZoGnEPrLB8TAguiFBVONZUKU9BknwStWgZ8EqsQX4Q7Yu0_-kzNtOCgLr9nF4TxYTo-mzY-eXRVn4ar7c3zU9yiVr2QJlADOoCxsfd9NiPAHfHpChEGAsp2ENK6AdmHdfL23DwwUMDsEgKT5HRD-0KXGzVqlpP6f00GSp0SHqeaKKWocmTZ0l3--2Q50px5VmyMykOYczv_CFgfTYnV1zgp7vBxsNFZ6cubJnmrAI2ZqtWuSSyPntXKZ_k-Jc6N_wYnycNkoURQ7sps9IkdQwg8mtdE6KUPlbKipfeMFkqojufCLtQRh8KOW9GDIS5uE5tiK72-hghRSiSU8Sx80p1siP1304olOCBVJT2j22lfGoCrCZWGzwlhR8ssyD7f4SYZY0WTycCe69-0brWhXlm2NzbdkmvHdlfODFZ_crlXjSihDIGhwwX8IWLGlmS5oDAC-v7CUZwt_XSfeAA66XzV2MSBS455NMxIGbtQz22HhhDJ_5Bfcx5fVeT1WnjTx5FqG4OG-e_NnIeElBPhZKdsFKRD6Tiv4EPbaM2zd3f7TVmz4BBjjEQBBzQied9KzOvAwXrGMi75v7RyFoJzuAYULDSnnFNdGNNcrLnxR1NTL71MxuwDokBJQibOfT8EGCJxQdG9xBmcuUlVPoErtSsO2Avpl9sOCiIcyToha0RqiqXyUeDruvZ0tjSq0Y4dT-1PCkn08GXQ2tLd18iGmqHT8n3gkG6q9C67HffHu7_NxEQnFyDcnyo-q_HfjiHJ69ZG4MmQujjJfiGHrmRPoHEFglVFZFTSy_qXTyRDqSJqCm-4xEKIsu-Uov4nDLlE3nq4dskD1sTa9JjYLBBVru8EC0oxpcZx8Hc3knS0-GuNALn86ppR2yQ5sK7ucBFM-nEi0abKDhJ9AMshaOyFC69f9saGaQ1tB0xuia2MHgxaNF-b0Z5S2hM6t6_cg703DXUdMkPhC7Oi4MYoC1ua4xe2VMqgVM6oKg4NlGmywyK1sr1XQWMl6Mna-Qz0DeEVZmjp0aoxq5qWZHbHe2RVASPllPscWiYZggXD4so4NUFrQrjPjOUSIT8_EV-kaNrzH1O4wyauaWLYcdB08sr28GP4oS28vt7eMj3rayWiZdMJ_ovQkLYJzeNg6hlQUVf3U0iU_LtPzaXgRsAJPkg9x1eO8uFevouwDQT08v-MgFJquy-hOYD23rw0BTTQNfvDzPj-1YaDUHjG2uWYgxHAH4YWs2KrymnT6fLm_jLQKrCyhI-EsMrI9Z7cVupbh1U1__i0IweObulG8hB6grJWvbf55H44h-_mBoZQAS3xvLs48EasU_eP4RBTU6CXSPjuXTBb6OkigoqzEyQojS7FvMRFtzvrXNa13DNYO6T16TYDIWFoDFeLMT-jD0ZXmRdTGi1QFjqEi-sTg5kfstt5_vVh-oLGNhyzP26MmGuuakCtHfQco-vDtqVSl4n54UGam66l8zjL-D3CCqj5W0ATaGq7y4fFEJkNfl4ubIr2eUVpBDqgV669i4Ia0oQsxSCN7Pnvw3q2Z3Whax8aG7I1590OO15sw1q9vv-6PEf0ptY-wxDJJT5wbBrDYZG1MVECEYAtsixR5BKdhI4C-evi0_T4EjAXeP9Rs8BBG1WYvZhsspsajj1nH1HG0cWH5BOWfboexIm4rbze9bU0AudAa4ci6O4VCEWsD0qOAkpRpoBZpue3UpxCSPWNJ4Ek2FOMkBFbgBekll6NdDDi1XNzoDX7qa5DeJhgRB1O4uxVjeGhfZ2mzsz2U9b7Nu2Tfi55orwpNZuXBKp2z-PxZuwLUipKBpGM9exxq62EvP79ajpigNryDTgeRoiIp4no03Ju93Kdv2Ut-Y8o6pfgGZE_81G74qgeCyjJQg2C8VNo5M2uuGOfA0NogvREsSMKbStY3JlMTh0iU8Bx_BjT8bpXvgrLpVj8VXlbqI6Z76k2YTy2AiqAkt2zgGSZV4HMTeSuamrXTFFtPG027pkpAc8NZmgZH26hv_hG_8PQHmB5j9nWA9mALGXCSG6AcUPI87QPilt1N2ydxG6Jer6gdiFDsgOwvAzVmS3p9pGC-3CVsABaZ6apUmDvJ6ckJriZJOUcTMMHLW_h017QCY8Ep-HjWNi7c340o_UAJWVaqkd_7kfsZRbs4neKpTUtRCbozv_vVlTJRr08rcHxSi1AhHk7uN_jaTzvG4SpkIdxfYIG15nawILmjosbsiZXUXXl6eglad7WaQVIFHZXdVXU-Xg82q5OMIpH0mg6sHUPSPbN4k2s_ZVzZ5D_WnQnIB7PMccSiRIPQrZi6bDYUlsAP4ad2FZ1Rl7qv8vEsi4j96H46_288-ZtAzV7MuYmDuiEDs4O3Ohd8_cjQUySWtM6fPToZ0rc3foToyT2qyWV5OjjikgefICA-Opl09ssqgk1BhQHoDqYJicJbjqg7q7v9v3ayM40m58gh4WaE3gCkm3k0Exk72-SxwTcvpVC-eR-RCjoNc_LY5IUCdhxkeVxabdN9AiH_jUriF3SMmmhIT10KsR1f9j_kGnA7f8Cydwf11wCTzEERL6Mufo3KR2q9khFT3IKpu0TLqC-0elBNjehCVW1jaZ8rwY-vct7dhs-X-tVmNWEh8sS2aFTTsOnXWFPRBgS-Xim3VFuxUNw3bNAuN37iZmAyh4Xvj2jBDnLWPSDed4HXncwnYWWeRIzULADsKRzZxlZ987PggufGeJioqreBf0kGisB4Ix2t3vN0luTy38yRpWtpsCaESZUENNbanQwzhzohx4tkYngCMmzM8YYzT5Jc3pk7ERgUXB3EG4fpspI8BsAZuXgrpwxyiFtcNoAwpPfUs3ZWoF5VKIQM3aPlGMObOgMxdf5Kej77BURMqL71wpt6LPkhO-dbicoeWUq5dCxFFSxrkh2GjEtsj2nKu_wNoo4kcNBuPKOwebpVxlKqWL-eWeC1hmgea9mseWcpuZGdXkBUroG9uRuatTNXMzb6owxQKa3YI2PiJ9hEpeN0g0pLzHUjiOAHgYuFZ9mxpOz-fHx6gOm5sI3y1q61dfF_yeJFRxwtZTSGAv5kIXjUAkk6e9aH4K300VNSAtvCvr8bX9KrCrzNAu89p0dGAPZTHSOYmZDYiVQHu2JA10EauQVNY86Y9apymfNSf6ln5t6dWBoGfD15cBAXfHkz9u5nwwsbNQwmfFEgR6FAo5vLpiS-JrM5BFlpDMG6-6z2j_ZptKLPRpOcSHQV6Xvsk5olxlCvlyVKSOBtNb5DQSP3Iv7W1fg3LSxHvrg5w7HPmbGqaT7UCFg6KQDPPdpjqJavI3fU3NsqzzBf6jX8UkQtmAokJu8Eu09jNhI0pGZ2_M7EVJUVOX_n0e4p0EpfzPGFH8Kpc2mH6-M730lRlJZlpf229KWV5fTw-3UOhoQnirBiO5oEcPedlkKDczPXBU34Xb_vRMgoqJ5Iysujae4kHbkMZfD8WUWZXd5pmgmqNi5S5AEgCk44-LWASBOhLB42oM1ri-dppdkR6O3s4R04JEW9V14xbOdqd-haMPWPN6ZllaKKhYIpnBQArzJVDlK6Goxr4HI5sw1LqmI8c7faZ6c-pRMLvyuYIIvFw6iGJtyFd-7x5-oSB4UikfQ1tg-d3Hkanq8kzWyFRc-Txb6d1F6qJezr6m6cd5Il1UkgW89IPU0v7sk42I1vEJJIf-14rCk_K5z84RmeqZv3_Bi_khuB4SgaxXrsAAhiJ0Tivp-qUPTtyW7mkZi5hwsLU1TOUEAlwndSNIlUju3XevyVnlM4_HuYDeS8KG8Ui_xCPJIMzW3tyMclArHruhybr3w0tyxetBZLy04_N5c_t-MlOKfhJflB7SqE3dCi6L0bGWIO57qcnf_VS6suQI_JGlDbU0diNTGcOwOfq3xhN69vfPwJIJ2Y7aDrI-B58IVeZLkYmpKYbpxBQh2BaN18KE8nE_omsLrGLQ6LGbzGwc3AhMlN2o3YLPKKrmurhGIwiLfMGjzI1RcD_syXVf4cgGJ5fxMmeqQE5ECacP9B7l5u-y5SqU4FXgo1liq-3DahTmZ7rZy1Br8qKksVQbfTvjJcN3PokjzUoFRT5hwS_-DuS2Txap1UpPx1w3JrkMx1JwiZs9LtZY9dVusfy0ZJmy-3yWXajiDIE42RZaEdEOIRBDjnqOsgZwGqA7_wA1286ebgpPxVCopYvPIZfDw_3iX-CraGPd2l67MuNxn7uervYfzIvAdHr9K7-iXpNOTv5lv60ICBR-vJm49EULYmd7PayPMhwhGtDUy3FzPuOhgHQpj-Oa_3JFUQd4NfveyeUh0ME1LMgCR5WOK4GqvJXgIfXjXZ659mLsHA719wvRKV4oEC-QKsC3dx9_5Y7vNA698fQZlgvLmeKkb6NEtU5um4IAJx-JLVfBnR5AVr3qhqxC38G_U3MSabV2Nh9UCFole6Bya7KHMXAIB_dgDlcH9tj8JnRGDIGMzJCRG2pIMvmmIZn4XbJpQ71AeovPStQ3-K1PFLnYNgzB_8Orc28nEuJw1JEVTmWUEEj-iL1V5jgAbJcLH9Z-vIL6ht1gUUasOs8zYDCgPrgTqFa4gaQzoFKFUhy8yVmiHk5iasVdvqxmxmJApOWDf7APNspjrrI-L4PJ13Rh6i9G_6GuvGpoRvGR2kTzNrfqXXWa9aV3ZfqaTLWPI1m9pNrpa0ESsKwdizxQ2zcfAjn_3e9peOL5x5O3BqQpKPXWBl8HuzYGd39dwYYISdpGpRFiQPE8g8B5EmtnbjjuiINNm4jt2xe_fQC-rgP33tLk_0YREXA5CgRoxk1OYSGmu-6oxito8e5H4c8AXEZyXuAztyd-nti2IjXmWss4SSx8HiaNBjldyenBQ-1JI0eFW0YtEPMzuti00iIastSdP7SETSQhita5-iP2kcIhFEw5klfrWHcpZKSiSwZm8tNdOsILtfn5IfC_2P_6CUoXZ83OB3AiTPmB9SBbkaZaEaB4he6TcQaXOhd46m9MlCvpVTLNCfic8ujp3xmAyucV4FutED3_pfz4BCPyXDxbDqjAUILTW38y0mCHMfUDYpKCZ57XieJZjGnCjhPyV3Dfi2c4aF611l2HKnNXX0GnqEB9CSKvjsETsHNUlllrELc5sXRwJsknsOqX-CP7RVyuBz1m3pRQt298_ttm7Zcj6uFe29XqpeMhvODPzbGB2dNTjzYrBxfGfg3jAGDbjLqM6Jj2RkL9iTDQ-9oTPexdJZfGj3YIUqKIe3Y7EjbvaA6E5W2yV1yeID2hXsqsM7dmMpw2l4JSoWlvY3keaWlBXEgAlidfVMsQzWo95qp8rycNz76LJHsevy_X4LrT__3lY4L2n1rH6HiG1a0T7Gbs6eEvIK6yDl2XNTruEGGdUIXWYblbMhn8PQ042IpkIi9cx3RyHNqeYZhCBSJtOlPv5xno2VIO5kHGfuug7Uy8msAlIZcJSZI7xL33mfhXFIr0-r7_N3rla4wYPPETFUUrDBWve4Ct8CR58siRARN90Pv4UJHAVHn4WZd7JzoOO2VNLnETggcel6uNLu3Ukmamv43V_fVIUjVv0CFJTPESy0EBXSIE3MLwsUq_SUaN056e4eBSoFvadY5S-3GT5VSCGS9wWNg5RihkxmF1duXrqU2OJDrnRlvCTkIPDtFx7EuM8yvv1Ey6cgrj7m4doFZPH4JoegzfQr5Ayo1GmuEQVQeZQcorxuG8Kdk-RAQtQpWnifD6zV_YX2WW5PZvYyp8yXh0GsJm3C8rYu7Z6xpIPPGdfWNU2p5SkgYmlKK9feC_0Nc3eOburDHzPUehQuSx5Zal7Xz_dKfJh27bFpX4v9Z7qBBhzUQyLfuISteYMUI6VFRoU7S0vcOyOnttV4_UjZmFORP8GvCdeB0kgssmf7C3RupZSO8LQf6x416NJIvSvoKdA4fspYEpOBeuxZhcdV8mZXqUSoXg7plnJf1U3jo9A5SP_hO7nibXbzKeC94MINzJJMR534M2bj9I_ndr7-mRb5KI06l3XEYwgXVCue-FedrF5jeE2_n_bxlXu-qLgKGy2wD471zHGFj4c9qrmfc8TnnLhBfRih52SU3e1WC2JkUPy_pI7U7pH0rjYo2l4fx-zTW735F6ag2h4uI2vgASK4reb020EpEjIHQJI1Ffx8jRcjBmFDHA7oshrgJCEU8wyjkV5iUTEMfMeIx-KBePU_lU1ibKg0w0Etn9TZJGJ4rKg1UA6-7rFitoU_UY2r2EkE5ABagJ-v16pn4bNTfii8u26jR_lFaGFci-6MwPd2BEW6W0tbvpV882SQPAcll5auYRiMJVdRyiM1BNIRvB1n_6B7DdIOGUjFzCXtcgIx-_GrI5JXdGnxtAbeQv6KtPaauC9HQ9NIL48DYFGHCCs9mLpj0Z76VNFMEWXWwtR30z3oAOlBP0zdTFW0jQGOCVlvHPwuHvaW9_LpKGAYktFC8u0NI-iNi9wyR-P6QvZXRHO7xFWZ6-2wMj4v5dlzjR69wDUjY4Hg88n8Hlt0mdo3UavSSHc3zS7OMydxf7hqaS_sW6ACo5C0s8KOqMGCOhvAe17POuB07ysxSAssea0l-kztE8u0i2SAhwNQrgtj4OyqUIv-91gJ1EHFrrS5KQy-Jl_flWn-GMubeKsfyFKbhyRdHsUmb_vNfO8oxyjslVuxXuam0yma478lFQPXuIGGloOSdcIUMUqbgTXQoc0EyuPm9hlU4IArYeBDpnv6ShlCqtyV2vpyFKo9ybhHdYDwWbqIMBV1mC_XshMevhcNyB2M1UN7htAT7CNo3Jv7KMPIFajn7P_oPsIQkEYMFeEYY7QJC_oumUyf_0O-MULiIxQSCxDg_voSS6ylR0c0rMJc8oGi07M-ph2uNFKyDmpar9iIBZYLacr1_q8IyYHhu_IYBDZz8m3kCjZBeCQNlYLAMRfm2JgYaIMvS1mSBYGT8geXj-mZKr7uz_eWI98m1ASzJaGZZtf82KdOKA2sMhxyGRTQp1z6f_1Cwijt1JsKma9p2vuVRVGJq0BHMclrfL7GKEec2VQqtBuCaQ9M-xWOkI0FL7-Lbdn_qtHPSz7mSxC93wsIHB0S6vknQ3WdtdhwjRJiZIKY2rnW2QvaLmf8MPqEJBxAe05GTvysPAJTG400MzCNH3yF5VAaMd9d0e4xQao0F0w_PTAPZqx05gFJIDgNja1oyeudgJdiKYv3s1KEtuRSqWKDTGS3BAS_1V4WrvVsBngbmH5BtagdMHYZ880f2C9bwsIWNCyuWqyweuHk6lLD5BHcGXsBu-ja6NNMy4IA3DVi4jfLdabAL9gIjIUI8OuNzSuyoLhGVYL-Tt9QAZXTxdcxNg40D7AcTjFzT5jbAr2_aznuU7Pif3vB6a40-DQ_YZ67suHnNe_PDIgHwsQgSDlbsBjart2I0vyi5jjZXXSPNJinqd-seFO5EDaK4S7c3EY455eQOKZSdv-6XuB-CKFzsynX18JmbezkyyrzYIfAQz2uQxAZSxbfMaJt-cdHfCxiZkJ6Z7ecLv8_PCKhm2hTxkY2VnYEQjjOoGhC4NsN-8AocpbKpm5yCqo7FPC6YQlSup9ARK1RXWuPCsIhbr3hLEsuVFIR_eri2Nc8CmL-uL33HVXTr-gNP2hWpZwyISKfnRsm9c_hnq1p2-zR0yVzrurpBmb9_5sveZdrOg5KVHkkL3O7PZEIQm7uPytexIufw1517bDLNNXE1DRfi3UBg-AAhPoC1ZqLeUhPQ1uXF1iAxFdxIlOIKzdR8clsDdj7upp1fdKRvIElwJ-e1BCLRJMuDa4hEI62bCWqI6ffbTLTB4005WXo1Nc5P5cgqq0GQQqtJjmDaKr71x578aWhYigZxMxWrqcwBsPgeOO8SH6GCRFqJM8MwlaLvjKBSBLlAeWVEgXU7BY-64rtII22GKTDpqbIvobtraw42R76uC9tltGrLQIi3aEtk-sVsB18lt9WtDuy2Ak3Jq3b7leTzi09UM-SdVhXZFDFjyIUvH460bRniIZOK5eMFJCxTvARIc6kyMU9d_sINAfmZj_oHKZLN6avEWHi1iYuJgas32h29Mp3JYU3MEYpf9OAdB6_L66wx3kmhGSzlRuzuCDoARynlFwnJdFBdxkO6cIIUxrn0bVb_uKq05iSksLAlGd7Em6C4EQq6muZUC6MZTs781waofjWZcWlEyWHkDXjYgpFiUr2TgpcMkjvebdESCYqseA-BY3cGgFhdfWHqUc0YbF-yj6eoCWa_oj3kgRfT0vR-4VwlDvBilNZvyO6Dvl8jSAe_Tsa5PfMSekgtKv7wB3TVE_So_iKJKjTT3zc9cBLLnCH2SmU4lR8pKf6EUlDUbUFrdhhK5T0caKNIjL2Uo_V2SewkX564HJeeJQ4SBhCAdvH88KT6bofdKh5idRtmpk17fYFDmTaLmHXNP5JHHzqTFHgg7RCH-eNcPzrKPYfA2ImCuT9uXqT_AR4xAsPGpDf5K7cwbMdvkpuEB2K6grQgfvzvPoDvgVBFReCxNrD9Y_EE8e1AzGzAczLg6Uc10h8itC1XsJM7u8F4IwpGC37FMAkSe3lA4FK-uKS3GV4mYAZ1iLtEGDcXyhWYh5ISUXchUXwjbrdDZTWNsrNoNcanoJX7F4Dqco_xdzEhf8ZfJyBDtDHKI1cmzMRh7z3uonDeBRIWbgmYkWYauqw3ml346DNygFJvj1eOdeu0rOGOV_PJljvU9ErIP8xk2eqklOA_x8LMVTPHbIUhYjJcdiTNJDJpK1EmoU1uPb8JpTAqaBThrbDzipd6IX41tPBBFfT28DnXdSTgzGZ0sctOZPmM5RMMEIVdnpIuDz6tDc-bCONJrG4vAsopPtzfoyFKU0eyGctBcOn3HkMKTQDtUClQpj2FuCDfw7eFuOt6y7DKlhiIIm4LBz6InLF5Mq3BUseQy__2vY0hEOkHVEiGBZ-dzztBOKOxgaIAKzd6WgErriBMjZHEotE3sHKtc-5TiNc-UI06OKzB2KmoT4_I3WkUTgdgy7DT7TRxbfCxWeuixaFZWA3yBcOzwPmyXkO3v3XXRhgT5yp8naHMyxPgJsH9VmHEeT18a8L3RoCDAySEWRDYbt3eRgmZVIEI6_-dytOg6vJVNb7ilc3X7YymoVhgUSnkCPIMJCnM72ltJpyaisIEaZSi4B_UYjr04dWDOmNRIeGefyni9Kn0ip9l5DvxvUiCHTgSk5A2piHaPHws2xdT4YbPah_tihnvs7bpMdF4PPuWRBXn6dvMRSt-Axm_G28Z8AW7--QCaM-mruu86qzOr6s9DnDG56l9k8dFTnZuFdiY19pjPl4-mn3ctUWAs6ChikMlySlpL6JO8tarMS1yeFBZ8c-wO33gJdWb30NASKaBb2cpaxpIfWKY4K2c-7Gchq6fB_711PrAncuTlsAyKOoF8MI7vmeD2I9BOr2_etyB0dQV8i-sSgVsWnirOoqEZmrI48Zm2FcPcLqfd-0vLzGYrW8S87UqHwK65RuJS5jTmoonGKSeo3OsSHaDp-jzygKP-khM00zwd7IgoQXnxmS0mEBB4WymnmXlx_YFuQ40TBK9Ks4ELXxawTZX1sQ9lM5kClRXTf46To4K6pHz4GnrlC0FhHVxWYcfvDFqp5xG4kMT6Po1BsiJXASUYtYVLQugQfUuCKVrjgk0kDCeqHgDQMYWsiYceCUUVSvmnHoXbREdhm7CrT_uECrwkYKVNgBAcyZmPi6fnTtAs8Tpn8u0o-Yu0czetmqW6z4jbFGBiJ3qfkZmPwCA1PDLBW8WQhPzeuvwsRbLWPOEcKoQ5fCEkVa4HrHGwesL6_gj3TM0ljPEYbOMb3BE05ifLX3ph110tp66Vm_u0hV0UExHJgM5vtSJrLCFgiye2tLnBd5GZFjNBWayhJxCOf5SfNsadmQxsEsML548no4Yyl7Xle7VuhYLeYI4d5OWB7QJvZj0w3kZbTmkFdTihskk8Yci9rjMLRgBtTehVbZHXgDcUZZxS0_pBvLVu1JCqoidH7MdAGmBk0ieNdMIArjWyLccFfHYqUNUJ1EeDXp87DJi7SD_4DYN1gQ-yiiT0cDrBfUmadiAJYvK0q6z79mNdDZo_kyRi5Uy8xkz2TWSi2_rNWdIYp6MbLclyVxfhcTBhqD0tOhXo9Yj7bgnztuF95hmA6F_88vgBMpWfcq09GxjclEjZwDv3hklR9v3EEhidGixeOBr3I0TWyO1MOtTjhzc3I99JIjcVTI-OzY6Qh-i-2q2G66zppd-xJ5eMGPdxz2MFCyS23XZ0eVJTaQG6EjtBbp_452SK48wxoshQ4O9Xz5UAZpLmgNZhsi7HDNoMvMFJSvZMMsJcrLL7q2mERXJ0Dkhn2NE2eRByjpZQeU6unjUoUROzLDqqDP6fAA3Wh8n3txyZLP1Ab3qhd5cn__ICwabRP6wkDpc-NTLvUpUH5-t8pNhvl-2cuGVF2EjMfwN7xUst_Z6qN_qDD75Wt77McXnL8-lFc8YEtg7b-SZ4uI4o_S_Iw86CXbMfdIeA2lDpzlGSwJxzfShKC7Sc1GIrQIxGSBNJtGM_zjuzr-QLjpelMsbABLSPKQE-YRftL3U2dE3aEWbYqUA6xfxuIWhowkMXZygLzdZ1nSXixaFi9ImRSkZ0YpGysqY3233Q7qt5UNHWrkax9ooGDtNmjlj-9sqw8VTeIHpmFCjnQ25B7vPkVmaAJGFTjXVawdwvAqB_n1e2lgFSDfUFS1bMwK1K5bk28RK2xPXqY6utXAtZTeo0NXPXpOdi21zL2Fk03psnqHhGeZx_HWQ8XwcM4Zfk72TNWsJUDexxDgvxjyfbGmFNvWnsQ46hy2LmU5J7mz3lxUBzEpY7aNMvz1dtNnaogah838uL2qsjeePUkXigLsFfCnImvJT9Jvh3Py_JZE-uIbkSgQwKU2I9E8j_SCuwS0R5V2yd1IAOv4oo-DKy_DoIYCXQJdGQERWIms7CxTpyfOwp05tpe4zRvsqhGeZhpynMJLVYOVK309elJ8uaWgHNVQZ1Om6oad76siChrS92UDeFpZn_xSpsXnRlbq_7Hxhwvs-1-GDd0Fel-hn48_4NwFce5rqpuWESshHbSXx5Os18mQ7Tjq-wO9UdLeOkxaYSJNdCvqnwgH3OQ5Jtw58hUyeCy1VWsja4TmfJCj4mYRS4cAPyg1xqhdD8IvhEFzS0t-IUYkoPYS8XrVSyRPQn-9PWBpnBy6VNTQ-IC_r8PNxzc1P3g6vHjPgCUySjeWHwdrQLj4It9vo116Rl4K3G-_xNjWEYl6XWiU-0V01WFNhnY1kLT0ZDSJfP85KLQWx9T_sziODgy-cGg86T625Erxe7ogksBwrusRa664hKNzkCWycmCtmaoFpjlLKoWuwnqLiU8TK3sa5ZcXmjK-E2tChLfEFpqeNAU2HyUZbNdEusFAAK_gQVaF-6cm_-IZI03mJSeo9mrjZNc11ooB3ToT63lZ-MmHAnvdu9yQhs3BGpssfQpA549QcsYwBXS6QI9C3-cUYPpVXQLA-dvMzkocvbGKHqM_mxY5ECmWpyUPlxoLcssdbTI-eJocDQEzpwpmi6lP4lG26cvHHeJV6y5kilS6C3A3Bt04UZ3du7pfsTV1-EFW94IWpHwP7CNc_dA5RvVsqmqrBDAQ4sWR73bNpgeYuK05zEnus2MYh5nrht3_3Yhqm4YhFIXDsIqk54jfFnAppqfhFxmi24zsxTRVTarcs6CxghqhoQrab6X1JzavvnL9NweDkipXziBHi-1_JDtD49Nlbv9pIIyJEj4qarU6ynjV9yZs_gxNymReyJaG9Fd51lqfPPVQuyQtioT2tOK4dvsQeb-x-0bCqCuPLheFVIquVR8L1DuAtxLU7eJ-8SUFCyiU7SsxBhO_Zk0so-VRS4up-G3GBFMy4SoZMOxi9SU5QVtZvC1WiATlHkPPtIwMSN9kStU6cL9qzuiDVNwXfPzwjJ4XQywgZsRJTrqDqSr24GK1sqJTDbop496N1D12y7oz6nL2p7IwhlOTzgURn3aozB2IZgqqz6SH3nk9MNukStLiqoCoBYr7cacTYJlw126I3E44zAQ3_rbXOvWe4auABdbo8xomji1DXc_trbhge_Sat6guyn62JurG4yFFKMT_B66Qv2HMnQc3GStGEtOtq3n52opl4XYSzwamqdkgQ65H8ySRGZ0ZsualZ8QPv6Hf5IPrWDxEDdVsXyAfugOKh0kqcxQNaEdKVoKLnHYFPF20ExKjvu655ZViCDAbUEsUb5xKmBvMZ1bimnHPGIsfcyBr1YYBDQwQ0yhavQlZDw8qOMrilJmeRfEttC4uApx9J78VjuQrfanVcBu1_q3K-RZvtIhHftWPFhAjRRNhTNqcclUcakCwAbd20e3oddqTlovumJ7O6WTVqXxVw4csspavO-nFSGkt60inwRClIqH2ajfERxQSymIjKIeA9YHOR0OYq6S-tKPN0_QrreE1x2xRPQ8KvL5qOgz5Qs4TdH99EYB--HXd3-xHqPvbs7B0EwBNJwrrQhx8z_KMNES1NhYuoHQgtahHbXDJdsWdkxFH22Ybg-JCkR06I7t9SYUuX_R5d74TAJzTp6EWzjJ50yAdeqHQ-wGzTakg5khjsN1q7tf6TWUGhsq4nVZQuPoOoR9O6QVGfVkIBzpMA0ZKtPW6700Se0GFHRvyd3QKCKZb6AGissUVxUzZaI33mSOWer9pRCE_IfZNhx5T59N30UrT9RdHWBhPEO4yicBSJcCmdiZm1g8glv9vcBh6KAkDela-EvG_BVnNj7CSlr82JMFojFGz5BnKFpuGP6o0RJo-HdhiBWj9LIxjopcKQm_yPo7hRm1DuBjRCT83Vi5llHe_nx3MDbZQalSwARX261LzdMQwzcGGbXyzdaUGRH_x0ET-q5rJTYA6ZdDd4WzPNEAD37h7x4Zi5sAtvPBHybU0VJe58m4fe1ixsXdAPXnX8M7IYFBR1Zo1Hq6t5JY2B0VB8Z283S4-VJBtVcZsGS0v03vD5tdc7LLaCADo80nqMroihLU9k78MGlAFkvwTvop5XMOqlvUceBcvs2yb8ZuK66zXfSC0daAQP8GWV2ozM6XlNy9iwjAxVX36u0O0zLiyimpI2NRR_JcHa4t5faNLQvg8L2mXnQMwrPSZg2sj3igFR5nmbXrBf8W2qmjEQKmcX0TUSe8vw36-0ptBpiivWrvaOJkY8f639jvyiKlzo0Lvtw487m9Nur3zI4JjuHmNoN0s-b1y7K4P0f6xuH84HLu7YT8Zqsz12gjNKRCh9BYAA499zM8qB4k8kVefjPsCSEajkOKLrFKxwHE7SKfEe304-89NAJFqVTFNSPpbju-wztU425Sj9N4MWfA"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-payload-files-file-key-short",
+      "source": "04 \u00a72.4.1: payload.files[].fileKey of 31 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "payload.files[].fileKey",
+        "value": "cBki8Fi-I_D0dGc1CF3mV9HSEM9SQDX97xVQ4W848A"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-payload-files-file-key-long",
+      "source": "04 \u00a72.4.1: payload.files[].fileKey of 33 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "payload.files[].fileKey",
+        "value": "cBki8Fi-I_D0dGc1CF3mV9HSEM9SQDX97xVQ4W848KSm"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-proof-envelope-id-short",
+      "source": "04 \u00a72.4.1: proof.envelopeId of 15 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "proof.envelopeId",
+        "value": "zsMEt3aIZVZR0mm44vJB"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-proof-envelope-id-long",
+      "source": "04 \u00a72.4.1: proof.envelopeId of 17 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "proof.envelopeId",
+        "value": "zsMEt3aIZVZR0mm44vJBPQY"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-commitment-scope-answers-envelope-id-short",
+      "source": "04 \u00a72.4.1: CommitmentScope.answers.envelopeId of 15 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.answers.envelopeId",
+        "value": "s0yUSQhCoovfU99ZfHh9"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-commitment-scope-answers-envelope-id-long",
+      "source": "04 \u00a72.4.1: CommitmentScope.answers.envelopeId of 17 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.answers.envelopeId",
+        "value": "s0yUSQhCoovfU99ZfHh9uFs"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-commitment-scope-thread-short",
+      "source": "04 \u00a72.4.1: CommitmentScope.thread of 15 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.thread",
+        "value": "nXD3xRvbEHB06D2HsxMf"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-commitment-scope-thread-long",
+      "source": "04 \u00a72.4.1: CommitmentScope.thread of 17 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.thread",
+        "value": "nXD3xRvbEHB06D2HsxMfL5s"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-commitment-scope-terms-id-short",
+      "source": "04 \u00a72.4.1: CommitmentScope.termsId of 15 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.termsId",
+        "value": "yAWyU2IRoCWDu44BuMAn"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-commitment-scope-terms-id-long",
+      "source": "04 \u00a72.4.1: CommitmentScope.termsId of 17 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "CommitmentScope.termsId",
+        "value": "yAWyU2IRoCWDu44BuMAnZxs"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-terms-terms-id-short",
+      "source": "04 \u00a72.4.1: terms.termsId of 15 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "terms.termsId",
+        "value": "T3VatdwBJ68E6EIV9YLu"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-terms-terms-id-long",
+      "source": "04 \u00a72.4.1: terms.termsId of 17 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "terms.termsId",
+        "value": "T3VatdwBJ68E6EIV9YLuvKs"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-invite-invite-id-short",
+      "source": "04 \u00a72.4.1: invite.inviteId of 15 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.inviteId",
+        "value": "U6vRSDPtKUVJtwegn0DR"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-invite-invite-id-long",
+      "source": "04 \u00a72.4.1: invite.inviteId of 17 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.inviteId",
+        "value": "U6vRSDPtKUVJtwegn0DR_5U"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-invite-secret-short",
+      "source": "04 \u00a72.4.1: invite.secret of 31 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.secret",
+        "value": "pdu2mn5ihiJ5yTd-A0QrbsXM04ds_H6TuQz3VhQalA"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-invite-secret-long",
+      "source": "04 \u00a72.4.1: invite.secret of 33 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.secret",
+        "value": "pdu2mn5ihiJ5yTd-A0QrbsXM04ds_H6TuQz3VhQalLun"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-invite-code-commit-short",
+      "source": "04 \u00a72.4.1: invite.codeCommit of 31 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.codeCommit",
+        "value": "cf381cFBSFT9-i3ce_FX6Iq4IBbyrSu4dzM15vasew"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-invite-code-commit-long",
+      "source": "04 \u00a72.4.1: invite.codeCommit of 33 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.codeCommit",
+        "value": "cf381cFBSFT9-i3ce_FX6Iq4IBbyrSu4dzM15vaseyPX"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-handshake-invite-id-short",
+      "source": "04 \u00a72.4.1: handshake.inviteId of 15 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "handshake.inviteId",
+        "value": "BXQhYOyvzJRSNLsut0r7"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-handshake-invite-id-long",
+      "source": "04 \u00a72.4.1: handshake.inviteId of 17 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "handshake.inviteId",
+        "value": "BXQhYOyvzJRSNLsut0r7WB8"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-handshake-proof-short",
+      "source": "04 \u00a72.4.1: handshake.proof of 31 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "handshake.proof",
+        "value": "WMJVFuZt0dKghala9jj9Y66JlPGWM4BmNkP6pE0y8w"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-handshake-proof-long",
+      "source": "04 \u00a72.4.1: handshake.proof of 33 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "handshake.proof",
+        "value": "WMJVFuZt0dKghala9jj9Y66JlPGWM4BmNkP6pE0y85u_"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-handshake-code-nonce-short",
+      "source": "04 \u00a72.4.1: handshake.codeNonce of 31 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "handshake.codeNonce",
+        "value": "OA0Dq2NnkI69fg3l7OWnx9r4hFVu0JLmvXthMO5Hhw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-handshake-code-nonce-long",
+      "source": "04 \u00a72.4.1: handshake.codeNonce of 33 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "handshake.codeNonce",
+        "value": "OA0Dq2NnkI69fg3l7OWnx9r4hFVu0JLmvXthMO5Hh9wL"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-handshake-code-commit-short",
+      "source": "04 \u00a72.4.1: handshake.codeCommit of 31 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "handshake.codeCommit",
+        "value": "opqDrfBZg5SJTEUw5Z2tpzU8CmZcSVJJVHrZRgQlBw"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-handshake-code-commit-long",
+      "source": "04 \u00a72.4.1: handshake.codeCommit of 33 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "handshake.codeCommit",
+        "value": "opqDrfBZg5SJTEUw5Z2tpzU8CmZcSVJJVHrZRgQlB7UD"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-handshake-ack-invite-id-short",
+      "source": "04 \u00a72.4.1: handshake-ack.inviteId of 15 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "handshake-ack.inviteId",
+        "value": "MTIZndzDL90xoqaY4vKd"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-handshake-ack-invite-id-long",
+      "source": "04 \u00a72.4.1: handshake-ack.inviteId of 17 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "handshake-ack.inviteId",
+        "value": "MTIZndzDL90xoqaY4vKd5MQ"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-handshake-ack-handshake-id-short",
+      "source": "04 \u00a72.4.1: handshake-ack.handshakeId of 15 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "handshake-ack.handshakeId",
+        "value": "6Ny6HKOaYMKemZb7fnbe"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-handshake-ack-handshake-id-long",
+      "source": "04 \u00a72.4.1: handshake-ack.handshakeId of 17 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "handshake-ack.handshakeId",
+        "value": "6Ny6HKOaYMKemZb7fnbejeQ"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-handshake-ack-code-reveal-short",
+      "source": "04 \u00a72.4.1: handshake-ack.codeReveal of 31 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "handshake-ack.codeReveal",
+        "value": "YvsDa-ILlcAXQjmj9xDYAMK6cy-LQsYNyXdJGo3oWg"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-handshake-ack-code-reveal-long",
+      "source": "04 \u00a72.4.1: handshake-ack.codeReveal of 33 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "handshake-ack.codeReveal",
+        "value": "YvsDa-ILlcAXQjmj9xDYAMK6cy-LQsYNyXdJGo3oWjpV"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-owner-action-nonce-short",
+      "source": "04 \u00a72.4.1: OwnerAction.nonce of 15 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.nonce",
+        "value": "5Qz9a9zhngrPJOF6SdM-"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-owner-action-nonce-long",
+      "source": "04 \u00a72.4.1: OwnerAction.nonce of 17 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.nonce",
+        "value": "5Qz9a9zhngrPJOF6SdM-BMg"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-proof-pack-disclosure-content-key-short",
+      "source": "04 \u00a72.4.1: ProofPack.disclosure.contentKey of 31 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.disclosure.contentKey",
+        "value": "Vp02v1h0TN-5wvo2qf5IqURg_IpoPRyP_PDxOZ1vOQ"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-proof-pack-disclosure-content-key-long",
+      "source": "04 \u00a72.4.1: ProofPack.disclosure.contentKey of 33 bytes (it is 32); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.disclosure.contentKey",
+        "value": "Vp02v1h0TN-5wvo2qf5IqURg_IpoPRyP_PDxOZ1vOZcU"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-tool-envelope-id-short",
+      "source": "04 \u00a72.4.1: tool.envelopeId of 15 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "tool.envelopeId",
+        "value": "Zhu_p8ZOk46Vk8zY8gHh"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-length-tool-envelope-id-long",
+      "source": "04 \u00a72.4.1: tool.envelopeId of 17 bytes (it is 16); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "tool.envelopeId",
+        "value": "Zhu_p8ZOk46Vk8zY8gHh1DA"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-address-eip55",
+      "source": "04 \u00a72.4.1: OwnerAction.agent in EIP-55 mixed case; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.agent",
+        "value": "0x0180EC93Ae3effd2535292DD293f5E4bB3Ea2876"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-address-uppercase",
+      "source": "04 \u00a72.4.1: OwnerAction.agent in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.agent",
+        "value": "0x0180EC93AE3EFFD2535292DD293F5E4BB3EA2876"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-address-no-prefix",
+      "source": "04 \u00a72.4.1: OwnerAction.agent without 0x; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.agent",
+        "value": "0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-address-capital-prefix",
+      "source": "04 \u00a72.4.1: OwnerAction.agent with 0X; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.agent",
+        "value": "0X0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-address-39-hex",
+      "source": "04 \u00a72.4.1: OwnerAction.agent with 39 hex digits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.agent",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea287"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-address-41-hex",
+      "source": "04 \u00a72.4.1: OwnerAction.agent with 41 hex digits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.agent",
+        "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea28760"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-address-whitespace",
+      "source": "04 \u00a72.4.1: OwnerAction.agent with leading whitespace; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.agent",
+        "value": " 0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bytes32-uppercase",
+      "source": "04 \u00a72.4.1: Record.envelopeHash in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "Record.envelopeHash",
+        "value": "0xB7E140215F66966B2B7E24383B62A0D3C561024C091438266970A33D4AC366B8"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bytes32-no-prefix",
+      "source": "04 \u00a72.4.1: AgentCard.ownerNostr without 0x; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "AgentCard.ownerNostr",
+        "value": "b7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bytes32-capital-prefix",
+      "source": "04 \u00a72.4.1: proof.recordId with 0X; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "proof.recordId",
+        "value": "0Xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bytes32-63-hex",
+      "source": "04 \u00a72.4.1: proof.recordId with 63 hex digits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "proof.recordId",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bytes32-trailing-space",
+      "source": "04 \u00a72.4.1: txHash with trailing whitespace; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "txHash",
+        "value": "0xb7e140215f66966b2b7e24383b62a0d3c561024c091438266970a33d4ac366b8 "
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bytes32-base64url-record-id",
+      "source": "04 \u00a72.4.1: proof.recordId as base64url; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "proof.recordId",
+        "value": "t-FAIV9mlmsrfiQ4O2Kg08VhAkwJFDgmaXCjPUrDZrg"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bytes32-base64url-salt",
+      "source": "04 \u00a72.4.1: proof.salt as base64url; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "proof.salt",
+        "value": "t-FAIV9mlmsrfiQ4O2Kg08VhAkwJFDgmaXCjPUrDZrg"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-high-s",
+      "source": "04 \u00a72.4.1: invite.cardSig with a high s (EIP-2); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d1b03ed2030d6656ad2c65e7650dc443d932cd8183e7571b47492f371a863bdda51c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-v-0",
+      "source": "04 \u00a72.4.1: invite.cardSig with v = 0; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c00"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-v-1",
+      "source": "04 \u00a72.4.1: invite.cardSig with v = 1; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c01"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-64-bytes",
+      "source": "04 \u00a72.4.1: invite.cardSig of 64 bytes; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-r-zero",
+      "source": "04 \u00a72.4.1: invite.cardSig with r = 0; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0x00000000000000000000000000000000000000000000000000000000000000004fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-s-zero",
+      "source": "04 \u00a72.4.1: invite.cardSig with s = 0; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d100000000000000000000000000000000000000000000000000000000000000001b"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-r-n",
+      "source": "04 \u00a72.4.1: invite.cardSig with r = n; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd03641414fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-uppercase",
+      "source": "04 \u00a72.4.1: invite.cardSig in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "0x7F06AD46921912A062AE94EA3729D7936ECED9807EE1B28288F1E72B77AC25D14FC12DFCF299A952D39A189AF23BBC2587E15B62C7F184F476A3277249FA639C1B"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-ecdsa-no-prefix",
+      "source": "04 \u00a72.4.1: invite.cardSig without 0x; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.cardSig",
+        "value": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1b"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-proof-pack-signature-erc1271",
+      "source": "04 \u00a72.4.1: ProofPack.signature as an ERC-1271 signature of another length (0x + even hex)",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.signature",
+        "value": "0xa8659bfd6c0fee5861883c8a53dce9786626de892943c3c507a521122f14aadba8659bfd6c0fee5861883c8a53dce9786626de892943c3c507a521122f14aadba8659bfd6c0fee5861883c8a53dce9786626de892943c3c507a521122f14aadb"
+      },
+      "expected": {
+        "bytes": "a8659bfd6c0fee5861883c8a53dce9786626de892943c3c507a521122f14aadba8659bfd6c0fee5861883c8a53dce9786626de892943c3c507a521122f14aadba8659bfd6c0fee5861883c8a53dce9786626de892943c3c507a521122f14aadb"
+      }
+    },
+    {
+      "id": "reject-proof-pack-signature-odd-hex",
+      "source": "04 \u00a72.4.1: ProofPack.signature with an odd number of hex digits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.signature",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d14fc12dfcf299a952d39a189af23bbc2587e15b62c7f184f476a3277249fa639c1"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-proof-pack-signature-empty",
+      "source": "04 \u00a72.4.1: ProofPack.signature empty after 0x; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.signature",
+        "value": "0x"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-proof-pack-signature-high-s",
+      "source": "04 \u00a72.4.1: ProofPack.signature as a 65-byte signature with a high s; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "ProofPack.signature",
+        "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d1b03ed2030d6656ad2c65e7650dc443d932cd8183e7571b47492f371a863bdda51c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decode-uint256-zero",
+      "source": "04 \u00a72.4.1: Record.maxFee = zero",
+      "input": {
+        "op": "decode",
+        "path": "Record.maxFee",
+        "value": "0"
+      },
+      "expected": {
+        "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "id": "decode-uint256-max",
+      "source": "04 \u00a72.4.1: Record.maxFee = max",
+      "input": {
+        "op": "decode",
+        "path": "Record.maxFee",
+        "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "expected": {
+        "bytes": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    {
+      "id": "reject-uint256-leading-zero",
+      "source": "04 \u00a72.4.1: Record.nonce with a leading zero; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "Record.nonce",
+        "value": "01500"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-uint256-plus",
+      "source": "04 \u00a72.4.1: Record.nonce with a sign; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "Record.nonce",
+        "value": "+1500"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-uint256-minus",
+      "source": "04 \u00a72.4.1: Record.nonce negative; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "Record.nonce",
+        "value": "-1"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-uint256-overflow",
+      "source": "04 \u00a72.4.1: Record.nonce of 2^256; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "Record.nonce",
+        "value": "115792089237316195423570985008687907853269984665640564039457584007913129639936"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-uint256-fraction",
+      "source": "04 \u00a72.4.1: Record.nonce with a fraction; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "Record.nonce",
+        "value": "1500.0"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-uint256-exponent",
+      "source": "04 \u00a72.4.1: Record.nonce in exponent form; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "Record.nonce",
+        "value": "1e3"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-uint256-hex",
+      "source": "04 \u00a72.4.1: Record.nonce in hex; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "Record.nonce",
+        "value": "0x5dc"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-uint256-whitespace",
+      "source": "04 \u00a72.4.1: Record.nonce with trailing whitespace; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "Record.nonce",
+        "value": "1500 "
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-uint256-empty",
+      "source": "04 \u00a72.4.1: Record.nonce empty; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "Record.nonce",
+        "value": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-nostr-key-0x",
+      "source": "04 \u00a72.4.1: OwnerAction.owner with 0x (Nostr-native); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.owner",
+        "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-nostr-key-uppercase",
+      "source": "04 \u00a72.4.1: envelope.from in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.from",
+        "value": "CFCA2D0D611CBFC149A2002FFA5056F9FF133238F5A4A47AA0AC910A443682EB"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-nostr-key-63-hex",
+      "source": "04 \u00a72.4.1: envelope.from with 63 hex digits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.from",
+        "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682e"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bip340-0x",
+      "source": "04 \u00a72.4.1: SignedOwnerAction.sig with 0x; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "SignedOwnerAction.sig",
+        "value": "0xb1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760d6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f617823"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bip340-uppercase",
+      "source": "04 \u00a72.4.1: envelope.sig in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.sig",
+        "value": "B1531B72291DB274F4590D179878FCF39434DDF96B14D9198B132E91E9A7D760D6B71D9BF7A0DE65AC066AF9DEF7B935A01EEA9D44BCC3FF10D84CF82F617823"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-bip340-127-hex",
+      "source": "04 \u00a72.4.1: envelope.sig with 127 hex digits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.sig",
+        "value": "b1531b72291db274f4590d179878fcf39434ddf96b14d9198b132e91e9a7d760d6b71d9bf7a0de65ac066af9def7b935a01eea9d44bcc3ff10d84cf82f61782"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-digest-0x",
+      "source": "04 \u00a72.4.1: approval.decide.params.actionDigest with 0x (signed only under a Nostr key); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "approval.decide.params.actionDigest",
+        "value": "0x9fd764ebb50143ecfb8d732f75864134131ec98df6e872e56fef45331bfda6d9"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-digest-uppercase",
+      "source": "04 \u00a72.4.1: terms-body.termsHash in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "terms-body.termsHash",
+        "value": "9FD764EBB50143ECFB8D732F75864134131EC98DF6E872E56FEF45331BFDA6D9"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-digest-base64url",
+      "source": "04 \u00a72.4.1: payload.files[].plaintextSha256 as base64url; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "payload.files[].plaintextSha256",
+        "value": "n9dk67UBQ-z7jXMvdYZBNBMeyY326HLlb-9FMxv9ptk"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-base64url-padded",
+      "source": "04 \u00a72.4.1: envelope.id with padding; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.id",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g=="
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-base64url-drop-nonce-padded",
+      "source": "04 \u00a72.4.1: drop-request.nonce with padding; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "drop-request.nonce",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g=="
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-base64url-standard-alphabet",
+      "source": "04 \u00a72.4.1: OwnerAction.nonce with + and /; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "OwnerAction.nonce",
+        "value": "+/8+DwD/EOD4/n08GwqZ7g"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-base64url-trailing-bits",
+      "source": "04 \u00a72.4.1: invite.inviteId with non-zero trailing bits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "invite.inviteId",
+        "value": "-_8-DwD_EOD4_n08GwqZ7h"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-base64url-whitespace",
+      "source": "04 \u00a72.4.1: envelope.recipients[].kid with whitespace; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "envelope.recipients[].kid",
+        "value": "-_8-DwD_EOD 4_n08GwqZ7g"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-base64url-impossible-length",
+      "source": "04 \u00a72.4.1: handshake.proof with an impossible length (4n + 1 characters); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "handshake.proof",
+        "value": "-_8-DwD_EOD4_n08GwqZ7gAAA"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-approval-id-no-prefix",
+      "source": "04 \u00a72.4.1: approvalId without apr_; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "approvalId",
+        "value": "-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-approval-id-uppercase-prefix",
+      "source": "04 \u00a72.4.1: approvalId with APR_; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "approvalId",
+        "value": "APR_-_8-DwD_EOD4_n08GwqZ7g"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-approval-id-padded",
+      "source": "04 \u00a72.4.1: approvalId with padding (28 characters); rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "approvalId",
+        "value": "apr_-_8-DwD_EOD4_n08GwqZ7g=="
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-approval-id-15-bytes",
+      "source": "04 \u00a72.4.1: approvalId of 15 bytes; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "approvalId",
+        "value": "apr_-_8-DwD_EOD4_n08GwqZ"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-approval-id-17-bytes",
+      "source": "04 \u00a72.4.1: approvalId of 17 bytes; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "approvalId",
+        "value": "apr_-_8-DwD_EOD4_n08GwqZ7gA"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-approval-id-trailing-bits",
+      "source": "04 \u00a72.4.1: approvalId with non-zero trailing bits; rejected, never normalised",
+      "input": {
+        "op": "decode",
+        "path": "approvalId",
+        "value": "apr_-_8-DwD_EOD4_n08GwqZ7h"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-accept-0",
+      "source": "04 \u00a72.4.1: JSON integer token 0 (zero)",
+      "input": {
+        "op": "parseInteger",
+        "json": "0"
+      },
+      "expected": {
+        "value": "0"
+      }
+    },
+    {
+      "id": "integer-accept-1760000000",
+      "source": "04 \u00a72.4.1: JSON integer token 1760000000 (a timestamp)",
+      "input": {
+        "op": "parseInteger",
+        "json": "1760000000"
+      },
+      "expected": {
+        "value": "1760000000"
+      }
+    },
+    {
+      "id": "integer-accept-9007199254740991",
+      "source": "04 \u00a72.4.1: JSON integer token 9007199254740991 (2^53 - 1)",
+      "input": {
+        "op": "parseInteger",
+        "json": "9007199254740991"
+      },
+      "expected": {
+        "value": "9007199254740991"
+      }
+    },
+    {
+      "id": "integer-reject-1p0",
+      "source": "04 \u00a72.4.1: JSON integer token 1.0 (spelled with a fraction)",
+      "input": {
+        "op": "parseInteger",
+        "json": "1.0"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-reject-1e3",
+      "source": "04 \u00a72.4.1: JSON integer token 1e3 (in exponent form)",
+      "input": {
+        "op": "parseInteger",
+        "json": "1e3"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-reject-1-e3",
+      "source": "04 \u00a72.4.1: JSON integer token 1E3 (in exponent form)",
+      "input": {
+        "op": "parseInteger",
+        "json": "1E3"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-reject-minus0",
+      "source": "04 \u00a72.4.1: JSON integer token -0 (negative zero)",
+      "input": {
+        "op": "parseInteger",
+        "json": "-0"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-reject-minus1",
+      "source": "04 \u00a72.4.1: JSON integer token -1 (negative)",
+      "input": {
+        "op": "parseInteger",
+        "json": "-1"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-reject-01",
+      "source": "04 \u00a72.4.1: JSON integer token 01 (with a leading zero)",
+      "input": {
+        "op": "parseInteger",
+        "json": "01"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-reject-9007199254740991p4",
+      "source": "04 \u00a72.4.1: JSON integer token 9007199254740991.4 (a near-integer fraction)",
+      "input": {
+        "op": "parseInteger",
+        "json": "9007199254740991.4"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-reject-9007199254740992",
+      "source": "04 \u00a72.4.1: JSON integer token 9007199254740992 (2^53)",
+      "input": {
+        "op": "parseInteger",
+        "json": "9007199254740992"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "integer-reject-18446744073709551615",
+      "source": "04 \u00a72.4.1: JSON integer token 18446744073709551615 (2^64 - 1 (a uint64 above 2^53 - 1))",
+      "input": {
+        "op": "parseInteger",
+        "json": "18446744073709551615"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "equal-owner-and-card-owner-nostr",
+      "source": "04 \u00a72.4.1: an OwnerAction owner and the card's ownerNostr for the same key are equal as bytes",
+      "input": {
+        "op": "equalBytes",
+        "a": {
+          "path": "OwnerAction.owner",
+          "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        },
+        "b": {
+          "path": "AgentCard.ownerNostr",
+          "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        }
+      },
+      "expected": {
+        "equal": "true"
+      }
+    },
+    {
+      "id": "equal-from-and-card-agent-nostr",
+      "source": "04 \u00a72.4.1: an envelope from and the card's agentNostr compare as bytes",
+      "input": {
+        "op": "equalBytes",
+        "a": {
+          "path": "envelope.from",
+          "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        },
+        "b": {
+          "path": "AgentCard.agentNostr",
+          "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        }
+      },
+      "expected": {
+        "equal": "true"
+      }
+    },
+    {
+      "id": "equal-owner-key-and-card",
+      "source": "04 \u00a72.4.1: a CommitmentScope ownerKey and a card key compare as bytes",
+      "input": {
+        "op": "equalBytes",
+        "a": {
+          "path": "CommitmentScope.counterparty.ownerKey",
+          "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        },
+        "b": {
+          "path": "AgentCard.ownerNostr",
+          "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        }
+      },
+      "expected": {
+        "equal": "true"
+      }
+    },
+    {
+      "id": "equal-owner-other-key",
+      "source": "04 \u00a72.4.1: two well-formed, different keys are not equal",
+      "input": {
+        "op": "equalBytes",
+        "a": {
+          "path": "OwnerAction.owner",
+          "value": "a4a9db7a44d5371e6470c4ff6d582d13232248518ed59b617101bb6a947bc6fb"
+        },
+        "b": {
+          "path": "AgentCard.ownerNostr",
+          "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        }
+      },
+      "expected": {
+        "equal": "false"
+      }
+    },
+    {
+      "id": "equal-owner-with-0x",
+      "source": "04 \u00a72.4.1: an owner with 0x fails its parse first, though the strings are equal",
+      "input": {
+        "op": "equalBytes",
+        "a": {
+          "path": "OwnerAction.owner",
+          "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        },
+        "b": {
+          "path": "AgentCard.ownerNostr",
+          "value": "0xcfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "equal-card-without-0x",
+      "source": "04 \u00a72.4.1: a card key without 0x fails its parse first",
+      "input": {
+        "op": "equalBytes",
+        "a": {
+          "path": "OwnerAction.owner",
+          "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        },
+        "b": {
+          "path": "AgentCard.ownerNostr",
+          "value": "cfca2d0d611cbfc149a2002ffa5056f9ff133238f5a4a47aa0ac910a443682eb"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "equal-contact-and-card-agent-evm",
+      "source": "04 \u00a72.4.1: a contact.check contact and the card's agentEvm compare as bytes",
+      "input": {
+        "op": "equalBytes",
+        "a": {
+          "path": "contact.check.params.contact",
+          "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+        },
+        "b": {
+          "path": "AgentCard.agentEvm",
+          "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+        }
+      },
+      "expected": {
+        "equal": "true"
+      }
+    },
+    {
+      "id": "equal-address-checksummed",
+      "source": "04 \u00a72.4.1: an EIP-55 address fails its parse; nothing lower-cases it",
+      "input": {
+        "op": "equalBytes",
+        "a": {
+          "path": "OwnerAction.agent",
+          "value": "0x0180EC93Ae3effd2535292DD293f5E4bB3Ea2876"
+        },
+        "b": {
+          "path": "AgentCard.agentEvm",
+          "value": "0x0180ec93ae3effd2535292dd293f5e4bb3ea2876"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    }
+  ]
+}

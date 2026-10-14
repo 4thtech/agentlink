@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/safety-code/case.schema.json",
+  "title": "safety-code case",
+  "description": "04 \u00a73.6.1 safety code. `commit`: codeCommit. `checkReveal`: whether codeReveal opens codeCommit. `code`: T, pairingDigest, the 64-bit integer (decimal) and the shown code. `labels`: the two tagged hashes of the same input. `recompute`: steps 1-5 from the surface's own agent ID, the contact's current card and the signed H and K (with their CEKs), or a rejection.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "inviteId",
+            "nonceA"
+          ],
+          "properties": {
+            "op": {
+              "const": "commit"
+            },
+            "inviteId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "nonceA": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "codeCommit"
+          ],
+          "properties": {
+            "codeCommit": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "inviteId",
+            "codeCommit",
+            "codeReveal"
+          ],
+          "properties": {
+            "op": {
+              "const": "checkReveal"
+            },
+            "inviteId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "codeCommit": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "codeReveal": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "cardA",
+            "cardB",
+            "inviteId",
+            "nonceA",
+            "nonceB"
+          ],
+          "properties": {
+            "op": {
+              "const": "code"
+            },
+            "cardA": {
+              "type": "object"
+            },
+            "cardB": {
+              "type": "object"
+            },
+            "inviteId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "nonceA": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "nonceB": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "transcript",
+            "pairingDigest",
+            "integer",
+            "code"
+          ],
+          "properties": {
+            "transcript": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "pairingDigest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "integer": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$"
+            },
+            "code": {
+              "type": "string",
+              "pattern": "^[0-9]{4} [0-9]{4} [0-9]{4}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "input"
+          ],
+          "properties": {
+            "op": {
+              "const": "labels"
+            },
+            "input": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "safetyCommit",
+            "safetyCode"
+          ],
+          "properties": {
+            "safetyCommit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "safetyCode": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "self",
+            "contactCard",
+            "handshake",
+            "ack"
+          ],
+          "properties": {
+            "op": {
+              "const": "recompute"
+            },
+            "self": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{40}$"
+            },
+            "contactCard": {
+              "type": "object"
+            },
+            "handshake": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "envelope",
+                "cek"
+              ],
+              "properties": {
+                "envelope": {
+                  "type": "object"
+                },
+                "cek": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            "ack": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "envelope",
+                "cek"
+              ],
+              "properties": {
+                "envelope": {
+                  "type": "object"
+                },
+                "cek": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "pairingDigest",
+                "code"
+              ],
+              "properties": {
+                "pairingDigest": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "code": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4} [0-9]{4} [0-9]{4}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

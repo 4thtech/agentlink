@@ -1,0 +1,437 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "pairing",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib, cryptography 50.0.2, coincurve 21.0.0, pycryptodome 3.23.0, rfc8785 0.1.4)",
+    "version": "cpython 3.12.13",
+    "script": "tools/vectors/generate_pairing.py"
+  },
+  "cases": [
+    {
+      "id": "rfc4231-1",
+      "source": "RFC 4231 \u00a74 test case 1, HMAC-SHA-256 (published)",
+      "input": {
+        "op": "hmacSha256",
+        "key": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+        "data": "4869205468657265"
+      },
+      "expected": {
+        "mac": "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7"
+      }
+    },
+    {
+      "id": "rfc4231-2",
+      "source": "RFC 4231 \u00a74 test case 2, HMAC-SHA-256 (published)",
+      "input": {
+        "op": "hmacSha256",
+        "key": "4a656665",
+        "data": "7768617420646f2079612077616e7420666f72206e6f7468696e673f"
+      },
+      "expected": {
+        "mac": "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
+      }
+    },
+    {
+      "id": "rfc4231-3",
+      "source": "RFC 4231 \u00a74 test case 3, HMAC-SHA-256 (published)",
+      "input": {
+        "op": "hmacSha256",
+        "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "data": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "expected": {
+        "mac": "773ea91e36800e46854db8ebd09181a72959098b3ef8c122d9635514ced565fe"
+      }
+    },
+    {
+      "id": "rfc4231-4",
+      "source": "RFC 4231 \u00a74 test case 4, HMAC-SHA-256 (published)",
+      "input": {
+        "op": "hmacSha256",
+        "key": "0102030405060708090a0b0c0d0e0f10111213141516171819",
+        "data": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+      },
+      "expected": {
+        "mac": "82558a389a443c0ea4cc819899f2083a85f0faa3e578f8077a2e3ff46729665b"
+      }
+    },
+    {
+      "id": "rfc4231-6",
+      "source": "RFC 4231 \u00a74 test case 6, HMAC-SHA-256 (published)",
+      "input": {
+        "op": "hmacSha256",
+        "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "data": "54657374205573696e67204c6172676572205468616e20426c6f636b2d53697a65204b6579202d2048617368204b6579204669727374"
+      },
+      "expected": {
+        "mac": "60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54"
+      }
+    },
+    {
+      "id": "rfc4231-7",
+      "source": "RFC 4231 \u00a74 test case 7, HMAC-SHA-256 (published)",
+      "input": {
+        "op": "hmacSha256",
+        "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "data": "5468697320697320612074657374207573696e672061206c6172676572207468616e20626c6f636b2d73697a65206b657920616e642061206c6172676572207468616e20626c6f636b2d73697a6520646174612e20546865206b6579206e6565647320746f20626520686173686564206265666f7265206265696e6720757365642062792074686520484d414320616c676f726974686d2e"
+      },
+      "expected": {
+        "mac": "9b09ffa71b942fcb27635fbcd5b0e944bfdc63644f0713938a7f51535c3a35e2"
+      }
+    },
+    {
+      "id": "proof",
+      "source": "04 \u00a73.6 pairing proof",
+      "input": {
+        "op": "pairingProof",
+        "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
+        "inviteId": "KdWh9qy33-31vfdSrLKusg",
+        "card": {
+          "version": 1,
+          "agentEvm": "0xf4c632bd3cf6a0fd8f9c66eeb7f0311c8f9723da",
+          "agentNostr": "0x19c23ecacc91455a7cd570129257fbc690420a43332c2583a6290698e1a76043",
+          "agentEnc": "0xd72ea8de6bb4185bd43f3beced1eb47470d57f54883e06ff2ed7f3439c949068",
+          "ownerEvm": "0x531d01fe61bc699831e61e212e178c0c8a9b9683",
+          "ownerNostr": "0xbd36452b127735a5cf548e344fd1b37339a1c0fcc67cd9b2887336c412b09cbf",
+          "ownerEnc": "0x6902edf623763549883b30ce7c676f7c9cad949f1c948a5c2257b327dc8a4213",
+          "nameHash": "0xd3d2dc24e37a6cb2cfd267b484ff2fec94e29f0e019ce31e69208a2cf6f94e96",
+          "relaysHash": "0x75eb592ec8abdaf14bd4649714b9f0359d6d4a6a58e2298e574fdc3d5a8beb21",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        }
+      },
+      "expected": {
+        "proofKey": "3ec8c555753cbddd6c1c1ace2b44c6911aa829f0a7c5bdb9ab303b7dc0892721",
+        "cardJcsSha256": "cb525ddf84b2a3bd7e6e04f0c1cf3a6c422783e80056a31609881b0019e2ee65",
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo"
+      }
+    },
+    {
+      "id": "proof-card-key-order",
+      "source": "04 \u00a73.6 pairing proof: the same card with its keys in another order gives the same proof (JCS)",
+      "input": {
+        "op": "pairingProof",
+        "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
+        "inviteId": "KdWh9qy33-31vfdSrLKusg",
+        "card": {
+          "keyEpoch": 0,
+          "expiresAt": 1791536000,
+          "issuedAt": 1760000000,
+          "relaysHash": "0x75eb592ec8abdaf14bd4649714b9f0359d6d4a6a58e2298e574fdc3d5a8beb21",
+          "nameHash": "0xd3d2dc24e37a6cb2cfd267b484ff2fec94e29f0e019ce31e69208a2cf6f94e96",
+          "ownerEnc": "0x6902edf623763549883b30ce7c676f7c9cad949f1c948a5c2257b327dc8a4213",
+          "ownerNostr": "0xbd36452b127735a5cf548e344fd1b37339a1c0fcc67cd9b2887336c412b09cbf",
+          "ownerEvm": "0x531d01fe61bc699831e61e212e178c0c8a9b9683",
+          "agentEnc": "0xd72ea8de6bb4185bd43f3beced1eb47470d57f54883e06ff2ed7f3439c949068",
+          "agentNostr": "0x19c23ecacc91455a7cd570129257fbc690420a43332c2583a6290698e1a76043",
+          "agentEvm": "0xf4c632bd3cf6a0fd8f9c66eeb7f0311c8f9723da",
+          "version": 1
+        }
+      },
+      "expected": {
+        "proofKey": "3ec8c555753cbddd6c1c1ace2b44c6911aa829f0a7c5bdb9ab303b7dc0892721",
+        "cardJcsSha256": "cb525ddf84b2a3bd7e6e04f0c1cf3a6c422783e80056a31609881b0019e2ee65",
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo"
+      }
+    },
+    {
+      "id": "verify",
+      "source": "04 \u00a73.6 pairing proof: the proof matches",
+      "input": {
+        "op": "verifyPairingProof",
+        "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
+        "inviteId": "KdWh9qy33-31vfdSrLKusg",
+        "card": {
+          "version": 1,
+          "agentEvm": "0xf4c632bd3cf6a0fd8f9c66eeb7f0311c8f9723da",
+          "agentNostr": "0x19c23ecacc91455a7cd570129257fbc690420a43332c2583a6290698e1a76043",
+          "agentEnc": "0xd72ea8de6bb4185bd43f3beced1eb47470d57f54883e06ff2ed7f3439c949068",
+          "ownerEvm": "0x531d01fe61bc699831e61e212e178c0c8a9b9683",
+          "ownerNostr": "0xbd36452b127735a5cf548e344fd1b37339a1c0fcc67cd9b2887336c412b09cbf",
+          "ownerEnc": "0x6902edf623763549883b30ce7c676f7c9cad949f1c948a5c2257b327dc8a4213",
+          "nameHash": "0xd3d2dc24e37a6cb2cfd267b484ff2fec94e29f0e019ce31e69208a2cf6f94e96",
+          "relaysHash": "0x75eb592ec8abdaf14bd4649714b9f0359d6d4a6a58e2298e574fdc3d5a8beb21",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo"
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "verify-reject-wrong-secret",
+      "source": "04 \u00a73.6 pairing proof: another invite secret",
+      "input": {
+        "op": "verifyPairingProof",
+        "secret": "q2Yhff8P19Ccqb8O9UA8BTjmtpS0tn-gplx9NRbHWrk",
+        "inviteId": "KdWh9qy33-31vfdSrLKusg",
+        "card": {
+          "version": 1,
+          "agentEvm": "0xf4c632bd3cf6a0fd8f9c66eeb7f0311c8f9723da",
+          "agentNostr": "0x19c23ecacc91455a7cd570129257fbc690420a43332c2583a6290698e1a76043",
+          "agentEnc": "0xd72ea8de6bb4185bd43f3beced1eb47470d57f54883e06ff2ed7f3439c949068",
+          "ownerEvm": "0x531d01fe61bc699831e61e212e178c0c8a9b9683",
+          "ownerNostr": "0xbd36452b127735a5cf548e344fd1b37339a1c0fcc67cd9b2887336c412b09cbf",
+          "ownerEnc": "0x6902edf623763549883b30ce7c676f7c9cad949f1c948a5c2257b327dc8a4213",
+          "nameHash": "0xd3d2dc24e37a6cb2cfd267b484ff2fec94e29f0e019ce31e69208a2cf6f94e96",
+          "relaysHash": "0x75eb592ec8abdaf14bd4649714b9f0359d6d4a6a58e2298e574fdc3d5a8beb21",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-other-invite",
+      "source": "04 \u00a73.6 pairing proof: another inviteId",
+      "input": {
+        "op": "verifyPairingProof",
+        "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
+        "inviteId": "rYa9vOL-6EmpOWMeBJIkEw",
+        "card": {
+          "version": 1,
+          "agentEvm": "0xf4c632bd3cf6a0fd8f9c66eeb7f0311c8f9723da",
+          "agentNostr": "0x19c23ecacc91455a7cd570129257fbc690420a43332c2583a6290698e1a76043",
+          "agentEnc": "0xd72ea8de6bb4185bd43f3beced1eb47470d57f54883e06ff2ed7f3439c949068",
+          "ownerEvm": "0x531d01fe61bc699831e61e212e178c0c8a9b9683",
+          "ownerNostr": "0xbd36452b127735a5cf548e344fd1b37339a1c0fcc67cd9b2887336c412b09cbf",
+          "ownerEnc": "0x6902edf623763549883b30ce7c676f7c9cad949f1c948a5c2257b327dc8a4213",
+          "nameHash": "0xd3d2dc24e37a6cb2cfd267b484ff2fec94e29f0e019ce31e69208a2cf6f94e96",
+          "relaysHash": "0x75eb592ec8abdaf14bd4649714b9f0359d6d4a6a58e2298e574fdc3d5a8beb21",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-card-changed",
+      "source": "04 \u00a73.6 pairing proof: B's card changed (keyEpoch)",
+      "input": {
+        "op": "verifyPairingProof",
+        "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
+        "inviteId": "KdWh9qy33-31vfdSrLKusg",
+        "card": {
+          "version": 1,
+          "agentEvm": "0xf4c632bd3cf6a0fd8f9c66eeb7f0311c8f9723da",
+          "agentNostr": "0x19c23ecacc91455a7cd570129257fbc690420a43332c2583a6290698e1a76043",
+          "agentEnc": "0xd72ea8de6bb4185bd43f3beced1eb47470d57f54883e06ff2ed7f3439c949068",
+          "ownerEvm": "0x531d01fe61bc699831e61e212e178c0c8a9b9683",
+          "ownerNostr": "0xbd36452b127735a5cf548e344fd1b37339a1c0fcc67cd9b2887336c412b09cbf",
+          "ownerEnc": "0x6902edf623763549883b30ce7c676f7c9cad949f1c948a5c2257b327dc8a4213",
+          "nameHash": "0xd3d2dc24e37a6cb2cfd267b484ff2fec94e29f0e019ce31e69208a2cf6f94e96",
+          "relaysHash": "0x75eb592ec8abdaf14bd4649714b9f0359d6d4a6a58e2298e574fdc3d5a8beb21",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 1
+        },
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-raw-secret-key",
+      "source": "04 \u00a73.6 pairing proof: the proof was keyed with the raw secret instead of proofKey",
+      "input": {
+        "op": "verifyPairingProof",
+        "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
+        "inviteId": "KdWh9qy33-31vfdSrLKusg",
+        "card": {
+          "version": 1,
+          "agentEvm": "0xf4c632bd3cf6a0fd8f9c66eeb7f0311c8f9723da",
+          "agentNostr": "0x19c23ecacc91455a7cd570129257fbc690420a43332c2583a6290698e1a76043",
+          "agentEnc": "0xd72ea8de6bb4185bd43f3beced1eb47470d57f54883e06ff2ed7f3439c949068",
+          "ownerEvm": "0x531d01fe61bc699831e61e212e178c0c8a9b9683",
+          "ownerNostr": "0xbd36452b127735a5cf548e344fd1b37339a1c0fcc67cd9b2887336c412b09cbf",
+          "ownerEnc": "0x6902edf623763549883b30ce7c676f7c9cad949f1c948a5c2257b327dc8a4213",
+          "nameHash": "0xd3d2dc24e37a6cb2cfd267b484ff2fec94e29f0e019ce31e69208a2cf6f94e96",
+          "relaysHash": "0x75eb592ec8abdaf14bd4649714b9f0359d6d4a6a58e2298e574fdc3d5a8beb21",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "proof": "wko67W24-mO86Uz4ef0K0REO_Npe_h28nZCl80Wlyco"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-invite-id-as-text",
+      "source": "04 \u00a73.6 pairing proof: the proof was built over the base64url text of inviteId",
+      "input": {
+        "op": "verifyPairingProof",
+        "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
+        "inviteId": "KdWh9qy33-31vfdSrLKusg",
+        "card": {
+          "version": 1,
+          "agentEvm": "0xf4c632bd3cf6a0fd8f9c66eeb7f0311c8f9723da",
+          "agentNostr": "0x19c23ecacc91455a7cd570129257fbc690420a43332c2583a6290698e1a76043",
+          "agentEnc": "0xd72ea8de6bb4185bd43f3beced1eb47470d57f54883e06ff2ed7f3439c949068",
+          "ownerEvm": "0x531d01fe61bc699831e61e212e178c0c8a9b9683",
+          "ownerNostr": "0xbd36452b127735a5cf548e344fd1b37339a1c0fcc67cd9b2887336c412b09cbf",
+          "ownerEnc": "0x6902edf623763549883b30ce7c676f7c9cad949f1c948a5c2257b327dc8a4213",
+          "nameHash": "0xd3d2dc24e37a6cb2cfd267b484ff2fec94e29f0e019ce31e69208a2cf6f94e96",
+          "relaysHash": "0x75eb592ec8abdaf14bd4649714b9f0359d6d4a6a58e2298e574fdc3d5a8beb21",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "proof": "7Xg7u1AxdwCH-B_e2abRbIiYvnehgJPN50Lt7qtt3vQ"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-card-not-jcs",
+      "source": "04 \u00a73.6 pairing proof: the proof was built over a non-JCS serialisation of the card",
+      "input": {
+        "op": "verifyPairingProof",
+        "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
+        "inviteId": "KdWh9qy33-31vfdSrLKusg",
+        "card": {
+          "version": 1,
+          "agentEvm": "0xf4c632bd3cf6a0fd8f9c66eeb7f0311c8f9723da",
+          "agentNostr": "0x19c23ecacc91455a7cd570129257fbc690420a43332c2583a6290698e1a76043",
+          "agentEnc": "0xd72ea8de6bb4185bd43f3beced1eb47470d57f54883e06ff2ed7f3439c949068",
+          "ownerEvm": "0x531d01fe61bc699831e61e212e178c0c8a9b9683",
+          "ownerNostr": "0xbd36452b127735a5cf548e344fd1b37339a1c0fcc67cd9b2887336c412b09cbf",
+          "ownerEnc": "0x6902edf623763549883b30ce7c676f7c9cad949f1c948a5c2257b327dc8a4213",
+          "nameHash": "0xd3d2dc24e37a6cb2cfd267b484ff2fec94e29f0e019ce31e69208a2cf6f94e96",
+          "relaysHash": "0x75eb592ec8abdaf14bd4649714b9f0359d6d4a6a58e2298e574fdc3d5a8beb21",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "proof": "ulYNuCd-023npvhDpsl7Fjq2tV23x1fEB8HlEjfIUGc"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-proof-padded",
+      "source": "04 \u00a73.6 pairing proof: proof as padded base64url",
+      "input": {
+        "op": "verifyPairingProof",
+        "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
+        "inviteId": "KdWh9qy33-31vfdSrLKusg",
+        "card": {
+          "version": 1,
+          "agentEvm": "0xf4c632bd3cf6a0fd8f9c66eeb7f0311c8f9723da",
+          "agentNostr": "0x19c23ecacc91455a7cd570129257fbc690420a43332c2583a6290698e1a76043",
+          "agentEnc": "0xd72ea8de6bb4185bd43f3beced1eb47470d57f54883e06ff2ed7f3439c949068",
+          "ownerEvm": "0x531d01fe61bc699831e61e212e178c0c8a9b9683",
+          "ownerNostr": "0xbd36452b127735a5cf548e344fd1b37339a1c0fcc67cd9b2887336c412b09cbf",
+          "ownerEnc": "0x6902edf623763549883b30ce7c676f7c9cad949f1c948a5c2257b327dc8a4213",
+          "nameHash": "0xd3d2dc24e37a6cb2cfd267b484ff2fec94e29f0e019ce31e69208a2cf6f94e96",
+          "relaysHash": "0x75eb592ec8abdaf14bd4649714b9f0359d6d4a6a58e2298e574fdc3d5a8beb21",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo="
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-proof-31-bytes",
+      "source": "04 \u00a73.6 pairing proof: a 31-byte proof",
+      "input": {
+        "op": "verifyPairingProof",
+        "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
+        "inviteId": "KdWh9qy33-31vfdSrLKusg",
+        "card": {
+          "version": 1,
+          "agentEvm": "0xf4c632bd3cf6a0fd8f9c66eeb7f0311c8f9723da",
+          "agentNostr": "0x19c23ecacc91455a7cd570129257fbc690420a43332c2583a6290698e1a76043",
+          "agentEnc": "0xd72ea8de6bb4185bd43f3beced1eb47470d57f54883e06ff2ed7f3439c949068",
+          "ownerEvm": "0x531d01fe61bc699831e61e212e178c0c8a9b9683",
+          "ownerNostr": "0xbd36452b127735a5cf548e344fd1b37339a1c0fcc67cd9b2887336c412b09cbf",
+          "ownerEnc": "0x6902edf623763549883b30ce7c676f7c9cad949f1c948a5c2257b327dc8a4213",
+          "nameHash": "0xd3d2dc24e37a6cb2cfd267b484ff2fec94e29f0e019ce31e69208a2cf6f94e96",
+          "relaysHash": "0x75eb592ec8abdaf14bd4649714b9f0359d6d4a6a58e2298e574fdc3d5a8beb21",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fA"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-secret-padded",
+      "source": "04 \u00a73.6 pairing proof: secret as padded base64url",
+      "input": {
+        "op": "verifyPairingProof",
+        "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg=",
+        "inviteId": "KdWh9qy33-31vfdSrLKusg",
+        "card": {
+          "version": 1,
+          "agentEvm": "0xf4c632bd3cf6a0fd8f9c66eeb7f0311c8f9723da",
+          "agentNostr": "0x19c23ecacc91455a7cd570129257fbc690420a43332c2583a6290698e1a76043",
+          "agentEnc": "0xd72ea8de6bb4185bd43f3beced1eb47470d57f54883e06ff2ed7f3439c949068",
+          "ownerEvm": "0x531d01fe61bc699831e61e212e178c0c8a9b9683",
+          "ownerNostr": "0xbd36452b127735a5cf548e344fd1b37339a1c0fcc67cd9b2887336c412b09cbf",
+          "ownerEnc": "0x6902edf623763549883b30ce7c676f7c9cad949f1c948a5c2257b327dc8a4213",
+          "nameHash": "0xd3d2dc24e37a6cb2cfd267b484ff2fec94e29f0e019ce31e69208a2cf6f94e96",
+          "relaysHash": "0x75eb592ec8abdaf14bd4649714b9f0359d6d4a6a58e2298e574fdc3d5a8beb21",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-card-non-canonical",
+      "source": "04 \u00a73.6 pairing proof: a card field in upper-case hex",
+      "input": {
+        "op": "verifyPairingProof",
+        "secret": "dojngc_j6iy6nKxKh0QJahT5C_8ZnarhrNbYFWCkqWg",
+        "inviteId": "KdWh9qy33-31vfdSrLKusg",
+        "card": {
+          "version": 1,
+          "agentEvm": "0xf4c632bd3cf6a0fd8f9c66eeb7f0311c8f9723da",
+          "agentNostr": "0x19C23ECACC91455A7CD570129257FBC690420A43332C2583A6290698E1A76043",
+          "agentEnc": "0xd72ea8de6bb4185bd43f3beced1eb47470d57f54883e06ff2ed7f3439c949068",
+          "ownerEvm": "0x531d01fe61bc699831e61e212e178c0c8a9b9683",
+          "ownerNostr": "0xbd36452b127735a5cf548e344fd1b37339a1c0fcc67cd9b2887336c412b09cbf",
+          "ownerEnc": "0x6902edf623763549883b30ce7c676f7c9cad949f1c948a5c2257b327dc8a4213",
+          "nameHash": "0xd3d2dc24e37a6cb2cfd267b484ff2fec94e29f0e019ce31e69208a2cf6f94e96",
+          "relaysHash": "0x75eb592ec8abdaf14bd4649714b9f0359d6d4a6a58e2298e574fdc3d5a8beb21",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "proof": "fPJVUsGDtHSqHUpr1ItAGGRSxIUMl6PmkkFCCmS5fKo"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    }
+  ]
+}

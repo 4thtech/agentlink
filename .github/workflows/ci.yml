@@ -193,10 +193,37 @@ jobs:
         if: needs.detect.outputs.needs_playwright == 'true'
         run: pnpm exec playwright install --with-deps chromium firefox webkit
 
+      # Python for the independent vector generators, fixed at the version requirements.txt was
+      # compiled for (every pinned package has a cp312 wheel), whatever ubuntu-latest ships.
+      - name: Set up Python for the vector generators
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      # The generators' pinned Python packages (M1-1h): every package, transitive ones included, is
+      # pinned with hashes; wheels only (no sdist build code runs) and no dependency resolution.
+      - name: Install the vector generators' pinned Python packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/vectors-py"
+          "$RUNNER_TEMP/vectors-py/bin/python" -m pip install --disable-pip-version-check --no-input \
+            --require-hashes --only-binary=:all: --no-deps -r tools/vectors/requirements.txt
+          echo "VECTORS_PYTHON=$RUNNER_TEMP/vectors-py/bin/python" >> "$GITHUB_ENV"
+
       # Provenance: every committed vector file must equal the output of the independent generator
       # it names (a script under tools/vectors/, run in `--check FILE` mode, which writes nothing).
       - name: Check committed vectors against their independent generators
         run: node tools/vectors/check-generators.mjs
+
+      # Pending suites (vectors before their code, M1-1h) may only shrink against main: a suite
+      # that was implemented on main can never become pending again (IR-M1-1h-1 F2).
+      - name: Check that pending vector suites only shrink against main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+          node tools/vectors/check-pending.mjs --base origin/main
 
       # Crypto + EIP-712 vectors across Node, browsers (Playwright) and Workers (workerd).
       - name: Check test vectors across runtimes

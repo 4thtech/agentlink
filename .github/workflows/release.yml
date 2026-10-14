@@ -223,6 +223,12 @@ jobs:
         with:
           cache: "false"
 
+      # Release gate (M1-1h, IR-M1-1h-1 F2): no release while an M1a vector suite is still pending,
+      # i.e. while protocol code it checks has not proven itself against the canonical vectors.
+      # Add the next phase here at its gate (docs/runbooks/test-vectors.md).
+      - name: Check that no M1a vector suite is pending
+        run: node tools/vectors/check-pending.mjs --gate M1a
+
       # Unlike CI there is no skip-if-missing here: a release without a build must fail.
       - name: Build
         run: pnpm build

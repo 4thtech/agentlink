@@ -1,0 +1,102 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "owner-wrap",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib, cryptography 50.0.2)",
+    "version": "cpython 3.12.13",
+    "script": "tools/vectors/generate_owner_wrap.py"
+  },
+  "cases": [
+    {
+      "id": "rfc9106-argon2id",
+      "source": "RFC 9106 \u00a75.3 Argon2id test vector (published)",
+      "input": {
+        "op": "argon2id",
+        "password": "0101010101010101010101010101010101010101010101010101010101010101",
+        "salt": "02020202020202020202020202020202",
+        "secret": "0303030303030303",
+        "ad": "040404040404040404040404",
+        "memoryKiB": 32,
+        "iterations": 3,
+        "parallelism": 4,
+        "length": 32
+      },
+      "expected": {
+        "tag": "0d640df58d78766c08c037a34a8b53c9d01ef0452d75b65eb52520e96b01e659"
+      }
+    },
+    {
+      "id": "owner-params-code",
+      "source": "Argon2id v1.3, owner wrap parameters; secretKind 1: the password is the 15 decoded code bytes (04 \u00a72.8)",
+      "input": {
+        "op": "argon2id",
+        "password": "0305546b6d90025ecf24eba11673aa",
+        "salt": "69283301d18036f73774ac9d69678edb",
+        "secret": "",
+        "ad": "",
+        "memoryKiB": 65536,
+        "iterations": 3,
+        "parallelism": 1,
+        "length": 32
+      },
+      "expected": {
+        "tag": "7fcf1dbd10b5406fd7a2688cd455e4e5bf742f3d45f2eb4bd6b215a1a834ee6b"
+      }
+    },
+    {
+      "id": "owner-params-ascii",
+      "source": "Argon2id v1.3, owner passphrase wrap parameters (m = 64 MiB, t = 3, p = 1)",
+      "input": {
+        "op": "argon2id",
+        "password": "636f727265637420686f727365206261747465727920737461706c65",
+        "salt": "b112c58532ab6b749fc9ed6f7a509e0d",
+        "secret": "",
+        "ad": "",
+        "memoryKiB": 65536,
+        "iterations": 3,
+        "parallelism": 1,
+        "length": 32
+      },
+      "expected": {
+        "tag": "33372c4a19a1a7ed8afb4ce009d06332811845f58d36c8b746bf6eddd5e1a1d9"
+      }
+    },
+    {
+      "id": "owner-params-unicode",
+      "source": "Argon2id v1.3, owner passphrase wrap parameters; NFKC-normalised UTF-8 password",
+      "input": {
+        "op": "argon2id",
+        "password": "506173732066696c6520436166c3a920e29c93",
+        "salt": "7727facf8ca7dc3b35aded313d078f16",
+        "secret": "",
+        "ad": "",
+        "memoryKiB": 65536,
+        "iterations": 3,
+        "parallelism": 1,
+        "length": 32
+      },
+      "expected": {
+        "tag": "35115e65599790fc880b9677abbf5e2c1209835eae3ae791a0fc970832960617"
+      }
+    },
+    {
+      "id": "keystore-floor",
+      "source": "Argon2id v1.3, file KeyStore floor (m = 19 MiB, t = 2, p = 1)",
+      "input": {
+        "op": "argon2id",
+        "password": "636f727265637420686f727365206261747465727920737461706c65",
+        "salt": "d1a9defe786884cf167ac285505d1e4e",
+        "secret": "",
+        "ad": "",
+        "memoryKiB": 19456,
+        "iterations": 2,
+        "parallelism": 1,
+        "length": 32
+      },
+      "expected": {
+        "tag": "01f951b06856c2ce5ccef142a26a99e52edb017147a95a330963d9717029f4a7"
+      }
+    }
+  ]
+}

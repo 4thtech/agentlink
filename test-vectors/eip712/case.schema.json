@@ -1,0 +1,458 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/eip712/case.schema.json",
+  "title": "eip712 case",
+  "description": "EIP-712. `typedData`: domain separator, hashStruct(message) and digest of full typed data. `signTypedData`, `signAgentCard`: deterministic ECDSA as 0x + r || s || v (v 27 or 28). `agentCard`: typeHash, domain separator, struct hash and digest of a card in the card JSON form under the chain-agnostic domain, or a rejection of a non-canonical card. `cardHashes`: nameHash and relaysHash. `verifyAgentCard`: whether `cardSig` is the card owner's. `signCardAgent` / `verifyCardAgentSig`: the agent key's cardAgentSig and whether it recovers agentEvm. Hashes are 32-byte hex without 0x. `agentCardJson`: the digest of a card given as JSON text, or a rejection of a duplicate key or a non-canonical integer token.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "typedData"
+          ],
+          "properties": {
+            "op": {
+              "const": "typedData"
+            },
+            "typedData": {
+              "type": "object"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "domainSeparator",
+            "structHash",
+            "digest"
+          ],
+          "properties": {
+            "domainSeparator": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "structHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "digest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "typedData",
+            "secretKey"
+          ],
+          "properties": {
+            "op": {
+              "const": "signTypedData"
+            },
+            "typedData": {
+              "type": "object"
+            },
+            "secretKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "signature"
+          ],
+          "properties": {
+            "signature": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{130}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "card"
+          ],
+          "properties": {
+            "op": {
+              "const": "agentCard"
+            },
+            "card": {
+              "type": "object"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "typeHash",
+                "domainSeparator",
+                "structHash",
+                "digest"
+              ],
+              "properties": {
+                "typeHash": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "domainSeparator": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "structHash": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "json"
+          ],
+          "properties": {
+            "op": {
+              "const": "agentCardJson"
+            },
+            "json": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "digest"
+              ],
+              "properties": {
+                "digest": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "card",
+            "secretKey"
+          ],
+          "properties": {
+            "op": {
+              "const": "signCardAgent"
+            },
+            "card": {
+              "type": "object"
+            },
+            "secretKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cardAgentSig"
+          ],
+          "properties": {
+            "cardAgentSig": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{130}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "card",
+            "cardAgentSig"
+          ],
+          "properties": {
+            "op": {
+              "const": "verifyCardAgentSig"
+            },
+            "card": {
+              "type": "object"
+            },
+            "cardAgentSig": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "name",
+            "relays"
+          ],
+          "properties": {
+            "op": {
+              "const": "cardHashes"
+            },
+            "name": {
+              "type": "string"
+            },
+            "relays": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "nameHash",
+            "relaysHash"
+          ],
+          "properties": {
+            "nameHash": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{64}$"
+            },
+            "relaysHash": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "card",
+            "secretKey"
+          ],
+          "properties": {
+            "op": {
+              "const": "signAgentCard"
+            },
+            "card": {
+              "type": "object"
+            },
+            "secretKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cardSig"
+          ],
+          "properties": {
+            "cardSig": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{130}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "card",
+            "cardSig"
+          ],
+          "properties": {
+            "op": {
+              "const": "verifyAgentCard"
+            },
+            "card": {
+              "type": "object"
+            },
+            "cardSig": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

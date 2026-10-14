@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/pairing/case.schema.json",
+  "title": "pairing case",
+  "description": "04 \u00a73.6 pairing proof. `hmacSha256`: RFC 4231. `pairingProof`: proofKey, sha256(JCS(card)) and the base64url proof for secret, inviteId and B's card. `verifyPairingProof`: accept or reject.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "key",
+            "data"
+          ],
+          "properties": {
+            "op": {
+              "const": "hmacSha256"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "data": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mac"
+          ],
+          "properties": {
+            "mac": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "secret",
+            "inviteId",
+            "card"
+          ],
+          "properties": {
+            "op": {
+              "const": "pairingProof"
+            },
+            "secret": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "inviteId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "card": {
+              "type": "object"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "proofKey",
+            "cardJcsSha256",
+            "proof"
+          ],
+          "properties": {
+            "proofKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "cardJcsSha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "proof": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "secret",
+            "inviteId",
+            "card",
+            "proof"
+          ],
+          "properties": {
+            "op": {
+              "const": "verifyPairingProof"
+            },
+            "secret": {
+              "type": "string"
+            },
+            "inviteId": {
+              "type": "string"
+            },
+            "card": {
+              "type": "object"
+            },
+            "proof": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

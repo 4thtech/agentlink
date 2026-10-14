@@ -1,0 +1,2 @@
+# Published vector copies are hashed byte for byte (tools/vectors/vectorlib.py): never convert line ends.
+tools/vectors/sources/** -text

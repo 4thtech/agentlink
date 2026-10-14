@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { checkCoverage, diffSnapshots, REQUIRED_RUNTIMES } from './rules.mjs';
+import {
+  cardPhases,
+  checkCoverage,
+  checkPendingCards,
+  checkPendingGate,
+  checkPendingShrinks,
+  diffSnapshots,
+  pendingSuites,
+  REQUIRED_RUNTIMES,
+} from './rules.mjs';
 
 const suites = [{ suite: 'placeholder-sha256', caseIds: ['a', 'b'] }];
 
@@ -96,6 +105,232 @@ describe('checkCoverage', () => {
     const problems = checkCoverage(fullReport(), more);
     expect(problems).toHaveLength(REQUIRED_RUNTIMES.length);
     expect(problems[0]).toBe('node: placeholder-sha256: no passing result for c');
+  });
+});
+
+describe('pending suites (M1-1h)', () => {
+  const withPending = [...suites, { suite: 'hpke', caseIds: ['x', 'y'] }];
+
+  /** fullReport plus a pending marker for `hpke` in the given runtimes. */
+  function pendingReport(runtimes = REQUIRED_RUNTIMES, status = 'passed') {
+    const report = fullReport();
+    for (const file of report.testResults) {
+      const runtime = file.assertionResults[0].meta.vectors.runtime;
+      if (!runtimes.includes(runtime)) continue;
+      file.assertionResults.push(
+        assertion({ kind: 'pending', runtime, suite: 'hpke', detail: 'M1-1c' }, status),
+      );
+    }
+    return report;
+  }
+
+  it('accepts a suite that every runtime reported as pending, and lists it', () => {
+    const report = pendingReport();
+    expect(checkCoverage(report, withPending)).toEqual([]);
+    expect(pendingSuites(report)).toEqual(new Map([['hpke', 'M1-1c']]));
+  });
+
+  it('requires every case in a runtime that did not report the suite as pending', () => {
+    const report = pendingReport(['node', 'chromium', 'firefox', 'webkit']);
+    expect(checkCoverage(report, withPending)).toEqual([
+      'workerd: hpke: no passing result for x, y',
+    ]);
+    expect(pendingSuites(report)).toEqual(new Map());
+  });
+
+  it('fails closed when the pending marker failed (the suite has a module)', () => {
+    const report = pendingReport(REQUIRED_RUNTIMES, 'failed');
+    const problems = checkCoverage(report, withPending);
+    expect(problems).toHaveLength(REQUIRED_RUNTIMES.length);
+    expect(problems[0]).toBe('node: hpke: no passing result for x, y');
+  });
+
+  it('fails a suite that reports pending and also ran cases', () => {
+    const report = pendingReport();
+    report.testResults[0].assertionResults.push(
+      assertion({ kind: 'case', runtime: 'node', suite: 'hpke', caseId: 'x' }),
+    );
+    expect(checkCoverage(report, withPending)).toEqual(['hpke: reported as pending but ran cases']);
+  });
+
+  it('does not let a pending marker for one suite excuse another', () => {
+    const report = pendingReport();
+    report.testResults[2].assertionResults.splice(1, 1);
+    expect(checkCoverage(report, withPending)).toEqual([
+      'firefox: placeholder-sha256: no passing result for a',
+    ]);
+  });
+});
+
+describe('declared runtimes (IR-M1-1h-1 Q7)', () => {
+  const nodeOnly = [
+    ...suites,
+    { suite: 'keystore-file', caseIds: ['k'], runtimes: ['node'], runtimesSource: '04 §2.8' },
+  ];
+
+  it('rejects a narrowed suite that is not an allowed exception (IR-M1-1h-2 F-E)', () => {
+    const other = [
+      ...suites,
+      { suite: 'hpke', caseIds: ['x'], runtimes: ['node'], runtimesSource: 'r' },
+    ];
+    expect(checkCoverage(fullReport(), other)).toContain(
+      'hpke: declares runtimes but is not in RUNTIME_EXCEPTIONS',
+    );
+  });
+
+  it('rejects unknown runtime names and a missing reason', () => {
+    const bad = [
+      ...suites,
+      { suite: 'keystore-file', caseIds: ['k'], runtimes: ['deno'], runtimesSource: '' },
+    ];
+    const problems = checkCoverage(fullReport(), bad);
+    expect(problems).toContain('keystore-file: declares unknown runtimes');
+    expect(problems).toContain('keystore-file: declares runtimes without a reason');
+  });
+
+  it('requires the cases only in the declared runtimes', () => {
+    const report = fullReport();
+    report.testResults[0].assertionResults.push(
+      assertion({ kind: 'case', runtime: 'node', suite: 'keystore-file', caseId: 'k' }),
+    );
+    expect(checkCoverage(report, nodeOnly)).toEqual([]);
+  });
+
+  it('still requires them in a declared runtime', () => {
+    expect(checkCoverage(fullReport(), nodeOnly)).toEqual([
+      'node: keystore-file: no passing result for k',
+    ]);
+  });
+
+  it('rejects a result from a runtime the suite did not declare', () => {
+    const report = fullReport();
+    report.testResults[0].assertionResults.push(
+      assertion({ kind: 'case', runtime: 'node', suite: 'keystore-file', caseId: 'k' }),
+    );
+    report.testResults[4].assertionResults.push(
+      assertion({ kind: 'case', runtime: 'workerd', suite: 'keystore-file', caseId: 'k' }),
+    );
+    expect(checkCoverage(report, nodeOnly)).toEqual([
+      'workerd: keystore-file: ran outside its declared runtimes',
+    ]);
+  });
+
+  it('lists a node-only pending suite as pending', () => {
+    const report = fullReport();
+    report.testResults[0].assertionResults.push(
+      assertion({ kind: 'pending', runtime: 'node', suite: 'keystore-file', detail: 'M1-1f' }),
+    );
+    expect(checkCoverage(report, nodeOnly)).toEqual([]);
+    expect(pendingSuites(report, nodeOnly)).toEqual(new Map([['keystore-file', 'M1-1f']]));
+  });
+});
+
+describe('checkPendingShrinks (IR-M1-1h-1 F2)', () => {
+  const entry = { card: 'M1-1a', phase: 'M1a' };
+  const head = (names) => ({ pending: new Map(names.map((n) => [n, entry])) });
+
+  it('accepts a list that shrank, and new suites that arrive pending with their vectors', () => {
+    const base = {
+      pending: new Map([
+        ['jcs', entry],
+        ['hpke', entry],
+      ]),
+      suites: new Set(['jcs', 'hpke']),
+    };
+    expect(checkPendingShrinks(head(['jcs', 'stream']), base)).toEqual([]);
+  });
+
+  it('rejects a suite that was implemented on the base becoming pending again', () => {
+    const base = { pending: new Map([['jcs', entry]]), suites: new Set(['jcs', 'hpke']) };
+    expect(checkPendingShrinks(head(['jcs', 'hpke']), base)).toEqual([
+      'hpke: has vectors on the base branch and was not pending there; pending suites only shrink',
+    ]);
+  });
+
+  it('rejects an entry without a card or a phase', () => {
+    const base = { pending: new Map(), suites: new Set() };
+    expect(checkPendingShrinks({ pending: new Map([['x', { card: 'soon' }]]) }, base)).toEqual([
+      'x: a pending entry needs a card (e.g. M1-1a) and a phase (e.g. M1a)',
+    ]);
+  });
+});
+
+describe('pending entries are frozen and tied to the backlog (IR-M1-1h-2 F-B)', () => {
+  const backlog = [
+    '#### M1-1a · crypto: encodings',
+    '- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a',
+    '#### M1-1d · crypto: STREAM',
+    '- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b',
+  ].join('\n');
+
+  it("reads each card's phase from the backlog", () => {
+    expect(cardPhases(backlog)).toEqual(
+      new Map([
+        ['M1-1a', 'M1a'],
+        ['M1-1d', 'M1b'],
+      ]),
+    );
+  });
+
+  it('refuses an existing entry whose phase or card changed', () => {
+    const base = {
+      pending: new Map([['jcs', { card: 'M1-1a', phase: 'M1a' }]]),
+      suites: new Set(['jcs']),
+    };
+    const head = { pending: new Map([['jcs', { card: 'M1-1a', phase: 'M9' }]]) };
+    expect(checkPendingShrinks(head, base)).toEqual([
+      'jcs: its pending entry changed from M1-1a/M1a to M1-1a/M9; an existing entry can only be removed',
+    ]);
+  });
+
+  it("refuses an entry whose phase differs from its card's backlog phase, or an unknown card", () => {
+    const head = {
+      pending: new Map([
+        ['jcs', { card: 'M1-1a', phase: 'M1b' }],
+        ['x', { card: 'M7-9', phase: 'M7' }],
+      ]),
+    };
+    expect(checkPendingCards(head, cardPhases(backlog))).toEqual([
+      "jcs: phase M1b differs from card M1-1a's backlog phase M1a",
+      'x: card M7-9 has no Phase in the backlog',
+    ]);
+  });
+
+  it('gates on the backlog phase even if the entry claims another', () => {
+    const head = { pending: new Map([['jcs', { card: 'M1-1a', phase: 'M9' }]]) };
+    expect(checkPendingGate(head, ['M1a'], cardPhases(backlog))).toEqual([
+      'jcs is still pending (M1-1a, phase M1a): every M1a suite must be implemented before a release',
+    ]);
+  });
+});
+
+describe('checkPendingGate (IR-M1-1h-1 F2)', () => {
+  const head = {
+    pending: new Map([
+      ['jcs', { card: 'M1-1a', phase: 'M1a' }],
+      ['stream', { card: 'M1-1d', phase: 'M1b' }],
+    ]),
+  };
+
+  const cards = new Map([
+    ['M1-1a', 'M1a'],
+    ['M1-1d', 'M1b'],
+  ]);
+
+  it('fails a release while a suite of the gated phase is pending', () => {
+    expect(checkPendingGate(head, ['M1a'], cards)).toEqual([
+      'jcs is still pending (M1-1a, phase M1a): every M1a suite must be implemented before a release',
+    ]);
+  });
+
+  it('passes when no pending suite belongs to a gated phase', () => {
+    expect(
+      checkPendingGate(
+        { pending: new Map([['stream', head.pending.get('stream')]]) },
+        ['M1a'],
+        cards,
+      ),
+    ).toEqual([]);
   });
 });
 

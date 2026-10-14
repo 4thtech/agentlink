@@ -1,0 +1,277 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/hkdf-derive/case.schema.json",
+  "title": "hkdf-derive case",
+  "description": "04 \u00a72.1 key derivation. `hkdf`: RFC 5869 HKDF-SHA256. `derive`: okm for (masterSeed, label, epoch, counter), or a rejection. `key`: the public identity for (label, epoch): EIP-55 address and its EIP-55 display form (evm), x-only public key (nostr, drop), X25519 public key and kid (enc), or a rejection.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "ikm",
+            "salt",
+            "info",
+            "length"
+          ],
+          "properties": {
+            "op": {
+              "const": "hkdf"
+            },
+            "ikm": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "salt": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "info": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "length": {
+              "type": "integer"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "okm"
+          ],
+          "properties": {
+            "okm": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "masterSeed",
+            "label",
+            "epoch",
+            "counter"
+          ],
+          "properties": {
+            "op": {
+              "const": "derive"
+            },
+            "masterSeed": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "label": {
+              "enum": [
+                "agentlink/v1/evm",
+                "agentlink/v1/nostr",
+                "agentlink/v1/enc",
+                "agentlink/v1/drop"
+              ]
+            },
+            "epoch": {
+              "type": "integer"
+            },
+            "counter": {
+              "type": "integer"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "okm"
+              ],
+              "properties": {
+                "okm": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "masterSeed"
+          ],
+          "properties": {
+            "op": {
+              "const": "agentId"
+            },
+            "masterSeed": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "agentId"
+          ],
+          "properties": {
+            "agentId": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{40}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "masterSeed",
+            "label",
+            "epoch"
+          ],
+          "properties": {
+            "op": {
+              "const": "key"
+            },
+            "masterSeed": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "label": {
+              "type": "string"
+            },
+            "epoch": {
+              "type": "integer"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "address",
+                "addressChecksummed"
+              ],
+              "properties": {
+                "address": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{40}$"
+                },
+                "addressChecksummed": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "publicKey"
+              ],
+              "properties": {
+                "publicKey": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "publicKey",
+                "kid"
+              ],
+              "properties": {
+                "publicKey": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "kid": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]*$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
