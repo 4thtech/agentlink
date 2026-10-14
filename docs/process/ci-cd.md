@@ -6,7 +6,7 @@ Scope: GitHub Actions workflows and repository hygiene for `4thtech/agentlink` (
 
 | File | Runs on | What it checks or does | Required check |
 |---|---|---|---|
-| `.github/workflows/ci.yml` | pull request, push to `main`, merge queue | `detect` looks at what exists; `checks` runs `pnpm lint`, `typecheck`, `build`, `test`; `vectors` runs `pnpm vectors:check` (Playwright browsers only if Playwright is in the lockfile); `context-budget` enforces the size budgets of `AGENTS.md` (≤ 8 KB) and `CLAUDE.md` (≤ 1 KB) (`development-process.md` §3.6) | `ci-gate` |
+| `.github/workflows/ci.yml` | pull request, push to `main`, merge queue | `detect` looks at what exists; `checks` runs `pnpm lint`, `typecheck`, `build`, `test`; `vectors` checks every committed vector file against its independent generator (`node tools/vectors/check-generators.mjs`), runs `pnpm vectors:check` (Node, Chromium, Firefox, WebKit and workerd; Playwright browsers are installed only if `playwright` or `@playwright/test` is a root devDependency) and fails if the run wrote anything under `test-vectors/` (M0-9); `context-budget` enforces the size budgets of `AGENTS.md` (≤ 8 KB) and `CLAUDE.md` (≤ 1 KB) (`development-process.md` §3.6) | `ci-gate` |
 | `.github/workflows/security.yml` | pull request, push to `main`, merge queue, weekly (Mon 05:23 UTC) | dependency review (PRs; moderate+ vulnerabilities and a license allowlist), gitleaks over the full git history (via `secret-scan.yml`; weekly also over the `sync` branch), CodeQL (`actions`, `javascript-typescript`), zizmor on the workflows | `security-gate` |
 | `.github/workflows/secret-scan.yml` | reusable (`workflow_call`) only | the gitleaks scan itself: official release binary, verified against the release checksums and a digest pinned in the file | none (reported through `security-gate`) |
 | `.github/workflows/pr-hygiene.yml` | pull request (opened, edited, synchronize, reopened) | title starts with a task ID (`M<n>-<n>[a-z]`, `OPS-<n>`, `DOCS`, `CHORE`, `DEPS`); body has every section of the PR template, filled in, with exactly one security class ticked | `pr-hygiene` |
@@ -42,14 +42,15 @@ Add exactly these four to the `main` ruleset: **`ci-gate`**, **`security-gate`**
 Until the monorepo skeleton exists, `detect` finds no `package.json` + `pnpm-lock.yaml` and every Node job is skipped. It activates by itself when both files appear. Rules once they do:
 
 - `package.json` must pin pnpm with `"packageManager": "pnpm@x.y.z"`, otherwise `detect` fails.
-- A missing root script (`lint`, `typecheck`, `build`, `test`) is a warning annotation and the step is skipped. `vectors:check` is optional.
+- A missing root script (`lint`, `typecheck`, `build`, `test`, and since M0-9 `vectors:check`) is a warning annotation and the step is skipped.
 - **Strict mode:** commit an empty file `.github/ci-strict` and a missing root script (or a `package.json` without a lockfile) becomes a failure. Add it in the same PR that completes the skeleton, so a deleted `test` script can never turn CI silently green. `.github/` is code-owned, so the code owners are notified.
 
 ### Contract with the monorepo skeleton
 
 - Root scripts: `lint`, `typecheck`, `build`, `test` (each typically `turbo run <task>`), plus `vectors:check` and `test:e2e` per `docs/process/repo-reference.md`. Turbo dependencies (`typecheck` and `test` after `^build`) belong in `turbo.json`.
 - `.nvmrc` is optional; without it CI uses Node 24 (the Active LTS line at the time of writing). The release jobs need npm ≥ 11.21.0 (or ≥ 12.2.0 on npm 12) for OIDC dist-tag rollback; pin a Node release whose bundled npm meets that.
-- `@playwright/test` must be a root devDependency if the vectors run in a browser; CI runs `pnpm exec playwright install --with-deps chromium`.
+- `playwright` (or `@playwright/test`) must be a root devDependency if the vectors run in a browser; `detect` reads the root `package.json`, not the lockfile (lesson LL-07), and CI runs `pnpm exec playwright install --with-deps chromium firefox webkit`.
+- The root `vectors:check` script calls `node tools/vectors/check.mjs` directly, not through turbo and a package script, so a stubbed or deleted package script cannot turn the job into a no-op (IR-M0-9-1 F01).
 - **Install scripts are disabled in CI** (`--ignore-scripts`). Packages that need a native build, such as `better-sqlite3` in `packages/node`, need an explicit allowlist: in `ci.yml` pass `rebuild: better-sqlite3` to the setup step (a comment shows where). Do not remove `--ignore-scripts`.
 - `pnpm-workspace.yaml`: set pnpm's own `minimumReleaseAge` so Renovate's lockfile maintenance respects the same cooldown as `renovate.json` (check the unit in the pnpm docs).
 - `e2e` (`pnpm test:e2e`) needs testnet RPC and relays and is not run in PR CI. Add a separate scheduled or manually triggered workflow with its own environment when M1-13 lands.

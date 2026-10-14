@@ -13,7 +13,7 @@ Private procedures (incident response, secret rotation, deploy keys, Safe operat
 | RB-03 | [Writing a worker brief](worker-brief.md) | Orchestrator | Opus |
 | RB-04 | [Running an independent review](independent-review.md) | Orchestrator spawns, reviewer runs | Opus |
 | RB-05 | [Writing tests](writing-tests.md) | Builder | Per the card |
-| RB-06 | [Cross-runtime test vectors](test-vectors.md) *(placeholder until M0-9)* | Builder | Opus (S2) |
+| RB-06 | [Cross-runtime test vectors](test-vectors.md) | Builder | Opus (S2) |
 | RB-07 | [Adding a dependency](add-dependency.md) | Builder proposes, orchestrator checks | Sonnet or above |
 | RB-08 | [CI is red](ci-red.md) | Orchestrator or builder | Sonnet or above |
 | RB-09 | [Merging, releases and changesets](merge-and-release.md) | Orchestrator; owner for his steps | Opus |

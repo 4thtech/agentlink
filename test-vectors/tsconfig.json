@@ -1,0 +1,16 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // The harness runs in Node, browsers and workerd: only the common web platform (DOM lib for
+    // WebCrypto, TextEncoder, navigator) and Vite's import.meta.glob typings. No @types/node.
+    "lib": ["ES2022", "DOM"],
+    "types": ["vite/client"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "composite": false,
+    "declaration": false,
+    "noEmit": true
+  },
+  "include": ["harness", "vitest.config.ts"]
+}
