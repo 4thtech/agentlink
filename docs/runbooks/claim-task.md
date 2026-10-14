@@ -7,7 +7,7 @@ Turn a backlog card into a visible, exclusive claim (a board row naming a pushed
 Before any write work on a card. Not for read-only surveys or reviews, which claim nothing.
 
 ## Who runs it
-The orchestrator (Opus), or a human builder for their own task. Workers never push, open PRs or write the `sync` branch (`development-process.md` §4.2); the orchestrator claims on their behalf and hands them the worktree path in the brief.
+The orchestrator (Opus), or a human builder for their own task. Workers never write the `sync` branch, and push or open a PR only as `development-process.md` §4.2 allows; the orchestrator claims on their behalf and hands them the worktree path in the brief.
 
 ## Preconditions
 - The card exists in `docs/process/backlog.md` and meets the Definition of Ready (`development-process.md` §6.2). No task ID, no work.

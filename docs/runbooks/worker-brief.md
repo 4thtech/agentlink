@@ -24,8 +24,9 @@ The orchestrator (Opus 5.5). It picks the worker's tier with the routing procedu
    Owned by others:      <paths other workers own right now: hands off, read only>
    Never:                Do not merge, do not deploy, do not push, do not open PRs
                          (except: push this task branch when this brief says so, as CI
-                         runs on the push; never open the PR, the orchestrator does
-                         that after the review; never touch main), do not write the
+                         runs on the push; open a PR only after the independent review passed,
+                         non-draft with the IR line, when this brief says so;
+                         never touch main), do not write the
                          sync branch or the Curator.
    Scratch files:        <scratch dir>/<unique prefix>-*   (never a shared fixed name)
    Lessons in scope:     <LL-nn links that apply, e.g. LL-05 for dependency work>

@@ -2,10 +2,11 @@
   "name": "@agentlink/test-vectors",
   "version": "0.0.0",
   "private": true,
-  "description": "Canonical crypto and EIP-712 test vectors (M0-9). Not published.",
+  "description": "Canonical crypto and EIP-712 test vectors and the cross-runtime harness that checks them (M0-9). Not published.",
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "vectors:check": "node -e \"console.log('vectors:check: no vector suites yet (M0-9 adds them).')\""
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint ."
   }
 }
