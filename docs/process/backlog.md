@@ -311,6 +311,21 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
 - **Acceptance:**
   - Each rule has a failing fixture test; the guard job is part of `ci-gate`.
 
+#### M0-10b · Boundary guards: residual bypasses and wider scope (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · eslint config, tools/deps-check/
+- **Depends on:** M0-10 (and M0-9 for the test-vectors items)
+- **Spec:** 04 §8.1; `development-process.md` §11; reviews IR-M0-10-1 and IR-M0-10-2 (open items)
+- **Invariants:** I-8
+- **Scope:** (the guards catch honest mistakes; they are not a security boundary against a malicious contributor, which is code review plus the crypto/KeyStore design. Do the items that stay cheap and drop the rest.)
+  - Treat `process` and `<x>.process` as a loader receiver (`.binding`, computed access, `Reflect.get(process, 'getBuiltinModule')`); report the member names `eval` and `Function` on any receiver and `.constructor(...)` calls with a string argument (IR-M0-10-2 F03, F04).
+  - Allowlist for app devDependencies that get bundled (`bundled: true` on app zones) plus a shared, reasoned dev-tools list (vite, vitest, wrangler, typescript, `@types/*`) (IR-M0-10-1 F04).
+  - Resolve `tsconfig` `paths`, Vite aliases and `new URL(..., import.meta.url)` against the relative-escape rule when the first app configs land (IR-M0-10-1 F10, IR-M0-10-2 F05).
+  - Zones for `e2e/` (no primitive libraries) and `test-vectors/` once M0-9 has landed; a check that every `SUBTLE_EXEMPT_FILES` entry exists, and removal of the placeholder-suite exemption when the first real vector suite lands (IR-M0-10-1 F11, IR-M0-10-2).
+  - A narrow, reasoned carve-out for Node built-ins in `vite.config.ts` and `vitest.config.ts` of non-Node zones (IR-M0-10-1 F12).
+- **Acceptance:**
+  - Each item has a failing fixture test; `pnpm lint` stays green on the real tree.
+
 #### M0-11 · Curator project context (new)
 - **Status:** done (setup) · **Size:** S · **Tier:** Owner · **Security:** S0
 - **Repo/path:** owner's Curator (project `agentlink`, domain `projects`); agentlink · .curator-project
@@ -703,7 +718,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Invariants:** I-6, I-8
 - **Scope:**
   - Written by a session that does not implement the TypeScript code. Generators use independent implementations (e.g. Python `cryptography`, a reference BIP-340, RFC 9180 reference vectors, an RFC 8785 reference, `eth-account`/`eth-abi` or `cast` for EIP-712).
-  - Suites (M1a, what Talk needs): HKDF derivation per 04 §2.1 (labels × epochs 0–2), BIP-340 tagged-hash envelope signatures, HPKE CEK wrap (fixed ephemeral keys), payload AEAD + AAD, envelope hash via JCS, pairing HMAC, safety code, owner-seed wrap (Argon2id passphrase path), file KeyStore `ALKS` v1 for both secret kinds (D-54, 04 §2.8), EIP-712 domain separator / struct hash / digest for `AgentCard` (chain-agnostic domain).
+  - Suites (M1a, what Talk needs): HKDF derivation per 04 §2.1 (labels × epochs 0–2), BIP-340 tagged-hash envelope signatures, BIP-340 tagged-hash owner-action signatures (`agentlink/owner-action/v1`, 04 §2.5.1, G-29) with rejection vectors for every non-canonical form (checksummed or uppercase address, uppercase hex, padded base64url, out-of-range integer, unknown key), HPKE CEK wrap (fixed ephemeral keys), payload AEAD + AAD, envelope hash via JCS, pairing HMAC, safety code, owner-seed wrap (Argon2id passphrase path), file KeyStore `ALKS` v1 for both secret kinds (D-54, 04 §2.8), EIP-712 domain separator / struct hash / digest for `AgentCard` (chain-agnostic domain).
   - Proof-layer suites (STREAM, PRF wrap, `Record`, `Receipt`, `Registration`) are M1-1i (M1b).
   - These are the **canonical** vectors; the contracts repo checks parity against a pinned commit (D-19).
   - Vectors that depend on open gap G-28 are added only after it is resolved.
@@ -863,11 +878,12 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types
 - **Depends on:** M0-2d; gap G-29 resolved for owner-operation bodies
-- **Spec:** 04 §2.4, §3.1, §3.4, §3.6; 05 §2.1, §3.1; 07 §1
+- **Spec:** 04 §2.4, §2.5.1, §3.1, §3.4, §3.4.1, §3.6; 05 §2.1, §3.1; 07 §1
 - **Invariants:** I-5
 - **Scope:**
   - Constants: 17 payload types, record kinds, receipt types, fee types, MCP status values, size limits (24 KB envelope, 12 KB inline), policy defaults reference.
-  - Strict zod schemas (unknown keys rejected) for Envelope v1, Payload with per-type bodies (handshake, handshake-ack, proof, approval-request, approval, policy, card-update, revoke, `request` with `kind: "refresh-link"`, file entries), AgentCard, Invite.
+  - Strict zod schemas (unknown keys rejected) for Envelope v1, Payload with per-type bodies (handshake, handshake-ack, proof, approval-request, approval, policy, card-update, revoke per 04 §3.4.1, `request` with `kind: "refresh-link"`, file entries), AgentCard, Invite.
+  - `OwnerAction` / `SignedOwnerAction` shape (04 §2.5.1: `op`, `body`, byte-exact canonical encoding, non-canonical forms rejected, never normalised) with `approval.decide` and `agent.revoke` params; the `policy.set` params (the policy schema) and the per-tool `context` schemas of `approval-request` plug in from M1-2b.
   - Field validation: base64url without padding, byte lengths (id/thread/kid 16 B, keys 32 B), hex formats.
   - Security S2 because envelope/payload schema changes are S2 (`audit-rules.md` §2.2).
 - **Acceptance:**
@@ -878,11 +894,11 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types
 - **Depends on:** M1-2a; gaps G-7, G-32 resolved
-- **Spec:** 06 §1 rule 3, §2 (`ProofStatus`), §3; 04 §2.5; 07 §8; 03 §3
+- **Spec:** 06 §1 rule 3, §2 (`ProofStatus`), §3; 04 §2.5, §2.5.1, §3.4.1; 07 §8; 03 §3
 - **Invariants:** I-4, I-5
 - **Scope:**
   - Policy schema with the exact 06 §3 defaults (plus per-contact overrides if G-32 adds them); signed-policy document wrapper.
-  - `OwnerAction{agentId, action, params, nonce, issuedAt}`, `ApprovalRequest`/`Approval` bound to an action digest, `ProofPack` v1, `ProofStatus`, the common tool-result shape `{status, summary, nextStep?, url?, approvalId?}`.
+  - `policy.set` params `{version, policy}` and the per-tool `action.context` schemas of `approval-request` (04 §2.5.1, §3.4.1; the `OwnerAction{v, agent, owner, op, params, nonce, issuedAt, expiresAt}` / `SignedOwnerAction{body, sig}` shape itself is M1-2a), approvals bound to the action digest, `ProofPack` v1, `ProofStatus`, the common tool-result shape `{status, summary, nextStep?, url?, approvalId?}`.
 - **Acceptance:**
   - Defaults deep-equal 06 §3 (snapshot test citing the spec); the 07 §8 example pack parses.
   - Round-trip and strictness tests for each schema.
@@ -1233,10 +1249,10 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Pure `evaluate(policy, action, context) → allow | approval | deny`, minimal for M1a (D-33): the 06 §3 rules for contacts and envelopes (hourly per-contact rate counts passed in as context), plus the `commitments` rule from M1-20. Files, proofs and receipts rules are M1-7i (M1b).
   - Signed policy documents verified against the owner key in the agent card on every load; behaviour on missing or invalid signatures per G-6.
-  - `OwnerAction` verification: owner signature, `agentId` binding, single-use nonce, freshness window (G-7).
+  - `SignedOwnerAction` verification (04 §2.5.1): canonical encoding, owner signature, `agent` and `owner` binding, single-use nonce, freshness window (G-7); `policy.set` version must increase; the highest applied version kept as a KeyStore item and checked on every load; stored `approval.decide` re-verified and the digest recomputed when an `approvalId` is presented; refused owner actions reported to the owner.
 - **Acceptance:**
   - Tests first; a table-driven test per rule and boundary (e.g. the per-contact hourly rate limit at N and N + 1).
-  - A policy row edited directly in the store is ignored (I-4); a replayed or stale `OwnerAction` is rejected.
+  - A policy row edited directly in the store is ignored (I-4); a replayed or stale `SignedOwnerAction` is rejected; an older signed policy put back in the store is detected against the KeyStore high-water mark.
   - Property test: `evaluate` is deterministic and has no side effects.
 
 #### M1-7i · core: policy rules for files, proofs and receipts (new, split from M1-7d)
@@ -1353,7 +1369,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Owner seed stored only wrapped with the Argon2id owner passphrase (the M1a owner-presence minimum, D-33); unwrapped only inside one owner operation, then wiped. The localhost passkey (PRF) path is M1-8e (M1b).
   - CLI passphrase prompt reads from a TTY only; no reusable bearer token on disk. The same holds on headless machines with the file KeyStore (D-54, 04 §2.8): no environment variable, file, argument or piped stdin can supply the owner passphrase; `AGENTLINK_OWNER_*` variables are ignored. On file-KeyStore machines (04 §2.8): the owner seed lives in `~/.agentlink/keystore/owner.alko`, is created by the separate `owner init` step, and requires a generated 120-bit owner code (no chosen passphrase); creating or changing the owner secret refuses a candidate that opens any agent's `.alks` file. `owner init` per 04 §2.8: it refuses when an owner exists and never overwrites; it shows the owner fingerprint; the code is display-only; it states what a lost code means.
   - **Owner-blob location on keychain machines (follow-up from IR-D54-2, F03):** pin where the owner-wrapped seed lives on machines with a keychain. Either it is a keychain item, or, wherever it is a file, the generated-code rule of 04 §2.8 applies. A chosen owner passphrase protecting a file that copies of the machine carry is open to offline guessing. Record the choice in 04 §2.2 through a spec change before this card is `ready`.
-  - Produces `OwnerAction` signatures and EIP-712 card/registration signatures.
+  - Produces `SignedOwnerAction` signatures (04 §2.5.1) and EIP-712 card/registration signatures.
   - Full threat note covering G-1 (shared `localhost` RP ID; same-user installation tampering).
 - **Acceptance:**
   - Build-plan test (10 M1-8): a script running as the same OS user, with read access to `~/.agentlink`, the agent's keychain items and the DB, cannot produce a valid approval or policy change without the passphrase. The test's stated scope excludes modifying the installed package (G-1).
@@ -1560,6 +1576,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - `POST /v1/notarize`, `POST /v1/receipt`, `GET /v1/status/:txHash`, `GET /v1/health`; signature validation and `eth_call` simulation (incl. credits) before sending; batching per G-4.
   - Per-signer and per-IP rate limits and per-chain transaction-nonce serialisation in Durable Objects; gas keys only from Worker secrets.
+  - The submitter uses viem only through `@agentlink/chain` (M0-10 policy: `apps/submitter` is not in the viem zone); needs from chain (simulation, signature checks, gas-key wallet) are added to `@agentlink/chain`, not by widening the zone.
   - No request logging beyond aggregate metrics; never signatures together with IPs. `/v1/deposit-authorization` present but disabled until M3-4b.
 - **Acceptance:**
   - Miniflare tests per endpoint: invalid signature, insufficient credits (rejected before sending), rate limit, concurrent nonce handling.
@@ -2991,9 +3008,9 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 4. **G-4 (H) Batch failure semantics.** 05 §3.2; 07 §7. Whether one failing item reverts `notarizeBatch`/`acknowledgeBatch` is unspecified; the submitter batches across signers, so one item (e.g. credits spent between simulation and inclusion) can grief the rest. *Proposed:* specify all-or-nothing with per-item pre-simulation and retry without the failing item, or skip-and-emit with per-item status; keep 05 §3.4 gas targets. *Blocks:* M1-3d, M1-10a.
 5. **G-5 (M) J1 key storage wording.** RESOLVED by 02 §5 J1 steps 2–3: `init` puts only the agent keys in the OS keychain (step 2); the owner key is created and wrapped in the setup step (step 3, 04 §2.2). *Was:* J1 step 2 stored "owner and agent keys" in the OS keychain, against 04 §2.2. *Blocked:* M1-9a, M1-12b.
 6. **G-6 (H) Policy fail-open.** 06 §3 (last paragraph); 04 §2.5. Unsigned or tampered policies fall back to defaults, which can be looser than the owner's policy (e.g. `proofs.notarize: deny` → `allow`); deleting the signed row downgrades policy. *Proposed:* once an owner-signed policy exists, fail closed (`approval` for owner-gated actions) and keep a policy version in an owner-signed object. *Blocks:* M1-7d.
-7. **G-7 (M) Lifetimes.** 04 §2.5 (`OwnerAction{nonce, issuedAt}`); 06 §2.5; 06 §3 (`dailyBudgetUSD`). No freshness window, nonce retention, approval TTL or budget day boundary. *Proposed:* e.g. OwnerAction valid 10 minutes, nonces kept 30 days, approvals expire after 24 h, budget day in UTC. *Blocks:* M1-2b, M1-7d, M1-7e.
+7. **G-7 (M) Lifetimes.** 04 §2.5.1 (`SignedOwnerAction` `nonce`, `issuedAt`, `expiresAt`); 06 §2.5; 06 §3 (`dailyBudgetUSD`). No freshness window, nonce retention, approval TTL or budget day boundary. *Proposed:* e.g. owner actions valid 10 minutes (`approval.decide`: until the request's `expiresAt`), nonces kept 30 days, approvals expire after 24 h, budget day in UTC. *Blocks:* M1-2b, M1-7d, M1-7e.
 8. **G-8 (H) CREATE3 salts and deployer lifecycle.** 05 §9; `release-and-deployment.md` §4.2. CreateX guarded salts bind addresses to the deployer; identical addresses for the Registry (M2) and M4 chains need the same deployer and salt scheme; proxies must be deployed and initialised atomically; testnet and mainnet deployers differ, so testnet and mainnet addresses differ. *Proposed:* specify salt layout (deployer-guarded, no cross-chain redeploy protection), deploy-and-init, and cold-storage retention of the mainnet deployer key until all planned chains are deployed. *Blocks:* M1-3g, M3-2b, M3-2c, M4-EPIC.
-9. **G-9 (M) Store schema gaps.** 07 §3 lacks the outbox (07 §4.2, 24 h retry), the ≥ 7-day seen-set (07 §4.2), idempotency results (06 §1 rule 6), budget ledger and rate counters (06 §3) and OwnerAction nonces (04 §2.5). *Proposed:* extend 07 §3. *Blocks:* M1-5b, M1-5c, M1-7a, M1-8b.
+9. **G-9 (M) Store schema gaps.** 07 §3 lacks the outbox (07 §4.2, 24 h retry), the ≥ 7-day seen-set (07 §4.2), idempotency results (06 §1 rule 6), budget ledger and rate counters (06 §3), and `SignedOwnerAction` nonces, the stored signed objects, the revoked-agent set and contact status `revoked` (04 §2.5.1, §3.4.1); the policy-version high-water mark lives in the KeyStore (04 §2.5.1). *Proposed:* extend 07 §3. *Blocks:* M1-5b, M1-5c, M1-7a, M1-8b.
 10. **G-10 (M) Where `@agentlink/occ-v2-abi` is published.** 05 §9; D-19. npm provenance is not generated for private source repos (verify). *Proposed* (`development-process.md` §9.2): import release artifacts into public `packages/occ-v2-abi` and publish from there. *Blocks:* M1-3f.
 11. **G-11 (L) Logger package missing from the package map.** 04 §8.4 vs 07 §1. *Proposed:* add `@agentlink/log` (zero dependencies). *Blocks:* M0-8.
 12. **G-12 (M) JCS and invite compression.** 04 §3.1, §3.6; `AGENTS.md` dependency allowlist. No JCS implementation is allowlisted although `envelopeHash` depends on it; "deflate" does not say raw DEFLATE or zlib. *Proposed:* approve a vetted RFC 8785 implementation (or in-repo code with RFC vectors); specify `deflate-raw` via `CompressionStream`. *Blocks:* M1-1a, M1-7c.
@@ -3007,13 +3024,13 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 20. **G-20 (M) Revocation typed data.** 05 §4 `revoke(agentEvm, nonce, deadline, ownerSig)` has no EIP-712 struct; nonce rules for `Registration` and revoke unspecified. *Blocks:* M1-1i (vectors), M2-4a.
 21. **G-21 (M) Measuring beta metrics without analytics.** 02 §7 and 10 gates vs 08 §2.3 and zero access. *Proposed:* moderated sessions plus opt-in, local-only timing exported by testers. *Blocks:* M1-GATE, M2-GATE.
 22. **G-22 (M) Owner archive mechanics.** 04 §4; 02 F-33; 06 §3: whose storage credentials, how the file key reaches the owner, who deletes. *Blocks:* M2-9.
-23. **G-23 (M) `agentId` undefined.** Used in 04 §2.2 (keychain account), 04 §2.5, 06 §6, 07 §3, 07 §5.2 (object key). The object-key path also gives every recipient of a presigned URL a stable per-agent identifier. *Proposed:* define `agentId`; use a random per-agent prefix in object keys. *Blocks:* M1-6a, M1-7a, M1-8a.
+23. **G-23 (M) `agentId` undefined.** Used in 04 §2.2 (keychain account), 06 §6, 07 §3, 07 §5.2 (object key). The object-key path also gives every recipient of a presigned URL a stable per-agent identifier. *Proposed:* define `agentId`; use a random per-agent prefix in object keys. Owner actions bind the canonical EVM address, not `agentId` (G-29), and `agentId` must not become a second binding. *Blocks:* M1-6a, M1-7a, M1-8a.
 24. **G-24 (M) Relays for owner copies.** 04 §3.5; 07 §4.2; 08 §2.2. AgentCard carries only the agent's `relaysHash`; owners have no relay list. *Proposed:* each owner copy goes to the relays of the agent it concerns; the console subscribes to all its agents' relays. *Blocks:* M1-5b, M2-2d.
 25. **G-25 (M) `agentlink_verify_proof_pack {path}`.** 06 §2.4 lets a tool read a caller-chosen file, against 06 §1 rule 4. *Proposed:* `json` only, or `path` restricted to `proofs.exportFolder`/inbox with realpath checks. *Blocks:* M1-9d.
 26. **G-26 (L) STREAM header not authenticated.** 04 §4: AAD is `u8(isFinal)` only; header fields rely on `ciphertextSha256`. *Proposed:* AAD = header ‖ isFinal, decided before vectors freeze. *Blocks:* M1-1d, M1-1i.
 27. **G-27 (L) Inline file vs envelope size.** 04 §3.5; 02 F-30; 06 §2.3. A 12 KB file, base64-encoded inside an encrypted, base64-encoded payload with four recipient wraps, is already near 24 KB before any text. *Proposed:* "inline only if the final envelope ≤ 24 KB". *Blocks:* M1-7f.
 28. **G-28 (L) Safety-code encoding.** 04 §3.6: the first 40 bits (2^40 ≈ 1.1 × 10^12) do not fit 12 decimal digits, the format 11 §1 and §8 specify. *Blocks:* M1-1f, M1-1h.
-29. **G-29 (M) Owner-operation payload bodies.** 04 §3.4 lists `approval-request`, `approval`, `policy`, `card-update`, `revoke`, `handshake-ack` without body schemas. *Blocks:* M1-2a, M2-2e.
+29. **G-29 (M) Owner-operation payload bodies.** Resolved by PR #10 (pending owner): one owner-signed object, `SignedOwnerAction` (04 §2.5.1, BIP-340 by the owner Nostr key over a tagged hash, bound to the agent's EVM address, with nonce and expiry), is produced by the local UI, the CLI and the console; `approval`, `policy` and `revoke` envelopes only carry it. Bodies for `approval-request`, `approval`, `policy`, `revoke`, `card-update` and `handshake-ack` in 04 §3.4.1, with receiver rules and the rule that no MCP tool can create them. Lifetimes stay with G-7, policy fail-closed with G-6. *Was:* 04 §3.4 listed these types without body schemas. *Blocks:* M1-2a, M2-2e.
 30. **G-30 (M) Native-coin price source.** RESOLVED for launch by D-46: fees are stablecoin-only, every fee token is valued 1:1, and 07 §6.2 needs no price endpoint. A USD price source for native coins returns with the `PRICE_UPDATER` work in M4-EPIC (12 §3.4). *Was:* 07 §6.2 "public price endpoint" unspecified (third-party egress, integrity). *Blocked:* M1-4b, M3-3.
 31. **G-31 (L) Linux without Secret Service.** RESOLVED by D-54 (04 §2.8, 07 §9): the OS keychain stays the default; without one, `needs_setup` unless the user opts in, in an interactive terminal, to a passphrase-locked file KeyStore (Argon2id + AES-256-GCM, unlocked by the MCP server from a passphrase file or an environment variable); the owner key is never unlocked non-interactively. Built in M1-8f. *Was:* 04 §2.2; 03 §6 (headless servers, containers, WSL); proposed `needs_setup` by default and a documented, weaker passphrase-wrapped file store as opt-in. *Blocked:* M1-8a.
 32. **G-32 (M) Per-contact policy overrides.** 11 §8 (approval card, "Remember for this contact") has no counterpart in 06 §3. *Blocks:* M1-2b, M1-11a.

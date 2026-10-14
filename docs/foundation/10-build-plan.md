@@ -121,7 +121,7 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 | Task | Output | Acceptance |
 |---|---|---|
 | M2-1 Design system + screens from Claude Design D2 (11) → `packages/ui` (needs D2) | Components | Matches design; accessibility AA |
-| M2-2 Owner console PWA | apps/console | Passkey + PRF identity, backup to relays, new-device restore, owner link from CLI; activity, threads, approvals, policies (owner-signed envelopes), proofs, credits |
+| M2-2 Owner console PWA | apps/console | Passkey + PRF identity, backup to relays, new-device restore, owner link from CLI; activity, threads, approvals, policies (`SignedOwnerAction` in owner-channel envelopes, 04 §2.5.1), proofs, credits |
 | M2-3 Cloud agent template | apps/cloud-agent | `agentlink cloud deploy` and Deploy button both work; DO inbox; remote MCP + OAuth; ChatGPT developer-mode connector and claude.ai connector tested |
 | M2-4 OCCRegistry + verified badge | contracts, chain, console | Register/revoke on testnets; badge shown in contacts |
 | M2-5 Verify page + invite landing | apps/verify, apps/invite | Verification fully client-side; fragment never sent (asserted in tests) |
