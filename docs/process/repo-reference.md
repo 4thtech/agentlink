@@ -61,4 +61,4 @@ Changing the policy is a reviewed S1 change. A new dependency needs an `external
 - Crypto, policy engine and anything that signs: tests first, including test vectors.
 - Every MCP tool: schema test + behaviour test for each `status` value.
 - New behaviour in core: unit tests plus an e2e scenario when it crosses agents.
-
+- Test timeout policy (M0-10e): every `packages/*` has a `vitest.config.ts` with `testTimeout: 20_000` (the 5 s Vitest default flakes on loaded CI runners); `tools/` uses the same value. A longer limit is allowed where measured (crypto Argon2id files 60 s, types 30 s); never lower one. A new package copies the config of an existing one. (A shared base file cannot be imported: the boundary guard forbids a relative import that leaves a package.)
