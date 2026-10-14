@@ -43,7 +43,7 @@
 
 - The PR body must have: Security class, Threat note, the Independent review report (a fresh AI reviewer that never saw the implementation), and Tests-first evidence. The `review-gate` check verifies that these exist, not that they are good. Judging that is what your review adds.
 - Read the spec sections the PR cites and the matching checklist in `audit-rules.md` §5.
-- Approve only if you would sign off on it yourself. Your approval is optional (D-51), but it is a real one: it counts as a code-owner approval. Your agent may draft review comments, but **the Approve is your human decision**. Agents must never approve on anyone's behalf.
+- Approve only if you would sign off on it yourself. Your approval is optional (D-51), but it is a real one. Your agent may draft review comments, but **the Approve is your human decision**. Agents must never approve on anyone's behalf.
 
 ### A5. One-time setup on your machine
 
@@ -79,7 +79,7 @@ You follow the same process as Tali's agents (`development-process.md`):
 - fill in the PR template;
 - get an independent review.
 
-Your S2 and code-owned PRs merge after Tali's GitHub approval as a code owner (D-51). Otherwise merging and deploying follow D-25: auto-merge behind GitHub-enforced gates, and production only after Tali's approval click.
+Your S2 and sensitive-path PRs merge after Tali's "merge" in chat (D-51). Otherwise merging and deploying follow D-52: develop, independent audit, green checks, auto-merge; services deploy to production automatically once staging and smoke tests are green; npm `latest` needs the owner's approval click.
 
 ### A7. Never
 

@@ -4,14 +4,14 @@
 
 AgentLink (working name) by 4thTech is *encrypted, provable exchange between AI agents*, on protocol OCC v2.
 - Specs (source of truth): `docs/foundation/`.
-- Process: `docs/process/`.
+- Process: `docs/process/`; end to end: `delivery-process.md`.
 - Stack, layout, commands and testing: `docs/process/repo-reference.md`.
 
 ## People
 
 | Who | Role |
 |---|---|
-| **@talirezun** (Tali) | Owner and lead. His orchestrated agents build; he gives the "merge" for S2 and sensitive-path PRs in chat, approves production releases and makes the owner-only calls |
+| **@talirezun** (Tali) | Owner and lead. His orchestrated agents build; he gives the "merge" for S2 and sensitive-path PRs in chat, approves npm `latest` releases and owner-only operations |
 | **@denisjazbec** (Denis) | Engineer: feedback via Tali; approval not required; code owner for notifications; takes over parts by agreement, recorded on the sync board |
 
 New collaborator, or an agent working for one? Start with `docs/process/onboarding.md`.
@@ -67,12 +67,12 @@ The main session is the **orchestrator**. Its job is to **orchestrate, deploy wo
   - secrets;
   - details of unfixed vulnerabilities.
 - **OCC v1 is reference only** (EUPL-1.2 with a non-commercial rider). Never copy its code.
-- **Merging and releases (D-25, D-51):**
-  - agents work under Tali's GitHub account (D-51);
-  - S0/S1 PRs: enable GitHub auto-merge; GitHub merges when every required check is green;
+- **Merging and releases (D-25, D-51, D-52):**
+  - agents work under Tali's GitHub account (D-51). Every task: develop → independent audit (S1/S2) → required checks green → auto-merge; improve CI, never skip it (D-52);
+  - S0/S1 PRs: enable GitHub auto-merge after the audit passes; GitHub merges when every required check is green;
   - S2 and sensitive-path PRs (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files) merge only after CI is green, the independent AI review passed and Tali has said "merge" in chat (process rule, owner-accepted; revisit before M3);
   - never use admin bypass, never push to `main`, never approve PRs or deployments;
-  - production releases go only through CI, after the owner's approval click;
+  - services reach production only through CI, automatically once staging smoke is green; npm `latest` needs the owner's approval click; `DEPLOY_FREEZE` halts everything (D-52);
   - owner-only: mainnet contracts, contract upgrades, Safe operations, production secrets and clearing `DEPLOY_FREEZE` (`docs/process/release-and-deployment.md`).
 - **No AI attribution anywhere.** No co-author trailers, "Generated with" footers or badges. Work ships under the operator's own git identity.
 - **New dependencies** need a justification in the PR. No `postinstall` scripts.
