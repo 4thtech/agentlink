@@ -154,11 +154,13 @@ Prices come from `agentlink_status` (`prices`, §2.1); every paid result and eve
 type ProofStatus = {
   status: "ok" | "pending_approval" | "needs_credits" | "submitted" | "error";
   chain: string; recordId?: `0x${string}`; txHash?: `0x${string}`;
-  fee?: { token: string; amount: string; usd: string; protocolUsd: string; integratorUsd: string };
+  fee?: { token: `0x${string}`; amount: string; usd: string; protocolUsd: string; integratorUsd: string };
   receipts: { type: "DELIVERED" | "OPENED" | "ACCEPTED" | "REJECTED"; at: string }[];
   explorerUrl?: string; verifyUrl?: string;
 };
 ```
+
+`fee.token` is the Record's `feeToken` (05 §3.1): `0x` + 40 lowercase hex. At launch fee tokens are USD stablecoins only (D-46, 07 §6.1 `feeTokens`); the zero address (a chain's native token) is allowed only where that token is itself a USD stablecoin (xDAI on Gnosis), and any other native coin only if the owner decides so later. `fee.amount` is a token amount in the token's base units, a decimal `uint256` string like `maxFee` (04 §2.4.1), and the token's decimals come from the token (07 §6.1 `feeTokens`), never from the amount: the Record's `maxFee` until the record is confirmed on-chain, then the fee charged (at most `maxFee`). `usd` is `amount / 10^decimals` valued 1:1 (D-46), rounded up to 6 decimals, in the USD spelling of 04 §2.4.1. Before confirmation the core signs `maxFee` equal to the quoted total (12 §4), and `protocolUsd` and `integratorUsd` are the split of the charged fee, so they are present only once it is known and `usd = protocolUsd + integratorUsd` holds for that fee. An approval's `context.fee` uses the same fields, with `amount` equal to the signed `maxFee` (04 §3.4.1; proposed, owner confirms at merge).
 
 Binary values in tool inputs and results use the canonical encodings of 04 §2.4.1, and an input in any other form is rejected with an error naming the expected form, never normalised. For example, `recordId`, `txHash`, `envelopeHash` and agent IDs are `0x` + lowercase hex; `termsHash` and `plaintextSha256` are 64 lowercase hex characters; `envelopeId` is base64url.
 
@@ -166,7 +168,7 @@ Binary values in tool inputs and results use the canonical encodings of 04 §2.4
 
 | Tool | Input | Output |
 |---|---|---|
-| `agentlink_get_approval` | `{approvalId}` | `{status: "pending" \| "approved" \| "denied" \| "expired", decidedAt?}` |
+| `agentlink_get_approval` | `{approvalId}` | `{status: "ok", approval: "pending" \| "approved" \| "denied" \| "expired", decidedAt?}` |
 
 When any tool needs approval it returns:
 
@@ -180,7 +182,7 @@ When any tool needs approval it returns:
 }
 ```
 
-Every tool with an entry in the "Approval" column of §2.0 accepts `approvalId?`. A valid approved ID for the identical action lets the action proceed once. A request expires 24 h after it was made (for a commitment, at the scope's expiry if that is sooner). The owner's decision must arrive before then, and an approved action must run before then (an approved commitment's parts run until the scope's expiry); after that `agentlink_get_approval` reports `expired` and the next call asks again (04 §3.4.1, G-7). Until it is used, the owner can void an approved approval (`agentlink cancel`, §8), and a rule changed to `deny` in the meantime refuses it. The approval binds the action digest (M1-7e); for `agentlink_send` with `path` the digest includes the resolved realpath and the file's `plaintextSha256`, the core re-hashes the file when the approved action runs, and a mismatch requires a new approval (nothing is sent). For commitments the digest is the commitment scope (04 §3.4.2, D-55): one approval covers an accept message and its `ACCEPTED` receipt, each at most once, until the scope's expiry, and any change to the terms, the counterparty or the call voids it. No tool creates, decides or widens an approval: the owner decides it with owner presence (04 §2.5, I-4).
+Every tool with an entry in the "Approval" column of §2.0 accepts `approvalId?`. A valid approved ID for the identical action lets the action proceed once. A request expires 24 h after it was made (for a commitment, at the scope's expiry if that is sooner). The owner's decision must arrive before then, and an approved action must run before then (an approved commitment's parts run until the scope's expiry); after that `agentlink_get_approval` reports `approval: "expired"` and the next call asks again (04 §3.4.1, G-7). Until it is used, the owner can void an approved approval (`agentlink cancel`, §8), and a rule changed to `deny` in the meantime refuses it. The approval binds the action digest (M1-7e); for `agentlink_send` with `path` the digest includes the resolved realpath and the file's `plaintextSha256`, the core re-hashes the file when the approved action runs, and a mismatch requires a new approval (nothing is sent). For commitments the digest is the commitment scope (04 §3.4.2, D-55): one approval covers an accept message and its `ACCEPTED` receipt, each at most once, until the scope's expiry, and any change to the terms, the counterparty or the call voids it. No tool creates, decides or widens an approval: the owner decides it with owner presence (04 §2.5, I-4).
 
 ---
 
@@ -281,7 +283,15 @@ contactRules: []            # per-contact proof rules (G-32), at most 256; creat
 - **Fail closed.** A missing, unreadable or inconsistent ledger, or a clock earlier than the newest entry's `t`, makes every paid action need the owner's approval until the owner re-confirms the budget: a new owner-signed `policy.set` (with presence) starts a fresh ledger. A broken ledger never counts as an empty sum. Residual: the ledger has no KeyStore high-water mark, so a same-OS-user process that deletes ledger rows resets the budget (G-1). A clock moved forward repeatedly (root or `CAP_SYS_TIME`) empties the window. `perActionMaxUSD` still bounds each action (04 §7).
 - **Display.** The local UI shows "used in the last 24 hours" and when the oldest entry leaves the window.
 
-Policies are owner-signed documents (04 §2.5); the core verifies the owner signature on load and ignores unsigned or tampered policies (falling back to these defaults).
+Policies are owner-signed documents (04 §2.5; G-6 resolved for this point, proposed, owner confirms at merge). On every load the core verifies the stored `policy.set` (signature, `agent`, `owner`, the strict schema above, and `version` equal to the highest applied version kept in the KeyStore, 04 §2.5.1). An agent for which no policy has ever been applied uses the defaults above. Once any version has been applied, a missing, unsigned, tampered, rolled-back or unparseable policy, including one in a form this core's schema does not accept, is **never** replaced by the defaults, because they can be looser than the owner's policy. The core then fails closed (M1-7d):
+
+- every paid action (`proofs`, including the proof part of a commitment) and every commitment (`commitments.accept`, `agentlink_respond_to_terms`, `accept` and `reject` acknowledgements, firm offers) needs the owner's approval, and so does every owner-gated action (new contacts, file access, key disclosure); nothing is auto-accepted, no `contactRules` entry applies, and no budget or auto-accept grant is read from the stored policy;
+- unknown senders are queued, not dropped, and no folder is allowed (`files.allowedFolders` is treated as empty);
+- limits that grant nothing use the built-in defaults as hard caps (`rateLimitPerContactPerHour`, `maxSendSizeMB`, `maxReceiveSizeMB`, `defaultExpiryDays`, `maxEnvelopeKB`, `deleteAfter: "expiry"`); no receipt is signed automatically (`autoDelivered` and `autoOpened` are treated as `false`); and nothing is uploaded, because sending a file needs an allowed folder;
+- an invalid stored policy is never partly applied: no decision value is taken from it, and a `deny` in it cannot be trusted, so it becomes `approval`, never `allow`; the approval card says the policy is not valid;
+- the local UI and the console say "policy not valid, confirm it again" until the owner signs a new `policy.set` with presence.
+
+The built-in defaults are used only while the KeyStore high-water mark for the policy version is 0 **and** no stored policy row exists. A stored signed policy with a mark of 0 (the KeyStore item was deleted, G-1) is handled as a mismatch and fails closed. M1-7d tests that the defaults are never used otherwise.
 
 ---
 
