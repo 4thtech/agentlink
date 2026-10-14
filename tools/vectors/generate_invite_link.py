@@ -5,12 +5,18 @@
 1951) with no zlib header or Adler-32 (RFC 1950) and no gzip wrapper (RFC 1952), base64url without
 padding. It is shared as `https://<invite-host>/i#<payload>` and accepted from the full URL or the
 bare payload. The decoder, each step failing closed (the D-69 bounds are proposed, derived):
-  1. the payload after `#`, or the bare payload: at most 21 846 characters and strict base64url,
-     checked on the text before decoding;
+  1. the whole input is length-checked first (21 846 characters plus the prefix), then it must be
+     exactly the canonical prefix `https://agentlink.4thtech.io/i#` (06 §7.1) followed by the
+     payload, or the bare payload: no other scheme, host, port or path, nothing before the prefix,
+     no second `#`, no percent-encoding; the payload is at most 21 846 characters of strict
+     base64url, checked on the text before decoding;
   2. inflate, stopping as soon as the output exceeds 16 384 bytes (before any parse);
   3. refuse a malformed stream, a truncated stream (no final block) and bytes after the final block;
-  4. UTF-8 with fatal errors, I-JSON (duplicate keys refused; integer tokens per 04 §2.4.1) and the
-     strict invite schema (the `pairing-bodies` reference parser).
+  4. UTF-8 with fatal errors and the byte-order mark kept (so a BOM is refused), I-JSON (duplicate
+     keys refused; integer tokens per 04 §2.4.1; RFC 8259 whitespace allowed) and the strict invite
+     schema (the `pairing-bodies` reference parser, including the 256-code-point `name`).
+Version 2 (IR-M1-2d-1 F03): the step 1 prefix rule as merged in 04 §3.6 (PR #70), with one
+rejection per rule, a leading BOM, and a name at and over 256 code points.
 The compressed bytes are not canonical (D-69), so there are no encoder-output cases: `decodeInviteLink`
 gives a fixed link and the JCS text (RFC 8785) of the decoded invite, or a rejection.
 
@@ -36,7 +42,7 @@ import generate_pairing_bodies as bodies  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "invite-link"
-VERSION = 1
+VERSION = 2
 SPEC = "04 §3.6 invite encoding (D-69)"
 URL_PREFIX = "https://agentlink.4thtech.io/i#"  # the canonical link (06 §7.1)
 MAX_PAYLOAD_CHARS = 21846
@@ -286,11 +292,23 @@ def parse_ijson(data):
 
 
 def decode_link(link):
-    payload = link[len(URL_PREFIX) :] if link.startswith(URL_PREFIX) else link
+    """04 §3.6 decoder step 1 (D-69, as merged): the whole input is length-checked first, then it
+    must be exactly the canonical prefix followed by the payload, or the bare payload; no other URL
+    form, no percent-encoding, nothing before the prefix, no second `#`."""
+    if len(link) > MAX_PAYLOAD_CHARS + len(URL_PREFIX):
+        raise ValueError("payload too long")
+    if link.startswith(URL_PREFIX):
+        payload = link[len(URL_PREFIX) :]
+    elif re.fullmatch(r"[A-Za-z0-9_-]*", link):
+        payload = link
+    else:
+        raise ValueError("not the canonical link or a bare payload")
     if len(payload) > MAX_PAYLOAD_CHARS:
         raise ValueError("payload too long")
     if payload == "":
         raise ValueError("empty payload")
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", payload):
+        raise ValueError("not strict base64url")
     stream = v.unb64u(payload)
     invite = parse_ijson(zlib_inflate(stream))
     return bodies.parse_invite(invite)
@@ -413,6 +431,37 @@ def build():
     case("reject-whitespace", "the payload with a line break inside", payload[:40] + "\n" + payload[40:], False)
     case("reject-empty", "an empty payload", "", False)
     case("reject-url-empty", "the full URL with nothing after #", URL_PREFIX, False)
+
+    # Step 1: exactly the canonical prefix, or the bare payload (D-69 as merged; 06 §7.1).
+    other_forms = "not the canonical link or a bare payload"
+    for case_id, link, why, reason in [
+        ("reject-url-http", "http://agentlink.4thtech.io/i#" + payload, "the http scheme", other_forms),
+        ("reject-url-other-host", "https://agentlink.example.com/i#" + payload, "another host", other_forms),
+        ("reject-url-host-uppercase", "https://AgentLink.4thtech.io/i#" + payload, "the host in another case", other_forms),
+        ("reject-url-host-port", "https://agentlink.4thtech.io:443/i#" + payload, "the host with an explicit port", other_forms),
+        ("reject-url-other-path", "https://agentlink.4thtech.io/invite#" + payload, "another path", other_forms),
+        ("reject-url-trailing-slash-path", "https://agentlink.4thtech.io/i/#" + payload, "the path /i/", other_forms),
+        ("reject-url-query", "https://agentlink.4thtech.io/i?ref=x#" + payload, "a query before the fragment", other_forms),
+        ("reject-url-leading-space", " " + URL_PREFIX + payload, "a space before the prefix", other_forms),
+        ("reject-url-leading-character", "x" + URL_PREFIX + payload, "a character before the prefix", other_forms),
+        ("reject-bare-leading-space", " " + payload, "a bare payload with a leading space", other_forms),
+        ("reject-url-second-hash", URL_PREFIX + payload + "#" + payload, "a second #", "not strict base64url"),
+        ("reject-url-percent-hash", "https://agentlink.4thtech.io/i%23" + payload, "the # percent-encoded", other_forms),
+        ("reject-url-percent-payload", URL_PREFIX + payload.replace("-", "%2D", 1).replace("_", "%5F", 1), "percent-encoding inside the payload", "not strict base64url"),
+        ("reject-bare-percent-payload", payload.replace("-", "%2D", 1).replace("_", "%5F", 1), "percent-encoding inside a bare payload", other_forms),
+    ]:
+        case(case_id, why, link, False, reason)
+
+    # Step 4: a leading byte-order mark reaches the parser and is refused (ignoreBOM: true).
+    case("reject-bom", "the inflated JSON starts with a UTF-8 byte-order mark", deflate([("dynamic", b"\xef\xbb\xbf" + data)]), False, "not JSON")
+
+    # `name` (04 §3.4): at most 256 code points.
+    name_256 = "Agent \U0001d400\U0001d401 \u00e9 " + "x" * 245
+    if len(name_256) != 256:
+        v.fail("name_256")
+    named = [bodies.invite_of(bodies.party("pairing-bodies-a", name, bodies.RELAYS_A), v.det("pairing-bodies/invite-id", 16), v.det("pairing-bodies/secret", 32), v.det("pairing-bodies/nonce-a", 32)) for name in (name_256, name_256 + "x")]
+    case("decode-name-256-code-points", "a name of exactly 256 code points (04 §3.4)", deflate([("dynamic", compact(named[0]))]), True, expect_invite=v.jcs(named[0]).decode("utf-8"))
+    case("reject-name-257-code-points", "a name of 257 code points (04 §3.4: at most 256)", deflate([("dynamic", compact(named[1]))]), False, "name")
 
     # Inflated content that is not a valid invite.
     case("reject-not-utf8", "the inflated bytes are not UTF-8 (fatal decoding, no replacement)", deflate([("dynamic", data.replace(b"Tali", b"T\xffli"))]), False, "not UTF-8")
