@@ -1,5 +1,6 @@
 import type { SuiteModule } from '../suite';
 import { bip340 } from './bip340';
+import { eip712 } from './eip712';
 import { fingerprint } from './fingerprint';
 import { hkdfDerive } from './hkdf-derive';
 import { jcs } from './jcs';
@@ -14,6 +15,7 @@ import { taggedHashSuite } from './tagged-hash';
  */
 export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['bip340', bip340],
+  ['eip712', eip712],
   ['fingerprint', fingerprint],
   ['hkdf-derive', hkdfDerive],
   ['jcs', jcs],

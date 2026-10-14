@@ -17,7 +17,10 @@ export type CryptoInputErrorCode =
   /** A ciphertext payload with the wrong format, version or size (M1-1g: NIP-44). */
   | 'invalid_payload'
   /** Authentication failed, or the authenticated plaintext is malformed (M1-1g: NIP-44). */
-  | 'decrypt_failed';
+  | 'decrypt_failed'
+  | 'invalid_signature'
+  | 'invalid_typed_data'
+  | 'invalid_card';
 
 /**
  * The one error type @agentlink/crypto throws for input it refuses.

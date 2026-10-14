@@ -15,6 +15,7 @@ import {
   ZONES,
   allowedWorkspaceNames,
   layerMessage,
+  libraryAllowed,
   libraryMessage,
   restrictedEntryMessage,
   testOnlyEntryMessage,
@@ -31,14 +32,14 @@ const SOURCE = '{ts,tsx,mts,cts}';
 // handled by no-restricted-imports; dynamic import(), require(), `import x = require()`, import()
 // types, cross-package relative paths and `crypto.subtle` by the local boundaries/no-bypass rule.
 
-function restrictionsFor(zone, { testFile = false } = {}) {
+function restrictionsFor(zone, { test = false } = {}) {
   const nodeAllowed = NODE_ZONES.includes(zone);
   const paths = nodeAllowed
     ? ['crypto', 'node:crypto'].map((name) => ({ name, message: CRYPTO_MSG }))
     : BUILTINS.map((name) => ({ name, message: NODE_MSG }));
   const patterns = nodeAllowed ? [] : [{ group: ['node:*'], message: NODE_MSG }];
   for (const lib of LIBRARIES) {
-    if (zone !== null && lib.zones.includes(zone)) continue;
+    if (zone !== null && libraryAllowed(lib, zone, { test })) continue;
     patterns.push({ group: lib.group, message: libraryMessage(lib) });
   }
   // Restricted subpaths of packages this zone may otherwise import (IR-M1-1b-1 M-1).
@@ -47,7 +48,7 @@ function restrictionsFor(zone, { testFile = false } = {}) {
     patterns.push({ group: entry.group, message: restrictedEntryMessage(entry) });
   }
   // Test-only subpaths (IR-M1-1g-1 M-2): refused everywhere except in test files.
-  if (!testFile) {
+  if (!test) {
     for (const entry of TEST_ONLY_ENTRY_POINTS) {
       patterns.push({ group: entry.group, message: testOnlyEntryMessage(entry) });
     }
@@ -127,11 +128,12 @@ export default tseslint.config(
     files: [`${zone}/**/*.${SOURCE}`],
     rules: restrictionsFor(zone),
   })),
-  // Test files of each zone: the same list without the test-only subpaths. It must come after the
-  // zone blocks, because ESLint applies only the last matching no-restricted-imports block.
+  // Test files of each zone: the same list with the zone's test-only libraries (LIBRARIES testZones,
+  // IR-M1-1e-1 L-1) allowed and without the test-only subpaths (IR-M1-1g-1 M-2). It must come after
+  // the zone blocks, because ESLint applies only the last matching no-restricted-imports block.
   ...Object.keys(ZONES).map((zone) => ({
     files: TEST_FILE_GLOBS.map((glob) => `${zone}/${glob}`),
-    rules: restrictionsFor(zone, { testFile: true }),
+    rules: restrictionsFor(zone, { test: true }),
   })),
   {
     // Node-only code gets Node globals: build tooling, config files and tests (which run in Node).

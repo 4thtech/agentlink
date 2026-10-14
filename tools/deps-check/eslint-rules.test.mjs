@@ -225,3 +225,28 @@ describe('IR-M1-1g-1 M-2: @agentlink/crypto/testing is for test files only', () 
     expect(await lint('packages/core/src/a.test.ts', dynamic)).toEqual([]);
   });
 });
+
+describe('IR-M1-1e-1 L-1: viem only in packages/crypto test files', () => {
+  const code = `import { keccak256 } from 'viem';\nvoid keccak256;\n`;
+
+  it('rejects viem in crypto runtime source', async () => {
+    expect(rules(await lint('packages/crypto/src/eip712.ts', code))).toEqual([
+      'no-restricted-imports',
+    ]);
+    const dynamic = `const m = await import('viem');\nvoid m;\n`;
+    expect(rules(await lint('packages/crypto/src/a.ts', dynamic))).toContain(
+      'boundaries/no-bypass',
+    );
+  });
+
+  it('allows viem in crypto test files and keeps the other crypto rules there', async () => {
+    expect(await lint('packages/crypto/src/eip712.test.ts', code)).toEqual([]);
+    const aws = `import * as x from 'aws4fetch';\nvoid x;\n`;
+    expect(rules(await lint('packages/crypto/src/a.test.ts', aws))).toEqual([
+      'no-restricted-imports',
+    ]);
+    expect(rules(await lint('packages/core/src/a.test.ts', code))).toEqual([
+      'no-restricted-imports',
+    ]);
+  });
+});

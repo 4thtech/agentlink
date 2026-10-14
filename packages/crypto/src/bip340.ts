@@ -12,20 +12,14 @@ import { assertBytes } from './bytes.js';
 import { encodeHex } from './encoding.js';
 import { CryptoInputError } from './errors.js';
 import { randomBytes } from './random.js';
-import { isSecp256k1SecretKey } from './secp256k1-range.js';
+import { assertSecp256k1SecretKey } from './secp256k1-range.js';
 import { wipe } from './wipe.js';
 
 export const BIP340_PUBLIC_KEY_LENGTH = 32;
 export const BIP340_SIGNATURE_LENGTH = 64;
 
 function assertSecretKey(secretKey: unknown): asserts secretKey is Uint8Array {
-  assertBytes(secretKey, 'bip340: the secret key');
-  if (secretKey.length !== 32) {
-    throw new CryptoInputError('invalid_length', 'bip340: the secret key must be 32 bytes');
-  }
-  if (!isSecp256k1SecretKey(secretKey)) {
-    throw new CryptoInputError('invalid_argument', 'bip340: the secret key is out of range');
-  }
+  assertSecp256k1SecretKey(secretKey, 'bip340');
 }
 
 /** The 32-byte x-only public key of a secret key (1 <= key < n). */

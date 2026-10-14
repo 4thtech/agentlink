@@ -28,6 +28,15 @@ export interface JsonObject {
  */
 export const MAX_JSON_DEPTH = 128;
 
+/** Options for parseJson. */
+export interface ParseJsonOptions {
+  /**
+   * Refuse every number token that is not a protocol integer: `0|[1-9][0-9]*` on the token text and
+   * at most 2^53 - 1 (04 §2.4.1). Default false (RFC 8259 numbers, as JCS needs).
+   */
+  readonly integersOnly?: boolean;
+}
+
 const invalidJson = (message: string): CryptoInputError =>
   new CryptoInputError('invalid_json', message);
 const unsupported = (message: string): CryptoInputError =>
@@ -36,6 +45,7 @@ const unsupported = (message: string): CryptoInputError =>
 // --- parse ---------------------------------------------------------------------------------------
 
 const NUMBER = /-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?/y;
+const INTEGER_TOKEN = /^(?:0|[1-9][0-9]*)$/;
 
 /** Value of one hex digit of a \u escape (either case, as RFC 8259 allows), or -1. */
 function hexDigit(code: number): number {
@@ -48,7 +58,10 @@ function hexDigit(code: number): number {
 class Parser {
   private index = 0;
 
-  constructor(private readonly text: string) {}
+  constructor(
+    private readonly text: string,
+    private readonly integersOnly: boolean,
+  ) {}
 
   parseDocument(): JsonValue {
     this.skipWhitespace();
@@ -209,6 +222,10 @@ class Parser {
     this.index += match[0].length;
     // ECMAScript StringToNumber rounds correctly in every runtime.
     const value = Number(match[0]);
+    // On the token, not the value: `1.0`, `1e3` and `-0` parse to integers (04 §2.4.1).
+    if (this.integersOnly && (!INTEGER_TOKEN.test(match[0]) || !Number.isSafeInteger(value))) {
+      throw invalidJson('JSON number must be an integer token in [0, 2^53 - 1]');
+    }
     // I-JSON: a number that overflows to Infinity cannot be represented, so it is refused.
     if (!Number.isFinite(value)) throw invalidJson('JSON number is outside the double range');
     return value;
@@ -221,14 +238,16 @@ class Parser {
  * duplicate property names (compared after unescaping), no lone surrogates, no number outside the
  * double range, nesting at most MAX_JSON_DEPTH. Objects come back with a null prototype.
  *
- * Integer-only fields (04 §2.4.1: `1.0` and `1e3` refused) need the number's source token, which
- * this parser does not expose; the schema layer (@agentlink/types) checks those tokens.
+ * With `integersOnly` (M1-1e), every number token must also be a protocol integer (04 §2.4.1): it
+ * matches `0|[1-9][0-9]*` on the token text, so `1.0`, `1e3`, `-0` and `9007199254740991.4` are
+ * refused whatever value they parse to, and its value is at most 2^53 - 1. Use it for JSON text
+ * whose numbers are all such integers, such as the card JSON form (04 §2.4).
  */
-export function parseJson(text: string): JsonValue {
+export function parseJson(text: string, options?: ParseJsonOptions): JsonValue {
   if (typeof text !== 'string') {
     throw new CryptoInputError('invalid_argument', 'parseJson: text must be a string');
   }
-  return new Parser(text).parseDocument();
+  return new Parser(text, options?.integersOnly === true).parseDocument();
 }
 
 // --- canonicalize --------------------------------------------------------------------------------

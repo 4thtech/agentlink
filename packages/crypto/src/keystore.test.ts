@@ -23,6 +23,10 @@ const SEED_OR_SECRET = [
   nip44('MessageKeys'),
   nip44('EncryptWithKey'),
   nip44('DecryptWithKey'),
+  // M1-1e (IR-M1-1e-1 M-1): ECDSA signing with a secret key.
+  'signDigestEcdsa',
+  'signTypedData',
+  'signAgentCard',
 ];
 
 describe('@agentlink/crypto/keystore', () => {
@@ -66,6 +70,13 @@ describe('@agentlink/crypto/keystore', () => {
       'KeyStoreError',
       'OWNER_SESSION_DEFAULT_TTL_MS',
       'OWNER_SESSION_MAX_TTL_MS',
+      'recoverEvmAddress',
+      'decodeEcdsaSignature',
+      'hashTypedData',
+      'hashAgentCard',
+      'verifyAgentCard',
+      'verifyCardOwnerSig',
+      'verifyCardAgentSig',
     ]) {
       expect(Object.keys(main), name).toContain(name);
     }
