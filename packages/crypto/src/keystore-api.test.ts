@@ -8,13 +8,14 @@ import type { PublicIdentity } from './keys.js';
 import {
   KeyStoreError,
   type EnvelopeKeys,
+  type KeyStoreErrorCode,
   type EpochOptions,
   type KeyStore,
   type OwnerKeyStore,
   type OwnerPresence,
   type OwnerPublicKeys,
   type OwnerSession,
-  type WrappedKey,
+  type WrappedCek,
 } from './keystore-api.js';
 import type { NostrEvent, UnsignedNostrEvent } from './nostr-event.js';
 
@@ -74,9 +75,9 @@ describe('EnvelopeKeys (type level, G-2: 03 §3, 04 §3.1.1)', () => {
 
   it('unwrapCek takes the envelope id, never an HPKE info (no general HPKE-open oracle)', () => {
     expectTypeOf<Params<EnvelopeKeys, 'unwrapCek'>>().toEqualTypeOf<
-      [WrappedKey, Uint8Array, (EpochOptions | undefined)?]
+      [WrappedCek, Uint8Array, (EpochOptions | undefined)?]
     >();
-    expectTypeOf<keyof WrappedKey>().toEqualTypeOf<'enc' | 'wk'>();
+    expectTypeOf<keyof WrappedCek>().toEqualTypeOf<'enc' | 'wk'>();
     expectTypeOf<keyof EpochOptions>().toEqualTypeOf<'epoch'>();
   });
 });
@@ -165,5 +166,11 @@ describe('KeyStoreError', () => {
     expect(error).toBeInstanceOf(Error);
     expect(error.name).toBe('KeyStoreError');
     expect(error.code).toBe('keystore_closed');
+  });
+
+  it('separates a capability refusal from an input error and from a missing implementation', () => {
+    expectTypeOf<'operation_not_allowed'>().toExtend<KeyStoreErrorCode>();
+    expectTypeOf<'unsupported_operation'>().toExtend<KeyStoreErrorCode>();
+    expect(new KeyStoreError('operation_not_allowed', 'x').code).toBe('operation_not_allowed');
   });
 });

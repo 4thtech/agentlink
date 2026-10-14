@@ -37,6 +37,27 @@ afterEach(() => {
 });
 
 describe('createGiftWrap', () => {
+  it('verifies and wraps one snapshot of the seal: a getter cannot swap its content (IR-M1-1g-G2-1 M-1)', async () => {
+    const real = await seal();
+    let reads = 0;
+    const flipping = { ...real } as Record<string, unknown>;
+    Object.defineProperty(flipping, 'content', {
+      enumerable: true,
+      get() {
+        reads += 1;
+        return reads === 1 ? real.content : 'tampered';
+      },
+    });
+    const wrap = createGiftWrap(flipping as unknown as typeof real, recipientHex, 1760000000);
+    const recipient = new MemoryKeyStore(RECIPIENT);
+    const opened = JSON.parse(
+      await recipient.nip44Decrypt(wrap.pubkey, wrap.content),
+    ) as typeof real;
+    expect(reads).toBe(1);
+    expect(opened.content).toBe(real.content);
+    expect(verifyNostrEvent(opened)).toBe(true);
+  });
+
   it('builds a signed kind 1059 event to the recipient that only the recipient opens', async () => {
     const s = await seal();
     const wrap = createGiftWrap(s, recipientHex, 1759990000);

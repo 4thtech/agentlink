@@ -172,6 +172,13 @@ describe('MemoryKeyStore', () => {
 
     it('refuses anything but 32 bytes', async () => {
       expect(await codeOf(() => a.signEnvelopeHash(new Uint8Array(31)))).toBe('invalid_length');
+      // A subclass that lies about its length is measured by its real bytes (M-1 pattern).
+      class Lying extends Uint8Array {
+        override get length(): number {
+          return 32;
+        }
+      }
+      expect(await codeOf(() => a.signEnvelopeHash(new Lying(31)))).toBe('invalid_length');
       expect(await codeOf(() => a.signEnvelopeHash('00' as never))).toBe('invalid_argument');
     });
   });
@@ -380,6 +387,40 @@ describe('MemoryOwnerKeyStore', () => {
     expect(bip340Verify(decodeHex(ownerNostr), digest, decodeHex(sig))).toBe(true);
   });
 
+  it('checks owner and v on the bytes it signs: a getter cannot swap them (IR-M1-1g-G2-1 I-3)', async () => {
+    const session = await owner.unlock(passphrase(CODE));
+    const plain = action() as unknown as Record<string, unknown>;
+    let reads = 0;
+    const flipping: Record<string, unknown> = { ...plain };
+    Object.defineProperty(flipping, 'owner', {
+      enumerable: true,
+      get() {
+        reads += 1;
+        return reads === 1 ? ownerNostr : 'ab'.repeat(32);
+      },
+    });
+    const sig = await session.signOwnerAction(flipping as unknown as JsonObject);
+    expect(reads).toBe(1);
+    // The signature covers exactly the body that passed the check.
+    const digest = taggedHash(TAGS.ownerAction, sha256(canonicalizeToBytes(plain as JsonObject)));
+    expect(bip340Verify(decodeHex(ownerNostr), digest, decodeHex(sig))).toBe(true);
+
+    const proxy = new Proxy(plain, {
+      get(object, key, receiver) {
+        if (key === 'v') {
+          reads += 1;
+          return reads % 2 === 0 ? 1 : 2;
+        }
+        return Reflect.get(object, key, receiver) as unknown;
+      },
+    });
+    // Whatever one read of v gives is what is checked and signed: here 2, so it is refused.
+    reads = 0;
+    expect(await codeOf(() => session.signOwnerAction(proxy as unknown as JsonObject))).toBe(
+      'invalid_argument',
+    );
+  });
+
   it('refuses to sign an action that names another owner or another version', async () => {
     const session = await owner.unlock(passphrase(CODE));
     expect(await codeOf(() => session.signOwnerAction(action({ owner: 'ab'.repeat(32) })))).toBe(
@@ -444,6 +485,29 @@ describe('MemoryOwnerKeyStore', () => {
     expect(await three.signOwnerAction(action())).toMatch(/^[0-9a-f]{128}$/);
   });
 
+  it('lock ends every session even if a wipe fails, and reports the failure (IR-M1-1g-G2-1 I-2)', async () => {
+    const one = await owner.unlock(passphrase(CODE));
+    const two = await owner.unlock(passphrase(CODE));
+    const original = Uint8Array.prototype.fill;
+    let calls = 0;
+    const spy = vi.spyOn(Uint8Array.prototype, 'fill').mockImplementation(function (
+      this: Uint8Array,
+      ...args: Parameters<Uint8Array['fill']>
+    ) {
+      calls += 1;
+      if (calls === 1) throw new TypeError('detached');
+      return original.apply(this, args);
+    });
+    try {
+      expect(await codeOf(() => owner.lock())).toBe('wipe_failed');
+    } finally {
+      spy.mockRestore();
+    }
+    expect(one.isActive()).toBe(false);
+    expect(two.isActive()).toBe(false);
+    expect(await codeOf(() => two.signOwnerAction(action()))).toBe('owner_locked');
+  });
+
   it('closing a session ends only that session', async () => {
     const one = await owner.unlock(passphrase(CODE));
     const two = await owner.unlock(passphrase(CODE));
@@ -490,9 +554,64 @@ describe('MemoryOwnerKeyStore', () => {
       for (const kind of [0, 1, 3, 4, 14, NOSTR_KIND_GIFT_WRAP, 10002, 22241, 22243, 30078]) {
         expect(
           await codeOf(() => session.signNostr({ kind, created_at: 0, tags: [], content: '' })),
-        ).toBe('invalid_argument');
+        ).toBe('operation_not_allowed');
       }
+      // A malformed event is still an input error, checked before the kind.
       expect(await codeOf(() => session.signNostr(null as never))).toBe('invalid_argument');
+      expect(
+        await codeOf(() => session.signNostr({ kind: 1, created_at: -1, tags: [], content: '' })),
+      ).toBe('invalid_argument');
+    });
+
+    it('checks the kind on a snapshot and signs that snapshot: a getter cannot swap it (IR-M1-1g-G2-1 M-1)', async () => {
+      const session = await owner.unlock(passphrase(CODE));
+      let reads = 0;
+      const flipping = {
+        get kind() {
+          reads += 1;
+          return reads === 1 ? NOSTR_KIND_SEAL : 1;
+        },
+        created_at: 1760000000,
+        tags: [],
+        content: '',
+      };
+      const signed = await session.signNostr(flipping);
+      expect(reads).toBe(1);
+      expect(signed.kind).toBe(NOSTR_KIND_SEAL);
+      expect(verifyNostrEvent(signed)).toBe(true);
+      expect(Object.isFrozen(signed)).toBe(true);
+
+      // The other order: an allowed kind on a later read never gets the disallowed one signed.
+      let laterReads = 0;
+      const late = {
+        get kind() {
+          laterReads += 1;
+          return laterReads === 1 ? 1 : NOSTR_KIND_SEAL;
+        },
+        created_at: 1760000000,
+        tags: [],
+        content: '',
+      };
+      expect(await codeOf(() => session.signNostr(late))).toBe('operation_not_allowed');
+    });
+
+    it('a Proxy that answers differently on each read cannot swap the kind either (M-1)', async () => {
+      const session = await owner.unlock(passphrase(CODE));
+      let kindReads = 0;
+      const target = { kind: 0, created_at: 1760000000, tags: [], content: 'x' };
+      const proxy = new Proxy(target, {
+        get(object, key, receiver) {
+          if (key === 'kind') {
+            kindReads += 1;
+            return kindReads === 1 ? NOSTR_KIND_AUTH : 30078;
+          }
+          return Reflect.get(object, key, receiver) as unknown;
+        },
+      });
+      const signed = await session.signNostr(proxy);
+      expect(signed.kind).toBe(NOSTR_KIND_AUTH);
+      expect(verifyNostrEvent(signed)).toBe(true);
+      expect(kindReads).toBe(1);
     });
 
     it('the owner seal and the envelope both verify under the owner key (acceptance)', async () => {

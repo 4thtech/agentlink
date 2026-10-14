@@ -14,11 +14,11 @@
 // the store state and the epoch first, so the refusals around it are already final.
 import { bip340PublicKey, bip340Sign } from './bip340.js';
 import { assertBytes, equalBytes } from './bytes.js';
-import { decodeHex, encodeHex } from './encoding.js';
+import { decodeHex, encodeHex, encodeUtf8 } from './encoding.js';
 import { signTypedData, type TypedData } from './eip712.js';
 import { CryptoInputError } from './errors.js';
 import { TAGS, sha256, taggedHash } from './hash.js';
-import { canonicalizeToBytes, type JsonObject } from './jcs.js';
+import { canonicalize, parseJson, type JsonObject } from './jcs.js';
 import {
   KEY_LABELS,
   MASTER_SEED_LENGTH,
@@ -39,13 +39,14 @@ import {
   type OwnerPublicKeys,
   type OwnerSession,
   type UnlockOptions,
-  type WrappedKey,
+  type WrappedCek,
 } from './keystore-api.js';
 import { nip44ConversationKey, nip44DecryptWithKey, nip44EncryptWithKey } from './nip44.js';
 import {
   NOSTR_KIND_AUTH,
   NOSTR_KIND_SEAL,
   signNostrEvent,
+  signedFields,
   type NostrEvent,
   type UnsignedNostrEvent,
 } from './nostr-event.js';
@@ -83,10 +84,12 @@ function unsupported(card: string): never {
 /** 04 §3.1.1: BIP-340 over taggedHash("agentlink/envelope/v1", envelopeHash), 128 lowercase hex. */
 function envelopeSig(secretKey: Uint8Array, envelopeHash: Uint8Array): string {
   assertBytes(envelopeHash, 'signEnvelopeHash: envelopeHash');
-  if (envelopeHash.length !== 32) {
+  // A plain copy of the real bytes: a subclass cannot report one length and sign another (M-1).
+  const hash = new Uint8Array(envelopeHash);
+  if (hash.length !== 32) {
     throw new CryptoInputError('invalid_length', 'signEnvelopeHash: envelopeHash must be 32 bytes');
   }
-  return encodeHex(bip340Sign(secretKey, taggedHash(TAGS.envelope, envelopeHash)));
+  return encodeHex(bip340Sign(secretKey, taggedHash(TAGS.envelope, hash)));
 }
 
 /** NIP-44 v2 under secretKey x peer; the conversation key is wiped afterwards. */
@@ -198,7 +201,7 @@ export class MemoryKeyStore implements KeyStore {
   }
 
   unwrapCek(
-    wrapped: WrappedKey,
+    wrapped: WrappedCek,
     envelopeId: Uint8Array,
     options?: EpochOptions,
   ): Promise<Uint8Array> {
@@ -361,7 +364,11 @@ class MemoryOwnerSession implements OwnerSession {
       if (typeof body !== 'object' || body === null || Array.isArray(body)) {
         throw new CryptoInputError('invalid_argument', 'signOwnerAction: body must be an object');
       }
-      const { v, owner } = body as Record<string, unknown>;
+      // Canonicalise once, then check v and owner on a parse of those exact bytes and sign them,
+      // so a getter or Proxy cannot pass the check with one value and be signed with another
+      // (IR-M1-1g-G2-1 M-1, I-3).
+      const text = canonicalize(body);
+      const { v, owner } = parseJson(text) as Record<string, unknown>;
       if (v !== 1) {
         throw new CryptoInputError('invalid_argument', 'signOwnerAction: body.v must be 1');
       }
@@ -371,7 +378,7 @@ class MemoryOwnerSession implements OwnerSession {
           'signOwnerAction: body.owner must be this owner key',
         );
       }
-      const digest = taggedHash(TAGS.ownerAction, sha256(canonicalizeToBytes(body)));
+      const digest = taggedHash(TAGS.ownerAction, sha256(encodeUtf8(text)));
       return encodeHex(bip340Sign(nostr, digest));
     });
   }
@@ -388,14 +395,16 @@ class MemoryOwnerSession implements OwnerSession {
     return Promise.resolve().then(() => {
       const { nostr } = this.#active();
       // A session is a bearer handle, not a general owner signer: seals and AUTH only (04 §3.1.1).
-      const kind = typeof event === 'object' && event !== null ? event.kind : undefined;
-      if (typeof kind !== 'number' || !OWNER_SESSION_KINDS.includes(kind)) {
-        throw new CryptoInputError(
-          'invalid_argument',
+      // The kind is checked on a frozen snapshot, and exactly that snapshot is signed, so a getter
+      // or Proxy cannot pass the check with one kind and be signed with another (M-1).
+      const fields = signedFields(event);
+      if (!OWNER_SESSION_KINDS.includes(fields.kind)) {
+        throw new KeyStoreError(
+          'operation_not_allowed',
           'owner session: only seal (kind 13) and AUTH (kind 22242) events are signed',
         );
       }
-      return signNostrEvent(nostr, event);
+      return signNostrEvent(nostr, fields);
     });
   }
 
@@ -414,7 +423,7 @@ class MemoryOwnerSession implements OwnerSession {
   }
 
   unwrapCek(
-    wrapped: WrappedKey,
+    wrapped: WrappedCek,
     envelopeId: Uint8Array,
     options?: EpochOptions,
   ): Promise<Uint8Array> {
@@ -436,10 +445,15 @@ class MemoryOwnerSession implements OwnerSession {
   end(): void {
     if (this.#timer !== undefined) timers.clearTimeout(this.#timer);
     this.#timer = undefined;
-    if (this.#keys !== null) {
-      wipe(this.#keys.nostr, this.#keys.evm);
+    const keys = this.#keys;
+    if (keys !== null) {
+      // The session ends even if a wipe fails (I-2); the failure is still reported.
       this.#keys = null;
-      this.#onEnd(this);
+      try {
+        wipe(keys.nostr, keys.evm);
+      } finally {
+        this.#onEnd(this);
+      }
     }
   }
 }
@@ -510,21 +524,24 @@ export class MemoryOwnerKeyStore implements OwnerKeyStore {
         }
         // The session's own copies of the owner keys, epoch 0 (04 §3.1.1); it wipes them when it
         // ends. The enc key joins them when unwrapCek lands (M1-1c).
-        const nostr = deriveSecretKey(seed, KEY_LABELS.nostr, 0);
-        let evm: Uint8Array;
+        // Until the session owns them, any failure wipes the keys derived so far (I-1).
+        let nostr: Uint8Array | undefined;
+        let evm: Uint8Array | undefined;
+        let session: MemoryOwnerSession;
         try {
+          nostr = deriveSecretKey(seed, KEY_LABELS.nostr, 0);
           evm = deriveSecretKey(seed, KEY_LABELS.evm, 0);
+          session = new MemoryOwnerSession(
+            SESSION_TOKEN,
+            { nostr, evm },
+            encodeHex(bip340PublicKey(nostr)),
+            ttlMs,
+            (ended) => this.#sessions.delete(ended),
+          );
         } catch (error) {
-          wipe(nostr);
+          wipe(nostr, evm);
           throw error;
         }
-        const session = new MemoryOwnerSession(
-          SESSION_TOKEN,
-          { nostr, evm },
-          encodeHex(bip340PublicKey(nostr)),
-          ttlMs,
-          (ended) => this.#sessions.delete(ended),
-        );
         this.#sessions.add(session);
         return session;
       } finally {
@@ -534,21 +551,43 @@ export class MemoryOwnerKeyStore implements OwnerKeyStore {
     });
   }
 
-  lock(): Promise<void> {
+  /** Ends every open session, even if one fails to wipe; the first failure is rethrown (I-2). */
+  #endAll(): void {
     this.#generation += 1;
-    for (const session of [...this.#sessions]) session.end();
+    const sessions = [...this.#sessions];
     this.#sessions.clear();
-    return Promise.resolve();
+    let failure: unknown;
+    for (const session of sessions) {
+      try {
+        session.end();
+      } catch (error) {
+        failure ??= error;
+      }
+    }
+    if (failure !== undefined) throw failure;
+  }
+
+  // lock() and close() act synchronously, at the call, so they also cancel an unlock already in
+  // flight (IR-M1-1g-1 L-2); a wipe failure is reported through the returned promise.
+  lock(): Promise<void> {
+    try {
+      this.#endAll();
+      return Promise.resolve();
+    } catch (error) {
+      return Promise.reject(error as Error);
+    }
   }
 
   close(): Promise<void> {
-    if (!this.#closed) {
-      this.#generation += 1;
-      for (const session of [...this.#sessions]) session.end();
-      this.#sessions.clear();
-      this.#closed = true;
+    if (this.#closed) return Promise.resolve();
+    this.#closed = true;
+    try {
+      this.#endAll();
+      return Promise.resolve();
+    } catch (error) {
+      return Promise.reject(error as Error);
+    } finally {
       wipe(this.#seed, this.#presenceBytes);
     }
-    return Promise.resolve();
   }
 }

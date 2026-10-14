@@ -76,7 +76,7 @@ export {
   type OwnerPublicKeys,
   type OwnerSession,
   type UnlockOptions,
-  type WrappedKey,
+  type WrappedCek,
 } from './keystore-api.js';
 export {
   NIP44_MAX_PLAINTEXT_BYTES,

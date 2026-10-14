@@ -41,8 +41,12 @@ function refuse(message: string): never {
   throw new CryptoInputError('invalid_argument', message);
 }
 
-/** A frozen copy of exactly the four signed fields, or a CryptoInputError. */
-function signedFields(event: unknown): UnsignedNostrEvent {
+/**
+ * A frozen copy of exactly the four signed fields, or a CryptoInputError. Each field is read once,
+ * so a caller that checks something on the copy and then signs the copy signs what it checked
+ * (IR-M1-1g-G2-1 M-1). Internal: exported from neither entry.
+ */
+export function signedFields(event: unknown): UnsignedNostrEvent {
   if (typeof event !== 'object' || event === null) refuse('nostr event: must be an object');
   const { kind, created_at: createdAt, tags, content } = event as Record<string, unknown>;
   if (typeof kind !== 'number' || !Number.isInteger(kind) || kind < 0 || kind > MAX_KIND) {
@@ -89,6 +93,20 @@ function idOf(pubkey: string, fields: UnsignedNostrEvent): string {
 export function nostrEventId(pubkey: string, event: UnsignedNostrEvent): string {
   decodeHex(pubkey, { length: 32 });
   return idOf(pubkey, signedFields(event));
+}
+
+/**
+ * A frozen plain copy of a signed event (the four signed fields plus id, pubkey and sig), each field
+ * read once, or a CryptoInputError. Check and use the copy, never the caller's object (M-1).
+ * Internal: exported from neither entry.
+ */
+export function signedEventSnapshot(event: unknown): NostrEvent {
+  const fields = signedFields(event);
+  const { id, pubkey, sig } = event as Record<string, unknown>;
+  if (typeof id !== 'string' || typeof pubkey !== 'string' || typeof sig !== 'string') {
+    refuse('nostr event: id, pubkey and sig must be strings');
+  }
+  return Object.freeze({ ...fields, id, pubkey, sig });
 }
 
 /**

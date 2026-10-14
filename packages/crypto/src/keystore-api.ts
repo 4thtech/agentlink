@@ -36,7 +36,12 @@ export type KeyStoreErrorCode =
   /** A key epoch above the store's current epoch. */
   | 'epoch_unavailable'
   /** This backend does not implement the operation yet; it fails closed. */
-  | 'unsupported_operation';
+  | 'unsupported_operation'
+  /**
+   * A well-formed request this signer will not perform, such as an OwnerSession asked to sign a
+   * Nostr kind other than 13 or 22242 (04 §3.1.1). A capability limit, not an input error.
+   */
+  | 'operation_not_allowed';
 
 /** The error a KeyStore throws for its state. Input refusals stay CryptoInputError. */
 export class KeyStoreError extends Error {
@@ -58,8 +63,11 @@ export interface EpochOptions {
   readonly epoch?: number;
 }
 
-/** One recipient entry's CEK wrap (04 §3.1 `recipients[i]`, §3.3), raw bytes: `enc` 32, `wk` 48. */
-export interface WrappedKey {
+/**
+ * One recipient entry's CEK wrap (04 §3.1 `recipients[i]`, §3.3), raw bytes: `enc` 32, `wk` 48. The
+ * same name and shape as M1-1c's `wrapCek` result, so the two merge into one type (IR-M1-1g-G2-1 L-3).
+ */
+export interface WrappedCek {
   /** HPKE encapsulated key. */
   readonly enc: Uint8Array;
   /** HPKE ciphertext of the CEK. */
@@ -101,7 +109,7 @@ export interface EnvelopeKeys {
    * ("agentlink/v1/cek" ‖ id), so this is never a general HPKE-open oracle (IR-M1-1c-1 F5).
    */
   unwrapCek(
-    wrapped: WrappedKey,
+    wrapped: WrappedCek,
     envelopeId: Uint8Array,
     options?: EpochOptions,
   ): Promise<Uint8Array>;

@@ -11,6 +11,7 @@ import {
   NOSTR_KIND_GIFT_WRAP,
   NOSTR_KIND_SEAL,
   signNostrEvent,
+  signedEventSnapshot,
   verifyNostrEvent,
   type NostrEvent,
 } from './nostr-event.js';
@@ -33,8 +34,20 @@ function ephemeralSecretKey(): Uint8Array {
  * validly signed kind 13 event, a recipient that is not a key on secp256k1 and a negative or
  * unsafe `createdAt`.
  */
-export function createGiftWrap(seal: NostrEvent, recipient: string, createdAt: number): NostrEvent {
-  if (typeof seal !== 'object' || seal === null || seal.kind !== NOSTR_KIND_SEAL) {
+export function createGiftWrap(
+  sealEvent: NostrEvent,
+  recipient: string,
+  createdAt: number,
+): NostrEvent {
+  // One snapshot of the seal is checked, verified and wrapped, so a getter or Proxy cannot wrap
+  // something other than what verified (IR-M1-1g-G2-1 M-1).
+  let seal: NostrEvent;
+  try {
+    seal = signedEventSnapshot(sealEvent);
+  } catch {
+    throw new CryptoInputError('invalid_argument', 'gift wrap: the seal must be a kind 13 event');
+  }
+  if (seal.kind !== NOSTR_KIND_SEAL) {
     throw new CryptoInputError('invalid_argument', 'gift wrap: the seal must be a kind 13 event');
   }
   if (!verifyNostrEvent(seal)) {
