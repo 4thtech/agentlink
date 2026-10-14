@@ -34,6 +34,7 @@ describe('@agentlink/crypto/keystore', () => {
       'isBip340PublicKey',
       'kidFromEncPublicKey',
       'evmAddressChecksummed',
+      'evmAddressFromPublicKey',
       'ownerFingerprint',
       'agentFingerprint',
       'formatFingerprint',
