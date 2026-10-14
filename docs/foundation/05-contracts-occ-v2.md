@@ -188,6 +188,7 @@ Signatures are verified with OpenZeppelin `SignatureChecker.isValidSignatureNow(
   - If a sent batch still reverts (state changed between simulation and inclusion, for example credits spent), it re-simulates per item, leaves out the failing items and resubmits the rest once. An item that fails twice is reported `failed` and never retried.
   - A signer whose item caused an on-chain batch revert is submitted alone, outside batches, for a cooling-off period, so that one signer cannot grief other signers' items. The period is a submitter setting, `soloAfterRevertSeconds`, default 3 600 (1 h) (D-62, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34).
   - Per-item status to clients: `recorded`, `skipped` (already on-chain, which a client treats as success, with the existing `recordId`) or `failed`.
+  - Proposed additions (pre-audit AUDIT-FABLE-OCCv2-1 FA-1, FA-3; owner confirms at merge), stated in 07 §7: items from signers with code are submitted solo (or at most one per batch) from their first item, every transaction's gas limit is its simulated gas plus a fixed margin, and items already on-chain at simulation are reported `skipped` without being transmitted.
   - A pause is not an item failure. While the Notary is paused, the submitter holds items and sends them after unpause. An item whose deadline passes in the meantime is `failed` (`Expired()`), and the client may sign a replacement only under 04 §5 ("Replacing a signed item").
 
 > Privacy note: a receipt reveals the salt, linking the recipient's agent address to the record. Records without receipts reveal only the salted commitment. Per-relationship agent keys (P2) reduce linkability.
@@ -200,7 +201,7 @@ Verifiers can check everything shown in a proof (signer, time, envelope hash, re
 |---|---|
 | `notarize` (credits, EOA) | ≤ 170k (decided by the owner in chat, 14 Oct 2026, D-61; wording confirmed at merge) |
 | `acknowledge` | ≤ 75k |
-| `notarizeBatch` per item (n = 20) | ≤ 120k |
+| `notarizeBatch` per item (n = 20) | ≤ 125k (raised from 120k by the owner, D-66 (4), 14 Oct 2026, on the AUDIT-FABLE-OCCv2-1 re-check: mixed USDC and native batches had only 158 gas of headroom under 120k) |
 
 On Base and Gnosis these cost a fraction of a cent, leaving margin for gas sponsorship by the submitter.
 
