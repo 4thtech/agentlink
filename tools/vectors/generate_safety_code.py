@@ -84,12 +84,13 @@ def party(label, name):
 
 
 def envelope(sender_nostr, recipients_enc, body_type, body, label):
-    """A signed envelope v1 carrying `body` (04 §3.1, §3.3), deterministic."""
+    """A signed envelope v1 carrying `body` (04 §3.1, §3.3: wraps with ephemeral keys derived from
+    the CEK, payload under encKey with the key commitment kc; G-46, D-66), deterministic."""
     cek = v.det(f"safety-code/{label}/cek", 32)
     env_id = v.det(f"safety-code/{label}/id", 16)
     recipients = []
-    for i, public in enumerate(recipients_enc):
-        enc, wk = hpke.seal(public, v.det(f"safety-code/{label}/eph/{i}", 32), hpke.CEK_INFO + env_id, b"", cek)
+    for public in recipients_enc:
+        enc, wk = hpke.wrap_cek(public, env_id, cek)
         recipients.append({"kid": v.b64u(v.sha256(public)[:16]), "enc": v.b64u(enc), "wk": v.b64u(wk)})
     e = {
         "v": 1,
@@ -101,7 +102,7 @@ def envelope(sender_nostr, recipients_enc, body_type, body, label):
     }
     payload = v.jcs({"type": body_type, "body": body, "replyTo": None, "files": []})
     iv = v.det(f"safety-code/{label}/iv", 12)
-    e["aead"] = {"alg": "A256GCM", "iv": v.b64u(iv), "ct": v.b64u(v.aes256gcm_encrypt(cek, iv, payload, env.aad_of(e)))}
+    e["aead"] = env.encrypt_payload(e, cek, iv, payload)
     e["sig"] = v.hx(env.sign(e, sender_nostr, v.det(f"safety-code/{label}/aux", 32)))
     return {"envelope": e, "cek": v.hx(cek)}
 

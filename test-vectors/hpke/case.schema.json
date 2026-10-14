@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/4thtech/agentlink/test-vectors/hpke/case.schema.json",
   "title": "hpke case",
-  "description": "RFC 9180 HPKE, mode Base, X25519/HKDF-SHA256/AES-256-GCM. `sealSequence`: one sender context with a fixed ephemeral key, messages sealed in order. `open`: single-shot open. `wrapCek` / `unwrapCek`: 04 \u00a73.3 CEK wrap, info = utf8(\"agentlink/v1/cek\") || raw 16-byte id, empty AAD; enc and wk base64url without padding.",
+  "description": "RFC 9180 HPKE, mode Base, X25519/HKDF-SHA256/AES-256-GCM. `sealSequence`: one sender context with a fixed ephemeral key, messages sealed in order. `open`: single-shot open. 04 \u00a73.3 (G-46, D-66): `deriveFromCek`: the `agentlink/v1/cek-eph` derivation ikm_j (HKDF-SHA256, ikm = CEK, empty salt, info = utf8(label) || raw 16-byte id || raw 32-byte recipient key), or a refusal; `recipientPublicKey` is absent when the case tests its absence. `wrapCek`: the CEK wrap with skE_j = ikm_j as the raw X25519 secret key (no DeriveKeyPair), info = utf8(\"agentlink/v1/cek\") || raw 16-byte id, empty AAD. `wrapCekWithEphemeralKey`: the same seal with the ephemeral secret given (the explicit-ephemeral path). `unwrapCek`: open one entry. `checkWrap`: recompute the entry from the public key and the CEK and compare the bytes. enc and wk are base64url without padding.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -187,8 +187,71 @@
           "additionalProperties": false,
           "required": [
             "op",
+            "label",
+            "cek",
+            "envelopeId"
+          ],
+          "properties": {
+            "op": {
+              "const": "deriveFromCek"
+            },
+            "label": {
+              "type": "string"
+            },
+            "cek": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "envelopeId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "recipientPublicKey": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "okm"
+              ],
+              "properties": {
+                "okm": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
             "recipientPublicKey",
-            "ephemeralSecretKey",
             "envelopeId",
             "cek"
           ],
@@ -197,10 +260,6 @@
               "const": "wrapCek"
             },
             "recipientPublicKey": {
-              "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
-            },
-            "ephemeralSecretKey": {
               "type": "string",
               "pattern": "^[0-9a-f]{64}$"
             },
@@ -258,6 +317,61 @@
           "additionalProperties": false,
           "required": [
             "op",
+            "recipientPublicKey",
+            "ephemeralSecretKey",
+            "envelopeId",
+            "cek"
+          ],
+          "properties": {
+            "op": {
+              "const": "wrapCekWithEphemeralKey"
+            },
+            "recipientPublicKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "ephemeralSecretKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "envelopeId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "cek": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enc",
+            "wk"
+          ],
+          "properties": {
+            "enc": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "wk": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
             "recipientSecretKey",
             "envelopeId",
             "enc",
@@ -297,6 +411,76 @@
                 "cek": {
                   "type": "string",
                   "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "recipientPublicKey",
+            "envelopeId",
+            "cek",
+            "enc",
+            "wk"
+          ],
+          "properties": {
+            "op": {
+              "const": "checkWrap"
+            },
+            "recipientPublicKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "envelopeId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "cek": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "enc": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "wk": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
                 }
               }
             },
