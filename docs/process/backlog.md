@@ -57,7 +57,7 @@ Every deploy card (submitter, faucet, console, verify, invite, pay, onboarding/l
 
 - **Deploy (D-25: continuous delivery, `release-and-deployment.md` §1, §3–§5, §8):** merge to `main` → CI deploys automatically to staging (`workers.dev` preview, testnets, npm `next`); smoke test; production Workers and sites deploy automatically once staging and smoke tests are green (D-52; the owner removes the required reviewer from the `production` environment at M1b), while npm `latest` waits for one approval click (`npm-publish` keeps its required reviewer); post-deploy health check; automatic rollback on a failed check; deploy record (§5.2); nothing runs while `DEPLOY_FREEZE` is set (M0-19).
 
-Never automated: mainnet contract deploys, contract upgrades and configuration (hardware key, Safe, timelocks), production secrets, rulesets, CODEOWNERS and environments.
+Never automated: mainnet contract deploys, contract upgrades and configuration (deployer key, hardware-backed unless D-64 applies; Safe; timelocks), production secrets, rulesets, CODEOWNERS and environments.
 
 ### Card count
 
@@ -1274,7 +1274,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-3g · contracts: CREATE3 deploy script and testnet deployment
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · script/Deploy.s.sol, script/config/*.json, .github/workflows/deploy-testnet.yml
-- **Depends on:** M1-3e, M1-14 (Base Sepolia entries, and the Chiado gas limits for sizing the stage); gap G-8 resolved by branch `docs/G-8-create3-salt` (05 §9.1; pending owner, proposed, owner confirms at merge); D-63; D-64
+- **Depends on:** M1-3e, M1-14 (Base Sepolia entries, and the Chiado gas limits for sizing the stage), plus the block gas limits and EIP-7825 caps of Base, Gnosis and the planned M4 mainnets (D-64 (2), proposed); gap G-8 resolved by branch `docs/G-8-create3-salt` (05 §9.1; pending owner, proposed, owner confirms at merge); D-63; D-64
 - **Spec:** 05 §5, §9, §9.1; 03 §6–§7; `release-and-deployment.md` §4.2; D-63, D-64
 - **Invariants:** I-6
 - **Scope:**
@@ -1284,9 +1284,9 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Post-deploy check script (in CI): deployer holds no role; delays equal `docs/roles.md`; addresses equal the campaign's address file (05 §9.1); the ERC-1967 implementation slot of each proxy equals the expected implementation; `authority()`, `paused()` and the vault configuration read back as configured.
   - Open Lows (IR-M1-3a-1 L-1, L-2, I-2): `OCCRoleSetup.calls` checks the mainnet delay floor itself (make it `view` and call `checkDelays` first), not only `configure`; on a mainnet `configure` reverts unless the vault, the Notary (and the Registry, if set) report `paused()` true, with a test; on a mainnet it requires exactly two ops keys (05 §5.1).
   - Deploy runs from CI in the private repo, triggered manually by the owner (Free plan: no environment protection); low balance. Agents never broadcast from a workstation. Proposed (05 §9.1 control 3; owner confirms at merge of D-63): the key is a CI secret only during a deploy window (the owner adds it before the run and deletes it after). Under D-64 it is kept for the whole campaign, testnet and mainnet.
-  - D-64 (owner decision, 14 Oct 2026, against the documented default): the deployer key this card uses is also the mainnet deployment key unless the owner switches it before mainnet, so the CI secret is mainnet-grade (`release-and-deployment.md` §4.2; 05 §9.1 control 3). Mitigations (a)–(e) apply from the first deploy window (proposed; owner confirms at merge). Mainnet prerequisite, checked on M3-2b and M3-2c: "Owner reassesses the campaign deployer key (D-64) and records go/switch."
+  - D-64 (owner decision, 14 Oct 2026, against the documented default): the deployer key this card uses is also the mainnet deployment key unless the owner switches it before mainnet, so the CI secret is mainnet-grade (`release-and-deployment.md` §4.2; 05 §9.1 control 3). Mitigations (a)–(k) apply from the first deploy window, including the deployer monitoring (f) and the CI hardening (h) of the deploy workflow (proposed; owner confirms at merge). Mainnet prerequisite, checked on M3-2b and M3-2c: "Owner reassesses the campaign deployer key (D-64) and records go/switch."
   - D-64 (2) (owner decision, 14 Oct 2026): testnet and mainnet share one campaign label, so the addresses this card deploys are also the mainnet addresses. Proposed (05 §9.1; owner confirms at merge): the label is `campaign-1`; upgrades keep the addresses; a full redeploy (for example a storage redesign) needs a new label, and mainnet uses the final testnet campaign's label.
-  - Order (D-63 (1), build-plan deviation announced by the owner, 14 Oct 2026): **Base Sepolia first; Gnosis Chiado later at the same CREATE3 addresses.** This card covers Base Sepolia; the Chiado run is card M1-3j. Proposed (D-63 (2)): the stage transaction is sized now for the lower of the two chains' block gas limits and per-transaction gas caps (EIP-7825), and the stage deployer's init code stays within EIP-3860, so the Chiado run can reproduce it (05 §9.1).
+  - Order (D-63 (1), build-plan deviation announced by the owner, 14 Oct 2026): **Base Sepolia first; Gnosis Chiado later at the same CREATE3 addresses.** This card covers Base Sepolia; the Chiado run is card M1-3j. Proposed (D-63 (2)): the stage transaction is sized now for the lower of the two chains' block gas limits and per-transaction gas caps (EIP-7825), and the stage deployer's init code stays within EIP-3860, so the Chiado run can reproduce it (05 §9.1). Proposed under D-64 (2) (owner confirms at merge): the stage is sized, with margin, for the lowest block gas limit and per-transaction gas cap (EIP-7825) of every chain of the campaign, the testnets, Base and Gnosis mainnet and the planned M4 chains (Arbitrum One, Optimism, Polygon PoS), with the limits recorded in this card's PR, and for the audited build as well as the testnet build (headroom for audit fixes). The guard layout of the M1 stage (the AccessManager under the stage deployer, or the fallback under the deployer key) and every label are frozen for the campaign from this card, because changing either changes the mainnet addresses (05 §9.1, **Gas and size**).
   - Gate residual (proposed; owner confirms at merge of D-63): M1-GATE may pass with OCC v2 on a single testnet chain (Base Sepolia). Chiado (M1-3j) is a hard prerequisite of M2-4a and M3-2c, not of M1-GATE.
   - Authority and stage deployer (05 §9.1, proposed): every constructor and initializer takes its authority as an explicit argument, never from `msg.sender` (under CREATE3 that is CreateX or its intermediate proxy); the stage deployer has no callable function and its runtime code hash is pinned.
   - Resolved (D-11, D-19): no explorer or Sourcify source verification on testnets; the source stays private until mainnet verification (M3-6). Testnet deploys publish ABIs and addresses only (`release-and-deployment.md` §4.2).
@@ -1297,7 +1297,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Base Sepolia: proxy and AccessManager addresses equal the fork dry-run's predictions and the committed address file (script output in PR).
   - `deployer-holds-no-role` passes on Base Sepolia, and neither CreateX nor any CREATE3 intermediate address holds a role; fork dry-run in CI before every broadcast.
   - Negative tests for the salt rules (05 §9.1): a salt whose guard bytes differ from CreateX's `msg.sender`, a zero guard, byte 20 not `0x00`, and a predicted address (or CREATE3 intermediate address) that already has code or a nonzero nonce each make the script fail before broadcast; a fork test shows the offline address computation equals the address CreateX deploys to; a test shows every call to the stage deployer reverts.
-  - The stage fits the Chiado block gas limit and per-transaction gas cap on a Chiado fork, and its init code is within EIP-3860 (so M1-3j can reproduce the addresses).
+  - The stage fits the Chiado block gas limit and per-transaction gas cap on a Chiado fork, and its init code is within EIP-3860 (so M1-3j can reproduce the addresses). Proposed (D-64 (2)): it also fits, with margin, the block gas limit and per-transaction gas cap of Base, Gnosis and each planned M4 mainnet, checked on forks, and a test fails if the guard layout or a label would change the committed address file.
   - Addresses published in the next `@agentlink/occ-v2-abi` prerelease (M1-3f).
   - Negative tests for the config assertions: an allowlisted token with a zero fee or cap, the native coin on a non-Gnosis chain, and a fee-on-transfer mock each make the script fail.
 
@@ -1928,6 +1928,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 06 §7, §8; 02 F-51, J1, J3, J5; 04 §2.2, §2.3; 07 §6.3; D-39, D-40
 - **Invariants:** I-1, I-4, I-10
 - **Scope:**
+  - D-64 (2) (proposed; owner confirms at merge): testnet and mainnet contract addresses are identical, so `agentlink verify` labels a testnet chain ID prominently and never presents a testnet proof as a mainnet proof (05 §9.1 (iv)).
   - `ui`, `credits [--topup]` (top-up routed to the cheapest supported chain, M1-26), `verify <proof.json>`; `doctor` checks for RPC and storage.
   - `init`: owner passkey option (localhost PRF via the local UI) beside the passphrase; recovery-kit offer.
   - No command asks for a chain or mentions wallets or gas in default output (11 §5).
@@ -2677,6 +2678,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Spec:** 08 §4; 11 §6.4; 02 F-44, J5
 - **Invariants:** I-3
 - **Scope:**
+  - D-64 (2) (proposed; owner confirms at merge): testnet and mainnet contract addresses are identical, so the verify page labels a testnet chain ID prominently and never presents a testnet proof as a mainnet proof (05 §9.1 (iv)).
   - Drop zone, or a pack compressed in the URL fragment; verification in the browser via public RPC; plain-language result with self-declared labels; disclosed-key content check; what it proves and does not prove; print-friendly; Advanced data.
   - Beta at `verify.agentlink.4thtech.io`.
 - **Acceptance:**
@@ -3023,7 +3025,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 #### M3-2b · Treasury Safes, signer keys and role holders
 - **Status:** backlog · **Size:** M · **Tier:** Owner (Opus prepares the role plan) · **Security:** S2
 - **Repo/path:** agentlink-ops · safes/ (addresses and configuration only; signer details private)
-- **Depends on:** M3-2a, M1-3a (`docs/roles.md`); prerequisite (D-64, mandatory): "Owner reassesses the campaign deployer key (D-64) and records go/switch", and confirms that the mainnet label equals the final testnet campaign label (`release-and-deployment.md` §4.3); on switch, a fresh hardware-backed key per the original procedure
+- **Depends on:** M3-2a, M1-3a (`docs/roles.md`); prerequisite (D-64, mandatory): "Owner reassesses the campaign deployer key (D-64) and records go/switch", and confirms that the mainnet label equals the final testnet campaign label (`release-and-deployment.md` §4.3). Fails closed (proposed): a known or suspected compromise, unconfirmed CI-secret deletion, unexplained deployer activity or a planned mainnet address already in use forces a switch; on switch, a fresh hardware-backed key per the original procedure and a new label
 - **Spec:** 05 §2.6, §5, §9.1; 10 M3-2; `release-and-deployment.md` §4.3, §6; D-64
 - **Invariants:** I-10
 - **Scope:**
@@ -3034,11 +3036,11 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 #### M3-2c · Mainnet deployment: Base and Gnosis
 - **Status:** backlog · **Size:** M · **Tier:** Owner (executes) + Opus (scripts, checks) · **Security:** S2
 - **Repo/path:** occ-v2-contracts · script/
-- **Depends on:** M3-1a, M3-2b, M3-12, M1-3j (Chiado deployed first, D-63); prerequisite (D-64, mandatory): "Owner reassesses the campaign deployer key (D-64) and records go/switch", and confirms that the mainnet label equals the final testnet campaign label (`release-and-deployment.md` §4.3); on switch, the original fresh-key procedure and mainnet addresses that differ from the testnets'
+- **Depends on:** M3-1a, M3-2b, M3-12, M1-3j (Chiado deployed first, D-63); prerequisite (D-64, mandatory): "Owner reassesses the campaign deployer key (D-64) and records go/switch", and confirms that the mainnet label equals the final testnet campaign label (`release-and-deployment.md` §4.3). Fails closed (proposed): a known or suspected compromise, unconfirmed CI-secret deletion, unexplained deployer activity or a planned mainnet address already in use forces a switch; on switch, the original fresh-key procedure, a new label and mainnet addresses that differ from the testnets'
 - **Spec:** 05 §5, §9, §9.1; 10 M3-2; `release-and-deployment.md` §3 rule 2, §4.3; D-64
 - **Invariants:** I-6, I-10
 - **Scope:**
-  - Only the audited commit (bytecode rebuilt and compared); fork dry-run; the owner runs the deploy locally with the mainnet deployer key (D-64: the campaign deployer key, not hardware-backed, unless switched) while a second person (by agreement, @denisjazbec) witnesses and independently verifies; identical addresses on both chains, equal to the campaign's address file and so to the latest published testnet addresses (05 §9.1, D-64 (2); unless the key was switched); all roles to the Safes; deployer roles revoked in the same script.
+  - Only the audited commit (bytecode rebuilt and compared); fork dry-run; the owner runs the deploy locally with the mainnet deployer key (D-64: the campaign deployer key, not hardware-backed, unless switched) while a second person (by agreement, @denisjazbec) witnesses and independently verifies; identical addresses on both chains, equal to the campaign's address file and so to the latest published testnet addresses (05 §9.1, D-64 (2); unless the key was switched); the dry-run re-checks the audited build's stage against every planned chain's limits, with the guard layout and labels frozen at M1-3g (proposed); all roles to the Safes; deployer roles revoked in the same script.
   - New `@agentlink/occ-v2-abi` version with mainnet addresses.
 - **Acceptance:**
   - Scripted check "deployer holds no role" passes on both chains; delays equal `docs/roles.md`; addresses identical, and equal to the latest testnet addresses unless the key was switched (D-64 (2)); deployed bytecode matches the audited build; witness record and the D-64 go/switch record stored.
@@ -3535,7 +3537,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | OPS-L2, OPS-L3 | Withdraw v1 fees to EOAs; create/verify Safes; sign 20 `transferOwnership` calls |
 | OPS-L6, OPS-L7 | Decide whether PollinationX stays live |
 | OPS-L8 | Rotate every live credential found |
-| M1-3g | Testnet deployer key and testnet Safe; fund with low balances; trigger the private-repo deploy workflow for Base Sepolia (D-63); proposed (05 §9.1): keep the deployer key offline for the life of the campaign, add it as a CI secret only for a deploy window and delete it after (no testnet explorer verification: D-11, D-19). D-64: this key is also the mainnet key unless switched, and the addresses are also the mainnet addresses (one shared label); keep its offline backup and never hold it in a browser or hot wallet beyond funding needs (proposed) |
+| M1-3g | Testnet deployer key and testnet Safe; fund with low balances; trigger the private-repo deploy workflow for Base Sepolia (D-63); proposed (05 §9.1): keep the deployer key offline for the life of the campaign, add it as a CI secret only for a deploy window and delete it after (no testnet explorer verification: D-11, D-19). D-64: this key is also the mainnet key unless switched, and the addresses are also the mainnet addresses (one shared label); keep its offline backup, never import it into a browser extension or hot wallet, clear any terminal scrollback or history that showed it, and set up the deployer monitoring before the first window (proposed) |
 | M1-3j | Trigger the Chiado deploy with the same testnet deployer key, added to CI only for that run (D-63) |
 | M1-3f | **DECISION NEEDED:** where `@agentlink/occ-v2-abi` is built and published (G-10) |
 | M1-9f | **DECISION NEEDED:** Claude Desktop bundle build, signing and distribution |
