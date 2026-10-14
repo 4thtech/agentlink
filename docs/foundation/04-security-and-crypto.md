@@ -213,12 +213,21 @@ The server derives `kek` and keeps only `kek`, together with the `salt`, `m`, `t
 - **Where it lives.** On a machine whose agents use the file KeyStore, the owner's wrapped seed is the file `~/.agentlink/keystore/owner.alko`, in the M1-1f format (magic `ALKO`). It follows the same file-handling rules as `.alks` files. It is never stored in plaintext and never inside an `.alks` file.
 - **Offline-guessing exposure.** Every copy of the home directory, volume, image layer or backup carries `owner.alko`. A weak, human-chosen owner passphrase could then be guessed offline. So **on file-KeyStore machines the owner secret must be a generated 120-bit owner code** (the same encoding as the unlock code); a chosen owner passphrase is refused there. With 120 bits, guessing a copied `owner.alko` is infeasible, whatever the KDF cost.
 - **Separate step.** `init --keystore file` creates only the agent identity. The owner key is created in a separate step, `agentlink owner init` †, in an interactive terminal. Its copy tells the user to run it themselves and never to let their AI run it or see the code. Until it is done, tools return `needs_setup` (`owner_missing`).
+- **`owner init` rules:**
+  - **It never overwrites.** It refuses when `owner.alko` already exists or when the agent's card already names an owner. Replacing an owner key is owner-key rotation (§2.6, P2) and out of scope.
+  - **An existing owner is linked or restored, not re-created.** Linking an owner whose key lives on another device happens from that device (owner link, M2). Restoring one happens from the recovery kit (M1b), and the seed is then re-wrapped under a new generated owner code. `owner init` never creates a second, unrelated owner identity, which would show contacts a different owner fingerprint.
+  - **The code is display-only.** `owner init` only displays the owner code. It never writes the code to a file, offers to, or stores it anywhere on the machine. The code-file offer of 07 §9.3 applies to the agent unlock code only.
+  - **The owner can check the result.** `owner init` shows the short owner fingerprint (11 §5.2). `doctor` shows the fingerprint and when the owner key was created, so the owner can tell whether the key on the machine is the one they created. The quickstart says: "If you never saw an owner code yourself, this owner key isn't yours: replace the agent."
+- **A lost owner code.** If the owner code is lost, this owner key can no longer approve, change rules, export (`backup export` †) or revoke the agent. Owner-key rotation is P2 (§2.6).
+  - **M1a:** there is no recovery path. The user sets up a new owner and a new agent and pairs again with their contacts. The old agent cannot be revoked, so its credits should be kept small (§2.5).
+  - **From M1b:** the owner restores from the recovery kit (§2.3, M1-9h/M1-9i).
+  - `owner init` tells the user this before showing the code (07 §9.4).
 - **`doctor`** warns while an owner key is present on a file-KeyStore machine and points to the off-device setup.
 - **Owner operations from a headless machine:**
   - **M1a:** the owner runs `agentlink approve <id>` (or another † command) in a terminal the agent does not control, such as an SSH session or `docker exec -it`, and types the owner code there. Until the local approval server lands, `pending_approval` results name that command as `nextStep` (06 §2.5, M1-9c).
   - **M1b:** the local approval server also works through port forwarding (`ssh -L`, or devcontainer port forwarding), with the localhost passkey in the owner's own browser. The shared-`localhost` weakness of §2.5 applies unchanged.
   - **M2 default for file-KeyStore machines** (proposed; owner confirms at merge): the owner key lives on the owner's own device (the console or the desktop app), **not on the headless machine**. The owner approves there; the console sends an owner-signed `approval` or `policy` envelope (§2.5), and the core verifies it as usual. Keeping an owner key on the headless machine becomes an explicit opt-in.
-- **G-1** applies unchanged. If the owner types the owner code on the same machine, as the same OS user as the agent, a tampered installation could capture it. A TTY shows presence, not intent.
+- **G-1 applies unchanged, and it covers key creation too.** If the owner types the owner code on the same machine, as the same OS user as the agent, a tampered installation could capture it. During `owner init`, a tampered installation or a same-user process that reads memory (for example through ptrace, which Docker's default seccomp profile allows on kernel 4.8 and later) can also capture the owner seed and code, or fix them in advance. On machines where the agent has unrestricted shell access, the owner key therefore belongs on the owner's own device (the M2 default). A TTY shows presence, not intent.
 
 **File handling** (`.alks` and `owner.alko`).
 
@@ -301,6 +310,9 @@ The user is told the trade-off once, in plain words, at opt-in, and `doctor` rep
 - **Owner key:**
   - no non-interactive source unlocks `OwnerKeyStore` (`AGENTLINK_OWNER_*`, a file, an argument, piped stdin);
   - on file-KeyStore machines, a chosen owner passphrase is refused and `init --keystore file` creates no owner key;
+  - `owner init` refuses when `owner.alko` exists or the agent's card already names an owner, and never overwrites;
+  - `owner init` writes the owner code to no file (a filesystem scan after setup finds no file containing it) and offers no code file;
+  - `owner init` shows the owner fingerprint and the lost-code consequence before showing the code, and `doctor` shows the fingerprint and the creation time;
   - agent ≠ owner is enforced in both directions and across several agents, with matching normalisation;
   - the M1-8c same-user test passes on the file backend with the agent passphrase readable by the test script.
 - **Environment:** both variables are removed from `process.env` after reading, and child processes started later do not inherit them. `init` never writes the value variable into a harness config.
