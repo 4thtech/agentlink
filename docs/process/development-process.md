@@ -198,7 +198,7 @@ Report format:        §4.3
 
 ### 4.2 Standard forbidden actions (always included)
 
-- No merge, auto-merge, tag, release or force-push; no commit on or push to `main`; no push except to the worker's own task branch and no PR except a draft PR for it, each only when the brief says so; no PR comments or reviews; no repository variable or settings changes (including `DEPLOY_FREEZE`).
+- No merge, auto-merge, tag, release or force-push; no commit on or push to `main`; no push except to the worker's own task branch and no PR except a draft PR for it, each only when the brief says so; no PR comments or reviews; no repository variable or settings changes.
 - No network writes: no publish, deploy, broadcast, upload or form submission.
 - No installs or dependency changes unless the brief grants them; never a `postinstall` script.
 - No Curator writes.

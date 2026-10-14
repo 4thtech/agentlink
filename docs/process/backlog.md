@@ -65,6 +65,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 |---|---|
 | M0 Foundations | 31 (incl. 7 in the D-25 group; 9 `done (setup)`) |
 | Legacy OPS-L | 9 |
+| Documentation (DOCS) | 2 |
 | Design drops (owner, D-30) | 3 |
 | M1 Local beta | 84 (M1a 38, M1b 46; incl. 11 split-off, 7 new cards from D-31…D-41 and 4 from D-48) |
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
@@ -507,6 +508,32 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:**
   - A fixture PR touching only `GEMINI.md` is derived as S1 by `review-gate`.
   - The §2.2 table, `review-gate.yml` and CODEOWNERS agree (checked by the independent review).
+
+### Documentation (DOCS) (new)
+
+#### DOCS-RB · Runbooks, lessons and onboarding map (new)
+- **Status:** ready (in review: PR #7; live status on the sync board) · **Size:** M · **Tier:** Opus · **Security:** S1
+- **Repo/path:** agentlink · `docs/README.md`, `docs/runbooks/**`, `docs/lessons/**`, `GEMINI.md`, one `AGENTS.md` pointer line, process-document alignment; agentlink-ops · `runbooks/**` (skeletons)
+- **Depends on:** —
+- **Spec:** owner request (2026-10-14); `delivery-process.md`; `development-process.md` §3–§8, §13, §14; `audit-rules.md` §3–§4
+- **Invariants:** — (restates the agent limits; relaxes none)
+- **Scope:**
+  - A role-based "Start here" map with a time-boxed onboarding track; one runbook per repeatable procedure in a fixed template; one file per lesson learned; harness pointer files only where a harness does not read `AGENTS.md`.
+  - Private runbook skeletons (headings and TODO lists) in `agentlink-ops`.
+- **Acceptance:**
+  - Every relative link resolves; every runbook has the eight template sections and an index row; every lesson has Problem, Symptom, Cause, Rule and Source (checked by M0-24 once it lands).
+  - `AGENTS.md` stays ≤ 8192 bytes; independent review recorded (`IR-DOCS-RB-<n>`).
+
+#### DOCS-PUB · Public documentation (new)
+- **Status:** ready (in progress; live status on the sync board) · **Size:** TBD · **Tier:** TBD · **Security:** TBD
+- **Repo/path:** TBD (set by the DOCS-PUB PR)
+- **Depends on:** —
+- **Spec:** owner request; `release-and-deployment.md` §4.9 (public docs, GitBook); M3-11
+- **Invariants:** —
+- **Scope:**
+  - TBD: the DOCS-PUB PR fills in scope and acceptance from the owner's request. Public docs never claim unimplemented features (`AGENTS.md`, README rule).
+- **Acceptance:**
+  - TBD by the DOCS-PUB PR; independent review recorded if S1.
 
 ### Legacy security (OPS-L)
 
