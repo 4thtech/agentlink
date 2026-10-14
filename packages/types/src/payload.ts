@@ -20,7 +20,14 @@ import {
   MAX_URL_LENGTH,
   type PayloadType,
 } from './constants.js';
-import { agentCardSchema, cardSigSchema, displayNameSchema, relayListSchema } from './card.js';
+import {
+  agentCardSchema,
+  cardAgentSigSchema,
+  cardSigSchema,
+  codeCommitSchema,
+  displayNameSchema,
+  relayListSchema,
+} from './card.js';
 import {
   approvalIdSchema,
   base64url,
@@ -145,20 +152,38 @@ export const offerBodySchema = termsBody(termsNote);
 export const acceptBodySchema = termsBody(z.null());
 export const rejectBodySchema = termsBody(termsNote);
 
-/** `handshake` (04 §3.6). `proof` = HMAC-SHA256 over the invite secret. */
+/**
+ * `handshake` (04 §3.6, G-23/G-28). `proof` = HMAC-SHA256 under `proofKey`. `codeNonce` is B's
+ * `nonceB` and `codeCommit` is copied from the invite (§3.6.1), both 32 bytes base64url;
+ * `inviterCardHash` = sha256(JCS(A's invite card)), bare 64 lowercase hex (it never reaches a Record).
+ */
 export const handshakeBodySchema = z.strictObject({
   inviteId: base64url(BYTE_LENGTHS.inviteId),
   card: agentCardSchema,
   cardSig: cardSigSchema,
+  cardAgentSig: cardAgentSigSchema,
   name: displayNameSchema,
   relays: relayListSchema,
   proof: base64url(BYTE_LENGTHS.hmac),
+  codeNonce: base64url(BYTE_LENGTHS.safetyCode),
+  codeCommit: codeCommitSchema,
+  inviterCardHash: sha256Hex,
 });
 
-/** `handshake-ack` (04 §3.4.1). `handshakeId` is B's handshake envelope `id`. */
+/**
+ * `handshake-ack` (04 §3.4.1, §3.6.1; G-24 `relays`, D-65 amends D-58). `handshakeId` is B's
+ * handshake envelope `id`; `handshakeHash` its `envelopeHash`, `0x` + 64 lowercase hex like every
+ * `envelopeHash` (04 §2.4.1); `codeReveal` is `nonceA`; `card`, `cardSig` and `relays` are A's,
+ * exactly as in the invite (the matching against the invite and `relaysHash` is the core's).
+ */
 export const handshakeAckBodySchema = z.strictObject({
   inviteId: base64url(BYTE_LENGTHS.inviteId),
   handshakeId: envelopeId,
+  handshakeHash: bytes32Hex,
+  codeReveal: base64url(BYTE_LENGTHS.safetyCode),
+  card: agentCardSchema,
+  cardSig: cardSigSchema,
+  relays: relayListSchema,
 });
 
 /**

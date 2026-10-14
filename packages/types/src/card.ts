@@ -8,6 +8,7 @@ import {
   BYTE_LENGTHS,
   MAX_DISPLAY_NAME_CODE_POINTS,
   MAX_RELAYS,
+  MIN_RELAYS,
   PROTOCOL_VERSION,
 } from './constants.js';
 import {
@@ -44,6 +45,19 @@ export const agentCardSchema = z
 
 /** The owner's EIP-712 signature over the card, canonical ECDSA (04 §2.4, §2.4.1). */
 export const cardSigSchema = ecdsaSignatureSchema;
+
+/**
+ * The agent's own EIP-712 signature over the same card (04 §2.9, G-23), canonical ECDSA `0x` + 130
+ * lowercase hex. Carried by the invite and the `handshake`; whether it recovers `card.agentEvm` is
+ * checked in @agentlink/crypto and the core, not here.
+ */
+export const cardAgentSigSchema = ecdsaSignatureSchema;
+
+/**
+ * Safety-code commitment, `taggedHash("agentlink/safety-commit/v1", inviteId ‖ nonceA)`: exactly 32
+ * bytes, base64url (04 §3.6, §3.6.1). The nonces (`codeNonce`, `codeReveal`) have the same encoding.
+ */
+export const codeCommitSchema = base64url(BYTE_LENGTHS.safetyCode);
 
 /**
  * A self-declared display name as it travels (04 §2.4: keccak256 of its UTF-8 is `nameHash`).
@@ -110,9 +124,14 @@ export const relayUrlSchema = z
   .string()
   .refine(isAllowedRelayUrl, 'must be a wss:// relay URL that passes the relay URL rule (04 §4)');
 
+/**
+ * A relay list carried with a card: in the invite, `handshake`, `handshake-ack` and `card-update`
+ * (04 §3.4). 2 to 16 unique URLs (G-24, D-65: a single relay never reaches `sent`, 07 §4.2). An
+ * owner's own Settings entries are not bodies and may hold 1 (07 §4.3); they do not use this schema.
+ */
 export const relayListSchema = z
   .array(relayUrlSchema)
-  .min(1)
+  .min(MIN_RELAYS)
   .max(MAX_RELAYS)
   .refine((list) => new Set(list).size === list.length, 'relay URLs must be unique');
 
@@ -122,6 +141,8 @@ export const inviteSchema = z.strictObject({
   secret: base64url(BYTE_LENGTHS.secret),
   card: agentCardSchema,
   cardSig: cardSigSchema,
+  cardAgentSig: cardAgentSigSchema,
+  codeCommit: codeCommitSchema,
   name: displayNameSchema,
   relays: relayListSchema,
   expiresAt: uint53,

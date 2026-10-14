@@ -48,7 +48,17 @@ export const agentCard = () => ({
 
 /** A canonical-form ECDSA signature: r = s = 0x3c…3c (in range, low s), v = 27 (0x1b). */
 export const CARD_SIG = `0x${hex(64, '3c')}1b`;
+/** The agent's EIP-712 signature over the card (04 §2.9), canonical form: r = s = 0x4d…4d, v = 28. */
+export const CARD_AGENT_SIG = `0x${hex(64, '4d')}1c`;
 export const RELAYS = ['wss://relay.example.org', 'wss://nos.example.net:7447/sub/path'];
+/** Safety-code commitment, nonces and hashes (04 §3.6, §3.6.1): filler bytes of the right shape. */
+export const CODE_COMMIT = b64u(32, 'D');
+export const CODE_NONCE = b64u(32, 'E');
+export const CODE_REVEAL = b64u(32, 'G');
+/** `inviterCardHash`: sha256(JCS(card)) as bare 64 lowercase hex (04 §3.6). */
+export const INVITER_CARD_HASH = hex(32, '9f');
+/** `handshakeHash`: an `envelopeHash`, so `0x` + 64 lowercase hex (04 §2.4.1, §3.4.1). */
+export const HANDSHAKE_HASH = hex0x(32, '8e');
 
 export const invite = () => ({
   v: 1,
@@ -56,6 +66,8 @@ export const invite = () => ({
   secret: KEY32,
   card: agentCard(),
   cardSig: CARD_SIG,
+  cardAgentSig: CARD_AGENT_SIG,
+  codeCommit: CODE_COMMIT,
   name: "Tali's Claude",
   relays: [...RELAYS],
   expiresAt: 1760600000,
@@ -509,11 +521,23 @@ export const payloads = (): Record<string, Record<string, unknown>> => ({
     inviteId: ID16,
     card: agentCard(),
     cardSig: CARD_SIG,
+    cardAgentSig: CARD_AGENT_SIG,
     name: 'Denis',
     relays: [...RELAYS],
     proof: KEY32,
+    codeNonce: CODE_NONCE,
+    codeCommit: CODE_COMMIT,
+    inviterCardHash: INVITER_CARD_HASH,
   }),
-  'handshake-ack': payloadOf('handshake-ack', { inviteId: ID16, handshakeId: ID16_B }),
+  'handshake-ack': payloadOf('handshake-ack', {
+    inviteId: ID16,
+    handshakeId: ID16_B,
+    handshakeHash: HANDSHAKE_HASH,
+    codeReveal: CODE_REVEAL,
+    card: agentCard(),
+    cardSig: CARD_SIG,
+    relays: [...RELAYS],
+  }),
   proof: payloadOf('proof', {
     envelopeId: ID16,
     chainId: 8453,

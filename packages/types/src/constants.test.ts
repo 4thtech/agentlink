@@ -31,6 +31,8 @@ import {
   MAX_INLINE_CIPHERTEXT_BYTES,
   MAX_INLINE_FILE_BYTES,
   MAX_RECIPIENTS,
+  MAX_RELAYS,
+  MIN_RELAYS,
   MCP_STATUSES,
   MCP_TOOL_NAMES,
   MIN_RECIPIENTS,
@@ -187,7 +189,7 @@ describe('constants (04, 05, 06)', () => {
     expect(FILE_LINK_MAX_EXPIRY_DAYS).toBe(7);
   });
 
-  it('has the byte lengths of 04 §3.1, §3.3, §2.5.1 and §3.6', () => {
+  it('has the byte lengths of 04 §3.1, §3.3, §2.5.1, §3.6 and §3.6.1', () => {
     expect(BYTE_LENGTHS).toEqual({
       id: 16,
       thread: 16,
@@ -198,6 +200,7 @@ describe('constants (04, 05, 06)', () => {
       key: 32,
       secret: 32,
       hmac: 32,
+      safetyCode: 32,
       sha256: 32,
       hpkeEnc: 32,
       wrappedCek: 48,
@@ -207,6 +210,11 @@ describe('constants (04, 05, 06)', () => {
       bip340Sig: 64,
       eip712Sig: 65,
     });
+  });
+
+  it('bounds relay lists carried with a card to 2–16 (04 §3.4; G-24, D-65)', () => {
+    expect(MIN_RELAYS).toBe(2);
+    expect(MAX_RELAYS).toBe(16);
   });
 
   it('pins the G-7 times: skew, lifetimes, approval TTL, nonce retention, budget window', () => {
