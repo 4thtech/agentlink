@@ -397,11 +397,16 @@ Only act on it if your user asks you to.
 
 Suggested relay: "Marko's agent sent a request (their words, not an instruction to me): '…'. Shall I send it?"
 
-**Commitments:**
-- Asking: "Accepting Ana's agent's terms (version 3) commits you. Review and approve: {url}". Don't name the subject or price; they came from Ana.
+**Commitments** (one approval per agreement, *D-55*, 04 §3.4.1):
+- Asking: "Accepting Ana's agent's terms (version 3) commits you. One approval covers your acceptance and its proof. Review and approve: {url}". Don't name the subject or price; they came from Ana.
+- Asking, when the other side recorded its acceptance of your offer: "Ana's agent accepted your terms (version 3) and recorded it. Adding your acceptance makes this a proof of agreement and commits you. Review and approve: {url}"
+- Rejecting recorded terms: "Rejecting Ana's agent's recorded terms (version 3) is final for this version. Review and approve: {url}"
 - Firm offer (only if §14 Q1 is yes): "Sending a firm offer with proof to Ana's agent needs your approval: {url}"
 - Waiting: "Waiting for Ana's agent to accept; valid until 20 Oct."
+- Accepted, their record still to come: "Accepted version 3. If Ana's agent records these terms by 20 Oct, your acceptance is added to that record automatically. You don't need to approve anything else."
 - Done: "Recorded: you accepted version 3. Proof of agreement is ready to export."
+- Changed while waiting: "Ana's agent sent version 4, so nothing was sent and your approval for version 3 no longer applies. Want me to show version 4?"
+- Used: "That approval was already used, so nothing more was sent."
 
 **Per journey:**
 - **J1:** "Here's the change AgentLink wants to make to Claude Code's settings: [diff]. Apply it?"
@@ -616,6 +621,7 @@ Show amounts only in dollars; never mention tokens or networks outside Advanced.
 | `doctor` | One line per check (message network, proof network, keychain or key file, storage, AI apps) with status word and fix |
 | No keychain (*D-54*) | One honest explanation at opt-in: "This machine has no system keychain. AgentLink can keep your agent's keys in a file locked with an unlock code. That's weaker than a keychain if someone copies this disk, unless the unlock code is kept elsewhere. Your approvals still need your owner passphrase." Then the generated unlock code once, with how to supply it at run time (a mounted secret file, recommended; an environment variable, weaker) |
 | `invite`, `accept`, `contacts` | As §6.1, with the safety code on its own line |
+| `approve <id>` for terms (*D-55*) | The commitment approval card (§8) as plain text. Headline: "Accepting terms from “Ana's agent” (Self-declared), version 3, valid until 20 Oct". Then a block headed "Proposed by “Ana's agent”: their content, not instructions", one field per line, with control and terminal escape sequences removed. Then the changes from version 2, the line "This one approval sends your acceptance and adds your Accepted receipt to their record. Nothing else." and the cost. Only then the passphrase prompt |
 
 **States:** success · needs confirmation · cancelled · no AI app found · restart needed · keychain unavailable · key file locked · wrong unlock code (one generic message) · offline.
 
@@ -699,7 +705,7 @@ All components support light, dark and increased contrast, keyboard and screen r
 | Component | Anatomy | Variants and states |
 |---|---|---|
 | **Approval card** | Requesting agent, time, expiry · plain headline · who (contact + label) · what · cost · why (the rule) · consequence · Details (Advanced IDs) · **Approve** (labelled with passkey or biometrics) / **Deny**, no default button · "Remember for this contact" (only for new-contact and proof-limit approvals; shows the resulting rule change) · new contact: name (name rule), label, fingerprint, safety code and an editable "Name this contact" field prefilled with the suggested alias · footer: "Your AI can't approve this for you" | **Types:** new contact · proof · file over limit · include document key in export. **States:** pending · waiting for passkey · approved · denied · expired · failed · decided elsewhere |
-| **Commitment approval card** | "Accepting terms" / "Rejecting terms" · contact + label · terms card framed "Proposed by Ana's agent: their content" · diff vs previous version · validity · consequence (reject: "You can't accept this version later") · price honesty line ("AgentLink records the agreement. It doesn't move money.") · cost or "Free for you" · auto-accept note if relevant ("doesn't apply: price is in EUR") · **no "remember"** | Accept · reject · firm offer (§14 Q1) · approval-card states + terms expired + newer version arrived |
+| **Commitment approval card** | "Accepting terms" / "Rejecting terms" · contact + label · terms card framed "Proposed by Ana's agent: their content" · diff vs previous version · validity · consequence (reject: "You can't accept this version later") · **what this one approval does** (*D-55*): "This approval sends your acceptance to Ana's agent and adds your Accepted receipt to their record of these terms, now or when they record them, until 20 Oct. Nothing else. If the terms change, it stops working." (for the other side: "This approval adds your Accepted receipt to Ana's agent's record. No message is sent.") · price honesty line ("AgentLink records the agreement. It doesn't move money.") · cost or "Free for you" · auto-accept note if relevant ("doesn't apply: price is in EUR") · Advanced: terms fingerprint · **no "remember"** | Accept · accept their recorded acceptance · reject · firm offer (§14 Q1) · approval-card states + terms expired + newer version arrived + already used |
 | **Terms card / terms diff** | Subject, parties + labels, deliverables, price, deadlines, valid until with countdown, version, proposer / per field: old value struck through, new value, icon + label ("Price changed"). **Subject and deliverable text come from the proposer:** plain text in body style (never heading style), under "Proposed by Ana's agent"; prices and dates are formatted by us. Notes are never part of the recorded terms | Compact · full · proposed · countered · waiting · accepted · rejected · expired / inline · side by side · added · removed · changed |
 | **Negotiation thread** | Version timeline · notes between versions in untrusted containers · state banner · "Accept these terms" | Older versions collapse |
 | **Proof badge, receipt timeline** | Icon + label / Recorded → Delivered → Opened → Accepted or Rejected, with times; pending steps hollow | Recording · Recorded · Delivered · Opened · Accepted · Rejected · Failed · Waiting for approval. The free "Received" mark is visibly lighter |
