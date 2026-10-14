@@ -14,6 +14,12 @@
 // guards allow `@agentlink/crypto/testing` only in test-vectors/, whose Vitest config maps it to this
 // source file (tools/deps-check/policy.mjs RESTRICTED_ENTRY_POINTS). A fixed ephemeral key, nonce or
 // IV in production would break HPKE and AES-GCM, so nothing outside tests may reach these functions.
+import {
+  PAYLOAD_COMMIT_LABEL,
+  PAYLOAD_KEY_LABEL,
+  deriveKeyCommitment,
+  derivePayloadKey,
+} from './aead.js';
 import { argon2idRaw, type Argon2idParams } from './argon2.js';
 import { bip340PublicKey, bip340Sign } from './bip340.js';
 import { assertBytes, equalBytes } from './bytes.js';
@@ -21,7 +27,12 @@ import { decodeHex, encodeHex, encodeUtf8 } from './encoding.js';
 import { signTypedData, type TypedData } from './eip712.js';
 import { CryptoInputError } from './errors.js';
 import { TAGS, sha256, taggedHash } from './hash.js';
-import { unwrapCek as unwrapCekWithKey, type WrappedCek } from './hpke.js';
+import {
+  CEK_EPH_LABEL,
+  deriveWrapEphemeralKey,
+  unwrapCek as unwrapCekWithKey,
+  type WrappedCek,
+} from './hpke.js';
 import { canonicalize, parseJson, type JsonObject } from './jcs.js';
 import {
   KEY_LABELS,
@@ -65,6 +76,35 @@ export {
 } from './hpke.js';
 // M1-1l: the three derivations from the CEK (04 §3.3), for the one-case-per-label vectors.
 export { deriveKeyCommitment, derivePayloadKey, encryptPayloadWithIv } from './aead.js';
+
+/**
+ * M1-1l (04 §3.3): one of the three derivations from the CEK, chosen by its exact label: the two
+ * payload labels take the CEK and the id only, and `agentlink/v1/cek-eph` also takes the 32-byte
+ * recipient key. Any other label (a prefix, another AgentLink label), a missing or extra recipient
+ * key, or a wrong length is refused. The caller wipes the result.
+ */
+export function deriveFromCek(
+  label: string,
+  cek: Uint8Array,
+  envelopeId: Uint8Array,
+  recipientPublicKey?: Uint8Array,
+): Uint8Array {
+  if (label === PAYLOAD_KEY_LABEL || label === PAYLOAD_COMMIT_LABEL) {
+    if (recipientPublicKey !== undefined) {
+      throw new CryptoInputError('invalid_argument', 'deriveFromCek: this label takes no key');
+    }
+    return label === PAYLOAD_KEY_LABEL
+      ? derivePayloadKey(cek, envelopeId)
+      : deriveKeyCommitment(cek, envelopeId);
+  }
+  if (label === CEK_EPH_LABEL) {
+    if (recipientPublicKey === undefined) {
+      throw new CryptoInputError('invalid_argument', 'deriveFromCek: cek-eph needs the key');
+    }
+    return deriveWrapEphemeralKey(recipientPublicKey, envelopeId, cek);
+  }
+  throw new CryptoInputError('invalid_argument', 'deriveFromCek: unknown label');
+}
 
 export {
   sealKeystoreFileWithNonceUnsafe as sealKeystoreFileWithNonce,

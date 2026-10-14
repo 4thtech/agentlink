@@ -58,6 +58,7 @@ const TEST_SEAM = [
   'derivePayloadKey',
   'deriveKeyCommitment',
   'deriveWrapEphemeralKey',
+  'deriveFromCek',
   // M1-1f: fixed nonce for ALKS and ALKO, Argon2id with K and X.
   'argon2idWithSecretAndAd',
   'sealKeystoreFileWithNonce',
