@@ -338,6 +338,12 @@ importers:
       '@agentlink/crypto':
         specifier: workspace:*
         version: link:../crypto
+      '@agentlink/log':
+        specifier: workspace:*
+        version: link:../log
+      '@agentlink/types':
+        specifier: workspace:*
+        version: link:../types
     devDependencies:
       nostr-tools:
         specifier: 2.25.2
