@@ -34,6 +34,7 @@
   },
   "dependencies": {
     "@agentlink/types": "workspace:*",
+    "@agentlink/log": "workspace:*",
     "@agentlink/crypto": "workspace:*",
     "@agentlink/chain": "workspace:*",
     "@agentlink/transport-nostr": "workspace:*",
