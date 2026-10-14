@@ -77,20 +77,31 @@ export function decodeHex(text: string, options?: ByteLengthOption): Uint8Array 
   return checkLength(hexBody(text, 0), options);
 }
 
-/** Bytes as `0x` + lowercase hex (values that are EIP-712 fields or ABI values). */
+/**
+ * Bytes as `0x` + lowercase hex (values that are EIP-712 fields or ABI values). Empty bytes are
+ * refused: no 04 §2.4.1 path carries an empty `0x` value (every row has a fixed length, and an
+ * ERC-1271 signature is a non-empty, even number of hex characters).
+ */
 export function encodeHex0x(bytes: Uint8Array): string {
+  assertBytes(bytes, 'encodeHex0x: bytes');
+  if (bytes.length === 0) {
+    throw new CryptoInputError('invalid_argument', 'encodeHex0x: a 0x value has at least one byte');
+  }
   return '0x' + encodeHex(bytes);
 }
 
 /**
  * Parses `0x` + lowercase hex. Refuses a missing prefix, `0X`, upper or mixed case (EIP-55
- * checksums are for display only), an odd number of digits, whitespace and, with `length`, any
- * other byte length.
+ * checksums are for display only), an odd number of digits, whitespace, `0x` with no digits (see
+ * encodeHex0x) and, with `length`, any other byte length.
  */
 export function decodeHex0x(text: string, options?: ByteLengthOption): Uint8Array {
   assertText(text, 'decodeHex0x: text');
   if (!text.startsWith('0x')) {
     throw new CryptoInputError('invalid_hex', '0x hex must start with a lowercase 0x');
+  }
+  if (text.length === 2) {
+    throw new CryptoInputError('invalid_hex', '0x hex must have at least one byte');
   }
   return checkLength(hexBody(text, 2), options);
 }

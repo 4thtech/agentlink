@@ -8,14 +8,15 @@ import { encodeUtf8 } from './encoding.js';
 
 /**
  * The BIP-340 tags of the protocol. Each signing context has its own tag, so a signature in one
- * context is never valid in another, nor as a Nostr event signature.
+ * context is never valid in another, nor as a Nostr event signature. Frozen, so no code in the
+ * process can change a tag at run time (IR-M1-1a-1 L-1).
  */
-export const TAGS = {
+export const TAGS = Object.freeze({
   /** 04 §3.1: envelope `sig` is BIP-340 over taggedHash(TAGS.envelope, envelopeHash). */
   envelope: 'agentlink/envelope/v1',
   /** 04 §2.5.1: owner-action `sig` is BIP-340 over taggedHash(TAGS.ownerAction, sha256(JCS(...))). */
   ownerAction: 'agentlink/owner-action/v1',
-} as const;
+} as const);
 
 /** SHA-256 (FIPS 180-4). */
 export function sha256(data: Uint8Array): Uint8Array {

@@ -15,15 +15,32 @@ import { CryptoInputError } from './errors.js';
  * - buffers inside libraries or WebCrypto (a CryptoKey's material, a hash's internal state);
  * - memory already written to swap, a core dump or a hibernation file.
  * Treat it as reducing how long a secret sits in memory, not as erasing it.
+ *
+ * Every buffer is attempted, whatever happens to the others (IR-M1-1a-1 L-2). Afterwards:
+ * - if any `fill` threw (for example on a detached ArrayBuffer), a `wipe_failed` error is thrown
+ *   whose `cause` is an AggregateError holding each failure;
+ * - otherwise, if an argument was not a Uint8Array, an `invalid_argument` error is thrown.
  */
 export function wipe(...buffers: readonly (Uint8Array | null | undefined)[]): void {
-  // Wipe every valid buffer first, then report a bad argument: one mistake must not leave the
-  // other secrets in memory.
+  // One bad buffer must not leave the other secrets in memory: attempt all, report afterwards.
   let refused = false;
+  const failures: unknown[] = [];
   for (const buffer of buffers) {
     if (buffer === null || buffer === undefined) continue;
-    if (buffer instanceof Uint8Array) buffer.fill(0);
-    else refused = true;
+    if (!(buffer instanceof Uint8Array)) {
+      refused = true;
+      continue;
+    }
+    try {
+      buffer.fill(0);
+    } catch (error) {
+      failures.push(error);
+    }
+  }
+  if (failures.length > 0) {
+    throw new CryptoInputError('wipe_failed', 'wipe: at least one buffer could not be wiped', {
+      cause: new AggregateError(failures, 'wipe: buffers that could not be wiped'),
+    });
   }
   if (refused) {
     throw new CryptoInputError('invalid_argument', 'wipe: only a Uint8Array can be wiped');

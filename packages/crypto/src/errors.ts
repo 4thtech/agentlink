@@ -10,7 +10,8 @@ export type CryptoInputErrorCode =
   | 'invalid_length'
   | 'invalid_json'
   | 'jcs_unsupported_value'
-  | 'no_secure_random';
+  | 'no_secure_random'
+  | 'wipe_failed';
 
 /**
  * The one error type @agentlink/crypto throws for input it refuses.
@@ -22,8 +23,8 @@ export type CryptoInputErrorCode =
 export class CryptoInputError extends Error {
   readonly code: CryptoInputErrorCode;
 
-  constructor(code: CryptoInputErrorCode, message: string) {
-    super(message);
+  constructor(code: CryptoInputErrorCode, message: string, options?: { cause?: unknown }) {
+    super(message, options);
     this.name = 'CryptoInputError';
     this.code = code;
   }
