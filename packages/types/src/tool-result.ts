@@ -9,9 +9,9 @@
 //   refusal or error; never on `ok`.
 // - I-4: results are strict, so a result can never carry a decision, a signature or a policy.
 import { z } from 'zod';
-import { MAX_URL_LENGTH, MCP_STATUSES } from './constants.js';
+import { APPROVAL_STATUSES, MAX_URL_LENGTH, MCP_STATUSES } from './constants.js';
 import { approvalIdSchema, hasControlOrFormat, ijsonString } from './encoding.js';
-import { checkProofStatus, proofStatusShape } from './proof.js';
+import { checkProofStatus, proofStatusShape, utcTimestampSchema } from './proof.js';
 
 /** Upper bound on `summary` and `nextStep` in code points (one sentence each, 06 §1 rule 2). */
 export const MAX_TOOL_TEXT_CHARS = 500;
@@ -94,5 +94,34 @@ export const toolResultSchema = toolResult({});
 /** `agentlink_notarize` and `agentlink_get_proof` return a ProofStatus (06 §2.4) as their result. */
 export const proofStatusResultSchema = toolResult(proofStatusShape, checkProofStatus);
 
+/**
+ * `agentlink_get_approval` (06 §2.5). The approval's state is `approval`, not `status`, so it never
+ * collides with the common tool `status` (IR-M1-2b-1 Q3; the spec PR renames it in 06 §2.5). An
+ * `ok` result has `approval`; `decidedAt` (UTC) only once the owner decided, so never while pending.
+ */
+export const getApprovalResultSchema = toolResult(
+  {
+    approval: z.enum(APPROVAL_STATUSES).exactOptional(),
+    decidedAt: utcTimestampSchema.exactOptional(),
+  },
+  (r, ctx) => {
+    if ((r.status === 'ok') !== (r.approval !== undefined)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'an ok result has the approval state, and only an ok result',
+        path: ['approval'],
+      });
+    }
+    if (r.decidedAt !== undefined && (r.approval === undefined || r.approval === 'pending')) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'decidedAt only once the owner decided',
+        path: ['decidedAt'],
+      });
+    }
+  },
+);
+
 export type ToolResult = z.infer<typeof toolResultSchema>;
+export type GetApprovalResult = z.infer<typeof getApprovalResultSchema>;
 export type ProofStatusResult = z.infer<typeof proofStatusResultSchema>;

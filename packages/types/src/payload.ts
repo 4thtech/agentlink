@@ -217,6 +217,15 @@ export const approvalRequestBodySchema = z
           path: ['action', 'context', 'scope', 'agentId'],
         });
       }
+      // The scope is built once, when the request is created (04 §3.4.2; IR-M1-2b-1 F-2), so its
+      // parts can never run on a clock that started after the 24 h request window.
+      if (scope.createdAt !== b.requestedAt) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'scope.createdAt must equal requestedAt',
+          path: ['action', 'context', 'scope', 'createdAt'],
+        });
+      }
     }
     if (b.expiresAt !== expected) {
       ctx.addIssue({

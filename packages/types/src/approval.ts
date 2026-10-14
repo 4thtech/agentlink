@@ -1,8 +1,9 @@
 // Approvals: the per-tool `approval-request.action` (04 §3.4.1) and the commitment scope (04 §3.4.2).
 //
 // `action` = `{tool, args, context}` and `actionDigest = sha256(JCS(action))` (M1-7e), which the
-// owner's `approval.decide` signs. `args` is the tool input (free JSON here; the MCP layer owns the
-// tool input schemas). `context` holds the facts the core bound when it evaluated policy. Its
+// owner's `approval.decide` signs. `args` is the tool input: free JSON here for most tools (the MCP
+// layer owns their input schemas), strict for the two terms tools, whose action can travel in a
+// proof pack. `context` holds the facts the core bound when it evaluated policy. Its
 // fields per tool are fixed here (PROPOSED in M1-2b; the spec names only examples: the contact's
 // agent address, a file's `plaintextSha256`, the fee `{token, amount, usd}` and, for commitments,
 // `scope` and `terms`). Every context is strict, so the digest covers exactly these facts.
@@ -218,15 +219,98 @@ const commitmentContext = (decisions: readonly CommitmentDecision[]) =>
 const actionOf = <T extends ApprovalToolName, C extends z.ZodType>(tool: T, context: C) =>
   z.strictObject({ tool: z.literal(tool), args: jsonObjectSchema, context });
 
+// --- commitment args (04 §3.4, §3.4.2; 06 §2.2a; IR-M1-2b-1 F-1, F-3) -----------------------------
+//
+// A commitment action can travel in a proof pack (07 §8), so by construction it holds no local
+// path and no text beyond the terms (04 §3.4): its `args` are strict, with no `note` and no `path`,
+// and the contact is its agent ID, never an alias or a display name. `args` are the tool input after
+// defaults, without `approvalId` and `clientRequestId` (04 §3.4.1). They must also agree with the
+// scope the core built, so an owner surface that renders `context` shows what `args` will do.
+
+/** `agentlink_propose_terms` args of a firm offer (the only propose call that needs an approval). */
+const proposeTermsArgs = z.strictObject({
+  to: evmAddress,
+  terms: jsonObjectSchema, // TermsInput: strict schema from M1-21
+  revises: base64url(BYTE_LENGTHS.id).exactOptional(),
+  notarize: z.literal(true),
+});
+
+/** `agentlink_respond_to_terms` args. `terms` only with `counter`. */
+const respondToTermsArgs = z.strictObject({
+  envelopeId: base64url(BYTE_LENGTHS.id),
+  decision: z.enum(['accept', 'reject', 'counter']),
+  terms: jsonObjectSchema.exactOptional(),
+  notarize: z.boolean(),
+});
+
+/** Which scope decisions each `respond_to_terms` decision can create (04 §3.4.2, 06 §2.2a). */
+const SCOPE_DECISIONS_FOR: Readonly<Record<string, readonly CommitmentDecision[]>> = freeze({
+  accept: freeze(['accept', 'confirm'] as const),
+  reject: freeze(['reject'] as const),
+  counter: freeze(['offer'] as const),
+});
+
+type ScopeLike = {
+  decision?: unknown;
+  notarize?: unknown;
+  counterparty?: { agentId?: unknown };
+  answers?: { envelopeId?: unknown } | null;
+};
+type IssueFn = (message: string, path: (string | number)[]) => void;
+const issuer =
+  (ctx: z.core.$RefinementCtx): IssueFn =>
+  (message, path) =>
+    ctx.addIssue({ code: 'custom', message, path });
+
+const proposeTermsAction = z
+  .strictObject({
+    tool: z.literal('agentlink_propose_terms'),
+    args: proposeTermsArgs,
+    context: commitmentContext(['offer']),
+  })
+  .superRefine((a, ctx) => {
+    const issue = issuer(ctx);
+    const scope = a.context?.scope as ScopeLike | undefined;
+    if (a.args?.to !== scope?.counterparty?.agentId) {
+      issue('args.to must be the scope counterparty', ['args', 'to']);
+    }
+    if (a.args?.notarize !== scope?.notarize) {
+      issue('args.notarize must match the scope', ['args', 'notarize']);
+    }
+  });
+
+const respondToTermsAction = z
+  .strictObject({
+    tool: z.literal('agentlink_respond_to_terms'),
+    args: respondToTermsArgs,
+    context: commitmentContext(['accept', 'reject', 'confirm', 'offer']),
+  })
+  .superRefine((a, ctx) => {
+    const issue = issuer(ctx);
+    const scope = a.context?.scope as ScopeLike | undefined;
+    const decision = a.args?.decision;
+    const allowed = typeof decision === 'string' ? SCOPE_DECISIONS_FOR[decision] : undefined;
+    if (allowed === undefined || !allowed.includes(scope?.decision as CommitmentDecision)) {
+      issue('args.decision does not match scope.decision', ['args', 'decision']);
+    }
+    if ((decision === 'counter') !== (a.args?.terms !== undefined)) {
+      issue('terms are given only with counter', ['args', 'terms']);
+    }
+    if (a.args?.notarize !== scope?.notarize) {
+      issue('args.notarize must match the scope', ['args', 'notarize']);
+    }
+    const answers = scope?.answers;
+    if (answers !== null && answers !== undefined && answers.envelopeId !== a.args?.envelopeId) {
+      issue('args.envelopeId must be the envelope the scope answers', ['args', 'envelopeId']);
+    }
+  });
+
 // `satisfies`: exactly one action per tool of the 06 §2.0 "Approval" column (APPROVAL_TOOL_NAMES).
 const ACTIONS = {
   agentlink_accept_invite: actionOf('agentlink_accept_invite', acceptInviteContext),
   agentlink_send: actionOf('agentlink_send', sendContext),
-  agentlink_propose_terms: actionOf('agentlink_propose_terms', commitmentContext(['offer'])),
-  agentlink_respond_to_terms: actionOf(
-    'agentlink_respond_to_terms',
-    commitmentContext(['accept', 'reject', 'confirm']),
-  ),
+  agentlink_propose_terms: proposeTermsAction,
+  agentlink_respond_to_terms: respondToTermsAction,
   agentlink_notarize: actionOf('agentlink_notarize', notarizeContext),
   agentlink_acknowledge: actionOf('agentlink_acknowledge', acknowledgeContext),
   agentlink_export_proof_pack: actionOf('agentlink_export_proof_pack', exportProofPackContext),
@@ -256,13 +340,13 @@ export const commitmentApprovalActionSchema = z.discriminatedUnion('tool', [
 /** The commitment scope of an action, if it has one (a defensive read of unvalidated data). */
 export function commitmentScopeOf(
   action: unknown,
-): { agentId?: unknown; expiresAt?: unknown } | undefined {
+): { agentId?: unknown; createdAt?: unknown; expiresAt?: unknown } | undefined {
   if (action === null || typeof action !== 'object') return undefined;
   const context = (action as { context?: unknown }).context;
   if (context === null || typeof context !== 'object') return undefined;
   const scope = (context as { scope?: unknown }).scope;
   if (scope === null || typeof scope !== 'object') return undefined;
-  return scope as { agentId?: unknown; expiresAt?: unknown };
+  return scope as { agentId?: unknown; createdAt?: unknown; expiresAt?: unknown };
 }
 
 export type Counterparty = z.infer<typeof counterpartySchema>;

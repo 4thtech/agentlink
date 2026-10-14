@@ -8,7 +8,13 @@
 // - Adding a key later is a schema change: an older core refuses such a policy (fail closed).
 // - Encodings follow 04 §2.4.1: agent IDs are `0x` + 40 lowercase hex, USD amounts are strings.
 import { z } from 'zod';
-import { evmAddress, isStrictlyAscending, isWellFormedString, utf8ByteLength } from './encoding.js';
+import {
+  evmAddress,
+  hasControlOrFormat,
+  isStrictlyAscending,
+  isWellFormedString,
+  utf8ByteLength,
+} from './encoding.js';
 import { usdAmountSchema } from './usd.js';
 
 const freeze = <T>(value: T): Readonly<T> => Object.freeze(value);
@@ -76,7 +82,9 @@ function hasC0OrC1(s: string): boolean {
 }
 
 /**
- * A local path (06 §3 "Path"): 1–4096 UTF-8 bytes, I-JSON, no C0 or C1 control character. A
+ * A local path (06 §3 "Path"): 1–4096 UTF-8 bytes, I-JSON, no C0 or C1 control character and
+ * (PROPOSED, IR-M1-2b-1 F-4) no format (Cf: bidi, zero-width) or line/paragraph separator, which
+ * could spoof a folder name on owner surfaces. A
  * leading `~/` means the user's home folder. The core resolves it with realpath when it is used
  * (04 §4); nothing here touches the file system.
  */
@@ -84,6 +92,10 @@ export const policyPathSchema = z
   .string()
   .refine(isWellFormedString, 'path contains a lone surrogate (not I-JSON)')
   .refine((s) => typeof s === 'string' && !hasC0OrC1(s), 'path contains a control character')
+  .refine(
+    (s) => typeof s === 'string' && !hasControlOrFormat(s),
+    'path contains a format (bidi, zero-width) or separator character',
+  )
   .refine((s) => {
     if (typeof s !== 'string') return false;
     const n = utf8ByteLength(s);
