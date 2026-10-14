@@ -63,10 +63,11 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 
 | Section | Cards |
 |---|---|
-| M0 Foundations | 29 (incl. 7 in the D-25 group; 9 `done (setup)`) |
+| M0 Foundations | 31 (incl. 7 in the D-25 group; 9 `done (setup)`) |
 | Legacy OPS-L | 9 |
+| Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 86 (M1a 40, M1b 46; incl. 11 split-off, 7 new cards from D-31…D-41, 4 from D-48 and 2 from D-53) |
+| M1 Local beta | 87 (M1a 41, M1b 46; incl. 11 split-off, 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53 and 1 from D-54) |
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 21 (incl. 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
@@ -146,7 +147,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
 - **Scope:**
   - pnpm workspace (`packageManager` pinned, pnpm `minimumReleaseAge`), Turborepo tasks `build`, `test`, `lint`, `typecheck`, `vectors:check`, `test:e2e`; strict ESM `tsconfig.base.json` with project references.
   - Stub package per directory in the `AGENTS.md` layout, each building to ESM + `.d.ts`; ESLint flat config + Prettier; Vitest workspace; Changesets initialised (`publishConfig.access`, `repository` fields).
-  - Install scripts: none in our packages; dependency builds only via an explicit allowlist (`onlyBuiltDependencies`; CI keeps `--ignore-scripts`).
+  - Install scripts: none in our packages; dependency builds only via an explicit allowlist (`allowBuilds` in `pnpm-workspace.yaml`, with `strictDepBuilds: true`, pnpm 12; CI keeps `--ignore-scripts`).
   - LICENSE: MIT (D-12); every `package.json` has `"license": "MIT"`, enforced by a check script. Commit `.github/ci-strict` in the same PR.
 - **Acceptance:**
   - `pnpm install && pnpm build && pnpm lint && pnpm typecheck && pnpm test` pass on a clean clone and in CI with strict mode on.
@@ -479,6 +480,53 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - A test PR opened from an agent worktree shows `4thtech-agent` as author and Tali's identity on the commits; the preflight fails closed when the profile is missing or is the owner's.
   - No file in the repo, the worktree or the sync branch contains the token; the secret scan stays green.
 
+#### M0-24 · Docs-consistency check: links and runbook template (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · tools/ (a check script and its test), root `package.json` script wiring
+- **Depends on:** M0-2d
+- **Spec:** `docs/runbooks/README.md` (template); `docs/lessons/README.md`; `development-process.md` §10
+- **Invariants:** —
+- **Scope:**
+  - A Node script under `tools/` (no new dependency) that fails when a relative Markdown link in `docs/**`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `README.md` or `CONTRIBUTING.md` points to a missing file, or to a missing heading anchor where one is given.
+  - Every `docs/runbooks/*.md` except `README.md` has, in order, the sections Purpose, When to use, Who runs it, Preconditions, Steps, Verify, If it fails, Related; its title starts with `RB-<nn>`, and it is listed in the runbooks index. Every `docs/lessons/LL-*.md` has Problem, Symptom, Cause, Rule and Source, and is listed in the lessons index.
+  - Runs inside `pnpm lint` (so `ci-gate` enforces it); no network access, so external links are not checked.
+  - A good first task for a new developer (`docs/README.md` §2).
+- **Acceptance:**
+  - Green on the current tree; a fixture with a broken link, a runbook missing "Verify" and an unlisted lesson each fail (negative controls recorded in the PR).
+  - Strict mode stays on; no change to `.github/**`.
+
+#### M0-25 · Harness pointer files: classification and Copilot instructions (new)
+- **Status:** backlog · **Size:** S · **Tier:** Owner · **Security:** S1
+- **Repo/path:** agentlink · `.github/workflows/review-gate.yml`, `.github/CODEOWNERS`, `.github/copilot-instructions.md`, `docs/process/audit-rules.md` §2.2
+- **Depends on:** —
+- **Spec:** `audit-rules.md` §2.2 (agent instructions are S1; the table is mirrored in `review-gate.yml` and CODEOWNERS); `docs/README.md` §3 (harness table)
+- **Invariants:** I-5 (agent-facing instructions are a control surface)
+- **Scope:**
+  - Classify `GEMINI.md` like `AGENTS.md` and `CLAUDE.md`: S1, a sensitive path, code-owned. Today it falls under "anything else" (S0), so a PR could change what Gemini CLI loads with no review.
+  - Decide whether `docs/runbooks/**` and `docs/lessons/**` are S1 like `docs/process/**` and `skills/**` (agent-facing procedures) or stay S0; update the §2.2 table, `review-gate.yml` and the PR template wording together.
+  - Add `.github/copilot-instructions.md` as a one-line pointer to `AGENTS.md` if Copilot Chat in the IDE is used (the Copilot coding agent already reads `AGENTS.md`).
+  - These are `.github` and process changes: prepared by an agent, merged by the owner.
+- **Acceptance:**
+  - A fixture PR touching only `GEMINI.md` is derived as S1 by `review-gate`.
+  - The §2.2 table, `review-gate.yml` and CODEOWNERS agree (checked by the independent review).
+
+### Documentation (DOCS) (new)
+
+#### DOCS-RB · Runbooks, lessons and onboarding map (new)
+- **Status:** ready (in review: PR #7; live status on the sync board) · **Size:** M · **Tier:** Opus · **Security:** S1
+- **Repo/path:** agentlink · `docs/README.md`, `docs/runbooks/**`, `docs/lessons/**`, `GEMINI.md`, one `AGENTS.md` pointer line, process-document alignment; agentlink-ops · `runbooks/**` (skeletons)
+- **Depends on:** —
+- **Spec:** owner request (2026-10-14); `delivery-process.md`; `development-process.md` §3–§8, §13, §14; `audit-rules.md` §3–§4
+- **Invariants:** — (restates the agent limits; relaxes none)
+- **Scope:**
+  - A role-based "Start here" map with a time-boxed onboarding track; one runbook per repeatable procedure in a fixed template; one file per lesson learned; harness pointer files only where a harness does not read `AGENTS.md`.
+  - Private runbook skeletons (headings and TODO lists) in `agentlink-ops`.
+- **Acceptance:**
+  - Every relative link resolves; every runbook has the eight template sections and an index row; every lesson has Problem, Symptom, Cause, Rule and Source (checked by M0-24 once it lands).
+  - `AGENTS.md` stays ≤ 8192 bytes; independent review recorded (`IR-DOCS-RB-<n>`).
+
+The public-docs cards (`DOCS-PUB` and the milestone passes `DOCS-M1a` to `DOCS-M3`, `DOCS-LINT`) are in §5, "Public documentation across milestones".
+
 ### Legacy security (OPS-L)
 
 Legacy OCC v1 / PollinationX items from private 09 §4. Details of unresolved items stay private (D-21, `development-process.md` §12); cards describe actions only. Evidence goes to `agentlink-ops`, never to this repo or the sync branch.
@@ -619,7 +667,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Spec:** 11 §6.1, §6.2, §8, §9, §11, §13; 10 "Design deliveries"; D-30
 - **Invariants:** —
 - **Scope:**
-  - In-chat copy sheet (11 §6.1, highest priority: it feeds the M1a tool summaries through M1-9g); design tokens (§11.7) and core components (§8); local settings and approvals app (§6.2) with its states (§9); simple "how to install" invite placeholder page.
+  - Brand core (11 §2, D-56: mark, wordmark, lockups, favicon, AI-app listing icon); in-chat copy sheet (11 §6.1, highest priority: it feeds the M1a tool summaries through M1-9g) and terminal copy (§6.10); design tokens (§11.7) and core components (§8); local settings and approvals app (§6.2.1) with its states (§9); simple "how to install" invite placeholder page. Exports per `docs/design/README.md`; paste-ready package `docs/design/claude-design-handoff.md`.
 - **Acceptance:**
   - Drop recorded in `docs/design/README.md` (date, links/files, delivered or partial); intake cards M1-9g, M1-11b and the M1-19 restyle become `ready`.
 
@@ -630,7 +678,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Spec:** 11 §6.3–§6.8, §8, §13; 08 §7 (browser counterparty, D-35), §8 (desktop dashboard, D-41); 02 F-15; D-30
 - **Invariants:** —
 - **Scope:**
-  - Complete component library; owner console (§6.3, desktop and mobile); verify page (§6.4); invite landing (§6.5); browser counterparty view-and-accept (D-35); onboarding (§6.6); pay page (§6.7) and pricing (§6.8); clickable prototypes J1, J2, J4, J5, J8; rationale notes (§13). The console screens are also the desktop dashboard (D-41).
+  - Complete component library; OS app, tray and PWA icons (§2.4); desktop apps for macOS, Windows and Linux (§6.2.2); cloud agent pages (§6.9); storage, proofs and printed records, registration and domain verification (§6.11–§6.13); owner console (§6.3, desktop and mobile); verify page (§6.4); invite landing (§6.5); browser counterparty view-and-accept (D-35); onboarding (§6.6); pay page (§6.7) and pricing (§6.8); clickable prototypes J1, J2, J4, J5, J8; rationale notes (§13). The console screens are also the desktop dashboard (D-41).
 - **Acceptance:**
   - Drop recorded in `docs/design/README.md`; M2-1a becomes `ready`. Arriving after M1-GATE delays the start of M2 by the same amount.
 
@@ -641,7 +689,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Spec:** 11 §2 (brand), §13 (D3 deliverables), §15 (marketing site out of scope for beta); D-28, D-30
 - **Invariants:** —
 - **Scope:**
-  - Production-domain brand and marketing site.
+  - Brand final after the trademark check (M1-24), marketing site (§6.15) and social images on the production domain.
 - **Acceptance:**
   - Drop recorded in `docs/design/README.md`; M3-13 becomes `ready`.
 
@@ -655,7 +703,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Invariants:** I-6, I-8
 - **Scope:**
   - Written by a session that does not implement the TypeScript code. Generators use independent implementations (e.g. Python `cryptography`, a reference BIP-340, RFC 9180 reference vectors, an RFC 8785 reference, `eth-account`/`eth-abi` or `cast` for EIP-712).
-  - Suites (M1a, what Talk needs): HKDF derivation per 04 §2.1 (labels × epochs 0–2), BIP-340 tagged-hash envelope signatures, HPKE CEK wrap (fixed ephemeral keys), payload AEAD + AAD, envelope hash via JCS, pairing HMAC, safety code, owner-seed wrap (Argon2id passphrase path), EIP-712 domain separator / struct hash / digest for `AgentCard` (chain-agnostic domain).
+  - Suites (M1a, what Talk needs): HKDF derivation per 04 §2.1 (labels × epochs 0–2), BIP-340 tagged-hash envelope signatures, HPKE CEK wrap (fixed ephemeral keys), payload AEAD + AAD, envelope hash via JCS, pairing HMAC, safety code, owner-seed wrap (Argon2id passphrase path), file KeyStore `ALKS` v1 for both secret kinds (D-54, 04 §2.8), EIP-712 domain separator / struct hash / digest for `AgentCard` (chain-agnostic domain).
   - Proof-layer suites (STREAM, PRF wrap, `Record`, `Receipt`, `Registration`) are M1-1i (M1b).
   - These are the **canonical** vectors; the contracts repo checks parity against a pinned commit (D-19).
   - Vectors that depend on open gap G-28 are added only after it is resolved.
@@ -773,10 +821,13 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Owner passphrase wrapping of the owner seed for local storage only: Argon2id (m = 64 MiB, t = 3, p = 1), AES-256-GCM (the M1a owner-presence minimum, D-33).
   - Pairing proof HMAC-SHA256(secret, "agentlink-handshake" ‖ inviteId ‖ SHA-256(JCS(B card))); safety code per 04 §3.6 with the encoding fixed by G-28.
   - Versioned wrapped-blob format (alg, params, salt, nonce), shared with M1-1k.
+  - Owner passphrase wrap pins HKDF label `agentlink/v1/owner-passphrase-wrap` and file magic `ALKO` (D-54, 04 §2.8), with a `secretKind` header byte (1 = generated owner code, 2 = chosen passphrase) covered by the AAD and the same normalisation by kind as `ALKS` (04 §2.8); vectors for both kinds (M1-1h).
+  - File KeyStore seal/open for `ALKS` v1 (D-54, 04 §2.8): Argon2id with the header's parameters (floor and cap checked before the KDF runs), HKDF label `agentlink/v1/keystore-file`, AES-256-GCM with the whole header (including `secretKind` and `agentId`) as AAD; entry parser with the 04 §2.8 refusals; entries as `Uint8Array`; 120-bit code generation (15 CSPRNG bytes, RFC 4648 base32) and normalisation by `secretKind`.
 - **Acceptance:**
   - M1-1h vectors for Argon2id (plus RFC 9106 vectors), HMAC proof and safety code pass in all runtimes.
   - Property test: both sides compute the same safety code regardless of argument order.
   - The API refuses passphrase wrapping for blobs flagged for relay publication (test).
+  - `ALKS` v1 vectors from M1-1h pass; an `ALKO` owner blob never opens as an `ALKS` file and vice versa (label and magic separation, both directions); code normalisation and parser refusal tests.
   - Argon2id timing measured in browser and Workers (Workers memory limit noted in PR).
 
 #### M1-1k · crypto: passkey PRF seed wrapping and recovery code (new, split from M1-1f)
@@ -1266,13 +1317,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-8a · node: OS keychain KeyStore
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/node
-- **Depends on:** M1-1g; gaps G-23, G-31 resolved
-- **Spec:** 04 §2.2 (service `agentlink`, account `<agentId>`); 03 §6 (`@napi-rs/keyring`); 10 M1-8
+- **Depends on:** M1-1g; gap G-23 resolved (G-31 resolved by D-54)
+- **Spec:** 04 §2.2 (service `agentlink`, account `<agentId>`), §2.8 (selection); 07 §9.1; 03 §6 (`@napi-rs/keyring`); 10 M1-8
 - **Invariants:** I-1, I-7
 - **Scope:**
   - `KeyStore` backed by macOS Keychain, Windows Credential Manager and libsecret via `@napi-rs/keyring` (dependency justification; prebuilt binaries, no install script); seed held in memory only as long as needed, then wiped.
   - Store key for encrypted SQLite columns also in the keychain; several agents per machine (`--agent <name>`).
-  - Headless Linux / no Secret Service: behaviour per G-31 (default: `needs_setup` with explanation).
+  - Keychain probe at `init` (write, read, delete a probe item) and the recorded backend per agent (07 §9.1). No usable keychain: `needs_setup` with explanation unless the user opted in to the file KeyStore (M1-8f, D-54).
 - **Acceptance:**
   - CI matrix on macOS, Windows and Ubuntu (gnome-keyring in a D-Bus session) runs the keychain tests.
   - A filesystem diff during `init` shows the seed in no file; missing keychain → `needs_setup`.
@@ -1299,12 +1350,14 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-1, I-4
 - **Scope:**
   - Owner seed stored only wrapped with the Argon2id owner passphrase (the M1a owner-presence minimum, D-33); unwrapped only inside one owner operation, then wiped. The localhost passkey (PRF) path is M1-8e (M1b).
-  - CLI passphrase prompt reads from a TTY only; no reusable bearer token on disk.
+  - CLI passphrase prompt reads from a TTY only; no reusable bearer token on disk. The same holds on headless machines with the file KeyStore (D-54, 04 §2.8): no environment variable, file, argument or piped stdin can supply the owner passphrase; `AGENTLINK_OWNER_*` variables are ignored. On file-KeyStore machines (04 §2.8): the owner seed lives in `~/.agentlink/keystore/owner.alko`, is created by the separate `owner init` step, and requires a generated 120-bit owner code (no chosen passphrase); creating or changing the owner secret refuses a candidate that opens any agent's `.alks` file. `owner init` per 04 §2.8: it refuses when an owner exists and never overwrites; it shows the owner fingerprint; the code is display-only; it states what a lost code means.
+  - **Owner-blob location on keychain machines (follow-up from IR-D54-2, F03):** pin where the owner-wrapped seed lives on machines with a keychain. Either it is a keychain item, or, wherever it is a file, the generated-code rule of 04 §2.8 applies. A chosen owner passphrase protecting a file that copies of the machine carry is open to offline guessing. Record the choice in 04 §2.2 through a spec change before this card is `ready`.
   - Produces `OwnerAction` signatures and EIP-712 card/registration signatures.
   - Full threat note covering G-1 (shared `localhost` RP ID; same-user installation tampering).
 - **Acceptance:**
   - Build-plan test (10 M1-8): a script running as the same OS user, with read access to `~/.agentlink`, the agent's keychain items and the DB, cannot produce a valid approval or policy change without the passphrase. The test's stated scope excludes modifying the installed package (G-1).
   - No owner-seed bytes on disk (scan after setup and after an operation); the unlock handle's buffers are zeroed after use (test).
+  - The owner blob is at the pinned location on keychain machines; if it is a file, a chosen passphrase is refused (test).
 
 #### M1-8d · node: local approval server
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -1333,18 +1386,39 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The M1-8c same-user script test passes with the passkey path enabled (virtual authenticator with PRF); a PRF-less authenticator falls back to the passphrase.
   - No owner-seed bytes on disk after passkey setup and after an operation (scan).
 
+#### M1-8f · node: passphrase-locked file KeyStore for headless machines (new, D-54)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the critical path: M1-9a needs only M1-8a's `needs_setup`; only the `--keystore file` branch of M1-9a waits for this card; proposed, owner confirms at merge)
+- **Repo/path:** agentlink · packages/node
+- **Depends on:** M1-1f (`ALKS`/`ALKO` seal/open), M1-1g, M1-8a (keychain probe, recorded backend), M1-8c (owner passphrase path); M1-8b for the shared inter-process lock
+- **Spec:** 04 §2.8 (format, KDF, unlock, owner key on a headless machine, file handling, threat delta, required tests); 07 §9; 06 §7; D-54
+- **Invariants:** I-1, I-4, I-7, I-10
+- **Scope:**
+  - File `KeyStore` with the same interface as the keychain backend, holding the same items (agent seed, store key, storage credentials) in `~/.agentlink/keystore/<agentId>.alks`; `agentId` charset check; expected-agent-ID check before the KDF and seed-derived check after decryption. All crypto through `@agentlink/crypto`; this package only handles files, locking and unlock sources.
+  - Selection per 07 §9.1: opt-in only, only when the keychain probe fails (with timeout and fix message), only from an interactive terminal with no harness marker set (UX guards, not boundaries); no forced file mode; backend recorded per agent and never switched.
+  - Unlock sources per 07 §9.2: passphrase file (`O_NOFOLLOW`, `fstat` checks), environment variable (allowed with the 04 §2.8 conditions; both variables removed from `process.env`; never written by `init`), interactive prompt for CLI commands; no CLI argument takes a passphrase. Async unlock after MCP `initialize`. `kek` kept in memory with its salt and parameters; entries decrypted per operation and wiped.
+  - Secrets: generated unlock code by default (pinned base32 encoding, `secretKind` in the header); chosen passphrase ≥ 12 characters. Owner key on file-KeyStore machines: separate `owner init` step, `owner.alko`, generated 120-bit owner code required. Agent ≠ owner enforced in both directions across all agents, with the owner wrap's normalisation.
+  - File handling per 04 §2.8: 0700/0600, descriptor-based checks, `realpath` of both sides, mode-sticks check (DrvFs, 9p, SMB, FUSE), write protocol (lock, re-read, header check, fail closed on mismatch), stale temp cleanup, zeroisation; `keystore passphrase` asks for the current passphrase at the prompt; `doctor` reporting and warnings (07 §9.4).
+  - Measure Argon2id unlock time on the reference container (2 vCPU, 512 MiB limit) and record whether `@noble/hashes` clears its Argon2id buffers.
+  - Full threat note (04 §2.8 threat delta, including the faked-terminal case) and quickstart input for M1-12b.
+- **Acceptance:**
+  - Every test listed in 04 §2.8 "Required tests", written first: canary (I-7), wrong passphrase, tamper detection, agent binding, parser, normalisation, permissions, write protocol, selection, owner key, environment, unlock timing, `ALKS` v1 vectors (M1-1h).
+  - CI: an Ubuntu job without D-Bus or Secret Service runs `init --keystore file` and `owner init` (with a pseudo-terminal) and a full M1a Talk round trip on the file backend; the same job without the opt-in gets `needs_setup`.
+  - The M1-8c same-user script test passes on the file backend with the agent passphrase readable by the script.
+  - Unlock time on the reference container is recorded in the PR. Up to 5 s is accepted (async); above that it goes to the owner (04 §2.8), never a silent parameter change. Node's built-in `crypto.argon2` is not used without an owner allowlist decision.
+
 ### CLI and MCP server (`@4thtech/agentlink`, `apps/cli`)
 
 #### M1-9a · CLI: init, harness setup, everyday commands
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli
-- **Depends on:** M1-8a, M1-8b, M1-8c, M1-7c; gap G-5 resolved
-- **Spec:** 06 §7, §8; 02 F-01, J1; 04 §2.2; D-39
+- **Depends on:** M1-8a, M1-8b, M1-8c, M1-7c; gap G-5 resolved. Only the `--keystore file` branch waits for M1-8f (off the critical path)
+- **Spec:** 06 §7, §8; 07 §9; 02 F-01, J1; 04 §2.2, §2.8; D-39, D-54
 - **Invariants:** I-1, I-4
 - **Scope:**
   - `agentlink init [--agent <name>]`: agent identity in the keychain; owner identity via the owner passphrase (04 §2.2, not plaintext in the keychain; G-5); display name. The passkey option and the recovery-kit offer are M1-9h (M1b).
   - Harness detection and config writes for Claude Code, Claude Desktop, Codex, Gemini CLI, each after confirmation showing the exact file change (D-39); printed snippets for Antigravity, Cursor, VS Code, Windsurf, Cline (config locations verified at build time).
-  - `invite`, `accept <url>`, `contacts [--verify <id>]`, `status [--brief]` (D-53, 06 §6.1, §8: `--brief` prints only unread counts, the `requests` count and contact names under the 06 §2.1 rule), `doctor` (relays, keychain). `ui`, `credits`, `verify` and the RPC and storage checks of `doctor` are M1-9h.
+  - Without an OS keychain (D-54): `init` returns `needs_setup` with the 07 §9.4 copy. When M1-8f lands: `init --keystore file` opt-in (interactive terminal, no harness marker, agent identity only), the generated unlock code shown once with re-type and screen clear, the separate `owner init` †, `keystore passphrase`.
+  - `invite`, `accept <url>`, `contacts [--verify <id>]`, `status [--brief]` (D-53, 06 §6.1, §8: `--brief` prints only unread counts, the `requests` count and contact names under the 06 §2.1 rule), `doctor` (relays, keychain or file KeyStore with its warnings, 07 §9.4). `ui`, `credits`, `verify` and the RPC and storage checks of `doctor` are M1-9h.
   - `accept <url>` applies the `contacts.acceptInvites` policy exactly as `agentlink_accept_invite` does (06 §7.1). Without a TTY it never prompts for the owner passphrase: under `approval` it returns `pending_approval` with the `agentlink approve <id>` command for the owner's own terminal.
   - `init` records the absolute path of the installed, exact-version `agentlink` binary for hook snippets (M1-29, 06 §6.1).
   - All key creation delegated to `@agentlink/node`; no new crypto here.
@@ -1650,6 +1724,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Per-harness install steps (the agent-assisted install prompts come from M1-25).
   - Harness permission settings that deny the agent access to `~/.agentlink`, the installed AgentLink package / npx cache and the keychain (Claude Code permission deny rules, Codex sandbox, Gemini CLI sandbox; syntax verified at build time).
+  - Containers, devcontainers, WSL and SSH (D-54, 07 §9): opting in to the file KeyStore; mounting the unlock code as a run-time secret and pointing `AGENTLINK_KEYSTORE_PASSPHRASE_FILE` at it (never in the image, a committed `devcontainer.json` or a committed MCP config); why the environment variable is weaker; disabling core dumps; deny rules for `~/.agentlink/keystore` and the secret file; doing `owner init` personally and never letting the agent see the owner code; owner approvals over SSH or `docker exec -it`.
   - Run owner († ) commands in a terminal the agent does not control; `doctor` for troubleshooting. Local UI, storage and credits sections are M1-12d (M1b).
 - **Acceptance:**
   - Tali and Denis install from the docs alone for the J9 dogfood (M1-23), times recorded.
@@ -1906,6 +1981,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Editorial only: no change to any rule, threshold or invariant.
 - **Acceptance:**
   - `grep` finds none of the 17 pre-D-53 tool names in `docs/` outside the 06 §2.0 consolidation table and contract or SDK function names; the independent S2 review confirms no rule changed.
+
+#### M1-31 · Local UI passkey origin: `localhost` vs `127.0.0.1` (new, IR-D56-1 F12)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · docs/foundation/08-clients-console-cloud.md §1, docs/foundation/06-mcp-server.md §2.5 (example URL), apps/cli (local UI server)
+- **Depends on:** — (before M1-8e and M1-11a are implemented)
+- **Spec:** 08 §1; 04 §2.5; 06 §2.5; 11 §6.2.1
+- **Invariants:** I-4
+- **Scope:**
+  - 08 §1 serves the local UI on `127.0.0.1` but registers the owner passkey for the RP ID `localhost`. WebAuthn does not accept an IP address as an RP ID, so the page must be opened as `http://localhost:<port>`. Fix 08 §1, the 06 §2.5 approval URL example and 11 §6.2.1 to one origin, and keep the `Host`-header and DNS-rebinding checks consistent with it.
+  - Check how `localhost` resolves on each OS (IPv4 and IPv6) and bind accordingly, without listening on non-loopback interfaces.
+- **Acceptance:**
+  - Specs name one origin for the local UI; a test registers and uses a PRF passkey on that origin, and requests with any other `Host` value are rejected.
 
 #### M1-GATE · Milestone 1 gate: internal audit and user testing
 - **Status:** backlog · **Size:** M · **Tier:** Opus (audit session) + Owner (sign-off) · **Security:** S2 · **Phase:** M1b
@@ -2288,10 +2375,10 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
 - **Repo/path:** agentlink · apps/desktop
 - **Depends on:** M2-11b
-- **Spec:** D-36; 08 §8 (owner key: Linux, weaker); 04 §2.2 (desktop row), §2.5; G-31
+- **Spec:** D-36; 08 §8 (owner key: Linux, weaker); 04 §2.2 (desktop row), §2.5, §2.8; D-54
 - **Invariants:** I-1, I-4, I-7
 - **Scope:**
-  - Linux integration: tray where the desktop supports it, libsecret keychain (G-31 behaviour without Secret Service), owner presence via the passphrase or a platform authenticator where M2-11a found one; packaging formats per M2-11a.
+  - Linux integration: tray where the desktop supports it, libsecret keychain (D-54 file KeyStore without Secret Service; the desktop opt-in and unlock through an app prompt are specified in 08 §8 at M2), owner presence via the passphrase or a platform authenticator where M2-11a found one; packaging formats per M2-11a.
 - **Acceptance:**
   - The same-user script test passes; the weaker Linux residual risk (no OS biometric binding) is stated in the threat note and the quickstart.
 
@@ -2742,7 +2829,7 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
   - Fill in the M1a column of the `MAINTAINING.md` table: setup pages for Claude Code, Codex, Gemini CLI and Claude Desktop (config), pairing, first message, contacts, messages, approvals (passphrase), negotiation, troubleshooting, FAQ, glossary; technical MCP tools (Talk), policies, CLI, harness configuration, SDK packages (Talk), crypto suites, test vectors.
   - Status hints of shipped features → "Available since v0.1.0" only once v0.1.0 is on npm `latest`; "What works today", Status and roadmap and Versioning updated.
   - Replace cross-space GitHub links with the published site URLs once the site address exists.
-  - Add the headless file KeyStore (containers, WSL, SSH) to Identities and keys → "Where seeds live" once D-54 is decided.
+  - Headless file KeyStore (D-54): mark the "Where seeds live" row available when it ships, and add the headless setup steps to the guide.
 - **Acceptance:**
   - Every page marked available maps to a `done` card and to software on npm `latest`; every unreleased feature still says Planned.
   - Guide passes the 11 §5 vocabulary check; every page is in its `SUMMARY.md`; no broken relative links (DOCS-LINT, or a manual check recorded in the PR until it lands).
@@ -2855,7 +2942,7 @@ Converging M1a chains that must arrive in time:
 - **Policy and commitments:** M1-2a → {M1-2b, M1-21}; M1-7a + M1-2b → M1-7d → {M1-7e, M1-20 (+ M1-21)} → M1-9b → (M1-9c).
 - **Pairing and card crypto:** M1-1f (after G-28) → (M1-7c); M1-1e → (M1-7a).
 - **Transport:** M1-5a → M1-5b → M1-5c → (M1-7h); M1-18 before the dogfood.
-- **Owner presence (passphrase):** M1-8a → {M1-8b, M1-8c} → M1-9a → M1-9b.
+- **Owner presence (passphrase):** M1-8a → {M1-8b, M1-8c} → M1-9a → M1-9b. Headless (off the critical path): M1-1f + M1-8a + M1-8b + M1-8c → M1-8f → M1-9a's `--keystore file` branch.
 - **Install and dogfood:** M1-16 + M1-9a + M1-12a + M1-12b → M1-25 → (M1-23); M1-13b → (M1-23); M1-19 (+ M1-25 prompt templates) for invite links; M1-9a + M1-12a → M1-29 → (M1-23).
 
 **M1b, to M1-GATE:** **M0-2f → M1-3a → M1-3b → M1-3c → M1-3e → M1-3g → M1-4c → M1-7g → M1-9d → M1-13c → M1-GATE**. This chain starts in M1a week 1 (contracts lane); if it waits for the M1a gate, M1 slips by the length of M1a.
@@ -2877,7 +2964,7 @@ Sizes are effort, not calendar time. The M1a path has thirteen sequential M1 car
 |---|---|
 | **A — M0 (week 1)** | Owner: M0-2a, M0-2b, M0-2e, M0-2g, M0-4, M0-6, M0-12 · Skeleton: M0-2d → {M0-8, M0-9, M0-10, M0-15} · Contracts repo: M0-2f · Legacy: OPS-L1, OPS-L5, OPS-L8 (→ M0-1), OPS-L3 → OPS-L2, OPS-L4, OPS-L9 |
 | **B — M1a weeks 1–2** | Vectors: M1-1h · Crypto: M1-1a → M1-1b → {M1-1c, M1-1f} → M1-1g; M1-1e · Types: M1-2a → {M1-2b, M1-21} · Relays: M1-18 · Release: M1-16 · Started early for M1b: M1-1i; Contracts M1-3a → {M1-3b, M1-3d}; Chain config M1-14; Utilities M1-15; Audit RFP M1-17; Trademark M1-24; Drop buckets and terms M1-28 (owner) |
-| **C — M1a weeks 2–4** | Core: M1-7a → M1-7b → M1-7c → M1-7h; M1-7d → {M1-7e, M1-20} · Transport: M1-5a → M1-5b → M1-5c · Node: M1-8a → {M1-8b, M1-8c} · CLI: M1-9a → M1-9b · MCP: M1-9c → {M1-9e, M1-9g (after DESIGN-D1), M1-12a, M1-13b} · Install: M1-12b → M1-25 → M1-19 (invite page with prompt); M1-29 · E2E: M1-13a → M1-22 → **M1-23 (M1a gate)** · Spec follow-up: M1-30 (after D-53 merges) · M1b in parallel: M1-1d, M1-1j, M1-1k, M1-3c, M1-3e, M1-3f, M1-6a |
+| **C — M1a weeks 2–4** | Core: M1-7a → M1-7b → M1-7c → M1-7h; M1-7d → {M1-7e, M1-20} · Transport: M1-5a → M1-5b → M1-5c · Node: M1-8a → {M1-8b, M1-8c}; M1-8f in parallel, off the critical path · CLI: M1-9a → M1-9b · MCP: M1-9c → {M1-9e, M1-9g (after DESIGN-D1), M1-12a, M1-13b} · Install: M1-12b → M1-25 → M1-19 (invite page with prompt); M1-29 · E2E: M1-13a → M1-22 → **M1-23 (M1a gate)** · Spec follow-up: M1-30 (after D-53 merges) · M1b in parallel: M1-1d, M1-1j, M1-1k, M1-3c, M1-3e, M1-3f, M1-6a |
 | **D — M1b weeks 4–6** | Chain: M1-4a → {M1-4b → M1-26, M1-4d}, M1-3g → M1-4c · Storage: M1-6b → M1-6c · Drop: M1-27a → M1-27b · Core: M1-7f, M1-7i, M1-7g · Owner presence: M1-8d → M1-8e → M1-11a → M1-11c → M1-11b (after DESIGN-D1) · Submitter: M1-10a → M1-10b → M1-10c · CLI: M1-9h, M1-9i · Owner: M2-14 enrolment and M2-16 OAuth registrations start |
 | **E — M1b weeks 6–7** | M1-9d, M1-9f, M1-12c, M1-12d, M1-13c, M1-13d → M1-GATE |
 | **M2** | Design: DESIGN-D2 → M2-1a → M2-1b → M2-6 · Console: M2-2a → M2-2b → {M2-2c, M2-2d → M2-2e}, M2-2f, M2-2h · Cloud: M2-3a → M2-3b → M2-3c → {M2-3d, M2-3e}, M2-2g · Registry: M2-4a → M2-4b → M2-12 · Public pages: M2-5a, M2-5b → M2-13, M2-8 · Desktop: M2-11a → M2-11b → {M2-11c, M2-11d, M2-11e (+ M2-14) → M2-11f}, M2-11g (after M2-2e, DESIGN-D2) · Storage connectors: M2-16 (owner) → M2-15a (after M2-11b, M2-11g) → {M2-15b, M2-15c, M2-15d} · M2-7, M2-9 · M2-10 (after M1-24) before external testers → M2-GATE |
@@ -2897,7 +2984,7 @@ Concurrency guideline: no more than five or six S1/S2 cards `in-review`/`audit` 
 
 Found while decomposing. None is resolved here; each needs a spec-change PR (or an owner decision) before the blocked cards become `ready`. Priority: **H** blocks security-critical design, **M** blocks a card's acceptance, **L** cosmetic or late.
 
-1. **G-1 (H) Local owner presence vs a same-user agent.** 04 §1 I-4, §2.5; 08 §1; 10 M1-8. The WebAuthn RP ID `localhost` is shared by every local origin, and 04 §2.5 already accepts that a shell-capable agent can tamper with the installation. Either way the next owner passkey or passphrase use on that machine can be captured and the wrapped owner seed on disk unwrapped: local presence proves presence, not intent. The residual-risk text lists only tampering and credit spending, and I-4's "no agent process can produce one" holds only while the installation is intact. *Proposed:* state this in 04 §2.5; scope the M1-8 test to an unmodified installation; recommend owner operations from the console on a separate device when the harness has unrestricted shell; harness deny rules for the installed package and npx cache; consider not storing the owner seed on agent machines by default. *Blocks:* M1-8c, M1-8d, M1-8e, M1-11a, M1-12b. *Status:* stays open until the D-36 desktop app ships (G-42).
+1. **G-1 (H) Local owner presence vs a same-user agent.** 04 §1 I-4, §2.5; 08 §1; 10 M1-8. The WebAuthn RP ID `localhost` is shared by every local origin, and 04 §2.5 already accepts that a shell-capable agent can tamper with the installation. Either way the next owner passkey or passphrase use on that machine can be captured and the wrapped owner seed on disk unwrapped: local presence proves presence, not intent. The same holds for creating the owner key on such a machine: a tampered installation or a same-user process that reads memory can capture or predetermine the owner seed during setup (04 §2.8, D-54). The residual-risk text lists only tampering and credit spending, and I-4's "no agent process can produce one" holds only while the installation is intact. *Proposed:* state this in 04 §2.5; scope the M1-8 test to an unmodified installation; recommend owner operations from the console on a separate device when the harness has unrestricted shell; harness deny rules for the installed package and npx cache; consider not storing the owner seed on agent machines by default. *Blocks:* M1-8c, M1-8d, M1-8e, M1-11a, M1-12b. *Status:* stays open until the D-36 desktop app ships (G-42).
 2. **G-2 (H) `KeyStore` location and methods.** 03 §3; 07 §1, §4.1; 04 §2.6, §3.1. The interface lives "in core", but `transport-nostr` depends only on `crypto` (dependency cycle). Missing: envelope-hash signing (`signNostr` signs events, the envelope signature is BIP-340 over a tagged hash) and epoch selection for decrypting with old keys. *Proposed:* define `KeyStore`/`OwnerKeyStore` in `@agentlink/crypto`; add `signEnvelopeHash` and epoch parameters. *Blocks:* M1-1g, M1-5a, M1-7b.
 3. **G-3 (H) AccessManager role mapping.** 05 §2.2, §5. Execution delays attach to (role, account) grants, so: cap lowering (immediate) and raising (7 days) need separate functions and roles; UPGRADER has two delays (48 h Notary/Registry, 7 days vault); `freezeUpgrades` is ADMIN with a 7-day delay while ADMIN is 48 h; guardian (cancel) roles, grant delays and `minSetback` are unspecified. *Proposed:* role-per-tier table with a role → selector map in 05 §5 (drafted in M1-3a). *Blocks:* M1-3a, M1-3b, M1-3g.
 4. **G-4 (H) Batch failure semantics.** 05 §3.2; 07 §7. Whether one failing item reverts `notarizeBatch`/`acknowledgeBatch` is unspecified; the submitter batches across signers, so one item (e.g. credits spent between simulation and inclusion) can grief the rest. *Proposed:* specify all-or-nothing with per-item pre-simulation and retry without the failing item, or skip-and-emit with per-item status; keep 05 §3.4 gas targets. *Blocks:* M1-3d, M1-10a.
@@ -2927,7 +3014,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 28. **G-28 (L) Safety-code encoding.** 04 §3.6: the first 40 bits (2^40 ≈ 1.1 × 10^12) do not fit 12 decimal digits, the format 11 §1 and §8 specify. *Blocks:* M1-1f, M1-1h.
 29. **G-29 (M) Owner-operation payload bodies.** 04 §3.4 lists `approval-request`, `approval`, `policy`, `card-update`, `revoke`, `handshake-ack` without body schemas. *Blocks:* M1-2a, M2-2e.
 30. **G-30 (M) Native-coin price source.** RESOLVED for launch by D-46: fees are stablecoin-only, every fee token is valued 1:1, and 07 §6.2 needs no price endpoint. A USD price source for native coins returns with the `PRICE_UPDATER` work in M4-EPIC (12 §3.4). *Was:* 07 §6.2 "public price endpoint" unspecified (third-party egress, integrity). *Blocked:* M1-4b, M3-3.
-31. **G-31 (L) Linux without Secret Service.** 04 §2.2; 03 §6 (headless servers, containers, WSL). *Proposed:* `needs_setup` by default; a documented, weaker passphrase-wrapped file store as opt-in. *Blocks:* M1-8a.
+31. **G-31 (L) Linux without Secret Service.** RESOLVED by D-54 (04 §2.8, 07 §9): the OS keychain stays the default; without one, `needs_setup` unless the user opts in, in an interactive terminal, to a passphrase-locked file KeyStore (Argon2id + AES-256-GCM, unlocked by the MCP server from a passphrase file or an environment variable); the owner key is never unlocked non-interactively. Built in M1-8f. *Was:* 04 §2.2; 03 §6 (headless servers, containers, WSL); proposed `needs_setup` by default and a documented, weaker passphrase-wrapped file store as opt-in. *Blocked:* M1-8a.
 32. **G-32 (M) Per-contact policy overrides.** 11 §8 (approval card, "Remember for this contact") has no counterpart in 06 §3. *Blocks:* M1-2b, M1-11a.
 33. **G-33 (M) DELIVERED timing for notarized messages.** 06 §2.2 records DELIVERED when `agentlink_inbox` returns a message, but the `proof` envelope (04 §3.4) arrives later. *Proposed:* sign DELIVERED when the proof envelope is processed if the message was already returned. *Blocks:* M1-7g, M1-9c.
 34. **G-34 (L) Default receipt linkability.** 05 §3.3 (a receipt links the recipient's agent address to the record) vs 06 §3 `receipts.autoDelivered: true`. *Proposed:* keep the default but state it at pairing and in settings, or default to off. *Blocks:* M1-7g, M1-11c.

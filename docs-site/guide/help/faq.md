@@ -44,4 +44,4 @@ Messages and files are free. Proof is planned at $0.10. See [Pricing](../pricing
 
 ### What is the product called?
 
-AgentLink is a working name, by 4thTech. The final name is still being checked.
+AgentLink, by 4thTech. The name is going through a trademark check, so details such as the final web address may still change.

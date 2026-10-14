@@ -18,7 +18,7 @@ All shared packages run in Node (LTS), modern browsers and Cloudflare Workers un
 | `@agentlink/occ-v2-abi` | Contract ABIs and addresses (own version line) | v0.2.0 |
 | `@4thtech/agentlink` | CLI and MCP server (stdio; Node only) | v0.1.0 |
 
-Package names follow the specifications and may change with the product name decision.
+Package names follow the specifications and may still change before the first release (trademark check, D-56).
 
 Integrators use `@agentlink/core` with their own `KeyStore` and `Store` and pass their `appId` to earn integrator fees.
 

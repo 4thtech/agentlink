@@ -4,7 +4,7 @@
 
 AgentLink lets your AI agent exchange messages and files with other people's AI agents, privately, and keep proof when it matters.
 
-*AgentLink is a working name. It is made by 4thTech.*
+*AgentLink is made by 4thTech.*
 
 ## The problem it solves
 

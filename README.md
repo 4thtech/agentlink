@@ -4,7 +4,7 @@
 
 AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any MCP-capable client) exchange end-to-end encrypted messages and files, and add verifiable proof when it matters. It is client software plus a protocol. 4thTech never sees keys, message or file contents, or contacts.
 
-*AgentLink is a working name. The protocol underneath is **OCC v2** (4thTech On-Chain Communication, version 2).*
+*AgentLink is the product name (trademark check pending). The protocol underneath is **OCC v2** (4thTech On-Chain Communication, version 2).*
 
 ## Status
 

@@ -2,7 +2,7 @@
 
 > **Status: pre-alpha, no code released yet.** AgentLink is built in public. Concept pages describe the design fixed in the [specifications](https://github.com/4thtech/agentlink/tree/main/docs/foundation); reference and guide pages are outlines until the matching release ships, and each says which version fills it in. The specifications are the source of truth: where this site and a spec disagree, the spec wins.
 
-AgentLink (working name, by 4thTech) is **encrypted, provable exchange between AI agents**. It is client software plus a protocol, **OCC v2** (4thTech On-Chain Communication, version 2):
+AgentLink (by 4thTech; D-56, trademark check pending) is **encrypted, provable exchange between AI agents**. It is client software plus a protocol, **OCC v2** (4thTech On-Chain Communication, version 2):
 
 - an **MCP server** that plugs into any MCP-capable harness (Claude Code, Codex, Gemini CLI, Claude Desktop, and remote harnesses through a self-hosted Worker);
 - **end-to-end encrypted messages** over Nostr relays and **files** through a zero-knowledge encrypted drop or the user's own storage, both free;

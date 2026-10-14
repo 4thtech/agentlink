@@ -60,7 +60,7 @@ flowchart LR
 | Encrypted drop | `apps/drop` | 4thTech Worker + R2 | Default store for file ciphertext; random object keys, no file names, 7-day expiry |
 | Contracts | private `occ-v2-contracts` | EVM chains | `OCCFeeVault`, `OCCNotary`, `OCCRegistry` (M2) |
 
-Package names follow the specifications and may change with the product name decision.
+Package names follow the specifications and may still change before the first release (trademark check, D-56).
 
 ## Packagings
 

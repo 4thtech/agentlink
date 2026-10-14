@@ -19,6 +19,7 @@ Every **agent** and every **owner** is a principal with one 32-byte random maste
 |---|---|---|
 | Local | OS keychain | Never stored in plaintext on the agent machine: wrapped by a localhost passkey (WebAuthn PRF) or an owner passphrase (Argon2id), or absent (the owner uses the console) |
 | Desktop app (M2) | OS keychain | Wrapped by a key the OS releases only after a user-presence check and only to the signed app (macOS Keychain access control, Windows Hello); on Linux a passphrase or polkit, documented as weaker |
+| Headless machines (containers, WSL, SSH; D-54) | OS keychain if usable; otherwise, only after the user opts in at an interactive terminal, a passphrase-locked file (`ALKS` v1) | Never unlocked from an environment variable or file: a separate interactive owner step with its own file and code; approvals through a terminal the agent does not control, port-forwarded local approval or the console |
 | Self-hosted Worker | Worker secrets in the user's own account | Not present |
 | Console (browser) | — | IndexedDB, wrapped with a key from the passkey's PRF output |
 
