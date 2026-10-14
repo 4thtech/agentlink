@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposal for the owner's decision. **Not normative.** 04 and 07 are unchanged until the owner decides; then a spec PR (S2) applies §5 of this note. |
+| **Status** | **Decided: D-66** (Tali, 14 Oct 2026): A + D, as recommended by the independent review IR-G-46-1 (sound with changes). The normative text is in 04 §3.1, §3.1.1 and §3.3 and in 07 §8; where it differs from this note, the spec wins. In particular, the spec fixes `skE_j = ikm_j` as the raw X25519 secret, not `DeriveKeyPair` (IR-G-46-1 F-2). The new gap for T6 is G-48. This note is kept as the rationale. |
 | **Gap** | G-46 (H), `docs/process/backlog.md` §8 |
 | **Requirement** | D-61 (5), stated in 04 §3.3: every recipient entry, every owner (I-9) and a proof-pack verifier obtain the same plaintext for a given `envelopeHash`, or fail to decrypt |
 | **Timing** | D-62: fixed before M1-7b becomes `ready` and before the `aead-envelope` and `envelope-sig` vectors freeze |
@@ -135,7 +135,7 @@ Opening: `unwrapCek` gives the CEK. `kc'` is derived and compared with `aead.kc`
 
 - **Allowlist:** yes (`@noble/*`; already a runtime dependency).
 - **Security:** Poly1305 is not key-committing (Len et al. 2021), so the commitment still has to come from Option A. The 24-byte nonce buys nothing here, because the payload key is single-use. AES-GCM-SIV (RFC 8452), also in `@noble/ciphers`, is not key-committing either. To our knowledge `@noble/ciphers` ships no key-committing AEAD; the builder confirms this against the pinned version.
-- **Cost:** +16 bytes for the nonce and +51 for `kc`, so the worst case is 24 574 of 24 576 bytes (2 bytes of headroom). The cipher runs in pure JS instead of hardware AES through WebCrypto; that is fine for 17 KB, but it adds a second payload cipher next to HPKE's and ALF1's AES-GCM.
+- **Cost:** +16 bytes for the nonce and +51 for `kc`, so the worst case is 24 579 bytes or more (more with a longer `alg`), above the 24 576-byte limit unless the `ct` cap drops (corrected after IR-G-46-1 F-7). The cipher runs in pure JS instead of hardware AES through WebCrypto; that is fine for 17 KB, but it adds a second payload cipher next to HPKE's and ALF1's AES-GCM.
 - **Impact:** the same as A, plus a second AEAD in the vectors and the audit scope, and divergence from the HPKE suite and ALF1.
 - **Verdict:** no gain over A. Rejected.
 - **References:** RFC 8439 (ChaCha20-Poly1305); the XChaCha IRTF draft (draft-irtf-cfrg-xchacha); Len, Grubbs and Ristenpart, "Partitioning Oracle Attacks" (USENIX Security 2021).
@@ -183,7 +183,7 @@ ikm_j            = HKDF(ikm = CEK, salt = "", info = utf8("agentlink/v1/cek-eph"
 |---|---|---|---|---|---|
 | Meets D-61 (T1, T4b) | Yes | Yes | CTX yes; HtE no; padding about 2^64 | Yes, through A | Yes |
 | Stops T2/T3 (owner exclusion) | No | No | No | No | **Yes** |
-| Worst-case envelope (limit 24 576) | 24 563 | 24 560–24 563 | ≈ 24 531 | 24 574 | 24 563 |
+| Worst-case envelope (limit 24 576) | 24 563 | 24 560–24 563 | ≈ 24 531 | ≥ 24 579 (over) | 24 563 |
 | Extra CPU | 2 HKDF | 1 SHA-256 | — | 2 HKDF, pure-JS cipher | + ≤ 7 HPKE seals on open |
 | Allowlisted, no custom composition | Yes | Yes | **No** (CTX) | Yes | Yes |
 | Spec and vector churn | Low | Low | — | Medium | Low to medium |
@@ -257,5 +257,5 @@ To be made in one S2 spec PR after the owner decides. Nothing below is applied b
    *Recommended: as stated.*
 4. **Proof packs:** `envelope` mandatory whenever `disclosure` is present; `contentKey` stays the CEK; the counterparty-entry check is optional for verifiers. *Recommended: yes.*
 5. **Size budget:** keep the `ct` cap at 17 152 (worst case 24 563 of 24 576, 13 bytes of headroom). Any future envelope field lowers the cap. *Recommended: yes.*
-6. **T6** (different envelopes under one `id` per recipient at the transport): record it as a new gap (G-47) for a separate design, for example the receiving agent reporting `envelopeHash` to its owner in the F-23 ack. *Recommended: record it.*
+6. **T6** (different envelopes under one `id` per recipient at the transport): record it as a new gap (G-48; numbered G-47 before that number went to FA-2) for a separate design, for example the receiving agent reporting `envelopeHash` to its owner in the F-23 ack. *Recommended: record it.*
 7. **Review:** an independent Opus review of the spec PR (S2, audit-rules §4), with the construction added explicitly to the M3-1 external audit scope. *Recommended: yes.*

@@ -114,7 +114,7 @@ An object embedded in another one keeps its own bytes. For example, a proof pack
 | Bare hex, 64 (Nostr key) | envelope `from`; OwnerAction `owner`; CommitmentScope `counterparty.ownerKey`; Nostr event ids |
 | Bare hex, 128 (BIP-340) | envelope `sig`; `SignedOwnerAction` `sig` |
 | Bare hex, 64 (digest under a Nostr key only) | `approval-request.actionDigest` and `approval.decide` `params.actionDigest`; `terms` bodies' `termsHash` and `terms.previousTermsHash`; CommitmentScope `termsHash`; `files[].plaintextSha256`, `terms.deliverables[].plaintextSha256`, `files[].ciphertextSha256`, drop commit `ciphertextSha256`; proof pack `ownerApproval.policyHash`; `handshake` `inviterCardHash`; `contact.check` `params.pairingDigest` (§3.6.1) |
-| base64url | envelope `id`, `thread`, `recipients[].kid`, `.enc`, `.wk`, `aead.iv`, `aead.ct`; payload `replyTo`, `files[].inline`, `files[].fileKey`; `proof` body `envelopeId`; CommitmentScope `answers.envelopeId`, `thread`, `termsId`; `terms.termsId`; invite `inviteId`, `secret`; `handshake` `inviteId`, `proof`, `codeNonce`, `codeCommit`; invite `codeCommit`; `handshake-ack` `inviteId`, `handshakeId`, `codeReveal`; OwnerAction `nonce`; drop request `nonce`; proof pack `disclosure.contentKey` |
+| base64url | envelope `id`, `thread`, `recipients[].kid`, `.enc`, `.wk`, `aead.iv`, `aead.kc`, `aead.ct`; payload `replyTo`, `files[].inline`, `files[].fileKey`; `proof` body `envelopeId`; CommitmentScope `answers.envelopeId`, `thread`, `termsId`; `terms.termsId`; invite `inviteId`, `secret`; `handshake` `inviteId`, `proof`, `codeNonce`, `codeCommit`; invite `codeCommit`; `handshake-ack` `inviteId`, `handshakeId`, `codeReveal`; OwnerAction `nonce`; drop request `nonce`; proof pack `disclosure.contentKey` |
 | Prefixed string (not binary) | `approvalId` everywhere (`approval-request`, `approval.decide` and `approval.cancel` `params`, tool inputs and results): exactly `apr_` followed by the base64url (no padding) of 16 random bytes, 26 characters in total, matched exactly |
 | Tool results (06 §2) | Use the row of the protocol path they mirror: `ProofStatus.recordId` and `txHash`, and `agentlink_verify_proof_pack` `recordId` and `envelopeHash`, are `0x` + 64 hex; `signer` there is a `0x` address; `termsHash` is bare hex; `envelopeId` is base64url |
 
@@ -353,6 +353,7 @@ ct          ciphertext || 16-byte tag
 
 **Passphrase strength.**
 - **Agent:** the default is a generated unlock code; offline guessing of a stolen file is then infeasible. A passphrase the user chooses is allowed at the interactive prompt only. It must have at least 12 Unicode code points, counted after NFKC, and comes with a warning that a weak passphrase can be guessed if the file leaks.
+- **Owner (D-66).** A chosen owner passphrase (kind 2, where one is allowed at all: never on file-KeyStore machines, below, and never for a blob published to relays, §2.3) must also have at least 12 Unicode code points, counted after NFKC, the same rule as for the agent. It is checked when the passphrase is set or changed, before the KDF runs. A shorter candidate is refused, never padded or completed.
 - **Agent and owner secrets always differ, checked in both directions.**
   - Setting or changing the agent passphrase refuses a candidate that unlocks the owner's wrapped seed. The candidate is normalised the way the owner wrap normalises it (M1-1f). A candidate that fails a kind's normalisation (for example, it is not a valid generated code) counts as "does not unlock" for that kind, never as an error.
   - Creating or changing the owner secret on a machine with file KeyStores refuses a candidate that opens any of them, for every agent on the machine.
@@ -544,24 +545,25 @@ All binary values are base64url **without padding** in JSON unless §2.4.1 puts 
       "enc": "<HPKE encapsulated key>",
       "wk":  "<HPKE ciphertext of the CEK>" }
   ],
-  "aead": { "alg": "A256GCM", "iv": "<12 bytes>", "ct": "<ciphertext || 16-byte tag>" },
+  "aead": { "alg": "A256GCM-KC", "iv": "<12 bytes>", "kc": "<32-byte key commitment>", "ct": "<ciphertext || 16-byte tag>" },
   "sig": "<BIP-340 signature, 128 lowercase hex>"
 }
 ```
 
 - `envelopeHash = sha256(JCS(envelope without "sig"))` (RFC 8785). This is the value notarized on-chain.
 - AEAD additional data = `sha256(JCS({v, id, thread, from, createdAt, recipients}))`.
+- **Payload key and key commitment (G-46, D-66).** `aead` is AES-256-GCM under `encKey`, never under the CEK. `encKey` and the 32-byte key commitment `kc` are both derived from the CEK, and `kc` is checked before decrypting (§3.3). `alg` is `A256GCM-KC`. The parser refuses any other `alg`, a `kc` that is not exactly 32 bytes, and any other key set in `aead`, so no envelope of the earlier form is accepted.
 - `sig` = BIP-340 Schnorr by `from` over `taggedHash("agentlink/envelope/v1", envelopeHash)` (BIP-340 tagged hash), so envelope signatures can never be confused with Nostr event signatures. Exact bytes, keys, verification and size limits: §3.1.1.
 
 #### 3.1.1 Envelope signatures, keys and limits (G-2; D-62, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34)
 
 **What is signed.** One construction for every envelope and every sender:
-1. `E` is the strictly parsed envelope (M1-1c) with every key except `sig`: `v`, `id`, `thread`, `from`, `createdAt`, `recipients` (in the order sent) and `aead` (`alg`, `iv`, `ct`). The hash is computed from the parsed copy, so what is hashed is what was checked.
+1. `E` is the strictly parsed envelope (M1-1c) with every key except `sig`: `v`, `id`, `thread`, `from`, `createdAt`, `recipients` (in the order sent) and `aead` (`alg`, `iv`, `kc`, `ct`). The hash is computed from the parsed copy, so what is hashed is what was checked.
 2. `envelopeHash = sha256(JCS(E))`, 32 bytes.
 3. `m = taggedHash("agentlink/envelope/v1", envelopeHash) = sha256(sha256(t) ‖ sha256(t) ‖ envelopeHash)`. `t` is the 21 UTF-8 bytes of the tag, and `envelopeHash` enters as its 32 raw bytes, never as hex.
 4. `sig = BIP-340 Sign(sk, m, auxRand)`, with 32 fresh CSPRNG bytes as `auxRand` (vectors fix them). `sk` is the secret key of `from` (table below). `sig` is the 64-byte signature as 128 lowercase hex (§2.4.1).
 
-The AAD (§3.1) covers the header only. The hash also covers `aead`, so the signature commits to the ciphertext. That alone does not make every recipient read the same plaintext; the requirement is in §3.3 (G-46).
+The AAD (§3.1) covers the header only. The hash also covers `aead`, so the signature commits to the ciphertext and to `kc`. The payload AEAD is key-committing (CMT-1) through `kc`. Context commitment (`iv`, the AAD and the header) comes from `envelopeHash`, which every opener checks, together with `sig`, before it decrypts. Together they give every party that decrypts the same plaintext (§3.3, G-46).
 
 **Domain separation.** A Nostr key signs several kinds of object. Each has its own 32-byte message:
 
@@ -602,14 +604,20 @@ The AAD (§3.1) covers the header only. The hash also covers `aead`, so the sign
 **Recipient entries (sender, core).**
 - The sender writes exactly the set of §3.2, or of §3.4.1 for the owner channel, with **one entry per distinct `enc` key**. When both agents have the same owner, that owner has a single entry. Gift wraps follow the same rule: one per distinct Nostr key (§3.5).
 - The order of the entries is the sender's choice. The hash and the AAD cover it, and receivers compare the entries as a set.
+- **Every wrap is derived from the CEK** and the recipient's key (§3.3, G-46). The sender has no free choice per entry, and an opener that holds the CEK and an entry's public key can recompute that entry byte for byte.
 
 **The owner reads its envelopes (I-9).** The owner is a recipient of its agents' envelopes (§3.2 entries 2 and 3) and of the owner channel (§3.4.1). It also reads back its own `approval`, `policy` and `revoke` on another device. Senders take `ownerEnc` (the CEK wrap) and `ownerNostr` (the gift wrap) from the cards. All steps run inside one `OwnerSession`:
 1. `nip44Decrypt` of the gift wrap (from its ephemeral key) under the owner Nostr key gives the seal. The seal's signature is verified, and `nip44Decrypt` of its content (from the seal key) gives the rumor.
 2. The envelope passes the verification steps below, 1–4.
 3. The core finds the one entry whose `kid` is the `kid` of `ownerEnc`.
-4. `unwrapCek(entry, id)` gives the CEK. The payload is decrypted with the AAD (§3.1), and the CEK is wiped.
-5. The payload passes step 6 (strict schema) before anything is rendered.
-6. The copy is placed by the attribution rules below. Nothing is shown on an agent's thread before they hold.
+4. `unwrapCek(entry, id)` gives the CEK. The payload is decrypted with the AAD (§3.1), after the `kc` check (§3.3).
+5. **Wrap check (G-46).** With the CEK, the surface recomputes (§3.3) and compares, byte for byte:
+   - every entry whose `kid` is the `enc` `kid` of one of its own agents, at any epoch of a card the owner signed (always possible);
+   - every entry of a contact's agent or owner whose card the surface holds, as the attribution rules below establish it.
+
+   An entry whose key the surface does not hold is not checked and causes no refusal. A mismatch here, or a `kc` mismatch at step 4, means that the sender signed entries that carry different keys. The copy is then shown outside the threads, as refused, and the contact is flagged. The CEK is wiped after this step.
+6. The payload passes step 6 (strict schema) before anything is rendered.
+7. The copy is placed by the attribution rules below. Nothing is shown on an agent's thread before they hold.
 
 **Where the owner shows a copy (I-9).** Anyone can address an envelope to `ownerNostr`, so a decrypted copy is not proof that the owner's agent sent or received it. A surface (the console, the desktop app) shows a copy on one of its agents' threads only when:
 - **Sent by the agent.** `from` is that agent's `agentNostr` at an epoch of a card the owner signed, and the agent is not revoked. Owner-authored types follow the key table above, and `approval-request` and the `policy` echo follow §3.4.1.
@@ -618,7 +626,7 @@ The AAD (§3.1) covers the header only. The hash also covers `aead`, so the sign
 - **Anything else** that passed steps 1–6 is shown outside the threads, as not from a known contact. It is never shown as something the agent sent, received or agreed to.
 
 - **Reading needs presence.** The gift wrap is addressed to `ownerNostr`, the key that signs owner actions, so no read-only owner key exists. A read session gets the same protections as a signing session. Receiving owner copies from DM relays also needs NIP-42 AUTH with the owner key (kind 22242) in the same session. How long the console keeps a read session open is decided in M2-2d, and it never outlives the console's own unlock. A separate owner inbox key would need a new card field and is not proposed.
-- **Where copies are published and read (G-24; proposed, owner confirms at merge).** A wrap for an owner key goes to the relays of the agent it concerns, and an owner surface subscribes on the authenticated relay lists of all its agents, inside the read session (07 §4.3). The relay a copy arrived on plays no part in the attribution rules above.
+- **Where copies are published and read (G-24; accepted with D-65).** A wrap for an owner key goes to the relays of the agent it concerns, and an owner surface subscribes on the authenticated relay lists of all its agents, inside the read session (07 §4.3). The relay a copy arrived on plays no part in the attribution rules above.
 - A surface may keep the plaintext it read under its own at-rest rules (07 §3, 08). It never keeps the owner keys.
 - An agent's `KeyStore` never holds owner keys and never opens an owner entry.
 
@@ -628,6 +636,8 @@ The AAD (§3.1) covers the header only. The hash also covers `aead`, so the sign
 3. **Strict parse** (M1-1c): exact keys and encodings (§2.4.1); 1 to 8 recipients with distinct `kid`s; the `ct` limit.
 4. **Signature.** `from` lifts to a curve point (BIP-340 `lift_x`), and `sig` verifies under `from` over `m` above. Only the envelope tag is tried. An untagged `envelopeHash` and a NIP-01 check are never accepted.
 5. **Own entry.** The core looks for an entry whose `kid` matches one of its own `enc` keys, at any epoch (`getPublicBundle({epoch})`). With none, the envelope is not for this agent. With one, there is exactly one `unwrapCek`, at that entry's epoch, so an envelope never makes the core try more than one HPKE open per local key. If entries match own keys at more than one epoch, the core uses the highest epoch, still with exactly one `unwrapCek`. A failed open or AEAD is dropped (`open_failed`).
+   - The payload decryption checks `kc` before AES-GCM (§3.3). A `kc` mismatch on an envelope whose signature passed step 4 shows that the sender signed a commitment that its own wrap for this agent does not carry. It is treated like a wrap mismatch at step 8: stored as refused, shown in the activity feed, and the contact is flagged. The crypto layer reports a `kc` mismatch and a failed tag as the same `open_failed`; the core tells them apart with the separate commitment check (§3.3).
+   - The core keeps the CEK until step 8 and wipes it there, or at the first failure.
 6. **Payload.** The payload passes its strict schema (`@agentlink/types`, M1-2a; `terms` limits M1-21).
 7. **Sender role.** `from` must be the key that the type requires:
    - a contact's agent key: the `agentNostr` of the contact's **current** card. A superseded epoch key is refused, except for `card-update` (§3.4.1), so a key replaced after a compromise cannot keep sending. The refused envelope is stored as refused and shown in the activity feed, never in `agentlink_inbox`. Owner copies stay readable.
@@ -638,11 +648,15 @@ The AAD (§3.1) covers the header only. The hash also covers `aead`, so the sign
    **Arrival order after a key rotation.** Relays do not order delivery, and NIP-59 randomises gift-wrap timestamps, so a contact's first envelopes under a new epoch key can arrive before its `card-update`. Fail closed:
    - Within one sync pass, the core processes `card-update` envelopes before any other envelope.
    - An envelope from an unknown agent key whose recipients include the `kid` of the `ownerEnc` of a stored contact's card (that owner's entry, §3.2) is **held**: it is neither processed nor shown as a request.
-   - Each time a `card-update` is applied, the core runs the held envelopes again from step 7. One whose `from` is now that contact's current key is processed as from the contact.
+   - Each time a `card-update` is applied, the core runs the held envelopes again from step 5, so that the wrap check of step 8 runs against the sender's new card (G-46). Each such pass makes exactly one `unwrapCek` per held envelope. One whose `from` is now that contact's current key is processed as from the contact.
    - A held envelope that no `card-update` claims within 48 h (the sync overlap, 07 §4.2) goes to the requests queue as from an unknown key. Before any request is shown, the core checks `from` again against its contacts' current cards, so a contact is never shown as a new contact request.
    - A held envelope is never accepted as the contact's without a valid `card-update`. The cost is that a new agent of an existing contact's owner waits up to 48 h in the requests queue.
    - Held envelopes have their own pool, separate from the requests queue (06; spam, §7), so they never use up the requests limits (07 §3.2; proposed, owner confirms at merge; amends D-62). At most 100 are held per owner `kid` (proposed; owner confirms at merge). Beyond that, the oldest held envelope is dropped. A stranger that copies a contact owner's `kid` into its recipients therefore delays only held envelopes for that `kid`, and cannot fill the requests queue.
-8. **Own owner (I-9).** The recipients must include the `kid` of the agent's own owner's `ownerEnc`. Without it, the envelope is stored as refused and shown in the activity feed, because the agent's owner could not read it. The check shows that an entry is present, not that it opens.
+8. **Own owner and wrap check (I-9, G-46).** The recipients must include the `kid` of the agent's own owner's `ownerEnc`. Without it, the envelope is stored as refused and shown in the activity feed, because the agent's owner could not read it. Then, with the CEK from step 5, the core recomputes (§3.3) and compares these entries byte for byte:
+   - **always:** its own owner's entry (the `ownerEnc` of its own card), so the check shows that the entry is present **and** carries the committed CEK;
+   - **when it holds the sender's card:** the entries of the sender's agent (`agentEnc` at the card's epoch) and of the sender's owner (`ownerEnc`). The sender's card is a contact's current card, or for a `card-update` the card it carries once it has passed §3.4.1, or for the pairing types the card in the body once it has passed §3.6.
+
+   An entry whose key the core does not hold (an arbitrator, or a sender whose card is not yet known) is not checked and causes no refusal. Held envelopes are checked again on a `card-update` (step 7). A mismatch means that the sender signed entries that carry different keys: the envelope is stored as refused, shown in the activity feed, and the contact is flagged. The CEK is then wiped.
 9. **Freshness and uniqueness.** A `createdAt` more than 300 s in the future (`S`, §2.5.1) is refused. An `id` already stored with the same `envelopeHash` is a duplicate and is dropped silently (07 §4.2). An `id` already stored with a different `envelopeHash` is refused, and the contact is flagged in the activity feed. This check covers every envelope still in the store, with no retention cutoff; the 07 §4.2 seen-set only saves work during sync.
 
 Decrypting stored history with an older epoch key stays allowed (§2.6). Only accepting a new envelope from a superseded sender key is refused.
@@ -655,8 +669,8 @@ Decrypting stored history with an older epoch key stays allowed (§2.6). Only ac
 | NIP-44 payload | 132 to 87 472 characters, plaintext ≤ 65 535 bytes | `@agentlink/crypto` (M1-1g) | NIP-44 v2 |
 | Envelope (rumor `content`) | ≤ 24 576 bytes of UTF-8, checked on the string **before** `JSON.parse`. On send, the rumor `content` is exactly `JCS(envelope)`, checked before wrapping, so send and receive measure the same string | `transport-nostr` (M1-5a), on both send and receive | §3.5. At this size the worst-case seal is 38 663 bytes (under the NIP-44 limit) and the `EVENT` frame is 55 131 bytes (under the common 64 KiB relay cap) |
 | `recipients` | 1 to 8 entries, distinct `kid`s | `@agentlink/crypto` parser (M1-1c), so every caller gets it | §3.2 needs at most 5 (with the P2 arbitrator), and the owner channel needs 2. 8 leaves room for one more role without a new version. It also caps the publish fan-out (one gift wrap per key) and the parse work, at about 157 bytes per entry |
-| `aead.ct` | 16 to 17 152 bytes decoded, so the payload plaintext is ≤ 17 136 bytes. Checked on the base64url length (≤ 22 870 characters) **before** decoding | `@agentlink/crypto` parser (M1-1c) | The largest multiple of 64 that keeps the worst-case envelope (8 entries, `createdAt` = 2^53 − 1) at or under 24 576 bytes as JCS (24 509 bytes). So every envelope that passes the parser fits §3.5 |
-| Exact recipient set; one HPKE open | per type (§3.2, §3.4.1) | `core` (M1-7b) | I-9, and bounded work per envelope |
+| `aead.ct` | 16 to 17 152 bytes decoded, so the payload plaintext is ≤ 17 136 bytes. Checked on the base64url length (≤ 22 870 characters) **before** decoding | `@agentlink/crypto` parser (M1-1c) | The largest multiple of 64 that keeps the worst-case envelope (8 entries, `createdAt` = 2^53 − 1) at or under 24 576 bytes as JCS: 24 563 bytes with `kc` and `alg` `A256GCM-KC` (G-46, D-66), so 13 bytes of headroom. So every envelope that passes the parser fits §3.5. **Any later envelope field lowers this cap by 64 bytes** |
+| Exact recipient set; one HPKE open | per type (§3.2, §3.4.1); at most 7 recomputed seals for the step 8 wrap check, after `sig` and `kc` have passed | `core` (M1-7b) | I-9, and bounded work per envelope |
 | Payload fields | payload schema (M1-2a), `terms` limits (M1-21), inline files per G-27 | `core` and `@agentlink/types` | |
 
 - **The IR-M1-1c-1 F3 values were checked and not adopted for `ct`.** A `ct` of 64 KiB + 16 gives an envelope of about 89 KB, above the 65 535-byte NIP-44 plaintext limit of the seal, so it could never be sent. D-48 sends files through the encrypted drop or the owner's storage, not inline, so the inline payload can stay small. The 1–8 recipient cap and a raw cap before `JSON.parse` are adopted, the second at both layers above.
@@ -671,14 +685,53 @@ Decrypting stored history with an older epoch key stays allowed (§2.6). Only ac
 4. Sender agent (to read its own sent items)
 5. Optional: arbitrator (P2)
 
-### 3.3 Content key wrapping
+### 3.3 Content key wrapping and key commitment (G-46; D-66)
 
-- CEK: 32 random bytes per envelope.
+- CEK: 32 random bytes per envelope. It is used only as the `ikm` of the three derivations below and as the plaintext of the wraps, never directly as a cipher key.
 - HPKE (RFC 9180), mode Base: KEM `DHKEM(X25519, HKDF-SHA256)`, KDF `HKDF-SHA256`, AEAD `AES-256-GCM`.
 - `info = utf8("agentlink/v1/cek") || id` (`id` as its raw 16 bytes).
-- Each recipient entry seals the CEK independently (empty AAD).
+- Each recipient entry seals the CEK independently (empty AAD), with an ephemeral key derived from the CEK (below).
 - Sender authenticity comes from `sig` and the agent card binding `from` to the owner, not from HPKE Auth mode.
-- **Requirement: one plaintext for every recipient (G-46; owner decision, 14 Oct 2026, D-61).** Every recipient entry, every owner (I-9) and a proof-pack verifier obtain the same plaintext for a given `envelopeHash`, or fail to decrypt. The payload AEAD as specified above does not guarantee this on its own. The owner decided the requirement; the construction is open. *Timing (build plan; D-62, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34):* the construction is fixed before M1-7b becomes `ready` and before the `aead-envelope` and `envelope-sig` vectors freeze.
+
+**Requirement: one plaintext for every recipient (G-46; owner decision, 14 Oct 2026, D-61).** Every recipient entry, every owner (I-9) and a proof-pack verifier obtain the same plaintext for a given `envelopeHash`, or fail to decrypt. The construction below meets it (D-66). It does not rely on any property of the payload format.
+
+**Derivations from the CEK.** Each is HKDF-SHA256 (RFC 5869) with `ikm` = the CEK and an empty `salt`, and each output is 32 bytes. `id` is the envelope id (16 raw bytes). `pk_j` is the raw 32-byte X25519 `enc` key of recipient entry `j`.
+
+| Label | `info` | Output | Use |
+|---|---|---|---|
+| `agentlink/v1/payload-key` | `utf8(label) ‖ id` | `encKey` | The AES-256-GCM key of `aead` |
+| `agentlink/v1/payload-commit` | `utf8(label) ‖ id` | `kc` | The key commitment, carried in `aead.kc` |
+| `agentlink/v1/cek-eph` | `utf8(label) ‖ id ‖ pk_j` | `ikm_j` | The ephemeral secret key of entry `j` |
+
+The labels are distinct, none is a prefix of another, and every suffix has a fixed length, so `info` is unambiguous. No other derivation takes the CEK as `ikm`. Each derivation has vector cases (M1-1h).
+
+**Payload encryption.** `aead.ct = AES-256-GCM(encKey, iv, AAD, payload)`, with `iv` 12 fresh random bytes and the AAD of §3.1. `aead.kc = kc` and `aead.alg = "A256GCM-KC"`.
+
+**Payload decryption** (`decryptPayload`, for every caller: core, the owner surfaces and proof-pack verification):
+1. Derive `kc` from the CEK and compare it with `aead.kc` using the constant-time byte comparison of `@agentlink/crypto`. On a mismatch, no AES-GCM runs, and the result is `open_failed`, the same error as a failed tag.
+2. Derive `encKey` and open AES-GCM.
+3. Wipe `encKey` and the derived `kc`. The caller wipes the CEK.
+
+`decryptPayload` does not verify `sig`: the `kc` check binds the key, not the context. Context comes from `envelopeHash` and `sig`, which the caller checks first (§3.1.1 steps 3 and 4; 07 §8). `@agentlink/crypto` also exports the commitment check on its own, so the core can tell a `kc` mismatch from a failed tag (§3.1.1 step 5).
+
+**Wraps.**
+- For entry `j`, the ephemeral secret key `skE_j` is `ikm_j` itself, used as a raw X25519 secret key. The library applies RFC 7748 clamping, so any 32 bytes are valid. RFC 9180 `DeriveKeyPair` is **not** used. This keeps the merged explicit-ephemeral path and the all-zero shared-secret pre-check, which needs the raw secret.
+- `(enc_j, wk_j) = SealBase(pk_j, info, aad = "", pt = CEK)` with ephemeral key `skE_j`.
+- The same `(CEK, id, pk_j)` always gives the same bytes. A changed `pk_j` or `id` gives a different `enc_j`.
+
+**Wrap check.** An opener that holds the CEK, after the `kc` check, recomputes `(enc_j, wk_j)` for an entry whose `pk_j` it holds and compares the bytes. HPKE mode Base is deterministic in `(pk_j, skE_j, info, aad, pt)`, so equality proves that the holder of the matching secret key opens exactly this CEK. Which entries each opener must check: §3.1.1 verification step 8 (an agent), owner read step 5 (an owner surface), and 07 §8 for a proof-pack verifier (optional). An entry whose key the opener does not hold cannot be checked. The wrap check therefore guarantees I-9 for every checkable entry, which always includes the checker's own owner and, once the sender's card is held, the sender's agent and owner. It does not make every entry verifiable by every party.
+
+**Security conditions.** These are hard rules, not style:
+- **A CEK-derived ephemeral key seals exactly the 32-byte CEK and nothing else.** The derandomised encapsulation (encrypt-with-hash, Fujisaki–Okamoto) is sound only because the sealed message is a uniform, secret 256-bit key.
+- **The HPKE context of a wrap is never used for `export` or for a second message.** Every co-recipient can compute every `skE_j`.
+- `kc` is exactly 32 bytes. The sender chooses both keys in an equivocation, so the commitment needs collision resistance; 32 bytes give about 2^128 work.
+
+**Library dependency.**
+- The wraps hand the derived ephemeral key to `@hpke/core` through its `ekm` sender parameter, which the library labels as for debugging and testing only. The code path is the library's standard encapsulation with only the key source replaced, and the merged `wrapCek` already uses it.
+- `@hpke/core` is pinned exactly at 1.9.0, with `@hpke/common` 1.10.1 in the lockfile.
+- **Regression guard.** The `hpke` vector suite guards this path. Its RFC 9180 cases supply the ephemeral key through the same parameter, and its AgentLink derived-ephemeral cases cover the `cek-eph` derivation. Any `@hpke/*` update runs `hpke` and `aead-envelope` in every runtime before it merges.
+- **No fallback.** An update that breaks them stays unmerged until a replacement is reviewed. A hand-built DHKEM would be a custom primitive (I-8).
+- A broken parameter would make honest envelopes fail the wrap check: a denial of service, never a loss of confidentiality.
 
 ### 3.4 Payload (plaintext inside `aead.ct`)
 
@@ -703,7 +756,7 @@ Decrypting stored history with an older epoch key stays allowed (§2.6). Only ac
   - **`files`** is always present (`[]` when empty) and holds at most 16 entries, but only the user message types carry any: `text`, `note`, `request`, `delivery`, `offer`, `accept`, `reject` and `file`. Every other type must have `files: []`.
   - **Download `url`** (a file entry's `url`) is `https://` + a lower-case host + an optional port + an optional path, query or fragment, at most 2048 characters of printable ASCII, with no user info or whitespace. The port, if present, is 1–65535 with no leading zero, as in the relay URL rule (§4). The SSRF rules (§4) still apply when it is fetched.
   - **`recipients`** (§3.1) has 2 to 5 entries with unique `kid`, because the wrap is picked by `kid`.
-  - **`relays`** (here, in the invite, `handshake`, `handshake-ack` and `card-update`) has 2 to 16 entries, unique, each passing the relay URL rule (§4). The minimum of 2 is proposed with G-24 (owner confirms at merge; it was 1): every such list comes with a card, and a single relay could never reach `sent`, which needs 2 `OK` (07 §4.2). The owner's own Settings entries are not bodies and may hold 1 (07 §4.3).
+  - **`relays`** (here, in the invite, `handshake`, `handshake-ack` and `card-update`) has 2 to 16 entries, unique, each passing the relay URL rule (§4). The minimum of 2 comes with G-24 (accepted with D-65; it was 1): every such list comes with a card, and a single relay could never reach `sent`, which needs 2 `OK` (07 §4.2). The owner's own Settings entries are not bodies and may hold 1 (07 §4.3).
   - **Expiry order.** A card's `expiresAt` is `0` (no expiry) or after its `issuedAt`. An `approval-request`'s `expiresAt` is after its `requestedAt` (and exactly the TTL below).
   - **`approval-request.summary`** is non-empty and contains no control (Cc), format (Cf) or line or paragraph separator (Zl, Zp: U+2028, U+2029) character (newlines, bidi controls and zero-width characters included), so it can never fake structure in an approval screen.
   - **Integers** are JSON integers in [0, 2^53 − 1], including every `uint64` field of the card and of EIP-712 messages (§2.4.1).
@@ -758,9 +811,9 @@ Decrypting stored history with an older epoch key stays allowed (§2.6). Only ac
 | `policy` | Owner → own agent; echo agent → own owner | `{signed: SignedOwnerAction}` with `policy.set` | Owner → agent: as for `approval`; the core stores the signed object, not the envelope. Echo: after applying a `policy.set` from any path, the core sends the same signed object to its owner. The console accepts it only from one of its own agents that is not revoked, only if `body.agent` equals that agent's `agentEvm` and only if the owner's own signature verifies. It keeps the highest `version` seen per agent, so an older or foreign echo cannot lower it |
 | `revoke` | Owner → the revoked agent and each of its contacts | `{signed: SignedOwnerAction}` with `agent.revoke` | Recipients per §3.2, with the owner as sender. **A contact applies it only if `signed` verifies per §2.5.1 with the contact's stored card in place of the agent's own**: `op` is `agent.revoke`; `agent` equals a stored contact's `agentEvm`; `owner` equals `ownerNostr` in that stored card, as bytes (§2.4.1); `sig` is valid; `v` = 1; `expiresAt` = 0; `issuedAt` is not in the future beyond skew; `params` are strict. Otherwise it is dropped (fail closed). This holds whatever the envelope's `from`: like `handshake`, a verified revoke is an exception to the requests queue, accepted directly from the owner key (decided, D-58). Once applied, the contact drops every envelope from that `agentEvm` processed afterwards, whatever its `createdAt`, and refuses later `card-update` and `handshake` for it. The contact status becomes `revoked` (distinct from `blocked`, not reversible); history stays readable. The revoked agent's own core stops sending and signing (best effort: a compromised agent ignores it, which is why contacts are told) |
 | `card-update` | Agent → each contact | `{card, cardSig, name, relays}` (the `handshake` shapes, §3.6) | `cardSig` valid; `card.agentEvm` equals the stored contact's; `ownerEvm`, `ownerNostr` and `ownerEnc` unchanged (owner-key rotation is P2); `keyEpoch` strictly greater; `nameHash` and `relaysHash` match `name` and `relays`; every URL in `relays` passes the relay URL rule (§4). The envelope may come from the old or the new epoch key: authority comes from `cardSig` only. A changed name is shown as a change and stays self-declared (§2.4) |
-| `handshake-ack` | Inviter A → B | `{inviteId, handshakeId, handshakeHash, codeReveal, card, cardSig, relays}`: `handshakeId` = B's `handshake` envelope `id`; `handshakeHash` = its `envelopeHash` (§3.1), `0x` + 64 lowercase hex like every `envelopeHash` (§2.4.1); `codeReveal` = `nonceA` (§3.6.1); `card` and `cardSig` = A's card exactly as in the invite; `relays` = A's relay list exactly as in the invite (G-24; proposed, owner confirms at merge; amends D-58) | B accepts it only if the envelope `from` and the seal pubkey equal `card.agentNostr`; `sha256(JCS(card))` equals that of the invite card; `relays` equals the invite's `relays` as strings and matches `card.relaysHash` (G-24); `inviteId` and `handshakeHash` match a handshake B sent; and `codeReveal` opens the invite's `codeCommit` (§3.6.1). B then marks the pairing complete (§2.9). Otherwise it drops the ack, and the pairing stays pending. A key change since the invite follows as a `card-update` |
+| `handshake-ack` | Inviter A → B | `{inviteId, handshakeId, handshakeHash, codeReveal, card, cardSig, relays}`: `handshakeId` = B's `handshake` envelope `id`; `handshakeHash` = its `envelopeHash` (§3.1), `0x` + 64 lowercase hex like every `envelopeHash` (§2.4.1); `codeReveal` = `nonceA` (§3.6.1); `card` and `cardSig` = A's card exactly as in the invite; `relays` = A's relay list exactly as in the invite (G-24; D-65, amends D-58) | B accepts it only if the envelope `from` and the seal pubkey equal `card.agentNostr`; `sha256(JCS(card))` equals that of the invite card; `relays` equals the invite's `relays` as strings and matches `card.relaysHash` (G-24); `inviteId` and `handshakeHash` match a handshake B sent; and `codeReveal` opens the invite's `codeCommit` (§3.6.1). B then marks the pairing complete (§2.9). Otherwise it drops the ack, and the pairing stays pending. A key change since the invite follows as a `card-update` |
 
-**Owner `card-update` (G-24; proposed, owner confirms at merge; amends D-58).** Besides the `card-update` to each contact, the core sends one `card-update` on the owner channel for its first card at `init` and each time it applies a new card. It goes out even when the agent has no contacts, so an owner surface that did not sign the card, or a new device, learns the agent and its relays.
+**Owner `card-update` (G-24; D-65, amends D-58).** Besides the `card-update` to each contact, the core sends one `card-update` on the owner channel for its first card at `init` and each time it applies a new card. It goes out even when the agent has no contacts, so an owner surface that did not sign the card, or a new device, learns the agent and its relays.
 - **Authority and creation (I-4).** The card inside is owner-signed, which needs owner presence (§2.5); the envelope is signed by the agent key and confers nothing. Only core flows create it; no MCP tool can create or pass it through ("Who may create these bodies", below).
 - **Recipients.** `card-update` now has two valid recipient sets. To a contact: the §3.2 set. On the owner channel: exactly the agent and its own owner, two entries. A contact's core accepts only the first. An owner surface accepts either, and tells them apart by the entries: the owner-channel set holds no contact `kid`. The agent's own copy of its owner-channel `card-update` is stored as sent and has no further effect; it never applies a card to the agent (M1-7b checks both sets).
 - **Where and how often.** It is published to the agent's old list, its new list and the release's default relay set, so every surface's bootstrap set finds it. The core re-publishes it as a new gift wrap of the same stored envelope (the next outbox attempt, 07 §3.2) every 24 h during a relay-change overlap and every 7 days otherwise, so a surface with a sync cursor finds it within its 48 h look-back, and a surface without one (a new device, a newly added relay) finds it with its 9-day first look-back (07 §4.3). An agent whose owner opts out under Advanced is not published to the default set (privacy cost: 07 §4.3). Values: 07 §4.3.
@@ -768,7 +821,7 @@ Decrypting stored history with an older epoch key stays allowed (§2.6). Only ac
 
 **Revoke delivery (decided, D-58).**
 - **Who is told.** The console builds the recipient list from the owner's own copies of the agent's `handshake`, `handshake-ack` and `card-update` envelopes (I-9), never from the agent's store.
-- **Where (G-24; proposed, owner confirms at merge).** Each contact's wraps go to that contact's relay list, taken from the same copies, and the revoked agent's to its own list (07 §4.3). When the owner's agent was the invitee, the inviter's list comes from the owner's copy of the `handshake-ack`, which carries it (G-24, table above). Only a contact whose list the owner does not hold at all (for example, a pairing made before that change) gets its wraps on the bootstrap set, and the console marks it as possibly not told.
+- **Where (G-24; accepted with D-65).** Each contact's wraps go to that contact's relay list, taken from the same copies, and the revoked agent's to its own list (07 §4.3). When the owner's agent was the invitee, the inviter's list comes from the owner's copy of the `handshake-ack`, which carries it (G-24, table above). Only a contact whose list the owner does not hold at all (for example, a pairing made before that change) gets its wraps on the bootstrap set, and the console marks it as possibly not told.
 - **Compromised machine.** A revoke with `reason: compromised` therefore never depends on the compromised machine's contact list. It is sent from the owner's console or another device of the owner. The CLI path is for an uncompromised machine only; for `compromised`, it sends the owner to the console.
 - **Re-publishing.** Relays keep events for a limited time, so the console re-publishes the revoke while it remains in use, and contacts that were offline still receive it. A contact applies it from any copy, idempotently.
 - **On-chain.** For a registered agent, the console also submits the Registry `revoke` (05 §4, M2-4b). Contacts and the verify page treat either one as revocation.
@@ -874,7 +927,7 @@ The terms fingerprint is under Advanced. Tool summaries name only the contact, t
 
 - The envelope JSON is the `content` of an unsigned **rumor** (kind 14, tag `["agentlink","1"]`), sealed (kind 13) with the sender's Nostr key, then **gift-wrapped** (kind 1059) with an ephemeral key to each recipient Nostr pubkey, per NIP-59 / NIP-17 with NIP-44 v2 encryption.
 - The receiver requires the seal's pubkey to equal `envelope.from`.
-- One gift wrap per recipient Nostr key: recipient agent, recipient owner, sender owner and sender agent (§3.2 entries 1–4). Each is published to the relays of the agent it concerns, since owners have no relay list of their own (07 §4.3; G-24, proposed, owner confirms at merge).
+- One gift wrap per recipient Nostr key: recipient agent, recipient owner, sender owner and sender agent (§3.2 entries 1–4). Each is published to the relays of the agent it concerns, since owners have no relay list of their own (07 §4.3; G-24, accepted with D-65).
 - **Size limits:** serialized envelope ≤ **24 KB** (24 576 bytes; every limit and where it is enforced: §3.1.1); inline files ≤ **12 KB**. Nesting (seal + gift wrap, NIP-44 padding, base64) roughly doubles size, and NIP-44 caps plaintext at 65,535 bytes; many relays cap events at 64 KB. Before publishing, check the final gift-wrap size against each relay's NIP-11 `max_message_length`.
 - Gift-wrap timestamps are randomized up to 2 days in the past (NIP-59), so inbox sync must use a ≥ 48 h look-back window and deduplicate by envelope ID (see 07 §4.2).
 - **Event shapes the receiver accepts (M1-5a, IR-M1-5a-1 L-2; proposed, owner confirms at merge).** Senders produce exactly these shapes, and a receiver drops anything else before the envelope is parsed (§3.1.1 step 2):
@@ -895,14 +948,14 @@ The terms fingerprint is under Advanced. Tool summaries name only the contact, t
 ```
 
 - `card` is in the card JSON form, and `cardSig` and `cardAgentSig` (§2.9) are `0x` hex (§2.4, §2.4.1). `inviteId` (exactly 16 bytes), `secret` (exactly 32) and `codeCommit` (exactly 32, §3.6.1) are base64url. Any other length is rejected on parse.
-- `relays` (here, in `handshake`, `handshake-ack` and `card-update`) is inbound content: every URL must pass the relay URL rule (§4) at parse, or the whole body is rejected. `name` and `relays` must also match the `nameHash` and `relaysHash` of the card they travel with, compared over the received strings (§4), or the whole body is rejected (G-24; proposed, owner confirms at merge).
+- `relays` (here, in `handshake`, `handshake-ack` and `card-update`) is inbound content: every URL must pass the relay URL rule (§4) at parse, or the whole body is rejected. `name` and `relays` must also match the `nameHash` and `relaysHash` of the card they travel with, compared over the received strings (§4), or the whole body is rejected (G-24; accepted with D-65).
 - Encoded as base64url(deflate(JSON)). Shared as `https://<invite-host>/i#<payload>` (the fragment is never sent to a server) and accepted by the CLI/MCP from the full URL or the bare payload. Until the invite landing page ships (M2), the host serves a static "how to install" page.
 - A stores `{inviteId, proofKey, nonceA, expiresAt, used=false}`, where `proofKey = HKDF-SHA256(ikm = secret (its 32 raw bytes), salt = "", info = utf8("agentlink/v1/pairing-proof"), L = 32)` (proposed; owner confirms at merge) and `nonceA` is the committed nonce of §3.6.1. A derives `proofKey` when it creates the invite, keeps it and `nonceA` only as encrypted store columns (07 §3), and never stores the raw `secret`. Anyone who reads `proofKey` can answer that one invite, just as with `secret`. The derivation adds key separation and keeps the secret that travels in the link out of the store, but it does not make the stored value safe to disclose. Single use; default expiry 7 days.
 - Whoever holds the link can answer it once, first come first served. The invite copy says so (11 §6.1), and a second answer is reported (Complete, below).
 
 **Accept** (agent B):
 
-1. Verify the strict schema, expiry, `cardSig`, and `cardAgentSig`, which must recover `card.agentEvm`, and that `nameHash` and `relaysHash` match `name` and `relays` (G-24; proposed, owner confirms at merge). A card whose `agentEvm` equals its `ownerEvm` is refused (§2.9).
+1. Verify the strict schema, expiry, `cardSig`, and `cardAgentSig`, which must recover `card.agentEvm`, and that `nameHash` and `relaysHash` match `name` and `relays` (G-24; accepted with D-65). A card whose `agentEvm` equals its `ownerEvm` is refused (§2.9).
 2. Apply policy `contacts.acceptInvites` (default `approval`: owner confirms in local UI or console, seeing name, label and owner fingerprint). There is no safety code yet: it exists only once pairing completes (§3.6.1).
 3. Send a `handshake` envelope to A (recipients: A agent, A owner, B owner, B agent) from B's own `agentNostr`, the key in the card it sends, with body `{inviteId, card: B's AgentCard, cardSig, cardAgentSig, name, relays, proof, codeNonce, codeCommit, inviterCardHash}`. `codeNonce` is `nonceB` (§3.6.1), `codeCommit` is copied from the invite, and `inviterCardHash` is `sha256(JCS(A's invite card))`, bare hex 64, naming whom B answers. The envelope signature covers all of them. `proof = HMAC-SHA256(proofKey, utf8("agentlink-handshake") || inviteId || sha256(JCS(B card)))`. Byte-exact input (proposed; owner confirms at merge):
    - The HMAC key is `proofKey` (32 bytes): B derives it from the invite's `secret` (decoded from base64url) with the HKDF above, and A reads it from its store. The raw `secret` is never an HMAC key.
@@ -918,7 +971,7 @@ The terms fingerprint is under Advanced. Tool summaries name only the contact, t
   - `proof` matches an unused, unexpired invite: A recomputes the HMAC with the stored `proofKey` and compares in constant time;
   - **the sender is the card's agent:** the envelope `from` and the seal pubkey (§3.5) both equal `card.agentNostr`, compared as bytes, so a replayed card with its signatures is useless to anyone without that key;
   - `cardSig` and `cardAgentSig` verify (§2.9), and `agentEvm` ≠ `ownerEvm`;
-  - `nameHash` and `relaysHash` match the body's `name` and `relays` (G-24; proposed, owner confirms at merge);
+  - `nameHash` and `relaysHash` match the body's `name` and `relays` (G-24; accepted with D-65);
   - `inviterCardHash` equals `sha256(JCS(card))` of the card A put in this invite, and `codeCommit` equals that invite's;
   - the §2.9 per-store rules allow it.
 - A then marks the invite used, completes the pairing (a re-pair replaces the old one only now, §2.9), and replies `handshake-ack` (§3.4.1). A signs the ack with the `agentNostr` of its invite card (old epoch keys are re-derivable, §2.6). A newer card follows as a `card-update`.
@@ -1004,7 +1057,7 @@ The §2.9 values go to other suites: the agent ID to `hkdf-derive`, `cardAgentSi
 ## 4. Files
 
 - **Ciphertext object layout:** header `magic "ALF1" (4 B) | version u8 | chunkSize u32be | noncePrefix (8 B)` followed by chunks. Each chunk is AES-256-GCM with nonce `noncePrefix || u32be(chunkIndex)`; the AAD is `u8(isFinal)`, so a missing final chunk is detected (STREAM construction). Default chunk size 1 MiB.
-- **Integrity:** recipient checks `ciphertextSha256` before decrypting and `plaintextSha256` after.
+- **Integrity:** recipient checks `ciphertextSha256` before decrypting and `plaintextSha256` after. Both checks are mandatory. Files inherit G-46's guarantee through them: `fileKey`, `ciphertextSha256` and `plaintextSha256` travel in the payload, which is the same for every party (§3.3), so every party gets the same file bytes or a failure, although ALF1's chunks are not key-committing.
 - **Where ciphertext goes (D-48, D-49):** files ≤ 12 KB travel inline; larger files go to the 4thTech **encrypted drop** by default, or to the user's own storage (S3-compatible; Google Drive, Dropbox or OneDrive from M2), chosen by policy `files.storage` (06 §3, 07 §5.6). Every backend receives only the ALF1 ciphertext. The file key, file name and `plaintextSha256` travel only inside the end-to-end-encrypted envelope (I-2); the backend sees only the ciphertext, its hash and its own download URL, which reaches the recipient only inside the envelope.
 - **Delivery:** a download URL valid until `expiresAt`: an S3 presigned GET, a signed drop URL or a provider share link. **Default and maximum expiry: 7 days** (the SigV4 limit; temporary credentials expire sooner), enforced by the drop and by S3-compatible storage. Consumer connectors (D-49) cannot always enforce link expiry: the sender's agent creates the share link, then deletes the object and revokes the link at expiry or on receipt, per `files.deleteAfter`. That is best effort (it needs the sender's device online); the content stays encrypted. A recipient can request a fresh link with a `request` envelope (`body.kind = "refresh-link"`), which the sender answers when online.
 - **Retention and crypto-shredding:** policy `files.deleteAfter` = `expiry` (default) or `receipt`. When triggered, the sender deletes the object and both sides delete the `fileKey`. This protects against storage remnants; it cannot force a recipient who already decrypted a copy to delete it.
@@ -1082,6 +1135,7 @@ Static recipient keys mean a stolen encryption key decrypts past envelopes addre
 | **Network observer** | TLS everywhere; content already E2E-encrypted |
 | **Compromised 4thTech web host serving malicious console JS** | Open source, reproducible builds, published hashes, SRI, CSP; self-hostable console; local packaging avoids the web entirely. Residual risk documented |
 | **Shell-capable harness agent (same OS user)** | Owner key never on disk unwrapped; owner operations need passkey/passphrase (§2.5); signed policies; harness permission guidance; small credit balances |
+| **Malicious sender equivocates across recipients** (one ciphertext that opens under two keys, different keys per entry, an owner's entry that does not open; G-46) | `aead.kc` key commitment checked before decrypting (§3.1, §3.3); every opener recomputes the wraps it can check, its own owner's always (§3.3, §3.1.1 step 8); the proof-pack verifier checks `kc` (07 §8). Residual: an entry whose key the opener does not hold cannot be checked. Different envelopes sent under one `id` to different recipients are G-48 |
 | **Malicious counterparty: prompt injection** | Inbound content labelled `untrusted`; actions limited by owner-signed policies; new contacts need owner approval by default; files only from allowed folders; spending budgets |
 | **Malicious counterparty: spam / flooding** | Allowlist by default; unknown senders → requests queue; per-contact rate limits; envelope size cap |
 | **Malicious counterparty: SSRF via file or relay URLs** | §4 SSRF rules (`fetch_file`; relay URLs at parse and at connect) |

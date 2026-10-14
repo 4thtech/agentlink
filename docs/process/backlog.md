@@ -67,7 +67,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 92 (M1a 42, M1b 50; incl. 11 split-off, 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d and M1-3j from D-63) |
+| M1 Local beta | 93 (M1a 43, M1b 50; incl. 11 split-off, 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63 and M1-1l from D-66) |
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 21 (incl. 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
@@ -804,7 +804,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 #### M1-1h · Independent test vectors for all protocol suites
 - **Status:** in-progress (vectors merged in 4thtech/agentlink#25; the G-2 follow-up vectors, including `envelope-sig`, are outstanding) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/generators/
-- **Depends on:** M0-9; gap G-46 resolved before the `aead-envelope` and `envelope-sig` suites freeze (the other suites do not wait)
+- **Depends on:** M0-9; M1-1l (G-46, D-66) before the `aead-envelope`, `envelope-sig` and `hpke` suites freeze (the other suites do not wait)
 - **Spec:** 04 §2.1, §2.3, §2.4, §2.4.1, §2.5.1, §2.8, §3.1, §3.3, §3.6, §4, §5, §8.2; 05 §3.1, §4, §8; `development-process.md` §9.1
 - **Invariants:** I-6, I-8
 - **Scope:**
@@ -833,7 +833,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
     - Size limits: accept 8 recipients with a `ct` of exactly 17 152 bytes (24 509 bytes as JCS). Reject 9 recipients, a `ct` of 17 153 bytes, a 22 871-character `ct`, and duplicate `kid`s.
     - Epochs: the enc public key and `kid` at epochs 0–2 of one seed, and an `unwrapCek` at epoch 1.
     - Owner read: an `approval` envelope from the owner (owner and agent entries) that the owner opens by its `ownerEnc` `kid`; a same-owner §3.2 set with 3 entries.
-    - Wait for G-46 before freezing `aead-envelope` and `envelope-sig`, because its outcome may change the header.
+    - G-46 is resolved by D-66 (04 §3.3). M1-1l regenerates `aead-envelope`, `safety-code-recompute` and the AgentLink cases of `hpke` on the new form; `envelope-sig` is written on that form. None of them freezes before M1-1l merges.
     - This follow-up commits `envelope-sig` to `test-vectors/pending-suites.json` as pending under M1-1g, whose `KeyStore` and `OwnerSession` sign envelope hashes and open entries by epoch. M1-1g registers the harness module and removes the suite from the list (IR-M1-1c-G2-1 L-1). M1-1c ships the hash and signature helpers but does not own the suite, which did not exist when it merged.
 - **Acceptance:**
   - Every case records generator, version and inputs; regeneration from the generator scripts reproduces the files byte for byte.
@@ -923,7 +923,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Payload AEAD AES-256-GCM, 12-byte random IV, AAD = SHA-256(JCS({v, id, thread, from, createdAt, recipients})).
   - `envelopeHash = SHA-256(JCS(envelope without sig))`; signature input = taggedHash("agentlink/envelope/v1", envelopeHash).
   - Deterministic test seam for randomness (never exported in production builds).
-  - G-2 (04 §3.1.1; once branch `docs/G-2-envelope-signatures` merges): the parser refuses fewer than 1 or more than 8 recipients and duplicate `kid`s. It refuses `aead.ct` above 17 152 decoded bytes, checked on the base64url length (≤ 22 870 characters) before decoding (IR-M1-1c-1 F3). The keystore helpers become `unwrapCek(…, envelopeId)` with `info` built inside, and `signEnvelopeHash` applies the tag inside (F5). G-46 may change the header before the vectors freeze.
+  - G-2 (04 §3.1.1; once branch `docs/G-2-envelope-signatures` merges): the parser refuses fewer than 1 or more than 8 recipients and duplicate `kid`s. It refuses `aead.ct` above 17 152 decoded bytes, checked on the base64url length (≤ 22 870 characters) before decoding (IR-M1-1c-1 F3). The keystore helpers become `unwrapCek(…, envelopeId)` with `info` built inside, and `signEnvelopeHash` applies the tag inside (F5). G-46 is resolved by D-66; its code and vector changes are card M1-1l.
 - **Acceptance:**
   - Vector suites `hpke` and `aead-envelope`: their harness modules are registered and the suites are removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - Vector suite `safety-code-recompute` (04 §3.6.1 steps 1–5 from the signed handshake and ack; split from `safety-code` by IR-M1-1f-1 M-1): a recompute function on top of the envelope helpers and M1-1f's safety code, its harness module registered and the suite removed from `test-vectors/pending-suites.json`; every case passes in every runtime.
@@ -991,6 +991,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - The API refuses passphrase wrapping for blobs flagged for relay publication (test).
   - `ALKS` v1 vectors from M1-1h pass; an `ALKO` owner blob never opens as an `ALKS` file and vice versa (label and magic separation, both directions); code normalisation and parser refusal tests.
   - Argon2id timing measured in browser and Workers (Workers memory limit noted in PR).
+  - M1-1f (follow-up, D-66): owner passphrase minimum. Setting or changing a chosen owner passphrase (kind 2) refuses a candidate with fewer than 12 Unicode code points after NFKC, the same rule as `newKeystoreKek` applies to the agent passphrase. The check runs on `normalizeSecret`'s output, before the KDF (04 §2.8). Tests: 11 code points refused; 12 accepted; a string that NFKC shortens below 12 refused. Unlocking an existing wrap is unaffected.
 
 #### M1-1k · crypto: passkey PRF seed wrapping and recovery code (new, split from M1-1f)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -1068,6 +1069,27 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 
 ### Types (`@agentlink/types`)
 
+#### M1-1l · crypto: key commitment and CEK-derived wraps (G-46, D-66) (new)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/crypto, packages/types, packages/transport-nostr (tests), tools/vectors, test-vectors
+- **Depends on:** M1-1c, M1-1g, M1-2a
+- **Spec:** 04 §3.1, §3.1.1 (size table), §3.3; 07 §8; D-66; decision note `docs/process/proposals/G-46-key-commitment.md`
+- **Invariants:** I-2, I-8, I-9
+- **Scope:**
+  - `envelope.ts`: `aead` has exactly `alg`, `iv`, `kc`, `ct`; `AEAD_ALG` = `A256GCM-KC`; `kc` exactly 32 bytes; the old `alg` and key set are refused.
+  - `aead.ts`: `encKey` and `kc` from the CEK (HKDF-SHA256, labels `agentlink/v1/payload-key` and `agentlink/v1/payload-commit`, `info` = label ‖ id); AES-256-GCM under `encKey`. `decryptPayload` compares `kc` in constant time (`equalBytes`) before GCM; a mismatch and a failed tag are the same `open_failed`. A separate exported commitment check lets the core classify a `kc` mismatch (04 §3.1.1 step 5). The derived keys are wiped.
+  - `hpke.ts`: `wrapCek` derives `ikm_j` (label `agentlink/v1/cek-eph`, `info` = label ‖ id ‖ pk_j) and uses it as the raw X25519 ephemeral secret through the existing explicit-ephemeral path (`ekm`), never RFC 9180 `DeriveKeyPair`. The all-zero shared-secret pre-check stays. A main-entry `checkWrap(pk, id, cek, entry)` recomputes and compares one entry (public key and CEK only). No HPKE context is used for `export` or a second message.
+  - `@hpke/core` stays pinned exactly (1.9.0; `@hpke/common` 1.10.1 in the lockfile). Add to the dependency-update rule (`renovate.json` group note and `development-process.md`) that any `@hpke/*` update runs `hpke` and `aead-envelope` in every runtime before it merges (04 §3.3, IR-G-46-1 F-1).
+  - `@agentlink/types` `aeadSchema` and fixtures: `alg` `A256GCM-KC`, `kc` base64url 32 bytes.
+  - Size assertions: the worst case moves from 24 509 to 24 563 bytes (`packages/transport-nostr/src/gift-wrap.test.ts`, `packages/crypto/src/envelope.test.ts`). Keep one test that the largest parser-accepted envelope is at most 24 576 bytes.
+  - Vectors, by an independent generator session (M1-1h rules): regenerate `aead-envelope` and `safety-code-recompute`. In `hpke`, add derived-ephemeral cases and keep the RFC 9180 cases. Add one case per derivation label. Add reject cases: missing `kc`, `kc` with one bit flipped, 31- and 33-byte `kc`, the old `alg`, and a two-key ciphertext that opens under AES-GCM with both keys but fails `kc` for one.
+  - `docs-site/technical/concepts/envelopes.md` and `docs-site/technical/reference/proof-pack-format.md` describe the new form.
+- **Acceptance:**
+  - Every regenerated and new case passes in all five runtimes; `pnpm vectors:check` and the generator check are green, and the suites are frozen only after this card merges.
+  - `wrapCek` twice with the same `(pk, id, cek)` gives identical bytes; a changed `pk` or `id` gives a different `enc`; `checkWrap` accepts the recomputed entry and refuses an entry that seals another CEK.
+  - A two-key ciphertext (both GCM tags valid) is refused by `decryptPayload` for the key whose `kc` does not match.
+  - deps-check and ESLint stay green: no primitive outside `packages/crypto`.
+
 #### M1-2a · types: constants and envelope, payload, card, invite schemas
 - **Status:** in-progress (code merged in 4thtech/agentlink#23; the `encodings` vector suite is still pending under M1-2a) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types
@@ -1142,7 +1164,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Spec:** 04 §3.4 (`relays` 2–16), §3.4.1 (`handshake-ack` `relays`), §3.6; 07 §4.3
 - **Invariants:** I-5
 - **Scope:**
-  - `handshakeAckBodySchema` (`packages/types/src/payload.ts`) gains `relays` (the relay list schema). Amends D-58; proposed, owner confirms at merge.
+  - `handshakeAckBodySchema` (`packages/types/src/payload.ts`) gains `relays` (the relay list schema). Amends D-58 (D-65, accepted).
   - The relay list schema for lists carried with a card (invite, `handshake`, `handshake-ack`, `card-update`) has 2 to 16 entries (was 1 to 16).
   - Vectors: the `handshake-ack` cases in the pairing and `safety-code-recompute` suites gain `relays`, regenerated by their independent generators; rejection cases for a 1-entry list and an ack without `relays`.
 - **Acceptance:**
@@ -1413,10 +1435,10 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 07 §6.2, §8; 05 §3.3; 02 J5, F-44; 06 §2.4
 - **Invariants:** I-3, I-6
 - **Scope:**
-  - Static `verifyProofPack(pack, {chains})`: `getRecord`, recompute `recordStructHash` from `pack.record`, envelope hash, commitment with disclosed salt, signer signature (EOA, or ERC-1271 via `eth_call`), receipts from `RecordState`; optional decryption with a disclosed content key and hash comparison.
+  - Static `verifyProofPack(pack, {chains})`: `getRecord`, recompute `recordStructHash` from `pack.record`, envelope hash, commitment with disclosed salt, signer signature (EOA, or ERC-1271 via `eth_call`), receipts from `RecordState`; optional decryption with a disclosed content key, only in the 07 §8 order (G-46, D-66): `envelope` required with `disclosure`, a 32-byte `contentKey`, the recomputed `envelopeHash` equal to the pack field and the Record, `sig`, the `kc` check through `@agentlink/crypto`, decryption, then the payload schema.
   - Structured result with a specific reason per failure, ready for plain-language rendering. No log queries (some RPCs prune logs) and no 4thTech service.
 - **Acceptance:**
-  - Vector packs: valid; each single-field tamper → its specific reason; ERC-1271 signer; disclosed-key content check.
+  - Vector packs: valid; each single-field tamper → its specific reason; ERC-1271 signer; disclosed-key content check; a `disclosure` without `envelope`, a 31-byte `contentKey`, and a key that opens a two-key ciphertext under AES-GCM but fails `kc` are each rejected (G-46).
   - Runs in browser and Workers (M0-9 harness).
 
 #### M1-26 · chain: zero-config chain auto-detection and auto-selection (D-40) (new)
@@ -1568,7 +1590,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-7b · core: envelope build/open and threads
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
-- **Depends on:** M1-7a, M1-1c; gap G-46 resolved (owner decision D-61: requirement; construction pending)
+- **Depends on:** M1-7a, M1-1c, M1-1l (G-46, D-66)
 - **Spec:** 04 §3.1–§3.4; 03 §4.1; 02 F-20, F-22, F-60
 - **Invariants:** I-2, I-5, I-9
 - **Scope:**
@@ -1579,6 +1601,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
     - the sender key must be the contact's current card key, except for `card-update`;
     - decryption may use any own epoch, with exactly one `unwrapCek` per envelope;
     - the own owner's `kid` must be present (I-9);
+    - G-46 (D-66): the `kc` check inside the payload decryption, with a `kc` mismatch on a signature-valid envelope stored as refused and flagged (step 5); the wrap check of step 8, always for the own owner's entry and for the sender's agent and owner entries whenever the sender's card is held; held envelopes run again from step 5 when a `card-update` is applied;
     - `createdAt` may be at most 300 s ahead;
     - an `id` already stored with a different hash is refused and flagged;
     - the type ↔ key table for owner-authored types.
@@ -1592,6 +1615,12 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Rotation order (04 §3.1.1, step 7): an envelope from a contact's new key that arrives before its `card-update` is held, then processed as from the contact once the `card-update` is applied, and is never shown as a new contact request. A held envelope with no `card-update` goes to requests after 48 h (fake clock), and one from a stranger key is never accepted as the contact's.
   - Two own entries at different epochs: exactly one `unwrapCek`, at the highest epoch. The same `id` with the same hash is dropped silently; with a different hash it is refused and flagged.
   - G-2: when both agents have the same owner, there are 3 entries and the owner opens one. Each refusal path has a test: a superseded epoch key, a missing own-owner `kid`, a duplicate `id` with a different hash, a future `createdAt`, and a `text` from the own owner key.
+  - G-46 (D-66, 04 §3.1.1 steps 5 and 8):
+    - T3: an envelope whose own-owner entry seals another CEK is refused, stored as refused and flagged, even though the agent's own entry opens.
+    - T2: a sender's-owner entry that seals another CEK is refused when the sender's card is held. A held envelope with such an entry is refused when its `card-update` is applied.
+    - An entry with an unknown `kid` (no card held) causes no refusal.
+    - A `kc` mismatch on a signature-valid envelope is refused and flagged, while a plain failed open is dropped as `open_failed`.
+    - Exactly one `unwrapCek` per pass, and at most 7 recomputed seals.
   - (IR-M1-7a-1 R2-M1) A blocked or removed contact that rotates keys: its `card-update` is dropped, so its new key stays unknown. An envelope from an unknown key whose recipients include the `ownerEnc` `kid` of a **blocked or removed** contact's owner is dropped (recorded in `seen` after step 4), never held and never queued as a request, also after 48 h. Only active contacts' owner kids hold. Test, replacing the `it.todo` in `packages/core/src/contacts.test.ts`.
 
 #### M1-7c · core: pairing protocol (invite, accept, handshake)
@@ -1696,13 +1725,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-7g · core: proofs and receipts
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core
-- **Depends on:** M1-7b, M1-7e, M1-7i, M1-20, M1-21, M1-32, M1-4b, M1-4c, M1-4d, M1-26; gaps G-13 and G-46 resolved
+- **Depends on:** M1-7b, M1-7e, M1-7i, M1-20, M1-21, M1-32, M1-4b, M1-4c, M1-4d, M1-26, M1-1l; gap G-13 resolved
 - **Spec:** 03 §4.3; 04 §3.4 (`proof`; `terms` and proof of agreement), §5; 05 §3.1, §3.3; 06 §2.4, §3 (`commitments`); 07 §6.2, §6.3, §8; 02 F-40, F-42, F-43, F-47, F-51, J2, J3, J8; D-31, D-32
 - **Invariants:** I-2, I-4, I-6
 - **Scope:**
   - `notarize(envelopeId)`: kind mapping (G-13), salt + commitment, `Record`, policy `proofs.*` and budgets (→ approval), automatic chain selection (M1-26; nothing funded → `needs_credits` with agent address and top-up link), submit, then a follow-up `proof` envelope `{envelopeId, chainId, recordId, salt}`.
   - Recipient: on a `proof` envelope, check on-chain that recordId matches the envelope hash and `commitment(self, salt)` before any receipt.
-  - Receipts: DELIVERED automatic per `receipts.autoDelivered`; OPENED only on explicit request; ACCEPTED/REJECTED exclusive and only after the `commitments` policy allows it or the owner approves (D-31, M1-20). On records whose envelope carries `terms`, only under a commitment scope (M1-32, 04 §3.4.2), including the deferred `ACCEPTED` receipt signed when the offer's `proof` envelope is processed after the accept (07 §2.1 step 4); `notarize` on an accept is skipped and not charged when the answered offer is already recorded. `getProof`; `exportProofPack` (content key only with `proofs.allowKeyDisclosure` approval; for a proof of agreement, `ownerApproval` with the signed `OwnerAction` and `CommitmentScope`, or the standing-rule policy hash, included by default and left out on the owner's choice, 07 §8, D-55).
+  - Receipts: DELIVERED automatic per `receipts.autoDelivered`; OPENED only on explicit request; ACCEPTED/REJECTED exclusive and only after the `commitments` policy allows it or the owner approves (D-31, M1-20). On records whose envelope carries `terms`, only under a commitment scope (M1-32, 04 §3.4.2), including the deferred `ACCEPTED` receipt signed when the offer's `proof` envelope is processed after the accept (07 §2.1 step 4); `notarize` on an accept is skipped and not charged when the answered offer is already recorded. `getProof`; `exportProofPack` (content key only with `proofs.allowKeyDisclosure` approval, and then always with the envelope and the 32-byte CEK as `contentKey`, 07 §8, G-46; for a proof of agreement, `ownerApproval` with the signed `OwnerAction` and `CommitmentScope`, or the standing-rule policy hash, included by default and left out on the owner's choice, 07 §8, D-55).
   - Proof of agreement (D-32): notarizing the envelope that carries the final `terms`, plus the counterparty's ACCEPTED receipt, yields a pack that states mutual assent, not just a timestamp.
 - **Acceptance:**
   - Testnet integration: notarize → automatic DELIVERED → explicit OPENED → export → `verifyProofPack` valid.
@@ -2564,7 +2593,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Invariants:** I-1, I-4
 - **Scope:**
   - Protocol written up first (G-16): the console page generates an ephemeral X25519 key; key exchange via QR plus a 6-digit code shown on both sides; the CLI (owner presence required) encrypts the owner seed to the console key; the console wraps it with a new passkey.
-  - The same transfer carries `{card, cardSig, name, relays}` for each agent the CLI holds, and the console stores them in `owner_agents` only after the 07 §3.6 checks (G-24, 07 §4.3; proposed).
+  - The same transfer carries `{card, cardSig, name, relays}` for each agent the CLI holds, and the console stores them in `owner_agents` only after the 07 §3.6 checks (G-24, 07 §4.3; accepted with D-65).
 - **Acceptance:**
   - A substituted ephemeral key is detected by the code comparison (MITM test); the transfer blob is single-use and expires.
   - Network capture shows the seed (or its transfer ciphertext) reaches no 4thTech service.
@@ -3067,6 +3096,12 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Invariants:** I-1 … I-10
 - **Scope:**
   - Review at a tagged commit built from the public scope register; fixes as separate PRs with regression tests and vectors where relevant.
+  - Named scope (G-46, D-66):
+    - the key commitment `aead.kc` (HKDF-SHA256, collision bound, label separation, the check before decrypt);
+    - the **derandomised DHKEM ephemeral keys** (`ikm_j` from the CEK as the raw X25519 secret) and their use rules (the CEK seal only, never `export`);
+    - the **`@hpke/core` `ekm` dependency** (a parameter the library labels test-only, the exact pin and the vector guard);
+    - the wrap check set per opener;
+    - the proof-pack verifier order (04 §3.3, §3.1.1; 07 §8).
 - **Acceptance:**
   - All High and Medium findings fixed and verified by the reviewer; report stored privately until mainnet, then published.
 
@@ -3540,7 +3575,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 21. **G-21 (M) Measuring beta metrics without analytics.** 02 §7 and 10 gates vs 08 §2.3 and zero access. *Proposed:* moderated sessions plus opt-in, local-only timing exported by testers. *Blocks:* M1-GATE, M2-GATE.
 22. **G-22 (M) Owner archive mechanics.** 04 §4; 02 F-33; 06 §3: whose storage credentials, how the file key reaches the owner, who deletes. *Blocks:* M2-9.
 23. **G-23 (M) `agentId` undefined.** Resolved by branch `docs/G-23-G-28-agentid-safety-code` (pending owner; proposed, owner confirms at merge), with G-28: `agentId` is the agent's EVM address (`agentlink/v1/evm`, epoch 0), `0x` + 40 lowercase hex, the same value as card `agentEvm`, owner-action `agent` (D-58), `terms.parties` and the commitment scope, so never a second binding (04 §2.9). Derived from the seed and checked on every seed load (keychain and `ALKS`). Invites and handshakes carry `cardAgentSig`, and a handshake is accepted only from the card's own `agentNostr`, so an owner cannot claim another agent's address and a replayed card completes nothing. One contact per `agentId`; a re-pair needs unchanged owner keys and takes effect only on completion. Object keys use a random per-agent `storagePrefix`, never the address (07 §5.2). Owner and agent fingerprints are tagged hashes, short form `7F3A·19C2`, display only and never an authenticator. *Was:* Used in 04 §2.2 (keychain account), 06 §6, 07 §3, 07 §5.2 (object key). The object-key path also gives every recipient of a presigned URL a stable per-agent identifier. *Proposed:* define `agentId`; use a random per-agent prefix in object keys. Owner actions bind the canonical EVM address, not `agentId` (G-29), and `agentId` must not become a second binding. *Blocks:* M1-6a, M1-7a, M1-8a.
-24. **G-24 (M) Relays for owner copies.** Resolved by branch `docs/G-24-owner-copy-relays` (pending owner; proposed, owner confirms at merge), in 07 §4.3, with pointers in 04 §3.1.1, §3.4.1, §3.5 and §4, the relay columns in 07 §3 and §3.6, and 08 §2.2. Each gift wrap goes to the relay list of the agent it concerns (the recipient's agent and owner to the recipient's list, the sender's agent and owner to the sender's own list, the union when one owner owns both agents), and an owner surface subscribes with `ownerNostr` on the bootstrap set (the release's default relays plus the owner's own Settings entries) and the lists of all its agents, inside the `OwnerSession`. A list counts only if it hashes to the `relaysHash` of a card whose `cardSig` is the owner's own; the surface learns it by signing the card, from owner copies of the agent's `handshake` or `card-update`, or from the owner link. A new owner-channel `card-update` (amends D-58) tells the owner of every new card, even with no contacts. Own lists hold 2–8 relays (3–5 by default), received lists 1–16 (unchanged); a relay change is a rotation, and the old list stays in use for 30 days. The console keeps at most 32 live connections and syncs the rest in turns. Kinds 10002 and 10050, relay hints and NIP-11 are never sources. Linkability through `ownerNostr` is stated, not removed. After IR-G-24-1 (also proposed, owner confirms at merge): invite, `handshake` and `handshake-ack` lists must match `relaysHash` and `nameHash` (04 §3.6); `handshake-ack` carries `relays` (amends D-58; M1-2d); lists carried with a card hold 2–16 relays; a relay change is refused while an overlap runs; the owner `card-update` is also sent at `init`, re-published every 24 h during an overlap and every 7 days otherwise, and also published to the release default set; no agent-directory event kind now (a directory, if wanted, goes into the G-36 owner-backup blob); the 15-minute sync turn is a target. New cards M1-2d and M1-7j. The two D-58 amendments (owner-channel `card-update`, `handshake-ack` `relays`) are recorded as D-65 (proposed) in the decision log (00-README). After round 2: a 9-day look-back on a surface's first sync of a relay with no cursor, and a per-agent Advanced opt-out from announcing on the default relays, with its privacy cost stated. *Was:* 04 §3.5; 07 §4.2; 08 §2.2. AgentCard carries only the agent's `relaysHash`; owners have no relay list. *Proposed:* each owner copy goes to the relays of the agent it concerns; the console subscribes to all its agents' relays. *Blocks:* M1-5b, M2-2d.
+24. **G-24 (M) Relays for owner copies.** RESOLVED by 4thtech/agentlink#51 (D-65; accepted by Tali, 2026-10-14, at merge, with every value below), in 07 §4.3, with pointers in 04 §3.1.1, §3.4.1, §3.5 and §4, the relay columns in 07 §3 and §3.6, and 08 §2.2. Each gift wrap goes to the relay list of the agent it concerns (the recipient's agent and owner to the recipient's list, the sender's agent and owner to the sender's own list, the union when one owner owns both agents), and an owner surface subscribes with `ownerNostr` on the bootstrap set (the release's default relays plus the owner's own Settings entries) and the lists of all its agents, inside the `OwnerSession`. A list counts only if it hashes to the `relaysHash` of a card whose `cardSig` is the owner's own; the surface learns it by signing the card, from owner copies of the agent's `handshake` or `card-update`, or from the owner link. A new owner-channel `card-update` (amends D-58) tells the owner of every new card, even with no contacts. Own lists hold 2–8 relays (3–5 by default), received lists 1–16 (unchanged); a relay change is a rotation, and the old list stays in use for 30 days. The console keeps at most 32 live connections and syncs the rest in turns. Kinds 10002 and 10050, relay hints and NIP-11 are never sources. Linkability through `ownerNostr` is stated, not removed. After IR-G-24-1 (also accepted at that merge): invite, `handshake` and `handshake-ack` lists must match `relaysHash` and `nameHash` (04 §3.6); `handshake-ack` carries `relays` (amends D-58; M1-2d); lists carried with a card hold 2–16 relays; a relay change is refused while an overlap runs; the owner `card-update` is also sent at `init`, re-published every 24 h during an overlap and every 7 days otherwise, and also published to the release default set; no agent-directory event kind now (a directory, if wanted, goes into the G-36 owner-backup blob); the 15-minute sync turn is a target. New cards M1-2d and M1-7j. The two D-58 amendments (owner-channel `card-update`, `handshake-ack` `relays`) are recorded as D-65 (accepted) in the decision log (00-README). After round 2: a 9-day look-back on a surface's first sync of a relay with no cursor, and a per-agent Advanced opt-out from announcing on the default relays, with its privacy cost stated. *Was:* 04 §3.5; 07 §4.2; 08 §2.2. AgentCard carries only the agent's `relaysHash`; owners have no relay list. *Proposed:* each owner copy goes to the relays of the agent it concerns; the console subscribes to all its agents' relays. *Blocks:* M1-5b, M2-2d.
 25. **G-25 (M) `agentlink_verify_proof_pack {path}`.** 06 §2.4 lets a tool read a caller-chosen file, against 06 §1 rule 4. *Proposed:* `json` only, or `path` restricted to `proofs.exportFolder`/inbox with realpath checks. *Blocks:* M1-9d.
 26. **G-26 (L) STREAM header not authenticated.** 04 §4: AAD is `u8(isFinal)` only; header fields rely on `ciphertextSha256`. *Proposed:* AAD = header ‖ isFinal, decided before vectors freeze. *Blocks:* M1-1d, M1-1i.
 27. **G-27 (L) Inline file vs envelope size.** 04 §3.5; 02 F-30; 06 §2.3. A 12 KB file, base64-encoded inside an encrypted, base64-encoded payload with four recipient wraps, is already near 24 KB before any text. *Proposed:* "inline only if the final envelope ≤ 24 KB". *Blocks:* M1-7f.
@@ -3569,7 +3604,9 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 44. **G-44 (M) Drop delete on receipt vs owner access.** RESOLVED: the drop follows `files.deleteAfter` like any storage (default `expiry`, `receipt` as an owner option; D-48, 04 §4), so I-9 holds as written: owners keep access to file contents until expiry. *Was:* D-48 deleted drop objects on receipt, ending owner access before expiry. *Blocked:* M1-7f.
 45. **G-45 (M) Consumer providers without expiring public links.** 07 §5.5; D-18 (links expire after at most 7 days); D-49. Google Drive "anyone with the link" permissions cannot expire; Dropbox link expiry needs a paid plan; Microsoft Graph documents `Files.ReadWrite` (broader than the app folder) as the least-privileged permission for `createLink` on personal accounts. Sender-side revocation works only while the sender's device is online. *Proposed:* accept sender-side revocation, run by the desktop tray app at expiry and at start-up, as the expiry mechanism where a provider has no expiring link; ship OneDrive only if `createLink` works with the app-folder scope. Owner decides per provider. A scope broader than the app folder (e.g. OneDrive `Files.ReadWrite`) voids the 04 §7 "stolen token reaches only AgentLink ciphertext" mitigation on Windows and Linux, where same-user processes can read keychain tokens. *Blocks:* M2-15b, M2-15c, M2-15d.
 
-46. **G-46 (H) One plaintext for every recipient.** Recorded as a requirement by the owner (D-61, 14 Oct 2026), stated normatively in 04 §3.3; the construction is open. *Timing (build plan; D-62, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34):* the construction is fixed before M1-7b becomes `ready` and before the `aead-envelope` and `envelope-sig` vectors freeze. 04 §3.1, §3.1.1, §3.3; 07 §8. Found while resolving G-2. *Requirement:* the payload AEAD must be key-committing, or the recipients must be bound to one content key, so that every recipient, every owner (I-9) and a proof-pack verifier who opens an envelope gets the same plaintext under its signed, notarized `envelopeHash`. Options include a key-committing construction, or a commitment to the CEK in the signed header that is checked before decrypting. Either option changes the envelope header, hence the timing above. *Blocks:* freezing the `aead-envelope` and `envelope-sig` vectors (M1-1h), M1-7b, M1-7g (proof of agreement); each lists it under Depends on. *Proposal (for the owner's decision; not normative):* [`docs/process/proposals/G-46-key-commitment.md`](proposals/G-46-key-commitment.md): threat model, four candidate constructions, and a recommendation (an HKDF-derived payload key with a key commitment in the signed `aead`, plus wraps derived from the CEK).
+46. **G-46 (H) One plaintext for every recipient.** RESOLVED by D-66 (owner decision, Tali, 14 Oct 2026): construction A + D of the decision note [`docs/process/proposals/G-46-key-commitment.md`](proposals/G-46-key-commitment.md), as recommended by its independent review IR-G-46-1. The payload key and a 32-byte key commitment `aead.kc` are derived from the CEK and `kc` is checked before decrypting; every wrap's ephemeral key is derived from the CEK, so every opener checks the entries it can, always its own owner's (04 §3.1, §3.1.1 steps 5 and 8, §3.3). Proof packs carry the envelope with any disclosed key, and the verifier checks hash, `sig`, `kc`, then decrypts (07 §8). The review's conditions F-1 to F-4 are in the spec. Code and vectors: M1-1l, before the `aead-envelope`, `envelope-sig` and `hpke` vectors freeze; core: M1-7b; packs: M1-4d, M1-7g; audit scope: M3-1b. *Was:* the requirement (D-61, 04 §3.3) with the construction open, timed by D-62. The payload AEAD was not key-committing and each recipient's wrap was free, so a sender could give parties to one signed envelope different plaintexts or make the owner's entry fail. *Blocked:* the vector freeze (M1-1h), M1-7b, M1-7g.
+
+48. **G-48 (M) Different envelopes under one `id` per recipient.** Found in the G-46 decision note (T6), recorded by D-66. A sender can gift-wrap one signed envelope to some recipients and a different signed envelope with the same `id` to others, for example `E1` to the recipient agent and `E2` to its owner. The hashes differ, so G-46 does not apply. Each party sees one consistent envelope. Today it is detected only by a party that holds both copies (owner conflict display and step 9, 04 §3.1.1), and for a notarized envelope by the Record (one hash) and receipts that bind `envelopeHash`. *Proposed:* a cross-party comparison, for example the receiving agent reporting `envelopeHash` to its owner in the F-23 ack, with the owner surface comparing it with its own copy. A design is needed before M2 owner surfaces show copies as the agent's. *Blocks:* nothing in M1a.
 
 ---
 

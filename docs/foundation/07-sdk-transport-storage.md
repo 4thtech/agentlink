@@ -102,7 +102,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 - **`pairings`** holds a verified card while its handshake runs, so that nothing in `contacts` changes before completion (04 §2.9): pairing_id (`id`, 16 random bytes, base64url), contact_id (the card's agent ID), role (`inviter` \| `invitee`), agent_nostr, key_epoch, owner_fingerprint (clear, for the re-pair and key rules), agent_card_json, name and relays (`enc`), created_at, expires_at (the invite's expiry). The re-pair, revocation and key rules are checked when it is staged and again on completion. Completion is one store transaction: the counterparty's `handshake` (for the inviter) or `handshake-ack` (for the invitee) is stored as received from the staged `agent_nostr` and processed, and the own one as sent; the contact is written with `pairing = complete`, the two envelope IDs, a new card, and the safety check cleared; and the staged row is deleted. A row is deleted on completion or abort, and pruned after expires_at. Several rows per agent ID may exist (crossed invites, 04 §2.9).
 - **`removed`** is a tombstone (02 F-14). Removing a contact keeps its row and its keys, and hides it from contact lists. A later envelope from any of its keys is dropped after the signature check (04 §3.1.1 step 4) and recorded in `seen` (§3.2); it is never queued as a request or held. The row is kept until a fresh completed pairing re-activates it, under the re-pair rules of 04 §2.9 (same owner keys, epoch not lower). Blocking or removing never changes `revoked`.
 
-**Relay columns (§4.3; G-24, proposed, owner confirms at merge).**
+**Relay columns (§4.3; G-24, accepted with D-65).**
 - `identity.relays`, `contacts.relays` and `pairings.relays` (above) are `enc` `json`: the verbatim `relays` array whose hash is the `relaysHash` of the card in the same row. They are written in the store transaction that writes that card, never on their own, and are checked against the card's `relaysHash` when read. A mismatch or a value that does not open makes the row's list unreadable (§3.1, fail closed): nothing is published to that agent.
 - `identity.prev_relays` (`enc` `json`) and `identity.prev_relays_until` (`int`) hold the previous list for the 30-day overlap after a relay change (§4.3), or null. Once `now` passes prev_relays_until, pruning clears both. A rotation that keeps the same list leaves both unchanged, so a compromise rotation during an overlap never overwrites the list contacts may still publish to (§4.3).
 
@@ -364,7 +364,7 @@ The console and the desktop app keep the owner's own store, never an agent's. Th
 
 **`owner_policy_echo`**: agent_id → the highest `version` seen in a verified `policy` echo. It is never lowered (04 §3.4.1).
 
-**`owner_agents`**: the surface's authenticated relay list for each of its agents (§4.3; G-24, proposed, owner confirms at merge).
+**`owner_agents`**: the surface's authenticated relay list for each of its agents (§4.3; G-24, accepted with D-65).
 
 | Column | Type and meaning |
 |---|---|
@@ -431,12 +431,12 @@ An XMTP adapter (P2) implements the same interface; envelopes are unchanged.
 
   **Residual risk.** A browser `WebSocket` (the console) cannot resolve or pin an address. There, the schema rule and the platform apply: browsers enforce Private Network Access where it has shipped, and Workers cannot open connections to private addresses. M1-5 tests the steps above with a stub resolver: a rebinding answer, a mixed public and private answer, a 6to4 answer and a NAT64 answer are all skipped.
 - **Delivery reliability:** publish to all listed relays, consider sent when ≥ 2 acknowledge (`OK`). Retry with backoff for up to 24 h from the local outbox.
-- **Sync:** `REQ` with `#p` = own Nostr pubkeys, `kinds: [1059]`, `since = lastSync − 48 h` (NIP-59 randomizes gift-wrap timestamps up to 2 days back, so `created_at` cursors alone miss messages). The first sync on a relay with no cursor looks back 9 days (§4.3; G-24, proposed). Deduplicate by envelope ID (keep a seen-set for ≥ 7 days). Support **NIP-42 AUTH**, since many DM relays serve kind 1059 only to the authenticated recipient.
+- **Sync:** `REQ` with `#p` = own Nostr pubkeys, `kinds: [1059]`, `since = lastSync − 48 h` (NIP-59 randomizes gift-wrap timestamps up to 2 days back, so `created_at` cursors alone miss messages). The first sync on a relay with no cursor looks back 9 days (§4.3; G-24, accepted with D-65). Deduplicate by envelope ID (keep a seen-set for ≥ 7 days). Support **NIP-42 AUTH**, since many DM relays serve kind 1059 only to the authenticated recipient.
 - **Size:** envelope ≤ 24 KB serialized (24 576 bytes; the relay-frame, envelope, recipient and `ct` limits and where each is enforced are in 04 §3.1.1); inline files ≤ 12 KB; check the final gift-wrap size against each relay's NIP-11 `max_message_length` and skip relays that cannot carry it.
 - **Relay retention:** public relays may drop events; agents should sync at least daily. The optional 4thTech relay keeps gift wraps for 30 days (it only ever sees ciphertext).
 - **Owner copies:** the owner console subscribes with the owner Nostr key on the relays of all its agents and receives copies of all envelopes for its agents (§4.3). Reading them, including NIP-42 AUTH, runs in an `OwnerSession` with presence (04 §3.1.1).
 
-### 4.3 Relay lists and owner copies (G-24; proposed, owner confirms at merge)
+### 4.3 Relay lists and owner copies (G-24; D-65, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#51)
 
 An owner has no relay list of its own: a card carries only the agent's `relaysHash` (04 §2.4), and no sender knows where an owner reads. So every wrap goes to the relays of the agent it concerns, and an owner surface reads on the relays of all its agents. Every value in this section is proposed; the owner confirms at merge.
 
@@ -466,12 +466,12 @@ An owner has no relay list of its own: a card carries only the agent's `relaysHa
   - the owner link from the CLI (M2-2c), which carries `{card, cardSig, name, relays}` for each agent the CLI holds, inside the same encrypted, code-checked transfer.
 
   A list replaces the stored one only with a card of strictly greater `keyEpoch` for the same `agentEvm` (compare-and-set). A revoked agent stays revoked. If a second relay change arrives while the surface's overlap for that agent still runs (a conforming agent refuses this, below), `prev_relays` becomes the union of both previous lists, at most 16 relays, until the later end time, so no list that contacts may still use is dropped.
-- **Contacts of an invitee.** When the owner's agent was the invitee, the invite is not an envelope, so the owner learns the inviter's list from its copy of the `handshake-ack`, which now carries `relays` (04 §3.4.1; proposed, amends D-58). This changes `handshakeAckBodySchema` in `@agentlink/types` and the pairing vectors (`safety-code-recompute`), so it lands before M1-7c (card M1-2d).
+- **Contacts of an invitee.** When the owner's agent was the invitee, the invite is not an envelope, so the owner learns the inviter's list from its copy of the `handshake-ack`, which now carries `relays` (04 §3.4.1; D-65, amends D-58). This changes `handshakeAckBodySchema` in `@agentlink/types` and the pairing vectors (`safety-code-recompute`), so it lands before M1-7c (card M1-2d).
 - **The bootstrap set.** The release's default relay set (the list that `init` picks from, §4.2), plus relays the owner enters under Settings. The owner's entries are local settings, pass the relay URL rule and are never published.
 - **Never a source:** NIP-65 or NIP-17 relay-list events (kinds 10002 and 10050), relay hints in event tags, NIP-11 documents, redirects, or any list from a contact about another party. No public relay-list event is published for an agent or an owner. An `OwnerSession` cannot sign one anyway (04 §3.1.1).
 - **SSRF.** Every list from any source is checked by the raw-string schema at parse (04 §4), and every connection by the connect-time rules of §4.2 on runtimes that own their sockets (Node, the desktop app). The console keeps the browser residual risk stated in §4.2.
 
-**Owner `card-update` (owner channel; proposed, amends D-58, 04 §3.4.1).** The core sends one `card-update` (body unchanged) on the owner channel for its first card at `init` and each time it applies a new card, even when it has no contacts. Recipients are exactly the agent and its own owner. It is published to the agent's old list, its new list and the release's default relay set, which every owner surface reads, so a surface that did not sign the card, was offline, or is on a new device finds the agent. The core re-publishes it every 24 h during an overlap and every 7 days otherwise, each time as a new gift wrap of the same stored envelope (the next outbox attempt, §3.2). A surface that has a cursor for a relay finds it within its 48 h look-back. A surface's first sync on a relay with no cursor (a new device, a relay newly added to the union) uses `since = now − 777 600` (9 days: the 7-day re-publish plus the 48 h NIP-59 back-dating), so it finds the latest re-publish as long as the relay keeps events for at least 7 days. Under Advanced, the owner can turn off announcing one agent on the default set (Privacy, below); that agent's owner `card-update` then goes only to its own lists. The card inside is owner-signed with presence; the envelope confers nothing; only core flows create it, and no MCP tool can create or pass it through (I-4). Surface checks, the two recipient sets of `card-update` and the agent's own copy: 04 §3.4.1.
+**Owner `card-update` (owner channel; D-65, amends D-58, 04 §3.4.1).** The core sends one `card-update` (body unchanged) on the owner channel for its first card at `init` and each time it applies a new card, even when it has no contacts. Recipients are exactly the agent and its own owner. It is published to the agent's old list, its new list and the release's default relay set, which every owner surface reads, so a surface that did not sign the card, was offline, or is on a new device finds the agent. The core re-publishes it every 24 h during an overlap and every 7 days otherwise, each time as a new gift wrap of the same stored envelope (the next outbox attempt, §3.2). A surface that has a cursor for a relay finds it within its 48 h look-back. A surface's first sync on a relay with no cursor (a new device, a relay newly added to the union) uses `since = now − 777 600` (9 days: the 7-day re-publish plus the 48 h NIP-59 back-dating), so it finds the latest re-publish as long as the relay keeps events for at least 7 days. Under Advanced, the owner can turn off announcing one agent on the default set (Privacy, below); that agent's owner `card-update` then goes only to its own lists. The card inside is owner-signed with presence; the envelope confers nothing; only core flows create it, and no MCP tool can create or pass it through (I-4). Surface checks, the two recipient sets of `card-update` and the agent's own copy: 04 §3.4.1.
 
 **Counts.**
 
@@ -624,7 +624,7 @@ The **supported-chain list** (all `ChainConfig` entries, including contract and 
 - Choose chain and payment automatically (§6.3).
 - Submit via submitter(s) with failover; fall back to direct mode if the agent has native gas.
 - Watch for inclusion; update `proofs`/`receipts`.
-- `verifyProofPack`: read `getRecord`, recompute hashes and commitment, check signatures, optionally decrypt with disclosed key and compare `envelopeHash`.
+- `verifyProofPack`: read `getRecord`, recompute hashes and commitment, check signatures, and, when a key is disclosed, decrypt only in the order of §8 (the envelope's hash, its `sig`, then the key commitment `aead.kc`, G-46).
 
 ### 6.3 Chain auto-detection and selection (D-40)
 
@@ -679,10 +679,10 @@ Requests and responses use the JSON form of 05 §3.1 (04 §2.4.1): `0x` + lowerc
   "signature": "0x…",
   "signer": { "evm": "0x…", "agentCard": { /* optional, card JSON form, 04 §2.4 */ }, "cardSig": "0x…" /* with agentCard, never alone: the owner's EIP-712 signature over it */ },
   "envelopeHash": "0x…",
-  "envelope": { /* optional ciphertext envelope */ },
+  "envelope": { /* ciphertext envelope; optional, but required whenever disclosure is non-null */ },
   "recipient": { "evm": "0x…", "salt": "0x…" },          // optional disclosure
   "receipts": [ { "type": "DELIVERED", "signer": "0x…", "txHash": "0x…", "at": "…" } ],
-  "disclosure": { "contentKey": "base64url" } | null,  // only if owner approved
+  "disclosure": { "contentKey": "base64url" } | null,  // only if owner approved; the 32-byte CEK (04 §3.3)
   "ownerApproval": { "signed": { /* SignedOwnerAction, approval.decide */ }, "action": { /* commitment approval-request.action incl. context.scope */ } }
                  | { "standingRule": true, "policyHash": "<64 lowercase hex>" } | null,  // proof of agreement: included by default, owner may leave it out (04 §3.4, D-55)
   "exportedAt": "…"
@@ -690,6 +690,19 @@ Requests and responses use the JSON form of 05 §3.1 (04 §2.4.1): `0x` + lowerc
 ```
 
 Encodings follow 04 §2.4.1, and a verifier rejects a pack in any other form. `recordId`, `envelopeHash` and `recipient.salt` are `0x` + 64 lowercase hex. `recordId` and `salt` are the same strings as in the `proof` envelope body (04 §3.4), and `envelopeHash` the same as in a commitment scope (04 §3.4.2), so a value never has two spellings. `signer.cardSig` is `0x` + 130 lowercase hex under the canonical ECDSA rule of 04 §2.4.1. It is present exactly when `signer.agentCard` is, and a verifier rejects a pack with one and not the other. Without it the card cannot be verified (proposed, owner confirms at merge). `ProofStatus.fee.token` is `record.feeToken`; for a confirmed record `fee.amount` is the charged fee, at most `record.maxFee` (06 §2.4).
+
+**Disclosed content key (G-46; D-66).** A pack with a disclosed key must let any verifier reach the one plaintext that every party to the envelope read (04 §3.3):
+- **Shape.** When `disclosure` is non-null, `envelope` must be present; otherwise the verifier rejects the pack. `contentKey` is the envelope's CEK, exactly 32 bytes, never the derived payload key. Any other length is rejected. Only the CEK can be checked against `aead.kc`.
+- **Verifier order, fail closed.** Each step must pass before the next one runs:
+  1. Parse `envelope` strictly (04 §3.1.1 step 3).
+  2. Recompute `envelopeHash` from it. It must equal the pack's `envelopeHash` field and the hash in the on-chain Record (`getRecord`): three values, one hash.
+  3. Verify `sig` under `from` with the envelope tag (04 §3.1.1 step 4).
+  4. Derive `kc` from `contentKey` and compare it with `aead.kc` (04 §3.3).
+  5. Decrypt.
+  6. Apply the payload's strict schema (04 §3.4) before anything is shown.
+- **Rejections.** A key that fails `kc`, or that passes AES-GCM but not `kc` (a two-key ciphertext), is rejected, never shown as a partial result. A failure at any step means that the pack proves no content. The record and its receipts are still verified on their own.
+- **Optional counterparty check.** With the disclosed CEK, a verifier that also holds the counterparty's card (out of band; the pack carries only the signer's card) may recompute that party's entry (04 §3.3, wrap check). This confirms that the counterparty's entry carried the same CEK. It is optional, and the pack format does not change for it.
+- **Export.** `exportProofPack` (M1-7g) always includes `envelope` when it discloses a key.
 
 ---
 
