@@ -6,23 +6,40 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
   agentCardSchema,
+  approvalActionSchema,
+  approvalRequestBodySchema,
   cardSigSchema,
+  commitmentScopeSchema,
   envelopeSchema,
   fileEntrySchema,
   inviteSchema,
   ownerActionSchema,
   payloadSchema,
+  policySchema,
+  proofPackSchema,
+  proofStatusSchema,
   relayUrlSchema,
   signedOwnerActionSchema,
+  toolResultSchema,
   uint256Decimal,
+  usdAmountSchema,
+  utcTimestampSchema,
 } from './index.js';
 import {
   agentCard,
+  approvalActions,
   approvalDecideAction,
+  approvalRequestFor,
+  commitmentScope,
   envelope,
   fileEntryInline,
   invite,
   payloads,
+  pendingApprovalResult,
+  policySetAction,
+  policyWithRules,
+  proofPack,
+  proofStatus,
   signed,
 } from './testing/fixtures.js';
 
@@ -34,6 +51,19 @@ const SCHEMAS = [
   ['signedOwnerAction', signedOwnerActionSchema, () => signed(approvalDecideAction())],
   ['agentCard', agentCardSchema, agentCard],
   ['invite', inviteSchema, invite],
+  // M1-2b
+  ['policy', policySchema, policyWithRules],
+  ['signedOwnerAction (policy.set)', signedOwnerActionSchema, () => signed(policySetAction())],
+  ['commitmentScope', commitmentScopeSchema, commitmentScope],
+  ['approvalAction', approvalActionSchema, () => approvalActions().agentlink_respond_to_terms],
+  [
+    'approvalRequestBody',
+    approvalRequestBodySchema,
+    () => approvalRequestFor(approvalActions().agentlink_send),
+  ],
+  ['proofPack', proofPackSchema, proofPack],
+  ['proofStatus', proofStatusSchema, proofStatus],
+  ['toolResult', toolResultSchema, pendingApprovalResult],
 ] as const;
 
 const RUNS = { numRuns: 300, seed: 0x4a11 } as const;
@@ -109,11 +139,12 @@ describe('fuzzing: only validation errors, never a crash', () => {
                 if (Array.isArray(node)) for (const item of node) walk(item, generic);
                 return;
               }
-              // Free-form JSON (policy placeholder, terms placeholder, args/context, message bodies)
-              // is deliberately open; the strict shapes around it are what this property covers.
+              // Free-form JSON (terms until M1-21, tool args) is deliberately open; the strict shapes
+              // around it are what this property covers. Since M1-2b the policy and the approval
+              // context are strict, so they are walked like every other shape.
               if (!generic) objects.push(node as Record<string, unknown>);
               for (const [k, v] of Object.entries(node)) {
-                walk(v, generic || ['policy', 'terms', 'args', 'context'].includes(k));
+                walk(v, generic || ['terms', 'args'].includes(k));
               }
             };
             walk(copy, false);
@@ -134,6 +165,8 @@ describe('fuzzing: only validation errors, never a crash', () => {
     ['relayUrl', relayUrlSchema],
     ['cardSig', cardSigSchema],
     ['uint256Decimal', uint256Decimal],
+    ['usdAmount', usdAmountSchema],
+    ['utcTimestamp', utcTimestampSchema],
   ] as const)('%s on arbitrary strings and values', (_name, schema) => {
     const strings = fc.oneof(
       fc.string({ unit: 'binary' }),

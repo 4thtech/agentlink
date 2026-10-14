@@ -11,11 +11,11 @@ import {
   base64url,
   bip340SigHex,
   evmAddress,
-  jsonObjectSchema,
   nostrPubkeyHex,
   sha256Hex,
   uint53,
 } from './encoding.js';
+import { policySchema } from './policy.js';
 
 // --- params per op -------------------------------------------------------------------------------
 
@@ -31,12 +31,12 @@ export const approvalCancelParamsSchema = z.strictObject({
 });
 
 /**
- * `policy.set` params. `policy` is the complete 06 §3 document; its schema plugs in from M1-2b. Until
- * then it is a bounded JSON object, so this schema fixes only the envelope of the params.
+ * `policy.set` params: `policy` is the complete 06 §3 document in the strict policy JSON form
+ * (policy.ts, G-32), never a partial patch. `version` ordering is the core's (04 §2.5.1).
  */
 export const policySetParamsSchema = z.strictObject({
   version: uint53,
-  policy: jsonObjectSchema,
+  policy: policySchema,
 });
 
 export const agentRevokeParamsSchema = z.strictObject({

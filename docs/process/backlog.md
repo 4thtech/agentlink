@@ -993,6 +993,10 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Hand-offs to the owning cards; no code in types:
     - transport-nostr re-checks relay hosts at connect time against private, loopback, link-local, CGNAT, ULA and metadata addresses, because a DNS name can resolve to one (IR-M1-2a-1 M-1, part 2);
     - the invite decoder caps the inflated size before parsing (deflate bomb).
+  - Follow-ups from IR-M1-2b-1 (F-1, F-2, F-3 `notarize` and the format-character part of F-4 are fixed in M1-2b):
+    - F-4 rest: once the spec PR decides it, policy paths must be absolute: a leading `/` or `~/`, plus a Windows drive form if 06 §3 allows one. Relative paths such as `../x` are then rejected.
+    - F-3 rest, hand-off to M1-7e: the core builds `fee.amount` and `fee.usd` from one quote, because the types cannot check them against each other (token decimals are unknown there). Owner surfaces render from `context`, never from `args`.
+    - F-5, hand-off to M1-9c (MCP approval tools): pin the `pending_approval` `url` to the local UI origin or the console origin. `resultUrlSchema` accepts any https host.
 - **Acceptance:**
   - `packages/types` tests are green in Node, three browsers and workerd, and each run reports its runtime; a deliberately failing schema test fails in all five.
   - Each Low is fixed with a negative control, or recorded as covered by the spec PR.
@@ -1002,7 +1006,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 All contract cards: private repo on the Free plan (D-27), so no rulesets or environment protection; `contracts-gate` is verified by the owner before merge; testnet deploy keys only, low balances; no OCC v1 code (D-20). Landing order for cross-repo changes: `development-process.md` §9.3.
 
 #### M1-3a · contracts: interfaces, storage layout, AccessManager role map
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (private repo, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · src/interfaces, src/libraries, docs/roles.md
 - **Depends on:** M0-2f; gap G-3 resolved
 - **Spec:** 05 §1, §5, §6, §7; 03 §6
@@ -1017,7 +1021,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A bound test (05 §5.1, §8): with the Safe compromised, every path to a 7-day power (use, new grant, `setRoleAdmin`, selector remap, `updateAuthority`, grant- or target-delay reduction) takes ≥ 7 days and every path to `CONFIG_ADMIN` power ≥ 48 h, including the first 5 days after deployment (before `minSetback`); a stolen ops key can pause and cancel but not unpause, and the Safe revokes both its roles at once; `removeModule` maps to `PAUSE_ADMIN` and `registerModule` to `MODULE_ADMIN`; pause never blocks `withdraw`, `withdrawIntegrator`, `sweep` or Registry `revoke`; the deploy script reverts on a mainnet with any delay below 05 §5.1.
 
 #### M1-3b · contracts: OCCFeeVault (credits, fees, apps, treasury)
-- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (private repo, merged 2026-10-14) · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · src/OCCFeeVault.sol, test/unit
 - **Depends on:** M1-3a; gap G-39 resolved (PR #11, pending owner)
 - **Spec:** 05 §2.1–§2.6, §5, §5.2, §6, §7
@@ -1063,12 +1067,14 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `SignatureChecker.isValidSignatureNow` (EOA + ERC-1271); deadlines; pause; one-way `freezeUpgrades()`.
   - CI parity job: EIP-712 hashes equal the canonical public vectors at the pinned commit.
   - Open Low (IR-M1-3a-1 L-3): the Notary's freeze goes through a `_beforeUpgrade` hook, not an override of `_authorizeUpgrade` (see M1-3b), so the role check stays in the base.
+  - Follow-up (IR-M1-3b-1 I-3): the Notary's direct-payment functions call `depositFromModule` with `payer = msg.sender`, never a signer or payer taken from calldata; a module charges only the payer's own credits.
 - **Acceptance:**
   - Tests first; unit test for every function and revert (`Expired`, `InvalidSignature`, `RecordExists`, `RecordNotFound`, `ReceiptExists`, `ConflictingReceipt`, `NotRecipient`, `NotSigner`, `FeeAboveMax`, `EnforcedPause`, `ExpectedPause`, `UpgradesAreFrozen`).
   - Role tests run against the real contract (IR-M1-3a-1 M-2): switch `RoleFixture._deploy` from the `NotaryHarness` stub to `OCCNotary`, so `RoleMap` and `RoleBound` (including `freezeUpgrades` → `FREEZER`, `pause`/`unpause`, `upgradeToAndCall`) cover shipping code; the "every non-view selector is in `docs/roles.md` or callable by an outsider" test from M1-3b covers the Notary too.
   - Gas snapshots meet 05 §3.4: `notarize` (credits, EOA) ≤ 160k, `acknowledge` ≤ 75k, `notarizeBatch` per item (n = 20) ≤ 120k; CI fails on regression.
   - A test recomputes `recordStructHash` from a full `Record` and matches `getRecord` (verification without logs).
   - Cross-chain, cross-contract and high-s signature replays rejected.
+  - A test shows that a direct payment with a signer other than the caller cannot draw on that signer's allowance (IR-M1-3b-1 I-3); the independent review checks this path by name.
 
 #### M1-3e · contracts: fuzz, invariant, ERC-1271 suites; static analysis clean
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -1082,6 +1088,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - ERC-1271 signers: Safe-style (threshold owners) and passkey-style (P-256/WebAuthn) smart-account mocks, including invalid and reverting `isValidSignature`.
   - Slither and Aderyn: clean, or each finding justified in `audits/static-analysis.md`.
   - Open Low and Info (IR-M1-3a-1 L-4, I-1): `OCCRoleSetup` is S2 and contains assembly but is skipped by Slither (`--skip ./script/**`) and Aderyn (`src/` only), so move it to `src/libraries/` (scripts can still import it). Anchor the CI path filter as `(^|/)(lib|test|script)/`, so a future `src/lib/` is not hidden.
+  - Follow-up (IR-M1-3b-1): integrator cap arithmetic and integrator handover per the private spec.
 - **Acceptance:**
   - Invariant suite runs in `contracts-gate` with the CI fuzz profile and nightly with a deep profile (runs/depth recorded).
   - ERC-1271 record and receipt paths pass; every static-analysis finding has a disposition.
@@ -1096,6 +1103,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tagged contracts release emits ABI JSON, per-chain addresses (empty until M1-3g) and a SHA-256 manifest; no Solidity source leaves the private repo.
   - Proposed (G-10): a PR imports the artifacts into public `packages/occ-v2-abi`; CI verifies the manifest; `release.yml` publishes with provenance (ABIs only, MIT licence).
   - `@agentlink/chain` pins an exact version; Renovate never automerges it.
+  - Follow-up (IR-M1-3b-1 I-4): no `@agentlink/occ-v2-abi` release is built from a contracts build whose concrete ABI differs from the interface in mutability (the `depositWithAuthorization` stub until M1-3c); generate the ABI from the interface, or publish only after M1-3c.
+  - Spec note (IR-M1-3b-1 choices 1 and 10, proposed; owner confirms at merge): 05 §7 lists the inherited OpenZeppelin errors that appear in the ABI (`AccessManagedUnauthorized`, `ReentrancyGuardReentrantCall`, `SafeERC20FailedOperation`, the UUPS and ERC-1967 errors) and decides whether a dedicated `ValueMismatch()` replaces `TransferFailed()` for a native value mismatch.
 - **Acceptance:**
   - A `next` prerelease of `@agentlink/occ-v2-abi` published with provenance visible on npm.
   - CI fails if imported files differ from the release manifest; no `.sol` file is present in the public package (check).
@@ -1114,10 +1123,14 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Open Lows (IR-M1-3a-1 L-1, L-2, I-2): `OCCRoleSetup.calls` checks the mainnet delay floor itself (make it `view` and call `checkDelays` first), not only `configure`; on a mainnet `configure` reverts unless the vault, the Notary (and the Registry, if set) report `paused()` true, with a test; on a mainnet it requires exactly two ops keys (05 §5.1).
   - Deploy runs from CI in the private repo, triggered manually by the owner (Free plan: no environment protection); testnet-only key, low balance. Agents never broadcast from a workstation.
   - Resolved (D-11, D-19): no explorer or Sourcify source verification on testnets; the source stays private until mainnet verification (M3-6). Testnet deploys publish ABIs and addresses only (`release-and-deployment.md` §4.2).
+  - Follow-up (IR-M1-3b-1 choice 12): promote the one-transaction deployer pattern to the script with CreateX CREATE3 deploy-and-init, keep the one-transaction property, and include the post-deploy implementation-slot check.
+  - Config assertions (IR-M1-3b-1 L-2; shared with M1-14): the script refuses to deploy or configure unless every allowlisted fee token has a nonzero `NOTARIZE` and `REGISTER` fee and cap, the native coin is allowlisted only on Gnosis chain IDs (D-46), and no allowlisted token is fee-on-transfer or rebasing.
+  - Runbook step (IR-M1-3b-1 L-2, choice 11): adding a fee token to the allowlist follows a fixed order, with its fees and caps effective before the allowlisting executes; the runbook also notes that a second `pause` or `unpause` that changes nothing reverts (`EnforcedPause()` / `ExpectedPause()`).
 - **Acceptance:**
   - Identical proxy addresses on Base Sepolia and Gnosis Chiado (script output in PR).
   - `deployer-holds-no-role` passes on both chains; fork dry-run in CI before broadcast.
   - Addresses published in the next `@agentlink/occ-v2-abi` prerelease (M1-3f).
+  - Negative tests for the config assertions: an allowlisted token with a zero fee or cap, the native coin on a non-Gnosis chain, and a fee-on-transfer mock each make the script fail.
 
 #### M1-14 · Testnet chain and fee configuration verification, stablecoin allowlist (D-45, D-46) (new)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -1130,9 +1143,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Every entry cites its source and verification date.
   - Fee configuration (D-45, D-46): one per-chain schema used by the deploy script (M1-3g) and the client's shipped `ChainConfig` (07 §6.1). Fee tokens limited to the stablecoin allowlist (USDC, USDT where available, native xDAI on Gnosis/Chiado); no fee-on-transfer token; fees and caps derived from the USD schedule in 12 §2 (USD × 10^decimals: `NOTARIZE` $0.10, cap $0.50; `REGISTER` $5, cap $25); `minDeposit` (proposed $5); integrator multiple 4.
   - Out: mainnet values (M3-2a, M3-3).
+  - Verification (IR-M1-3b-1 L-2; the same checks as M1-3g): every allowlisted token has a nonzero `NOTARIZE` and `REGISTER` fee and cap, the native coin is allowlisted only on Gnosis chain IDs (D-46), and no allowlisted token shows fee-on-transfer or rebasing behaviour (the vault assumes a transfer moves at most the stated amount). The runbook step for adding a token later (fees and caps effective before allowlisting) is written here and linked from M1-3g.
 - **Acceptance:**
   - A re-runnable script checks CreateX code hash, `decimals()`, `symbol()` and the EIP-3009 selector per token per chain; its output is attached to the PR.
   - The config check rejects a fee token outside the stablecoin allowlist (including a volatile native coin), a token without an issuer source, a fee-on-transfer token (mock), and any fee or cap whose USD value differs between chains or tokens; it passes on the committed testnet config.
+  - The config check also fails on an allowlisted token with a zero `NOTARIZE` or `REGISTER` fee or cap, and on the native coin outside Gnosis chain IDs; each has a negative test. It also confirms the transient-storage opcode (Cancun) is available on every target chain.
 
 ### Chain client (`@agentlink/chain`)
 
@@ -1158,6 +1173,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - `OCCFeeVault.quote`; USD at 1:1 for every launch fee token (all USD stablecoins, D-46), no price endpoint; protocol and integrator parts shown separately (12 §5); never used on-chain.
   - `creditsOf` across the supported chains and tokens; `deposit` helper (direct mode). Which chain pays (auto-detection and auto-selection, D-40) is M1-26.
+  - Follow-up (IR-M1-3b-1 I-2): the client ignores zero-amount `Deposited`, `Swept` and `IntegratorWithdrawn` events when it reads credits or history; events are verified against the canonical contract address.
 - **Acceptance:**
   - Quotes equal the contract's `quote` including the integrator cap, with the protocol and integrator parts in USD; `creditsOf` read on every supported chain (fork or mocked RPC); a fee token outside the configured stablecoin allowlist is never priced or offered.
 
@@ -2270,6 +2286,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Acceptance:**
   - Two agents' sent and received envelopes appear for their owner (e2e with local relays).
   - File decryption verifies both hashes; captured network traffic contains no decrypted content.
+  - Zero-amount `Deposited`, `Swept` and `IntegratorWithdrawn` events are not shown in the credits view (IR-M1-3b-1 I-2).
 
 #### M2-2e · console: approvals, policies, agent management
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
@@ -2878,6 +2895,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Invariants:** I-10
 - **Scope:**
   - Mainnet additions to the M2-7 runbooks: pause via the PAUSER hardware key and via the Safe, unpause, upgrade under the 7-day delay, cancellation of a scheduled operation (`GUARDIAN` or Safe), revoking a stolen ops key via `PAUSE_ADMIN`, user communication.
+  - Include the note that a second `pause` or `unpause` that changes nothing reverts, so a second ops key pausing during an incident sees `EnforcedPause()` (IR-M1-3b-1 choice 11).
 - **Acceptance:**
   - Pause/unpause drill on a mainnet fork with the real role layout; withdrawals keep working while paused (verified in the drill).
 
@@ -3015,6 +3033,7 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
 - **Scope:**
   - Fill in the M1b column: files, agreements and proof, credits (free test credits), passkey approvals, Claude Desktop extension; technical file and proof tools, proof pack format, verify a proof (CLI), first integration tutorial, contracts with testnet addresses, proof-layer test vectors.
   - Status hints, "What works today", Status and roadmap and Versioning (format table) updated for v0.2.0.
+  - Follow-up (IR-M1-3b-1 I-1): the contracts page states that native coin sent to the vault outside the deposit functions, or attached to an upgrade call, is surplus that no one can recover (no admin path moves funds, I-10).
 - **Acceptance:**
   - As DOCS-M1a, for v0.2.0; testnet contract addresses on the Contracts page equal `@agentlink/occ-v2-abi`.
 
