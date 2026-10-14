@@ -2,7 +2,7 @@
 // limit on the string, before it is parsed (04 §3.1.1 "Size before parsing"). Spy test: the JSON
 // parser (@agentlink/crypto parseJson, and the global JSON.parse) never sees an oversized content.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { EnvelopeKeys } from '@agentlink/crypto';
+import { encodeUtf8, type EnvelopeKeys } from '@agentlink/crypto';
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import { v2 as nip44 } from 'nostr-tools/nip44';
 import { wrapEvent } from 'nostr-tools/nip59';
@@ -39,7 +39,11 @@ function recipientKeys(): EnvelopeKeys & { pubkey: string } {
 async function unwrapCode(content: string): Promise<string> {
   const sender = generateSecretKey();
   const recipient = recipientKeys();
-  const wrap = wrapEvent({ kind: 14, tags: [['agentlink', '1']], content }, sender, recipient.pubkey);
+  const wrap = wrapEvent(
+    { kind: 14, tags: [['agentlink', '1']], content },
+    sender,
+    recipient.pubkey,
+  );
   parseJsonSpy.calls.length = 0;
   try {
     await unwrapGiftWrap(wrap, recipient);
@@ -58,7 +62,7 @@ describe('receive: rumor content size before JSON.parse (04 §3.1.1)', () => {
   it('drops a 24 577-byte content without parsing it', async () => {
     const jsonParse = vi.spyOn(JSON, 'parse');
     const content = `{${' '.repeat(ENVELOPE_MAX_BYTES + 1 - 2)}}`;
-    expect(new TextEncoder().encode(content).length).toBe(24_577);
+    expect(encodeUtf8(content).length).toBe(24_577);
     expect(await unwrapCode(content)).toBe('envelope_too_large');
     // The seal and the rumor were parsed (two calls); the content never was.
     expect(parseJsonSpy.calls).toHaveLength(2);

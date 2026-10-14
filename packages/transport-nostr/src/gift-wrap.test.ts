@@ -9,6 +9,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AEAD_CT_MAX_LENGTH,
+  KeyStoreError,
   MAX_RECIPIENTS,
   NOSTR_KIND_GIFT_WRAP,
   NOSTR_KIND_SEAL,
@@ -96,7 +97,11 @@ function makeEnvelope(
     thread: b64(16),
     from,
     createdAt,
-    recipients: Array.from({ length: recipients }, () => ({ kid: b64(16), enc: b64(32), wk: b64(48) })),
+    recipients: Array.from({ length: recipients }, () => ({
+      kid: b64(16),
+      enc: b64(32),
+      wk: b64(48),
+    })),
     aead: { alg: 'A256GCM', iv: b64(12), ct: b64(ctBytes) },
     sig: encodeHex(randomBytes(64)),
   };
@@ -120,6 +125,9 @@ function envelopeOfSize(from: string, bytes: number): Envelope {
 
 const utf8Length = (text: string) => encodeUtf8(text).length;
 
+/** A mutable plain copy (nostr-tools marks the events it verifies, and ours are frozen). */
+const plain = (event: NostrEvent) => JSON.parse(JSON.stringify(event)) as never;
+
 async function codeOf(promise: Promise<unknown>): Promise<TransportErrorCode | 'accepted'> {
   try {
     await promise;
@@ -137,7 +145,11 @@ function referenceWrap(
   rumor: { kind?: number; tags?: string[][]; content: string },
 ) {
   return wrapEvent(
-    { kind: rumor.kind ?? NOSTR_KIND_RUMOR, tags: rumor.tags ?? [[...AGENTLINK_TAG]], content: rumor.content },
+    {
+      kind: rumor.kind ?? NOSTR_KIND_RUMOR,
+      tags: rumor.tags ?? [[...AGENTLINK_TAG]],
+      content: rumor.content,
+    },
     sender.secretKey,
     recipient.pubkey,
   );
@@ -174,8 +186,8 @@ describe('interop with the nostr-tools NIP-59 reference', () => {
     for (const [index, recipient] of recipients.entries()) {
       const wrap = result.wraps[index]!;
       expect(wrap.recipient).toBe(recipient.pubkey);
-      expect(verifyEvent(structuredClone(wrap.event) as never)).toBe(true);
-      const rumor = unwrapEvent(structuredClone(wrap.event) as never, recipient.secretKey);
+      expect(verifyEvent(plain(wrap.event))).toBe(true);
+      const rumor = unwrapEvent(plain(wrap.event), recipient.secretKey);
       expect(rumor.kind).toBe(14);
       expect(rumor.pubkey).toBe(sender.pubkey);
       expect(rumor.tags).toEqual([['agentlink', '1']]);
@@ -267,7 +279,11 @@ describe('wrapEnvelope', () => {
 
   it('reports the final size of each gift wrap: the event JSON and the relay EVENT frame, in bytes', async () => {
     const sender = referenceKeys();
-    const { wraps } = await wrapEnvelope(makeEnvelope(sender.pubkey), [referenceKeys().pubkey], sender);
+    const { wraps } = await wrapEnvelope(
+      makeEnvelope(sender.pubkey),
+      [referenceKeys().pubkey],
+      sender,
+    );
     const wrap = wraps[0]!;
     expect(wrap.eventBytes).toBe(utf8Length(JSON.stringify(wrap.event)));
     expect(wrap.frameBytes).toBe(utf8Length(JSON.stringify(['EVENT', wrap.event])));
@@ -309,15 +325,18 @@ describe('wrapEnvelope', () => {
   it('refuses an envelope that fails the strict parser, before any key operation', async () => {
     const sender = spied(referenceKeys());
     const bad = { ...makeEnvelope(sender.pubkey), extra: 1 } as unknown as Envelope;
-    expect(await codeOf(wrapEnvelope(bad, [referenceKeys().pubkey], sender))).toBe('invalid_envelope');
-    const noSig = { ...makeEnvelope(sender.pubkey) } as Partial<Envelope>;
-    delete noSig.sig;
-    expect(await codeOf(wrapEnvelope(noSig as Envelope, [referenceKeys().pubkey], sender))).toBe(
+    expect(await codeOf(wrapEnvelope(bad, [referenceKeys().pubkey], sender))).toBe(
       'invalid_envelope',
     );
-    expect(await codeOf(wrapEnvelope(null as unknown as Envelope, [referenceKeys().pubkey], sender))).toBe(
-      'invalid_envelope',
+    const noSig = Object.fromEntries(
+      Object.entries(makeEnvelope(sender.pubkey)).filter(([key]) => key !== 'sig'),
     );
+    expect(
+      await codeOf(wrapEnvelope(noSig as unknown as Envelope, [referenceKeys().pubkey], sender)),
+    ).toBe('invalid_envelope');
+    expect(
+      await codeOf(wrapEnvelope(null as unknown as Envelope, [referenceKeys().pubkey], sender)),
+    ).toBe('invalid_envelope');
     expect(sender.signNostr).not.toHaveBeenCalled();
     expect(sender.nip44Encrypt).not.toHaveBeenCalled();
   });
@@ -355,7 +374,11 @@ describe('wrapEnvelope', () => {
   it('eight distinct recipients are allowed, nine duplicates of eight keys collapse to eight', async () => {
     const sender = referenceKeys();
     const eight = Array.from({ length: MAX_RECIPIENTS }, () => referenceKeys().pubkey);
-    const { wraps } = await wrapEnvelope(makeEnvelope(sender.pubkey), [...eight, eight[0]!], sender);
+    const { wraps } = await wrapEnvelope(
+      makeEnvelope(sender.pubkey),
+      [...eight, eight[0]!],
+      sender,
+    );
     expect(wraps).toHaveLength(8);
   });
 });
@@ -407,10 +430,13 @@ describe('created_at randomisation (NIP-59; 04 §3.5)', () => {
         const event = wraps[index]!.event;
         wrapTimes.push(event.created_at);
         const seal = JSON.parse(
-          nip44.decrypt(event.content, nip44.utils.getConversationKey(recipient.secretKey, event.pubkey)),
+          nip44.decrypt(
+            event.content,
+            nip44.utils.getConversationKey(recipient.secretKey, event.pubkey),
+          ),
         ) as NostrEvent;
         sealTimes.push(seal.created_at);
-        const rumor = unwrapEvent(structuredClone(event) as never, recipient.secretKey);
+        const rumor = unwrapEvent(plain(event), recipient.secretKey);
         expect(rumor.created_at).toBe(NOW);
       }
     }
@@ -428,7 +454,11 @@ describe('created_at randomisation (NIP-59; 04 §3.5)', () => {
   it('defaults to the wall clock', async () => {
     const sender = referenceKeys();
     const before = Math.floor(Date.now() / 1000);
-    const { wraps } = await wrapEnvelope(makeEnvelope(sender.pubkey), [referenceKeys().pubkey], sender);
+    const { wraps } = await wrapEnvelope(
+      makeEnvelope(sender.pubkey),
+      [referenceKeys().pubkey],
+      sender,
+    );
     const after = Math.floor(Date.now() / 1000);
     expect(wraps[0]!.event.created_at).toBeGreaterThanOrEqual(before - WINDOW);
     expect(wraps[0]!.event.created_at).toBeLessThanOrEqual(after);
@@ -442,7 +472,9 @@ describe('unwrapGiftWrap: fail closed (04 §3.1.1 step 2)', () => {
     const sender = referenceKeys();
     const victim = referenceKeys();
     const recipient = referenceKeys();
-    const wrap = referenceWrap(sender, recipient, { content: canonicalize(makeEnvelope(victim.pubkey)) });
+    const wrap = referenceWrap(sender, recipient, {
+      content: canonicalize(makeEnvelope(victim.pubkey)),
+    });
     expect(await codeOf(unwrapGiftWrap(wrap, recipient))).toBe('sender_mismatch');
   });
 
@@ -452,10 +484,17 @@ describe('unwrapGiftWrap: fail closed (04 §3.1.1 step 2)', () => {
     const recipient = referenceKeys();
     for (const from of [sealer.pubkey, author.pubkey]) {
       const rumor = createRumor(
-        { kind: NOSTR_KIND_RUMOR, tags: [[...AGENTLINK_TAG]], content: canonicalize(makeEnvelope(from)) },
+        {
+          kind: NOSTR_KIND_RUMOR,
+          tags: [[...AGENTLINK_TAG]],
+          content: canonicalize(makeEnvelope(from)),
+        },
         author.secretKey,
       );
-      const wrap = createWrap(createSeal(rumor, sealer.secretKey, recipient.pubkey), recipient.pubkey);
+      const wrap = createWrap(
+        createSeal(rumor, sealer.secretKey, recipient.pubkey),
+        recipient.pubkey,
+      );
       expect(await codeOf(unwrapGiftWrap(wrap, recipient))).toBe('rumor_mismatch');
     }
   });
@@ -464,12 +503,22 @@ describe('unwrapGiftWrap: fail closed (04 §3.1.1 step 2)', () => {
     const sender = referenceKeys();
     const recipient = referenceKeys();
     const content = canonicalize(makeEnvelope(sender.pubkey));
-    for (const tags of [[], [['agentlink', '2']], [['agentlink']], [['p', recipient.pubkey]], [['Agentlink', '1']]]) {
+    for (const tags of [
+      [],
+      [['agentlink', '2']],
+      [['agentlink']],
+      [['agentlink', '1', 'x']],
+      [['p', recipient.pubkey]],
+      [['Agentlink', '1']],
+    ]) {
       const wrap = referenceWrap(sender, recipient, { tags, content });
       expect(await codeOf(unwrapGiftWrap(wrap, recipient))).toBe('missing_agentlink_tag');
     }
     // Other tags next to it are fine.
-    const ok = referenceWrap(sender, recipient, { tags: [['x', 'y'], [...AGENTLINK_TAG]], content });
+    const ok = referenceWrap(sender, recipient, {
+      tags: [['x', 'y'], [...AGENTLINK_TAG]],
+      content,
+    });
     expect(await codeOf(unwrapGiftWrap(ok, recipient))).toBe('accepted');
   });
 
@@ -487,7 +536,11 @@ describe('unwrapGiftWrap: fail closed (04 §3.1.1 step 2)', () => {
     const sender = referenceKeys();
     const recipient = referenceKeys();
     const base = createRumor(
-      { kind: NOSTR_KIND_RUMOR, tags: [[...AGENTLINK_TAG]], content: canonicalize(makeEnvelope(sender.pubkey)) },
+      {
+        kind: NOSTR_KIND_RUMOR,
+        tags: [[...AGENTLINK_TAG]],
+        content: canonicalize(makeEnvelope(sender.pubkey)),
+      },
       sender.secretKey,
     );
     const variants = [
@@ -518,14 +571,25 @@ describe('unwrapGiftWrap: fail closed (04 §3.1.1 step 2)', () => {
     const sender = referenceKeys();
     const recipient = referenceKeys();
     const rumor = createRumor(
-      { kind: NOSTR_KIND_RUMOR, tags: [[...AGENTLINK_TAG]], content: canonicalize(makeEnvelope(sender.pubkey)) },
+      {
+        kind: NOSTR_KIND_RUMOR,
+        tags: [[...AGENTLINK_TAG]],
+        content: canonicalize(makeEnvelope(sender.pubkey)),
+      },
       sender.secretKey,
     );
     const good = createSeal(rumor, sender.secretKey, recipient.pubkey);
     const tampered = { ...good, created_at: good.created_at + 1 };
     const sealOf = (kind: number, tags: string[][]) =>
-      finalizeEvent({ kind, created_at: good.created_at, tags, content: good.content }, sender.secretKey);
-    for (const seal of [tampered, sealOf(1, []), sealOf(NOSTR_KIND_SEAL, [['p', recipient.pubkey]])]) {
+      finalizeEvent(
+        { kind, created_at: good.created_at, tags, content: good.content },
+        sender.secretKey,
+      );
+    for (const seal of [
+      tampered,
+      sealOf(1, []),
+      sealOf(NOSTR_KIND_SEAL, [['p', recipient.pubkey]]),
+    ]) {
       const wrap = createWrap(seal as never, recipient.pubkey);
       expect(await codeOf(unwrapGiftWrap(wrap, recipient))).toBe('invalid_seal');
     }
@@ -534,7 +598,9 @@ describe('unwrapGiftWrap: fail closed (04 §3.1.1 step 2)', () => {
   it('rejects a gift wrap with a bad signature or another kind, before any decryption', async () => {
     const sender = referenceKeys();
     const recipient = spied(referenceKeys());
-    const wrap = referenceWrap(sender, recipient, { content: canonicalize(makeEnvelope(sender.pubkey)) });
+    const wrap = referenceWrap(sender, recipient, {
+      content: canonicalize(makeEnvelope(sender.pubkey)),
+    });
     const relabelled = finalizeEvent(
       { kind: 4, created_at: wrap.created_at, tags: wrap.tags, content: wrap.content },
       generateSecretKey(),
@@ -558,7 +624,9 @@ describe('unwrapGiftWrap: fail closed (04 §3.1.1 step 2)', () => {
   it('rejects a gift wrap addressed to another key', async () => {
     const sender = referenceKeys();
     const recipient = referenceKeys();
-    const wrap = referenceWrap(sender, recipient, { content: canonicalize(makeEnvelope(sender.pubkey)) });
+    const wrap = referenceWrap(sender, recipient, {
+      content: canonicalize(makeEnvelope(sender.pubkey)),
+    });
     expect(await codeOf(unwrapGiftWrap(wrap, referenceKeys()))).toBe('decrypt_failed');
   });
 
@@ -586,7 +654,10 @@ describe('unwrapGiftWrap: fail closed (04 §3.1.1 step 2)', () => {
         kind: NOSTR_KIND_GIFT_WRAP,
         created_at: 1_760_000_000,
         tags: [['p', recipient.pubkey]],
-        content: nip44.encrypt('not a seal', nip44.utils.getConversationKey(ephemeral, recipient.pubkey)),
+        content: nip44.encrypt(
+          'not a seal',
+          nip44.utils.getConversationKey(ephemeral, recipient.pubkey),
+        ),
       },
       ephemeral,
     );
@@ -597,7 +668,10 @@ describe('unwrapGiftWrap: fail closed (04 §3.1.1 step 2)', () => {
         kind: NOSTR_KIND_SEAL,
         created_at: 1_760_000_000,
         tags: [],
-        content: nip44.encrypt('not a rumor', nip44.utils.getConversationKey(sender.secretKey, recipient.pubkey)),
+        content: nip44.encrypt(
+          'not a rumor',
+          nip44.utils.getConversationKey(sender.secretKey, recipient.pubkey),
+        ),
       },
       sender.secretKey,
     );
@@ -609,7 +683,9 @@ describe('unwrapGiftWrap: fail closed (04 §3.1.1 step 2)', () => {
   it('passes the epoch option to both NIP-44 decryptions', async () => {
     const sender = referenceKeys();
     const recipient = spied(referenceKeys());
-    const wrap = referenceWrap(sender, recipient, { content: canonicalize(makeEnvelope(sender.pubkey)) });
+    const wrap = referenceWrap(sender, recipient, {
+      content: canonicalize(makeEnvelope(sender.pubkey)),
+    });
     await unwrapGiftWrap(wrap, recipient, { epoch: 0 });
     expect(recipient.nip44Decrypt).toHaveBeenCalledTimes(2);
     for (const call of recipient.nip44Decrypt.mock.calls) expect(call[2]).toEqual({ epoch: 0 });
@@ -618,8 +694,10 @@ describe('unwrapGiftWrap: fail closed (04 §3.1.1 step 2)', () => {
   it('lets a KeyStore state error through unchanged (it is not the event that failed)', async () => {
     const sender = referenceKeys();
     const recipient = referenceKeys();
-    const wrap = referenceWrap(sender, recipient, { content: canonicalize(makeEnvelope(sender.pubkey)) });
-    const closed = new Error('keystore closed');
+    const wrap = referenceWrap(sender, recipient, {
+      content: canonicalize(makeEnvelope(sender.pubkey)),
+    });
+    const closed = new KeyStoreError('keystore_closed', 'closed');
     const keys = { ...recipient, nip44Decrypt: () => Promise.reject(closed) };
     await expect(unwrapGiftWrap(wrap, keys)).rejects.toBe(closed);
   });
@@ -637,7 +715,13 @@ describe('unwrapGiftWrap: fail closed (04 §3.1.1 step 2)', () => {
     }
     expect(caught).toBeInstanceOf(TransportError);
     const text = `${(caught as Error).message} ${String((caught as Error).cause ?? '')}`;
-    for (const secret of [envelope.from, envelope.id, envelope.aead.ct.slice(0, 16), sender.pubkey, wrap.id]) {
+    for (const secret of [
+      envelope.from,
+      envelope.id,
+      envelope.aead.ct.slice(0, 16),
+      sender.pubkey,
+      wrap.id,
+    ]) {
       expect(text).not.toContain(secret);
     }
   });
