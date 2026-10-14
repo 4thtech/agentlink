@@ -5,6 +5,7 @@
   "fixed": [
     [
       "@agentlink/types",
+      "@agentlink/log",
       "@agentlink/crypto",
       "@agentlink/chain",
       "@agentlink/transport-nostr",

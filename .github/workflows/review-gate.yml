@@ -283,7 +283,7 @@ jobs:
               }
               if (!filled(sectionText(/^tests-first evidence\b/i))) {
                 problems.push(
-                  'S2: the "Tests-first evidence" section is empty (failing-test commit and red run, audit-rules.md §3).',
+                  'S2: the "Tests-first evidence" section is empty (RED commit SHA, command and local output excerpt, audit-rules.md §3.4).',
                 );
               }
             }
