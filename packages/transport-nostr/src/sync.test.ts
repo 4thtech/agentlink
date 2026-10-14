@@ -26,6 +26,7 @@ import {
   FIRST_SYNC_LOOKBACK_SECONDS,
   LIVE_RETRY_BASE_MS,
   MAX_NEW_WRAPS_PER_PASS,
+  MAX_PAGES_PER_PASS,
   MAX_QUEUED_EVENTS,
   SYNC_PAGE_LIMIT,
   type SyncResume,
@@ -99,7 +100,7 @@ function makeEnvelope(from: string, overrides: Partial<Envelope> = {}): Envelope
     from,
     createdAt: 1_760_000_000,
     recipients: [{ kid: b64(16), enc: b64(32), wk: b64(48) }],
-    aead: { alg: 'A256GCM', iv: b64(12), ct: b64(64) },
+    aead: { alg: 'A256GCM-KC', iv: b64(12), kc: b64(32), ct: b64(64) },
     sig: encodeHex(randomBytes(64)),
     ...overrides,
   };
@@ -1045,7 +1046,7 @@ describe('NIP-42', () => {
       onEnvelope: s.handler(),
     });
     expect(result).toMatchObject({ partial: false, delivered: 1 });
-    expect(s.net.reqs(relay)).toHaveLength(3); // refused once, served after the login, and the repeat page
+    expect(s.net.reqs(relay)).toHaveLength(4); // refused once, served after the login, the repeat page, the step below it
     expect(s.net.socket(relay)?.authed).toBe(true);
   });
 
@@ -1505,5 +1506,139 @@ describe('live cursor timing (L-1)', () => {
     await vi.advanceTimersByTimeAsync(50);
     expect(s.store.cursors.get(relay)).toBe(NOW + 100);
     unsubscribe();
+  });
+});
+
+// --- H-1b: a second that holds at least the relay's cap of events -------------------------------
+
+describe('a saturated second (IR-M1-5c-1 H-1b)', () => {
+  it('reaches an older real wrap behind a full page of wraps at one second', async () => {
+    const s = setup();
+    const [relay] = relayUrls('saturated', 1) as [string];
+    s.net.configure(relay, { maxLimit: 5 });
+    const T = NOW - 1_000;
+    const same = Array.from({ length: 5 }, () => makeWrap(s.recipient, { createdAt: T }));
+    const older = makeWrap(s.recipient, { createdAt: T - 3 * HOUR });
+    for (const w of same) s.net.inject(relay, w.event);
+    s.net.inject(relay, older.event);
+    const cursorsSeen: number[] = [];
+    const result = await s.engine.sync({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: (item) => {
+        s.items.push(item);
+        cursorsSeen.push(s.store.cursors.size);
+        return 'verified';
+      },
+    });
+    expect(ids(s)).toContain(older.event.id);
+    expect(result).toMatchObject({ partial: false, delivered: 6 });
+    expect(cursorsSeen.every((n) => n === 0)).toBe(true);
+    expect(s.store.cursors.get(relay)).toBe(NOW);
+  });
+
+  it('is not hidden from by a junk flood of at least the cap at one timestamp', async () => {
+    const s = setup();
+    const [relay] = relayUrls('satflood', 1) as [string];
+    s.net.configure(relay, { maxLimit: 5 });
+    for (let i = 0; i < 12; i += 1) {
+      s.net.inject(relay, junkWrap(s.recipient.pubkey, NOW - 500) as unknown as NostrEvent);
+    }
+    const real = [1, 2, 3].map((i) => makeWrap(s.recipient, { createdAt: NOW - 500 - i * HOUR }));
+    for (const w of real) s.net.inject(relay, w.event);
+    const result = await s.engine.sync({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect([...ids(s)].sort()).toEqual(real.map((w) => w.event.id).sort());
+    expect(result.partial).toBe(false);
+    expect(s.store.cursors.get(relay)).toBe(NOW);
+  });
+
+  it('walks through many saturated seconds with strictly falling pages and a bounded count', async () => {
+    const s = setup();
+    const [relay] = relayUrls('satbound', 1) as [string];
+    s.net.configure(relay, { maxLimit: 2 });
+    for (let sec = 0; sec < 40; sec += 1) {
+      for (let k = 0; k < 3; k += 1) {
+        s.net.inject(relay, junkWrap(s.recipient.pubkey, NOW - 100 - sec) as unknown as NostrEvent);
+      }
+    }
+    const real = makeWrap(s.recipient, { createdAt: NOW - 2 * HOUR });
+    s.net.inject(relay, real.event);
+    const result = await s.engine.sync({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(ids(s)).toEqual([real.event.id]);
+    expect(result.partial).toBe(false);
+    const untils = s.net
+      .reqs(relay)
+      .map((r) => r.filter.until)
+      .filter((u): u is number => u !== undefined);
+    expect(untils.every((u, i) => i === 0 || u < (untils[i - 1] as number))).toBe(true);
+    expect(s.net.reqs(relay).length).toBeLessThanOrEqual(MAX_PAGES_PER_PASS);
+  });
+
+  it('still stops when a relay ignores until (an event lies above it)', async () => {
+    const s = setup();
+    const [relay] = relayUrls('satignore', 1) as [string];
+    s.net.configure(relay, { ignoreLimit: true });
+    for (let i = 0; i < 6; i += 1) {
+      s.net.inject(relay, makeWrap(s.recipient, { createdAt: NOW - 100 }).event);
+    }
+    const result = await s.engine.sync({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(result.partial).toBe(false);
+    expect(s.net.reqs(relay).length).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('a bound drop shared between relays (L-2)', () => {
+  it("holds the cursor of a relay that waited on another relay's over-bound drop", async () => {
+    const s = setup();
+    const [a, b] = relayUrls('shared-bound', 2) as [string, string];
+    const wrap = makeWrap(s.recipient, { createdAt: NOW - 3 * HOUR });
+    // Relay A uses up the pass bound with junk, then serves the wrap as the 2001st opening.
+    s.net.configure(a, {
+      extraFrames: (subId) => [
+        ...Array.from({ length: MAX_NEW_WRAPS_PER_PASS }, () =>
+          JSON.stringify(['EVENT', subId, junkWrap(s.recipient.pubkey, NOW - 10)]),
+        ),
+        JSON.stringify(['EVENT', subId, wrap.event]),
+      ],
+      noEose: true,
+    });
+    // Relay B is quiet until the wrap is already being opened for A.
+    s.net.configure(b, { noEose: true });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const isSeen = s.store.isSeen.bind(s.store);
+    s.store.isSeen = (k, id) => (id === wrap.event.id ? gate.then(() => false) : isSeen(k, id));
+
+    const done = s.engine.sync({
+      relays: [a, b],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    await vi.advanceTimersByTimeAsync(200); // A is stuck on the wrap's seen-set read
+    s.net.inject(b, wrap.event); // B's copy arrives and waits on A's work
+    await vi.advanceTimersByTimeAsync(50);
+    release();
+    const result = await within(done, 10);
+
+    expect(s.items).toHaveLength(0);
+    for (const relay of [a, b]) {
+      expect(result.relays.find((r) => r.relay === relay)).toMatchObject({
+        status: 'incomplete',
+        reason: 'too_many_events',
+      });
+      expect(s.store.cursors.has(relay)).toBe(false);
+    }
   });
 });

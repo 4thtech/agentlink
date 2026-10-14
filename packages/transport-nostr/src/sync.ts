@@ -585,12 +585,15 @@ export class SyncEngine {
       let phase: 'backlog' | 'live' = 'backlog';
       let subId = newSubId();
       let pageUntil = resumeUntil; // the `until` of the page being read
-      let prevOldest = resumeUntil; // the oldest event of the page before
       let pageOldest: number | undefined;
       // Ids of this page's events at `pageOldest`; the next page starts at that second (inclusive),
       // so it repeats them. They are skipped there, not counted or handled twice.
       let pageOldestIds: string[] = [];
       let skipIds = new Set<string>();
+      // This page, relative to its `until`: did an event sit at it, and did one lie above it (a relay
+      // that ignores `until`)?
+      let sawAtUntil = false;
+      let sawNewer = false;
       let pages = 1;
       let eosePending = false;
       const pageRequest = (): string =>
@@ -662,21 +665,41 @@ export class SyncEngine {
           finish({ status: 'incomplete', reason: 'handler_retry' });
           return;
         }
-        const more =
-          pageOldest !== undefined &&
-          pageOldest > since &&
-          (prevOldest === undefined || pageOldest < prevOldest);
-        if (more) {
+        // Where the next page starts, or undefined when the window is read. A relay caps the events
+        // it returns per filter, newest first, so a second that holds at least the cap returns the
+        // same events again for `until` = that second (H-1b): step below it, giving up only the
+        // overflow of that one second. If an event lies above `until`, the relay ignores `until`:
+        // stop. Residual limit: more events than the relay's cap within one single second cannot
+        // all be fetched (Nostr has no sub-second paging).
+        const next = ((): { until: number; skip: readonly string[] } | undefined => {
+          if (sawNewer) return undefined;
+          if (pageOldest !== undefined) {
+            if (pageOldest <= since) return undefined;
+            // The first page of a walk is repeated from its oldest second (inclusive), because the
+            // cap may have cut that second in the middle.
+            if (pageUntil === undefined || pageOldest < pageUntil) {
+              return { until: pageOldest, skip: pageOldestIds };
+            }
+          } else if (!(pageUntil !== undefined && sawAtUntil)) {
+            return undefined;
+          }
+          // Nothing older than `pageUntil` came back: that second is all this page held.
+          return pageUntil !== undefined && pageUntil - 1 >= since
+            ? { until: pageUntil - 1, skip: [] }
+            : undefined;
+        })();
+        if (next !== undefined) {
           if (pages >= MAX_PAGES_PER_PASS) {
             finish({ status: 'incomplete', reason: 'too_many_events' });
             return;
           }
           link.send(JSON.stringify(['CLOSE', subId]));
-          pageUntil = pageOldest;
-          prevOldest = pageOldest;
+          pageUntil = next.until;
+          skipIds = new Set(next.skip);
           pageOldest = undefined;
-          skipIds = new Set(pageOldestIds);
           pageOldestIds = [];
+          sawAtUntil = false;
+          sawNewer = false;
           pages += 1;
           eosePending = false;
           subId = newSubId();
@@ -746,6 +769,7 @@ export class SyncEngine {
               typeof event.id === 'string' &&
               skipIds.has(event.id)
             ) {
+              sawAtUntil = true;
               return; // the repeat of the previous page's last second
             }
             frames += 1;
@@ -762,6 +786,10 @@ export class SyncEngine {
             }
             if (phase === 'backlog' && isRecord(event)) {
               const at = event.created_at;
+              if (typeof at === 'number' && pageUntil !== undefined) {
+                if (at > pageUntil) sawNewer = true;
+                else if (at === pageUntil) sawAtUntil = true;
+              }
               if (
                 typeof at === 'number' &&
                 Number.isSafeInteger(at) &&
