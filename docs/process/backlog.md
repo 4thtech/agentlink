@@ -766,6 +766,19 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - The spec line lands first. Vectors come from the M1-1h generators, and the suites stay pending until their modules land.
 
+#### M1-1h-c · Regenerate the `sign-policy-set` vector for the post-G-32 policy form (new, IR-M1-2b-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Repo/path:** agentlink · test-vectors/, tools/vectors/generate_owner_action.py
+- **Depends on:** M1-1h; M1-2b; proposed, owner confirms at merge
+- **Spec:** 04 §2.5.1, §2.4.1; 06 §3 (policy JSON form, G-32)
+- **Invariants:** I-4, I-8
+- **Scope:**
+  - Regenerate the `sign-policy-set` vector of the `owner-action` suite from the independent generator `tools/vectors/generate_owner_action.py`, not derived from the `@agentlink/types` schema. The current vector predates G-32: it must use the 06 §3 defaults in the JSON form (USD values as strings, `contactRules: []`).
+  - Add one vector with a non-empty, sorted `contactRules` (JCS key order inside the rules, 04 §2.5.1).
+  - Keep the old number-USD form as a rejection vector.
+- **Acceptance:**
+  - Done before M1-7d unpends the `owner-action` suite. Regeneration reproduces the files byte for byte, and the vector check passes in every declared runtime.
+
 #### M1-1i · Independent test vectors for the proof-layer suites (new, split from M1-1h)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/generators/
@@ -1355,6 +1368,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Vector suite `owner-action`: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - Tests first; a table-driven test per rule and boundary (e.g. the per-contact hourly rate limit at N and N + 1).
   - A policy row edited directly in the store is ignored (I-4); a replayed or stale `SignedOwnerAction` is rejected; an older signed policy put back in the store is detected against the KeyStore high-water mark.
+  - G-6 fail closed (06 §3): with the KeyStore high-water mark above 0, a deleted, unsigned, tampered, rolled-back or schema-invalid stored policy (including the old number-USD form) gives `approval` for every paid action, commitment and owner-gated action, queues unknown senders, applies no `contactRules` entry or auto-accept, and never reads the built-in defaults (a test fails if the defaults are used once the mark is above 0). With no policy ever applied, the defaults apply.
   - G-7 boundaries (04 §2.5.1), per op: `issuedAt = now + 300` is accepted and `now + 301` refused; `now = expiresAt` is accepted and `expiresAt + 1` refused; a lifetime of exactly `L(op)` is accepted and `L(op) + 1` refused; an `approval.decide` whose `expiresAt` is after the request's is refused; a replay of an applied `approval.cancel` within its lifetime is refused by its nonce; two concurrent deliveries of one object apply it once (nonce check, record and apply in one transaction); a re-published `agent.revoke` is a no-op, not an error.
   - Property test: `evaluate` is deterministic and has no side effects.
 
@@ -3146,7 +3160,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 3. **G-3 (H) AccessManager role mapping.** Resolved by PR #11 (D-59, confirmed by the owner at merge): 05 §5.1 role map with role IDs, selectors, holders (mainnet Safe and ops hardware key; separate testnet Safe and key with scaled delays), execution and grant delays, `GUARDIAN` (cancel only), role admins, 7-day target admin delays and the OZ default `minSetback`. The AccessManager delays are the timelock (no `TimelockController`). `ADMIN_ROLE` moves to 7 days, and module registration and every upgrade move to 7 days, because any module can charge credits. The cap is lowered and raised through two functions (`InvalidCapChange()`). `unpause` is Safe-only. Mainnet contracts start paused until the configured delays are in effect. *Was:* per-function delays that AccessManager cannot express; two UPGRADER delays; `freezeUpgrades` under the 48 h ADMIN; guardians, grant delays and `minSetback` unspecified. *Blocks:* M1-3a, M1-3b, M1-3g.
 4. **G-4 (H) Batch failure semantics.** 05 §3.2; 07 §7. Whether one failing item reverts `notarizeBatch`/`acknowledgeBatch` is unspecified; the submitter batches across signers, so one item (e.g. credits spent between simulation and inclusion) can grief the rest. *Proposed:* specify all-or-nothing with per-item pre-simulation and retry without the failing item, or skip-and-emit with per-item status; keep 05 §3.4 gas targets. *Blocks:* M1-3d, M1-10a.
 5. **G-5 (M) J1 key storage wording.** RESOLVED by 02 §5 J1 steps 2–3: `init` puts only the agent keys in the OS keychain (step 2); the owner key is created and wrapped in the setup step (step 3, 04 §2.2). *Was:* J1 step 2 stored "owner and agent keys" in the OS keychain, against 04 §2.2. *Blocked:* M1-9a, M1-12b.
-6. **G-6 (H) Policy fail-open.** 06 §3 (last paragraph); 04 §2.5. Unsigned or tampered policies fall back to defaults, which can be looser than the owner's policy (e.g. `proofs.notarize: deny` → `allow`); deleting the signed row downgrades policy. *Proposed:* once an owner-signed policy exists, fail closed (`approval` for owner-gated actions) and keep a policy version in an owner-signed object. *Blocks:* M1-7d.
+6. **G-6 (H) Policy fail-open.** Resolved for the fallback by branch `docs/m12b-spec-fixes` (pending owner; proposed, owner confirms at merge; review IR-M1-2b-1). The version in an owner-signed object and the KeyStore high-water mark were already in 04 §2.5.1. 06 §3 (last paragraph) now says that once any policy version has been applied, a missing, unsigned, tampered, rolled-back or unparseable policy never falls back to the defaults: every paid action, commitment and owner-gated action needs the owner's approval, unknown senders are queued, no contact rule or auto-accept applies, and the owner is told to confirm the policy again. A `deny` that can no longer be read becomes `approval`, never `allow`. *Was:* 06 §3 (last paragraph): unsigned or tampered policies fell back to defaults, which can be looser than the owner's policy (e.g. `proofs.notarize: deny` → `allow`), and deleting the signed row downgraded policy. *Blocks:* M1-7d.
 7. **G-7 (M) Lifetimes.** Resolved by branch `docs/G-7-G-32` (pending owner; proposed, owner confirms at merge). The values are in 04 §2.5.1 (lifetimes, skew and nonces), 04 §3.4.1 (approval TTL) and 06 §3 (daily budget window).
    - Skew is 300 s and applies to `issuedAt` only; expiry has no skew.
    - Maximum lifetime per op: `approval.decide` until the request's `expiresAt`; `approval.cancel` 7 days, so a cancel from the console still reaches a sleeping agent; `policy.set` and `contact.check` 24 h, since rollback is stopped by `version`; later ops 10 minutes unless their task says otherwise, never above 7 days.
