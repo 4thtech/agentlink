@@ -14,6 +14,10 @@ export {
   sealOwnerSeedWithNonceUnsafe as sealOwnerSeedWithNonce,
 } from './keystore-file.js';
 
+// IR-M1-1f-1 L-7: pairingDigest without the commitment check is not public; the `labels` vectors
+// (the same input under both tags) reach it here.
+export { pairingDigest } from './safety-code.js';
+
 /** RFC 9106 Argon2id v1.3 with K and X (empty = none) and any output length from 4 to 1024. */
 export function argon2idWithSecretAndAd(
   password: Uint8Array,

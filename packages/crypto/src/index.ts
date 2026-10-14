@@ -90,7 +90,8 @@ export {
   type AgentCard,
   type AgentCardHashes,
 } from './agent-card.js';
-// M1-1f: the pairing proof and the safety code (04 §3.6, §3.6.1), and the public constants of the
+// M1-1f: the pairing proof and the safety code (04 §3.6, §3.6.1; only the commit-checked functions
+// produce digits, IR-M1-1f-1 L-7), and the public constants of the
 // file KeyStore and owner wrap (04 §2.8). Argon2id, password() and the ALKS / ALKO seal and open
 // functions are in @agentlink/crypto/keystore.
 export {
@@ -110,11 +111,8 @@ export {
   SAFETY_TRANSCRIPT_LENGTH,
   checkSafetyCodeReveal,
   computeSafetyCode,
-  pairingDigest,
   safetyCodeCommit,
   safetyCodeForRole,
-  safetyCodeFromDigest,
-  safetyCodeTranscript,
   type SafetyCode,
   type SafetyCodeInput,
 } from './safety-code.js';
