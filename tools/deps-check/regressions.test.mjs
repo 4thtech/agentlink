@@ -12,6 +12,8 @@ import {
   RESTRICTED_ENTRY_POINTS,
   SUBTLE_EXEMPT_FILES,
   ZONES,
+  isTestFile,
+  misnamedTestFile,
   violationFor,
 } from './policy.mjs';
 
@@ -434,9 +436,10 @@ describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', 
     }
   });
 
-  it('is refused by name in test files outside test-vectors too: one seam, one rule', () => {
-    expect(src('packages/core', forms[0], 'src/a.test.ts').join('\n')).toMatch(RESTRICTED);
+  it('is refused by name in test files of zones 04 §3.1.1 does not list: one seam, one rule', () => {
+    // packages/core and packages/transport-nostr test files may use it (M1-1g-b, below).
     expect(src('packages/node', forms[0], 'src/a.test.ts').join('\n')).toMatch(RESTRICTED);
+    expect(src('apps/cli', forms[0], 'src/a.test.ts').join('\n')).toMatch(RESTRICTED);
   });
 
   it('is refused by relative path from crypto production code and allowed from crypto tests', () => {
@@ -450,7 +453,8 @@ describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', 
       entry.group.includes('@agentlink/crypto/testing'),
     );
     expect(entries).toHaveLength(1);
-    expect(entries[0]?.zones).toEqual(['test-vectors']);
+    expect(entries[0]?.zones).toEqual(['test-vectors', 'e2e']);
+    expect(entries[0]?.testZones).toEqual(['packages/core', 'packages/transport-nostr']);
   });
 });
 
@@ -551,6 +555,157 @@ describe('M1-1c, M1-1f: the crypto test seam @agentlink/crypto/testing', () => {
       [],
     );
     expect(src('packages/core', `import { x } from './testing.js';\n`, 'src/a.ts')).toEqual([]);
+  });
+});
+
+describe('M1-1g-b (IR-M1-1g-G2-1 R2-L-1): the test seam in package test files (04 §3.1.1)', () => {
+  // 04 §3.1.1: the test doubles are "in an entry point that deps-check allows only in tests,
+  // test-vectors and e2e, never in production src". Test files of the packages that need a
+  // MemoryKeyStore (core M1-7a, transport-nostr M1-5a) may import it by package name.
+  const RESTRICTED = /@agentlink\/crypto\/testing may be imported only in test-vectors/;
+  const SEAM_SOURCE = /test seam\) may be imported only by test files/;
+  const ZONES_WITH_TESTS = ['packages/core', 'packages/transport-nostr'];
+  const forms = [
+    `import { MemoryKeyStore } from '@agentlink/crypto/testing';\n`,
+    `export { MemoryOwnerKeyStore } from '@agentlink/crypto/testing';\n`,
+    `const m = await import('@agentlink/crypto/testing');\n`,
+    `type T = import('@agentlink/crypto/testing').MemoryKeyStore;\n`,
+  ];
+
+  it('allows it by package name in test files of core and transport-nostr, in every form', () => {
+    for (const zone of ZONES_WITH_TESTS) {
+      for (const name of ['src/a.test.ts', 'src/deep/er/b.test.ts']) {
+        for (const code of forms) expect(src(zone, code, name), `${zone} ${name}`).toEqual([]);
+        expect(violationFor(zone, '@agentlink/crypto/testing', `${zone}/${name}`)).toBeNull();
+      }
+    }
+  });
+
+  it('allows e2e and test-vectors (test-only directories, never built)', () => {
+    for (const zone of ['e2e', 'test-vectors']) {
+      expect(
+        violationFor(zone, '@agentlink/crypto/testing', `${zone}/a.ts`) ?? '',
+        zone,
+      ).not.toMatch(RESTRICTED);
+    }
+  });
+
+  it('still refuses it by name in production files of the same packages', () => {
+    for (const zone of ZONES_WITH_TESTS) {
+      for (const name of ['src/index.ts', 'src/a.ts', 'src/testing.ts', 'src/test/helpers.ts']) {
+        for (const code of forms) {
+          expect(src(zone, code, name).join('\n'), `${zone} ${name} ${code}`).toMatch(RESTRICTED);
+        }
+      }
+    }
+  });
+
+  it('still refuses it in test files of every other zone', () => {
+    for (const zone of Object.keys(ZONES).filter((z) => !ZONES_WITH_TESTS.includes(z))) {
+      if (zone === 'packages/crypto') continue; // its own tests use the relative path
+      expect(
+        violationFor(zone, '@agentlink/crypto/testing', `${zone}/src/a.test.ts`),
+        zone,
+      ).toMatch(RESTRICTED);
+    }
+  });
+
+  it('refuses a relative path to the seam source from those packages, test files included', () => {
+    for (const zone of ZONES_WITH_TESTS) {
+      for (const name of ['src/a.ts', 'src/a.test.ts']) {
+        const problems = src(
+          zone,
+          `import { MemoryKeyStore } from '../../crypto/src/testing.js';\n`,
+          name,
+        );
+        expect(problems.join('\n'), `${zone} ${name}`).toMatch(/leaves/);
+      }
+      expect(
+        src(zone, `export * from '../../crypto/src/testing';\n`, 'src/a.ts').join('\n'),
+      ).toMatch(SEAM_SOURCE);
+    }
+  });
+
+  it('refuses deep dist/, src/ and subpaths of the seam, in test files too: the exact name only', () => {
+    for (const zone of ZONES_WITH_TESTS) {
+      for (const name of ['src/a.ts', 'src/a.test.ts']) {
+        for (const specifier of [
+          '@agentlink/crypto/src/testing',
+          '@agentlink/crypto/src/testing.ts',
+          '@agentlink/crypto/dist/testing.js',
+          '@agentlink/crypto/testing/../src/testing.js',
+          '@agentlink/crypto/testing/index.js',
+          '@agentlink/crypto/./src/testing.js',
+        ]) {
+          expect(
+            violationFor(zone, specifier, `${zone}/${name}`),
+            `${zone} ${name} ${specifier}`,
+          ).not.toBeNull();
+        }
+      }
+    }
+  });
+
+  // IR-M1-1c-G2-1 L-1: every package build excludes exactly `src/**/*.test.ts`, so that is the only
+  // test-file name the guards accept. Any other test-like name is treated as production code (the
+  // seam and test-only libraries are refused) and is reported by deps-check (rename it).
+  const OTHER_NAMES = [
+    'src/a.test.mts',
+    'src/a.test.cts',
+    'src/a.test.tsx',
+    'src/a.test.js',
+    'src/a.test.mjs',
+    'src/a.spec.ts',
+    'src/a.spec.mts',
+  ];
+
+  it('treats *.test.mts, *.test.cts, *.spec.* and other test-like names as production code', () => {
+    for (const name of OTHER_NAMES) {
+      expect(isTestFile(`packages/core/${name}`), name).toBe(false);
+      expect(src('packages/core', forms[0], name).join('\n'), name).toMatch(RESTRICTED);
+      expect(
+        src('packages/crypto', `import { hpkeOpen } from './testing.js';\n`, name).join('\n'),
+        name,
+      ).toMatch(SEAM_SOURCE);
+      expect(src('packages/crypto', `import 'viem';\n`, name).join('\n'), name).toMatch(/viem/);
+    }
+    expect(isTestFile('packages/core/src/a.test.ts')).toBe(true);
+  });
+
+  it('reports any test-like file name other than *.test.ts in packages and apps', () => {
+    for (const name of OTHER_NAMES) {
+      expect(misnamedTestFile(`packages/core/${name}`), name).toMatch(/\*\.test\.ts/);
+    }
+    for (const name of [
+      'src/a.test.ts',
+      'src/a.ts',
+      'src/testing.ts',
+      'src/contest.ts',
+      'src/latest.mts',
+    ]) {
+      expect(misnamedTestFile(`packages/core/${name}`), name).toBeNull();
+    }
+  });
+
+  const dirs = [];
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('fails the repository scan for a planted src/x.test.mts that imports the seam', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deps-check-seam-'));
+    dirs.push(root);
+    const write = (path, text) => {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), text);
+    };
+    write('packages/core/package.json', JSON.stringify({ name: '@agentlink/core' }));
+    write('packages/core/src/ok.test.ts', forms[0]);
+    write('packages/core/src/x.test.mts', forms[0]);
+    const { problems } = runChecks(root);
+    expect(problems.some((p) => p.includes('src/ok.test.ts'))).toBe(false);
+    expect(problems.some((p) => p.includes('src/x.test.mts') && /\*\.test\.ts/.test(p))).toBe(true);
+    expect(problems.some((p) => p.includes('src/x.test.mts') && RESTRICTED.test(p))).toBe(true);
   });
 });
 

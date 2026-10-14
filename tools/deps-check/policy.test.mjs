@@ -1,10 +1,13 @@
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { findCycle, runChecks } from './check.mjs';
 import {
   LIBRARIES,
   NODE_ZONES,
+  RESTRICTED_ENTRY_POINTS,
   SUBTLE_ZONES,
   WORKSPACE_NAMES,
   ZONES,
@@ -91,5 +94,76 @@ describe('the repository itself', () => {
     const { problems, packages } = runChecks(REPO);
     expect(problems).toEqual([]);
     expect(packages).toBeGreaterThan(10);
+  });
+});
+
+describe('M1-1g-b: no build can include the crypto test seam (IR-M1-1c-G2-1 L-1)', () => {
+  const readJsonc = (path) => {
+    const { config, error } = ts.parseConfigFileTextToJson(path, readFileSync(path, 'utf8'));
+    if (error)
+      throw new Error(`${path}: ${ts.flattenDiagnosticMessageText(error.messageText, '\n')}`);
+    return config;
+  };
+  const packageDirs = ['packages', 'apps'].flatMap((group) =>
+    readdirSync(join(REPO, group), { withFileTypes: true })
+      .filter(
+        (entry) =>
+          entry.isDirectory() && existsSync(join(REPO, group, entry.name, 'tsconfig.json')),
+      )
+      .map((entry) => `${group}/${entry.name}`),
+  );
+  const seam = RESTRICTED_ENTRY_POINTS.find((entry) =>
+    entry.group.includes('@agentlink/crypto/testing'),
+  );
+
+  it('finds the workspace packages', () => {
+    expect(packageDirs.length).toBeGreaterThan(10);
+  });
+
+  it.each(packageDirs)('%s: the build excludes *.test.ts and has no path mapping', (dir) => {
+    const build = readJsonc(join(REPO, dir, 'tsconfig.json'));
+    expect(build.exclude).toContain('src/**/*.test.ts');
+    expect(build.compilerOptions?.paths).toBeUndefined();
+    expect(build.compilerOptions?.baseUrl).toBeUndefined();
+  });
+
+  it.each(packageDirs)(
+    '%s: a seam path mapping exists only in a noEmit test config of a test zone',
+    (dir) => {
+      const path = join(REPO, dir, 'tsconfig.test.json');
+      if (!existsSync(path)) return;
+      const test = readJsonc(path);
+      const paths = test.compilerOptions?.paths ?? {};
+      if (Object.keys(paths).some((key) => key.startsWith('@agentlink/crypto/testing'))) {
+        expect(seam?.testZones).toContain(dir);
+        expect(test.compilerOptions.noEmit).toBe(true);
+      }
+    },
+  );
+
+  it.each(packageDirs)('%s: only a test zone vitest config aliases the seam', (dir) => {
+    const path = join(REPO, dir, 'vitest.config.ts');
+    if (!existsSync(path) || !readFileSync(path, 'utf8').includes('crypto\\/testing')) return;
+    expect(seam?.testZones).toContain(dir);
+  });
+
+  it('packages/crypto never exports or builds the seam', () => {
+    const manifest = JSON.parse(readFileSync(join(REPO, 'packages/crypto/package.json'), 'utf8'));
+    expect(Object.keys(manifest.exports).some((key) => key.includes('testing'))).toBe(false);
+    expect(readJsonc(join(REPO, 'packages/crypto/tsconfig.json')).exclude).toContain(
+      'src/testing.ts',
+    );
+  });
+
+  it('every test zone of the seam has the alias and the noEmit path it needs', () => {
+    for (const zone of seam?.testZones ?? []) {
+      expect(readFileSync(join(REPO, zone, 'vitest.config.ts'), 'utf8'), zone).toMatch(
+        /find: \/\^@agentlink\\\/crypto\\\/testing\$\//,
+      );
+      const test = readJsonc(join(REPO, zone, 'tsconfig.test.json'));
+      expect(test.compilerOptions.paths['@agentlink/crypto/testing'], zone).toEqual([
+        '../crypto/src/testing.ts',
+      ]);
+    }
   });
 });
