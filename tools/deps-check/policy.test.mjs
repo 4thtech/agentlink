@@ -145,10 +145,33 @@ describe('M1-1g-b: no build can include the crypto test seam (IR-M1-1c-G2-1 L-1)
     },
   );
 
-  it.each(packageDirs)('%s: only a test zone vitest config aliases the seam', (dir) => {
-    const path = join(REPO, dir, 'vitest.config.ts');
-    if (!existsSync(path) || !readFileSync(path, 'utf8').includes('crypto\\/testing')) return;
-    expect(seam?.testZones).toContain(dir);
+  // IR-M1-1g-b-1 L-3: detect the alias however it is written (escaped regex, string key, a path to
+  // the seam source, a helper called with 'testing.ts'), in any Vite or Vitest config.
+  const SEAM_PATH = /crypto(?:\\?\/|\\\\)(?:src(?:\\?\/|\\\\))?testing/;
+  const aliasesSeam = (text) =>
+    SEAM_PATH.test(text) || (text.includes('crypto') && /['"`]testing(?:\.ts)?['"`]/.test(text));
+  const VITE_CONFIG = /^vite(?:st)?\.config\.[cm]?[jt]s$/;
+
+  it('the alias detector finds every spelling', () => {
+    for (const text of [
+      String.raw`{ find: /^@agentlink\/crypto\/testing$/, replacement: x }`,
+      `alias: { '@agentlink/crypto/testing': y }`,
+      `replacement: '../crypto/src/testing.ts'`,
+      String.raw`replacement: '..\\crypto\\src\\testing.ts'`,
+      `replacement: cryptoSource('testing.ts')`,
+      `replacement: cryptoSource("testing")`,
+    ]) {
+      expect(aliasesSeam(text), text).toBe(true);
+    }
+    expect(aliasesSeam(String.raw`{ find: /^@agentlink\/crypto$/, replacement: x }`)).toBe(false);
+  });
+
+  it.each(packageDirs)('%s: only a test zone Vite or Vitest config aliases the seam', (dir) => {
+    for (const name of readdirSync(join(REPO, dir)).filter((n) => VITE_CONFIG.test(n))) {
+      if (!aliasesSeam(readFileSync(join(REPO, dir, name), 'utf8'))) continue;
+      expect(seam?.testZones, `${dir}/${name}`).toContain(dir);
+      expect(name, `${dir}/${name}`).toMatch(/^vitest\./);
+    }
   });
 
   it('packages/crypto never exports or builds the seam', () => {

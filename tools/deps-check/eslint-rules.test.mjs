@@ -289,6 +289,38 @@ describe('M1-1g-b (IR-M1-1g-G2-1 R2-L-1): the test seam in core and transport-no
   });
 });
 
+describe('IR-M1-1g-b-1 L-1, L-2: dot, empty and case-variant segments in static imports', () => {
+  const bad = [
+    '@agentlink/crypto/./testing',
+    '@agentlink/crypto/x/../testing',
+    '@agentlink/crypto//testing',
+    '@agentlink/crypto/Testing',
+    '@agentlink/Crypto/testing',
+  ];
+
+  it.each(['packages/core/src/a.ts', 'packages/core/src/a.test.ts'])(
+    'rejects each form in %s, static import and re-export',
+    async (filePath) => {
+      for (const specifier of bad) {
+        for (const code of [
+          `import * as m from '${specifier}';\nvoid m;\n`,
+          `export * from '${specifier}';\n`,
+        ]) {
+          const messages = await lint(filePath, code);
+          expect(messages.map((m) => m.message).join('\n'), `${specifier}: ${code}`).toMatch(
+            /non-canonical/,
+          );
+        }
+      }
+    },
+  );
+
+  it('leaves the canonical seam import alone in a core test file', async () => {
+    const code = `import { MemoryKeyStore } from '@agentlink/crypto/testing';\nvoid MemoryKeyStore;\n`;
+    expect(await lint('packages/core/src/a.test.ts', code)).toEqual([]);
+  });
+});
+
 describe('IR-M1-1e-1 L-1: viem only in packages/crypto test files', () => {
   const code = `import { keccak256 } from 'viem';\nvoid keccak256;\n`;
 

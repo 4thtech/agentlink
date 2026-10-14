@@ -709,6 +709,50 @@ describe('M1-1g-b (IR-M1-1g-G2-1 R2-L-1): the test seam in package test files (0
   });
 });
 
+describe('IR-M1-1g-b-1 L-2: non-canonical workspace specifiers are refused', () => {
+  const NON_CANONICAL = /non-canonical/;
+  const bad = [
+    '@agentlink/crypto//testing',
+    '@agentlink/crypto/Testing',
+    '@agentlink/Crypto/testing',
+    '@AgentLink/crypto',
+    '@agentlink/crypto/testing/',
+    '@agentlink/crypto/./testing',
+    '@agentlink/crypto/x/../testing',
+    '@4thtech/AgentLink',
+  ];
+
+  it('refuses each form in production and test files of every zone', () => {
+    for (const zone of [...Object.keys(ZONES), 'test-vectors', 'e2e']) {
+      for (const name of ['src/a.ts', 'src/a.test.ts']) {
+        for (const specifier of bad) {
+          expect(
+            violationFor(zone, specifier, `${zone}/${name}`),
+            `${zone} ${name} ${specifier}`,
+          ).toMatch(NON_CANONICAL);
+        }
+      }
+    }
+  });
+
+  it('finds a planted static import in a core test file', () => {
+    for (const specifier of bad) {
+      const code = `export * from '${specifier}';\n`;
+      expect(src('packages/core', code, 'src/a.test.ts').join('\n'), specifier).toMatch(
+        NON_CANONICAL,
+      );
+    }
+  });
+
+  it('leaves canonical specifiers and other scopes alone', () => {
+    expect(violationFor('packages/core', '@agentlink/crypto', 'packages/core/src/a.ts')).toBeNull();
+    expect(
+      violationFor('packages/core', '@agentlink/crypto/testing', 'packages/core/src/a.test.ts'),
+    ).toBeNull();
+    expect(violationFor('packages/types', 'zod', 'packages/types/src/a.ts')).toBeNull();
+  });
+});
+
 describe('IR-M1-1f-1 L-2: deep imports into a workspace package', () => {
   const DEEP = /deep import/;
 
