@@ -14,9 +14,33 @@ export type CryptoInputErrorCode =
   | 'wipe_failed'
   /** A byte string that is not a valid curve point (M1-1b: evmAddressFromPublicKey). */
   | 'invalid_public_key'
+  /** An envelope that breaks the 04 §3.1 v1 structure or a §2.4.1 encoding (M1-1c). */
+  | 'invalid_envelope'
+  /**
+   * Decryption refused (M1-1c): a CEK unwrap or a payload that does not authenticate (wrong key,
+   * wrong envelope, tampered bytes) or whose X25519 shared secret is all zero. One code for every
+   * cause, so a caller cannot tell them apart.
+   */
+  | 'open_failed'
   | 'invalid_signature'
   | 'invalid_typed_data'
-  | 'invalid_card';
+  | 'invalid_card'
+  /** M1-1f: a secret refused by 04 §2.8 password() before any KDF runs (not a wrong secret). */
+  | 'invalid_secret'
+  /**
+   * M1-1f: an ALKS file or ALKO blob that does not open. One code and one message for a wrong
+   * secret, a tampered or truncated file, unknown header values and out-of-bounds KDF parameters, so
+   * they are indistinguishable (04 §2.8).
+   */
+  | 'open_failed'
+  /** M1-1f: a chosen owner passphrase (secretKind 2) on a file-KeyStore machine (04 §2.8). */
+  | 'secret_kind_refused'
+  /** M1-1f: the owner passphrase wrap is for local storage only, never for relay publication (04 §2.3). */
+  | 'relay_publication_refused'
+  /** M1-1f (IR-M1-1f-1 M-2): codeReveal (nonceA) does not open codeCommit; no code (04 §3.6.1 step 3). */
+  | 'commitment_mismatch'
+  /** M1-1f (IR-M1-1f-1 L-4): a chosen agent passphrase under 12 code points after NFKC (04 §2.8). */
+  | 'passphrase_too_short';
 
 /**
  * The one error type @agentlink/crypto throws for input it refuses.

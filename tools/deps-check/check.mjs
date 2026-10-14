@@ -39,6 +39,7 @@ import {
   libraryAllowed,
   libraryMessage,
   matchesGroup,
+  testSeamViolation,
   violationFor,
   workspaceNameOf,
 } from './policy.mjs';
@@ -237,13 +238,16 @@ export function checkSource(zone, file, text, root) {
 
   function checkSpecifier(node, specifier) {
     if (specifier.startsWith('.')) {
-      const rel = relative(zoneDir, resolve(dirname(file), specifier));
+      const target = resolve(dirname(file), specifier);
+      const rel = relative(zoneDir, target);
       if (rel.startsWith('..') || isAbsolute(rel)) {
         report(
           node,
           `relative import "${specifier}" leaves ${zone}; import another package by its name`,
         );
       }
+      const seam = testSeamViolation(repoPath, relative(root, target).split('\\').join('/'));
+      if (seam !== null) report(node, `import of "${specifier}": ${seam}`);
       return;
     }
     const message = violationFor(zone, specifier, repoPath);

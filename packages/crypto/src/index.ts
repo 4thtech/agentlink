@@ -59,6 +59,41 @@ export {
   ownerFingerprint,
   type FingerprintForm,
 } from './fingerprint.js';
+// M1-1c: the envelope (04 §3.1, §3.1.1, §3.3). Public: structure, encodings and limits,
+// envelopeHash, the AEAD additional data, the signature input and verification, and the CEK and
+// payload operations, which take a per-envelope CEK but no long-term secret (04 §3.1.1:
+// EnvelopeKeys.unwrapCek hands the CEK to core).
+// Unwrapping a CEK with a recipient's secret key and signing an envelopeHash are in
+// @agentlink/crypto/keystore. The deterministic test seam (testing.ts) is not exported from any entry.
+export {
+  AEAD_ALG,
+  AEAD_CT_MAX_ENCODED_LENGTH,
+  AEAD_CT_MAX_LENGTH,
+  AEAD_IV_LENGTH,
+  AEAD_TAG_LENGTH,
+  CEK_LENGTH,
+  ENVELOPE_ID_LENGTH,
+  ENVELOPE_VERSION,
+  HPKE_ENC_LENGTH,
+  KID_LENGTH,
+  MAX_RECIPIENTS,
+  THREAD_ID_LENGTH,
+  WRAPPED_CEK_LENGTH,
+  envelopeAad,
+  envelopeHash,
+  envelopeSignatureInput,
+  parseEnvelope,
+  parseEnvelopeHeader,
+  parseUnsignedEnvelope,
+  verifyEnvelope,
+  type Envelope,
+  type EnvelopeAead,
+  type EnvelopeHeader,
+  type EnvelopeRecipient,
+  type UnsignedEnvelope,
+} from './envelope.js';
+export { CEK_INFO_LABEL, cekInfo, wrapCek, type WrappedCek } from './hpke.js';
+export { decryptPayload, encryptPayload, generateCek } from './aead.js';
 export {
   ECDSA_SIGNATURE_BYTES,
   decodeEcdsaSignature,
@@ -90,3 +125,46 @@ export {
   type AgentCard,
   type AgentCardHashes,
 } from './agent-card.js';
+// M1-1f: the pairing proof and the safety code (04 §3.6, §3.6.1; only the commit-checked functions
+// produce digits, IR-M1-1f-1 L-7), and the public constants of the
+// file KeyStore and owner wrap (04 §2.8). Argon2id, password() and the ALKS / ALKO seal and open
+// functions are in @agentlink/crypto/keystore.
+export {
+  INVITE_ID_LENGTH,
+  INVITE_SECRET_LENGTH,
+  PAIRING_HANDSHAKE_LABEL,
+  PAIRING_PROOF_INFO,
+  PAIRING_PROOF_LENGTH,
+  derivePairingProofKey,
+  hmacSha256,
+  pairingProof,
+  verifyPairingProof,
+} from './pairing.js';
+export {
+  SAFETY_CODE_MODULUS,
+  SAFETY_NONCE_LENGTH,
+  SAFETY_TRANSCRIPT_LENGTH,
+  checkSafetyCodeReveal,
+  computeSafetyCode,
+  safetyCodeCommit,
+  safetyCodeForRole,
+  type SafetyCode,
+  type SafetyCodeInput,
+} from './safety-code.js';
+export type { Argon2idParams } from './argon2.js';
+export {
+  SECRET_CODE_LENGTH,
+  SECRET_KINDS,
+  type SecretKind,
+  type SecretSource,
+} from './secret-code.js';
+export { KEYSTORE_KDF_BOUNDS, KEYSTORE_KDF_DEFAULTS } from './argon2.js';
+export {
+  type ExpectedOwner,
+  type KeystoreEntry,
+  type KeystoreFormat,
+  type KeystoreKek,
+  type KeystoreSecret,
+  type KeystoreUnlockSecret,
+  type SealOwnerSeedOptions,
+} from './keystore-file.js';

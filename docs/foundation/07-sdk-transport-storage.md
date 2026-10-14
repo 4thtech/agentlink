@@ -8,13 +8,13 @@ All packages live in the public `agentlink` monorepo (see 09). Every package mus
 
 | Package | Depends on | Exposes |
 |---|---|---|
-| `@agentlink/types` | — | Shared types, zod schemas, constants (kinds, receipt types, fee types) |
+| `@agentlink/types` | zod | Shared types, zod schemas, constants (kinds, receipt types, fee types) |
 | `@agentlink/log` | — | Redacting structured logger used by every package (04 §8 rule 4, I-7); secret-canary test helper (`@agentlink/log/testing`) |
-| `@agentlink/crypto` | noble, hpke | Key derivation, HPKE seal/open, AES-GCM, STREAM file encryption, hashing, JCS, BIP-340 sign/verify, EIP-712 helpers |
+| `@agentlink/crypto` | noble, hpke | Key derivation, HPKE seal/open, AES-GCM, STREAM file encryption, hashing, JCS, BIP-340 sign/verify, EIP-712 helpers; `KeyStore`, `OwnerKeyStore` and `EnvelopeKeys` interfaces (G-2, 04 §3.1.1) |
 | `@agentlink/chain` | viem, types, crypto | Chain configs, contract ABIs, fee quotes, credits, record/receipt building, submitter client, proof verification |
 | `@agentlink/transport-nostr` | nostr-tools, types, crypto | `Transport` implementation: relay pool, gift wrap/unwrap, subscriptions, sync cursors |
 | `@agentlink/storage` | types, crypto | `StorageAdapter` interface; `inline`, `drop` (default, D-48) and `s3` adapters (P0); `gdrive`, `dropbox`, `onedrive` connectors (P1, M2, D-49); `ipfs-pinning` (P2); storage selection (§5.6) |
-| `@agentlink/core` | all above | `AgentLinkClient`: identity, contacts, envelopes, threads, files, proofs, policies, approvals; `KeyStore`, `Store`, `ApprovalChannel` interfaces |
+| `@agentlink/core` | all above | `AgentLinkClient`: identity, contacts, envelopes, threads, files, proofs, policies, approvals; `Store`, `ApprovalChannel` interfaces (the key interfaces are in crypto, G-2) |
 | `@agentlink/node` | core | Node implementations: keychain `KeyStore` and the opt-in passphrase-locked file `KeyStore` for headless machines (§9, D-54), SQLite `Store`, local approval server (Node only) |
 | `@4thtech/agentlink` | node, core | CLI + MCP server (stdio) (Node only) |
 
@@ -61,7 +61,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
    - `allow`: the core stores a policy grant with the policy document's hash. The grant is a ledger row, not authority: before each part runs, the core evaluates the verified policy again and requires `allow` for this scope.
    - `approval`: the core stores a pending approval with the scope and its digest, and the call returns `pending_approval`.
    A proof approval needed by the same call joins the same request.
-3. **Run.** On the retry with `approvalId`, the core verifies the owner-signed approval against the stored scope's digest and checks the void rules. It then runs the parts that have not run yet: send the `accept`, then record it if `notarize` is set and the offer has no record, then sign the receipt if the offer's record is known. Each part is claimed atomically: in one store transaction (SQLite, or Durable Object storage) the core checks that the part is unused (compare-and-set), marks it used and stores the signed item (envelope, record or receipt), and only then publishes it. A concurrent retry finds the part claimed and runs nothing. After a crash it republishes the same signed item rather than making a new one, and receivers and the contract deduplicate it by envelope ID, record nonce or one-time receipt flag.
+3. **Run.** On the retry with `approvalId`, the core verifies the owner-signed approval against the stored scope's digest and checks the void rules. It then runs the parts that have not run yet: send the `accept`, then record it if `notarize` is set and the offer has no record, then sign the receipt if the offer's record is known. Each part is claimed atomically: in one store transaction (SQLite, or Durable Object storage) the core checks that the part is `unclaimed` (compare-and-set), sets it to `claimed` and stores the signed item (envelope, record or receipt), and only then publishes it (part states: 04 §3.4.2). A concurrent retry finds the part claimed and runs nothing. After a crash it republishes the same signed item rather than making a new one, and receivers and the contract deduplicate it by envelope ID, record nonce or one-time receipt flag. A replacement item is signed only when the chain shows the stored one can never land (04 §5).
 4. **Deferred receipt.** When `syncInbox` processes a `proof` envelope (background loop or `agentlink_inbox`, never the read-only `agentlink_status`), it checks the record on-chain (M1-7g). It then looks up an open `accept` scope whose `answers.envelopeHash` equals the record's `envelopeHash`, where the record's kind is `OFFER`, its signer is the scope's `counterparty.agentId` and its recipient commitment opens to this agent. It rechecks void rules 2–6 (04 §3.4.2) and, for a grant, re-evaluates the policy. Only then does it claim the receipt part, sign `ACCEPTED` and submit it. Otherwise it signs nothing, and the activity feed says why.
 5. **Expire.** At `expiresAt`, open parts are marked void and nothing more runs for that scope.
 
@@ -98,14 +98,16 @@ Every mutating call runs: **policy check → (approval) → action → store →
 
 ```ts
 interface Transport {
-  publish(envelope: Envelope, recipients: NostrRecipient[], keys: KeyStore): Promise<PublishResult>; // one gift wrap per recipient key
-  subscribe(keys: KeyStore, onEnvelope: (e: Envelope, meta) => void): Unsubscribe;
-  sync(keys: KeyStore, since: number): Promise<Envelope[]>;
+  publish(envelope: Envelope, recipients: NostrRecipient[], keys: EnvelopeKeys): Promise<PublishResult>; // one gift wrap per distinct recipient key
+  subscribe(keys: EnvelopeKeys, onEnvelope: (e: Envelope, meta) => void): Unsubscribe;
+  sync(keys: EnvelopeKeys, since: number): Promise<Envelope[]>;
 }
 
-// KeyStore (03 §3) exposes the secret-key operations the transport needs:
-//   signNostr(event), nip44Encrypt(peerPubkey, plaintext), nip44Decrypt(peerPubkey, ciphertext), hpkeOpen(wrapped)
-// Seal signing uses the agent key; gift-wrap encryption uses a fresh ephemeral key created inside @agentlink/crypto.
+// EnvelopeKeys (03 §3, 04 §3.1.1) exposes the secret-key operations the transport needs:
+//   signNostr(event), nip44Encrypt(peerPubkey, plaintext), nip44Decrypt(peerPubkey, ciphertext, {epoch})
+// It is the agent's KeyStore, or an OwnerSession on owner surfaces (owner-authored envelopes, owner copies).
+// Seal signing uses the sender's key (seal key = envelope `from`); gift-wrap encryption uses a fresh
+// ephemeral key created inside @agentlink/crypto. Size checks before JSON.parse: 04 §3.1.1.
 ```
 
 An XMTP adapter (P2) implements the same interface; envelopes are unchanged.
@@ -126,9 +128,9 @@ An XMTP adapter (P2) implements the same interface; envelopes are unchanged.
   **Residual risk.** A browser `WebSocket` (the console) cannot resolve or pin an address. There, the schema rule and the platform apply: browsers enforce Private Network Access where it has shipped, and Workers cannot open connections to private addresses. M1-5 tests the steps above with a stub resolver: a rebinding answer, a mixed public and private answer, a 6to4 answer and a NAT64 answer are all skipped.
 - **Delivery reliability:** publish to all listed relays, consider sent when ≥ 2 acknowledge (`OK`). Retry with backoff for up to 24 h from the local outbox.
 - **Sync:** `REQ` with `#p` = own Nostr pubkeys, `kinds: [1059]`, `since = lastSync − 48 h` (NIP-59 randomizes gift-wrap timestamps up to 2 days back, so `created_at` cursors alone miss messages). Deduplicate by envelope ID (keep a seen-set for ≥ 7 days). Support **NIP-42 AUTH**, since many DM relays serve kind 1059 only to the authenticated recipient.
-- **Size:** envelope ≤ 24 KB serialized; inline files ≤ 12 KB; check the final gift-wrap size against each relay's NIP-11 `max_message_length` and skip relays that cannot carry it.
+- **Size:** envelope ≤ 24 KB serialized (24 576 bytes; the relay-frame, envelope, recipient and `ct` limits and where each is enforced are in 04 §3.1.1); inline files ≤ 12 KB; check the final gift-wrap size against each relay's NIP-11 `max_message_length` and skip relays that cannot carry it.
 - **Relay retention:** public relays may drop events; agents should sync at least daily. The optional 4thTech relay keeps gift wraps for 30 days (it only ever sees ciphertext).
-- **Owner copies:** the owner console subscribes with the owner Nostr key and receives copies of all envelopes for its agents.
+- **Owner copies:** the owner console subscribes with the owner Nostr key and receives copies of all envelopes for its agents. Reading them, including NIP-42 AUTH, runs in an `OwnerSession` with presence (04 §3.1.1).
 
 ---
 
@@ -281,6 +283,7 @@ Requests and responses use the JSON form of 05 §3.1 (04 §2.4.1): `0x` + lowerc
 
 - Gas wallets per chain (hot keys in Workers secrets, low balances, auto-alerts). Gas costs are recovered through protocol fees.
 - Per-signer and per-IP rate limits; reject if simulated credits are insufficient.
+- Batches follow 05 §3.3 (G-4): all-or-nothing, except that items already on-chain in identical form are skipped. The submitter rule (per-item simulation, one resubmission without the failing items, per-item status `recorded`, `skipped` or `failed`) is there too.
 - Anyone can run a submitter (same code); clients accept a list.
 - No request logging beyond aggregate metrics; never log signatures linked to IPs.
 
@@ -315,7 +318,7 @@ Encodings follow 04 §2.4.1, and a verifier rejects a pack in any other form. `r
 
 ## 9. Node KeyStore backends (D-54)
 
-`@agentlink/node` ships two backends behind the same core `KeyStore` interface (03 §3): the **OS keychain**, which is the default (04 §2.2), and the **passphrase-locked file KeyStore** for headless machines, which is opt-in (04 §2.8). Formats, KDF parameters, the owner-key rules, the threat model and the required tests are in 04 §2.8. This section covers runtime behaviour. Neither backend weakens `OwnerKeyStore` (04 §2.5).
+`@agentlink/node` ships two backends behind the same `KeyStore` interface from `@agentlink/crypto` (04 §3.1.1, G-2): the **OS keychain**, which is the default (04 §2.2), and the **passphrase-locked file KeyStore** for headless machines, which is opt-in (04 §2.8). Formats, KDF parameters, the owner-key rules, the threat model and the required tests are in 04 §2.8. This section covers runtime behaviour. Neither backend weakens `OwnerKeyStore` (04 §2.5).
 
 ### 9.1 Selection and the recorded backend
 

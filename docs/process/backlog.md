@@ -728,7 +728,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 #### M1-1h · Independent test vectors for all protocol suites
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/generators/
-- **Depends on:** M0-9
+- **Depends on:** M0-9; gap G-46 resolved before the `aead-envelope` and `envelope-sig` suites freeze (the other suites do not wait)
 - **Spec:** 04 §2.1, §2.3, §2.4, §2.4.1, §2.5.1, §2.8, §3.1, §3.3, §3.6, §4, §5, §8.2; 05 §3.1, §4, §8; `development-process.md` §9.1
 - **Invariants:** I-6, I-8
 - **Scope:**
@@ -750,6 +750,15 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
     - Reject vectors (schema): a USD limit as a JSON number (`5`) and as `"5.0000001"`; an unsorted `autoAcceptContacts` or `contactRules`; a duplicate contact; a `ContactRule` with `proofs: {}`; a missing policy key.
     - Encoding suite: the USD amount row of 04 §2.4.1, with accept cases (`"0"`, `"0.1"`, `"5"`, `"999999999.999999"`) and reject cases (`"0.10"`, `"5.0"`, `"5."`, `"05"`, `"1.0000001"`, `"1000000000"`, a JSON number), on a policy path, `maxFeeUsd` and `fee.usd`.
     - Freshness is not a signing property, so its boundaries are M1-7d table tests, not vectors.
+  - G-2 vectors (04 §3.1.1; follow-up, added once the branch `docs/G-2-envelope-signatures` merges):
+    - `envelope-sig`: for agent keys at epochs 0 and 1 and for an owner key, `sha256(tag)`, `m`, `sig` with a fixed `auxRand`, and verification.
+    - Reject vectors for the signature: a signature over the untagged `envelopeHash`, over the owner-action tag of the same 32 bytes, and over a NIP-01 id; another key; `s ≥ n`; `r ≥ p`; a `from` that does not lift to a curve point.
+    - Cross-protocol: one owner key signs an owner action and an envelope over the same 32 inner bytes, and each signature fails under the other tag. The first bytes of each tag prefix are not `[0,"`.
+    - Size limits: accept 8 recipients with a `ct` of exactly 17 152 bytes (24 509 bytes as JCS). Reject 9 recipients, a `ct` of 17 153 bytes, a 22 871-character `ct`, and duplicate `kid`s.
+    - Epochs: the enc public key and `kid` at epochs 0–2 of one seed, and an `unwrapCek` at epoch 1.
+    - Owner read: an `approval` envelope from the owner (owner and agent entries) that the owner opens by its `ownerEnc` `kid`; a same-owner §3.2 set with 3 entries.
+    - Wait for G-46 before freezing `aead-envelope` and `envelope-sig`, because its outcome may change the header.
+    - This follow-up commits `envelope-sig` to `test-vectors/pending-suites.json` as pending under M1-1g, whose `KeyStore` and `OwnerSession` sign envelope hashes and open entries by epoch. M1-1g registers the harness module and removes the suite from the list (IR-M1-1c-G2-1 L-1). M1-1c ships the hash and signature helpers but does not own the suite, which did not exist when it merged.
 - **Acceptance:**
   - Every case records generator, version and inputs; regeneration from the generator scripts reproduces the files byte for byte.
   - Narrow gitleaks allowlist (fingerprints, owner-reviewed) for deliberate test keys; no directory-wide allowlist.
@@ -838,8 +847,10 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Payload AEAD AES-256-GCM, 12-byte random IV, AAD = SHA-256(JCS({v, id, thread, from, createdAt, recipients})).
   - `envelopeHash = SHA-256(JCS(envelope without sig))`; signature input = taggedHash("agentlink/envelope/v1", envelopeHash).
   - Deterministic test seam for randomness (never exported in production builds).
+  - G-2 (04 §3.1.1; once branch `docs/G-2-envelope-signatures` merges): the parser refuses fewer than 1 or more than 8 recipients and duplicate `kid`s. It refuses `aead.ct` above 17 152 decoded bytes, checked on the base64url length (≤ 22 870 characters) before decoding (IR-M1-1c-1 F3). The keystore helpers become `unwrapCek(…, envelopeId)` with `info` built inside, and `signEnvelopeHash` applies the tag inside (F5). G-46 may change the header before the vectors freeze.
 - **Acceptance:**
   - Vector suites `hpke` and `aead-envelope`: their harness modules are registered and the suites are removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
+  - Vector suite `safety-code-recompute` (04 §3.6.1 steps 1–5 from the signed handshake and ack; split from `safety-code` by IR-M1-1f-1 M-1): a recompute function on top of the envelope helpers and M1-1f's safety code, its harness module registered and the suite removed from `test-vectors/pending-suites.json`; every case passes in every runtime.
   - RFC 9180 vectors for suite (KEM 0x0020, KDF 0x0001, AEAD 0x0002, mode 0) and M1-1h envelope vectors pass in all runtimes.
   - Changing any covered field (incl. recipient order or `createdAt`) changes the hash and fails verification; wrong-recipient open and tampered `ct`/AAD fail.
 
@@ -919,18 +930,26 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 #### M1-1g · crypto: KeyStore / OwnerKeyStore interfaces, MemoryKeyStore, NIP-44 helpers
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/crypto (interfaces location per gap G-2)
-- **Depends on:** M1-1b, M1-1c; gap G-2 resolved
-- **Spec:** 03 §3; 04 §2.5, §2.6, §8.1; 07 §4.1
+- **Depends on:** M1-1b, M1-1c; gap G-2 resolved (branch `docs/G-2-envelope-signatures`, pending owner)
+- **Spec:** 03 §3; 04 §2.5, §2.6, §3.1.1, §8.1; 07 §4.1
 - **Invariants:** I-1, I-4, I-8
 - **Scope:**
-  - `KeyStore`: `getPublicBundle`, `sign712`, `signNostr`, envelope-hash signing, `nip44Encrypt`/`nip44Decrypt`, `hpkeOpen`, all epoch-aware (G-2). `OwnerKeyStore`: `unlock(presence)` → short-lived handle; owner signatures (OwnerAction, AgentCard, Registration); wipe on lock.
-  - `MemoryKeyStore` from a seed (tests, base for the Worker implementation).
-  - NIP-44 v2 and gift-wrap ephemeral key generation wrapped from `nostr-tools`; ephemeral secrets never leave the module.
+  - `KeyStore`: `getPublicBundle({epoch?})`, `sign712`, and `EnvelopeKeys` (`signEnvelopeHash`, `signNostr`, `nip44Encrypt`, `nip44Decrypt({epoch?})`, `unwrapCek(wrapped, envelopeId, {epoch?})`). There is no `hpkeOpen`. Signing and encryption always use the current epoch; only the decrypting methods and `getPublicBundle` take an epoch (04 §3.1.1). `OwnerKeyStore`: `unlock(presence)` → short-lived handle; owner signatures (OwnerAction, AgentCard, Registration); wipe on lock.
+  - `MemoryKeyStore` from a seed (tests only; the Worker gets its own backend in M2-3a).
+  - NIP-44 v2 and gift-wrap ephemeral key generation from allowlisted libraries (`@noble/*` or `nostr-tools`); ephemeral secrets never leave the module.
+  - G-2 (04 §3.1.1):
+    - `EnvelopeKeys` (`signEnvelopeHash`, `signNostr`, `nip44Encrypt`, `nip44Decrypt`, `unwrapCek(wrapped, envelopeId, {epoch})`) is implemented by `KeyStore` and by `OwnerSession` (IR-M1-1g-1 M-1).
+    - `OwnerSession.signNostr` signs kinds 13 and 22242 only, and the session has epoch 0 only. `getPublicBundle({epoch})` exists.
+    - The test doubles move out of `/keystore` into an entry point that deps-check allows only in tests, `test-vectors` and e2e (M-2).
+    - Session expiry is enforced on a monotonic clock (L-1), and `lock()` also stops an `unlock` in flight (L-2).
 - **Acceptance:**
   - Vector suite `nip44`: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
+  - Vector suite `envelope-sig`, once the M1-1h G-2 follow-up has committed it as pending under this card: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (IR-M1-1c-G2-1 L-1).
   - Official NIP-44 v2 vectors pass in all runtimes.
   - Type-level test: no interface method returns private key or seed bytes.
   - Owner operations fail when locked; handles expire (fake-timer test).
+  - Type-level test: no `KeyStore`, `OwnerSession` or `EnvelopeKeys` exports `hpkeOpen` or any open that takes an `info`, and no signing method takes an epoch (G-2, IR-M1-1c-1 F5).
+  - G-2: an `OwnerSession` signs an envelope hash, a seal and an AUTH event, refuses any other Nostr kind, and opens an owner entry. The owner seal and envelope both verify under the owner key. A wall-clock rollback does not extend a session. A deps-check regression refuses the test-double entry point in a production `src` file.
 
 ### Types (`@agentlink/types`)
 
@@ -1058,20 +1077,31 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-3d · contracts: OCCNotary (records, receipts, freeze)
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · src/OCCNotary.sol, test/unit
-- **Depends on:** M1-3a (uses `IOCCFeeVault` with a mock until M1-3b lands), M1-1i; gap G-4 resolved
+- **Depends on:** M1-3a (uses `IOCCFeeVault` with a mock until M1-3b lands), M1-1i; gap G-4 resolved (owner decision, 14 Oct 2026; 05 §3.3)
 - **Spec:** 05 §3.1–§3.4, §5 (freeze), §5.2, §6, §7; 04 §5
 - **Invariants:** I-6
 - **Scope:**
   - EIP-712 `Record`/`Receipt`; `notarize`, `notarizeBatch` (semantics per G-4), `notarizeDirect` (payable; `msg.sender == r.signer`; `depositFromModule` then `charge`), `acknowledge`, `acknowledgeBatch`, `getRecord`, `computeRecordId`.
   - recordId = keccak256(abi.encode(block.chainid, address(this), signer, nonce)) (also the single-use nonce); `RecordState` packed into 5 slots incl. `recordStructHash`; receipt flags; ACCEPTED/REJECTED exclusive; commitment check `keccak256(abi.encode(rc.signer, rc.salt)) == recipientCommitment`.
   - `SignatureChecker.isValidSignatureNow` (EOA + ERC-1271); deadlines; pause; one-way `freezeUpgrades()`.
+  - Owner decisions of 14 Oct 2026:
+    - G-4 batches (05 §3.3): an identical existing record or receipt is skipped and emits `RecordSkipped` or `ReceiptSkipped`; every other failure reverts the batch.
+    - Pause blocks `acknowledge` and `acknowledgeBatch` (05 §5.1, D-61).
+  - Proposed (owner confirms at merge, D-62): pause and unpause still work after `freezeUpgrades`; a receipt batch item is skipped only after its deadline, signature and commitment checks pass (05 §3.3).
   - CI parity job: EIP-712 hashes equal the canonical public vectors at the pinned commit.
   - Open Low (IR-M1-3a-1 L-3): the Notary's freeze goes through a `_beforeUpgrade` hook, not an override of `_authorizeUpgrade` (see M1-3b), so the role check stays in the base.
   - Follow-up (IR-M1-3b-1 I-3): the Notary's direct-payment functions call `depositFromModule` with `payer = msg.sender`, never a signer or payer taken from calldata; a module charges only the payer's own credits.
 - **Acceptance:**
   - Tests first; unit test for every function and revert (`Expired`, `InvalidSignature`, `RecordExists`, `RecordNotFound`, `ReceiptExists`, `ConflictingReceipt`, `NotRecipient`, `NotSigner`, `FeeAboveMax`, `EnforcedPause`, `ExpectedPause`, `UpgradesAreFrozen`).
   - Role tests run against the real contract (IR-M1-3a-1 M-2): switch `RoleFixture._deploy` from the `NotaryHarness` stub to `OCCNotary`, so `RoleMap` and `RoleBound` (including `freezeUpgrades` → `FREEZER`, `pause`/`unpause`, `upgradeToAndCall`) cover shipping code; the "every non-view selector is in `docs/roles.md` or callable by an outsider" test from M1-3b covers the Notary too.
-  - Gas snapshots meet 05 §3.4: `notarize` (credits, EOA) ≤ 160k, `acknowledge` ≤ 75k, `notarizeBatch` per item (n = 20) ≤ 120k; CI fails on regression.
+  - Batch tests (G-4):
+    - an identical record is skipped (no charge, event emitted, no deadline or signature check);
+    - the same `recordId` with a different struct hash reverts the batch;
+    - an identical receipt with a valid deadline and signature is skipped; an identical receipt that is expired or badly signed reverts the batch; a conflicting receipt or a wrong salt reverts;
+    - one expired, unsigned or underfunded item reverts the batch;
+    - a duplicate within one batch is skipped.
+  - Pause tests: `acknowledge` reverts with `EnforcedPause` while paused, and `pause` and `unpause` still work after `freezeUpgrades`.
+  - Gas snapshots meet 05 §3.4: `notarize` (credits, EOA) ≤ 170k, `acknowledge` ≤ 75k, `notarizeBatch` per item (n = 20) ≤ 120k; CI fails on regression.
   - A test recomputes `recordStructHash` from a full `Record` and matches `getRecord` (verification without logs).
   - Cross-chain, cross-contract and high-s signature replays rejected.
   - A test shows that a direct payment with a signer other than the caller cannot draw on that signer's allowance (IR-M1-3b-1 I-3); the independent review checks this path by name.
@@ -1101,6 +1131,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-6
 - **Scope:**
   - Tagged contracts release emits ABI JSON, per-chain addresses (empty until M1-3g) and a SHA-256 manifest; no Solidity source leaves the private repo.
+  - The ABI includes the G-4 events `RecordSkipped` and `ReceiptSkipped` (05 §6).
   - Proposed (G-10): a PR imports the artifacts into public `packages/occ-v2-abi`; CI verifies the manifest; `release.yml` publishes with provenance (ABIs only, MIT licence).
   - `@agentlink/chain` pins an exact version; Renovate never automerges it.
   - Follow-up (IR-M1-3b-1 I-4): no `@agentlink/occ-v2-abi` release is built from a contracts build whose concrete ABI differs from the interface in mutability (the `depositWithAuthorization` stub until M1-3c); generate the ABI from the interface, or publish only after M1-3c.
@@ -1163,6 +1194,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Random 256-bit nonces, 32-byte salts, recipient commitments, recordId computation.
 - **Acceptance:**
   - EIP-712 vector parity in all runtimes; config schema rejects unknown chains and duplicate tokens.
+  - Every Record gets a fresh 32-byte CSPRNG salt; the builder takes no salt from its caller and exposes no salt derivation (04 §5, D-61).
 
 #### M1-4b · chain: quotes, USD display, credits
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -1181,15 +1213,16 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain
 - **Depends on:** M1-4a, M1-3g (testnet addresses); M1-10a for integration (mock before)
-- **Spec:** 07 §6.2, §7; 03 §4.3; 05 §3.2; 04 §7 (malicious submitter)
+- **Spec:** 07 §6.2, §7; 03 §4.3; 05 §3.2, §3.3; 04 §5, §7 (malicious submitter)
 - **Invariants:** I-3, I-6
 - **Scope:**
   - Submitter client (`/v1/notarize`, `/v1/receipt`, `/v1/status`) with failover across a list; direct mode (`notarizeDirect`, direct `acknowledge`) when the agent has native gas, simulated before sending; confirmations per chain config.
-  - Idempotent retry: the same signed record is resubmitted, never re-signed with a new nonce unless the deadline passed; `RecordExists` with matching on-chain state counts as success.
+  - Idempotent retry: the same signed record is resubmitted. A replacement (new nonce) is signed only under 04 §5: the deadline has passed and `getRecord` at the `finalized` block (timestamp after the deadline) shows no record; configured confirmations only on a chain without that tag. `RecordExists` with matching on-chain state, and a submitter's `skipped`, count as success with the existing `recordId` once a chain read confirms it.
   - Results are trusted only after reading chain state, never from submitter responses alone.
 - **Acceptance:**
   - Testnet integration: notarize via submitter and via direct mode; receipts both ways.
   - Fake-submitter tests (wrong tx hash, silent drop, modified record) are detected via chain reads and fail over.
+  - A submitter that reports `failed` for a Record it included: no replacement is signed.
 
 #### M1-4d · chain: proof-pack verification
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -1225,12 +1258,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 04 §3.5; 07 §4.1, §4.2 (wrapping, size)
 - **Invariants:** I-1, I-2, I-5
 - **Scope:**
-  - Rumor kind 14 with tag `["agentlink","1"]` and `content` = envelope JSON; seal kind 13 signed via `KeyStore.signNostr`; gift wrap kind 1059 per recipient Nostr key with an ephemeral key created inside `@agentlink/crypto`; NIP-44 v2; `created_at` randomised up to 2 days back.
+  - Rumor kind 14 with tag `["agentlink","1"]` and `content` = envelope JSON; seal kind 13 signed via `EnvelopeKeys.signNostr` (the agent's `KeyStore`, or an `OwnerSession` for owner-authored envelopes, 04 §3.1.1); gift wrap kind 1059 per recipient Nostr key with an ephemeral key created inside `@agentlink/crypto`; NIP-44 v2; `created_at` randomised up to 2 days back.
   - Unwrap rejects unless: wrap and seal signatures verify, rumor pubkey == seal pubkey, seal pubkey == `envelope.from`, the `agentlink` tag is present, the envelope parses.
-  - Envelope ≤ 24 KB before wrapping; final gift-wrap size computed per recipient for M1-5b.
+  - Envelope ≤ 24 KB (24 576 bytes) before wrapping; on receipt, the rumor `content` is checked against the same limit before `JSON.parse` (04 §3.1.1); one gift wrap per distinct recipient key; final gift-wrap size computed per recipient for M1-5b.
 - **Acceptance:**
   - Interop both directions with the `nostr-tools` NIP-59 reference (ours → reference unwrap and reference → ours).
   - Impersonation tests (seal ≠ `from`, rumor ≠ seal) rejected; a 24 KB envelope yields a wrap < 64 KB, 24 KB + 1 B is refused before wrapping.
+  - Receive side: a rumor `content` of 24 577 bytes is dropped before `JSON.parse` (spy test); the sent rumor `content` equals `JCS(envelope)` byte for byte.
   - Timestamp distribution test within [now − 2 d, now].
 
 #### M1-5b · transport-nostr: relay pool, publish, NIP-11, NIP-42, outbox
@@ -1242,11 +1276,14 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - WebSocket relay pool for Node, browsers and Workers; publish to the recipient's relays and the sender's own relays (owner copies per G-24); "sent" when ≥ 2 relays return `OK`.
   - Outbox retry with backoff for up to 24 h through an injected persistence interface (implemented by core/node).
-  - NIP-11 fetch and cache; skip relays whose `max_message_length` is below the wrap size. NIP-42 AUTH signed via `KeyStore.signNostr`.
+  - NIP-11 fetch and cache; skip relays whose `max_message_length` is below the wrap size. NIP-42 AUTH signed via `EnvelopeKeys.signNostr`.
+  - Inbound relay frames above 131 072 bytes are dropped before `JSON.parse` (04 §3.1.1, G-2).
   - Event contents never logged; per-relay health and timeouts.
+  - (hand-off from M1-2c, IR-M1-2a-1 M-1 part 2) Re-check every relay host at connect time, and again on every reconnect: resolve it, and refuse the relay if any address is private, loopback, link-local, CGNAT, unique-local or a metadata address, because a DNS name can resolve to one (04 §4, 07 §4.2). The schema in `@agentlink/types` checks only the string.
 - **Acceptance:**
   - Tests against 2–3 local relays in Docker (one requiring AUTH, one with a small `max_message_length`): success only with ≥ 2 `OK`; the small relay is skipped.
   - Outbox survives a restart (persistence fake) and gives up after 24 h (fake clock); canary test shows no content in logs.
+  - An inbound frame of 131 073 bytes is dropped before `JSON.parse` and one of 131 072 bytes is parsed (spy test).
 
 #### M1-5c · transport-nostr: subscribe and sync with cursors and dedup
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
@@ -1333,16 +1370,28 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-7b · core: envelope build/open and threads
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
-- **Depends on:** M1-7a, M1-1c
+- **Depends on:** M1-7a, M1-1c; gap G-46 resolved (owner decision D-61: requirement; construction pending)
 - **Spec:** 04 §3.1–§3.4; 03 §4.1; 02 F-20, F-22, F-60
 - **Invariants:** I-2, I-5, I-9
 - **Scope:**
   - Build: random 16-byte `id`, stable `thread`, CEK, payload AEAD, HPKE wraps to the 04 §3.2 recipient set (recipient agent, recipient owner, sender owner, sender agent), signature; ≤ 24 KB check.
   - Open: verify signature against the contact's card (epoch-aware), pick the wrap by `kid`, decrypt, validate payload with zod. Unknown senders → requests queue, except `handshake` (M1-7c).
+  - G-2 (04 §3.1.1): the nine verification steps, in order:
+    - the sender key must be the contact's current card key, except for `card-update`;
+    - decryption may use any own epoch, with exactly one `unwrapCek` per envelope;
+    - the own owner's `kid` must be present (I-9);
+    - `createdAt` may be at most 300 s ahead;
+    - an `id` already stored with a different hash is refused and flagged;
+    - the type ↔ key table for owner-authored types.
+
+    On send: exactly the §3.2 or §3.4.1 set, one entry per distinct `enc` key.
   - Store the ciphertext envelope; decrypted payload only in encrypted columns.
 - **Acceptance:**
   - Each of the four recipients decrypts (test per role; I-9 for both owners).
   - Unknown sender lands in requests (F-13); unknown type or invalid body rejected; M1-1h envelope fixture opens.
+  - Rotation order (04 §3.1.1, step 7): an envelope from a contact's new key that arrives before its `card-update` is held, then processed as from the contact once the `card-update` is applied, and is never shown as a new contact request. A held envelope with no `card-update` goes to requests after 48 h (fake clock), and one from a stranger key is never accepted as the contact's.
+  - Two own entries at different epochs: exactly one `unwrapCek`, at the highest epoch. The same `id` with the same hash is dropped silently; with a different hash it is refused and flagged.
+  - G-2: when both agents have the same owner, there are 3 entries and the owner opens one. Each refusal path has a test: a superseded epoch key, a missing own-owner `kid`, a duplicate `id` with a different hash, a future `createdAt`, and a `text` from the own owner key.
 
 #### M1-7c · core: pairing protocol (invite, accept, handshake)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1352,6 +1401,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-1, I-4, I-5
 - **Scope:**
   - Invite `{v, inviteId, secret, card, cardSig, name, relays, expiresAt}` → base64url(deflate) → `https://<invite-host>/i#<payload>`; accept from the full URL or the bare payload; default expiry 7 days.
+  - (hand-off from M1-2c) The invite decoder caps the inflated size before parsing (a deflate bomb), and fails closed on a cap hit.
   - A stores `{inviteId, proofKey, expiresAt, used}` (`proofKey` = HKDF of the secret, label `agentlink/v1/pairing-proof`, encrypted at rest; never the raw secret, 04 §3.6). B verifies `cardSig` and expiry, applies `contacts.acceptInvites` (default `approval` → `pending_approval`), then sends `handshake` with the HMAC proof.
   - Contact names (D-53, 06 §2.1 contact-name rule): the invite `label` is stored as A's suggested alias for B and shown restricted until A's owner confirms it (it is agent-written); B's owner types or confirms an alias on the pairing approval, prefilled with the restricted self-declared name. Only owner-set aliases are shown unrestricted. A shared `restrictName` helper exactly per 06 §2.1 (NFKC; only `[\p{L}\p{N} .'-]`; spaces collapsed; ≤ 32 code points; fallback "Contact" plus short owner fingerprint for empty, mixed-script or confusable names beyond UTS #39 moderately restrictive, or names containing a reserved label word) renders names quoted, followed by the identity label, with `nameSource`; the raw self-declared name is stored as untrusted data.
   - A accepts a `handshake` from an unknown sender only for an unused, unexpired invite; marks it used, adds B, replies `handshake-ack`. This processing runs in the background loop or on `agentlink_inbox`, never in a read-only status call (06 §2.0, §6). A completes on accepting the handshake and B on a verified ack. Each keeps the signed `handshake` and `handshake-ack` and recomputes the safety code from them on every display, never from a stored digest (04 §3.6.1). `createInvite` returns `{inviteUrl, ownerFingerprint, expiresAt}` and no safety code. No tool result carries the code; `acceptInvite` and `listContacts` return `pairing` and `safetyCodeChecked`. Contacts are keyed by `agentId`; a re-pair takes effect only on completion, and concurrent pairings converge per 04 §2.9.
@@ -1411,6 +1461,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Approval requests bound to an action digest (SHA-256 of the JCS action); an approved ID lets the identical action proceed once; expiry per G-7; statuses `pending | approved | denied | expired`.
   - Approval accepted only as an owner-signed object (local UI, CLI or console envelope).
+  - (hand-off from M1-2c, IR-M1-2b-1 F-3) The core builds `fee.amount` and `fee.usd` of an approval `context` from one fee quote, because the types cannot check them against each other (token decimals are unknown there). Owner surfaces render from `context`, never from `args`.
   - Requests queue for unknown senders with owner accept/ignore; `clientRequestId` idempotency (repeats return the original result).
   - Action digests for actions with a file (`agentlink_send` with `path`, implemented with M1-7f) include the resolved realpath and `plaintextSha256`; the core re-hashes the file when the approved action runs, and a mismatch needs a new approval (D-53, 06 §2.5).
   - Approval rows can carry a commitment scope, its source (owner approval or policy grant) and a ledger of used parts (07 §3, D-55). For commitments, "proceeds once" applies per part of the scope; M1-32 implements the scope and its rules.
@@ -1440,7 +1491,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-7g · core: proofs and receipts
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core
-- **Depends on:** M1-7b, M1-7e, M1-7i, M1-20, M1-21, M1-32, M1-4b, M1-4c, M1-4d, M1-26; gap G-13 resolved
+- **Depends on:** M1-7b, M1-7e, M1-7i, M1-20, M1-21, M1-32, M1-4b, M1-4c, M1-4d, M1-26; gaps G-13 and G-46 resolved
 - **Spec:** 03 §4.3; 04 §3.4 (`proof`; `terms` and proof of agreement), §5; 05 §3.1, §3.3; 06 §2.4, §3 (`commitments`); 07 §6.2, §6.3, §8; 02 F-40, F-42, F-43, F-47, F-51, J2, J3, J8; D-31, D-32
 - **Invariants:** I-2, I-4, I-6
 - **Scope:**
@@ -1453,6 +1504,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - No receipt is signed when the on-chain record does not match (tampered proof-envelope test); no ACCEPTED/REJECTED receipt is signed under the default policy without an owner-signed approval.
   - Deferred receipt (D-55): an offer recorded after the approved accept gets exactly one `ACCEPTED` receipt with no second approval; a record with a different `envelopeHash` or signer, a record arriving after `expiresAt`, or one arriving after the contact's owner key changed gets none.
   - Zero credits → `needs_credits`; key disclosure without approval → `pending_approval`.
+  - Replacing a signed item (04 §5, §3.4.2): an earlier Record that lands just before its deadline while the submitter reports `failed` gets no replacement, the part becomes `done` with it and the budget is charged once; a replacement is signed only after the `finalized` block is past the deadline and shows no record, and a failed chain read signs nothing; a Record approved outside a commitment is not replaced after that approval's `expiresAt` (`pending_approval`); a commitment part never has two live items, and none is replaced after the scope's `expiresAt`.
+  - Fresh salts (04 §5, D-61): two Records for the same recipient, and a replacement Record for the same envelope, have different CSPRNG salts; no salt-derivation API exists.
 
 #### M1-7h · core: inbox sync, card updates, revocation, delivery acks
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1462,11 +1515,12 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-4, I-5
 - **Scope:**
   - `syncInbox`: transport sync → unwrap → open → classify (contact, request, handshake) → store; idempotent across restarts.
-  - Per-contact rate limit (`contacts.rateLimitPerContactPerHour`); `card-update` accepted only for a higher epoch signed by the same owner; `revoke` envelopes; F-23 signed off-chain "received" ack (P1, behind a flag).
+  - Per-contact rate limit (`contacts.rateLimitPerContactPerHour`); `card-update` accepted only for a higher epoch signed by the same owner; after it, a new envelope from the superseded key is stored as refused and shown in the activity feed, never in `agentlink_inbox` (04 §3.1.1, G-2); `revoke` envelopes; F-23 signed off-chain "received" ack (P1, behind a flag).
   - Metadata for the untrusted-content wrapper (sender name under the 06 §2.1 contact-name rule, identity label per 11 §5.2, owner fingerprint; never "verified" alone).
 - **Acceptance:**
   - `card-update` with the same epoch or a different owner rejected; a revoked contact's later envelopes dropped.
   - 500 envelopes from one contact are rate-limited without delaying another contact's envelopes.
+  - In one sync pass, a `card-update` is processed before the same contact's envelopes from the new key, whatever their arrival order or `created_at` (04 §3.1.1, step 7).
 
 ### Node runtime (`@agentlink/node`)
 
@@ -1620,6 +1674,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - stdio server on the official MCP TypeScript SDK; every tool declares `inputSchema` and `outputSchema` and returns `structuredContent` plus a one-sentence summary; status values with `nextStep`/`url`; contact resolution with `AMBIGUOUS_CONTACT`.
   - Tools (names frozen at 0.1.0, D-53): `agentlink_status` (incl. per-contact unread counts by local name for the session-start check, 06 §6.1; `credits` and `prices` arrive with M1-9d), `agentlink_create_invite` (incl. `shareText`), `agentlink_accept_invite`, `agentlink_list_contacts`, `agentlink_send` (text and typed `note`/`request`/`delivery` only; a `body` with `terms` → `USE_TERMS_TOOLS`; `path` and `notarize` arrive with M1-9d as additive fields), `agentlink_propose_terms` and `agentlink_respond_to_terms` (D-55, 06 §2.2a: `TermsInput` from M1-21; `accept`, `reject`, `counter`; a binding `accept` goes through the `commitments` policy, M1-20, under one commitment scope, M1-32; receipts and `notarize` arrive with M1-9d), `agentlink_inbox` (3 s sync budget; thread view with `contact`, `includeRead`, `includeSent`, `before`; automatic DELIVERED once proofs land, M1-9d), `agentlink_get_approval`.
   - MCP annotations on every tool exactly per the 06 §2.0 table; `approvalId?` on every tool that can return `pending_approval`.
+  - (hand-off from M1-2c, IR-M1-2b-1 F-5) Pin the `url` of a `pending_approval` result to the local UI origin or the console origin; `resultUrlSchema` in `@agentlink/types` accepts any https host.
   - Until the local approval server lands (M1-8d, M1b), `pending_approval` results name the owner's CLI command (`agentlink approve <id>`, run in a terminal the agent does not control) as `nextStep`; M1-11a adds the local UI `url`.
   - Untrusted-content wrapper exactly per 06 §4 (escape `</untrusted_content>` and control characters, in text and `structuredContent`); server instructions verbatim from 06 §5.
   - Relay subscriptions while running; optional `agentlink://inbox` resource notifications (tools work without them).
@@ -1712,15 +1767,24 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/submitter
 - **Depends on:** M1-4a, M1-3g, M0-8; gap G-4 resolved
-- **Spec:** 07 §7; 03 §4.3; 04 §7 (malicious submitter, gas griefing); 05 §3.2
+- **Spec:** 07 §7; 03 §4.3; 04 §7 (malicious submitter, gas griefing); 05 §3.2, §3.3
 - **Invariants:** I-3, I-7
 - **Scope:**
-  - `POST /v1/notarize`, `POST /v1/receipt`, `GET /v1/status/:txHash`, `GET /v1/health`; signature validation and `eth_call` simulation (incl. credits) before sending; batching per G-4.
+  - `POST /v1/notarize`, `POST /v1/receipt`, `GET /v1/status/:txHash`, `GET /v1/health`; signature validation and `eth_call` simulation (incl. credits) before sending; batching per G-4 (05 §3.3):
+    - per-item simulation, and the failing items left out;
+    - after an on-chain revert, one resubmission without the failing items;
+    - a signer that caused a revert is submitted alone for `soloAfterRevertSeconds` (default 3 600, 05 §3.3);
+    - per-item status `recorded`, `skipped` or `failed`.
   - Per-signer and per-IP rate limits and per-chain transaction-nonce serialisation in Durable Objects; gas keys only from Worker secrets.
   - The submitter uses viem only through `@agentlink/chain` (M0-10 policy: `apps/submitter` is not in the viem zone); needs from chain (simulation, signature checks, gas-key wallet) are added to `@agentlink/chain`, not by widening the zone.
   - No request logging beyond aggregate metrics; never signatures together with IPs. `/v1/deposit-authorization` present but disabled until M3-4b.
 - **Acceptance:**
   - Miniflare tests per endpoint: invalid signature, insufficient credits (rejected before sending), rate limit, concurrent nonce handling.
+  - G-4 tests:
+    - an item already on-chain reports `skipped`;
+    - a batch whose item loses its credits after simulation is resubmitted once without that item, and the others are `recorded`;
+    - an item that fails twice is `failed`.
+  - A paused Notary: items are held, not reported `failed`, until their deadline.
   - Testnet integration with M1-4c; captured logs contain no IPs or signatures; `/v1/health` reports gas balances and queue depth.
 
 #### M1-10b · testnet credits faucet
@@ -2277,7 +2341,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2
 - **Repo/path:** agentlink · apps/console
 - **Depends on:** M2-2b, M1-7h, M1-4d; gap G-24 resolved
-- **Spec:** 08 §2.2 (Activity, Threads, Proofs, Credits); 07 §4.2 (owner copies); 11 §6.3
+- **Spec:** 08 §2.2 (Activity, Threads, Proofs, Credits); 07 §4.2 (owner copies); 04 §3.1.1 (owner read path, where the owner shows a copy); 11 §6.3
 - **Invariants:** I-2, I-5, I-9
 - **Scope:**
   - Core in the browser with an IndexedDB Store; subscribe with the owner Nostr key on the relays fixed by G-24; decrypt all envelope copies; unified timeline; threads with typed cards.
@@ -2287,6 +2351,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
   - Two agents' sent and received envelopes appear for their owner (e2e with local relays).
   - File decryption verifies both hashes; captured network traffic contains no decrypted content.
   - Zero-amount `Deposited`, `Swept` and `IntegratorWithdrawn` events are not shown in the credits view (IR-M1-3b-1 I-2).
+  - Owner copies (04 §3.1.1): reading runs in an `OwnerSession` opened with presence. A forged copy addressed only to the owner, from a key that is not a contact of the agent, is shown outside the threads as not from a known contact. Two copies with the same `id` and different hashes are shown as a conflict, neither as the thread's message. A payload that fails its schema is not rendered.
 
 #### M2-2e · console: approvals, policies, agent management
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
@@ -2297,6 +2362,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Scope:**
   - `approval-request` envelopes → approval card → owner-signed `approval` envelope back over Talk; policy editor → owner-signed `policy` envelope.
   - Agents list from cards; add agent (owner signs the agent card); revoke (revoke envelope; on-chain revoke when registered, M2-4b).
+  - `contact.check` carrier: add its envelope type and its row in the 04 §3.1.1 owner-signing table (spec PR first) before the console sends `contact.check` over relays.
 - **Acceptance:**
   - An agent applies a console-signed policy and rejects one signed by another key (e2e).
   - A console approval unblocks the pending action exactly once; contacts stop accepting a revoked agent's envelopes.
@@ -3175,9 +3241,23 @@ Concurrency guideline: no more than five or six S1/S2 cards `in-review`/`audit` 
 Found while decomposing. None is resolved here; each needs a spec-change PR (or an owner decision) before the blocked cards become `ready`. Priority: **H** blocks security-critical design, **M** blocks a card's acceptance, **L** cosmetic or late.
 
 1. **G-1 (H) Local owner presence vs a same-user agent.** 04 §1 I-4, §2.5; 08 §1; 10 M1-8. The WebAuthn RP ID `localhost` is shared by every local origin, and 04 §2.5 already accepts that a shell-capable agent can tamper with the installation. Either way the next owner passkey or passphrase use on that machine can be captured and the wrapped owner seed on disk unwrapped: local presence proves presence, not intent. The same holds for creating the owner key on such a machine: a tampered installation or a same-user process that reads memory can capture or predetermine the owner seed during setup (04 §2.8, D-54). The residual-risk text lists only tampering and credit spending, and I-4's "no agent process can produce one" holds only while the installation is intact. *Proposed:* state this in 04 §2.5; scope the M1-8 test to an unmodified installation; recommend owner operations from the console on a separate device when the harness has unrestricted shell; harness deny rules for the installed package and npx cache; consider not storing the owner seed on agent machines by default. *Blocks:* M1-8c, M1-8d, M1-8e, M1-11a, M1-12b. *Status:* stays open until the D-36 desktop app ships (G-42).
-2. **G-2 (H) `KeyStore` location and methods.** 03 §3; 07 §1, §4.1; 04 §2.6, §3.1. The interface lives "in core", but `transport-nostr` depends only on `crypto` (dependency cycle). Missing: envelope-hash signing (`signNostr` signs events, the envelope signature is BIP-340 over a tagged hash) and epoch selection for decrypting with old keys. *Proposed:* define `KeyStore`/`OwnerKeyStore` in `@agentlink/crypto`; add `signEnvelopeHash` and epoch parameters. *Blocks:* M1-1g, M1-5a, M1-7b.
+2. **G-2 (H) `KeyStore` location and methods.** Resolved by branch `docs/G-2-envelope-signatures` (pending owner; proposed, owner confirms at merge), in 04 §3.1.1, with 03 §3, 04 §2.6, §3.5 and 07 §1, §4.1, §4.2 aligned. Reviews IR-M1-1g-1 (M-1, M-2, L-1, L-2, I-4, I-5) and IR-M1-1c-1 (F3, F5) are folded in.
+   - **Signature.** `sig` = BIP-340 by `from` over `taggedHash("agentlink/envelope/v1", envelopeHash)`, where `envelopeHash = sha256(JCS(envelope without sig))` over the strictly parsed envelope, with the 32 raw hash bytes inside the tagged hash. A table of every BIP-340 use of a Nostr key (envelope, owner action, NIP-01 seal and AUTH) fixes one message per object. A new use needs its own tag, and nothing signs an untagged digest.
+   - **Keys.** Agent-sent types are signed by the agent Nostr key at the current epoch. `approval`, `policy` (owner → agent) and `revoke` are signed by the owner Nostr key, only in an `OwnerSession` from `unlock(presence)`, in the same gesture as the carried `SignedOwnerAction`. The envelope signature authorises nothing. Receivers enforce the type ↔ key table.
+   - **Interfaces.** The interfaces are types in `@agentlink/crypto`, and the seed holders are in `/keystore` and `@agentlink/node`. Test doubles are unreachable from production `src`. `EnvelopeKeys` (`signEnvelopeHash`, `signNostr`, `nip44Encrypt`/`nip44Decrypt`, `unwrapCek(wrapped, envelopeId, {epoch})`, which replaces `hpkeOpen(wrapped, info)`) is shared by `KeyStore` and `OwnerSession` (IR-M1-1g-1 M-1). An `OwnerSession` signs only Nostr kinds 13 and 22242. `{epoch}` is accepted only on decrypting methods and `getPublicBundle`.
+   - **Owner reading.** Recipient entries are deduplicated per distinct key. The owner reads its copies inside one `OwnerSession`: gift wrap and seal through `nip44Decrypt`, then the `ownerEnc` entry by `kid`, then `unwrapCek` and the AEAD. Reading needs presence, because the gift wrap is addressed to the owner's signing key.
+   - **Verification** runs in nine fail-closed steps. A new envelope from a superseded sender key is refused (except `card-update`), and the own owner's `kid` must be present (I-9).
+   - **Limits.** Relay frame ≤ 128 KiB before `JSON.parse` (transport). Envelope ≤ 24 576 bytes before `JSON.parse` (transport). 1–8 recipients with distinct `kid`s, and `ct` ≤ 17 152 bytes checked before decoding (crypto parser). Exact set and one HPKE open (core). The IR-M1-1c-1 `ct` ≤ 64 KiB is not adopted: such an envelope exceeds the NIP-44 plaintext limit of the seal, and D-48 moves files off-envelope.
+
+   *Was:* 03 §3; 07 §1, §4.1; 04 §2.6, §3.1. The interface lived "in core", but `transport-nostr` depends only on `crypto` (a dependency cycle). Missing were envelope-hash signing (`signNostr` signs events, while the envelope signature is BIP-340 over a tagged hash) and epoch selection for decrypting with old keys. The first proposal was to define `KeyStore`/`OwnerKeyStore` in `@agentlink/crypto` and add `signEnvelopeHash` and epoch parameters. *Blocks:* M1-1g, M1-5a, M1-7b.
 3. **G-3 (H) AccessManager role mapping.** Resolved by PR #11 (D-59, confirmed by the owner at merge): 05 §5.1 role map with role IDs, selectors, holders (mainnet Safe and ops hardware key; separate testnet Safe and key with scaled delays), execution and grant delays, `GUARDIAN` (cancel only), role admins, 7-day target admin delays and the OZ default `minSetback`. The AccessManager delays are the timelock (no `TimelockController`). `ADMIN_ROLE` moves to 7 days, and module registration and every upgrade move to 7 days, because any module can charge credits. The cap is lowered and raised through two functions (`InvalidCapChange()`). `unpause` is Safe-only. Mainnet contracts start paused until the configured delays are in effect. *Was:* per-function delays that AccessManager cannot express; two UPGRADER delays; `freezeUpgrades` under the 48 h ADMIN; guardians, grant delays and `minSetback` unspecified. *Blocks:* M1-3a, M1-3b, M1-3g.
-4. **G-4 (H) Batch failure semantics.** 05 §3.2; 07 §7. Whether one failing item reverts `notarizeBatch`/`acknowledgeBatch` is unspecified; the submitter batches across signers, so one item (e.g. credits spent between simulation and inclusion) can grief the rest. *Proposed:* specify all-or-nothing with per-item pre-simulation and retry without the failing item, or skip-and-emit with per-item status; keep 05 §3.4 gas targets. *Blocks:* M1-3d, M1-10a.
+4. **G-4 (H) Batch failure semantics.** Resolved (decided by the owner in chat, 14 Oct 2026, D-61; wording confirmed at merge; recorded by branch `docs/G-2-envelope-signatures`), in 05 §3.3.
+   - Batches are all-or-nothing. The exception is an item that is already on-chain in identical form: a Record with the same `recordStructHash`, or a receipt type already set by the committed recipient. Such an item is skipped, with no charge and no revert, and emits `RecordSkipped` or `ReceiptSkipped`. Any other failure reverts the whole batch. Single calls still revert.
+   - **Submitter (M1-10a):** simulate per item and then as a batch, and leave out every failing item. If a sent batch reverts, resubmit once without the failing items; an item that fails twice is `failed`. A signer that caused a revert is submitted alone for a while. Per-item status is `recorded`, `skipped` or `failed`.
+   - Same decision (D-61): the `notarize` gas target is ≤ 170k (05 §3.4). Pause also blocks receipts (05 §5.1). Every Record has a fresh random salt (04 §5).
+   - Proposed with it (owner confirms at merge, D-62): pause and unpause still work after freeze; a signed item that did not land is replaced only when the chain shows it never can (04 §5); a receipt item is skipped only after its own checks pass (05 §3.3).
+
+   *Was:* 05 §3.2; 07 §7. Whether one failing item reverts `notarizeBatch`/`acknowledgeBatch` was unspecified. The submitter batches across signers, so one item (for example credits spent between simulation and inclusion) could grief the rest. *Blocks:* M1-3d, M1-10a.
 5. **G-5 (M) J1 key storage wording.** RESOLVED by 02 §5 J1 steps 2–3: `init` puts only the agent keys in the OS keychain (step 2); the owner key is created and wrapped in the setup step (step 3, 04 §2.2). *Was:* J1 step 2 stored "owner and agent keys" in the OS keychain, against 04 §2.2. *Blocked:* M1-9a, M1-12b.
 6. **G-6 (H) Policy fail-open.** Resolved for the fallback by branch `docs/m12b-spec-fixes` (pending owner; proposed, owner confirms at merge; review IR-M1-2b-1). The version in an owner-signed object and the KeyStore high-water mark were already in 04 §2.5.1. 06 §3 (last paragraph) now says that once any policy version has been applied, a missing, unsigned, tampered, rolled-back or unparseable policy never falls back to the defaults: every paid action, commitment and owner-gated action needs the owner's approval, unknown senders are queued, no contact rule or auto-accept applies, and the owner is told to confirm the policy again. A `deny` that can no longer be read becomes `approval`, never `allow`. *Was:* 06 §3 (last paragraph): unsigned or tampered policies fell back to defaults, which can be looser than the owner's policy (e.g. `proofs.notarize: deny` → `allow`), and deleting the signed row downgraded policy. *Blocks:* M1-7d.
 7. **G-7 (M) Lifetimes.** Resolved by branch `docs/G-7-G-32` (pending owner; proposed, owner confirms at merge). The values are in 04 §2.5.1 (lifetimes, skew and nonces), 04 §3.4.1 (approval TTL) and 06 §3 (daily budget window).
@@ -3226,13 +3306,15 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 36. **G-36 (L) Owner-backup event kind.** 04 §2.3 names the `d` tag but not the parameterised-replaceable kind. *Blocks:* M2-2b.
 37. **G-37 (L, process) PR title pattern.** `pr-hygiene.yml` accepts `OPS-<n>` and `M<n>-<n>[a-z]`, but `development-process.md` §12.2 and `audit-rules.md` §7 use `OPS-L<n>` and `M<n>-GATE`. *Blocks:* PRs for OPS-L, gate and design-drop cards (fixed by M0-15; design drops may also use the `DOCS` prefix).
 38. **G-38 (M, decision) D-25 scope.** RESOLVED: D-25 is decided (decision log, 12 Oct 2026): continuous delivery with auto-merge behind `review-gate`, automatic staging deploys, automatic rollback, and one owner approval click for production (`talirezun` required reviewer on `production` and `npm-publish`, "Prevent self-review" off; click superseded by D-52 for services, npm `latest` keeps it). `release-and-deployment.md` and `ci-cd.md` are aligned. Remaining work is owner setup: M0-17 (ruleset with auto-merge), M0-18 (environments), M0-19 (`DEPLOY_FREEZE`).
-39. **G-39 (M) Pause scope.** Resolved by PR #11 (D-59, confirmed by the owner at merge), with G-3: pause blocks charges, deposits, notarization and registration, and never `withdraw`, `withdrawIntegrator`, `sweep` or Registry `revoke` (05 §5.1). *Was:* 05 §2.5 said pause never blocks payer withdrawals but was silent on `sweep` and `withdrawIntegrator`. *Blocks:* M1-3b.
+39. **G-39 (M) Pause scope.** Resolved by PR #11 (D-59, confirmed by the owner at merge), with G-3; amended 14 Oct 2026 (D-61): receipts are also blocked. Pause blocks charges, deposits, notarization, receipts and registration, and never `withdraw`, `withdrawIntegrator`, `sweep` or Registry `revoke` (05 §5.1). *Was:* 05 §2.5 said pause never blocks payer withdrawals but was silent on `sweep` and `withdrawIntegrator`. *Blocks:* M1-3b.
 40. **G-40 (M, process) Beta hostnames vs environments.** D-28 puts beta services on `*.agentlink.4thtech.io` and staging on `workers.dev`; `release-and-deployment.md` §1 maps testnets to staging and production to mainnets. Which environment (and approval) serves the testnet submitter, faucet and console used by M1/M2 testers is undefined. *Proposed:* a "beta" environment (testnets, beta hostnames, owner-approved promotion). *Blocks:* M1-10c, M2-2h.
 41. **G-41 (L) D-12 propagation.** The decision log now records MIT (D-12); the private internal docs predate it. *Proposed:* align them privately; every public `package.json` and the cloud-agent template carry MIT. *Blocks:* M0-2d (check script), M2-3d (template licence).
 42. **G-42 (H, note) Desktop owner presence as the G-1 mitigation.** D-36; 04 §2.5; 08 §1. D-36's desktop model (a signed app, a native approval window, the owner key in the OS keychain gated by OS biometrics such as Touch ID or Windows Hello) is the intended mitigation for G-1: the OS, not a `localhost` web origin, shows the presence prompt, and keychain access bound to the app's signing identity is meant to stop a tampered installation or another same-user process from unlocking the owner key. It is not yet specified or proven: Linux has no equivalent OS binding, and `npx` installs keep G-1's residual risk. *Proposed:* M2-11a's threat model states exactly which G-1 paths the desktop app closes, per OS; 04 §2.5 is updated when the desktop app ships, and only then is G-1 closed for desktop installs. G-1 stays open until then. *Blocks:* M2-11a, M2-11b, M2-11c, M2-11d.
 43. **G-43 (M) `fee_quote` split.** RESOLVED by 06 §2.4, and since D-53 by 06 §2.1: `agentlink_status` `prices` returns `{action, usd, protocolUsd, integratorUsd, payFrom}` (the former `fee_quote` folded in), and `ProofStatus.fee` carries the same split, as D-45 and 12 §4.3, §5 require. *Was:* `fee_quote` returned only `{chain, token, amount, usd, payFrom}`. *Blocked:* M1-9d.
 44. **G-44 (M) Drop delete on receipt vs owner access.** RESOLVED: the drop follows `files.deleteAfter` like any storage (default `expiry`, `receipt` as an owner option; D-48, 04 §4), so I-9 holds as written: owners keep access to file contents until expiry. *Was:* D-48 deleted drop objects on receipt, ending owner access before expiry. *Blocked:* M1-7f.
 45. **G-45 (M) Consumer providers without expiring public links.** 07 §5.5; D-18 (links expire after at most 7 days); D-49. Google Drive "anyone with the link" permissions cannot expire; Dropbox link expiry needs a paid plan; Microsoft Graph documents `Files.ReadWrite` (broader than the app folder) as the least-privileged permission for `createLink` on personal accounts. Sender-side revocation works only while the sender's device is online. *Proposed:* accept sender-side revocation, run by the desktop tray app at expiry and at start-up, as the expiry mechanism where a provider has no expiring link; ship OneDrive only if `createLink` works with the app-folder scope. Owner decides per provider. A scope broader than the app folder (e.g. OneDrive `Files.ReadWrite`) voids the 04 §7 "stolen token reaches only AgentLink ciphertext" mitigation on Windows and Linux, where same-user processes can read keychain tokens. *Blocks:* M2-15b, M2-15c, M2-15d.
+
+46. **G-46 (H) One plaintext for every recipient.** Recorded as a requirement by the owner (D-61, 14 Oct 2026), stated normatively in 04 §3.3; the construction is open. *Timing (proposed, build plan; owner confirms at merge, D-62):* the construction is fixed before M1-7b becomes `ready` and before the `aead-envelope` and `envelope-sig` vectors freeze. 04 §3.1, §3.1.1, §3.3; 07 §8. Found while resolving G-2. *Requirement:* the payload AEAD must be key-committing, or the recipients must be bound to one content key, so that every recipient, every owner (I-9) and a proof-pack verifier who opens an envelope gets the same plaintext under its signed, notarized `envelopeHash`. Options include a key-committing construction, or a commitment to the CEK in the signed header that is checked before decrypting. Either option changes the envelope header, hence the timing above. *Blocks:* freezing the `aead-envelope` and `envelope-sig` vectors (M1-1h), M1-7b, M1-7g (proof of agreement); each lists it under Depends on.
 
 ---
 

@@ -23,7 +23,7 @@ agentlink/
 │  ├─ chain/                     # viem clients, OCC v2 bindings (ABIs from @agentlink/occ-v2-abi)
 │  ├─ transport-nostr/           # NIP-17/59 gift wraps, relay pool, sync
 │  ├─ storage/                   # inline, drop and S3 (aws4fetch) adapters; Drive/Dropbox/OneDrive connectors (M2)
-│  ├─ core/                      # AgentLinkClient, policies, approvals, KeyStore/Store interfaces
+│  ├─ core/                      # AgentLinkClient, policies, approvals, Store interface (KeyStore types: @agentlink/crypto, G-2)
 │  ├─ node/                      # keychain KeyStore, SQLite Store, local approval server
 │  └─ ui/                        # shared React components (design system)
 ├─ apps/
@@ -44,7 +44,7 @@ agentlink/
 ```
 pnpm install
 pnpm build            # turbo build
-pnpm test             # unit tests (all packages)
+pnpm test             # unit tests (all packages); packages/types also runs in Chromium, Firefox, WebKit and workerd (needs `pnpm exec playwright install chromium firefox webkit` once; `pnpm test:node` inside the package runs Node only)
 pnpm test:e2e         # multi-agent end-to-end (requires testnet RPC + relays)
 pnpm lint && pnpm typecheck
 pnpm vectors:check    # crypto + EIP-712 test vectors across runtimes

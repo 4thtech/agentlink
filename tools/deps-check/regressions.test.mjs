@@ -454,3 +454,92 @@ describe('IR-M1-1e-1 L-1: viem is a test-only library in packages/crypto', () =>
     expect(viem?.testZones).toEqual(['packages/crypto']);
   });
 });
+
+describe('M1-1c, M1-1f: the crypto test seam @agentlink/crypto/testing', () => {
+  const seams = [
+    `import { encryptPayloadWithIv } from '@agentlink/crypto/testing';\n`,
+    `import { sealOwnerSeedWithNonce } from '@agentlink/crypto/testing';\n`,
+  ];
+  const RESTRICTED = /@agentlink\/crypto\/testing may be imported only in test-vectors/;
+
+  it('fails in every zone, packages/node and packages/crypto included', () => {
+    for (const zone of Object.keys(ZONES)) {
+      expect(violationFor(zone, '@agentlink/crypto/testing', `${zone}/src/a.ts`), zone).toMatch(
+        RESTRICTED,
+      );
+    }
+    for (const code of [...seams, `const m = await import('@agentlink/crypto/testing');\n`]) {
+      expect(src('packages/core', code).join('\n')).toMatch(RESTRICTED);
+    }
+  });
+
+  it('allows the vector harness', () => {
+    expect(
+      violationFor('test-vectors', '@agentlink/crypto/testing', 'test-vectors/a.ts') ?? '',
+    ).not.toMatch(RESTRICTED);
+  });
+
+  // Inside packages/crypto the seam source is reachable by a relative path, which the entry above
+  // (by package name) does not see. tsc builds every file a built module imports, so one production
+  // import would also put the seam into dist/.
+  const SEAM_SOURCE = /test seam\) may be imported only by test files/;
+
+  it('refuses a relative import of the seam source from crypto production code, in every form', () => {
+    for (const code of [
+      `import { hpkeOpen } from './testing.js';\n`,
+      `import { pairingDigest } from './testing';\n`,
+      `export * from './testing.js';\n`,
+      `const m = await import('./testing.js');\n`,
+      `type T = import('./testing.js').HpkeSealed;\n`,
+    ]) {
+      expect(src('packages/crypto', code, 'src/hpke.ts').join('\n')).toMatch(SEAM_SOURCE);
+    }
+    expect(
+      src('packages/crypto', `export * from '../testing.js';\n`, 'src/x/a.ts').join('\n'),
+    ).toMatch(SEAM_SOURCE);
+  });
+
+  it('allows the seam source in crypto test files, and other relative imports everywhere', () => {
+    expect(
+      src('packages/crypto', `import { hpkeOpen } from './testing.js';\n`, 'src/hpke.test.ts'),
+    ).toEqual([]);
+    expect(src('packages/crypto', `import { wrapCek } from './hpke.js';\n`, 'src/a.ts')).toEqual(
+      [],
+    );
+    expect(src('packages/core', `import { x } from './testing.js';\n`, 'src/a.ts')).toEqual([]);
+  });
+});
+
+describe('IR-M1-1f-1 L-2: deep imports into a workspace package', () => {
+  const DEEP = /deep import/;
+
+  it('refuses dist/ and src/ subpaths of every workspace package, in every zone', () => {
+    for (const zone of Object.keys(ZONES)) {
+      for (const specifier of [
+        '@agentlink/crypto/dist/keystore-file.js',
+        '@agentlink/crypto/dist',
+        '@agentlink/crypto/src/testing.ts',
+        '@agentlink/types/dist/index.js',
+      ]) {
+        expect(violationFor(zone, specifier, `${zone}/src/a.ts`), `${zone} ${specifier}`).toMatch(
+          DEEP,
+        );
+      }
+    }
+    expect(
+      violationFor('test-vectors', '@agentlink/crypto/dist/keystore.js', 'test-vectors/a.ts'),
+    ).toMatch(DEEP);
+  });
+
+  it('finds a planted static import in packages/core', () => {
+    const code = `import { sealOwnerSeedWithNonceUnsafe } from '@agentlink/crypto/dist/keystore-file.js';\n`;
+    expect(src('packages/core', code).join('\n')).toMatch(DEEP);
+  });
+
+  it('leaves the declared entry points alone', () => {
+    expect(violationFor('packages/core', '@agentlink/crypto', 'packages/core/src/a.ts')).toBeNull();
+    expect(
+      violationFor('packages/node', '@agentlink/crypto/keystore', 'packages/node/src/a.ts') ?? '',
+    ).not.toMatch(DEEP);
+  });
+});

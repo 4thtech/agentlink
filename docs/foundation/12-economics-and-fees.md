@@ -161,7 +161,7 @@ The signed `maxFee` (§4) protects every payer even if a change happens between 
 
 All figures are **estimates** and move with network prices.
 
-- **Network cost per proof.** A record plus up to three receipts uses at most about 160k + 3 × 75k gas (05 §3.4 targets). On Base and Gnosis this is about **$0.001–0.01** per record.
+- **Network cost per proof.** A record plus up to three receipts uses at most about 170k + 3 × 75k gas (05 §3.4 targets). On Base and Gnosis this is about **$0.001–0.01** per record.
 - **Who carries it.** The submitter sponsors that cost and recovers it from protocol fees, together with running the submitter, the faucet, audits and the bug bounty.
 - **Files.** The encrypted drop's storage cost (R2, about $0.015 per GB-month, free egress, at most 7 days per object) is borne by 4thTech; files are free within the quotas (§2, D-48).
 - **What you buy.** A proof is not a bare timestamp. It can be a **proof of agreement**: the sender's signature over the exact content hash, plus the recipient's signed receipts for delivery, opening and acceptance, so an accepted record shows that both sides assented to the same terms. Anyone can check it without trusting 4thTech. (It does not by itself establish legal enforceability, 02 F-43.)

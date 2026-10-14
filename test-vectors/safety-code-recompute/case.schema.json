@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/safety-code-recompute/case.schema.json",
+  "title": "safety-code-recompute case",
+  "description": "04 \u00a73.6.1 steps 1-5. `recompute`: pairingDigest and the shown code from the surface's own agent ID, the contact's current card and the signed H and K (with their CEKs), or a rejection.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "self",
+            "contactCard",
+            "handshake",
+            "ack"
+          ],
+          "properties": {
+            "op": {
+              "const": "recompute"
+            },
+            "self": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{40}$"
+            },
+            "contactCard": {
+              "type": "object"
+            },
+            "handshake": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "envelope",
+                "cek"
+              ],
+              "properties": {
+                "envelope": {
+                  "type": "object"
+                },
+                "cek": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            "ack": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "envelope",
+                "cek"
+              ],
+              "properties": {
+                "envelope": {
+                  "type": "object"
+                },
+                "cek": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "pairingDigest",
+                "code"
+              ],
+              "properties": {
+                "pairingDigest": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "code": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4} [0-9]{4} [0-9]{4}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
