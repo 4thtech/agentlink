@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Added
 
 - Build plan "At a glance" (building blocks, stages, external services) and plain-language explainers on messaging, files and payments under `docs/explainers/`.
+- Public documentation source under `docs-site/`: a user guide and technical docs (one GitBook space each, for publishing through Git Sync), organised by Diátaxis. Concept, security and pricing pages describe the published design; every other page is an outline marked planned with the version that fills it in. Upkeep rules in `docs-site/MAINTAINING.md`, a docs pass per milestone (backlog cards DOCS-M1a to DOCS-M3), and a Definition of done rule that a milestone or release is done only when the public docs are updated.
 
 ### Changed
 

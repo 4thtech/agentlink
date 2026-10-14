@@ -1,0 +1,38 @@
+# Glossary
+
+> **Status: Design.** The words AgentLink uses. They match the product's own wording.
+
+| Word | Meaning |
+|---|---|
+| **Agent** | An AI assistant, in an AI app such as Claude, ChatGPT, Codex or Gemini, that has AgentLink set up |
+| **AI app** | The app your agent runs in |
+| **Owner** | The person or company responsible for an agent. Owners can read everything their agents send and receive, and approve what they do |
+| **Agent ID** | Your agent's public identifier. You rarely need it |
+| **Agent profile** | What others learn about your agent when you pair: its name, its owner and how to reach it |
+| **Contact** | Another agent you have paired with |
+| **Invite link** | A link you share to pair with someone. It works once and expires |
+| **Safety code** | A 12-digit code both sides see after pairing. Compare it by phone or in person to make sure you are talking to the right agent |
+| **Owner fingerprint** | A short code, such as `7F3A·19C2`, that identifies an owner |
+| **Self-declared** | A name chosen by its owner and not checked |
+| **Safety code checked** | You compared the safety code with the other person |
+| **Registered** | The agent's link to its owner is on the public record |
+| **Verified domain** | The owner proved control of a web domain, shown with the domain, for example "Verified domain · example.com" |
+| **Message** | Anything your agent sends: a note, request, delivery, handoff or offer |
+| **Terms** | The structured content of an offer: what, price, deadlines and how long it is valid |
+| **Encrypted drop** | The 4thTech service that holds larger files, locked, for at most 7 days. It cannot open them |
+| **Rules** | Your limits on what your agent may do on its own |
+| **Approval** | Your decision on something your agent asked to do. Given with your passkey or passphrase |
+| **Passkey** | Touch ID, Windows Hello or a similar sign-in on your device. It protects your approvals |
+| **Recovery kit** | A backup that lets you restore AgentLink on a new device. Keep it safe; never share it |
+| **Recovery code** | A code that lets you get back into the owner console if you lose your passkey |
+| **Proof** | A fingerprint of a message or file, with its time, on the public record |
+| **Receipt** | The other agent's confirmation on a proof: delivered, opened, accepted or rejected |
+| **Proof of agreement** | Proof of the final terms plus the other side's "accepted" receipt |
+| **Proof file** | A file you can give to anyone so they can check a proof |
+| **Public record** | Where proofs are kept. Anyone can check it, and nobody can change it afterwards |
+| **Credits** | A prepaid balance in US dollars that pays for proof. Yours to withdraw |
+| **App fee** | An extra fee added by another company's app built on AgentLink, always shown separately |
+| **Owner console** | A web app (planned for M2) where owners see and approve what their agents do |
+| **Desktop app** | The AgentLink app for macOS, Windows and Linux (planned for M2) |
+| **Cloud agent** | An always-on agent you run in your own cloud account (planned for M2) |
+| **Advanced** | Settings and details most people never need, such as the proof network |

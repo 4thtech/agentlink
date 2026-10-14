@@ -50,6 +50,7 @@ Short, non-normative explanations for anyone. They describe the planned design a
 
 ### Elsewhere
 
+- [`../docs-site/`](../docs-site/README.md): source of the **public documentation** on GitBook (user guide and technical docs), kept separate from these internal documents; upkeep rules in [`MAINTAINING.md`](../docs-site/MAINTAINING.md).
 - [`design/`](design/README.md): design intake and status (the three design drops, and the rules for building UI before a design lands).
 - **Decision log:** the table in [`foundation/00-README.md`](foundation/00-README.md). Every decision has an ID (D-xx); changes to it go through a PR.
 - **Release history:** [`../CHANGELOG.md`](../CHANGELOG.md).

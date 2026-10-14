@@ -26,7 +26,7 @@ Contents: §1 How to read a card · §2 M0 Foundations (incl. legacy OPS-L items
 
 | Field | Meaning |
 |---|---|
-| **ID** | `M<milestone>-<build-plan task><letter>`. A build-plan task split into PR-sized parts gets letter suffixes (`M1-1a`, `M1-1b`, …). Tasks not in the build plan take the next free number in their milestone and are marked **(new)**. Legacy security items are `OPS-L1`…`OPS-L9` (private 09 §4 L-1…L-9). Milestone gates are `M1-GATE`, `M2-GATE`, `M3-GATE`. Owner design drops are `DESIGN-D1`…`DESIGN-D3` (D-30). M4 and M5 are single epic cards (`M4-EPIC`, `M5-EPIC`), decomposed when they start. |
+| **ID** | `M<milestone>-<build-plan task><letter>`. A build-plan task split into PR-sized parts gets letter suffixes (`M1-1a`, `M1-1b`, …). Tasks not in the build plan take the next free number in their milestone and are marked **(new)**. Legacy security items are `OPS-L1`…`OPS-L9` (private 09 §4 L-1…L-9). Milestone gates are `M1-GATE`, `M2-GATE`, `M3-GATE`. Owner design drops are `DESIGN-D1`…`DESIGN-D3` (D-30). M4 and M5 are single epic cards (`M4-EPIC`, `M5-EPIC`), decomposed when they start. Public-docs passes are `DOCS-M1a`, `DOCS-M1b`, `DOCS-M2`, `DOCS-M3`, plus `DOCS-LINT` (§5, DOCS-PUB). |
 | **Status** | See the legend below. |
 | **Size** | **S** ≤ 2 days · **M** 3–5 days · **L** 6–8 days of focused agent + human work. Anything larger is split. The changed-lines limits in `development-process.md` §7.4 also apply. |
 | **Tier** | Worker model routing (`development-process.md` §3): **Haiku** (mechanical, read-only, no design choices, never S1/S2) · **Sonnet** (clear-spec implementation, tests, CI, UI, docs, non-security review) · **Opus** (S2 work, architecture, protocol, contracts, signing, deploy scripts, audits). **Owner** marks a card that only the human owner can execute (accounts, settings, keys, legal, money); an agent may prepare material for it. |
@@ -70,6 +70,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 21 (incl. 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
+| Public docs (DOCS-PUB, all milestones) | 5 (DOCS-M1a, DOCS-M1b, DOCS-M2, DOCS-M3, DOCS-LINT) |
 
 ---
 
@@ -1626,7 +1627,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-12b · quickstart and harness permission guidance
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
-- **Repo/path:** agentlink · docs/quickstart/ (published to GitBook in M3-11)
+- **Repo/path:** agentlink · docs-site/guide/get-started/, docs-site/technical/reference/harness-configuration.md (published to GitBook through Git Sync, DOCS-PUB)
 - **Depends on:** M1-9a, M1-9b; gap G-1 resolved
 - **Spec:** 04 §2.5 (residual risk, harness permissions); 06 §7; 02 J1; 10 M1-12
 - **Invariants:** I-4
@@ -1640,7 +1641,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-12d · quickstart: local UI, storage, credits and proof (new, split from M1-12b)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · docs/quickstart/
+- **Repo/path:** agentlink · docs-site/guide/ (published to GitBook through Git Sync, DOCS-PUB)
 - **Depends on:** M1-12b, M1-11a, M1-9h, M1-9i
 - **Spec:** 04 §2.5; 06 §7; 02 F-51, J1–J5; 10 M1-12; D-39, D-40
 - **Invariants:** I-4
@@ -2063,7 +2064,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 
 #### M2-3e · harness connector validation (ChatGPT developer mode, claude.ai)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
-- **Repo/path:** agentlink · docs/quickstart/cloud
+- **Repo/path:** agentlink · docs-site/guide/apps/cloud-agent.md, docs-site/technical/guides/self-host-cloud-agent.md
 - **Depends on:** M2-3c
 - **Spec:** 10 M2-3; 06 §7; 02 J6
 - **Invariants:** —
@@ -2586,16 +2587,16 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 
 #### M3-11 · Publish AgentLink / OCC v2 docs on GitBook (new)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S0
-- **Repo/path:** GitBook `wiki.4thtech.io` (via the owner-provided GitBook MCP); sources in agentlink · docs/quickstart/
-- **Depends on:** M3-10, M1-12b, M1-12d
+- **Repo/path:** GitBook `wiki.4thtech.io` (OCC v1 space, via the owner-provided GitBook MCP); AgentLink docs are synced from agentlink · docs-site/ by Git Sync (DOCS-PUB)
+- **Depends on:** M3-10, M1-12b, M1-12d, DOCS-M3
 - **Spec:** D-29; 02 (features); 06 §7; 01 positioning rules (private: never claim unimplemented features)
 - **Invariants:** —
 - **Scope:**
-  - Add AgentLink and OCC v2 product and developer docs at mainnet beta using the GitBook change-request flow (no direct edits to published content); mark OCC v1 docs as legacy.
+  - AgentLink and OCC v2 docs are already published from `docs-site/` by Git Sync (DOCS-PUB) and brought to the mainnet state by DOCS-M3. This card covers the GitBook side at mainnet beta: mark the OCC v1 docs on `wiki.4thtech.io` as legacy and link them to the AgentLink docs, using the GitBook change-request flow (the v1 space is not Git-synced; no direct edits to published content).
   - Only features that are merged and deployed are documented as available; everything else is labelled planned.
   - Update the README Status and roadmap; never claim unimplemented features.
 - **Acceptance:**
-  - Change request merged by the owner; each documented feature maps to a `done` card; v1 pages carry a legacy notice.
+  - Change request merged by the owner; v1 pages carry a legacy notice linking to the AgentLink docs; each feature the AgentLink docs present as available maps to a `done` card.
 
 #### M3-13 · Launch brand and marketing site from D3 (new)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1
@@ -2662,6 +2663,75 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - Zero open Critical, High or Medium findings; first paid notarizations recorded; incident log empty for the period.
   - README Status and roadmap updated to the state at this point; README never claims unimplemented features.
   - Owner sign-off recorded.
+
+### Public documentation across milestones (DOCS-PUB) (new)
+
+The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook space each, published from `main` by Git Sync; the owner connects Git Sync in the GitBook interface (`docs-site/MAINTAINING.md` §2). Pages for unreleased features carry a **Planned** status hint and are filled in by the milestone's DOCS card below, in the delivery step "Docs and knowledge". Cards that still name `docs/quickstart/` (M1-25) write into `docs-site/guide/` instead. A milestone is done only when its DOCS card is done (`development-process.md` §6.3).
+
+#### DOCS-M1a · Public docs pass for v0.1.0 (pair and talk) (new)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1a
+- **Repo/path:** agentlink · docs-site/
+- **Depends on:** M1-12b, M1-25, M1-9c, M1-16 (release); the owner's GitBook Git Sync setup
+- **Spec:** `docs-site/MAINTAINING.md` §3–§4; 06 §2, §3, §7, §8; 02 J1, J4, J8, J9; 11 §5; `versioning.md` §3
+- **Invariants:** — (pages restate I-4, I-5 behaviour; any change to the security pages follows the spec)
+- **Scope:**
+  - Fill in the M1a column of the `MAINTAINING.md` table: setup pages for Claude Code, Codex, Gemini CLI and Claude Desktop (config), pairing, first message, contacts, messages, approvals (passphrase), negotiation, troubleshooting, FAQ, glossary; technical MCP tools (Talk), policies, CLI, harness configuration, SDK packages (Talk), crypto suites, test vectors.
+  - Status hints of shipped features → "Available since v0.1.0" only once v0.1.0 is on npm `latest`; "What works today", Status and roadmap and Versioning updated.
+  - Replace cross-space GitHub links with the published site URLs once the site address exists.
+- **Acceptance:**
+  - Every page marked available maps to a `done` card and to software on npm `latest`; every unreleased feature still says Planned.
+  - Guide passes the 11 §5 vocabulary check; every page is in its `SUMMARY.md`; no broken relative links (DOCS-LINT, or a manual check recorded in the PR until it lands).
+  - Someone new to AgentLink installs and pairs from the guide alone (shared with the M1-12b acceptance).
+
+#### DOCS-M1b · Public docs pass for v0.2.0 (files, proof, credits) (new)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Repo/path:** agentlink · docs-site/
+- **Depends on:** DOCS-M1a, M1-12d, M1-12c, M1-GATE (release v0.2.0)
+- **Spec:** `docs-site/MAINTAINING.md` §3–§4; 04 §4, §5; 05 §2–§3; 06 §2.3–§2.5; 07 §5, §8; 12; 11 §5
+- **Invariants:** —
+- **Scope:**
+  - Fill in the M1b column: files, agreements and proof, credits (free test credits), passkey approvals, Claude Desktop extension; technical file and proof tools, proof pack format, verify a proof (CLI), first integration tutorial, contracts with testnet addresses, proof-layer test vectors.
+  - Status hints, "What works today", Status and roadmap and Versioning (format table) updated for v0.2.0.
+- **Acceptance:**
+  - As DOCS-M1a, for v0.2.0; testnet contract addresses on the Contracts page equal `@agentlink/occ-v2-abi`.
+
+#### DOCS-M2 · Public docs pass for v0.3.0 (console, desktop apps, cloud agent) (new)
+- **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S0
+- **Repo/path:** agentlink · docs-site/
+- **Depends on:** DOCS-M1b, M2-3e, M2-11b to M2-11d, M2-11g, M2-5a, M2-5b, M2-GATE (release v0.3.0)
+- **Spec:** `docs-site/MAINTAINING.md` §3–§4; 08 §2–§4, §7, §8; 04 §2.2, §2.7; 07 §5.5; 11 §5
+- **Invariants:** —
+- **Scope:**
+  - Fill in the M2 column: desktop app (macOS, Windows, Linux, with the weaker Linux owner presence stated), always-on cloud agent, ChatGPT and claude.ai, accepting in the browser, storage connectors, Registered and Verified domain labels, the web verify page; technical self-host guide, Registry, CLI and harness updates.
+  - Screenshots only from the shipped, styled UI (design drop D2); no invented visuals.
+  - Status hints, "What works today", Status and roadmap and Versioning updated for v0.3.0.
+- **Acceptance:**
+  - As DOCS-M1a, for v0.3.0; the desktop and cloud setup pages are followed end to end by an external tester (times recorded).
+
+#### DOCS-M3 · Public docs pass for v1.0.0 (mainnet beta) and versioned docs (new)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S0
+- **Repo/path:** agentlink · docs-site/
+- **Depends on:** DOCS-M2, M3-6, M3-10, M3-14
+- **Spec:** `docs-site/MAINTAINING.md` §3–§5; 12 (live fee schedule); 05 §9; `versioning.md` §3, §7
+- **Invariants:** —
+- **Scope:**
+  - Fill in the M3 column: paid proof, real credits (adding and withdrawing), live prices (Pricing status "Available"), mainnet contract addresses, audit summary (only fixed findings) and frozen formats.
+  - Decide and set up versioned docs from 1.0.0 (for example a GitBook variant per supported version synced from a release branch); document the mechanism in `MAINTAINING.md` §5. Owner action for any GitBook-side setup.
+  - Hand the GitBook-side v1 legacy notice to M3-11.
+- **Acceptance:**
+  - As DOCS-M1a, for v1.0.0; mainnet addresses equal the published per-chain configuration; prices equal 12 §2 as deployed.
+
+#### DOCS-LINT · Docs check: links, navigation, status hints and vocabulary (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (adds a CI step) · **Phase:** M1a
+- **Repo/path:** agentlink · tools/ (check script and tests); `.github/workflows/ci.yml` (sensitive path: owner "merge" needed)
+- **Depends on:** M0-2d (monorepo skeleton, `tools/` workspace)
+- **Spec:** `docs-site/MAINTAINING.md` §1, §3; 11 §5.1
+- **Invariants:** —
+- **Scope:**
+  - A zero-dependency Node script, run in CI on changes to `docs-site/`: every relative link and anchor resolves; every Markdown file in a space appears in its `SUMMARY.md` exactly once and every entry exists; every page starts with a status hint; the guide uses none of the 11 §5 "Never say" terms outside sections titled "Advanced".
+  - Optional: classify `docs-site/**/privacy-and-security.md` and `docs-site/technical/concepts/security-model.md`, `threat-model.md` as S1 in `review-gate`, since they restate security commitments.
+- **Acceptance:**
+  - Unit tests with a passing and a failing fixture for each rule; the check passes on `main` and fails on a planted broken link and a planted "wallet" in the guide.
 
 ---
 

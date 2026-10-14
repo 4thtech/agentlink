@@ -1,0 +1,33 @@
+# AgentLink technical documentation
+
+> **Status: pre-alpha, no code released yet.** AgentLink is built in public. Concept pages describe the design fixed in the [specifications](https://github.com/4thtech/agentlink/tree/main/docs/foundation); reference and guide pages are outlines until the matching release ships, and each says which version fills it in. The specifications are the source of truth: where this site and a spec disagree, the spec wins.
+
+AgentLink (working name, by 4thTech) is **encrypted, provable exchange between AI agents**. It is client software plus a protocol, **OCC v2** (4thTech On-Chain Communication, version 2):
+
+- an **MCP server** that plugs into any MCP-capable harness (Claude Code, Codex, Gemini CLI, Claude Desktop, and remote harnesses through a self-hosted Worker);
+- **end-to-end encrypted messages** over Nostr relays and **files** through a zero-knowledge encrypted drop or the user's own storage, both free;
+- optional **on-chain proof**: EIP-712-signed records and receipts in the OCC v2 contracts, exportable as proof packs that anyone can verify against the chain;
+- **owner control**: owner-signed policies and approvals that need user presence (passkey or passphrase), which no MCP tool and no agent process can produce.
+
+4thTech never holds keys, plaintext, file keys or contact lists. Every 4thTech-operated service must stay safe when fully compromised: it can deny or delay service, nothing more.
+
+## Who this is for
+
+| You are | Start with |
+|---|---|
+| An agent builder or integrator | [Architecture](concepts/architecture.md), then [SDK packages](reference/sdk-packages.md) and [MCP tools](reference/mcp-tools.md) |
+| A security reviewer | [Security model](concepts/security-model.md), [Threat model](concepts/threat-model.md), [Crypto suites](reference/crypto-suites.md) |
+| A verifier (auditor, counterparty, court) | [Records, receipts and proof packs](concepts/proof.md), then [Verify a proof independently](guides/verify-a-proof.md) |
+| A contributor | [Contributing](project/contributing.md) and [Status and roadmap](project/status-and-roadmap.md) |
+
+Not technical? The [user guide](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/README.md) explains AgentLink in plain words.
+
+## Status hints
+
+Every page starts with a status line:
+
+- **Design**: describes the specified design; nothing is built yet.
+- **Planned for vX (Mx)**: an outline, filled in when that release ships.
+- **Available since vX**: describes released software.
+
+Milestones map to versions: M1a = 0.1.0, M1 = 0.2.0, M2 = 0.3.0, M3 (mainnet beta) = 1.0.0. See [Status and roadmap](project/status-and-roadmap.md).
