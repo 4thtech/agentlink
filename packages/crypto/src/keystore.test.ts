@@ -39,6 +39,8 @@ const TEST_SEAM = [
   'argon2idWithSecretAndAd',
   'sealKeystoreFileWithNonce',
   'sealOwnerSeedWithNonce',
+  // IR-M1-1f-1 L-7: pairingDigest for the labels vectors.
+  'pairingDigest',
 ];
 
 describe('@agentlink/crypto/keystore', () => {
@@ -79,9 +81,6 @@ describe('@agentlink/crypto/keystore', () => {
       'hmacSha256',
       'safetyCodeCommit',
       'checkSafetyCodeReveal',
-      'safetyCodeTranscript',
-      'pairingDigest',
-      'safetyCodeFromDigest',
       'computeSafetyCode',
       'safetyCodeForRole',
       'KEYSTORE_KDF_DEFAULTS',
@@ -132,5 +131,17 @@ describe('@agentlink/crypto/keystore', () => {
       exclude: string[];
     };
     expect(config.exclude).toContain('src/testing.ts');
+  });
+
+  // IR-M1-1f-1 L-7: the commit-checked functions are the only public route to safety-code digits
+  // (04 §3.6.1 step 3); the unchecked building blocks stay internal.
+  it('exports no unchecked safety-code building block', () => {
+    for (const name of ['safetyCodeTranscript', 'pairingDigest', 'safetyCodeFromDigest']) {
+      expect(Object.keys(main), name).not.toContain(name);
+      expect(Object.keys(keystore), name).not.toContain(name);
+    }
+    expect(Object.keys(main)).toEqual(
+      expect.arrayContaining(['computeSafetyCode', 'safetyCodeForRole', 'checkSafetyCodeReveal']),
+    );
   });
 });

@@ -11,15 +11,13 @@ import {
   computeSafetyCode,
   decodeBase64url,
   encodeHex,
-  pairingDigest,
   randomBytes,
   safetyCodeCommit,
   safetyCodeForRole,
-  safetyCodeFromDigest,
-  safetyCodeTranscript,
   taggedHash,
   type AgentCard,
 } from './index.js';
+import { pairingDigest, safetyCodeFromDigest, safetyCodeTranscript } from './safety-code.js';
 
 const CARD_A: AgentCard = {
   version: 1,

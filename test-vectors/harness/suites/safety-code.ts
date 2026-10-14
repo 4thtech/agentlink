@@ -4,6 +4,7 @@
 // after the commitment check (step 3, IR-M1-1f-1 M-2). Wire values are decoded with the strict
 // base64url decoder; a refusal (CryptoInputError) or a reveal that does not open is
 // `outcome: reject`. The steps 1-5 recomputation is the `safety-code-recompute` suite (M1-1c).
+// pairingDigest is not public (IR-M1-1f-1 L-7); the `labels` op reaches it through the test seam.
 import {
   CryptoInputError,
   TAGS,
@@ -11,10 +12,10 @@ import {
   computeSafetyCode,
   decodeBase64url,
   encodeBase64url,
-  pairingDigest,
   safetyCodeCommit,
   taggedHash,
 } from '@agentlink/crypto';
+import { pairingDigest } from '@agentlink/crypto/testing';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 
