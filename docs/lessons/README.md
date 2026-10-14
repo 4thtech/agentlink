@@ -18,6 +18,7 @@ A lesson explains a rule; it does not create one. When a lesson needs a binding 
 | [LL-10](LL-10-zsh-glob-in-gh-api.md) | zsh treats `?` in a URL as a glob |
 | [LL-11](LL-11-ambiguous-go-ahead.md) | An ambiguous owner message is not a merge go-ahead |
 | [LL-12](LL-12-stacked-pr-after-squash.md) | A stacked PR conflicts after its base is squash-merged |
+| [LL-13](LL-13-open-prs-after-review.md) | Failed-run emails come from PR runs under the owner's account; open PRs only after review |
 
 ## Adding a lesson
 

@@ -6,7 +6,7 @@ Scope: GitHub Actions workflows and repository hygiene for `4thtech/agentlink` (
 
 | File | Runs on | What it checks or does | Required check |
 |---|---|---|---|
-| `.github/workflows/ci.yml` | pull request, push to `main`, merge queue | `detect` looks at what exists; `checks` runs `pnpm lint`, `typecheck`, `build`, `test`; `vectors` runs `pnpm vectors:check` (Playwright browsers only if Playwright is in the lockfile); `context-budget` enforces the size budgets of `AGENTS.md` (≤ 8 KB) and `CLAUDE.md` (≤ 1 KB) (`development-process.md` §3.6) | `ci-gate` |
+| `.github/workflows/ci.yml` | pull request, push to any branch except `sync` (builders push before the PR exists), merge queue | `detect` looks at what exists; `checks` runs `pnpm lint`, `typecheck`, `build`, `test`; `vectors` runs `pnpm vectors:check` (Playwright browsers only if Playwright is in the lockfile); `context-budget` enforces the size budgets of `AGENTS.md` (≤ 8 KB) and `CLAUDE.md` (≤ 1 KB) (`development-process.md` §3.6) | `ci-gate` |
 | `.github/workflows/security.yml` | pull request, push to `main`, merge queue, weekly (Mon 05:23 UTC) | dependency review (PRs; moderate+ vulnerabilities and a license allowlist), gitleaks over the full git history (via `secret-scan.yml`; weekly also over the `sync` branch), CodeQL (`actions`, `javascript-typescript`), zizmor on the workflows | `security-gate` |
 | `.github/workflows/secret-scan.yml` | reusable (`workflow_call`) only | the gitleaks scan itself: official release binary, verified against the release checksums and a digest pinned in the file | none (reported through `security-gate`) |
 | `.github/workflows/pr-hygiene.yml` | pull request (opened, edited, synchronize, reopened) | title starts with a task ID (`M<n>-<n>[a-z]`, `OPS-<n>`, `DOCS`, `CHORE`, `DEPS`); body has every section of the PR template, filled in, with exactly one security class ticked | `pr-hygiene` |
@@ -202,7 +202,7 @@ Agents push branches and open PRs as a dedicated machine account, never with you
 
 `sync` is an orphan branch (no shared history with `main`) that holds coordination markdown only (`board.md` and per-person files). It is pushed to directly, with no pull requests, so it is deliberately outside the review rules of `main`. Safeguards:
 
-- `ci.yml`, `pr-hygiene.yml` and `review-gate.yml` do not run for it: they trigger on pushes to `main` only and ignore pull requests into `sync`.
+- `ci.yml`, `pr-hygiene.yml` and `review-gate.yml` do not run for it: `ci.yml` ignores pushes to `sync` (`branches-ignore`), the other two run only on pull requests, and all three ignore pull requests into `sync`.
 - **Secret scan on every push.** GitHub runs a push-triggered workflow from the workflow files *in the pushed branch*, so a workflow on `main` can never fire for pushes to `sync`. The branch therefore carries one small stub, `.github/workflows/secret-scan.yml`, that calls the reviewed reusable workflow on `main`. The stub is the only non-markdown file on `sync`:
 
   ```yaml

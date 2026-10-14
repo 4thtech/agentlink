@@ -198,7 +198,7 @@ Report format:        §4.3
 
 ### 4.2 Standard forbidden actions (always included)
 
-- No merge, auto-merge, tag, release or force-push; no commit on or push to `main`; no push except to the worker's own task branch and no PR except a draft PR for it, each only when the brief says so; no PR comments or reviews; no repository variable or settings changes.
+- No merge, auto-merge, tag, release or force-push; no commit on or push to `main`; no push except to the worker's own task branch, and no PR (the orchestrator opens it after the independent review passes), each only when the brief says so; no PR comments or reviews; no repository variable or settings changes.
 - No network writes: no publish, deploy, broadcast, upload or form submission.
 - No installs or dependency changes unless the brief grants them; never a `postinstall` script.
 - No Curator writes.
@@ -258,8 +258,8 @@ For S1/S2, invariant and spec conformance come from step 8, not from the orchest
 |---|---|---|
 | `backlog` | Task card exists | Orchestrator / owner |
 | `ready` | Definition of Ready met | Orchestrator |
-| `in-progress` | Task claimed on `board.md` and as a draft PR titled with the task ID; brief issued; worktree and branch created | Orchestrator |
-| `in-review` | §5 protocol complete; PR open (draft → ready); CI running; auto-merge MAY be enabled | Orchestrator |
+| `in-progress` | Task claimed on `board.md` with its branch name; brief issued; worktree and branch created (no PR yet) | Orchestrator |
+| `in-review` | Independent review passed and §5 protocol complete; PR open (not a draft) with the `IR-…` line; CI running; auto-merge MAY be enabled | Orchestrator |
 | `audit` | S1/S2: independent review in progress, S2 or sensitive path waiting for the owner's "merge", or findings being closed | Orchestrator |
 | `done` | Definition of Done met; merged through the gates | Orchestrator, after the merge |
 
@@ -313,7 +313,7 @@ S0 tasks MAY skip `audit`. A task that hits stop-the-line (`audit-rules.md` §10
 
 - Title: `<TASK-ID> <summary>` (validated by `pr-hygiene`).
 - Body: the repository PR template under `.github/` is authoritative for headings (validated by `pr-hygiene` and `review-gate`). It MUST cover: task ID; security class; spec sections implemented; invariants touched and how they hold; tests added and acceptance evidence; dependencies changed; docs/spec updated; verification protocol results (§5); independent review report line; threat note; tests-first evidence; open questions.
-- PRs open as **draft** until §5 is complete.
+- The PR is opened only once the independent review has passed and §5 is complete, so it is never a draft and already carries the `IR-…` line. Until then the branch is pushed (CI runs on every branch push) and reviewed as a branch diff. Draft PRs are not task claims; claims live on `board.md`.
 - Merge: once §5 is complete and the PR is ready, the orchestrator MAY enable auto-merge (`gh pr merge --auto --squash`). GitHub then merges when every required check is green. On S2 and sensitive paths the orchestrator enables it only after Tali's "merge" in chat, recorded in the PR body (D-51, D-52). The owner MAY merge manually or disable auto-merge. Never admin bypass. Squash only, so the title (with task ID) lands on `main`. Owner-approval changes (§1.1, §8) are merged by the owner, or set to auto-merge by the orchestrator only after the owner's explicit "merge" in chat for that specific PR, recorded in the PR body.
 
 ### 7.4 Size guideline

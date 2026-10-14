@@ -9,7 +9,7 @@ Private procedures (incident response, secret rotation, deploy keys, Safe operat
 | ID | Runbook | Who runs it | Tier |
 |---|---|---|---|
 | RB-01 | [Session start and end, any harness](session-start-end.md) | Any agent or person | Any |
-| RB-02 | [Claiming a task: branch, worktree, draft PR](claim-task.md) | Orchestrator, or a human builder | Opus (orchestrator) |
+| RB-02 | [Claiming a task: board row, branch, worktree](claim-task.md) | Orchestrator, or a human builder | Opus (orchestrator) |
 | RB-03 | [Writing a worker brief](worker-brief.md) | Orchestrator | Opus |
 | RB-04 | [Running an independent review](independent-review.md) | Orchestrator spawns, reviewer runs | Opus |
 | RB-05 | [Writing tests](writing-tests.md) | Builder | Per the card |
