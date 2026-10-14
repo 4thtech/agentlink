@@ -11,6 +11,12 @@ Version 2 (M1-1l; G-46, D-66): H and K are on the key-committing envelope form o
 (`aead` with `alg` "A256GCM-KC" and `kc`, the payload under encKey, the wraps' ephemeral keys
 derived from the CEK), and opening them checks `kc` first. The cases are otherwise unchanged.
 
+Version 3 (M1-2d; G-24, D-65; G-23, G-28): K carries `relays`, the inviter's list exactly as in the
+invite, and every relay list carried with a card has 2 to 16 entries, so H and K use cards over
+2-relay lists. Each opened body is parsed by the strict pairing-body schema (`pairing-bodies`
+reference parser) before steps 1-5. New rejections: K without `relays`, with 1 or 17 relays or with
+an extra `name`; H with 1 relay; and H with a tampered `codeCommit` (step 3).
+
 Usage: python3 -I tools/vectors/generate_safety_code_recompute.py --check [FILE] | --write
 """
 
@@ -22,7 +28,7 @@ import generate_safety_code as safety  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "safety-code-recompute"
-VERSION = 2
+VERSION = 3
 
 SCHEMA = v.case_schema(
     SUITE,

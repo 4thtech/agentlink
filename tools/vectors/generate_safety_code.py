@@ -22,6 +22,9 @@ codes with leading zeros; an integer in the top, biased part of the 2^64 range (
 H and K pair recomputed per 04 §3.6.1 steps 1-5, plus one failing pair per step 1-4. The surface's
 inputs are its own agent ID, the contact's current card, and H and K as envelopes with their CEKs
 (the surface's own unwrap is covered by the `hpke` suite). Keys and nonces are synthetic.
+Since M1-2d (G-24, D-65) H and K use their own cards over 2-relay lists, K carries `relays`, each
+opened body is parsed by the strict pairing-body schema (generate_pairing_bodies.py), and the
+recompute cases add the schema rejections and a tampered codeCommit; the code cases are unchanged.
 
 Usage: python3 -I tools/vectors/generate_safety_code.py --check [FILE] | --write
 """
@@ -35,6 +38,7 @@ import generate_aead_envelope as env  # noqa: E402
 import generate_eip712 as eip712  # noqa: E402
 import generate_hpke as hpke  # noqa: E402
 import generate_pairing as pairing  # noqa: E402
+import generate_pairing_bodies as bodies  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "safety-code"
@@ -68,8 +72,8 @@ def code_of(t):
     return digest, n, f"{digits[0:4]} {digits[4:8]} {digits[8:12]}"
 
 
-def party(label, name):
-    card = eip712.make_card(label, name, ["wss://relay.example.com"], 1760000000, 1791536000, 0)
+def party(label, name, relays=("wss://relay.example.com",)):
+    card = eip712.make_card(label, name, list(relays), 1760000000, 1791536000, 0)
     owner_evm = v.det(f"eip712/{label}/owner/evm", 32)
     agent_evm = v.det(f"eip712/{label}/agent/evm", 32)
     digest = eip712.card_digest(card)
@@ -80,6 +84,7 @@ def party(label, name):
         "nostr": v.det(f"eip712/{label}/agent/nostr", 32),
         "ownerNostr": v.det(f"eip712/{label}/owner/nostr", 32),
         "enc": [v.det(f"eip712/{label}/agent/enc", 32), v.det(f"eip712/{label}/owner/enc", 32)],
+        "relays": list(relays),
     }
 
 
@@ -116,7 +121,10 @@ def open_body(item):
         raise ValueError("payload")
     import json
 
-    return json.loads(payload)["body"]
+    message = json.loads(payload)
+    # The strict body schema (04 §3.4, §3.4.1, §3.6; G-23, G-24, G-28), as every surface parses it.
+    parse = {"handshake": bodies.parse_handshake, "handshake-ack": bodies.parse_handshake_ack}[message["type"]]
+    return parse(message["body"])
 
 
 def recompute(self_id, contact_card, h_item, k_item):
@@ -202,7 +210,12 @@ def build_all():
         v.fail("labels collide")
     cases.append(v.case("labels-differ", f"{SPEC}: the same input under the commit and the code labels", {"op": "labels", "input": t.hex()}, {"safetyCommit": v.hx(v.tagged_hash(COMMIT_TAG, t)), "safetyCode": v.hx(v.tagged_hash(CODE_TAG, t))}))
 
-    # A full signed handshake H (B -> A) and handshake-ack K (A -> B).
+    # A full signed handshake H (B -> A) and handshake-ack K (A -> B). Since G-24 every relay list
+    # carried with a card has 2 to 16 entries, so H and K use cards over 2-relay lists (version 3).
+    a = party("safety-a", "Inviter A", bodies.RELAYS_A)
+    b = party("safety-b", "Invitee B", bodies.RELAYS_B)
+    card_a, card_b = a["card"], b["card"]
+    cc = commit(invite_id, nonce_a)
     secret = v.det("safety-code/invite-secret", 32)
     recipients = [a["enc"][0], a["enc"][1], b["enc"][1], b["enc"][0]]  # 04 §3.2 / §3.6 roles
     recipients = [v.x25519_public_key(x) for x in recipients]
@@ -214,15 +227,16 @@ def build_all():
             "cardSig": b["cardSig"],
             "cardAgentSig": b["cardAgentSig"],
             "name": "Invitee B",
-            "relays": ["wss://relay.example.com"],
+            "relays": b["relays"],
             "proof": v.b64u(pairing.proof_of(secret, invite_id, card_b)),
             "codeNonce": v.b64u(nonce_b),
             "codeCommit": v.b64u(cc),
             "inviterCardHash": v.sha256(v.jcs(card_a)).hex(),
         }
         signer = overrides.pop("signer", b["nostr"])
+        tag = overrides.pop("tag", "")
         body.update(overrides)
-        return envelope(signer, recipients, "handshake", body, "h-" + "-".join(sorted(overrides)) + ("-signer" if signer is not b["nostr"] else ""))
+        return envelope(signer, recipients, "handshake", body, "h-" + "-".join(sorted(overrides)) + ("-signer" if signer is not b["nostr"] else "") + tag)
 
     def make_k(h_item, **overrides):
         body = {
@@ -232,14 +246,19 @@ def build_all():
             "codeReveal": v.b64u(nonce_a),
             "card": card_a,
             "cardSig": a["cardSig"],
+            "relays": a["relays"],
         }
         signer = overrides.pop("signer", a["nostr"])
+        tag = overrides.pop("tag", "")
+        drop = overrides.pop("drop", ())
         body.update(overrides)
-        return envelope(signer, recipients, "handshake-ack", body, "k-" + "-".join(sorted(overrides)) + ("-signer" if signer is not a["nostr"] else ""))
+        for key in drop:
+            del body[key]
+        return envelope(signer, recipients, "handshake-ack", body, "k-" + "-".join(sorted(overrides)) + ("-signer" if signer is not a["nostr"] else "") + tag)
 
     H = make_h()
     K = make_k(H)
-    expected_digest, expected_code = code_of(transcript(card_a, card_b, invite_id, nonce_a, nonce_b))[0], base_code
+    expected_digest, _, expected_code = code_of(transcript(card_a, card_b, invite_id, nonce_a, nonce_b))
     for case_id, self_id, contact in [("recompute-inviter", card_a["agentEvm"], card_b), ("recompute-invitee", card_b["agentEvm"], card_a)]:
         digest, shown = recompute(self_id, contact, H, K)
         if digest != expected_digest or shown != expected_code:
@@ -266,6 +285,13 @@ def build_all():
     K_wrong_hash = make_k(H, handshakeHash="0x" + v.sha256(b"not H").hex())
     K_wrong_invite = make_k(H, inviteId=v.b64u(v.det("safety-code/other-invite", 16)))
     K_bad_reveal = make_k(H, codeReveal=v.b64u(nonce_b))
+    H_bad_commit = make_h(codeCommit=v.b64u(commit(invite_id, v.det("safety-code/other-nonce-a", 32))))
+    K_no_relays = make_k(H, drop=("relays",), tag="-no-relays")
+    K_one_relay = make_k(H, relays=a["relays"][:1], tag="-one")
+    K_17_relays = make_k(H, relays=bodies.relay_set(17, "k"), tag="-seventeen")
+    K_extra_name = make_k(H, name="Inviter A", tag="-extra")
+    b_one = party("safety-b", "Invitee B", bodies.RELAYS_B[:1])
+    H_one_relay = make_h(card=b_one["card"], cardSig=b_one["cardSig"], cardAgentSig=b_one["cardAgentSig"], relays=b_one["relays"], proof=v.b64u(pairing.proof_of(secret, invite_id, b_one["card"])), tag="-one")
     failing = [
         ("step-1-h-signature", "H's envelope signature is invalid", card_a["agentEvm"], card_b, tampered_sig(H), K),
         ("step-1-h-from", "H is signed by a key other than H.card.agentNostr", card_a["agentEvm"], card_b, H_other_signer, make_k(H_other_signer)),
@@ -275,8 +301,14 @@ def build_all():
         ("step-2-k-handshake-hash", "K's handshakeHash is not H's envelopeHash", card_b["agentEvm"], card_a, H, K_wrong_hash),
         ("step-2-k-invite-id", "K's inviteId differs from H's", card_b["agentEvm"], card_a, H, K_wrong_invite),
         ("step-3-reveal", "K's codeReveal does not open H's codeCommit", card_b["agentEvm"], card_a, H, K_bad_reveal),
+        ("step-3-commit-tampered", "H's codeCommit is not the invite's (K's codeReveal = nonceA does not open it)", card_a["agentEvm"], card_b, H_bad_commit, make_k(H_bad_commit)),
         ("step-4-not-own-agent", "neither card is the surface's own agent", other_card["card"]["agentEvm"], card_a, H, K),
         ("step-4-contact-card", "the contact's current card has other owner keys", card_a["agentEvm"], {**card_b, "ownerNostr": other_card["card"]["ownerNostr"]}, H, K),
+        ("schema-ack-without-relays", "K has no `relays` (04 §3.4.1, G-24; D-65)", card_b["agentEvm"], card_a, H, K_no_relays),
+        ("schema-ack-one-relay", "K's `relays` has 1 entry (04 §3.4: 2 to 16)", card_b["agentEvm"], card_a, H, K_one_relay),
+        ("schema-ack-17-relays", "K's `relays` has 17 entries (04 §3.4: 2 to 16)", card_b["agentEvm"], card_a, H, K_17_relays),
+        ("schema-ack-extra-name", "K carries a `name` (04 §3.4.1: strict body)", card_b["agentEvm"], card_a, H, K_extra_name),
+        ("schema-handshake-one-relay", "H's `relays` has 1 entry, with a card over that list (04 §3.4: 2 to 16)", card_a["agentEvm"], b_one["card"], H_one_relay, make_k(H_one_relay)),
     ]
     for case_id, why, self_id, contact, h_item, k_item in failing:
         try:
@@ -287,7 +319,7 @@ def build_all():
         cases.append(
             v.case(
                 f"recompute-reject-{case_id}",
-                f"{SPEC} step {case_id.split('-')[1]}: {why}; no code is shown",
+                (f"{SPEC} step {case_id.split('-')[1]}" if case_id.startswith("step-") else f"{SPEC} with the strict body schemas") + f": {why}; no code is shown",
                 {"op": "recompute", "self": self_id, "contactCard": contact, "handshake": h_item, "ack": k_item},
                 {"outcome": "reject"},
             )

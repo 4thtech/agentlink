@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/invite-link/case.schema.json",
+  "title": "invite-link case",
+  "description": "04 \u00a73.6 invite encoding (G-12, D-69): `decodeInviteLink` decodes a full invite URL or a bare payload (base64url of raw DEFLATE of the invite JSON) and gives the JCS text of the invite, or a rejection: over 21 846 characters, not strict base64url, a malformed, truncated, wrapped or trailing-byte stream, over 16 384 inflated bytes, not UTF-8, not I-JSON, or not a valid invite.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "link"
+          ],
+          "properties": {
+            "op": {
+              "const": "decodeInviteLink"
+            },
+            "link": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "inviteJcs"
+              ],
+              "properties": {
+                "inviteJcs": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
