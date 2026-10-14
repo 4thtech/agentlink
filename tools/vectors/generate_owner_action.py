@@ -7,13 +7,20 @@ JCS is Trail of Bits' `rfc8785`, BIP-340 is libsecp256k1 (coincurve). Keys, nonc
 are synthetic test values.
 
 Ops: `agent.revoke` (sign and verify); `approval.decide` (sign and verify against a pending
-request); `approval.cancel` and `policy.set` (sign; `policy` is the 06 §3 defaults, until M1-2b
-builds the strict schema). `actionDigest` is 64 lowercase hex, and the card's `ownerNostr` is
+request); `approval.cancel` (sign); `policy.set` (sign, verify and reject: the policy is the 06 §3
+"Policy JSON form", G-32). Its signing vectors are the 06 §3 defaults in that JSON form (USD limits as
+decimal strings, `contactRules: []`) and one policy with two `contactRules`, written here in
+non-JCS key order and sorted by `contact`. Its rejection vectors are the pre-G-32 form this file
+carried in version 1 (JSON-number USD, no `contactRules`) and one schema violation each; the
+policy is written here by hand from 06 §3, never taken from `@agentlink/types`. Its verify vectors
+accept a `version` above the highest applied one and reject an equal or lower one (04 §2.5.1
+rollback rule); the context's optional `appliedPolicyVersion` is that highest applied version, and
+an absent value means 0, no policy applied yet (06 §3). `actionDigest` is 64 lowercase hex, and the card's `ownerNostr` is
 0x + 64 hex while `owner` has no prefix, compared as bytes: 04 §2.4.1 and §3.4.1. `approvalId` is exactly `apr_` + base64url of 16 bytes.
 
 `verify` cases give the receiving core's context: the agent's own EVM address, `ownerNostr` as the
-card spells it, the current time, an empty nonce store and, for `approval.decide`, the pending
-request. Every rejection vector for a non-canonical
+card spells it, the current time, an empty nonce store, for `approval.decide` the pending
+request and, for `policy.set`, the highest applied policy version (absent = 0). Every rejection vector for a non-canonical
 form carries a signature that is VALID over the JCS of that non-canonical body, so it can only be
 refused by the encoding check (04 §2.5.1: "rejected, never normalised"). The forms are those the
 card lists: checksummed or uppercase address, uppercase hex, padded base64url, out-of-range
@@ -33,7 +40,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import vectorlib as v  # noqa: E402
 
 SUITE = "owner-action"
-VERSION = 1
+VERSION = 2
 TAG = "agentlink/owner-action/v1"
 ENVELOPE_TAG = "agentlink/envelope/v1"
 SPEC = "04 §2.5.1"
@@ -198,6 +205,8 @@ def build():
     def op_body(op, params, expires_at=ISSUED_AT + 600, **overrides):
         return body(op=op, params=params, expiresAt=expires_at, **overrides)
 
+    # 06 §3 defaults in the policy JSON form (G-32): every key, USD limits as USD amount strings
+    # (04 §2.4.1), empty contact lists, `autoAcceptMinUSD: null` and `contactRules: []`.
     policy = {
         "contacts": {"acceptInvites": "approval", "unknownSenders": "queue", "allowed": "paired", "rateLimitPerContactPerHour": 120},
         "files": {
@@ -211,15 +220,32 @@ def build():
             "ownerArchive": False,
         },
         "envelopes": {"maxEnvelopeKB": 24},
-        "proofs": {"notarize": "allow", "dailyBudgetUSD": 5, "perActionMaxUSD": 1, "allowKeyDisclosure": "approval", "exportFolder": "~/AgentLink/Proofs", "defaultChain": "base"},
+        "proofs": {"notarize": "allow", "dailyBudgetUSD": "5", "perActionMaxUSD": "1", "allowKeyDisclosure": "approval", "exportFolder": "~/AgentLink/Proofs", "defaultChain": "base"},
         "receipts": {"autoDelivered": True, "autoOpened": False},
-        "commitments": {"accept": "approval", "autoAcceptContacts": [], "autoAcceptMaxUSD": 0, "autoAcceptDirection": "buy", "autoAcceptMinUSD": None},
+        "commitments": {"accept": "approval", "autoAcceptContacts": [], "autoAcceptMaxUSD": "0", "autoAcceptDirection": "buy", "autoAcceptMinUSD": None},
+        "contactRules": [],
     }
+
+    # Two per-contact rules (06 §3 "Per-contact rules"). Keys are written out of JCS order on
+    # purpose, and the list is sorted by `contact` in strictly ascending byte order.
+    third_agent = v.evm_address(v.det("owner-action/third-agent/evm", 32))
+    rule_contacts = sorted([other_agent, third_agent])
+    if rule_contacts[0] == rule_contacts[1]:
+        v.fail("the two rule contacts must differ")
+    rules = [
+        {"proofs": {"perActionMaxUSD": "2.5", "notarize": "allow"}, "contact": rule_contacts[0]},
+        {"proofs": {"perActionMaxUSD": "0.01"}, "contact": rule_contacts[1]},
+    ]
+    policy_with_rules = copy.deepcopy(policy)
+    policy_with_rules["contactRules"] = rules
+    if [r["contact"] for r in rules] != sorted({r["contact"] for r in rules}):
+        v.fail("contactRules must be sorted and unique")
     for case_id, why, b in [
         ("sign-approval-approve", "approval.decide, approve", op_body("approval.decide", {"approvalId": approval_id, "actionDigest": digest, "decision": "approve"})),
         ("sign-approval-deny", "approval.decide, deny (a deny is signed too)", op_body("approval.decide", {"approvalId": approval_id, "actionDigest": digest, "decision": "deny"})),
         ("sign-approval-cancel", "approval.cancel (D-55)", op_body("approval.cancel", {"approvalId": approval_id})),
-        ("sign-policy-set", "policy.set with the 06 §3 defaults as policy (proposed until M1-2b)", op_body("policy.set", {"version": 1, "policy": policy})),
+        ("sign-policy-set", "policy.set with the 06 §3 defaults in the policy JSON form as policy (G-32)", op_body("policy.set", {"version": 1, "policy": policy})),
+        ("sign-policy-set-contact-rules", "policy.set with two contactRules, sorted by contact, in JCS key order once canonicalised (06 §3, G-32)", op_body("policy.set", {"version": 2, "policy": policy_with_rules})),
     ]:
         cases.append(
             v.case(
@@ -264,6 +290,58 @@ def build():
         ("reject-decide-expired", "now is after expiresAt", op_body("approval.decide", decide(), expires_at=ISSUED_AT + 30)),
     ]:
         reject(case_id, why, signed_body(b), decide_ctx)
+
+    # policy.set schema rejections (06 §3 "Policy JSON form", G-32; 04 §2.5.1 "params match the
+    # op's schema"). Each policy breaks one rule and is validly signed, so only the schema refuses it.
+    def policy_edit(base, path, value=None, delete=False):
+        p_ = copy.deepcopy(base)
+        node = p_
+        for key in path[:-1]:
+            node = node[key]
+        if delete:
+            del node[path[-1]]
+        else:
+            node[path[-1]] = value
+        return p_
+
+    pre_g32 = policy_edit(policy, ["contactRules"], delete=True)
+    pre_g32["proofs"]["dailyBudgetUSD"] = 5
+    pre_g32["proofs"]["perActionMaxUSD"] = 1
+    pre_g32["commitments"]["autoAcceptMaxUSD"] = 0
+    unsorted_contacts = list(reversed(rule_contacts))
+    for case_id, why, bad in [
+        ("pre-g32-form", "the pre-G-32 policy (owner-action version 1: USD limits as JSON numbers, no contactRules)", pre_g32),
+        ("usd-number", "`proofs.dailyBudgetUSD` as the JSON number 5", policy_edit(policy, ["proofs", "dailyBudgetUSD"], 5)),
+        ("usd-trailing-zeros", "`proofs.dailyBudgetUSD` \"5.00\" (a trailing zero, 04 §2.4.1)", policy_edit(policy, ["proofs", "dailyBudgetUSD"], "5.00")),
+        ("usd-seven-decimals", "`proofs.perActionMaxUSD` \"5.0000001\" (more than 6 decimals)", policy_edit(policy, ["proofs", "perActionMaxUSD"], "5.0000001")),
+        ("unsorted-auto-accept-contacts", "`commitments.autoAcceptContacts` not sorted", policy_edit(policy, ["commitments", "autoAcceptContacts"], unsorted_contacts)),
+        ("unsorted-contact-rules", "`contactRules` not sorted by contact", policy_edit(policy, ["contactRules"], list(reversed(rules)))),
+        ("duplicate-contact-rule", "two `contactRules` for one contact", policy_edit(policy, ["contactRules"], [rules[0], {"contact": rules[0]["contact"], "proofs": {"notarize": "deny"}}])),
+        ("contact-rule-empty-proofs", "a ContactRule with `proofs: {}`", policy_edit(policy, ["contactRules"], [{"contact": rule_contacts[0], "proofs": {}}])),
+        ("contact-rule-unknown-key", "an unknown key in a ContactRule", policy_edit(policy, ["contactRules"], [{"contact": rule_contacts[0], "proofs": {"notarize": "allow"}, "note": "x"}])),
+        ("missing-key", "`files.storage` missing (never filled from a default)", policy_edit(policy, ["files", "storage"], delete=True)),
+    ]:
+        reject(f"reject-policy-set-{case_id}", f"policy.set: {why}", signed_body(op_body("policy.set", {"version": 1, "policy": bad})))
+
+    # policy.set verification and the version rule (04 §2.5.1: `version` must be greater than the
+    # highest applied version, so an older signed policy cannot be replayed to roll back). The
+    # context's `appliedPolicyVersion` is that version; absent means 0, no policy applied (06 §3).
+    for case_id, why, version, applied_version, pol, outcome in [
+        ("verify-policy-set", "the 06 §3 defaults as version 1, no policy applied yet (appliedPolicyVersion absent = 0)", 1, None, policy, "accept"),
+        ("verify-policy-set-contact-rules", "the policy with two contactRules as version 2 over applied version 1", 2, 1, policy_with_rules, "accept"),
+        ("reject-policy-set-version-equal", "`version` 2 equal to the applied version 2 (rollback rule)", 2, 2, policy_with_rules, "reject"),
+        ("reject-policy-set-version-lower", "`version` 1 below the applied version 2 (rollback rule)", 1, 2, policy, "reject"),
+    ]:
+        ctx = dict(context) if applied_version is None else {**context, "appliedPolicyVersion": applied_version}
+        verdict = "verification passes" if outcome == "accept" else "rejected"
+        cases.append(
+            v.case(
+                case_id,
+                f"{SPEC}: policy.set, {why}; {verdict}",
+                {"op": "verify", "signed": signed_body(op_body("policy.set", {"version": version, "policy": pol})), "context": ctx},
+                {"outcome": outcome},
+            )
+        )
 
     # contact.check (04 §2.5.1, §3.6.1; G-28): {contact, pairingDigest}. Its maximum lifetime is
     # G-7's, so only signing and encoding rejections are vectored (no positive verify yet).
@@ -334,13 +412,15 @@ CONTEXT = {
         "now": v.INTEGER,
         "pendingApproval": v.strict_object({"approvalId": v.STRING, "actionDigest": v.hexn(32), "expiresAt": v.INTEGER}),
         "pairing": v.strict_object({"contact": v.ADDRESS, "pairingDigest": v.hexn(32)}),
+        "appliedPolicyVersion": v.INTEGER,
     },
 }
 SCHEMA = v.case_schema(
     SUITE,
     "04 §2.5.1 SignedOwnerAction. `sign`: JCS text, sha256 body hash, tagged signature input and "
     "sig for a body. `verify`: accept or reject a SignedOwnerAction for a receiving core whose "
-    "agent address, card ownerNostr and clock are given in `context` (nonce store empty).",
+    "agent address, card ownerNostr and clock are given in `context` (nonce store empty; "
+    "`appliedPolicyVersion` absent means 0).",
     {
         "sign": (
             {"body": v.OBJECT, "secretKey": v.hexn(32), "auxRand": v.hexn(32)},
