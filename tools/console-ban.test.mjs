@@ -2,7 +2,7 @@
 // so a later zone block that sets no-restricted-syntax could silently drop the console selectors.
 // This lints probe code at a virtual path in every package and app (source and test files) and
 // asserts each route to the console or the process output streams is still flagged, and that the
-// two documented channels are not.
+// documented channels are not.
 
 import { readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -53,12 +53,13 @@ describe('console ban in every zone', () => {
     }
   }
 
-  it.each(['packages/log/src/console.ts', 'apps/cli/src/output.ts'])(
-    'the documented channel %s is not flagged',
-    async (file) => {
-      expect(await rulesHit(PROBES['globalThis.console'], file)).not.toContain(
-        'no-restricted-syntax',
-      );
-    },
-  );
+  it.each([
+    'packages/log/src/console.ts',
+    'apps/cli/src/output.ts',
+    'packages/node/src/owner-terminal.ts',
+  ])('the documented channel %s is not flagged', async (file) => {
+    expect(await rulesHit(PROBES['globalThis.console'], file)).not.toContain(
+      'no-restricted-syntax',
+    );
+  });
 });

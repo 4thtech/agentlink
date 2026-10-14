@@ -23,6 +23,21 @@ export {
   probeOsKeychain,
   type KeychainKeyStoreOptions,
 } from './keychain-keystore.js';
+// M1-8c: owner steps at a TTY prompt (04 §2.2, §2.5, D-67). Only the prompting entry points are
+// exported: no OwnerKeyStore, session, owner item or presence argument is reachable from here.
+export { initOwner, type OwnerInitOptions, type OwnerInitResult } from './owner-init.js';
+export {
+  performOwnerOperation,
+  type OwnerOperationItem,
+  type OwnerSignature,
+} from './owner-operation.js';
+export {
+  LOCAL_APPROVAL_LIFETIME_S,
+  MAX_APPROVAL_BATCH_ITEMS,
+  decideReviewedApprovals,
+  type ApprovalContext,
+  type ReviewedApproval,
+} from './owner-approval.js';
 // M1-8b: the agent's local SQLite store and the cipher of its `enc` columns (07 §3). The store key
 // stays inside the package: the entry returns only the Store and the cipher (fence.test.ts).
 export { NodeStoreError, type NodeStoreErrorCode } from './store-errors.js';

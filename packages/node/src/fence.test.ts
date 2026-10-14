@@ -10,14 +10,19 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
   it('exports exactly the opaque entry points', () => {
     expect(Object.keys(entry).sort()).toEqual([
       'KEYCHAIN_SERVICE',
+      'LOCAL_APPROVAL_LIFETIME_S',
+      'MAX_APPROVAL_BATCH_ITEMS',
       'NodeKeyStoreError',
       // M1-8b: the store entry returns the Store and its cipher, never the store key.
       'NodeStoreError',
       'assertAgentId',
       'createOsKeychainAgent',
+      'decideReviewedApprovals',
+      'initOwner',
       'openAgentKeyStore',
       'openAgentStore',
       'packageName',
+      'performOwnerOperation',
       'probeOsKeychain',
       'selectKeyStoreBackend',
     ]);
@@ -32,6 +37,14 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'createKeychainAgent',
       'openRecordedKeyStore',
       'KeychainKeyStore',
+      // M1-8c: no owner store, session, owner item, seed or prompt seam (I-4).
+      'KeychainOwnerKeyStore',
+      'storeOwnerSeed',
+      'readOwnerItem',
+      'runOwnerOperation',
+      'decideReviewedWith',
+      'initOwnerWith',
+      'ttyOwnerTerminal',
       'openAgentStoreWith',
       'createAgentStoreCipher',
       'SqliteStore',
