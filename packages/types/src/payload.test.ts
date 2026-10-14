@@ -16,6 +16,7 @@ import {
   agentCard,
   agentRevokeAction,
   approvalCancelAction,
+  approvalDecideBatchAction,
   approvalDecideAction,
   APPROVAL_ID,
   B32,
@@ -421,8 +422,12 @@ describe('proof body (04 §3.4: {envelopeId, chainId, recordId, salt})', () => {
 });
 
 describe('owner-channel bodies (04 §3.4.1)', () => {
-  it('approval carries approval.decide or approval.cancel (04 §3.4.1, D-55)', () => {
+  it('approval carries approval.decide, approval.decideBatch or approval.cancel (04 §3.4.1, D-55, D-68)', () => {
     expectRoundTrip(payloadSchema, payloads().approval);
+    expectRoundTrip(payloadSchema, {
+      ...payloads().approval,
+      body: { signed: signed(approvalDecideBatchAction()) },
+    });
     expectRoundTrip(payloadSchema, {
       ...payloads().approval,
       body: { signed: signed(approvalCancelAction()) },

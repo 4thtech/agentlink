@@ -66,7 +66,7 @@ Vectors can land before the code they test (M1-1h, tests first). Such a suite is
 | `owner-wrap` | committed (M1-1f) | Argon2id: RFC 9106 (secret value and associated data through the crypto test seam, `@agentlink/crypto/testing`) and the owner-wrap and KeyStore parameters, both secret kinds |
 | `keystore-file` | committed (M1-1f), Node only | 04 §2.8 `ALKS` v1 (agent ID per §2.9, seed-derived check) and `ALKO` v1 for both secret kinds, `password()`, every format refusal, cross-type cases |
 | `nip44` | pending (M1-1g) | The official NIP-44 v2 vectors |
-| `owner-action` | pending (M1-7d) | 04 §2.5.1 `SignedOwnerAction`: `agent.revoke`, `approval.decide`, `approval.cancel`, `policy.set`, `contact.check`, JSON-text integer and duplicate-key cases, and rejection of every non-canonical form |
+| `owner-action` | pending (M1-7d) | 04 §2.5.1 `SignedOwnerAction`: `agent.revoke`, `approval.decide`, `approval.decideBatch` (04 §2.5.2, D-68: 2 and 20 items; 0, 1 and 21 items, order, duplicates, unknown keys, digest spellings and decide/batch body confusion refused; M1-2e), `approval.cancel`, `policy.set`, `contact.check`, JSON-text integer and duplicate-key cases, and rejection of every non-canonical form |
 | `stream` | planned (M1-1i) | STREAM file encryption |
 
 ## Adding a suite
