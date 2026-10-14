@@ -13,7 +13,11 @@ export type CryptoInputErrorCode =
   | 'no_secure_random'
   | 'wipe_failed'
   /** A byte string that is not a valid curve point (M1-1b: evmAddressFromPublicKey). */
-  | 'invalid_public_key';
+  | 'invalid_public_key'
+  /** A ciphertext payload with the wrong format, version or size (M1-1g: NIP-44). */
+  | 'invalid_payload'
+  /** Authentication failed, or the authenticated plaintext is malformed (M1-1g: NIP-44). */
+  | 'decrypt_failed';
 
 /**
  * The one error type @agentlink/crypto throws for input it refuses.

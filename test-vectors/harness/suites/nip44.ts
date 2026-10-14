@@ -141,7 +141,11 @@ function evaluate(input: Nip44Input): readonly Comparison[] {
       return rejectOr(() => [
         {
           field: 'payload',
-          actual: nip44EncryptWithKey(new Uint8Array(32), 'a'.repeat(input.length), new Uint8Array(32)),
+          actual: nip44EncryptWithKey(
+            new Uint8Array(32),
+            'a'.repeat(input.length),
+            new Uint8Array(32),
+          ),
         },
       ]);
   }

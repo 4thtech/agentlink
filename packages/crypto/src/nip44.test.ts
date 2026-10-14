@@ -6,6 +6,7 @@ import { sha256 as nobleSha256 } from '@noble/hashes/sha2.js';
 import { describe, expect, it } from 'vitest';
 import { bip340PublicKey } from './bip340.js';
 import { concatBytes } from './bytes.js';
+import { encodeUtf8 } from './encoding.js';
 import { CryptoInputError } from './errors.js';
 import { KEY_LABELS, deriveSecretKey } from './keys.js';
 import {
@@ -31,14 +32,35 @@ function codeOf(fn: () => unknown): string {
   return 'accepted';
 }
 
+// Test-local padded base64 (RFC 4648 §4), independent of the module under test.
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
 function toBase64(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const chunk = [bytes[i], bytes[i + 1], bytes[i + 2]];
+    const n = ((chunk[0] ?? 0) << 16) | ((chunk[1] ?? 0) << 8) | (chunk[2] ?? 0);
+    const chars = [n >> 18, (n >> 12) & 63, (n >> 6) & 63, n & 63].map((x) => B64[x] as string);
+    const kept = chunk.filter((x) => x !== undefined).length + 1;
+    out += chars.slice(0, kept).join('') + '='.repeat(4 - kept);
+  }
+  return out;
 }
 
 function fromBase64(text: string): Uint8Array {
-  return Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
+  const body = text.replace(/=+$/, '');
+  const out: number[] = [];
+  let buffer = 0;
+  let bits = 0;
+  for (const char of body) {
+    buffer = ((buffer << 6) | B64.indexOf(char)) & 0xffffff;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out.push((buffer >> bits) & 0xff);
+    }
+  }
+  return Uint8Array.from(out);
 }
 
 /**
@@ -160,9 +182,10 @@ describe('nip44EncryptWithKey / nip44DecryptWithKey', () => {
     for (const index of [1, 32, 33, 40, data.length - 33, data.length - 32, data.length - 1]) {
       const tampered = data.slice();
       tampered[index] = (tampered[index] as number) ^ 0x01;
-      expect(codeOf(() => nip44DecryptWithKey(KEY, toBase64(tampered))), String(index)).toBe(
-        'decrypt_failed',
-      );
+      expect(
+        codeOf(() => nip44DecryptWithKey(KEY, toBase64(tampered))),
+        String(index),
+      ).toBe('decrypt_failed');
     }
   });
 
@@ -213,25 +236,25 @@ describe('nip44EncryptWithKey / nip44DecryptWithKey', () => {
 
   describe('padding (MAC valid, framing wrong)', () => {
     it('accepts the correct framing built by hand (control)', () => {
-      const body = new TextEncoder().encode('hello');
+      const body = encodeUtf8('hello');
       expect(nip44DecryptWithKey(KEY, forge(KEY, framed(5, body, 34)))).toBe('hello');
     });
 
     it('refuses a declared length of 0', () => {
-      expect(codeOf(() => nip44DecryptWithKey(KEY, forge(KEY, framed(0, new Uint8Array(0), 34))))).toBe(
-        'decrypt_failed',
-      );
+      expect(
+        codeOf(() => nip44DecryptWithKey(KEY, forge(KEY, framed(0, new Uint8Array(0), 34)))),
+      ).toBe('decrypt_failed');
     });
 
     it('refuses a declared length longer than the buffer', () => {
-      const body = new TextEncoder().encode('hello');
+      const body = encodeUtf8('hello');
       expect(codeOf(() => nip44DecryptWithKey(KEY, forge(KEY, framed(40, body, 34))))).toBe(
         'decrypt_failed',
       );
     });
 
     it('refuses a padded size that does not match the declared length', () => {
-      const body = new TextEncoder().encode('hello');
+      const body = encodeUtf8('hello');
       // 5 bytes pad to 32, so the buffer must be 34 bytes; 66 is the size for 33..64.
       expect(codeOf(() => nip44DecryptWithKey(KEY, forge(KEY, framed(5, body, 66))))).toBe(
         'decrypt_failed',
@@ -239,7 +262,7 @@ describe('nip44EncryptWithKey / nip44DecryptWithKey', () => {
     });
 
     it('refuses non-zero padding bytes', () => {
-      const padded = framed(5, new TextEncoder().encode('hello'), 34);
+      const padded = framed(5, encodeUtf8('hello'), 34);
       padded[33] = 1;
       expect(codeOf(() => nip44DecryptWithKey(KEY, forge(KEY, padded)))).toBe('decrypt_failed');
     });

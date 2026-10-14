@@ -2,10 +2,10 @@
 // additions (signEnvelopeHash, decryption epochs), owner presence (04 §2.5) and wiping (04 §8.3).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bip340Verify } from './bip340.js';
-import { decodeHex, encodeHex } from './encoding.js';
+import { decodeHex, encodeHex, encodeUtf8 } from './encoding.js';
 import { CryptoInputError } from './errors.js';
 import { sha256, taggedHash, TAGS } from './hash.js';
-import { canonicalizeToBytes } from './jcs.js';
+import { canonicalizeToBytes, type JsonObject } from './jcs.js';
 import {
   KeyStoreError,
   OWNER_SESSION_DEFAULT_TTL_MS,
@@ -37,7 +37,7 @@ async function codeOf(fn: () => Promise<unknown>): Promise<string> {
 
 const passphrase = (text: string): OwnerPresence => ({
   kind: 'passphrase',
-  secret: new TextEncoder().encode(text),
+  secret: encodeUtf8(text),
 });
 
 describe('MemoryKeyStore', () => {
@@ -94,7 +94,7 @@ describe('MemoryKeyStore', () => {
 
   describe('signEnvelopeHash (G-2)', () => {
     it('is BIP-340 by the Nostr key over taggedHash("agentlink/envelope/v1", envelopeHash)', async () => {
-      const envelopeHash = sha256(new TextEncoder().encode('envelope'));
+      const envelopeHash = sha256(encodeUtf8('envelope'));
       const sig = await b.signEnvelopeHash(envelopeHash);
       expect(sig).toMatch(/^[0-9a-f]{128}$/);
       const pub = decodeHex(nostrHex(SEED_B, 2));
@@ -199,7 +199,9 @@ describe('MemoryKeyStore', () => {
       } finally {
         spy.mockRestore();
       }
-      const wipedSeeds = filled.filter((buffer) => buffer.length === 32 && buffer.every((x) => x === 0));
+      const wipedSeeds = filled.filter(
+        (buffer) => buffer.length === 32 && buffer.every((x) => x === 0),
+      );
       expect(wipedSeeds.length).toBeGreaterThan(0);
     });
   });
@@ -211,17 +213,22 @@ describe('MemoryOwnerKeyStore', () => {
   const ownerNostr = encodeHex(
     (derivePublicKey(OWNER_SEED, KEY_LABELS.nostr, 0) as { publicKey: Uint8Array }).publicKey,
   );
-  const action = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
-    v: 1,
-    agent: '0x' + '11'.repeat(20),
-    owner: ownerNostr,
-    op: 'approval.decide',
-    params: { approvalId: 'AAAAAAAAAAAAAAAAAAAAAA', actionDigest: 'ab'.repeat(32), decision: 'approve' },
-    nonce: 'AAAAAAAAAAAAAAAAAAAAAA',
-    issuedAt: 1760000000,
-    expiresAt: 1760000600,
-    ...overrides,
-  });
+  const action = (overrides: Record<string, unknown> = {}): JsonObject =>
+    ({
+      v: 1,
+      agent: '0x' + '11'.repeat(20),
+      owner: ownerNostr,
+      op: 'approval.decide',
+      params: {
+        approvalId: 'AAAAAAAAAAAAAAAAAAAAAA',
+        actionDigest: 'ab'.repeat(32),
+        decision: 'approve',
+      },
+      nonce: 'AAAAAAAAAAAAAAAAAAAAAA',
+      issuedAt: 1760000000,
+      expiresAt: 1760000600,
+      ...overrides,
+    }) as unknown as JsonObject;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -331,7 +338,9 @@ describe('MemoryOwnerKeyStore', () => {
     } finally {
       spy.mockRestore();
     }
-    expect(filled.some((buffer) => buffer.length === 32 && buffer.every((x) => x === 0))).toBe(true);
+    expect(filled.some((buffer) => buffer.length === 32 && buffer.every((x) => x === 0))).toBe(
+      true,
+    );
   });
 
   it('lock ends every session at once', async () => {

@@ -64,13 +64,13 @@ describe('createGiftWrap', () => {
   it('wipes the ephemeral secret key before returning', async () => {
     const s = await seal();
     const drawn: Uint8Array[] = [];
-    const source = globalThis.crypto;
+    const source = (
+      globalThis as unknown as { crypto: { getRandomValues(a: Uint8Array): Uint8Array } }
+    ).crypto;
     const original = source.getRandomValues.bind(source);
-    vi.spyOn(source, 'getRandomValues').mockImplementation(<T extends ArrayBufferView | null>(
-      array: T,
-    ): T => {
-      original(array as unknown as Uint8Array);
-      drawn.push(array as unknown as Uint8Array);
+    vi.spyOn(source, 'getRandomValues').mockImplementation((array: Uint8Array) => {
+      original(array);
+      drawn.push(array);
       return array;
     });
     createGiftWrap(s, recipientHex, 1759990000);
