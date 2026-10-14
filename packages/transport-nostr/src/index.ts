@@ -1,6 +1,6 @@
 // @agentlink/transport-nostr: the Nostr Transport (07 §4). M1-5a adds the gift wrap and unwrap
-// (04 §3.5, §3.1.1); M1-5b adds the relay pool, publish and outbox delivery (07 §4.2, §4.3); the
-// subscription and sync follow in M1-5c.
+// (04 §3.5, §3.1.1); M1-5b adds the relay pool, publish and outbox delivery (07 §4.2, §4.3); M1-5c adds
+// subscribe and sync with cursors and dedup (07 §4.2, §3.2).
 export const packageName = '@agentlink/transport-nostr';
 
 export { TransportError, type TransportErrorCode } from './errors.js';
@@ -38,10 +38,12 @@ export {
   NIP11_MAX_BYTES,
   OK_TIMEOUT_MS,
   RelayPool,
+  type CloseListener,
   type FrameListener,
   type PublishOutcome,
   type RelayFailure,
   type RelayHealth,
+  type RelayLink,
   type RelayPoolOptions,
   type RelayPublishResult,
 } from './relay-pool.js';
@@ -55,3 +57,37 @@ export {
   type OutboxSummary,
   type OutboxWorkerOptions,
 } from './outbox.js';
+export {
+  CURSOR_IGNORE_AFTER_SECONDS,
+  DEDUP_CACHE_ENTRIES,
+  FIRST_SYNC_LOOKBACK_SECONDS,
+  LIVE_RETRY_BASE_MS,
+  LIVE_RETRY_MAX_MS,
+  MAX_FRAMES_PER_PASS,
+  MAX_LIVE_NEW_WRAPS_PER_MINUTE,
+  MAX_NEW_WRAPS_PER_PASS,
+  MAX_QUEUED_CHARS,
+  MAX_QUEUED_EVENTS,
+  MAX_SYNC_IDENTITIES,
+  MAX_SYNC_RELAYS,
+  SEEN_RETENTION_SECONDS,
+  SYNC_BUDGET_MS,
+  SYNC_LOOKBACK_SECONDS,
+  SYNC_SKEW_SECONDS,
+  SyncEngine,
+  seenPruneBefore,
+  syncSince,
+  type EnvelopeHandler,
+  type SeenKind,
+  type SubscribeOptions,
+  type SyncDisposition,
+  type SyncEngineOptions,
+  type SyncIdentity,
+  type SyncItem,
+  type SyncOptions,
+  type SyncPersistence,
+  type SyncRelayReason,
+  type SyncRelayResult,
+  type SyncResult,
+  type Unsubscribe,
+} from './sync.js';
