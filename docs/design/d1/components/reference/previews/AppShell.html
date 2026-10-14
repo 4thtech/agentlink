@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../../tokens/tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../../screens/lib/react.production.min.js"></script><script src="../../../screens/lib/react-dom.production.min.js"></script><script src="../bundle.js"></script><meta charset="utf-8"><title>AppShell</title></head>
+<body>
+<div id="root" class="al-preview is-col"></div>
+<script>
+  var A = window.AgentLink, h = React.createElement, F = React.Fragment;
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div',{style:{width:'100%',height:520}},
+ h(A.AppShell,{os:'macos',title:'AgentLink \u2014 Approvals',agent:'Tali\u2019s Claude (laptop)',version:'v0.3.0',statusItems:['48 proofs left','Encrypted drop 212 MB / 1 GB'],
+  nav:[{icon:'activity',label:'Home'},{icon:'approval',label:'Approvals',count:2,active:true},{icon:'inbox',label:'Threads'},{icon:'proof-seal',label:'Proofs'},{icon:'users',label:'Contacts'},{icon:'hard-drive',label:'Storage'},{icon:'sliders-horizontal',label:'Rules'},{icon:'settings',label:'Settings'}]},
+  h('div',{className:'al-text-label al-muted'},'Approvals \u00B7 2 waiting'),
+  h('h1',{className:'al-text-title-1',style:{margin:0}},'Approvals'),
+  h(A.ApprovalCard,{type:'proof',agent:'Tali\u2019s Claude (laptop)',time:'14:01',expires:'Expires in 9 min',headline:'Send contract-signed.pdf to Marko with proof',who:h('strong',null,'Marko'),cost:h(A.CostChip,{amount:'$0.10',source:'from credits'}),method:'Touch ID'}))));
+</script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Native approval window</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="width: 440px; height: 600px; box-sizing: border-box; display: flex; flex-direction: column; border: 1px solid var(--al-color-border-strong); border-radius: 10px; overflow: hidden; background: var(--al-color-bg-canvas); color: var(--al-color-fg-default); font-family: var(--font-sans);">
+<sc-if value="{{isMac}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; background: var(--al-color-bg-surface); border-bottom: 1px solid var(--al-color-border-default);">
+<span aria-hidden="true" style="display: flex; gap: 8px;"><span style="width: 12px; height: 12px; border-radius: 50%; background: var(--al-color-border-strong);"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: var(--al-color-border-strong);"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: var(--al-color-border-strong);"></span></span>
+<span class="al-text-body-sm" style="flex-grow: 1; text-align: center; padding-right: 52px; color: var(--al-color-fg-muted);">AgentLink · Approval</span>
+</div>
+</sc-if>
+<sc-if value="{{isWin}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 0 0 12px; background: var(--al-color-bg-surface); border-bottom: 1px solid var(--al-color-border-default);">
+<x-import component-from-global-scope="AgentLink.Mark" size="{{s14}}"></x-import>
+<span class="al-text-body-sm" style="flex-grow: 1; color: var(--al-color-fg-muted);">AgentLink · Approval</span>
+<button type="button" aria-label="Close" style="width: 46px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--al-color-fg-muted);"><x-import component-from-global-scope="AgentLink.Icon" name="x" size="{{s14}}"></x-import></button>
+</div>
+</sc-if>
+<div style="flex-grow: 1; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+<x-import component-from-global-scope="AgentLink.ApprovalCard" type="proof" agent="Tali's Claude (laptop)" time="14:01" expires="9 min left" headline="Send contract-signed.pdf to Marko with proof" who="Marko · Verified domain" what="contract-signed.pdf · 1.1 MB" cost="$0.10 from credits" why="Your rule for proofs: Ask me" consequence="A public record shows this exact file was sent at this time." state="{{state}}" method="{{method}}" style="display: block;"></x-import>
+<sc-if value="{{isWaiting}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 1px dashed var(--al-color-border-strong); border-radius: 6px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">System prompt · drawn by the OS, not us</span>
+<span class="al-text-body-sm">“AgentLink” wants to approve sending a file to Marko.</span>
+</div>
+</sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light","dark-contrast","light-contrast"],"default":"dark"},"os":{"editor":"enum","options":["macos","windows"],"default":"macos"},"state":{"editor":"enum","options":["pending","waiting","approved","denied","expired","failed","decided-elsewhere"],"default":"pending"},"$preview":{"width":440,"height":600}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const os = this.props.os ?? 'macos';
+    const state = this.props.state ?? 'pending';
+    return {
+      theme: this.props.theme ?? 'dark', state: state,
+      isMac: os === 'macos', isWin: os === 'windows', isWaiting: state === 'waiting',
+      method: os === 'windows' ? 'Windows Hello' : 'Touch ID', s14: 14
+    };
+  }
+}
+</script>
+</body>
+</html>

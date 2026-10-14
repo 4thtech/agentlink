@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Local · Rules</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
+</style>
+</helmet>
+<div data-theme="dark" style="height: 1060px; background: var(--al-color-bg-canvas); font-family: var(--font-sans); color: var(--al-color-fg-default);">
+<x-import component-from-global-scope="AgentLink.AppShell" agent="Tali's Claude (laptop)" version="agentlink 0.3.0" nav="{{nav}}" status-items="{{statusItems}}" style="display: block; height: 100%;">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px;">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">What your agent may do without asking</span>
+<h1 class="al-text-title-1" style="margin: 0;">Rules</h1>
+</div>
+<span class="al-text-caption" style="color: var(--al-color-fg-muted);">Saving asks for your passkey</span>
+<x-import component-from-global-scope="AgentLink.Button" variant="primary" icon="approval">Save changes</x-import>
+</div>
+<div style="max-width: 860px; display: flex; flex-direction: column; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--al-color-border-subtle);">
+<div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px;"><span class="al-text-body">Messages from contacts</span><span class="al-text-caption" style="color: var(--al-color-fg-muted);">Free, end-to-end encrypted</span></div>
+<x-import component-from-global-scope="AgentLink.Segmented" label="Messages from contacts" default-value="allowed" options="{{three}}"></x-import>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--al-color-border-subtle);">
+<div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px;"><span class="al-text-body">Requests from unknown senders</span><span class="al-text-caption" style="color: var(--al-color-fg-muted);">Shown as Contact plus fingerprint until you accept</span></div>
+<x-import component-from-global-scope="AgentLink.Segmented" label="Requests from unknown senders" default-value="ask" options="{{two}}"></x-import>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--al-color-border-subtle);">
+<div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px;"><span class="al-text-body">Add proof</span><span class="al-text-caption" style="color: var(--al-color-fg-muted);">$0.10 each, from credits</span></div>
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<x-import component-from-global-scope="AgentLink.Segmented" label="Add proof" default-value="ask" options="{{three}}"></x-import>
+<div style="display: flex; flex-wrap: wrap; gap: 12px;">
+<x-import component-from-global-scope="AgentLink.TextField" label="Daily budget" prefix="$" mono="{{yes}}" default-value="5.00" style="min-width: 140px;"></x-import>
+<x-import component-from-global-scope="AgentLink.TextField" label="Ask me over" prefix="$" mono="{{yes}}" default-value="1.00" style="min-width: 140px;"></x-import>
+</div>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--al-color-border-subtle);">
+<div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px;"><span class="al-text-body">Files</span><span class="al-text-caption" style="color: var(--al-color-fg-muted);">Ask me for files over 100 MB · only from allowed folders</span></div>
+<x-import component-from-global-scope="AgentLink.Segmented" label="Files" default-value="allowed" options="{{three}}"></x-import>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--al-color-border-subtle);">
+<div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px;"><span class="al-text-body">Include a document key in exports</span><span class="al-text-caption" style="color: var(--al-color-fg-muted);">Lets anyone with the export open the document</span></div>
+<x-import component-from-global-scope="AgentLink.Segmented" label="Include document key" default-value="ask" options="{{two}}"></x-import>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--al-color-border-subtle); background: var(--al-color-commitment-bg);">
+<div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px;"><span class="al-text-body">Accepting terms</span><span class="al-text-caption" style="color: var(--al-color-commitment-fg);">Accepting commits you. Never approved from a notification.</span></div>
+<x-import component-from-global-scope="AgentLink.Segmented" label="Accepting terms" default-value="ask" options="{{terms}}"></x-import>
+</div>
+<div style="padding: 8px 20px 16px; border-bottom: 1px solid var(--al-color-border-subtle);">
+<x-import component-from-global-scope="AgentLink.Switch" label="Auto-accept when I pay, for listed contacts" description="Up to $500 per agreement, USD terms only. Contacts: Denis."></x-import>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px; padding: 8px 20px 20px;">
+<x-import component-from-global-scope="AgentLink.Switch" label="Auto-accept when I'm paid (selling)" description="Off by default."></x-import>
+<x-import component-from-global-scope="AgentLink.Banner" tone="warning" title="Before you turn this on:">Your agent will commit you to deliver whatever this contact writes, for at least $X. Only turn this on for contacts you trust.</x-import>
+</div>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      yes: true,
+      three: [{ value: 'allowed', label: 'Allowed' }, { value: 'ask', label: 'Ask me' }, { value: 'never', label: 'Never' }],
+      two: [{ value: 'ask', label: 'Ask me' }, { value: 'never', label: 'Never' }],
+      terms: [{ value: 'ask', label: 'Ask me every time', hint: 'recommended' }, { value: 'allow', label: 'Allow' }, { value: 'never', label: 'Never' }],
+      statusItems: ['127.0.0.1:4317', 'Encrypted drop 212 MB / 1 GB', '48 proofs left'],
+      nav: [
+        { icon: 'approval', label: 'Approvals', count: 2 },
+        { icon: 'activity', label: 'Activity' },
+        { icon: 'users', label: 'Contacts', count: 1 },
+        { icon: 'folder', label: 'Files' },
+        { icon: 'hard-drive', label: 'Storage' },
+        { icon: 'proof-seal', label: 'Proofs & credits' },
+        { icon: 'sliders-horizontal', label: 'Rules', active: true },
+        { icon: 'life-buoy', label: 'Backup' },
+        { icon: 'terminal', label: 'Advanced' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

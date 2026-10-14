@@ -1,0 +1,1377 @@
+{
+ "name": "AgentLink",
+ "version": 1,
+ "meta": {
+  "source": "AgentLink design handoff (docs/foundation/11-claude-design-brief.md, 2026-10-14)"
+ },
+ "color": {
+  "themes": [
+   {
+    "id": "dark",
+    "name": "Dark"
+   },
+   {
+    "id": "light",
+    "name": "Light"
+   },
+   {
+    "id": "dark-contrast",
+    "name": "Dark · increased contrast"
+   },
+   {
+    "id": "light-contrast",
+    "name": "Light · increased contrast"
+   }
+  ],
+  "tokens": [
+   {
+    "name": "al-color-bg-canvas",
+    "value": {
+     "dark": "#0b0c0e",
+     "light": "#f5f6f7",
+     "dark-contrast": "#000000",
+     "light-contrast": "#ffffff"
+    },
+    "usage": "Page/window background: the outermost layer of every surface."
+   },
+   {
+    "name": "al-color-bg-surface",
+    "value": {
+     "dark": "#111316",
+     "light": "#ffffff",
+     "dark-contrast": "#060708",
+     "light-contrast": "#ffffff"
+    },
+    "usage": "Panels, sidebars, list panes and cards that sit on the canvas."
+   },
+   {
+    "name": "al-color-bg-raised",
+    "value": {
+     "dark": "#171a1e",
+     "light": "#ffffff",
+     "dark-contrast": "#0e1013",
+     "light-contrast": "#ffffff"
+    },
+    "usage": "Popovers, menus, dialogs, approval cards and the selected list row."
+   },
+   {
+    "name": "al-color-bg-sunken",
+    "value": {
+     "dark": "#08090b",
+     "light": "#eceef0",
+     "dark-contrast": "#000000",
+     "light-contrast": "#f2f3f5"
+    },
+    "usage": "Wells: code blocks, terminal output, inputs, the copy-prompt block."
+   },
+   {
+    "name": "al-color-bg-inverse",
+    "value": {
+     "dark": "#e7e9ec",
+     "light": "#15171a",
+     "dark-contrast": "#e7e9ec",
+     "light-contrast": "#000000"
+    },
+    "usage": "Tooltips and the rare inverse toast."
+   },
+   {
+    "name": "al-color-bg-overlay",
+    "value": {
+     "dark": "rgba(5, 6, 8, 0.72)",
+     "light": "rgba(14, 16, 19, 0.48)",
+     "dark-contrast": "rgba(0, 0, 0, 0.85)",
+     "light-contrast": "rgba(0, 0, 0, 0.6)"
+    },
+    "usage": "Scrim behind modal dialogs and the native approval window's sheet."
+   },
+   {
+    "name": "al-color-fg-default",
+    "value": {
+     "dark": "#e7e9ec",
+     "light": "#0e1013",
+     "dark-contrast": "#ffffff",
+     "light-contrast": "#000000"
+    },
+    "usage": "Primary text and icons on canvas, surface, raised and sunken."
+   },
+   {
+    "name": "al-color-fg-muted",
+    "value": {
+     "dark": "#a1a9b4",
+     "light": "#4f5761",
+     "dark-contrast": "#d3d8de",
+     "light-contrast": "#2f353c"
+    },
+    "usage": "Secondary text, metadata, table headers on canvas, surface, raised and sunken."
+   },
+   {
+    "name": "al-color-fg-subtle",
+    "value": {
+     "dark": "#8a929d",
+     "light": "#626b76",
+     "dark-contrast": "#bcc3cb",
+     "light-contrast": "#3f464e"
+    },
+    "usage": "Tertiary text: timestamps, placeholders, disabled-adjacent hints, on canvas, surface, raised and sunken (still 4.5:1)."
+   },
+   {
+    "name": "al-color-fg-inverse",
+    "value": {
+     "dark": "#0e1013",
+     "light": "#f5f6f7",
+     "dark-contrast": "#0e1013",
+     "light-contrast": "#f5f6f7"
+    },
+    "usage": "Text on bg-inverse."
+   },
+   {
+    "name": "al-color-fg-on-accent",
+    "value": {
+     "dark": "#0b0c0e",
+     "light": "#0b0c0e",
+     "dark-contrast": "#000000",
+     "light-contrast": "#ffffff"
+    },
+    "usage": "Text and icons on an accent fill (primary button label). Dark ink on orange; white only in Light · increased contrast, where the fill deepens to burnt orange."
+   },
+   {
+    "name": "al-color-fg-link",
+    "value": {
+     "dark": "#ff8a4c",
+     "light": "#b23a09",
+     "dark-contrast": "#ffae80",
+     "light-contrast": "#7a2906"
+    },
+    "usage": "Inline hyperlinks on canvas, surface and raised. Underlined, never colour alone."
+   },
+   {
+    "name": "al-color-border-subtle",
+    "value": {
+     "dark": "#1e2227",
+     "light": "#e4e7ea",
+     "dark-contrast": "#5a626c",
+     "light-contrast": "#8a939e"
+    },
+    "usage": "Dividers between rows and panes. Decorative only: never the only boundary of a control."
+   },
+   {
+    "name": "al-color-border-default",
+    "value": {
+     "dark": "#2a2f36",
+     "light": "#d3d7dc",
+     "dark-contrast": "#8a939e",
+     "light-contrast": "#4f5761"
+    },
+    "usage": "Card and panel outlines, table rules."
+   },
+   {
+    "name": "al-color-border-strong",
+    "value": {
+     "dark": "#68717c",
+     "light": "#848d98",
+     "dark-contrast": "#d3d8de",
+     "light-contrast": "#1f2328"
+    },
+    "usage": "Control boundaries (inputs, switches, secondary buttons): 3:1 on canvas, surface and raised."
+   },
+   {
+    "name": "al-color-focus-ring",
+    "value": {
+     "dark": "#ff8a4c",
+     "light": "#c2410c",
+     "dark-contrast": "#ffae80",
+     "light-contrast": "#7a2906"
+    },
+    "usage": "Keyboard focus: a solid 2px ring, 2px offset. 3:1 on every surface in every theme."
+   },
+   {
+    "name": "al-color-accent-default",
+    "value": {
+     "dark": "#ff6a1a",
+     "light": "#ea5a10",
+     "dark-contrast": "#ff7a2e",
+     "light-contrast": "#9a3408"
+    },
+    "usage": "Signal orange. Primary button fill, the selected nav marker, the caret, the seal in the mark. Once per view for actions."
+   },
+   {
+    "name": "al-color-accent-hover",
+    "value": {
+     "dark": "#ff8240",
+     "light": "#ff6a1a",
+     "dark-contrast": "#ff9152",
+     "light-contrast": "#7a2906"
+    },
+    "usage": "Primary button fill on hover."
+   },
+   {
+    "name": "al-color-accent-pressed",
+    "value": {
+     "dark": "#e5590c",
+     "light": "#d94f06",
+     "dark-contrast": "#ff6a1a",
+     "light-contrast": "#6e2405"
+    },
+    "usage": "Primary button fill while pressed."
+   },
+   {
+    "name": "al-color-accent-subtle",
+    "value": {
+     "dark": "#2b170b",
+     "light": "#ffede2",
+     "dark-contrast": "#2b170b",
+     "light-contrast": "#fff1e8"
+    },
+    "usage": "Tinted ground behind accent-fg (selected nav row, active tab)."
+   },
+   {
+    "name": "al-color-accent-fg",
+    "value": {
+     "dark": "#ff8a4c",
+     "light": "#b23a09",
+     "dark-contrast": "#ffae80",
+     "light-contrast": "#7a2906"
+    },
+    "usage": "Orange as text or icon on canvas, surface, raised and accent-subtle."
+   },
+   {
+    "name": "al-color-status-success-bg",
+    "value": {
+     "dark": "#0e241d",
+     "light": "#e3f6ef",
+     "dark-contrast": "#0e241d",
+     "light-contrast": "#e3f6ef"
+    },
+    "usage": "Success: sent, delivered, accepted, connected. The status ground."
+   },
+   {
+    "name": "al-color-status-success-fg",
+    "value": {
+     "dark": "#4fd1a5",
+     "light": "#0a6e51",
+     "dark-contrast": "#7eecc7",
+     "light-contrast": "#04503a"
+    },
+    "usage": "Success: sent, delivered, accepted, connected. The status text, on its status-success-bg and the surfaces."
+   },
+   {
+    "name": "al-color-status-success-border",
+    "value": {
+     "dark": "#1f4d3e",
+     "light": "#9ad9c2",
+     "dark-contrast": "#4fd1a5",
+     "light-contrast": "#0e8a66"
+    },
+    "usage": "Success: sent, delivered, accepted, connected. The status outline."
+   },
+   {
+    "name": "al-color-status-success-icon",
+    "value": {
+     "dark": "#4fd1a5",
+     "light": "#0e8a66",
+     "dark-contrast": "#7eecc7",
+     "light-contrast": "#04503a"
+    },
+    "usage": "Success: sent, delivered, accepted, connected. The status icon (with text, never alone)."
+   },
+   {
+    "name": "al-color-status-warning-bg",
+    "value": {
+     "dark": "#2a2410",
+     "light": "#fdf4dc",
+     "dark-contrast": "#2a2410",
+     "light-contrast": "#fdf4dc"
+    },
+    "usage": "Warning: near quota, expiring, weaker setup. The status ground."
+   },
+   {
+    "name": "al-color-status-warning-fg",
+    "value": {
+     "dark": "#f2c94c",
+     "light": "#805300",
+     "dark-contrast": "#ffdf7a",
+     "light-contrast": "#573800"
+    },
+    "usage": "Warning: near quota, expiring, weaker setup. The status text, on its status-warning-bg and the surfaces."
+   },
+   {
+    "name": "al-color-status-warning-border",
+    "value": {
+     "dark": "#574a1c",
+     "light": "#e8cd7c",
+     "dark-contrast": "#f2c94c",
+     "light-contrast": "#a06900"
+    },
+    "usage": "Warning: near quota, expiring, weaker setup. The status outline."
+   },
+   {
+    "name": "al-color-status-warning-icon",
+    "value": {
+     "dark": "#f2c94c",
+     "light": "#a06900",
+     "dark-contrast": "#ffdf7a",
+     "light-contrast": "#573800"
+    },
+    "usage": "Warning: near quota, expiring, weaker setup. The status icon (with text, never alone)."
+   },
+   {
+    "name": "al-color-status-danger-bg",
+    "value": {
+     "dark": "#2d1415",
+     "light": "#fde8e8",
+     "dark-contrast": "#2d1415",
+     "light-contrast": "#fde8e8"
+    },
+    "usage": "Danger: destructive, irreversible or integrity failure only. The status ground."
+   },
+   {
+    "name": "al-color-status-danger-fg",
+    "value": {
+     "dark": "#ff7b7b",
+     "light": "#b3191f",
+     "dark-contrast": "#ffaaaa",
+     "light-contrast": "#850f14"
+    },
+    "usage": "Danger: destructive, irreversible or integrity failure only. The status text, on its status-danger-bg and the surfaces."
+   },
+   {
+    "name": "al-color-status-danger-border",
+    "value": {
+     "dark": "#5c2628",
+     "light": "#f3a9ab",
+     "dark-contrast": "#ff7b7b",
+     "light-contrast": "#d3282e"
+    },
+    "usage": "Danger: destructive, irreversible or integrity failure only. The status outline."
+   },
+   {
+    "name": "al-color-status-danger-icon",
+    "value": {
+     "dark": "#ff6b6b",
+     "light": "#d3282e",
+     "dark-contrast": "#ff9a9a",
+     "light-contrast": "#850f14"
+    },
+    "usage": "Danger: destructive, irreversible or integrity failure only. The status icon (with text, never alone)."
+   },
+   {
+    "name": "al-color-status-info-bg",
+    "value": {
+     "dark": "#0f1d2e",
+     "light": "#e6f0fc",
+     "dark-contrast": "#0f1d2e",
+     "light-contrast": "#e6f0fc"
+    },
+    "usage": "Info: neutral news, checking, recording. The status ground."
+   },
+   {
+    "name": "al-color-status-info-fg",
+    "value": {
+     "dark": "#6cb6ff",
+     "light": "#0b5cb8",
+     "dark-contrast": "#a8d2ff",
+     "light-contrast": "#083f80"
+    },
+    "usage": "Info: neutral news, checking, recording. The status text, on its status-info-bg and the surfaces."
+   },
+   {
+    "name": "al-color-status-info-border",
+    "value": {
+     "dark": "#1f3d5f",
+     "light": "#a3c6ef",
+     "dark-contrast": "#6cb6ff",
+     "light-contrast": "#1668c7"
+    },
+    "usage": "Info: neutral news, checking, recording. The status outline."
+   },
+   {
+    "name": "al-color-status-info-icon",
+    "value": {
+     "dark": "#6cb6ff",
+     "light": "#1668c7",
+     "dark-contrast": "#a8d2ff",
+     "light-contrast": "#083f80"
+    },
+    "usage": "Info: neutral news, checking, recording. The status icon (with text, never alone)."
+   },
+   {
+    "name": "al-color-status-neutral-bg",
+    "value": {
+     "dark": "#1a1d21",
+     "light": "#eef0f2",
+     "dark-contrast": "#1a1d21",
+     "light-contrast": "#eef0f2"
+    },
+    "usage": "Neutral: idle, paused, expired. The status ground."
+   },
+   {
+    "name": "al-color-status-neutral-fg",
+    "value": {
+     "dark": "#a1a9b4",
+     "light": "#4f5761",
+     "dark-contrast": "#d3d8de",
+     "light-contrast": "#2f353c"
+    },
+    "usage": "Neutral: idle, paused, expired. The status text, on its status-neutral-bg and the surfaces."
+   },
+   {
+    "name": "al-color-status-neutral-border",
+    "value": {
+     "dark": "#2a2f36",
+     "light": "#d3d7dc",
+     "dark-contrast": "#8a939e",
+     "light-contrast": "#4f5761"
+    },
+    "usage": "Neutral: idle, paused, expired. The status outline."
+   },
+   {
+    "name": "al-color-status-neutral-icon",
+    "value": {
+     "dark": "#a1a9b4",
+     "light": "#5b636e",
+     "dark-contrast": "#d3d8de",
+     "light-contrast": "#2f353c"
+    },
+    "usage": "Neutral: idle, paused, expired. The status icon (with text, never alone)."
+   },
+   {
+    "name": "al-color-proof-bg",
+    "value": {
+     "dark": "#1c1830",
+     "light": "#efedff",
+     "dark-contrast": "#1c1830",
+     "light-contrast": "#efedff"
+    },
+    "usage": "Ground of proof badges, the proof stamp header and proof detail panels."
+   },
+   {
+    "name": "al-color-proof-fg",
+    "value": {
+     "dark": "#b9aeff",
+     "light": "#4b3bc2",
+     "dark-contrast": "#d6cfff",
+     "light-contrast": "#2f2393"
+    },
+    "usage": "Text and icons on proof-bg and on the surfaces."
+   },
+   {
+    "name": "al-color-proof-border",
+    "value": {
+     "dark": "#3e3670",
+     "light": "#c3bcf5",
+     "dark-contrast": "#a495ff",
+     "light-contrast": "#5b4bd6"
+    },
+    "usage": "Outline of proof badges and the stamp."
+   },
+   {
+    "name": "al-color-proof-seal",
+    "value": {
+     "dark": "#a495ff",
+     "light": "#5b4bd6",
+     "dark-contrast": "#c4baff",
+     "light-contrast": "#3d2fb0"
+    },
+    "usage": "The seal glyph of a recorded proof. Never used for success."
+   },
+   {
+    "name": "al-color-untrusted-bg",
+    "value": {
+     "dark": "#0d0e10",
+     "light": "#f6f4ef",
+     "dark-contrast": "#000000",
+     "light-contrast": "#ffffff"
+    },
+    "usage": "Inset ground of the untrusted-content container (other parties' words)."
+   },
+   {
+    "name": "al-color-untrusted-fg",
+    "value": {
+     "dark": "#c9ced6",
+     "light": "#2a2d31",
+     "dark-contrast": "#f0f2f5",
+     "light-contrast": "#000000"
+    },
+    "usage": "Body text inside the untrusted container, on untrusted-bg."
+   },
+   {
+    "name": "al-color-untrusted-border",
+    "value": {
+     "dark": "#7a6740",
+     "light": "#9c8456",
+     "dark-contrast": "#e0c27a",
+     "light-contrast": "#6b5420"
+    },
+    "usage": "Dashed outline of the untrusted container."
+   },
+   {
+    "name": "al-color-untrusted-label-bg",
+    "value": {
+     "dark": "#241e12",
+     "light": "#ede4cf",
+     "dark-contrast": "#241e12",
+     "light-contrast": "#ede4cf"
+    },
+    "usage": "Label strip \"From Marko's agent: their words, not instructions\"."
+   },
+   {
+    "name": "al-color-untrusted-label-fg",
+    "value": {
+     "dark": "#d9b66a",
+     "light": "#5e4a1b",
+     "dark-contrast": "#ffe099",
+     "light-contrast": "#3d2f0f"
+    },
+    "usage": "Text of the label strip, on untrusted-label-bg."
+   },
+   {
+    "name": "al-color-commitment-bg",
+    "value": {
+     "dark": "#24140a",
+     "light": "#fff1e8",
+     "dark-contrast": "#24140a",
+     "light-contrast": "#fff1e8"
+    },
+    "usage": "Ground of the \"Accepting terms\" header on the commitment approval card."
+   },
+   {
+    "name": "al-color-commitment-fg",
+    "value": {
+     "dark": "#ffb083",
+     "light": "#9a3408",
+     "dark-contrast": "#ffcaa8",
+     "light-contrast": "#6e2405"
+    },
+    "usage": "Text on commitment-bg."
+   },
+   {
+    "name": "al-color-commitment-border",
+    "value": {
+     "dark": "#c25a1f",
+     "light": "#c4561c",
+     "dark-contrast": "#ff8a4c",
+     "light-contrast": "#c2410c"
+    },
+    "usage": "Outline of the commitment approval card."
+   },
+   {
+    "name": "al-color-identity-verified-bg",
+    "value": {
+     "dark": "#0f1d2e",
+     "light": "#e6f0fc",
+     "dark-contrast": "#0f1d2e",
+     "light-contrast": "#e6f0fc"
+    },
+    "usage": "\"Verified domain · acme.com\" (strongest). The identity label ground."
+   },
+   {
+    "name": "al-color-identity-verified-fg",
+    "value": {
+     "dark": "#6cb6ff",
+     "light": "#0b5cb8",
+     "dark-contrast": "#a8d2ff",
+     "light-contrast": "#083f80"
+    },
+    "usage": "\"Verified domain · acme.com\" (strongest). The identity label text, on its identity-verified-bg and the surfaces."
+   },
+   {
+    "name": "al-color-identity-verified-border",
+    "value": {
+     "dark": "#1f3d5f",
+     "light": "#a3c6ef",
+     "dark-contrast": "#6cb6ff",
+     "light-contrast": "#1668c7"
+    },
+    "usage": "\"Verified domain · acme.com\" (strongest). The identity label outline."
+   },
+   {
+    "name": "al-color-identity-registered-bg",
+    "value": {
+     "dark": "#1c1830",
+     "light": "#efedff",
+     "dark-contrast": "#1c1830",
+     "light-contrast": "#efedff"
+    },
+    "usage": "\"Registered\" (on the public record). The identity label ground."
+   },
+   {
+    "name": "al-color-identity-registered-fg",
+    "value": {
+     "dark": "#b9aeff",
+     "light": "#4b3bc2",
+     "dark-contrast": "#d6cfff",
+     "light-contrast": "#2f2393"
+    },
+    "usage": "\"Registered\" (on the public record). The identity label text, on its identity-registered-bg and the surfaces."
+   },
+   {
+    "name": "al-color-identity-registered-border",
+    "value": {
+     "dark": "#3e3670",
+     "light": "#c3bcf5",
+     "dark-contrast": "#a495ff",
+     "light-contrast": "#5b4bd6"
+    },
+    "usage": "\"Registered\" (on the public record). The identity label outline."
+   },
+   {
+    "name": "al-color-identity-selfdeclared-bg",
+    "value": {
+     "dark": "#15171a",
+     "light": "#f0f1f3",
+     "dark-contrast": "#0e1013",
+     "light-contrast": "#f0f1f3"
+    },
+    "usage": "\"Self-declared\" (weakest). The identity label ground."
+   },
+   {
+    "name": "al-color-identity-selfdeclared-fg",
+    "value": {
+     "dark": "#a1a9b4",
+     "light": "#4f5761",
+     "dark-contrast": "#d3d8de",
+     "light-contrast": "#2f353c"
+    },
+    "usage": "\"Self-declared\" (weakest). The identity label text, on its identity-selfdeclared-bg and the surfaces."
+   },
+   {
+    "name": "al-color-identity-selfdeclared-border",
+    "value": {
+     "dark": "#353b43",
+     "light": "#c9ced4",
+     "dark-contrast": "#8a939e",
+     "light-contrast": "#4f5761"
+    },
+    "usage": "\"Self-declared\" (weakest). The identity label outline."
+   },
+   {
+    "name": "al-color-identity-warning-bg",
+    "value": {
+     "dark": "#2a2410",
+     "light": "#fdf4dc",
+     "dark-contrast": "#2a2410",
+     "light-contrast": "#fdf4dc"
+    },
+    "usage": "\"Domain no longer verified\". The identity label ground."
+   },
+   {
+    "name": "al-color-identity-warning-fg",
+    "value": {
+     "dark": "#f2c94c",
+     "light": "#805300",
+     "dark-contrast": "#ffdf7a",
+     "light-contrast": "#573800"
+    },
+    "usage": "\"Domain no longer verified\". The identity label text, on its identity-warning-bg and the surfaces."
+   },
+   {
+    "name": "al-color-identity-warning-border",
+    "value": {
+     "dark": "#574a1c",
+     "light": "#e8cd7c",
+     "dark-contrast": "#f2c94c",
+     "light-contrast": "#a06900"
+    },
+    "usage": "\"Domain no longer verified\". The identity label outline."
+   },
+   {
+    "name": "al-color-diff-added-bg",
+    "value": {
+     "dark": "#0e241d",
+     "light": "#e3f6ef",
+     "dark-contrast": "#0e241d",
+     "light-contrast": "#e3f6ef"
+    },
+    "usage": "Added value (+). The diff ground."
+   },
+   {
+    "name": "al-color-diff-added-fg",
+    "value": {
+     "dark": "#4fd1a5",
+     "light": "#0a6e51",
+     "dark-contrast": "#7eecc7",
+     "light-contrast": "#04503a"
+    },
+    "usage": "Added value (+). The diff text, on its diff-added-bg and the surfaces."
+   },
+   {
+    "name": "al-color-diff-added-border",
+    "value": {
+     "dark": "#1f4d3e",
+     "light": "#9ad9c2",
+     "dark-contrast": "#4fd1a5",
+     "light-contrast": "#0e8a66"
+    },
+    "usage": "Added value (+). The diff outline."
+   },
+   {
+    "name": "al-color-diff-removed-bg",
+    "value": {
+     "dark": "#2d1415",
+     "light": "#fde8e8",
+     "dark-contrast": "#2d1415",
+     "light-contrast": "#fde8e8"
+    },
+    "usage": "Removed value (−, struck through). The diff ground."
+   },
+   {
+    "name": "al-color-diff-removed-fg",
+    "value": {
+     "dark": "#ff8e8e",
+     "light": "#b3191f",
+     "dark-contrast": "#ffaaaa",
+     "light-contrast": "#850f14"
+    },
+    "usage": "Removed value (−, struck through). The diff text, on its diff-removed-bg and the surfaces."
+   },
+   {
+    "name": "al-color-diff-removed-border",
+    "value": {
+     "dark": "#5c2628",
+     "light": "#f3a9ab",
+     "dark-contrast": "#ff7b7b",
+     "light-contrast": "#d3282e"
+    },
+    "usage": "Removed value (−, struck through). The diff outline."
+   },
+   {
+    "name": "al-color-diff-changed-bg",
+    "value": {
+     "dark": "#2a2410",
+     "light": "#fdf4dc",
+     "dark-contrast": "#2a2410",
+     "light-contrast": "#fdf4dc"
+    },
+    "usage": "Changed value (~). The diff ground."
+   },
+   {
+    "name": "al-color-diff-changed-fg",
+    "value": {
+     "dark": "#f2c94c",
+     "light": "#805300",
+     "dark-contrast": "#ffdf7a",
+     "light-contrast": "#573800"
+    },
+    "usage": "Changed value (~). The diff text, on its diff-changed-bg and the surfaces."
+   },
+   {
+    "name": "al-color-diff-changed-border",
+    "value": {
+     "dark": "#574a1c",
+     "light": "#e8cd7c",
+     "dark-contrast": "#f2c94c",
+     "light-contrast": "#a06900"
+    },
+    "usage": "Changed value (~). The diff outline."
+   },
+   {
+    "name": "al-color-brand-mark",
+    "value": {
+     "dark": "#e7e9ec",
+     "light": "#0e1013",
+     "dark-contrast": "#ffffff",
+     "light-contrast": "#000000"
+    },
+    "usage": "The brackets of the mark."
+   },
+   {
+    "name": "al-color-brand-seal",
+    "value": {
+     "dark": "#ff6a1a",
+     "light": "#ff6a1a",
+     "dark-contrast": "#ff6a1a",
+     "light-contrast": "#ff6a1a"
+    },
+    "usage": "The diamond seal of the mark. Fixed signal orange #FF6A1A in every theme (a logo: exempt from contrast floors, but always beside brackets that pass)."
+   },
+   {
+    "name": "al-color-brand-wordmark",
+    "value": {
+     "dark": "#e7e9ec",
+     "light": "#0e1013",
+     "dark-contrast": "#ffffff",
+     "light-contrast": "#000000"
+    },
+    "usage": "The AgentLink wordmark."
+   },
+   {
+    "name": "al-color-brand-endorsement",
+    "value": {
+     "dark": "#a1a9b4",
+     "light": "#4f5761",
+     "dark-contrast": "#d3d8de",
+     "light-contrast": "#2f353c"
+    },
+    "usage": "\"by 4thTech\" endorsement line, on canvas and surface."
+   },
+   {
+    "name": "al-color-syntax-keyword",
+    "value": {
+     "dark": "#ff8a4c",
+     "light": "#b23a09",
+     "dark-contrast": "#ffae80",
+     "light-contrast": "#7a2906"
+    },
+    "usage": "Code and terminal blocks: commands, keywords, on bg-sunken."
+   },
+   {
+    "name": "al-color-syntax-string",
+    "value": {
+     "dark": "#4fd1a5",
+     "light": "#0a6e51",
+     "dark-contrast": "#7eecc7",
+     "light-contrast": "#04503a"
+    },
+    "usage": "Code and terminal blocks: strings and paths, on bg-sunken."
+   },
+   {
+    "name": "al-color-syntax-comment",
+    "value": {
+     "dark": "#8a929d",
+     "light": "#626b76",
+     "dark-contrast": "#bcc3cb",
+     "light-contrast": "#3f464e"
+    },
+    "usage": "Code and terminal blocks: comments, on bg-sunken."
+   },
+   {
+    "name": "al-color-syntax-number",
+    "value": {
+     "dark": "#b9aeff",
+     "light": "#4b3bc2",
+     "dark-contrast": "#d6cfff",
+     "light-contrast": "#2f2393"
+    },
+    "usage": "Code and terminal blocks: numbers and literals, on bg-sunken."
+   }
+  ]
+ },
+ "type": {
+  "fonts": [
+   {
+    "family": "Geist",
+    "file": "fonts/Geist-Variable.woff2",
+    "weight": "100 900",
+    "style": "normal"
+   },
+   {
+    "family": "Geist Mono",
+    "file": "fonts/GeistMono-Variable.woff2",
+    "weight": "100 900",
+    "style": "normal"
+   }
+  ],
+  "families": {
+   "sans": "\"Geist\", ui-sans-serif, system-ui, -apple-system, \"Segoe UI\", \"Noto Sans\", sans-serif",
+   "mono": "\"Geist Mono\", ui-monospace, \"SF Mono\", \"Cascadia Mono\", \"JetBrains Mono\", Menlo, Consolas, monospace"
+  },
+  "groups": [
+   {
+    "name": "Display & titles",
+    "family": "sans",
+    "styles": [
+     {
+      "name": "al-text-display",
+      "fontSize": "40px",
+      "lineHeight": "44px",
+      "fontWeight": 600,
+      "letterSpacing": "-0.025em",
+      "sample": "Agreement recorded",
+      "usage": "One per screen at most: onboarding, verify result, proof stamp."
+     },
+     {
+      "name": "al-text-title-1",
+      "fontSize": "28px",
+      "lineHeight": "34px",
+      "fontWeight": 600,
+      "letterSpacing": "-0.02em",
+      "sample": "Approvals",
+      "usage": "Page titles."
+     },
+     {
+      "name": "al-text-title-2",
+      "fontSize": "20px",
+      "lineHeight": "28px",
+      "fontWeight": 600,
+      "letterSpacing": "-0.015em",
+      "sample": "Send a file to Marko",
+      "usage": "Card and dialog headlines (the approval headline)."
+     },
+     {
+      "name": "al-text-title-3",
+      "fontSize": "16px",
+      "lineHeight": "24px",
+      "fontWeight": 600,
+      "letterSpacing": "-0.01em",
+      "sample": "Proof of agreement",
+      "usage": "Section and panel headers."
+     }
+    ]
+   },
+   {
+    "name": "Text",
+    "family": "sans",
+    "styles": [
+     {
+      "name": "al-text-body-lg",
+      "fontSize": "16px",
+      "lineHeight": "24px",
+      "fontWeight": 400,
+      "letterSpacing": "0em",
+      "sample": "Only you, Marko and your agents can read it.",
+      "usage": "Onboarding, verify, mobile body. Mobile inputs use this size (16px floor)."
+     },
+     {
+      "name": "al-text-body",
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "fontWeight": 400,
+      "letterSpacing": "0em",
+      "sample": "Sent with proof. Recorded 12 Oct 2026 at 14:02.",
+      "usage": "Default UI text on desktop."
+     },
+     {
+      "name": "al-text-body-sm",
+      "fontSize": "13px",
+      "lineHeight": "18px",
+      "fontWeight": 400,
+      "letterSpacing": "0em",
+      "sample": "Delivered 09:20 · Opened 11:02",
+      "usage": "Dense rows, secondary lines."
+     },
+     {
+      "name": "al-text-caption",
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "fontWeight": 400,
+      "letterSpacing": "0em",
+      "sample": "Your AI can’t approve this for you.",
+      "usage": "Footnotes, helper text, trust lines."
+     }
+    ]
+   },
+   {
+    "name": "Mono",
+    "family": "mono",
+    "styles": [
+     {
+      "name": "al-text-label",
+      "fontSize": "11px",
+      "lineHeight": "16px",
+      "fontWeight": 500,
+      "letterSpacing": "0.06em",
+      "sample": "NEEDS APPROVAL",
+      "usage": "Uppercase mono labels: section eyebrows, status chips, table headers. Always uppercase via CSS."
+     },
+     {
+      "name": "al-text-code",
+      "fontSize": "13px",
+      "lineHeight": "20px",
+      "fontWeight": 400,
+      "letterSpacing": "0em",
+      "sample": "npx -y @4thtech/agentlink init",
+      "usage": "Commands, IDs, fingerprints, amounts in tables (tabular by construction)."
+     },
+     {
+      "name": "al-text-code-lg",
+      "fontSize": "24px",
+      "lineHeight": "32px",
+      "fontWeight": 500,
+      "letterSpacing": "0.02em",
+      "sample": "4821 0937 5512",
+      "usage": "Safety codes, pairing codes, recovery codes: grouped digits."
+     },
+     {
+      "name": "al-text-wordmark",
+      "fontSize": "20px",
+      "lineHeight": "24px",
+      "fontWeight": 600,
+      "letterSpacing": "-0.03em",
+      "sample": "AgentLink",
+      "usage": "Live-text wordmark fallback when the SVG cannot be used."
+     }
+    ]
+   }
+  ]
+ },
+ "spacing": {
+  "tokens": [
+   {
+    "name": "al-space-0",
+    "value": "0px",
+    "usage": "No gap."
+   },
+   {
+    "name": "al-space-1",
+    "value": "2px",
+    "usage": "Hairline nudges; icon-to-badge gaps."
+   },
+   {
+    "name": "al-space-2",
+    "value": "4px",
+    "usage": "Icon-to-label gap inside chips and buttons."
+   },
+   {
+    "name": "al-space-3",
+    "value": "8px",
+    "usage": "Gap between related controls; chip padding."
+   },
+   {
+    "name": "al-space-4",
+    "value": "12px",
+    "usage": "Compact row padding (IDE density); control horizontal padding."
+   },
+   {
+    "name": "al-space-5",
+    "value": "16px",
+    "usage": "Card padding; mobile page gutter."
+   },
+   {
+    "name": "al-space-6",
+    "value": "20px",
+    "usage": "Card padding at comfortable density."
+   },
+   {
+    "name": "al-space-7",
+    "value": "24px",
+    "usage": "Gap between cards and sections; desktop gutter."
+   },
+   {
+    "name": "al-space-8",
+    "value": "32px",
+    "usage": "Section spacing inside a page."
+   },
+   {
+    "name": "al-space-9",
+    "value": "40px",
+    "usage": "Page header to content."
+   },
+   {
+    "name": "al-space-10",
+    "value": "48px",
+    "usage": "Large section breaks."
+   },
+   {
+    "name": "al-space-11",
+    "value": "64px",
+    "usage": "Marketing / onboarding vertical rhythm."
+   },
+   {
+    "name": "al-space-12",
+    "value": "80px",
+    "usage": "Hero spacing (marketing only)."
+   }
+  ]
+ },
+ "radius": {
+  "tokens": [
+   {
+    "name": "al-radius-none",
+    "value": "0px",
+    "usage": "Terminal blocks, tables, the app shell, the mark."
+   },
+   {
+    "name": "al-radius-xs",
+    "value": "2px",
+    "usage": "Kbd keys, inline code, fingerprint chips."
+   },
+   {
+    "name": "al-radius-sm",
+    "value": "3px",
+    "usage": "Chips, badges, checkboxes."
+   },
+   {
+    "name": "al-radius-md",
+    "value": "4px",
+    "usage": "Buttons, inputs, menus. The default."
+   },
+   {
+    "name": "al-radius-lg",
+    "value": "6px",
+    "usage": "Cards, panels, approval card."
+   },
+   {
+    "name": "al-radius-xl",
+    "value": "10px",
+    "usage": "Dialogs and the native approval window sheet."
+   },
+   {
+    "name": "al-radius-full",
+    "value": "9999px",
+    "usage": "Status dots and monogram avatars only."
+   }
+  ]
+ },
+ "shadow": {
+  "note": "Borders first. Shadows only lift floating layers; in dark themes they are barely visible by design.",
+  "tokens": [
+   {
+    "name": "al-shadow-0",
+    "value": "none",
+    "usage": "Flat: everything in the page flow."
+   },
+   {
+    "name": "al-shadow-1",
+    "value": {
+     "dark": "0 1px 0 rgba(0, 0, 0, 0.5)",
+     "light": "0 1px 2px rgba(14, 16, 19, 0.06)",
+     "dark-contrast": "none",
+     "light-contrast": "none"
+    },
+    "usage": "Buttons, inputs."
+   },
+   {
+    "name": "al-shadow-2",
+    "value": {
+     "dark": "0 4px 12px rgba(0, 0, 0, 0.45)",
+     "light": "0 4px 12px rgba(14, 16, 19, 0.08)",
+     "dark-contrast": "none",
+     "light-contrast": "none"
+    },
+    "usage": "Menus, popovers."
+   },
+   {
+    "name": "al-shadow-3",
+    "value": {
+     "dark": "0 12px 32px rgba(0, 0, 0, 0.55)",
+     "light": "0 12px 32px rgba(14, 16, 19, 0.12)",
+     "dark-contrast": "none",
+     "light-contrast": "none"
+    },
+    "usage": "Dialogs, approval sheet."
+   },
+   {
+    "name": "al-shadow-4",
+    "value": {
+     "dark": "0 24px 64px rgba(0, 0, 0, 0.6)",
+     "light": "0 24px 64px rgba(14, 16, 19, 0.16)",
+     "dark-contrast": "none",
+     "light-contrast": "none"
+    },
+    "usage": "Native approval window, toasts."
+   }
+  ]
+ },
+ "size": {
+  "tokens": [
+   {
+    "name": "al-size-touch-min",
+    "value": "44px",
+    "usage": "Minimum touch target on mobile and for approval buttons everywhere."
+   },
+   {
+    "name": "al-size-icon-sm",
+    "value": "14px",
+    "usage": "Icons inside chips and dense rows."
+   },
+   {
+    "name": "al-size-icon-md",
+    "value": "16px",
+    "usage": "Default UI icon size."
+   },
+   {
+    "name": "al-size-icon-lg",
+    "value": "20px",
+    "usage": "Icons in card headers and empty states."
+   },
+   {
+    "name": "al-size-control-sm",
+    "value": "28px",
+    "usage": "Dense toolbar controls (desktop only)."
+   },
+   {
+    "name": "al-size-control-md",
+    "value": "32px",
+    "usage": "Default control height on desktop."
+   },
+   {
+    "name": "al-size-control-lg",
+    "value": "44px",
+    "usage": "Approve / Deny, mobile controls, primary onboarding actions."
+   }
+  ]
+ },
+ "borderWidth": {
+  "tokens": [
+   {
+    "name": "al-border-width-thin",
+    "value": "1px",
+    "usage": "Every outline and divider."
+   },
+   {
+    "name": "al-border-width-thick",
+    "value": "2px",
+    "usage": "Selected state, increased-contrast outlines, the untrusted container's dashed edge."
+   },
+   {
+    "name": "al-focus-ring-width",
+    "value": "2px",
+    "usage": "Width of the focus-ring outline."
+   },
+   {
+    "name": "al-focus-ring-offset",
+    "value": "2px",
+    "usage": "Gap between a control and its focus ring."
+   }
+  ]
+ },
+ "fontWeight": {
+  "tokens": [
+   {
+    "name": "al-font-weight-regular",
+    "value": "400",
+    "usage": "Body and code."
+   },
+   {
+    "name": "al-font-weight-medium",
+    "value": "500",
+    "usage": "Labels, buttons, table headers."
+   },
+   {
+    "name": "al-font-weight-semibold",
+    "value": "600",
+    "usage": "Titles and the wordmark."
+   },
+   {
+    "name": "al-font-weight-bold",
+    "value": "700",
+    "usage": "Rare emphasis in long-form text."
+   }
+  ]
+ },
+ "opacity": {
+  "tokens": [
+   {
+    "name": "al-opacity-disabled",
+    "value": "0.4",
+    "usage": "Disabled controls (also remove pointer events; never the only cue)."
+   },
+   {
+    "name": "al-opacity-scrim",
+    "value": "0.72",
+    "usage": "Reference opacity of bg-overlay."
+   }
+  ]
+ },
+ "zIndex": {
+  "tokens": [
+   {
+    "name": "al-z-base",
+    "value": "0",
+    "usage": "Page content."
+   },
+   {
+    "name": "al-z-sticky",
+    "value": "100",
+    "usage": "Sticky headers, bottom tabs."
+   },
+   {
+    "name": "al-z-dropdown",
+    "value": "200",
+    "usage": "Menus and popovers."
+   },
+   {
+    "name": "al-z-overlay",
+    "value": "300",
+    "usage": "Scrims."
+   },
+   {
+    "name": "al-z-modal",
+    "value": "400",
+    "usage": "Dialogs, approval sheet."
+   },
+   {
+    "name": "al-z-toast",
+    "value": "500",
+    "usage": "Toasts (never cover focused controls)."
+   }
+  ]
+ },
+ "duration": {
+  "tokens": [
+   {
+    "name": "al-duration-instant",
+    "value": "0ms",
+    "usage": "Reduced motion, state swaps."
+   },
+   {
+    "name": "al-duration-fast",
+    "value": "120ms",
+    "usage": "Hover, press, focus."
+   },
+   {
+    "name": "al-duration-base",
+    "value": "200ms",
+    "usage": "Menus, toasts, panels."
+   },
+   {
+    "name": "al-duration-slow",
+    "value": "320ms",
+    "usage": "Signature moments: proof stamp settles, approval confirmed, pairing matched."
+   }
+  ]
+ },
+ "easing": {
+  "tokens": [
+   {
+    "name": "al-easing-standard",
+    "value": "cubic-bezier(0.2, 0, 0, 1)",
+    "usage": "Most transitions."
+   },
+   {
+    "name": "al-easing-enter",
+    "value": "cubic-bezier(0, 0, 0, 1)",
+    "usage": "Elements entering."
+   },
+   {
+    "name": "al-easing-exit",
+    "value": "cubic-bezier(0.3, 0, 1, 1)",
+    "usage": "Elements leaving."
+   }
+  ]
+ },
+ "layout": {
+  "tokens": [
+   {
+    "name": "al-layout-gutter-mobile",
+    "value": "16px",
+    "usage": "Side gutter under 600px."
+   },
+   {
+    "name": "al-layout-gutter-desktop",
+    "value": "24px",
+    "usage": "Side gutter from 600px."
+   },
+   {
+    "name": "al-layout-max-content",
+    "value": "720px",
+    "usage": "Reading width: approval cards, verify result, onboarding."
+   },
+   {
+    "name": "al-layout-max-page",
+    "value": "1440px",
+    "usage": "Max page width (xl caps here)."
+   },
+   {
+    "name": "al-layout-sidebar-width",
+    "value": "232px",
+    "usage": "Console / desktop dashboard sidebar."
+   },
+   {
+    "name": "al-breakpoint-sm",
+    "value": "600px",
+    "usage": "Below: phone layout, bottom tabs (design at 360)."
+   },
+   {
+    "name": "al-breakpoint-md",
+    "value": "1024px",
+    "usage": "600–1023: tablet (design at 768)."
+   },
+   {
+    "name": "al-breakpoint-lg",
+    "value": "1440px",
+    "usage": "1024–1439: sidebar + list + detail (design at 1280). From 1440: xl, capped width."
+   }
+  ]
+ }
+}

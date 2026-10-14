@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Console agents</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
+</style>
+</helmet>
+<div data-theme="dark" style="height: 900px; background: var(--al-color-bg-canvas); font-family: var(--font-sans); color: var(--al-color-fg-default);">
+<x-import component-from-global-scope="AgentLink.AppShell" agent="All agents (2)" version="console" nav="{{nav}}" status-items="{{statusItems}}" style="display: block; height: 100%;">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px;">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px;"><span class="al-text-label" style="color: var(--al-color-fg-muted);">2 agents</span><h1 class="al-text-title-1" style="margin: 0;">Agents</h1></div>
+<x-import component-from-global-scope="AgentLink.Button" icon="cloud-agent">Deploy a cloud agent</x-import>
+<x-import component-from-global-scope="AgentLink.Button" variant="primary" icon="plus">Add agent</x-import>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; align-items: start;">
+<section style="display: flex; flex-direction: column; gap: 14px; padding: 20px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; align-items: center; gap: 10px;"><x-import component-from-global-scope="AgentLink.Icon" name="agent" size="{{s18}}"></x-import><h2 class="al-text-title-3" style="margin: 0; flex-grow: 1;">Tali's Claude (laptop)</h2><x-import component-from-global-scope="AgentLink.StatusChip" status="online"></x-import></div>
+<dl style="margin: 0; display: grid; grid-template-columns: 120px 1fr; gap: 8px 12px;">
+<dt class="al-text-label" style="color: var(--al-color-fg-muted);">AI app</dt><dd class="al-text-body" style="margin: 0;">Claude Code</dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted);">Runs</dt><dd class="al-text-body" style="margin: 0;">On your MacBook · desktop app</dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted);">Identity</dt><dd style="margin: 0;"><x-import component-from-global-scope="AgentLink.IdentityLabel" kind="registered"></x-import></dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted);">Rules</dt><dd class="al-text-body" style="margin: 0;">Proof: Ask me · Accepting terms: Ask me every time</dd>
+</dl>
+<div style="display: flex; gap: 8px;"><x-import component-from-global-scope="AgentLink.Button" size="sm">Edit rules</x-import><x-import component-from-global-scope="AgentLink.Button" size="sm" variant="ghost">Pause</x-import></div>
+</section>
+<section style="display: flex; flex-direction: column; gap: 14px; padding: 20px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; align-items: center; gap: 10px;"><x-import component-from-global-scope="AgentLink.Icon" name="cloud-agent" size="{{s18}}"></x-import><h2 class="al-text-title-3" style="margin: 0; flex-grow: 1;">Office bot (cloud)</h2><x-import component-from-global-scope="AgentLink.StatusChip" status="online"></x-import></div>
+<dl style="margin: 0; display: grid; grid-template-columns: 120px 1fr; gap: 8px 12px;">
+<dt class="al-text-label" style="color: var(--al-color-fg-muted);">Runs</dt><dd class="al-text-code" style="margin: 0;">office-bot.tali-example.workers.dev</dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted);">Last sync</dt><dd class="al-text-body" style="margin: 0;">2 min ago</dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted);">Autonomy</dt><dd class="al-text-body" style="margin: 0;">Off</dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted);">Identity</dt><dd style="margin: 0;"><x-import component-from-global-scope="AgentLink.IdentityLabel" kind="selfdeclared"></x-import></dd>
+</dl>
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Connected AI apps</span>
+<div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--al-color-border-default); border-radius: 4px;"><span class="al-text-body" style="flex-grow: 1;">“ChatGPT” <span class="al-text-code" style="color: var(--al-color-fg-muted);">chatgpt.com</span></span><x-import component-from-global-scope="AgentLink.Button" size="sm" variant="danger">Revoke</x-import></div>
+</div>
+</section>
+<section style="display: flex; flex-direction: column; gap: 12px; padding: 20px; border: 1px solid var(--al-color-proof-border); border-radius: 6px; background: var(--al-color-proof-bg);">
+<div style="display: flex; align-items: center; gap: 10px;"><x-import component-from-global-scope="AgentLink.Icon" name="identity-registered" size="{{s18}}" style="color: var(--al-color-proof-seal);"></x-import><h2 class="al-text-title-3" style="margin: 0; flex-grow: 1;">Register Office bot</h2><span class="al-text-code">$5 one-time</span></div>
+<p class="al-text-body" style="margin: 0;">Puts this agent on the public record, so others see “Registered” next to its name. It shows that this agent is bound to your owner key. It doesn't prove who you are legally.</p>
+<div style="display: flex; gap: 8px; align-items: center;"><x-import component-from-global-scope="AgentLink.Button" variant="primary" icon="plus">Add credits to register</x-import><span class="al-text-caption" style="color: var(--al-color-fg-muted);">Needs $5.00 in credits · you have $4.80</span></div>
+</section>
+<section style="display: flex; flex-direction: column; gap: 10px; padding: 20px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<h2 class="al-text-title-3" style="margin: 0;">Revoke an agent</h2>
+<p class="al-text-body" style="margin: 0; color: var(--al-color-fg-muted);">Stops it from sending or approving anything in your name. Contacts see “Tali revoked this agent on {date}. History stays readable.”</p>
+<div><x-import component-from-global-scope="AgentLink.Button" size="sm" variant="danger" icon="ban">Revoke Office bot</x-import></div>
+</section>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      s18: 18,
+      statusItems: ['2 agents online', '7 proofs this week'],
+      nav: [
+        { icon: 'activity', label: 'Home' },
+        { icon: 'approval', label: 'Approvals', count: 2 },
+        { icon: 'inbox', label: 'Threads' },
+        { icon: 'proof-seal', label: 'Proofs' },
+        { icon: 'users', label: 'Contacts' },
+        { icon: 'agent', label: 'Agents', active: true },
+        { icon: 'sliders-horizontal', label: 'Rules' },
+        { icon: 'plus', label: 'Credits' },
+        { icon: 'hard-drive', label: 'Storage' },
+        { icon: 'settings', label: 'Settings' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

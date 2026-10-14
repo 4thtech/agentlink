@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../../tokens/tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../../screens/lib/react.production.min.js"></script><script src="../../../screens/lib/react-dom.production.min.js"></script><script src="../bundle.js"></script><meta charset="utf-8"><title>FileCard</title></head>
+<body>
+<div id="root" class="al-preview is-col"></div>
+<script>
+  var A = window.AgentLink, h = React.createElement, F = React.Fragment;
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div',{style:{display:'flex',flexDirection:'column',gap:8,width:'100%',maxWidth:640}},
+ h(A.FileCard,{name:'Invoice_September.pdf',size:'240 KB',from:'To Marko',proof:'recorded',proofTime:'09:14'}),
+ h(A.FileCard,{name:'proposal-draft.pdf',size:'2 MB',status:'delivered',expiry:'Link until 19 Oct'}),
+ h(A.FileCard,{name:'contract-signed.pdf',size:'1.1 MB',expiry:'Link expired 19 Oct',action:h(A.Button,{size:'sm',icon:'refresh-cw'},'Request fresh link')}),
+ h(A.FileCard,{name:'report-final.pdf',size:'3.4 MB',integrity:'failed'})));
+</script>
+</body>
+</html>

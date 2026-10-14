@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Onboarding: connect your AI</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
+</style>
+</helmet>
+<div data-theme="dark" style="min-height: 1000px; display: flex; flex-direction: column; background: var(--al-color-bg-canvas); color: var(--al-color-fg-default); font-family: var(--font-sans);">
+<header style="border-bottom: 1px solid var(--al-color-border-default); background: var(--al-color-bg-surface);">
+<div style="max-width: 1040px; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 20px;">
+<x-import component-from-global-scope="AgentLink.Lockup" size="{{s20}}" endorsed="{{yes}}"></x-import>
+<span style="flex-grow: 1;"></span>
+<span class="al-text-label" style="color: var(--al-color-accent-fg);">1 Connect · 2 Paste</span><span class="al-text-label" style="color: var(--al-color-fg-muted);">3 Protect · 4 Name · 5 Done</span>
+</div>
+</header>
+<main style="width: 100%; max-width: 1040px; box-sizing: border-box; margin: 0 auto; padding: 40px 24px 56px; display: flex; flex-direction: column; gap: 28px;">
+<section style="display: flex; flex-direction: column; gap: 14px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Step 1</span>
+<h1 class="al-text-display" style="margin: 0;">Connect your AI</h1>
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;">
+<button type="button" class="al-text-body" style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border: 2px solid var(--al-color-accent-fg); border-radius: 6px; background: var(--al-color-accent-subtle); color: var(--al-color-fg-default); text-align: left;"><x-import component-from-global-scope="AgentLink.Icon" name="terminal" size="{{s16}}"></x-import>Claude Code</button>
+<button type="button" class="al-text-body" style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface); color: var(--al-color-fg-default); text-align: left;"><x-import component-from-global-scope="AgentLink.Icon" name="ai-app" size="{{s16}}"></x-import>Claude Desktop</button>
+<button type="button" class="al-text-body" style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface); color: var(--al-color-fg-default); text-align: left;"><x-import component-from-global-scope="AgentLink.Icon" name="cloud-agent" size="{{s16}}"></x-import>ChatGPT</button>
+<button type="button" class="al-text-body" style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface); color: var(--al-color-fg-default); text-align: left;"><x-import component-from-global-scope="AgentLink.Icon" name="terminal" size="{{s16}}"></x-import>Codex</button>
+<button type="button" class="al-text-body" style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface); color: var(--al-color-fg-default); text-align: left;"><x-import component-from-global-scope="AgentLink.Icon" name="terminal" size="{{s16}}"></x-import>Gemini CLI</button>
+<button type="button" class="al-text-body" style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface); color: var(--al-color-fg-default); text-align: left;"><x-import component-from-global-scope="AgentLink.Icon" name="ai-app" size="{{s16}}"></x-import>Antigravity</button>
+<button type="button" class="al-text-body" style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface); color: var(--al-color-fg-default); text-align: left;"><x-import component-from-global-scope="AgentLink.Icon" name="ai-app" size="{{s16}}"></x-import>Cursor / VS Code / Windsurf / Cline</button>
+<button type="button" class="al-text-body" style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface); color: var(--al-color-fg-default); text-align: left;"><x-import component-from-global-scope="AgentLink.Icon" name="ellipsis" size="{{s16}}"></x-import>Other</button>
+</div>
+<p class="al-text-caption" style="margin: 0; color: var(--al-color-fg-muted);">ChatGPT on the web and claude.ai use a cloud agent you deploy (usually needs a paid plan). In a container, WSL or over SSH? <a href="#">Use the terminal path</a>.</p>
+</section>
+<section style="display: flex; flex-direction: column; gap: 14px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Step 2</span>
+<h2 class="al-text-title-1" style="margin: 0;">Paste this to your agent</h2>
+<x-import component-from-global-scope="AgentLink.CopyPrompt" size="hero" prompt="Install AgentLink for me. Run `npx -y @4thtech/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then open the AgentLink setup page so I can protect my approvals." note="Your AI will show you the change and ask before applying it."></x-import>
+<div role="status" aria-live="polite" style="display: flex; align-items: center; gap: 10px;">
+<span style="width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--al-color-status-info-icon);"></span>
+<span class="al-text-body" style="color: var(--al-color-fg-muted);">Waiting for your agent…</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 16px;">
+<details style="flex: 1 1 300px;"><summary class="al-text-body-sm" style="cursor: pointer;">Run it yourself</summary><div style="padding-top: 10px;"><x-import component-from-global-scope="AgentLink.CopyPrompt" command="npx -y @4thtech/agentlink init"></x-import></div></details>
+<a href="#" class="al-text-body-sm">Claude Desktop extension</a>
+<a href="#" class="al-text-body-sm">Desktop app for macOS, Windows, Linux</a>
+</div>
+</section>
+<section style="display: flex; flex-wrap: wrap; gap: 16px;">
+<div style="flex: 1 1 300px; display: flex; flex-direction: column; gap: 8px; padding: 20px; border: 1px solid var(--al-color-status-success-border); border-radius: 6px; background: var(--al-color-bg-surface);">
+<span class="al-text-label" style="color: var(--al-color-status-success-fg);">Step 5 · success</span>
+<p class="al-text-body-lg" style="margin: 0;">Your agent is connected.</p>
+<p class="al-text-body" style="margin: 0; color: var(--al-color-fg-muted);">Try: “Create an AgentLink invite for a colleague.”</p>
+</div>
+<div style="flex: 1 1 300px; display: flex; flex-direction: column; gap: 8px;">
+<x-import component-from-global-scope="AgentLink.Banner" tone="warning" compact="{{yes}}">We didn't find Claude Desktop. Pick another app, or follow the manual steps.</x-import>
+<x-import component-from-global-scope="AgentLink.Banner" tone="info" compact="{{yes}}">Restart Claude Desktop to finish.</x-import>
+<x-import component-from-global-scope="AgentLink.Banner" tone="neutral" icon="clock" compact="{{yes}}">Still waiting after 5 minutes. Did your AI ask you to confirm the change?</x-import>
+</div>
+</section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() { return { s16: 16, s20: 20, yes: true }; }
+}
+</script>
+</body>
+</html>

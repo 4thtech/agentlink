@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Desktop settings</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}
+</style>
+</helmet>
+<div data-theme="dark" style="width: 960px; height: 760px; box-sizing: border-box; display: flex; flex-direction: column; border: 1px solid var(--al-color-border-strong); border-radius: 10px; overflow: hidden; background: var(--al-color-bg-canvas); color: var(--al-color-fg-default); font-family: var(--font-sans);">
+<div style="display: flex; align-items: center; height: 32px; padding: 0 12px; background: var(--al-color-bg-surface); border-bottom: 1px solid var(--al-color-border-default);">
+<span aria-hidden="true" style="display: flex; gap: 8px;"><span style="width: 12px; height: 12px; border-radius: 50%; background: var(--al-color-border-strong);"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: var(--al-color-border-strong);"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: var(--al-color-border-strong);"></span></span>
+<span class="al-text-body-sm" style="flex-grow: 1; text-align: center; padding-right: 52px; color: var(--al-color-fg-muted);">Settings</span>
+</div>
+<div style="flex-grow: 1; display: flex; min-height: 0;">
+<nav aria-label="Settings" style="width: 200px; padding: 16px 12px; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--al-color-border-default); background: var(--al-color-bg-surface);">
+<a href="#" class="al-text-body" style="padding: 6px 10px; border-radius: 4px; color: var(--al-color-fg-muted); text-decoration: none;">General</a>
+<a href="#" aria-current="page" class="al-text-body" style="padding: 6px 10px; border-radius: 4px; background: var(--al-color-accent-subtle); color: var(--al-color-accent-fg); text-decoration: none;">Security</a>
+<a href="#" class="al-text-body" style="padding: 6px 10px; border-radius: 4px; color: var(--al-color-fg-muted); text-decoration: none;">Updates</a>
+<a href="#" class="al-text-body" style="padding: 6px 10px; border-radius: 4px; color: var(--al-color-fg-muted); text-decoration: none;">Notifications</a>
+<a href="#" class="al-text-body" style="padding: 6px 10px; border-radius: 4px; color: var(--al-color-fg-muted); text-decoration: none;">About</a>
+</nav>
+<div style="flex-grow: 1; overflow: auto; padding: 28px 32px; display: flex; flex-direction: column; gap: 24px;">
+<section style="display: flex; flex-direction: column; gap: 12px;">
+<h2 class="al-text-title-3" style="margin: 0;">Security</h2>
+<div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<x-import component-from-global-scope="AgentLink.Icon" name="eye-off" size="{{s16}}"></x-import>
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px;"><span class="al-text-body">Unlocked · reading messages</span><span class="al-text-caption" style="color: var(--al-color-fg-muted);">Locks after 15 minutes, on screen lock or sleep. Approvals always ask for Touch ID.</span></div>
+<x-import component-from-global-scope="AgentLink.Button" size="sm">Lock now</x-import>
+</div>
+<x-import component-from-global-scope="AgentLink.Switch" label="Start AgentLink at login" description="Keeps your inbox synced in the background." default-checked="{{yes}}"></x-import>
+</section>
+<section style="display: flex; flex-direction: column; gap: 10px;">
+<h2 class="al-text-title-3" style="margin: 0;">Updates</h2>
+<x-import component-from-global-scope="AgentLink.Banner" tone="info" icon="download">Update ready, restart to apply. 0.3.1 · <a href="#">What's new</a> · <a href="#">Restart</a></x-import>
+<x-import component-from-global-scope="AgentLink.Banner" tone="danger" compact="{{yes}}">This update wasn't installed because its signature didn't match. You're still on 0.3.0.</x-import>
+<x-import component-from-global-scope="AgentLink.Banner" tone="success" compact="{{yes}}">Updated to 0.3.1.</x-import>
+<span class="al-text-caption" style="color: var(--al-color-fg-muted);">Checking · Downloading 64% · Up to date — same banner, one line each. Advanced: Signature verified.</span>
+</section>
+<section style="display: flex; flex-direction: column; gap: 12px; padding-top: 8px; border-top: 1px solid var(--al-color-border-subtle);">
+<h2 class="al-text-title-3" style="margin: 0;">About</h2>
+<x-import component-from-global-scope="AgentLink.Lockup" size="{{s24}}" endorsed="{{yes}}"></x-import>
+<dl style="margin: 0; display: grid; grid-template-columns: 140px 1fr; gap: 6px 16px;">
+<dt class="al-text-label" style="color: var(--al-color-fg-muted);">Version</dt><dd class="al-text-code" style="margin: 0;">0.3.0</dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted);">Build fingerprint</dt><dd class="al-text-code" style="margin: 0;">[BUILD FINGERPRINT]</dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted);">Signed by</dt><dd class="al-text-body" style="margin: 0;">4thTech</dd>
+</dl>
+</section>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() { return { s16: 16, s24: 24, yes: true }; }
+}
+</script>
+</body>
+</html>

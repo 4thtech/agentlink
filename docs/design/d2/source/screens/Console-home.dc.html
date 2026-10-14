@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Console home</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
+</style>
+</helmet>
+<div data-theme="dark" style="height: 900px; background: var(--al-color-bg-canvas); font-family: var(--font-sans); color: var(--al-color-fg-default);">
+<x-import component-from-global-scope="AgentLink.AppShell" agent="All agents (2)" version="console" nav="{{nav}}" status-items="{{statusItems}}" style="display: block; height: 100%;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Monday 12 Oct</span>
+<h1 class="al-text-title-1" style="margin: 0;">Good afternoon, Tali</h1>
+</div>
+<section style="display: flex; flex-direction: column; gap: 8px;">
+<span class="al-text-label" style="color: var(--al-color-accent-fg);">2 approvals waiting</span>
+<div style="border: 1px solid var(--al-color-accent-fg); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--al-color-border-subtle);">
+<x-import component-from-global-scope="AgentLink.Icon" name="proof-seal" size="{{s16}}" style="color: var(--al-color-accent-fg);"></x-import>
+<span class="al-text-body" style="flex-grow: 1;">Send a file to Marko with proof</span>
+<span class="al-text-body-sm" style="color: var(--al-color-fg-muted);">Tali's Claude (laptop) · $0.10 · 9 min left</span>
+<x-import component-from-global-scope="AgentLink.Button" size="sm" variant="primary">Review</x-import>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px;">
+<x-import component-from-global-scope="AgentLink.Icon" name="commitment" size="{{s16}}" style="color: var(--al-color-commitment-fg);"></x-import>
+<span class="al-text-body" style="flex-grow: 1;">Accepting terms from Ana · version 3</span>
+<span class="al-text-body-sm" style="color: var(--al-color-fg-muted);">Office bot (cloud) · free · until 20 Oct</span>
+<x-import component-from-global-scope="AgentLink.Button" size="sm">Review</x-import>
+</div>
+</div>
+</section>
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+<section style="flex: 999 1 460px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Activity</span>
+<div style="border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--al-color-border-subtle);"><span class="al-text-code" style="color: var(--al-color-fg-muted);">15:10</span><span class="al-text-body" style="flex-grow: 1;">Ana accepted version 3</span><x-import component-from-global-scope="AgentLink.StatusChip" status="accepted"></x-import></div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--al-color-border-subtle);"><span class="al-text-code" style="color: var(--al-color-fg-muted);">14:02</span><span class="al-text-body" style="flex-grow: 1;">Terms version 3 recorded</span><x-import component-from-global-scope="AgentLink.ProofBadge" state="recorded" time="14:02"></x-import></div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--al-color-border-subtle);"><span class="al-text-code" style="color: var(--al-color-fg-muted);">11:58</span><span class="al-text-body" style="flex-grow: 1;">Request received from Marko</span><x-import component-from-global-scope="AgentLink.StatusChip" status="received"></x-import></div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px;"><span class="al-text-code" style="color: var(--al-color-fg-muted);">11:02</span><span class="al-text-body" style="flex-grow: 1;">Marko opened Invoice_September.pdf</span><x-import component-from-global-scope="AgentLink.StatusChip" status="opened"></x-import></div>
+</div>
+</section>
+<aside style="flex: 1 1 320px; display: flex; flex-direction: column; gap: 16px;">
+<x-import component-from-global-scope="AgentLink.CreditsMeter" balance="$4.80" proofs-left="{{n48}}" spent-today="{{spent}}" budget="{{n5}}"></x-import>
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 20px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Agents</span>
+<div style="display: flex; align-items: center; gap: 8px;"><span class="al-text-body" style="flex-grow: 1;">Tali's Claude (laptop)</span><x-import component-from-global-scope="AgentLink.StatusChip" status="online"></x-import></div>
+<div style="display: flex; align-items: center; gap: 8px;"><span class="al-text-body" style="flex-grow: 1;">Office bot (cloud)</span><x-import component-from-global-scope="AgentLink.StatusChip" status="online"></x-import></div>
+<span class="al-text-caption" style="color: var(--al-color-fg-muted);">7 proofs this week</span>
+</div>
+</aside>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      s16: 16, n48: 48, n5: 5, spent: 0.3,
+      statusItems: ['2 agents online', '7 proofs this week'],
+      nav: [
+        { icon: 'activity', label: 'Home', active: true },
+        { icon: 'approval', label: 'Approvals', count: 2 },
+        { icon: 'inbox', label: 'Threads' },
+        { icon: 'proof-seal', label: 'Proofs' },
+        { icon: 'users', label: 'Contacts' },
+        { icon: 'agent', label: 'Agents' },
+        { icon: 'sliders-horizontal', label: 'Rules' },
+        { icon: 'plus', label: 'Credits' },
+        { icon: 'hard-drive', label: 'Storage' },
+        { icon: 'settings', label: 'Settings' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
