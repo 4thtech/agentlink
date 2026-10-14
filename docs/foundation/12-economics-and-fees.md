@@ -127,6 +127,8 @@ The multiple defaults to **4** and can never exceed **10** (a contract constant)
 | Change the treasury | `TREASURY_ADMIN` (Safe) | 7 days |
 | Pause charging | `PAUSER` | None; **never blocks withdrawals** |
 | Register a module, upgrade a contract (proposed, G-3) | `MODULE_ADMIN`, `UPGRADER` (Safe) | **7 days**; the notice tells users to withdraw and revoke token approvals |
+| Remove a module (proposed, G-3) | `PAUSE_ADMIN` (Safe) | None; only reduces power |
+| Unpause (proposed, G-3) | `PAUSE_ADMIN` (Safe) | None |
 
 **Public price policy** (D-45; a commitment, not enforced on-chain):
 

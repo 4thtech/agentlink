@@ -30,7 +30,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 
 | Class | Name | Definition |
 |---|---|---|
-| **S0** | None | No security-relevant behaviour: docs outside `docs/foundation/`, internal tooling with no secrets, UI styling with no data flow change. |
+| **S0** | None | No security-relevant behaviour: docs outside `docs/foundation/`, `docs/process/` and `docs-site/`, internal tooling with no secrets, UI styling with no data flow change. |
 | **S1** | Sensitive | Handles inbound content; files, paths or URLs; storage credentials; the policy or approval UI; CI or release configuration; the chain client. |
 | **S2** | Critical | Crypto; key derivation and storage; owner presence; the envelope or pairing protocol; the policy engine; contracts; anything that signs; the submitter; deploy scripts with roles. |
 
@@ -58,6 +58,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 | `package.json` (root), `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc` (any depth), `.pnpmfile.*` (any depth), `turbo.json`, `.changeset/config.json`, `.gitleaks.toml`, `.gitleaksignore` | S1 | Supply chain, release and secret-scan configuration. `.npmrc`, `.pnpmfile.*`, `pnpm-workspace.yaml` and the root `package.json` can run code or redirect installs and publishing in CI (`--ignore-scripts` does not stop a pnpmfile), including in jobs holding the npm OIDC token |
 | `docs/foundation/04-security-and-crypto.md` | S2 | Invariants |
 | other `docs/foundation/**`, `docs/process/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, `SECURITY.md` | S1 | Specs, agent instructions and harness settings |
+| `docs-site/**` | S1 | Public docs, published on merge (D-57); they restate security and privacy commitments. Mirror in `review-gate.yml` pending (owner, M0-25); until then the PR declares S1 |
 | anything else | S0 | — |
 
 This table is mirrored in two places that MUST change with it in the same PR:

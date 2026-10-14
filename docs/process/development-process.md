@@ -25,7 +25,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 
 ### 1.1 Owner-only actions
 
-Approving production deployments (GitHub Environments `npm-publish` and `production`) · clearing `DEPLOY_FREEZE` · mainnet contract deployment · contract upgrades and configuration changes (Safe schedule → delay → execute) · Safe signing · production secrets (gas keys via `wrangler secret put`, Cloudflare API tokens, `DEPLOY_FREEZE_TOKEN`) · npm actions with 2FA (bootstrap publish, `dist-tag`, `deprecate`) · publishing docs on GitBook · merging changes that need the owner's explicit approval (§8: spec, decision-log and process-document changes) himself, or giving the explicit "merge" for that specific PR, after which the orchestrator may enable auto-merge · the "merge" go-ahead for every S2 PR and every sensitive-path PR (D-51) · recording or changing decisions (D-xx) · lowering a security class · accepting a risk · break-glass changes to a ruleset (`audit-rules.md` §6) · changing rulesets, CODEOWNERS, environments, org settings or the standing brief. Release and deployment detail: `release-and-deployment.md` §3.2.
+Approving production deployments (GitHub Environments `npm-publish` and `production`) · clearing `DEPLOY_FREEZE` · mainnet contract deployment · contract upgrades and configuration changes (Safe schedule → delay → execute) · Safe signing · production secrets (gas keys via `wrangler secret put`, Cloudflare API tokens, `DEPLOY_FREEZE_TOKEN`) · npm actions with 2FA (bootstrap publish, `dist-tag`, `deprecate`) · changing the public docs publishing setup (GitBook Git Sync, domain, site structure, spaces; D-57) · merging changes that need the owner's explicit approval (§8: spec, decision-log and process-document changes) himself, or giving the explicit "merge" for that specific PR, after which the orchestrator may enable auto-merge · the "merge" go-ahead for every S2 PR and every sensitive-path PR (D-51) · recording or changing decisions (D-xx) · lowering a security class · accepting a risk · break-glass changes to a ruleset (`audit-rules.md` §6) · changing rulesets, CODEOWNERS, environments, org settings or the standing brief. Release and deployment detail: `release-and-deployment.md` §3.2.
 
 ### 1.2 Hard limits for every agent (orchestrator and workers)
 
@@ -289,6 +289,8 @@ S0 tasks MAY skip `audit`. A task that hits stop-the-line (`audit-rules.md` §10
 - [ ] Backlog status updated per `backlog.md`; claim released on `board.md`.
 - [ ] Own sync file updated (`sync-protocol.md`).
 - [ ] Curator handoff saved by the orchestrator (§13).
+
+**Milestones and releases.** A milestone or release (patches and M4/M5 included) is done only when the public docs (`docs-site/`, per `docs-site/MAINTAINING.md` and the milestone's DOCS card), the README Status and Roadmap, the CHANGELOG, the explainers (`docs/explainers/`) and the documentation map (`docs/README.md`), the runbooks and lessons, and the design status (`docs/design/README.md`) are updated.
 
 ---
 
