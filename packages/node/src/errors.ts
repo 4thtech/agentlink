@@ -9,6 +9,8 @@ export type NodeKeyStoreErrorCode =
   | 'identity_missing'
   /** The keychain item does not derive the agent ID it is stored under (04 §2.9). */
   | 'identity_mismatch'
+  /** The store key item is not 32 bytes (07 §3). */
+  | 'store_key_invalid'
   /** An item for this agent already exists; it is never overwritten. */
   | 'identity_exists'
   /** The OS keychain refused or failed the operation. */

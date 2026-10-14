@@ -57,6 +57,8 @@ okm = HKDF-SHA256(
 
 Headless machines (containers, WSL, SSH sessions) without a usable OS keychain follow §2.8.
 
+**Keychain item names (proposed; owner confirms at merge; M1-8a, IR-M1-8a-1 L-3).** Every item is a generic credential under service `agentlink`. The agent seed is under account `<agentId>`. Every other item of the agent is under `<agentId>:<name>`, where `<name>` is its `ALKS` entry name (§2.8), for example `<agentId>:store-key`. The keychain probe (§2.8) uses account `probe:<32 random lowercase hex>`. `agentId` is checked against the §2.9 form before any account is built, so it contains no `:` and accounts cannot collide. When storage credentials land (`s3:<id>`), `<id>` gets a fixed format.
+
 Rationale: harness agents (Claude Code, Codex, Gemini CLI…) can run shell commands as the same OS user. They can read anything the agent process can read, including the agent seed. They must **not** be able to obtain the owner key, which is why owner operations require user presence (§2.5).
 
 ### 2.3 Owner identity in the browser (passkey)

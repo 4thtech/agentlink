@@ -41,9 +41,13 @@ import { NodeKeyStoreError } from './errors.js';
 import {
   assertAgentId,
   keychainAccount,
+  osKeychain,
+  probeKeychain,
   type KeyStoreBackendKind,
   type KeychainBackend,
   type KeychainItem,
+  type KeychainProbe,
+  type ProbeOptions,
 } from './keychain.js';
 
 const keychainFailed = (): NodeKeyStoreError =>
@@ -64,12 +68,35 @@ const identityMismatch = (): NodeKeyStoreError =>
     "The keychain item for this agent belongs to a different agent. Restore this agent's item from a backup; `agentlink doctor` shows the expected agent ID.",
   );
 
-/** Every keychain call, with native errors replaced by a fixed sentence (I-7). */
-async function guarded<T>(call: () => Promise<T>): Promise<T> {
+/**
+ * Default limit for one keychain call (IR-M1-8a-1 L-4). A keychain locked mid-session can wait on an
+ * unlock prompt; the tool call then fails instead of hanging. The native call may still finish later.
+ */
+export const KEYCHAIN_CALL_TIMEOUT_MS = 30_000;
+
+/**
+ * Every keychain call, with native errors and timeouts replaced by a fixed sentence (I-7).
+ */
+async function guarded<T>(call: () => Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
+  // Bytes that arrive after the timeout are wiped: nobody will use them.
+  const pending = call().then((value) => {
+    if (timedOut && value instanceof Uint8Array) wipe(value);
+    return value;
+  });
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      reject(new Error('timeout'));
+    }, timeoutMs);
+  });
   try {
-    return await call();
+    return await Promise.race([pending, timeout]);
   } catch {
     throw keychainFailed();
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -136,18 +163,27 @@ function derivesAgent(seed: Uint8Array, agentId: string): boolean {
 export interface KeychainKeyStoreOptions {
   /** The current key epoch (04 §2.6), as recorded in the agent's `identity` row. Default 0. */
   readonly keyEpoch?: number;
+  /** Limit for each keychain call in milliseconds. Default KEYCHAIN_CALL_TIMEOUT_MS. */
+  readonly timeoutMs?: number;
 }
 
 export class KeychainKeyStore implements KeyStore {
   readonly #keychain: KeychainBackend;
   readonly #agentId: string;
   readonly #keyEpoch: number;
+  readonly #timeoutMs: number;
   #closed = false;
 
-  private constructor(keychain: KeychainBackend, agentId: string, keyEpoch: number) {
+  private constructor(
+    keychain: KeychainBackend,
+    agentId: string,
+    keyEpoch: number,
+    timeoutMs: number,
+  ) {
     this.#keychain = keychain;
     this.#agentId = agentId;
     this.#keyEpoch = keyEpoch;
+    this.#timeoutMs = timeoutMs;
   }
 
   /**
@@ -162,7 +198,8 @@ export class KeychainKeyStore implements KeyStore {
     assertAgentId(agentId);
     const keyEpoch = options.keyEpoch ?? 0;
     assertEpoch(keyEpoch);
-    const store = new KeychainKeyStore(keychain, agentId, keyEpoch);
+    const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
+    const store = new KeychainKeyStore(keychain, agentId, keyEpoch, timeoutMs);
     await store.#withSeed(() => undefined);
     return store;
   }
@@ -170,7 +207,10 @@ export class KeychainKeyStore implements KeyStore {
   /** Reads one item of this agent, or throws `identity_missing`. The caller wipes the result. */
   async #read(item: KeychainItem): Promise<Uint8Array> {
     if (this.#closed) throw new KeyStoreError('keystore_closed', 'keystore: the store is closed');
-    const value = await guarded(() => this.#keychain.get(keychainAccount(this.#agentId, item)));
+    const value = await guarded(
+      () => this.#keychain.get(keychainAccount(this.#agentId, item)),
+      this.#timeoutMs,
+    );
     if (value === null) throw identityMissing();
     if (this.#closed) {
       wipe(value);
@@ -286,7 +326,12 @@ export class KeychainKeyStore implements KeyStore {
   async withStoreKey<T>(fn: (storeKey: Uint8Array) => T | Promise<T>): Promise<T> {
     const key = await this.#read('store-key');
     try {
-      if (key.length !== 32) throw identityMismatch();
+      if (key.length !== 32) {
+        throw new NodeKeyStoreError(
+          'store_key_invalid',
+          "This agent's local data key in the system keychain is damaged. Restore it from a backup.",
+        );
+      }
       return await fn(key);
     } finally {
       wipe(key);
@@ -305,14 +350,17 @@ export class KeychainKeyStore implements KeyStore {
  * backend `keychain` (07 §9.1). Existing items are never overwritten. On any failure both items are
  * removed, so nothing half-made remains. No file is written.
  */
-export async function createKeychainAgent(keychain: KeychainBackend): Promise<string> {
+export async function createKeychainAgent(
+  keychain: KeychainBackend,
+  { timeoutMs = KEYCHAIN_CALL_TIMEOUT_MS }: { readonly timeoutMs?: number } = {},
+): Promise<string> {
   const seed = randomBytes(MASTER_SEED_LENGTH);
   const storeKey = randomBytes(32);
   try {
     const agentId = deriveAgentId(seed);
     const accounts = [keychainAccount(agentId, 'seed'), keychainAccount(agentId, 'store-key')];
     for (const account of accounts) {
-      const existing = await guarded(() => keychain.get(account));
+      const existing = await guarded(() => keychain.get(account), timeoutMs);
       if (existing !== null) {
         wipe(existing);
         throw new NodeKeyStoreError(
@@ -322,11 +370,13 @@ export async function createKeychainAgent(keychain: KeychainBackend): Promise<st
       }
     }
     try {
-      await guarded(() => keychain.set(accounts[0] as string, seed));
-      await guarded(() => keychain.set(accounts[1] as string, storeKey));
-      await (await KeychainKeyStore.open(keychain, agentId)).close();
+      await guarded(() => keychain.set(accounts[0] as string, seed), timeoutMs);
+      await guarded(() => keychain.set(accounts[1] as string, storeKey), timeoutMs);
+      await (await KeychainKeyStore.open(keychain, agentId, { timeoutMs })).close();
     } catch (error) {
-      for (const account of accounts) await keychain.delete(account).catch(() => false);
+      for (const account of accounts) {
+        await guarded(() => keychain.delete(account), timeoutMs).catch(() => false);
+      }
       throw error;
     }
     return agentId;
@@ -345,9 +395,54 @@ export async function openRecordedKeyStore(
   backends: { readonly keychain: KeychainBackend },
   options: KeychainKeyStoreOptions = {},
 ): Promise<KeyStore> {
-  if (backend === 'keychain') return KeychainKeyStore.open(backends.keychain, agentId, options);
+  if (backend === 'keychain') {
+    return keyStoreFacade(await KeychainKeyStore.open(backends.keychain, agentId, options));
+  }
   throw new NodeKeyStoreError(
     'backend_unavailable',
-    "This agent's identity is kept in a passphrase-locked file, which this version of AgentLink can't open yet. Update AgentLink.",
+    backend === 'file'
+      ? "This agent's identity is kept in a passphrase-locked file, which this version of AgentLink can't open yet. Update AgentLink."
+      : "This agent's recorded key store is not one AgentLink knows. Check the agent's config with `agentlink doctor`.",
   );
+}
+
+/**
+ * A frozen object with exactly the KeyStore methods (IR-M1-8a-1 M-2): code outside this package gets
+ * no `withStoreKey`, no backend and no constructor to reach a raw item through.
+ */
+function keyStoreFacade(store: KeychainKeyStore): KeyStore {
+  return Object.freeze({
+    getPublicBundle: (options?: EpochOptions) => store.getPublicBundle(options),
+    signNostr: (event: UnsignedNostrEvent) => store.signNostr(event),
+    signEnvelopeHash: (hash: Uint8Array) => store.signEnvelopeHash(hash),
+    nip44Encrypt: (peer: string, plaintext: string) => store.nip44Encrypt(peer, plaintext),
+    nip44Decrypt: (peer: string, payload: string, options?: EpochOptions) =>
+      store.nip44Decrypt(peer, payload, options),
+    unwrapCek: (wrapped: WrappedCek, envelopeId: Uint8Array, options?: EpochOptions) =>
+      store.unwrapCek(wrapped, envelopeId, options),
+    sign712: (typedData: TypedData) => store.sign712(typedData),
+    close: () => store.close(),
+  });
+}
+
+// --- The package's public entry points (index.ts). They take no backend and return nothing that
+// holds raw keychain bytes: the OS keychain is chosen here, inside the fence (04 §8.1, M-2).
+
+/** 04 §2.8: the keychain probe against the OS keychain. */
+export function probeOsKeychain(options: ProbeOptions = {}): Promise<KeychainProbe> {
+  return probeKeychain(osKeychain(), options);
+}
+
+/** Creates a new agent in the OS keychain and returns its agent ID (04 §2.9). */
+export function createOsKeychainAgent(): Promise<string> {
+  return createKeychainAgent(osKeychain());
+}
+
+/** Opens an agent with its recorded backend (07 §9.1). Returns only the KeyStore interface. */
+export function openAgentKeyStore(
+  backend: KeyStoreBackendKind,
+  agentId: string,
+  options: KeychainKeyStoreOptions = {},
+): Promise<KeyStore> {
+  return openRecordedKeyStore(backend, agentId, { keychain: osKeychain() }, options);
 }

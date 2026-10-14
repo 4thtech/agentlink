@@ -56,12 +56,27 @@ export function keychainAccount(agentId: string, item: KeychainItem): string {
 type Binding = typeof import('@napi-rs/keyring');
 
 /**
+ * The napi-rs loader reads these to load another native library or a WASI build instead of the
+ * pinned platform package (IR-M1-8a-1 L-7). Not a boundary against a same-user process, which can
+ * set NODE_OPTIONS or edit node_modules (04 §2.5), but the seed code should not change silently.
+ */
+const LOADER_OVERRIDES = [
+  'NAPI_RS_NATIVE_LIBRARY_PATH',
+  'NAPI_RS_FORCE_WASI',
+  'NAPI_RS_WASI_FLAVOR',
+];
+
+/**
  * The OS keychain through @napi-rs/keyring. The native binding loads on first use, so importing this
  * package loads no native code. `service` is `agentlink` except in tests.
+ *
+ * Internal to @agentlink/node (IR-M1-8a-1 M-2): it returns raw item bytes, the agent seed included,
+ * so the package entry never exports it (fence.test.ts).
  */
 export function osKeychain(service: string = KEYCHAIN_SERVICE): KeychainBackend {
   let binding: Promise<Binding> | undefined;
   const entry = async (account: string) => {
+    for (const name of LOADER_OVERRIDES) Reflect.deleteProperty(process.env, name);
     binding ??= import('@napi-rs/keyring');
     const { AsyncEntry } = await binding;
     return new AsyncEntry(service, account, { linux: { store: KEYCHAIN_LINUX_STORE } });
