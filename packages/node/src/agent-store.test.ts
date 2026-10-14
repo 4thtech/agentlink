@@ -9,6 +9,7 @@ import { openAgentStoreWith } from './agent-store.js';
 import { NodeKeyStoreError } from './errors.js';
 import { createKeychainAgent } from './keychain-keystore.js';
 import { keychainAccount, type KeychainBackend } from './keychain.js';
+import { SqliteStore } from './sqlite-store.js';
 
 class MapKeychain implements KeychainBackend {
   readonly items = new Map<string, Uint8Array>();
@@ -49,6 +50,25 @@ describe('openAgentStoreWith', () => {
     const second = await openAgentStoreWith('keychain', agentId, path, { keychain });
     expect(await second.cipher.open(context, sealedName)).toBe('Denis');
     await second.close();
+  });
+
+  it('hands out a frozen store facade with no connection or SqliteStore instance (IR-M1-8b-1 L-1)', async () => {
+    const opened = await openAgentStoreWith('keychain', agentId, join(dir, 'agent.sqlite'), {
+      keychain,
+    });
+    expect(Object.isFrozen(opened.store)).toBe(true);
+    expect(Object.keys(opened.store).sort()).toEqual([
+      'close',
+      'schemaVersion',
+      'transaction',
+      'withInterProcessLock',
+    ]);
+    expect(opened.store).not.toBeInstanceOf(SqliteStore);
+    const loose = opened.store as unknown as Record<string, unknown>;
+    for (const name of ['db', 'statement', 'run']) expect(loose[name], name).toBeUndefined();
+    expect(await opened.store.transaction((tx) => tx.count('seen'))).toBe(0);
+    expect(await opened.store.withInterProcessLock(() => 'held')).toBe('held');
+    await opened.close();
   });
 
   it('fails to open values after the store key item changes (wrong key)', async () => {

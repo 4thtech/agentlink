@@ -1,7 +1,7 @@
 // M1-8b: opening an agent's local store: the SQLite file and the cipher of its `enc` columns under the
 // agent's store key (07 §3, §3.1). The store key is read from the agent's recorded KeyStore backend
 // once, imported into non-extractable keys and wiped (withStoreKey); it never leaves this package.
-import type { Store } from '@agentlink/core';
+import type { Store, StoreTx } from '@agentlink/core';
 import { NodeKeyStoreError } from './errors.js';
 import { KeychainKeyStore, type KeychainKeyStoreOptions } from './keychain-keystore.js';
 import { osKeychain, type KeyStoreBackendKind, type KeychainBackend } from './keychain.js';
@@ -23,6 +23,21 @@ export interface AgentStore {
 export interface AgentStoreOptions {
   /** Limit for each keychain call in milliseconds (KeychainKeyStoreOptions). */
   readonly timeoutMs?: number;
+}
+
+/**
+ * A frozen object with exactly the Store methods and the inter-process lock (IR-M1-8b-1 L-1, as
+ * keyStoreFacade for the KeyStore): code holding an AgentStore reaches no connection, statement or
+ * SqliteStore instance to run its own SQL through.
+ */
+function storeFacade(store: SqliteStore): AgentStore['store'] {
+  return Object.freeze({
+    schemaVersion: store.schemaVersion,
+    transaction: <R>(body: (tx: StoreTx) => R): Promise<R> => store.transaction(body),
+    withInterProcessLock: <T>(fn: () => Promise<T> | T): Promise<T> =>
+      store.withInterProcessLock(fn),
+    close: (): Promise<void> => store.close(),
+  });
 }
 
 /** @internal The same as openAgentStore over a given keychain backend (tests use a double). */
@@ -58,7 +73,7 @@ export async function openAgentStoreWith(
     throw error;
   }
   return Object.freeze({
-    store,
+    store: storeFacade(store),
     cipher,
     close: async (): Promise<void> => {
       cipher.close();

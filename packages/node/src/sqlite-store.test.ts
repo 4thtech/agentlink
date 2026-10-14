@@ -388,30 +388,47 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     expect(await again.transaction((tx) => tx.get('seen', { kind: 'wrap', id: 'a' }))).toEqual(
       seen('a'),
     );
-    expect(again.db.pragma('journal_mode', { simple: true })).toBe('wal');
-    expect(again.db.pragma('synchronous', { simple: true })).toBe(2);
+    expect(SqliteStore.readSetting(again, 'journal_mode')).toBe('wal');
+    expect(SqliteStore.readSetting(again, 'synchronous')).toBe(2);
+    // IR-M1-8b-1 L-3: the WAL (while the store is open) and the lock file are owner-only too.
+    await again.transaction((tx) => tx.insert('seen', seen('b')));
+    await again.withInterProcessLock(() => undefined);
+    if (process.platform !== 'win32') {
+      for (const file of [path(), `${path()}-wal`, `${path()}-shm`, `${path()}.lock`]) {
+        expect((await stat(file)).mode & 0o777, file).toBe(0o600);
+      }
+    }
     await again.close();
     if (process.platform !== 'win32') {
       expect((await stat(path())).mode & 0o777).toBe(0o600);
     }
   });
 
-  it('creates every table of the logical schema, STRICT, with the second-layer triggers', async () => {
+  it('keeps its connection private: no raw handle or statement method on the instance (IR-M1-8b-1 L-1)', async () => {
     const store = await SqliteStore.open(path());
-    const tables = store.db
+    const loose = store as unknown as Record<string, unknown>;
+    for (const name of ['db', 'statement', 'run']) expect(loose[name], name).toBeUndefined();
+    expect(Object.keys(store)).toEqual([]);
+    await store.close();
+  });
+
+  it('creates every table of the logical schema, STRICT, with the second-layer triggers', async () => {
+    (await SqliteStore.open(path())).close();
+    const raw = new Database(path(), { readonly: true });
+    const tables = raw
       .prepare("SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name")
       .pluck()
       .all();
     expect(tables).toEqual([...TABLE_NAMES].sort());
-    const strict = store.db.prepare('PRAGMA table_list').all() as {
+    const strict = raw.prepare('PRAGMA table_list').all() as {
       name: string;
       strict: number;
     }[];
     for (const t of strict.filter((r) => TABLE_NAMES.includes(r.name as never))) {
       expect(t.strict, t.name).toBe(1);
     }
-    expect(Number(store.db.pragma('user_version', { simple: true }))).toBe(STORE_SCHEMA_VERSION);
-    await store.close();
+    expect(Number(raw.pragma('user_version', { simple: true }))).toBe(STORE_SCHEMA_VERSION);
+    raw.close();
   });
 
   it('pins the version 1 schema: a TABLES change needs a new migration, never an edit of v1', () => {
@@ -436,12 +453,14 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     const migrated = await SqliteStore.open(path(), { migrations: [...MIGRATIONS, v2] });
     expect(migrated.schemaVersion).toBe(2);
     expect(await migrated.transaction((tx) => tx.count('seen'))).toBe(1);
+    const check = new Database(path(), { readonly: true });
     expect(
-      migrated.db
+      check
         .prepare("SELECT count(*) FROM sqlite_schema WHERE name = 'seen__by_time'")
         .pluck()
         .get(),
     ).toBe(1);
+    check.close();
     await migrated.close();
     // The code at version 1 refuses the newer file, and leaves it as it is (no downgrade).
     const error = await rejects(SqliteStore.open(path()));

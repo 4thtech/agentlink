@@ -191,12 +191,19 @@ function checkTable(table: unknown): asserts table is TableName {
   }
 }
 
+/** What a transaction handle may do on the connection: no raw handle, no other SQL than its own. */
+interface TxOps {
+  statement(sql: string): Database.Statement;
+  run<R>(table: TableName, fn: () => R): R;
+  inTransaction(): boolean;
+}
+
 class SqliteTx implements StoreTx {
   #open = true;
-  readonly #store: SqliteStore;
+  readonly #ops: TxOps;
 
-  constructor(store: SqliteStore) {
-    this.#store = store;
+  constructor(ops: TxOps) {
+    this.#ops = ops;
   }
 
   end(): void {
@@ -208,12 +215,12 @@ class SqliteTx implements StoreTx {
     checkTable(table);
     // SQLite rolls a transaction back by itself on some I/O errors; statements after that would
     // run outside any transaction and commit on their own. Stop the body instead.
-    if (!this.#store.db.inTransaction) throw new NodeStoreError('store_failed');
+    if (!this.#ops.inTransaction()) throw new NodeStoreError('store_failed');
   }
 
   #read(table: TableName, sql: string, params: readonly StoreValue[]): Row<TableName>[] {
-    const raw = this.#store.run(table, () =>
-      this.#store
+    const raw = this.#ops.run(table, () =>
+      this.#ops
         .statement(sql)
         .safeIntegers(true)
         .raw(true)
@@ -270,8 +277,8 @@ class SqliteTx implements StoreTx {
   count<T extends TableName>(table: T, where?: Where<T>): number {
     this.#ready(table);
     const w = whereSql(table, where);
-    const n = this.#store.run(table, () =>
-      this.#store
+    const n = this.#ops.run(table, () =>
+      this.#ops
         .statement(`SELECT count(*) FROM ${q(table)}${w.text}`)
         .pluck(true)
         .get(...w.params),
@@ -286,7 +293,7 @@ class SqliteTx implements StoreTx {
     const sql = `INSERT INTO ${q(table)} (${columns.map(q).join(', ')}) VALUES (${columns
       .map(() => '?')
       .join(', ')})`;
-    this.#store.run(table, () => this.#store.statement(sql).run(...values));
+    this.#ops.run(table, () => this.#ops.statement(sql).run(...values));
   }
 
   update<T extends TableName>(table: T, where: Where<T>, patch: Partial<Row<T>>): number {
@@ -309,15 +316,15 @@ class SqliteTx implements StoreTx {
     const w = whereSql(table, where);
     const sql = `UPDATE ${q(table)} SET ${entries.map(([c]) => `${q(c)} = ?`).join(', ')}${w.text}`;
     const params = [...entries.map(([, v]) => v as StoreValue), ...w.params];
-    const info = this.#store.run(table, () => this.#store.statement(sql).run(...params));
+    const info = this.#ops.run(table, () => this.#ops.statement(sql).run(...params));
     return info.changes;
   }
 
   delete<T extends TableName>(table: T, where: Where<T>): number {
     this.#ready(table);
     const w = whereSql(table, where);
-    const info = this.#store.run(table, () =>
-      this.#store.statement(`DELETE FROM ${q(table)}${w.text}`).run(...w.params),
+    const info = this.#ops.run(table, () =>
+      this.#ops.statement(`DELETE FROM ${q(table)}${w.text}`).run(...w.params),
     );
     return info.changes;
   }
@@ -355,19 +362,33 @@ function createOwnerOnly(path: string): void {
 
 export class SqliteStore implements Store {
   #schemaVersion = 0;
-  /** @internal */
-  readonly db: Database.Database;
+  readonly #db: Database.Database;
   readonly #path: string;
   readonly #lockTimeoutMs: number;
   readonly #statements = new Map<string, Database.Statement>();
   #tail: Promise<unknown> = Promise.resolve();
   #closed = false;
   #inBody = false;
+  readonly #ops: TxOps = {
+    statement: (sql) => this.#statement(sql),
+    run: (table, fn) => this.#runStatement(table, fn),
+    inTransaction: () => this.#db.inTransaction,
+  };
 
   private constructor(db: Database.Database, path: string, lockTimeoutMs: number) {
-    this.db = db;
+    this.#db = db;
     this.#path = path;
     this.#lockTimeoutMs = lockTimeoutMs;
+  }
+
+  /**
+   * Test seam (IR-M1-8b-1 L-1): reads one of the connection's settings. The connection itself is
+   * private, and the package hands out only a frozen facade (agent-store.ts), never this instance.
+   */
+  static readSetting(store: SqliteStore, name: 'journal_mode' | 'synchronous'): unknown {
+    return store.#db.pragma(name === 'journal_mode' ? 'journal_mode' : 'synchronous', {
+      simple: true,
+    });
   }
 
   /** The schema version of this store's data (07 §3.7), after its forward migrations ran. */
@@ -443,12 +464,12 @@ export class SqliteStore implements Store {
   async #migrate(migrations: readonly StoreMigration[]): Promise<number> {
     const target = migrations.at(-1)?.version ?? 0;
     for (;;) {
-      await this.#retryBusy(() => this.db.prepare('BEGIN IMMEDIATE').run());
+      await this.#retryBusy(() => this.#db.prepare('BEGIN IMMEDIATE').run());
       try {
-        const appId = Number(this.db.pragma('application_id', { simple: true }));
-        const version = Number(this.db.pragma('user_version', { simple: true }));
+        const appId = Number(this.#db.pragma('application_id', { simple: true }));
+        const version = Number(this.#db.pragma('user_version', { simple: true }));
         const objects = Number(
-          this.db
+          this.#db
             .prepare("SELECT count(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'")
             .pluck()
             .get(),
@@ -458,15 +479,15 @@ export class SqliteStore implements Store {
         }
         if (version > target) throw new NodeStoreError('store_too_new');
         if (version === target) {
-          this.db.prepare('COMMIT').run();
+          this.#db.prepare('COMMIT').run();
           return version;
         }
         const next = migrations.find((m) => m.version === version + 1);
         if (next === undefined) throw new NodeStoreError('store_foreign');
-        for (const statement of next.statements) this.db.prepare(statement).run();
-        this.db.pragma(`application_id = ${STORE_APPLICATION_ID}`);
-        this.db.pragma(`user_version = ${next.version}`);
-        this.db.prepare('COMMIT').run();
+        for (const statement of next.statements) this.#db.prepare(statement).run();
+        this.#db.pragma(`application_id = ${STORE_APPLICATION_ID}`);
+        this.#db.pragma(`user_version = ${next.version}`);
+        this.#db.prepare('COMMIT').run();
       } catch (error) {
         this.#rollback();
         throw error;
@@ -477,25 +498,25 @@ export class SqliteStore implements Store {
   /** Rolls back the open transaction, if any; a failed rollback never hides the original error. */
   #rollback(): void {
     try {
-      if (this.db.inTransaction) this.statement('ROLLBACK').run();
+      if (this.#db.inTransaction) this.#statement('ROLLBACK').run();
     } catch {
       // SQLite has already rolled back, or the connection failed; nothing was committed.
     }
   }
 
-  /** @internal A cached prepared statement. */
-  statement(sql: string): Database.Statement {
+  /** A cached prepared statement. */
+  #statement(sql: string): Database.Statement {
     let statement = this.#statements.get(sql);
     if (statement === undefined) {
       if (this.#statements.size >= STATEMENT_CACHE_LIMIT) this.#statements.clear();
-      statement = this.db.prepare(sql);
+      statement = this.#db.prepare(sql);
       this.#statements.set(sql, statement);
     }
     return statement;
   }
 
-  /** @internal Runs one statement, mapping SQLite errors: constraints to StoreConstraintError. */
-  run<R>(table: TableName, fn: () => R): R {
+  /** Runs one statement, mapping SQLite errors: constraints to StoreConstraintError. */
+  #runStatement<R>(table: TableName, fn: () => R): R {
     try {
       return fn();
     } catch (error) {
@@ -525,18 +546,18 @@ export class SqliteStore implements Store {
     if (this.#closed) throw new StoreUsageError('store: the store is closed');
     // The write lock is waited for here, between polls, never inside SQLite's own busy handler,
     // which would block this process's event loop for the whole wait.
-    const begin = this.statement('BEGIN IMMEDIATE');
-    this.db.pragma('busy_timeout = 0');
+    const begin = this.#statement('BEGIN IMMEDIATE');
+    this.#db.pragma('busy_timeout = 0');
     try {
       await this.#retryBusy(() => begin.run());
     } finally {
-      this.db.pragma(`busy_timeout = ${STATEMENT_BUSY_MS}`);
+      this.#db.pragma(`busy_timeout = ${STATEMENT_BUSY_MS}`);
     }
     if (this.#closed) {
       this.#rollback();
       throw new StoreUsageError('store: the store is closed');
     }
-    const tx = new SqliteTx(this);
+    const tx = new SqliteTx(this.#ops);
     this.#inBody = true;
     try {
       const result = body(tx);
@@ -549,9 +570,9 @@ export class SqliteStore implements Store {
         Promise.resolve(result).catch(() => undefined);
         throw new StoreUsageError('store: a transaction body must be synchronous');
       }
-      if (!this.db.inTransaction) throw new NodeStoreError('store_failed');
+      if (!this.#db.inTransaction) throw new NodeStoreError('store_failed');
       try {
-        this.statement('COMMIT').run();
+        this.#statement('COMMIT').run();
       } catch {
         throw new NodeStoreError('store_failed');
       }
@@ -581,7 +602,7 @@ export class SqliteStore implements Store {
     this.#closed = true;
     await this.#tail;
     this.#statements.clear();
-    this.db.close();
+    this.#db.close();
   }
 }
 
