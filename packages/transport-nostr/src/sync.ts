@@ -18,12 +18,13 @@
 //   and a relay with no cursor is read 9 days back (07 §4.3). A relay that fails, times out or has an
 //   event handled as `retry` keeps its old cursor.
 // - Dedup (04 §3.1.1, IR-M1-5a-1 L-3): wraps are skipped by gift-wrap id, never by `envelope.id`
-//   before verification (an unverified envelope's id is chosen by its sender). An envelope id is
-//   recorded only when the caller reports `verified`, and it is passed to the handler as a hint
-//   (`envelopeSeen`), never as a reason to skip. Core writes the `seen` row in its own transaction
-//   (07 §3.2); the optional `markSeen` here is called only after the handler's processed outcome,
-//   and `retry` marks nothing. The same wrap from 3 relays is
-//   delivered once, also when the copies arrive at the same time.
+//   before verification (an unverified envelope's id is chosen by its sender). Core writes the
+//   `seen` rows in its own transaction (07 §3.2), and its `envelope` rows hold the envelopeHash,
+//   never the envelope id (04 §3.1.1 step 9; IR-M1-7b-1 Q1). The `envelopeSeen` hint below looks
+//   up the envelope id, so it can only find a row written by the optional `markSeen` here (called
+//   only after the handler's processed outcome, with the id only on `verified`; `retry` marks
+//   nothing). It is never a reason to skip. Aligning the hint with core's keying is M1-5e. The same
+//   wrap from 3 relays is delivered once, also when the copies arrive at the same time.
 // - Junk (07 §3.2): a wrap that fails to open is not recorded in the seen-set; it is remembered only
 //   in a bounded in-memory cache, keyed by id and signature, so a forged copy of a real wrap's id
 //   cannot hide the real one.
@@ -122,8 +123,10 @@ export interface SyncPersistence {
   /**
    * Optional; the default is to write nothing. Upserts `(kind, id)` with `first_seen_at` after the
    * handler reported the item's processed outcome. Leave it out when core writes `seen` itself (the
-   * intended setup). An `envelope` row written here is keyed on the id alone, which any sender may
-   * choose (IR-M1-5c-1 L-6): never skip on it. Pruning follows `seenPruneBefore`.
+   * intended setup). An `envelope` row written here is keyed on the envelope id, which any sender
+   * may choose (IR-M1-5c-1 L-6): never skip on it. Core's own `envelope` rows hold the envelopeHash
+   * instead (07 §3.2; IR-M1-7b-1 Q1), so the two kinds of row never match (M1-5e aligns them).
+   * Pruning follows `seenPruneBefore`.
    */
   markSeen?(kind: SeenKind, id: string, firstSeenAt: number): Promise<void>;
   /**
@@ -153,8 +156,10 @@ export interface SyncItem {
   /** The own key the wrap was addressed to. */
   readonly recipient: string;
   /**
-   * A hint: an envelope with this id was verified and processed before. Unverified, so the sender
-   * chose it: core must never skip or drop on it (IR-M1-5a-1 L-3). Core step 9 compares `envelopeHash`.
+   * A hint: `seen` has an `envelope` row equal to this envelope's id, which only the optional
+   * `markSeen` writes (core's rows hold the envelopeHash, 07 §3.2, so with core writing `seen` this
+   * is false). Unverified, so the sender chose the id: core must never skip or drop on it
+   * (IR-M1-5a-1 L-3). Core step 9 compares `envelopeHash`.
    */
   readonly envelopeSeen: boolean;
 }
@@ -162,8 +167,9 @@ export interface SyncItem {
 /**
  * The handler's answer.
  * - `processed`: the item is durably stored or its final outcome recorded. The wrap id is marked seen.
- * - `verified`: as `processed`, and the envelope signature passed (04 §3.1.1 step 4), so its id is
- *   marked seen too.
+ * - `verified`: as `processed`, and the envelope signature passed (04 §3.1.1 step 4), so the
+ *   optional `markSeen` also gets an `envelope` row for its id (core keys its own rows on the
+ *   envelopeHash, 07 §3.2).
  * - `retry`: not stored (for example the store was busy). Nothing is marked seen and the relay's
  *   cursor does not move, so the item comes again.
  */
