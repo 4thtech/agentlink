@@ -22,5 +22,7 @@ export default defineConfig({
     environment: 'node',
     // Only *.test.ts: the one test-file name every build excludes (IR-M1-1c-G2-1 L-1).
     include: ['src/**/*.test.ts'],
+    // Repository-wide test timeout policy (M0-10e): 20 s, not the 5 s default (docs/process/repo-reference.md).
+    testTimeout: 20_000,
   },
 });

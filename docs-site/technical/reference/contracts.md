@@ -34,7 +34,7 @@ function creditsOf(address payer, address token) external view returns (uint256)
 - No admin function can move, freeze or reduce a payer's credits; pausing blocks new charges, never withdrawals.
 - Fees are bounded by on-chain caps; raising a cap has a 7-day delay; every record carries the signer's maximum fee.
 - Governance by Safe multisigs through `AccessManager` with per-function delays; the Notary can be frozen against upgrades.
-- Identical addresses on every chain where the contracts are deployed (CREATE3 via CreateX). Proposed: one set for mainnets and a different set for testnets. Clients use only the addresses listed for each chain ID.
+- Identical addresses on every chain where the contracts are deployed (CREATE3 via CreateX). Testnets and mainnets share the same addresses (owner decision D-64). Clients use only the addresses listed for each chain ID, so the chain ID is what tells a testnet proof from a mainnet proof.
 
 ## Addresses
 
