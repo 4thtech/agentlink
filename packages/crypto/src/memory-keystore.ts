@@ -215,7 +215,15 @@ export class MemoryKeyStore implements KeyStore {
 
 // --- Owner -----------------------------------------------------------------------------------------
 
-function presenceBytes(presence: unknown): { kind: OwnerPresence['kind']; bytes: Uint8Array } {
+/**
+ * The kind and secret bytes of a presence proof. A malformed proof is refused with
+ * `presence_required`; with `wipeRefused`, any byte array it carries is wiped first, so a refused
+ * secret does not linger either (IR-M1-1g-1 I-1).
+ */
+function presenceBytes(
+  presence: unknown,
+  wipeRefused: boolean,
+): { kind: OwnerPresence['kind']; bytes: Uint8Array } {
   const required = (): KeyStoreError =>
     new KeyStoreError('presence_required', 'owner keystore: a presence proof is required');
   if (typeof presence !== 'object' || presence === null) throw required();
@@ -225,6 +233,9 @@ function presenceBytes(presence: unknown): { kind: OwnerPresence['kind']; bytes:
   }
   if (kind === 'passkey-prf' && prfOutput instanceof Uint8Array && prfOutput.length === 32) {
     return { kind, bytes: prfOutput };
+  }
+  if (wipeRefused) {
+    for (const value of [secret, prfOutput]) if (value instanceof Uint8Array) wipe(value);
   }
   throw required();
 }
@@ -250,11 +261,22 @@ interface Timers {
 }
 const timers = globalThis as unknown as Timers;
 
+/**
+ * A monotonic clock in milliseconds (`performance.now`, present in Node, browsers and workerd), so a
+ * system clock set back cannot extend a session (IR-M1-1g-1 L-1). Without it, fall back to the
+ * wall clock, which the session checks anyway.
+ */
+function monotonicNow(): number {
+  const performance = (globalThis as { performance?: { now?: () => number } }).performance;
+  return typeof performance?.now === 'function' ? performance.now() : Date.now();
+}
+
 /** Module-private: only MemoryOwnerKeyStore.unlock can construct a session. */
 const SESSION_TOKEN = Symbol('MemoryOwnerSession');
 
 class MemoryOwnerSession implements OwnerSession {
   readonly expiresAt: number;
+  readonly #deadline: number;
   readonly #ownerNostrHex: string;
   #nostrSecret: Uint8Array | null;
   #timer: unknown;
@@ -274,6 +296,7 @@ class MemoryOwnerSession implements OwnerSession {
     this.#ownerNostrHex = ownerNostrHex;
     this.#onEnd = onEnd;
     this.expiresAt = Date.now() + ttlMs;
+    this.#deadline = monotonicNow() + ttlMs;
     // Wipe at expiry even if the handle is never used again. unref: never keep Node alive for it.
     const timer = timers.setTimeout(() => {
       this.end();
@@ -283,7 +306,13 @@ class MemoryOwnerSession implements OwnerSession {
   }
 
   isActive(): boolean {
-    if (this.#nostrSecret !== null && Date.now() >= this.expiresAt) this.end();
+    // Whichever clock says the session is over ends it: monotonic (authoritative) or wall clock.
+    if (
+      this.#nostrSecret !== null &&
+      (monotonicNow() >= this.#deadline || Date.now() >= this.expiresAt)
+    ) {
+      this.end();
+    }
     return this.#nostrSecret !== null;
   }
 
@@ -323,6 +352,38 @@ class MemoryOwnerSession implements OwnerSession {
     });
   }
 
+  // PENDING G-2 (IR-M1-1g-1 M-1): the owner-channel operations fail closed until gap G-2 decides
+  // whether they belong on this presence-gated session. An ended session still says owner_locked.
+
+  signEnvelopeHash(envelopeHash: Uint8Array): Promise<string> {
+    void envelopeHash;
+    return this.#pendingG2();
+  }
+
+  signNostr(event: UnsignedNostrEvent): Promise<NostrEvent> {
+    void event;
+    return this.#pendingG2();
+  }
+
+  nip44Decrypt(peer: string, payload: string): Promise<string> {
+    void peer;
+    void payload;
+    return this.#pendingG2();
+  }
+
+  hpkeOpen(wrapped: HpkeWrappedKey, info: Uint8Array): Promise<Uint8Array> {
+    void wrapped;
+    void info;
+    return this.#pendingG2();
+  }
+
+  #pendingG2(): Promise<never> {
+    return Promise.resolve().then(() => {
+      this.#secret();
+      return unsupported('owner channel, gap G-2');
+    });
+  }
+
   close(): Promise<void> {
     this.end();
     return Promise.resolve();
@@ -351,10 +412,12 @@ export class MemoryOwnerKeyStore implements OwnerKeyStore {
   readonly #presenceKind: OwnerPresence['kind'];
   readonly #presenceBytes: Uint8Array;
   readonly #sessions = new Set<MemoryOwnerSession>();
+  /** Bumped by lock() and close(); an unlock started under an older value issues no session. */
+  #generation = 0;
   #closed = false;
 
   constructor(ownerSeed: Uint8Array, presence: OwnerPresence) {
-    const { kind, bytes } = presenceBytes(presence);
+    const { kind, bytes } = presenceBytes(presence, false);
     this.#seed = copySeed(ownerSeed, 'MemoryOwnerKeyStore: the owner seed');
     this.#presenceKind = kind;
     this.#presenceBytes = bytes.slice();
@@ -387,14 +450,20 @@ export class MemoryOwnerKeyStore implements OwnerKeyStore {
   }
 
   unlock(presence: OwnerPresence, options: UnlockOptions = {}): Promise<OwnerSession> {
+    // Captured when the call is made: a lock() or close() before this resolves cancels it
+    // (IR-M1-1g-1 L-2).
+    const generation = this.#generation;
     return Promise.resolve().then(() => {
-      const { kind, bytes } = presenceBytes(presence);
+      const { kind, bytes } = presenceBytes(presence, true);
       try {
         const seed = this.#open();
         const ttlMs = options.ttlMs ?? OWNER_SESSION_DEFAULT_TTL_MS;
         assertTtl(ttlMs);
         if (kind !== this.#presenceKind || !equalBytes(bytes, this.#presenceBytes)) {
           throw new KeyStoreError('presence_rejected', 'owner keystore: presence was not accepted');
+        }
+        if (generation !== this.#generation) {
+          throw new KeyStoreError('owner_locked', 'owner keystore: locked while unlocking');
         }
         const nostrSecret = deriveSecretKey(seed, KEY_LABELS.nostr, 0);
         const session = new MemoryOwnerSession(
@@ -414,6 +483,7 @@ export class MemoryOwnerKeyStore implements OwnerKeyStore {
   }
 
   lock(): Promise<void> {
+    this.#generation += 1;
     for (const session of [...this.#sessions]) session.end();
     this.#sessions.clear();
     return Promise.resolve();
@@ -421,6 +491,7 @@ export class MemoryOwnerKeyStore implements OwnerKeyStore {
 
   close(): Promise<void> {
     if (!this.#closed) {
+      this.#generation += 1;
       for (const session of [...this.#sessions]) session.end();
       this.#sessions.clear();
       this.#closed = true;

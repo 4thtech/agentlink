@@ -125,7 +125,12 @@ export interface KeyStore {
 /**
  * A proof of owner presence (04 §2.5): what unlocks the owner key. It carries the secret that
  * unwraps the owner seed, so a process without the owner's input cannot make one that works.
- * The store wipes the bytes it is given, whether or not they unlock it.
+ * The store wipes the bytes it is given, whether or not they unlock it, malformed proofs included.
+ *
+ * Real backends (M1-8a, M1-8c, M1-8f) collect presence themselves, at an interactive prompt or a
+ * native or passkey dialog the agent does not control, and never accept it from an environment
+ * variable, a file or agent-reachable code (D-54, IR-M1-1g-1 I-4). This type is the hand-off from
+ * that prompt to the store, not an argument for MCP tools or other agent-facing code.
  */
 export type OwnerPresence =
   /** The owner passphrase or generated owner code, typed at a prompt the agent does not control. */
@@ -156,7 +161,8 @@ export const OWNER_SESSION_MAX_TTL_MS = 300_000;
 
 /**
  * The owner key store (04 §2.5). It signs nothing itself: owner signatures come only from an
- * OwnerSession, and unlock(presence) is the only way to get one.
+ * OwnerSession, and unlock(presence) is the only way to get one. lock() and close() also cancel
+ * an unlock that is still in flight: it fails with `owner_locked` instead of returning a session.
  */
 export interface OwnerKeyStore {
   /** The owner's public keys. No presence needed. */
@@ -176,11 +182,18 @@ export interface OwnerKeyStore {
 }
 
 /**
- * A short-lived owner handle from OwnerKeyStore.unlock. After `expiresAt`, close() or the store's
- * lock() or close(), every method fails with `owner_locked`.
+ * A short-lived owner handle from OwnerKeyStore.unlock. After expiry, close() or the store's lock()
+ * or close(), every method fails with `owner_locked`.
+ *
+ * A session is a bearer handle: whatever holds it can sign owner actions until it ends. The CLI and
+ * the local UI keep it inside the owner flow and never pass it to MCP tools or other agent-reachable
+ * code (I-4; IR-M1-1g-1 I-5).
+ *
+ * Expiry is enforced on a monotonic clock (`performance.now`) and on the wall clock, whichever ends
+ * the session first, so setting the system clock back never extends a session (IR-M1-1g-1 L-1).
  */
 export interface OwnerSession {
-  /** When the session ends, in milliseconds since the epoch (Date.now clock). */
+  /** When the session ends, in milliseconds since the epoch (Date.now clock). For display only. */
   readonly expiresAt: number;
 
   /** True until the session expires or is closed or locked. */
@@ -199,6 +212,23 @@ export interface OwnerSession {
    * until M1-1e: MemoryOwnerKeyStore fails closed.
    */
   sign712(typedData: Eip712TypedData): Promise<string>;
+
+  // Owner-channel operations (04 §3.4.1: the owner is `from` on `approval`, `policy` and `revoke`
+  // envelopes and receives `approval-request`). PENDING G-2 (IR-M1-1g-1 M-1): whether these belong
+  // on the presence-gated session or on a separate console-side store is decided with gap G-2.
+  // Until then every implementation fails closed with `unsupported_operation`.
+
+  /** G-2 pending: the envelope `sig` of 04 §3.1 by the owner Nostr key. Fails closed. */
+  signEnvelopeHash(envelopeHash: Uint8Array): Promise<string>;
+
+  /** G-2 pending: a Nostr event (a seal) signed by the owner Nostr key. Fails closed. */
+  signNostr(event: UnsignedNostrEvent): Promise<NostrEvent>;
+
+  /** G-2 pending: NIP-44 v2 from `peer` with the owner Nostr key. Fails closed. */
+  nip44Decrypt(peer: string, payload: string): Promise<string>;
+
+  /** G-2 pending: opens an HPKE wrap with the owner enc key; returns the CEK. Fails closed. */
+  hpkeOpen(wrapped: HpkeWrappedKey, info: Uint8Array): Promise<Uint8Array>;
 
   /** Ends this session now and wipes its key material. */
   close(): Promise<void>;

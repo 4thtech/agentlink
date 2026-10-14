@@ -13,7 +13,7 @@ export {
 } from './keys.js';
 export { bip340PublicKey, bip340Sign } from './bip340.js';
 // M1-1g: NIP-44 v2 under a given secret key or conversation key (KeyStore backends and the vector
-// harness), and the in-memory KeyStores built from a seed: NOT FOR PRODUCTION, tests and dev only.
+// harness). The in-memory KeyStores are in the test-only subpath @agentlink/crypto/testing.
 export {
   nip44ConversationKey,
   nip44DecryptWithKey,
@@ -21,8 +21,3 @@ export {
   nip44MessageKeys,
   type Nip44MessageKeys,
 } from './nip44.js';
-export {
-  MemoryKeyStore,
-  MemoryOwnerKeyStore,
-  type MemoryKeyStoreOptions,
-} from './memory-keystore.js';

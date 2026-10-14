@@ -24,6 +24,10 @@
     "./keystore": {
       "types": "./dist/keystore.d.ts",
       "default": "./dist/keystore.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
     }
   },
   "files": [

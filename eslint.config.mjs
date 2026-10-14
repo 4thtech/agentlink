@@ -9,12 +9,15 @@ import {
   NODE_MSG,
   NODE_ZONES,
   RESTRICTED_ENTRY_POINTS,
+  TEST_FILE_GLOBS,
+  TEST_ONLY_ENTRY_POINTS,
   WORKSPACE_NAMES,
   ZONES,
   allowedWorkspaceNames,
   layerMessage,
   libraryMessage,
   restrictedEntryMessage,
+  testOnlyEntryMessage,
 } from './tools/deps-check/policy.mjs';
 
 const SOURCE = '{ts,tsx,mts,cts}';
@@ -28,7 +31,7 @@ const SOURCE = '{ts,tsx,mts,cts}';
 // handled by no-restricted-imports; dynamic import(), require(), `import x = require()`, import()
 // types, cross-package relative paths and `crypto.subtle` by the local boundaries/no-bypass rule.
 
-function restrictionsFor(zone) {
+function restrictionsFor(zone, { testFile = false } = {}) {
   const nodeAllowed = NODE_ZONES.includes(zone);
   const paths = nodeAllowed
     ? ['crypto', 'node:crypto'].map((name) => ({ name, message: CRYPTO_MSG }))
@@ -42,6 +45,12 @@ function restrictionsFor(zone) {
   for (const entry of RESTRICTED_ENTRY_POINTS) {
     if (zone !== null && entry.zones.includes(zone)) continue;
     patterns.push({ group: entry.group, message: restrictedEntryMessage(entry) });
+  }
+  // Test-only subpaths (IR-M1-1g-1 M-2): refused everywhere except in test files.
+  if (!testFile) {
+    for (const entry of TEST_ONLY_ENTRY_POINTS) {
+      patterns.push({ group: entry.group, message: testOnlyEntryMessage(entry) });
+    }
   }
   // Package layering: every workspace package this zone may not import (apps are never importable).
   const allowed = allowedWorkspaceNames(zone);
@@ -117,6 +126,12 @@ export default tseslint.config(
   ...Object.keys(ZONES).map((zone) => ({
     files: [`${zone}/**/*.${SOURCE}`],
     rules: restrictionsFor(zone),
+  })),
+  // Test files of each zone: the same list without the test-only subpaths. It must come after the
+  // zone blocks, because ESLint applies only the last matching no-restricted-imports block.
+  ...Object.keys(ZONES).map((zone) => ({
+    files: TEST_FILE_GLOBS.map((glob) => `${zone}/${glob}`),
+    rules: restrictionsFor(zone, { testFile: true }),
   })),
   {
     // Node-only code gets Node globals: build tooling, config files and tests (which run in Node).

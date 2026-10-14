@@ -84,6 +84,37 @@ export const RESTRICTED_ENTRY_POINTS = [
 ];
 
 /**
+ * Test-only entry points of workspace packages (IR-M1-1g-1 M-2). Unlike RESTRICTED_ENTRY_POINTS,
+ * which are allowed per zone, these are allowed per file: only in test files (isTestFile), in every
+ * zone that may import the package at all, and never in production source, packages/node included.
+ * `@agentlink/crypto/testing` holds MemoryKeyStore and MemoryOwnerKeyStore, which keep a master
+ * seed in plain memory. Widening this is a reviewed S1 change with a reason.
+ */
+export const TEST_ONLY_ENTRY_POINTS = [
+  {
+    group: ['@agentlink/crypto/testing', '@agentlink/crypto/testing/*'],
+    via: 'a real KeyStore backend',
+    reason:
+      'the in-memory KeyStores hold a seed in plain memory and are not for production (M1-1g)',
+  },
+];
+
+/**
+ * True for a test file (path relative to the repository root): a `*.test.<ext>` file anywhere, or any
+ * file under test-vectors/ or e2e/. Nothing else counts: not `test.ts`, not a `tests/` directory.
+ */
+export const isTestFile = (file) =>
+  typeof file === 'string' &&
+  (/(^|\/)[^/]+\.test\.(ts|tsx|mts|cts|js|mjs|cjs)$/.test(file) ||
+    /^(test-vectors|e2e)\//.test(file));
+
+/**
+ * Glob forms of isTestFile, for ESLint blocks inside a zone (`${zone}/${glob}`). test-vectors/ and
+ * e2e/ have their own ESLint configs and do not restrict the test-only entry points.
+ */
+export const TEST_FILE_GLOBS = ['**/*.test.{ts,tsx,mts,cts,js,mjs,cjs}'];
+
+/**
  * Files that may import `node:module` (createRequire can resolve code from another package's
  * directory). Each entry needs a reason. Empty: nothing needs it today.
  */
@@ -269,6 +300,8 @@ export const libraryMessage = (lib) =>
     : `${lib.group[0]} may be imported only in ${lib.zones.join(', ')}; everything else uses ${lib.via} (AGENTS.md).`;
 export const restrictedEntryMessage = (entry) =>
   `${entry.group[0]} may be imported only in ${entry.zones.join(', ')}; everything else uses ${entry.via}.`;
+export const testOnlyEntryMessage = (entry) =>
+  `${entry.group[0]} may be imported only in test files (*.test.*, test-vectors/, e2e/); production code uses ${entry.via}.`;
 export const layerMessage = (zone, name) =>
   ZONES[zone]
     ? `${zone} may not import ${name} (package layering: tools/deps-check/policy.mjs, 07 §1).`
@@ -295,6 +328,11 @@ export function violationFor(zone, specifier, file) {
   for (const entry of RESTRICTED_ENTRY_POINTS) {
     if (matchesGroup(specifier, entry.group) && !entry.zones.includes(zone)) {
       return restrictedEntryMessage(entry);
+    }
+  }
+  for (const entry of TEST_ONLY_ENTRY_POINTS) {
+    if (matchesGroup(specifier, entry.group) && !isTestFile(file)) {
+      return testOnlyEntryMessage(entry);
     }
   }
   for (const lib of LIBRARIES) {
