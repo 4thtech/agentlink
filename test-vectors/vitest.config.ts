@@ -16,7 +16,8 @@ const BATCH_FORM = 'harness/batch-form.test.ts';
 // every project repeats it.
 // The entries are exact (anchored) so the restricted subpath `@agentlink/crypto/keystore`
 // (IR-M1-1b-1 M-1) maps to its own source file instead of a path under index.ts.
-// The Node project's policy-form check (M1-1h-c) reads @agentlink/types' source the same way.
+// The Node project's policy-form check (M1-1h-c) reads @agentlink/types' source the same way, and
+// the invite-link and safety-code-recompute suites (M1-7c) read two core modules from source.
 const packageSource = (pkg: string, file: string): string =>
   decodeURIComponent(new URL(`../packages/${pkg}/src/${file}`, import.meta.url).pathname);
 const cryptoSource = (file: string): string => packageSource('crypto', file);
@@ -27,6 +28,17 @@ const resolve = {
     // The deterministic test seam (M1-1c, M1-1f): source only, never built and not in the package exports.
     { find: /^@agentlink\/crypto\/testing$/, replacement: cryptoSource('testing.ts') },
     { find: /^@agentlink\/types$/, replacement: packageSource('types', 'index.ts') },
+    // M1-7c: the invite codec and the safety-code recomputation of @agentlink/core, from source.
+    // Each module imports only @agentlink/crypto, @agentlink/types and the core's errors, so it runs
+    // in every runtime; these subpaths exist only here and in tsconfig.json (no package export).
+    {
+      find: /^@agentlink\/core\/invite-link$/,
+      replacement: packageSource('core', 'invite-link.ts'),
+    },
+    {
+      find: /^@agentlink\/core\/safety-code$/,
+      replacement: packageSource('core', 'safety-code.ts'),
+    },
   ],
 };
 
