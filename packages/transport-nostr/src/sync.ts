@@ -8,6 +8,10 @@
 // `sync_cursors` and `seen`.
 //
 // Properties, each with a test:
+// - Pages (IR-M1-5c-1 H-1): a relay may cap the stored events it returns per filter, newest first, and
+//   then send EOSE. So a relay is read in pages (`limit`, `until`) walking back to `since`, and the
+//   cursor moves only after the last page. A pass that stops early saves the page it reached
+//   (optional `setResume`), and the next pass continues there, so a flood of junk cannot stall it.
 // - Cursor (07 §4.2): per relay, `last_seen` is the local time the pass started, written only after
 //   the relay reached EOSE and every event of the pass was handled. The next REQ asks for
 //   `since = last_seen - 48 h - S` (NIP-59 randomises wrap times by up to 2 days; S = 300 s, 04 §2.5.1),
@@ -16,8 +20,9 @@
 // - Dedup (04 §3.1.1, IR-M1-5a-1 L-3): wraps are skipped by gift-wrap id, never by `envelope.id`
 //   before verification (an unverified envelope's id is chosen by its sender). An envelope id is
 //   recorded only when the caller reports `verified`, and it is passed to the handler as a hint
-//   (`envelopeSeen`), never as a reason to skip. An id is marked seen only after the handler reports
-//   its processed outcome (07 §3.2); `retry` marks nothing. The same wrap from 3 relays is
+//   (`envelopeSeen`), never as a reason to skip. Core writes the `seen` row in its own transaction
+//   (07 §3.2); the optional `markSeen` here is called only after the handler's processed outcome,
+//   and `retry` marks nothing. The same wrap from 3 relays is
 //   delivered once, also when the copies arrive at the same time.
 // - Junk (07 §3.2): a wrap that fails to open is not recorded in the seen-set; it is remembered only
 //   in a bounded in-memory cache, keyed by id and signature, so a forged copy of a real wrap's id
@@ -65,9 +70,15 @@ export const MAX_FRAMES_PER_PASS = 50_000;
 export const MAX_NEW_WRAPS_PER_PASS = 2_000;
 /** Live: wraps one relay may make us open in one minute. */
 export const MAX_LIVE_NEW_WRAPS_PER_MINUTE = 600;
+/** Stored events asked for per page (strfry's own default result cap is 500). */
+export const SYNC_PAGE_LIMIT = 500;
+/** Pages one relay may take in a pass (about 50 000 events at the page limit). */
+export const MAX_PAGES_PER_PASS = 100;
+/** A saved page position older than this is not resumed. */
+export const SYNC_RESUME_MAX_AGE_SECONDS = 7 * 86_400;
 /** Events waiting behind a slow handler, per relay. */
 export const MAX_QUEUED_EVENTS = 2_048;
-/** Characters of event content waiting behind a slow handler, per relay (about 16 MiB). */
+/** Characters of events (the whole event as JSON) waiting behind a slow handler, per relay (about 16 MiB). */
 export const MAX_QUEUED_CHARS = 16_777_216;
 /** Entries of each in-memory dedup cache (processed wraps, junk wraps). */
 export const DEDUP_CACHE_ENTRIES = 8_192;
@@ -102,14 +113,33 @@ export interface SyncPersistence {
   /** `sync_cursors.last_seen` of the relay, or undefined if it has none. */
   getCursor(relay: string): Promise<number | undefined>;
   setCursor(relay: string, lastSeen: number): Promise<void>;
-  /** True if `(kind, id)` is in `seen`. */
+  /**
+   * True if `(kind, id)` is in `seen`. A read only: core writes the `seen` row inside its own store
+   * transaction, together with the item it stores (07 §3.2), so two writers never disagree on
+   * `first_seen_at`.
+   */
   isSeen(kind: SeenKind, id: string): Promise<boolean>;
   /**
-   * Upserts `(kind, id)` with `first_seen_at`. Called only after the handler reported the item's
-   * processed outcome. Core may also write the row inside its own store transaction (07 §3.2); the
-   * write here is then a no-op upsert. Pruning follows `seenPruneBefore`.
+   * Optional; the default is to write nothing. Upserts `(kind, id)` with `first_seen_at` after the
+   * handler reported the item's processed outcome. Leave it out when core writes `seen` itself (the
+   * intended setup). An `envelope` row written here is keyed on the id alone, which any sender may
+   * choose (IR-M1-5c-1 L-6): never skip on it. Pruning follows `seenPruneBefore`.
    */
-  markSeen(kind: SeenKind, id: string, firstSeenAt: number): Promise<void>;
+  markSeen?(kind: SeenKind, id: string, firstSeenAt: number): Promise<void>;
+  /**
+   * Optional: where a pass that was cut short (budget, a bound, a lost connection) stopped, so the
+   * next pass continues there instead of reading the newest pages again (a flood of junk larger than
+   * a pass cannot then stall a relay for good). Without these, every pass starts from the newest.
+   */
+  getResume?(relay: string): Promise<SyncResume | undefined>;
+  /** `undefined` clears it. */
+  setResume?(relay: string, resume: SyncResume | undefined): Promise<void>;
+}
+
+/** A saved page position: events newer than `until` were read and handled in the pass that began at `startedAt`. */
+export interface SyncResume {
+  readonly until: number;
+  readonly startedAt: number;
 }
 
 /** What the handler gets for each new gift wrap. */
@@ -124,7 +154,7 @@ export interface SyncItem {
   readonly recipient: string;
   /**
    * A hint: an envelope with this id was verified and processed before. Unverified, so the sender
-   * chose it: never a reason to drop the item (IR-M1-5a-1 L-3). Core step 9 compares `envelopeHash`.
+   * chose it: core must never skip or drop on it (IR-M1-5a-1 L-3). Core step 9 compares `envelopeHash`.
    */
   readonly envelopeSeen: boolean;
 }
@@ -263,7 +293,7 @@ class BoundedSet {
   }
 }
 
-type EventResult = 'delivered' | 'duplicate' | 'dropped' | 'retry' | 'keys_unavailable';
+type EventResult = 'delivered' | 'duplicate' | 'dropped' | 'retry' | 'bound' | 'keys_unavailable';
 
 interface Counters {
   delivered: number;
@@ -499,12 +529,28 @@ export class SyncEngine {
   private async runRelay(relay: string, run: Run): Promise<RelayOutcome> {
     if (!isAllowedRelayUrl(relay))
       return { status: 'failed', reason: 'invalid_url', reachedLive: false };
-    const startedAt = this.nowSeconds();
+    const now = this.nowSeconds();
     let cursor: number | undefined;
     try {
       cursor = await this.persistence.getCursor(relay);
     } catch {
       cursor = undefined; // an unreadable cursor: read the full first-sync window
+    }
+    // A pass that was cut short earlier continues at the page where it stopped (M-3). The window
+    // (`since`) is recomputed from that pass's start, so the cursor it will write is that start too.
+    let startedAt = now;
+    let resumeUntil: number | undefined;
+    const resume = await this.safeGetResume(relay);
+    if (
+      resume !== undefined &&
+      Number.isSafeInteger(resume.until) &&
+      Number.isSafeInteger(resume.startedAt) &&
+      resume.startedAt <= now &&
+      now - resume.startedAt <= SYNC_RESUME_MAX_AGE_SECONDS &&
+      resume.until >= syncSince(resume.startedAt, cursor)
+    ) {
+      startedAt = resume.startedAt;
+      resumeUntil = resume.until;
     }
     if (run.stopped) return { status: 'incomplete', reason: run.stopReason, reachedLive: false };
     const since = syncSince(startedAt, cursor);
@@ -514,9 +560,17 @@ export class SyncEngine {
       link.release();
       return { status: 'incomplete', reason: run.stopReason, reachedLive: false };
     }
-    return this.subscription(relay, run, link, startedAt, since, cursor);
+    return this.subscription(relay, run, link, startedAt, since, cursor, resumeUntil);
   }
 
+  /**
+   * Reads one relay: pages of stored events walking back from now to `since` (H-1), then, in live
+   * mode, a live-only subscription. A relay may cap the stored events it returns per filter (newest
+   * first, then EOSE), so one EOSE does not mean "all of it". Each page asks for `limit` events up
+   * to `until` (inclusive); the walk goes on while a page holds an event older than the page before
+   * it, so a relay that caps below our limit or ignores `limit` and `until` is read correctly too.
+   * The cursor moves only after the last page is read and every event was handled.
+   */
   private subscription(
     relay: string,
     run: Run,
@@ -524,14 +578,41 @@ export class SyncEngine {
     startedAt: number,
     since: number,
     cursor: number | undefined,
+    resumeUntil: number | undefined,
   ): Promise<RelayOutcome> {
-    const subId = `al-${encodeHex(randomBytes(6))}`;
-    const reqFrame = JSON.stringify([
-      'REQ',
-      subId,
-      { kinds: [NOSTR_KIND_GIFT_WRAP], '#p': run.pubkeys, since },
-    ]);
+    const newSubId = (): string => `al-${encodeHex(randomBytes(6))}`;
     return new Promise<RelayOutcome>((resolve) => {
+      let phase: 'backlog' | 'live' = 'backlog';
+      let subId = newSubId();
+      let pageUntil = resumeUntil; // the `until` of the page being read
+      let prevOldest = resumeUntil; // the oldest event of the page before
+      let pageOldest: number | undefined;
+      // Ids of this page's events at `pageOldest`; the next page starts at that second (inclusive),
+      // so it repeats them. They are skipped there, not counted or handled twice.
+      let pageOldestIds: string[] = [];
+      let skipIds = new Set<string>();
+      let pages = 1;
+      let eosePending = false;
+      const pageRequest = (): string =>
+        JSON.stringify([
+          'REQ',
+          subId,
+          {
+            kinds: [NOSTR_KIND_GIFT_WRAP],
+            '#p': run.pubkeys,
+            since,
+            ...(pageUntil === undefined ? {} : { until: pageUntil }),
+            limit: SYNC_PAGE_LIMIT,
+          },
+        ]);
+      // Live: no stored events (limit 0). `since` stays, because a wrap's created_at is back-dated.
+      const liveRequest = (): string =>
+        JSON.stringify([
+          'REQ',
+          subId,
+          { kinds: [NOSTR_KIND_GIFT_WRAP], '#p': run.pubkeys, since, limit: 0 },
+        ]);
+      let reqFrame = pageRequest();
       let finished = false;
       let reachedLive = false;
       let authTried = false;
@@ -550,6 +631,10 @@ export class SyncEngine {
         unFrame();
         unClose();
         run.hooks.delete(onStop);
+        if (outcome.status !== 'complete' && phase === 'backlog' && pageUntil !== undefined) {
+          // Pages above `pageUntil` were read and handled; the next pass continues here.
+          void this.safeSetResume(relay, { until: pageUntil, startedAt });
+        }
         if (link.isOpen()) link.send(JSON.stringify(['CLOSE', subId]));
         link.release();
         resolve({ ...outcome, reachedLive });
@@ -570,41 +655,72 @@ export class SyncEngine {
         chain = chain.then(task).catch(() => undefined);
       };
 
+      /** Runs after every event of the page was handled (it is chained behind them). */
       const afterEose = async (): Promise<void> => {
-        if (finished) return;
+        if (finished || phase !== 'backlog') return;
         if (hold) {
           finish({ status: 'incomplete', reason: 'handler_retry' });
           return;
         }
+        const more =
+          pageOldest !== undefined &&
+          pageOldest > since &&
+          (prevOldest === undefined || pageOldest < prevOldest);
+        if (more) {
+          if (pages >= MAX_PAGES_PER_PASS) {
+            finish({ status: 'incomplete', reason: 'too_many_events' });
+            return;
+          }
+          link.send(JSON.stringify(['CLOSE', subId]));
+          pageUntil = pageOldest;
+          prevOldest = pageOldest;
+          pageOldest = undefined;
+          skipIds = new Set(pageOldestIds);
+          pageOldestIds = [];
+          pages += 1;
+          eosePending = false;
+          subId = newSubId();
+          reqFrame = pageRequest();
+          if (!link.send(reqFrame)) finish({ status: 'failed', reason: 'closed' });
+          return;
+        }
         await writeCursor(startedAt);
+        await this.safeSetResume(relay, undefined);
+        if (finished) return;
+        if (!run.live) {
+          finish({ status: 'complete', reason: 'ok' });
+          return;
+        }
+        link.send(JSON.stringify(['CLOSE', subId]));
+        phase = 'live';
         reachedLive = true;
-        if (!run.live) finish({ status: 'complete', reason: 'ok' });
+        subId = newSubId();
+        reqFrame = liveRequest();
+        if (!link.send(reqFrame)) finish({ status: 'failed', reason: 'closed' });
       };
 
-      const handle = async (event: unknown): Promise<void> => {
+      const handle = async (event: unknown, arrivedAt: number): Promise<void> => {
         if (finished || run.stopped) return;
         // The bound on openings: a pass, or a minute of live traffic.
-        const nowSec = this.nowSeconds();
-        if (run.live && reachedLive && nowSec - windowStart >= 60) {
-          windowStart = nowSec;
+        if (run.live && reachedLive && arrivedAt - windowStart >= 60) {
+          windowStart = arrivedAt;
           newWraps = 0;
         }
-        let over = false;
         const result = await this.handleEvent(event, relay, run, () => {
           newWraps += 1;
           const limit =
             run.live && reachedLive ? MAX_LIVE_NEW_WRAPS_PER_MINUTE : MAX_NEW_WRAPS_PER_PASS;
-          if (newWraps > limit) over = true;
-          return !over;
+          return newWraps <= limit;
         });
         if (result === 'keys_unavailable') {
           finish({ status: 'failed', reason: 'keys_unavailable' });
           return;
         }
         if (result === 'retry') hold = true;
-        if (over) {
+        if (result === 'bound') {
           hold = true; // events were left unread: the cursor stays
-          if (!run.live) finish({ status: 'incomplete', reason: 'too_many_events' });
+          if (!run.live || !reachedLive)
+            finish({ status: 'incomplete', reason: 'too_many_events' });
           return;
         }
         if (
@@ -612,9 +728,10 @@ export class SyncEngine {
           reachedLive &&
           !hold &&
           result === 'delivered' &&
-          nowSec - lastCursorWrite >= LIVE_CURSOR_INTERVAL_SECONDS
+          arrivedAt - lastCursorWrite >= LIVE_CURSOR_INTERVAL_SECONDS
         ) {
-          await writeCursor(nowSec);
+          // The arrival time, not now: later frames may still sit in the queue (L-1).
+          await writeCursor(arrivedAt);
         }
       };
 
@@ -622,25 +739,54 @@ export class SyncEngine {
         if (finished || from !== relay || frame[1] !== subId) return;
         switch (frame[0]) {
           case 'EVENT': {
-            frames += 1;
             const event = frame[2];
-            const size =
-              isRecord(event) && typeof event.content === 'string' ? event.content.length : 0;
+            if (
+              skipIds.size > 0 &&
+              isRecord(event) &&
+              typeof event.id === 'string' &&
+              skipIds.has(event.id)
+            ) {
+              return; // the repeat of the previous page's last second
+            }
+            frames += 1;
             if (frames > MAX_FRAMES_PER_PASS && !(run.live && reachedLive)) {
               finish({ status: 'incomplete', reason: 'too_many_events' });
               return;
             }
+            const size = eventWeight(event);
             if (queued >= MAX_QUEUED_EVENTS || queuedChars + size > MAX_QUEUED_CHARS) {
               // A slow handler behind a fast relay: stop reading rather than hold it all in memory.
               this.logger?.warn('relay stopped', { reason: 'overflow', host: host(relay) });
               finish({ status: 'incomplete', reason: 'overflow' });
               return;
             }
+            if (phase === 'backlog' && isRecord(event)) {
+              const at = event.created_at;
+              if (
+                typeof at === 'number' &&
+                Number.isSafeInteger(at) &&
+                at >= since &&
+                (pageUntil === undefined || at <= pageUntil) &&
+                (pageOldest === undefined || at < pageOldest)
+              ) {
+                if (pageOldest === undefined || at < pageOldest) pageOldestIds = [];
+                pageOldest = at;
+              }
+              if (
+                typeof at === 'number' &&
+                at === pageOldest &&
+                typeof event.id === 'string' &&
+                pageOldestIds.length < 2 * SYNC_PAGE_LIMIT
+              ) {
+                pageOldestIds.push(event.id);
+              }
+            }
             queued += 1;
             queuedChars += size;
+            const arrivedAt = this.nowSeconds();
             enqueue(async () => {
               try {
-                await handle(event);
+                await handle(event, arrivedAt);
               } finally {
                 queued -= 1;
                 queuedChars -= size;
@@ -649,7 +795,10 @@ export class SyncEngine {
             return;
           }
           case 'EOSE':
-            if (!reachedLive) enqueue(afterEose);
+            if (phase === 'backlog' && !eosePending) {
+              eosePending = true;
+              enqueue(afterEose);
+            }
             return;
           case 'CLOSED': {
             // Only a fixed prefix of the relay's text is read (NIP-01, NIP-42).
@@ -678,7 +827,7 @@ export class SyncEngine {
       });
       const unClose = this.pool.onRelayClose((closed) => {
         if (closed !== relay || finished) return;
-        // Let events already queued finish, but report the loss.
+        // Events still queued are not handled after this: the cursor stays, and the loss is reported.
         finish(
           reachedLive || run.live
             ? { status: 'incomplete', reason: 'connection_lost' }
@@ -750,20 +899,22 @@ export class SyncEngine {
     countOpening: () => boolean,
   ): Promise<EventResult> {
     const counters = run.counters;
-    if (await this.safeSeen('wrap', id)) {
-      this.processed.add(id);
-      counters.duplicates += 1;
-      return 'duplicate';
-    }
+    // Cheapest first: our key, then the seen-set read, then the bound on openings (which counts
+    // only wraps that are really opened, so wraps seen before do not use it up).
     const identity = pickIdentity(event.tags, run.identities);
     if (identity === undefined) {
       this.junk.add(key); // a relay served a wrap that is not for us
       counters.dropped += 1;
       return 'dropped';
     }
+    if (await this.safeSeen('wrap', id)) {
+      this.processed.add(id);
+      counters.duplicates += 1;
+      return 'duplicate';
+    }
     if (!countOpening()) {
       counters.dropped += 1; // over the relay's bound: not recorded, comes again if it is real
-      return 'dropped';
+      return 'bound';
     }
     let unwrapped: Awaited<ReturnType<typeof unwrapGiftWrap>>;
     try {
@@ -797,9 +948,12 @@ export class SyncEngine {
       counters.deferred += 1;
       return 'retry';
     }
-    const at = this.nowSeconds();
-    await this.safeMark('wrap', id, at);
-    if (disposition === 'verified') await this.safeMark('envelope', unwrapped.envelope.id, at);
+    const mark = this.persistence.markSeen;
+    if (mark !== undefined) {
+      const at = this.nowSeconds();
+      await this.safeMark('wrap', id, at);
+      if (disposition === 'verified') await this.safeMark('envelope', unwrapped.envelope.id, at);
+    }
     this.processed.add(id);
     counters.delivered += 1;
     return 'delivered';
@@ -813,12 +967,40 @@ export class SyncEngine {
     }
   }
 
+  private async safeGetResume(relay: string): Promise<SyncResume | undefined> {
+    try {
+      return await this.persistence.getResume?.(relay);
+    } catch {
+      return undefined; // an unreadable position: start from the newest page
+    }
+  }
+
+  private async safeSetResume(relay: string, resume: SyncResume | undefined): Promise<void> {
+    try {
+      await this.persistence.setResume?.(relay, resume);
+    } catch {
+      this.logger?.warn('page position not saved', { host: host(relay) });
+    }
+  }
+
   private async safeMark(kind: SeenKind, id: string, at: number): Promise<void> {
     try {
-      await this.persistence.markSeen(kind, id, at);
+      await this.persistence.markSeen?.(kind, id, at);
     } catch {
       this.logger?.warn('seen not saved', { kind });
     }
+  }
+}
+
+/**
+ * The size of an inbound event for the queue bound: the whole event as JSON (content, tags and any
+ * other field), never less than 1. The event came out of JSON.parse, so it is plain data (IR-M1-5c-1 M-2).
+ */
+function eventWeight(event: unknown): number {
+  try {
+    return Math.max(1, JSON.stringify(event)?.length ?? 1);
+  } catch {
+    return MAX_QUEUED_CHARS; // cannot be measured: counts as the largest
   }
 }
 

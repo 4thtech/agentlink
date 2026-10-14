@@ -27,6 +27,8 @@ import {
   LIVE_RETRY_BASE_MS,
   MAX_NEW_WRAPS_PER_PASS,
   MAX_QUEUED_EVENTS,
+  SYNC_PAGE_LIMIT,
+  type SyncResume,
   SEEN_RETENTION_SECONDS,
   SYNC_BUDGET_MS,
   SYNC_LOOKBACK_SECONDS,
@@ -146,6 +148,15 @@ class MemorySync implements SyncPersistence {
     if (!this.seen.has(`${kind}:${id}`)) this.seen.set(`${kind}:${id}`, firstSeenAt);
     return Promise.resolve();
   }
+  readonly resumes = new Map<string, SyncResume>();
+  getResume(relay: string): Promise<SyncResume | undefined> {
+    return Promise.resolve(this.resumes.get(relay));
+  }
+  setResume(relay: string, resume: SyncResume | undefined): Promise<void> {
+    if (resume === undefined) this.resumes.delete(relay);
+    else this.resumes.set(relay, resume);
+    return Promise.resolve();
+  }
   prune(before: number): void {
     for (const [key, at] of this.seen) if (at < before) this.seen.delete(key);
   }
@@ -220,6 +231,9 @@ function setup(
   };
   return result;
 }
+
+/** The live-only REQs (limit 0) sent to `relay`. */
+const liveReqs = (s: Setup, relay: string) => s.net.reqs(relay).filter((r) => r.filter.limit === 0);
 
 const ids = (s: Setup): string[] => s.items.map((i) => i.giftWrapId);
 
@@ -298,6 +312,7 @@ describe('cursor and resume', () => {
       kinds: [1059],
       '#p': [s.recipient.pubkey],
       since: NOW - 9 * 86_400,
+      limit: SYNC_PAGE_LIMIT,
     });
     expect(result).toMatchObject({ partial: false, delivered: 1, duplicates: 0, dropped: 0 });
     expect(result.relays).toEqual([{ relay, status: 'complete', reason: 'ok' }]);
@@ -1030,7 +1045,7 @@ describe('NIP-42', () => {
       onEnvelope: s.handler(),
     });
     expect(result).toMatchObject({ partial: false, delivered: 1 });
-    expect(s.net.reqs(relay)).toHaveLength(2); // refused once, then served after the login
+    expect(s.net.reqs(relay)).toHaveLength(3); // refused once, served after the login, and the repeat page
     expect(s.net.socket(relay)?.authed).toBe(true);
   });
 
@@ -1079,7 +1094,7 @@ describe('live subscription', () => {
     s.net.inject(relay, makeWrap(s.recipient).event);
     await vi.advanceTimersByTimeAsync(LIVE_RETRY_BASE_MS * 3);
     expect(s.items).toHaveLength(2);
-    expect(s.net.reqs(relay)).toHaveLength(1);
+    expect(liveReqs(s, relay)).toHaveLength(1);
   });
 
   it('delivers a live duplicate once, and a wrap seen by a sync pass never', async () => {
@@ -1105,7 +1120,7 @@ describe('live subscription', () => {
       onEnvelope: s.handler(),
     });
     await vi.advanceTimersByTimeAsync(20);
-    expect(s.net.reqs(relay)).toHaveLength(1);
+    expect(liveReqs(s, relay)).toHaveLength(1);
 
     s.net.socket(relay)?.dropFromRelay();
     await vi.advanceTimersByTimeAsync(20);
@@ -1114,9 +1129,9 @@ describe('live subscription', () => {
     await vi.advanceTimersByTimeAsync(LIVE_RETRY_BASE_MS);
     await vi.advanceTimersByTimeAsync(20);
 
-    const reqs = s.net.reqs(relay);
-    expect(reqs).toHaveLength(2);
-    expect(reqs[1]?.filter.since).toBe(NOW - 173_100);
+    const paged = s.net.reqs(relay).filter((r) => r.filter.limit !== 0);
+    expect(paged[1]?.filter.since).toBe(NOW - 173_100);
+    expect(liveReqs(s, relay)).toHaveLength(2);
     expect(ids(s)).toEqual([missed.event.id]);
     unsubscribe();
   });
@@ -1133,7 +1148,7 @@ describe('live subscription', () => {
     await vi.advanceTimersByTimeAsync(20);
     await vi.advanceTimersByTimeAsync(IDLE_CLOSE_MS * 2);
     expect(s.pool.connectionCount).toBe(1);
-    expect(s.net.reqs(relay)).toHaveLength(1);
+    expect(liveReqs(s, relay)).toHaveLength(1);
     unsubscribe();
     await vi.advanceTimersByTimeAsync(IDLE_CLOSE_MS + 10);
     expect(s.pool.connectionCount).toBe(0); // released: the idle rule applies again
@@ -1147,7 +1162,7 @@ describe('live subscription', () => {
     await vi.advanceTimersByTimeAsync(20);
     s.pool.close();
     await vi.advanceTimersByTimeAsync(LIVE_RETRY_BASE_MS * 10);
-    expect(s.net.reqs(relay)).toHaveLength(1);
+    expect(liveReqs(s, relay)).toHaveLength(1);
     expect(vi.getTimerCount()).toBe(0);
   });
 });
@@ -1220,5 +1235,275 @@ describe('logging (I-7)', () => {
     ]) {
       expect(text).not.toContain(forbidden);
     }
+  });
+});
+
+// --- pagination (IR-M1-5c-1 H-1, M-2, M-3) -------------------------------------------------------
+
+/** A wrap-shaped event for us that fails to open: what a flood of junk looks like. */
+function junkWrap(recipientKey: string, createdAt: number): Record<string, unknown> {
+  return {
+    id: encodeHex(randomBytes(32)),
+    pubkey: encodeHex(randomBytes(32)),
+    created_at: createdAt,
+    kind: 1059,
+    tags: [['p', recipientKey]],
+    content: 'x',
+    sig: encodeHex(randomBytes(64)),
+  };
+}
+
+describe('pagination (a relay that caps stored results per filter)', () => {
+  it('delivers every wrap of the window from a relay that caps results, and moves the cursor only at the end', async () => {
+    const s = setup();
+    const [relay] = relayUrls('capped', 1) as [string];
+    s.net.configure(relay, { maxLimit: 5 });
+    const wraps = Array.from({ length: 23 }, (_, i) =>
+      makeWrap(s.recipient, { createdAt: NOW - (i + 1) * 600 }),
+    );
+    for (const w of wraps) s.net.inject(relay, w.event);
+    const cursorsSeen: number[] = [];
+    const result = await s.engine.sync({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: (item) => {
+        s.items.push(item);
+        cursorsSeen.push(s.store.cursors.size);
+        return 'verified';
+      },
+    });
+    expect(result).toMatchObject({ partial: false, delivered: 23 });
+    expect([...ids(s)].sort()).toEqual(wraps.map((w) => w.event.id).sort());
+    expect(cursorsSeen.every((n) => n === 0)).toBe(true); // never before the last page
+    expect(s.store.cursors.get(relay)).toBe(NOW);
+    // Pages walk back: each later page asks for an older `until`.
+    const untils = s.net
+      .reqs(relay)
+      .map((r) => r.filter.until)
+      .filter((u): u is number => u !== undefined);
+    expect(untils.length).toBeGreaterThanOrEqual(4);
+    expect([...untils].sort((a, b) => b - a)).toEqual(untils);
+  });
+
+  it('is not starved by a flood of junk wraps tagged to us: older real events stay reachable', async () => {
+    const s = setup();
+    const [relay] = relayUrls('flood-cap', 1) as [string];
+    s.net.configure(relay, { maxLimit: 5 });
+    for (let i = 0; i < 40; i += 1) {
+      s.net.inject(relay, junkWrap(s.recipient.pubkey, NOW - 10 - i) as unknown as NostrEvent);
+    }
+    const real = [1, 2, 3].map((i) => makeWrap(s.recipient, { createdAt: NOW - i * 6 * HOUR }));
+    for (const w of real) s.net.inject(relay, w.event);
+    const result = await s.engine.sync({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(result).toMatchObject({ partial: false, delivered: 3, dropped: 40 });
+    expect(s.store.cursors.get(relay)).toBe(NOW);
+  });
+
+  it('reads a relay that ignores limit and until once, and ends', async () => {
+    const s = setup();
+    const [relay] = relayUrls('nolimit', 1) as [string];
+    s.net.configure(relay, { ignoreLimit: true });
+    const wraps = Array.from({ length: 12 }, (_, i) =>
+      makeWrap(s.recipient, { createdAt: NOW - (i + 1) * 60 }),
+    );
+    for (const w of wraps) s.net.inject(relay, w.event);
+    const result = await s.engine.sync({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(result).toMatchObject({ partial: false, delivered: 12 });
+    expect(s.net.reqs(relay).length).toBeLessThanOrEqual(3);
+  });
+
+  it('keeps the cursor when pagination is interrupted, and resumes from the saved page next time', async () => {
+    const s = setup();
+    const [relay] = relayUrls('interrupt', 1) as [string];
+    s.net.configure(relay, { maxLimit: 5 });
+    const wraps = Array.from({ length: 14 }, (_, i) =>
+      makeWrap(s.recipient, { createdAt: NOW - (i + 1) * 600 }),
+    );
+    for (const w of wraps) s.net.inject(relay, w.event);
+    // After the first page the relay stops answering.
+    let delivered = 0;
+    const first = await within(
+      s.engine.sync({
+        relays: [relay],
+        identities: identity(s),
+        onEnvelope: (item) => {
+          s.items.push(item);
+          delivered += 1;
+          if (delivered === 5) s.net.configure(relay, { maxLimit: 5, silentReq: true });
+          return 'verified';
+        },
+      }),
+      SYNC_BUDGET_MS,
+    );
+    expect(first.partial).toBe(true);
+    expect(first.delivered).toBe(5);
+    expect(s.store.cursors.has(relay)).toBe(false);
+    const resume = s.store.resumes.get(relay);
+    expect(resume?.startedAt).toBe(NOW);
+    expect(resume?.until).toBe(NOW - 5 * 600);
+
+    // The relay answers again: the next pass starts at the saved page, not at the newest.
+    s.net.configure(relay, { maxLimit: 5 });
+    const second = s.restart();
+    const result = await second.engine.sync({
+      relays: [relay],
+      identities: identity(second),
+      onEnvelope: second.handler(),
+    });
+    expect(second.net.reqs(relay).some((r) => r.filter.until === NOW - 5 * 600)).toBe(true);
+    expect(result).toMatchObject({ partial: false });
+    expect(s.items.length + second.items.length).toBe(14);
+    expect(second.store.cursors.get(relay)).toBe(NOW);
+    expect(second.store.resumes.has(relay)).toBe(false);
+  });
+
+  it('makes progress through a junk flood larger than the pass bound, across restarts (M-3)', async () => {
+    const s = setup();
+    const [relay] = relayUrls('bigflood', 1) as [string];
+    s.net.configure(relay, { maxLimit: 500 });
+    const total = MAX_NEW_WRAPS_PER_PASS + 60;
+    for (let i = 0; i < total; i += 1) {
+      s.net.inject(relay, junkWrap(s.recipient.pubkey, NOW - 100 - i) as unknown as NostrEvent);
+    }
+    const real = [1, 2].map((i) => makeWrap(s.recipient, { createdAt: NOW - i * 5 * HOUR }));
+    for (const w of real) s.net.inject(relay, w.event);
+
+    const first = await s.engine.sync({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(first.relays[0]).toMatchObject({ status: 'incomplete', reason: 'too_many_events' });
+    expect(s.store.cursors.has(relay)).toBe(false);
+    expect(s.store.resumes.has(relay)).toBe(true);
+
+    const second = s.restart(); // a new process: the in-memory junk cache is empty
+    const result = await second.engine.sync({
+      relays: [relay],
+      identities: identity(second),
+      onEnvelope: second.handler(),
+    });
+    expect(result.partial).toBe(false);
+    expect(second.items.map((i) => i.giftWrapId).sort()).toEqual(
+      real.map((w) => w.event.id).sort(),
+    );
+    expect(second.store.cursors.get(relay)).toBe(NOW);
+  });
+});
+
+describe('queue memory bound counts the whole event (M-2)', () => {
+  it('ends a relay that fills frames with tags rather than content', async () => {
+    const s = setup();
+    const [relay] = relayUrls('tagflood', 1) as [string];
+    s.net.inject(relay, makeWrap(s.recipient).event);
+    s.net.configure(relay, {
+      extraFrames: (subId) =>
+        Array.from({ length: 220 }, () =>
+          JSON.stringify([
+            'EVENT',
+            subId,
+            { ...junkWrap(s.recipient.pubkey, NOW - 5), tags: [['x', 'a'.repeat(100_000)]] },
+          ]),
+        ),
+    });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const done = s.engine.sync({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: async (): Promise<SyncDisposition> => {
+        await gate;
+        return 'verified';
+      },
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    release();
+    const result = await done;
+    expect(result.relays[0]).toMatchObject({ status: 'incomplete', reason: 'overflow' });
+  });
+});
+
+describe('seen-set seam (Q-1) and ordering (L-3)', () => {
+  it('works with a persistence that has no markSeen: core writes the seen row itself', async () => {
+    const store = new MemorySync();
+    const reads: string[] = [];
+    const persistence: SyncPersistence = {
+      getCursor: (r) => store.getCursor(r),
+      setCursor: (r, t) => store.setCursor(r, t),
+      isSeen: (k, id) => {
+        reads.push(`${k}:${id}`);
+        return store.isSeen(k, id);
+      },
+    };
+    const net = new MockNetwork();
+    const recipient = referenceKeys();
+    const pool = new RelayPool({ connector: net, addressCheck: { resolver: net } });
+    const engine = new SyncEngine({ pool, persistence, keys: recipient });
+    const [relay] = relayUrls('nomark', 1) as [string];
+    net.configure(relay);
+    const wrap = makeWrap(recipient);
+    net.inject(relay, wrap.event);
+    const items: SyncItem[] = [];
+    const handler = (item: SyncItem): SyncDisposition => {
+      items.push(item);
+      return 'verified';
+    };
+    const opts = {
+      relays: [relay],
+      identities: [{ pubkey: recipient.pubkey }],
+      onEnvelope: handler,
+    };
+    expect(await engine.sync(opts)).toMatchObject({ delivered: 1 });
+    expect(await engine.sync(opts)).toMatchObject({ delivered: 0, duplicates: 1 }); // in-process cache
+    expect(items).toHaveLength(1);
+    expect(reads).toContain(`wrap:${wrap.event.id}`);
+  });
+
+  it('does not read the persisted seen-set for a wrap that is not addressed to us', async () => {
+    const s = setup();
+    const reads: string[] = [];
+    const isSeen = s.store.isSeen.bind(s.store);
+    s.store.isSeen = (k, id) => {
+      reads.push(id);
+      return isSeen(k, id);
+    };
+    const [relay] = relayUrls('orderchk', 1) as [string];
+    const foreign = makeWrap(referenceKeys()).event;
+    s.net.configure(relay, { extraFrames: (subId) => [JSON.stringify(['EVENT', subId, foreign])] });
+    await s.engine.sync({ relays: [relay], identities: identity(s), onEnvelope: s.handler() });
+    expect(reads).not.toContain(foreign.id);
+  });
+});
+
+describe('live cursor timing (L-1)', () => {
+  it('writes the arrival time of the event, not the time it was handled', async () => {
+    const s = setup();
+    const [relay] = relayUrls('arrival', 1) as [string];
+    s.net.configure(relay);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const unsubscribe = s.engine.subscribe({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: async (): Promise<SyncDisposition> => {
+        await gate;
+        return 'verified';
+      },
+    });
+    await vi.advanceTimersByTimeAsync(100 * 1000);
+    s.net.inject(relay, makeWrap(s.recipient, { createdAt: NOW + 50 }).event);
+    await vi.advanceTimersByTimeAsync(400 * 1000); // the handler is still busy
+    release();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(s.store.cursors.get(relay)).toBe(NOW + 100);
+    unsubscribe();
   });
 });

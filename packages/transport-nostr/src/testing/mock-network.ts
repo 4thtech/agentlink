@@ -38,6 +38,13 @@ export interface MockRelayConfig {
   extraFrames?: (subId: string) => string[];
   /** M1-5c: serves stored events newest first (relays make no promise about order). */
   newestFirst?: boolean;
+  /**
+   * M1-5c: a per-filter cap on stored events, newest `created_at` first, then EOSE (strfry's default
+   * is 500). The cap applies below any `limit` the client asks for.
+   */
+  maxLimit?: number;
+  /** M1-5c: ignores `limit` and `until` (a relay that does not paginate). */
+  ignoreLimit?: boolean;
 }
 
 const microtask = (fn: () => void): void => {
@@ -51,6 +58,8 @@ interface MockFilter {
   kinds?: number[];
   '#p'?: string[];
   since?: number;
+  until?: number;
+  limit?: number;
 }
 
 export class MockSocket implements RelaySocket {
@@ -58,6 +67,7 @@ export class MockSocket implements RelaySocket {
   closed = false;
   /** Open subscriptions on this connection (M1-5c): sub id to filter. */
   readonly subs = new Map<string, MockFilter>();
+  private extrasSent = false;
   readonly challenge: string;
 
   constructor(
@@ -158,7 +168,8 @@ export class MockSocket implements RelaySocket {
       const wanted = filter['#p'];
       if (!event.tags.some((t) => t[0] === 'p' && wanted.includes(t[1] as string))) return false;
     }
-    return filter.since === undefined || event.created_at >= filter.since;
+    if (filter.since !== undefined && event.created_at < filter.since) return false;
+    return filter.until === undefined || event.created_at <= filter.until;
   }
 
   private handleReq(subId: string, filter: MockFilter, config: MockRelayConfig): void {
@@ -168,12 +179,30 @@ export class MockSocket implements RelaySocket {
     }
     if (config.silentReq === true) return;
     this.subs.set(subId, filter);
-    const stored = this.network.stored
-      .filter((s) => s.relay === this.target.url && this.matches(filter, s.event))
+    const ignore = config.ignoreLimit === true;
+    const withoutUntil: MockFilter = { ...filter };
+    delete withoutUntil.until;
+    const matchFilter: MockFilter = ignore ? withoutUntil : filter;
+    let stored = this.network.stored
+      .filter((s) => s.relay === this.target.url && this.matches(matchFilter, s.event))
       .map((s) => s.event);
     if (config.newestFirst === true) stored.reverse();
+    const limit = ignore ? undefined : filter.limit;
+    if (limit === 0) stored = []; // limit 0: no stored events, live only
+    const cap = Math.min(limit ?? Infinity, config.maxLimit ?? Infinity);
+    if (cap !== Infinity) {
+      // Newest created_at first (stable), then cut: what a relay with a result cap does.
+      stored = stored
+        .map((event, i) => ({ event, i }))
+        .sort((a, b) => b.event.created_at - a.event.created_at || a.i - b.i)
+        .slice(0, cap)
+        .map((x) => x.event);
+    }
     for (const event of stored) this.push(JSON.stringify(['EVENT', subId, event]));
-    for (const raw of config.extraFrames?.(subId) ?? []) this.push(raw);
+    if (!this.extrasSent) {
+      this.extrasSent = true; // once per connection, with the first stored read
+      for (const raw of config.extraFrames?.(subId) ?? []) this.push(raw);
+    }
     if (config.noEose !== true) this.push(JSON.stringify(['EOSE', subId]));
   }
 
