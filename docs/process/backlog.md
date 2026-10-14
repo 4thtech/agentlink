@@ -1196,7 +1196,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Threat note (draft):** a malformed or forged batch encoding could (a) give one signed batch two readings, if a verifier sorted, deduplicated or dropped unknown keys before checking, so the owner's reviewed list differs from what is applied; (b) widen what one signature covers, with more than 20 items or a single item outside `approval.decide`; (c) let an `approval.decide` be read as a batch or the reverse; (d) carry an `actionDigest` in a second spelling that compares unequal to the request's digest, or equal after normalising. Stopped by: the strict schema, which rejects instead of normalising (04 §2.5.1, §2.5.2); `op` and `params` inside the signed body under the owner-action tag; the recomputed `actionDigest` on use and whole-or-nothing application with the nonce burnt (M1-7d, M1-7e); I-4 (no MCP tool creates or passes a batch). Residual: a modified installation can show one list and have another signed (G-1, D-67).
 
 #### M1-2f · types: `contact.check` params schema (new, G-28 hand-off)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** ready · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types
 - **Depends on:** M1-2b; the `contact.check` signing and reject vectors of M1-1h (`owner-action` suite)
 - **Spec:** 04 §2.5.1 (op table: `contact.check` `{contact, pairingDigest}`, `L(op)` 86 400 s), §2.4.1 (encodings), §3.6.1; G-28
@@ -1206,6 +1206,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Core verification and the `contacts.safety_check` write are M1-7c; signing from `agentlink contacts --verify <id>` is M1-9a.
 - **Acceptance:**
   - The schema accepts the `contact.check` signing vector and rejects every `contact.check` reject vector in every runtime the suite declares.
+- **Threat note (draft):** a malformed `contact.check` could (a) mark a contact "Safety code checked" for another contact or another pairing than the owner compared, if a verifier normalised `contact` (EIP-55 or upper-case hex) or `pairingDigest` (upper case, `0x`, base64url) before comparing, so two spellings of one signed body read differently; (b) carry extra keys that a later reader treats as meaning, beside what the owner signed; (c) be read as another op's params, or another op's body as a `contact.check`. Stopped by: the strict schema, which rejects instead of normalising (04 §2.4.1, §2.5.1); `op` and `params` inside the signed body under the owner-action tag; the core's comparison against a digest recomputed from the signed `handshake` and `handshake-ack` on every load, never a stored one (04 §3.6.1, 07 §3; M1-7c); I-4 (no MCP tool creates or passes a `contact.check`). Residual: a modified installation can show one code and have another digest signed (G-1, 04 §2.5); important contacts are compared on the console.
 
 ### Contracts (`occ-v2-contracts`, private)
 
