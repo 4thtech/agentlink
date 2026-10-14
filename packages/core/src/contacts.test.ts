@@ -21,6 +21,17 @@ import {
   seed,
   storePairingEnvelope,
 } from './testing/fixtures.js';
+import {
+  agentEnc,
+  agentSigner,
+  cardUpdatePayload,
+  craft,
+  giftWrapId,
+  makeAgent,
+  ownerEnc,
+  pairWith,
+  rotate,
+} from './testing/envelopes.js';
 
 const clock = new FakeClock();
 
@@ -604,9 +615,68 @@ describe('block and remove (02 F-14) and the inbound screen', () => {
   // rotates keys has its card-update dropped, so its new key stays unknown. An envelope from an
   // unknown key whose recipients include the ownerEnc kid of a blocked or removed contact's owner
   // must be dropped: never held, never queued as a request, also after 48 h.
-  it.todo(
-    'M1-7b: drops (never holds or queues) an envelope from an unknown key carrying the owner kid of a blocked or removed contact',
-  );
+  for (const action of ['block', 'remove'] as const) {
+    it(`M1-7b, ${action}: drops (never holds or queues) an envelope from an unknown key carrying the owner kid of that contact, also after 48 h`, async () => {
+      const a = await makeAgent(clock, new MemoryKeyStore(seed(1)), ownerA, 'alice');
+      const b = await makeAgent(clock, new MemoryKeyStore(seed(2)), ownerB, 'bob');
+      await pairWith(clock, a, b);
+      await pairWith(clock, b, a);
+      await a.client.contacts[action](b.id);
+      await rotate(b);
+      // Its card-update is dropped, so its new key stays unknown.
+      const update = await b.client.envelopes.build({
+        to: { contact: a.id },
+        payload: await cardUpdatePayload(b),
+      });
+      expect((await a.client.envelopes.receive({ envelope: update.envelope })).status).toBe(
+        'verified',
+      );
+      expect(await a.client.envelopes.processReceived()).toEqual([
+        {
+          envelopeId: update.envelope.id,
+          outcome: 'dropped',
+          reason: action === 'block' ? 'blocked' : 'removed',
+          flagged: false,
+        },
+      ]);
+      expect((await contactRow(a, b.id))?.key_epoch).toBe(0);
+      // A message from the new key carries B's owner kid (a blocked or removed contact's owner).
+      const env = await craft({
+        signer: await agentSigner(b.keyStore),
+        entries: [
+          { pk: await agentEnc(a) },
+          { pk: await ownerEnc(ownerA) },
+          { pk: await ownerEnc(ownerB) },
+          { pk: await agentEnc(b, 1) },
+        ],
+        createdAt: clock.t,
+      });
+      const wrap = giftWrapId();
+      expect((await a.client.envelopes.receive({ envelope: env, giftWrapId: wrap })).status).toBe(
+        'verified',
+      );
+      expect(await a.client.envelopes.processReceived()).toEqual([
+        { envelopeId: env.id, outcome: 'dropped', reason: 'held_owner_inactive', flagged: false },
+      ]);
+      const state = () =>
+        a.store.transaction((tx) => ({
+          seen: tx.get('seen', { kind: 'wrap', id: wrap }) !== undefined,
+          held: tx.count('held_envelopes'),
+          requests: tx.count('envelopes', { state: 'request' }),
+          stored: tx.get('envelopes', { envelope_id: env.id }) !== undefined,
+        }));
+      // Recorded in `seen` after step 4; never held, never a request.
+      expect(await state()).toEqual({ seen: true, held: 0, requests: 0, stored: false });
+      const start = clock.t;
+      try {
+        clock.t = start + 172_800;
+        expect(await a.client.envelopes.processReceived()).toEqual([]);
+        expect(await state()).toEqual({ seen: true, held: 0, requests: 0, stored: false });
+      } finally {
+        clock.t = start;
+      }
+    });
+  }
 
   it('a blocked contact stays blocked across a re-pair', async () => {
     const s = await self();

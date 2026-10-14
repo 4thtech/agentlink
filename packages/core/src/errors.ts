@@ -31,7 +31,13 @@ export type CoreErrorCode =
   | 'card_update_not_newer'
   | 'pairing_not_found'
   | 'pairing_expired'
-  | 'pairing_evidence_missing';
+  | 'pairing_evidence_missing'
+  // Envelopes (04 §3.1–§3.4; M1-7b)
+  | 'contact_not_active'
+  | 'type_not_sendable'
+  | 'payload_invalid'
+  | 'thread_invalid'
+  | 'envelope_too_large';
 
 export class CoreError extends Error {
   readonly code: CoreErrorCode;
