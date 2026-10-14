@@ -1,12 +1,25 @@
-// Suite `hpke` (M1-1c): RFC 9180 HPKE, mode Base, DHKEM(X25519, HKDF-SHA256), HKDF-SHA256,
-// AES-256-GCM through @agentlink/crypto. `sealSequence` and `open` drive the raw suite (the CFRG
-// vector) through the test seam; `wrapCek` and `unwrapCek` are the 04 §3.3 CEK wrap, with the
-// ephemeral key fixed through the test seam for `wrapCek`. Inputs go to the code under test
-// unchecked, so its own refusals (CryptoInputError) are what `outcome: reject` measures; any other
-// error is a bug and fails the case.
-import { CryptoInputError, decodeBase64url, encodeBase64url } from '@agentlink/crypto';
+// Suite `hpke` (M1-1c; CEK-derived wraps M1-1l, G-46, D-66): RFC 9180 HPKE, mode Base,
+// DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-256-GCM through @agentlink/crypto. `sealSequence`
+// and `open` drive the raw suite (the CFRG vector) through the test seam. `wrapCek` and `unwrapCek`
+// are the 04 §3.3 CEK wrap, whose ephemeral key is derived from the CEK; `wrapCekWithEphemeralKey`
+// fixes the ephemeral key through the test seam; `checkWrap` recomputes one entry and compares it;
+// `deriveFromCek` runs one 04 §3.3 derivation by its label through the test seam. Inputs go to
+// the code under test unchecked, so its own refusals (CryptoInputError) and a failed check are
+// what `outcome: reject` measures; any other error is a bug and fails the case.
+import {
+  CryptoInputError,
+  checkWrap,
+  decodeBase64url,
+  encodeBase64url,
+  wrapCek,
+} from '@agentlink/crypto';
 import { unwrapCek } from '@agentlink/crypto/keystore';
-import { hpkeOpen, hpkeSealSequence, wrapCekWithEphemeralKey } from '@agentlink/crypto/testing';
+import {
+  deriveFromCek,
+  hpkeOpen,
+  hpkeSealSequence,
+  wrapCekWithEphemeralKey,
+} from '@agentlink/crypto/testing';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 
@@ -32,13 +45,29 @@ type HpkeInput =
       ciphertext: string;
     }
   | {
-      op: 'wrapCek';
+      op: 'deriveFromCek';
+      label: string;
+      cek: string;
+      envelopeId: string;
+      recipientPublicKey?: string;
+    }
+  | { op: 'wrapCek'; recipientPublicKey: string; envelopeId: string; cek: string }
+  | {
+      op: 'wrapCekWithEphemeralKey';
       recipientPublicKey: string;
       ephemeralSecretKey: string;
       envelopeId: string;
       cek: string;
     }
-  | { op: 'unwrapCek'; recipientSecretKey: string; envelopeId: string; enc: string; wk: string };
+  | { op: 'unwrapCek'; recipientSecretKey: string; envelopeId: string; enc: string; wk: string }
+  | {
+      op: 'checkWrap';
+      recipientPublicKey: string;
+      envelopeId: string;
+      cek: string;
+      enc: string;
+      wk: string;
+    };
 
 function parseInput(input: unknown): HpkeInput {
   const i = input as Record<string, unknown> | null;
@@ -57,14 +86,34 @@ function parseInput(input: unknown): HpkeInput {
   if (i?.op === 'open' && str('recipientSecretKey', 'enc', 'info', 'aad', 'ciphertext')) {
     return i as HpkeInput;
   }
-  if (i?.op === 'wrapCek' && str('recipientPublicKey', 'ephemeralSecretKey', 'envelopeId', 'cek')) {
+  if (
+    i?.op === 'deriveFromCek' &&
+    str('label', 'cek', 'envelopeId') &&
+    (i.recipientPublicKey === undefined || typeof i.recipientPublicKey === 'string')
+  ) {
+    return i as HpkeInput;
+  }
+  if (i?.op === 'wrapCek' && str('recipientPublicKey', 'envelopeId', 'cek')) {
+    return i as HpkeInput;
+  }
+  if (
+    i?.op === 'wrapCekWithEphemeralKey' &&
+    str('recipientPublicKey', 'ephemeralSecretKey', 'envelopeId', 'cek')
+  ) {
     return i as HpkeInput;
   }
   if (i?.op === 'unwrapCek' && str('recipientSecretKey', 'envelopeId', 'enc', 'wk')) {
     return i as HpkeInput;
   }
+  if (i?.op === 'checkWrap' && str('recipientPublicKey', 'envelopeId', 'cek', 'enc', 'wk')) {
+    return i as HpkeInput;
+  }
   throw new TypeError('hpke: input does not match any op of case.schema.json');
 }
+
+const outcome = (accepted: boolean): readonly Comparison[] => [
+  { field: 'outcome', actual: accepted ? 'accept' : 'reject' },
+];
 
 async function rejectedOr(
   run: () => Promise<readonly Comparison[]>,
@@ -72,10 +121,15 @@ async function rejectedOr(
   try {
     return await run();
   } catch (error) {
-    if (error instanceof CryptoInputError) return [{ field: 'outcome', actual: 'reject' }];
+    if (error instanceof CryptoInputError) return outcome(false);
     throw error;
   }
 }
+
+const wrapped = (result: { enc: Uint8Array; wk: Uint8Array }): readonly Comparison[] => [
+  { field: 'enc', actual: encodeBase64url(result.enc) },
+  { field: 'wk', actual: encodeBase64url(result.wk) },
+];
 
 async function evaluateInput(input: HpkeInput): Promise<readonly Comparison[]> {
   switch (input.op) {
@@ -104,19 +158,33 @@ async function evaluateInput(input: HpkeInput): Promise<readonly Comparison[]> {
       );
       return [{ field: 'plaintext', actual: bytesToHex(plaintext) }];
     }
-    case 'wrapCek': {
-      // The id is decoded without a length, so a wrong-length id reaches the code under test.
-      const wrapped = await wrapCekWithEphemeralKey(
-        hexToBytes(input.recipientPublicKey),
-        decodeBase64url(input.envelopeId),
+    case 'deriveFromCek': {
+      // The id and key are decoded without a length, so wrong lengths reach the code under test.
+      const okm = deriveFromCek(
+        input.label,
         hexToBytes(input.cek),
-        hexToBytes(input.ephemeralSecretKey),
+        decodeBase64url(input.envelopeId),
+        input.recipientPublicKey === undefined ? undefined : hexToBytes(input.recipientPublicKey),
       );
-      return [
-        { field: 'enc', actual: encodeBase64url(wrapped.enc) },
-        { field: 'wk', actual: encodeBase64url(wrapped.wk) },
-      ];
+      return [{ field: 'okm', actual: bytesToHex(okm) }];
     }
+    case 'wrapCek':
+      return wrapped(
+        await wrapCek(
+          hexToBytes(input.recipientPublicKey),
+          decodeBase64url(input.envelopeId),
+          hexToBytes(input.cek),
+        ),
+      );
+    case 'wrapCekWithEphemeralKey':
+      return wrapped(
+        await wrapCekWithEphemeralKey(
+          hexToBytes(input.recipientPublicKey),
+          decodeBase64url(input.envelopeId),
+          hexToBytes(input.cek),
+          hexToBytes(input.ephemeralSecretKey),
+        ),
+      );
     case 'unwrapCek': {
       const cek = await unwrapCek(
         hexToBytes(input.recipientSecretKey),
@@ -128,6 +196,15 @@ async function evaluateInput(input: HpkeInput): Promise<readonly Comparison[]> {
       );
       return [{ field: 'cek', actual: bytesToHex(cek) }];
     }
+    case 'checkWrap':
+      return outcome(
+        await checkWrap(
+          hexToBytes(input.recipientPublicKey),
+          decodeBase64url(input.envelopeId),
+          hexToBytes(input.cek),
+          { enc: decodeBase64url(input.enc), wk: decodeBase64url(input.wk) },
+        ),
+      );
   }
 }
 

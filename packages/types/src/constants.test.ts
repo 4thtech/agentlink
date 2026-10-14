@@ -188,6 +188,7 @@ describe('constants (04, 05, 06)', () => {
       wrappedCek: 48,
       iv: 12,
       tag: 16,
+      keyCommitment: 32,
       bip340Sig: 64,
       eip712Sig: 65,
     });

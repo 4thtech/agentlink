@@ -34,8 +34,13 @@ export const HPKE_ENC_LENGTH = 32;
 export const WRAPPED_CEK_LENGTH = 48;
 /** The content encryption key: 32 random bytes per envelope (04 §3.3). */
 export const CEK_LENGTH = 32;
-/** The payload AEAD: AES-256-GCM. */
-export const AEAD_ALG = 'A256GCM';
+/**
+ * The payload AEAD (04 §3.1, §3.3; G-46, D-66): AES-256-GCM under a payload key derived from the
+ * CEK, with the 32-byte key commitment `kc`. The earlier `A256GCM` form is refused.
+ */
+export const AEAD_ALG = 'A256GCM-KC';
+/** Raw byte length of `aead.kc`, the key commitment derived from the CEK (04 §3.3). */
+export const KEY_COMMITMENT_LENGTH = 32;
 /** Raw byte length of `aead.iv`. */
 export const AEAD_IV_LENGTH = 12;
 /** Raw byte length of the GCM tag at the end of `aead.ct`. */
@@ -57,10 +62,14 @@ export interface EnvelopeRecipient {
   readonly wk: string;
 }
 
-/** The payload AEAD; `iv` and `ct` (ciphertext || 16-byte tag) base64url without padding. */
+/**
+ * The payload AEAD; `iv`, `kc` (the 32-byte key commitment) and `ct` (ciphertext || 16-byte tag)
+ * base64url without padding (04 §3.1).
+ */
 export interface EnvelopeAead {
   readonly alg: typeof AEAD_ALG;
   readonly iv: string;
+  readonly kc: string;
   readonly ct: string;
 }
 
@@ -94,7 +103,7 @@ const HEADER_KEYS = ['v', 'id', 'thread', 'from', 'createdAt', 'recipients'] as 
 const UNSIGNED_KEYS = [...HEADER_KEYS, 'aead'] as const;
 const SIGNED_KEYS = [...UNSIGNED_KEYS, 'sig'] as const;
 const RECIPIENT_KEYS = ['kid', 'enc', 'wk'] as const;
-const AEAD_KEYS = ['alg', 'iv', 'ct'] as const;
+const AEAD_KEYS = ['alg', 'iv', 'kc', 'ct'] as const;
 
 function refuse(rule: string): never {
   throw new CryptoInputError('invalid_envelope', `envelope: ${rule}`);
@@ -226,11 +235,14 @@ function readHeaderFields(raw: Record<(typeof HEADER_KEYS)[number], unknown>): E
 }
 
 function readAead(value: unknown): EnvelopeAead {
+  // 04 §3.1 (G-46, D-66): exactly {alg, iv, kc, ct}, alg A256GCM-KC and a 32-byte kc, so no
+  // envelope of the earlier form (alg A256GCM, no kc) is accepted.
   const raw = readObject(value, AEAD_KEYS, 'aead');
-  if (raw.alg !== AEAD_ALG) refuse('aead.alg must be A256GCM');
+  if (raw.alg !== AEAD_ALG) refuse('aead.alg must be A256GCM-KC');
   return Object.freeze({
     alg: AEAD_ALG,
     iv: readBase64url(raw.iv, 'aead.iv', { length: AEAD_IV_LENGTH }),
+    kc: readBase64url(raw.kc, 'aead.kc', { length: KEY_COMMITMENT_LENGTH }),
     ct: readCiphertext(raw.ct),
   });
 }

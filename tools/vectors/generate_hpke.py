@@ -9,16 +9,28 @@ commit 5f503c564da00b0687b3de75f1dfbdfc4079ad31; full file SHA-256
 copied below, and the two published secret keys are read from the committed vectors.json, the only
 place they are kept) and refuses to write on any difference.
 
-AgentLink CEK wrap (04 §3.3): info = utf8("agentlink/v1/cek") || id (the envelope id as its raw 16
-bytes), empty AAD, one single-shot seal of the 32-byte CEK per recipient. Ephemeral keys are fixed
-test values so the output is deterministic (M1-1c's test seam). `enc` and `wk` are base64url
-without padding, as in an envelope (04 §3.1). Negative cases: the wrong recipient key, another
-envelope id, tampered or truncated `wk` and `enc`, the id encoded as text instead of raw bytes, a
-non-empty AAD, envelope ids and CEKs of the wrong length, and every small-order X25519 point as
-`enc` or as the recipient key. For the small-order `enc` cases, `wk` is sealed under the key
-schedule of the all-zero DH output (written out below),
-so only the RFC 9180 §7.1.4 all-zero check can reject them. The written-out schedule is checked
-first: it must reproduce the published base nonce and ciphertexts 0-2.
+AgentLink CEK wrap (04 §3.3, G-46, D-66): info = utf8("agentlink/v1/cek") || id (the envelope id as
+its raw 16 bytes), empty AAD, one single-shot seal of the 32-byte CEK per recipient. The ephemeral
+secret key of entry j is derived from the CEK:
+  ikm_j = HKDF-SHA256(ikm = CEK, salt = "", info = utf8("agentlink/v1/cek-eph") || id || pk_j, L = 32)
+and used as the raw X25519 secret key (skE_j = ikm_j; RFC 9180 DeriveKeyPair is NOT applied), so
+the same (CEK, id, pk_j) always gives the same (enc_j, wk_j). HKDF is `cryptography`, cross-checked
+against HKDF written out over hashlib HMAC. `enc` and `wk` are base64url without padding, as in an
+envelope (04 §3.1).
+
+Cases: the `cek-eph` derivation (`deriveFromCek`) and its refusals; the derived wrap per 04 §3.2
+role (`wrapCek`, no ephemeral input) and its unwrap; determinism (another id gives another enc);
+the explicit-ephemeral seam (`wrapCekWithEphemeralKey`), which equals `wrapCek` when given ikm_j
+and gives different bytes when given the RFC 9180 DeriveKeyPair(ikm_j) key instead (IR-D-66-1 L-5;
+DeriveKeyPair is written out and cross-checked against pyhpke); the wrap check (`checkWrap`), which
+accepts the recomputed entry and refuses an entry that seals another CEK, an entry under a
+non-derived ephemeral key, under the DeriveKeyPair path, for another recipient or another id, and
+tampered entries. Negative unwrap cases: the wrong recipient key, another envelope id, tampered or
+truncated `wk` and `enc`, the id encoded as text instead of raw bytes, a non-empty AAD, envelope ids
+and CEKs of the wrong length, and every small-order X25519 point as `enc` or as the recipient key.
+For the small-order `enc` cases, `wk` is sealed under the key schedule of the all-zero DH output
+(written out below), so only the RFC 9180 §7.1.4 all-zero check can reject them. The written-out
+schedule is checked first: it must reproduce the published base nonce and ciphertexts 0-2.
 
 Usage: python3 -I tools/vectors/generate_hpke.py --check [FILE] | --write
 """
@@ -30,8 +42,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import vectorlib as v  # noqa: E402
 
 SUITE = "hpke"
-VERSION = 1
+VERSION = 2
 CEK_INFO = b"agentlink/v1/cek"
+CEK_EPH_LABEL = "agentlink/v1/cek-eph"
+SPEC_WRAP = "04 §3.3 (G-46, D-66)"
 RFC = "RFC 9180 / CFRG test-vectors.json (mode 0, kem 0x20, kdf 1, aead 2)"
 
 # Published values (CFRG test-vectors.json, the entry for this suite).
@@ -78,6 +92,42 @@ def open_(recipient_secret, enc, info, aad, ciphertext):
         return ctx.open(ciphertext, aad)
     except Exception:
         return None
+
+
+# --- 04 §3.3 derived wraps (G-46, D-66) ----------------------------------------------------------
+
+
+def ephemeral_of(recipient_public, envelope_id, cek):
+    """ikm_j of 04 §3.3: the raw X25519 ephemeral secret key of entry j."""
+    return v.derive_from_cek(CEK_EPH_LABEL, cek, envelope_id, recipient_public)
+
+
+def wrap_cek(recipient_public, envelope_id, cek):
+    """04 §3.3 wrap: SealBase(pk_j, "agentlink/v1/cek" || id, "", CEK) with skE_j = ikm_j used as
+    the raw X25519 secret key. Raises on wrong lengths or an all-zero DH output."""
+    if len(recipient_public) != 32 or len(envelope_id) != 16 or len(cek) != 32:
+        raise ValueError("wrong length")
+    return seal(recipient_public, ephemeral_of(recipient_public, envelope_id, cek), CEK_INFO + envelope_id, b"", cek)
+
+
+def check_wrap(recipient_public, envelope_id, cek, enc, wk):
+    """04 §3.3 wrap check: recompute the entry and compare the bytes."""
+    try:
+        return wrap_cek(recipient_public, envelope_id, cek) == (bytes(enc), bytes(wk))
+    except Exception:
+        return False
+
+
+def derive_key_pair(ikm):
+    """RFC 9180 §7.1.3 DeriveKeyPair for DHKEM(X25519, HKDF-SHA256), written out and cross-checked
+    against pyhpke. 04 §3.3 does NOT use it; it is here only to show that the two paths differ
+    (IR-D-66-1 L-5)."""
+    dkp_prk = labeled_extract(KEM_SUITE, b"", b"dkp_prk", ikm)
+    secret = labeled_expand(KEM_SUITE, dkp_prk, b"sk", b"", 32)
+    pair = suite().kem.derive_key_pair(ikm)
+    if pair.private_key.to_private_bytes() != secret or pair.public_key.to_public_bytes() != v.x25519_public_key(secret):
+        v.fail("pyhpke DeriveKeyPair disagrees with RFC 9180 §7.1.3 written out")
+    return secret
 
 
 # --- RFC 9180 key schedule written out (base mode), to build ciphertexts pyhpke refuses to make ----
@@ -246,49 +296,153 @@ def build():
     if open_(v.unhex(o["skRm"]), v.unhex(o["enc"]), v.unhex(o["info"]), v.unhex(o["encryptions"][1][0]), v.unhex(o["encryptions"][0][1])) is not None:
         v.fail("wrong AAD opened")
 
-    # AgentLink CEK wrap. Recipient keys: X25519 secrets from synthetic test seeds (04 §3.2 roles).
+    # AgentLink CEK wrap (04 §3.3, G-46, D-66). Recipient keys: X25519 secrets from synthetic test
+    # seeds (04 §3.2 roles). Every ephemeral key is derived from the CEK, never chosen.
     roles = ["recipient-agent", "recipient-owner", "sender-owner", "sender-agent"]
     secrets = {r: v.det(f"hpke/{r}/enc", 32) for r in roles}
     publics = {r: v.x25519_public_key(secrets[r]) for r in roles}
     envelope_id = v.det("hpke/envelope-id", 16)
     other_id = v.det("hpke/other-envelope-id", 16)
     cek = v.det("hpke/cek", 32)
+    other_cek = v.det("hpke/other-cek", 32)
     info = CEK_INFO + envelope_id
+
+    # The cek-eph derivation (the payload-key and payload-commit labels are in `aead-envelope`).
+    def derive_case(case_id, why, label, the_cek, env_id, public, expected):
+        fields = {"op": "deriveFromCek", "label": label, "cek": v.hx(the_cek), "envelopeId": v.b64u(env_id)}
+        if public is not None:
+            fields["recipientPublicKey"] = v.hx(public)
+        cases.append(v.case(case_id, f"{SPEC_WRAP} derivation from the CEK: {why}", fields, expected))
+
+    for role in roles:
+        ikm = ephemeral_of(publics[role], envelope_id, cek)
+        derive_case(
+            f"derive-cek-eph-{role}",
+            "HKDF-SHA256(CEK, salt \"\", utf8(\"agentlink/v1/cek-eph\") || id || pk_j), 32 bytes; it is skE_j, used raw",
+            CEK_EPH_LABEL, cek, envelope_id, publics[role], {"okm": v.hx(ikm)},
+        )
+    pk = publics["recipient-agent"]
+    for case_id, why, label, the_cek, env_id, public in [
+        ("derive-reject-unknown-label", "a label that is not one of the three (the HPKE info label agentlink/v1/cek)", "agentlink/v1/cek", cek, envelope_id, pk),
+        ("derive-reject-label-prefix", "a label that is a prefix of agentlink/v1/cek-eph", "agentlink/v1/cek-e", cek, envelope_id, pk),
+        ("derive-reject-cek-eph-without-key", "cek-eph without the recipient key", CEK_EPH_LABEL, cek, envelope_id, None),
+        ("derive-reject-cek-eph-key-31-bytes", "cek-eph with a 31-byte recipient key", CEK_EPH_LABEL, cek, envelope_id, pk[:31]),
+        ("derive-reject-cek-eph-key-33-bytes", "cek-eph with a 33-byte recipient key", CEK_EPH_LABEL, cek, envelope_id, pk + bytes(1)),
+        ("derive-reject-cek-eph-id-15-bytes", "cek-eph with a 15-byte envelope id", CEK_EPH_LABEL, cek, envelope_id[:15], pk),
+        ("derive-reject-cek-eph-cek-31-bytes", "cek-eph with a 31-byte CEK", CEK_EPH_LABEL, cek[:31], envelope_id, pk),
+    ]:
+        try:
+            v.derive_from_cek(label, the_cek, env_id, public)
+            v.fail(f"{case_id} derives")
+        except ValueError:
+            pass
+        derive_case(case_id, f"{why}; refused (fixed-length info, 04 §3.3)", label, the_cek, env_id, public, {"outcome": "reject"})
 
     wraps = {}
     for role in roles:
-        eph = v.det(f"hpke/{role}/ephemeral", 32)
-        enc, wk = seal(publics[role], eph, info, b"", cek)
+        enc, wk = wrap_cek(publics[role], envelope_id, cek)
+        eph = ephemeral_of(publics[role], envelope_id, cek)
+        if enc != v.x25519_public_key(eph) or (enc, wk) != seal(publics[role], eph, info, b"", cek):
+            v.fail("the derived wrap does not use ikm_j as the raw ephemeral secret")
+        if wrap_cek(publics[role], envelope_id, cek) != (enc, wk):
+            v.fail("the derived wrap is not deterministic")
         if open_(secrets[role], enc, info, b"", wk) != cek:
             v.fail("CEK wrap does not open")
         wraps[role] = (enc, wk)
         cases.append(
             v.case(
                 f"wrap-cek-{role}",
-                "04 §3.3 CEK wrap (fixed ephemeral key)",
-                {
-                    "op": "wrapCek",
-                    "recipientPublicKey": v.hx(publics[role]),
-                    "ephemeralSecretKey": v.hx(eph),
-                    "envelopeId": v.b64u(envelope_id),
-                    "cek": v.hx(cek),
-                },
+                f"{SPEC_WRAP} CEK wrap with the ephemeral key derived from the CEK (skE_j = ikm_j, raw X25519)",
+                {"op": "wrapCek", "recipientPublicKey": v.hx(publics[role]), "envelopeId": v.b64u(envelope_id), "cek": v.hx(cek)},
                 {"enc": v.b64u(enc), "wk": v.b64u(wk)},
             )
         )
         cases.append(
             v.case(
                 f"unwrap-cek-{role}",
-                "04 §3.3 CEK unwrap",
+                f"{SPEC_WRAP} CEK unwrap",
                 {"op": "unwrapCek", "recipientSecretKey": v.hx(secrets[role]), "envelopeId": v.b64u(envelope_id), "enc": v.b64u(enc), "wk": v.b64u(wk)},
                 {"cek": v.hx(cek)},
             )
         )
 
+    # Determinism: another id (or another key, above) gives another enc.
     enc, wk = wraps["recipient-agent"]
-    eph = v.det("hpke/recipient-agent/ephemeral", 32)
-    text_id_enc, text_id_wk = seal(publics["recipient-agent"], eph, CEK_INFO + v.b64u(envelope_id).encode(), b"", cek)
-    aad_enc, aad_wk = seal(publics["recipient-agent"], eph, info, envelope_id, cek)
+    other_id_enc, other_id_wk = wrap_cek(pk, other_id, cek)
+    if other_id_enc == enc or other_id_enc in [e for e, _ in wraps.values()]:
+        v.fail("another id or key gives the same enc")
+    cases.append(
+        v.case(
+            "wrap-cek-recipient-agent-other-envelope-id",
+            f"{SPEC_WRAP}: the same CEK and key under another envelope id give another enc",
+            {"op": "wrapCek", "recipientPublicKey": v.hx(pk), "envelopeId": v.b64u(other_id), "cek": v.hx(cek)},
+            {"enc": v.b64u(other_id_enc), "wk": v.b64u(other_id_wk)},
+        )
+    )
+
+    # The explicit-ephemeral path (`ekm`): given ikm_j it equals wrapCek; given the RFC 9180
+    # DeriveKeyPair(ikm_j) secret instead, the bytes differ (IR-D-66-1 L-5).
+    ikm = ephemeral_of(pk, envelope_id, cek)
+    dkp_secret = derive_key_pair(ikm)
+    dkp_enc, dkp_wk = seal(pk, dkp_secret, info, b"", cek)
+    if dkp_secret == ikm or dkp_enc == enc or dkp_wk == wk:
+        v.fail("the DeriveKeyPair path gives the same bytes as the raw path")
+    if open_(secrets["recipient-agent"], dkp_enc, info, b"", dkp_wk) != cek:
+        v.fail("the DeriveKeyPair-path wrap does not open")
+    for case_id, why, eph, expected in [
+        ("wrap-cek-with-ephemeral-key-raw-ikm", "the explicit-ephemeral path given ikm_j as the raw X25519 secret gives exactly wrap-cek-recipient-agent", ikm, (enc, wk)),
+        (
+            "wrap-cek-with-ephemeral-key-derive-key-pair-path",
+            "the explicit-ephemeral path given RFC 9180 DeriveKeyPair(ikm_j)'s secret (what the library does with ikm bytes) gives "
+            "other bytes than wrap-cek-recipient-agent; 04 §3.3 never uses this path (IR-D-66-1 L-5)",
+            dkp_secret,
+            (dkp_enc, dkp_wk),
+        ),
+    ]:
+        cases.append(
+            v.case(
+                case_id,
+                f"{SPEC_WRAP}: {why}",
+                {"op": "wrapCekWithEphemeralKey", "recipientPublicKey": v.hx(pk), "ephemeralSecretKey": v.hx(eph), "envelopeId": v.b64u(envelope_id), "cek": v.hx(cek)},
+                {"enc": v.b64u(expected[0]), "wk": v.b64u(expected[1])},
+            )
+        )
+
+    # The wrap check (checkWrap: public key and CEK only).
+    def check_case(case_id, why, public, env_id, the_cek, the_enc, the_wk, accept):
+        if check_wrap(public, env_id, the_cek, the_enc, the_wk) != accept:
+            v.fail(f"{case_id}: the wrap check disagrees")
+        cases.append(
+            v.case(
+                case_id,
+                f"{SPEC_WRAP} wrap check: {why}",
+                {"op": "checkWrap", "recipientPublicKey": v.hx(public), "envelopeId": v.b64u(env_id), "cek": v.hx(the_cek), "enc": v.b64u(the_enc), "wk": v.b64u(the_wk)},
+                {"outcome": "accept" if accept else "reject"},
+            )
+        )
+
+    for role in roles:
+        check_case(f"check-wrap-{role}", "the recomputed entry is byte-identical", publics[role], envelope_id, cek, *wraps[role], True)
+    foreign_enc, foreign_wk = wrap_cek(pk, envelope_id, other_cek)
+    random_eph = v.det("hpke/recipient-agent/non-derived-ephemeral", 32)
+    random_enc, random_wk = seal(pk, random_eph, info, b"", cek)
+    if open_(secrets["recipient-agent"], random_enc, info, b"", random_wk) != cek:
+        v.fail("the non-derived entry does not open")
+    owner_enc, owner_wk = wraps["recipient-owner"]
+    for case_id, why, the_enc, the_wk, public, env_id in [
+        ("check-wrap-reject-other-cek", "the entry seals another CEK (a correct derived wrap of that CEK)", foreign_enc, foreign_wk, pk, envelope_id),
+        ("check-wrap-reject-non-derived-ephemeral", "the entry seals this CEK under a non-derived ephemeral key; it unwraps, but is not the committed entry", random_enc, random_wk, pk, envelope_id),
+        ("check-wrap-reject-derive-key-pair-path", "the entry was built through RFC 9180 DeriveKeyPair(ikm_j) (IR-D-66-1 L-5)", dkp_enc, dkp_wk, pk, envelope_id),
+        ("check-wrap-reject-other-recipient", "the recipient-owner entry checked against the recipient-agent key", owner_enc, owner_wk, pk, envelope_id),
+        ("check-wrap-reject-other-envelope-id", "the entry checked under another envelope id", enc, wk, pk, other_id),
+        ("check-wrap-reject-enc-flipped", "enc with one bit flipped", flip(enc, 5), wk, pk, envelope_id),
+        ("check-wrap-reject-wk-flipped", "wk with one bit flipped", enc, flip(wk, 0), pk, envelope_id),
+    ]:
+        check_case(case_id, why, public, env_id, cek, the_enc, the_wk, False)
+
+    eph = ikm
+    text_id_enc, text_id_wk = seal(pk, eph, CEK_INFO + v.b64u(envelope_id).encode(), b"", cek)
+    aad_enc, aad_wk = seal(pk, eph, info, envelope_id, cek)
     negatives = [
         ("unwrap-reject-wrong-recipient", "another recipient's key", secrets["recipient-owner"], envelope_id, enc, wk),
         ("unwrap-reject-other-envelope-id", "the CEK is bound to the envelope id through info", secrets["recipient-agent"], other_id, enc, wk),
@@ -314,12 +468,12 @@ def build():
     # RFC 9180 §7.1.4: an all-zero DH output must be rejected. Each `wk` below is sealed under the
     # key schedule of that all-zero output, so it opens unless the explicit check refuses it.
     recipient_secret, recipient_public = secrets["recipient-agent"], publics["recipient-agent"]
-    sender_eph = v.det("hpke/small-order/ephemeral", 32)
     for name, u in SMALL_ORDER:
         if not raw_x25519_is_zero(recipient_secret, u) or x25519(recipient_secret, u) is not None:
             v.fail(f"{name}: not an all-zero X25519 output")
+        sender_eph = ephemeral_of(u, envelope_id, cek)
         if not raw_x25519_is_zero(sender_eph, u) or x25519(sender_eph, u) is not None:
-            v.fail(f"{name}: the sender's DH is not all zero")
+            v.fail(f"{name}: the sender's derived DH is not all zero")
         _, key, base_nonce = key_schedule(bytes(32), u, recipient_public, info)
         zero_wk = v.aes256gcm_encrypt(key, base_nonce, cek, b"")
         if open_(recipient_secret, u, info, b"", zero_wk) is not None:
@@ -336,14 +490,14 @@ def build():
         cases.append(
             v.case(
                 f"wrap-reject-small-order-recipient-{name}",
-                "RFC 9180 §7.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
-                {"op": "wrapCek", "recipientPublicKey": v.hx(u), "ephemeralSecretKey": v.hx(sender_eph), "envelopeId": v.b64u(envelope_id), "cek": v.hx(cek)},
+                "RFC 9180 §7.1.4: the recipient key is a small-order X25519 point, so the sender's DH output "
+                "(under the ephemeral key derived from the CEK) is all zero",
+                {"op": "wrapCek", "recipientPublicKey": v.hx(u), "envelopeId": v.b64u(envelope_id), "cek": v.hx(cek)},
                 {"outcome": "reject"},
             )
         )
 
     # Lengths fixed by 04 §3.1 and §3.3: the envelope id is 16 bytes and the CEK 32 bytes.
-    eph = v.det("hpke/recipient-agent/ephemeral", 32)
     for case_id, why, env_id, the_cek in [
         ("wrap-reject-id-15-bytes", "an envelope id of 15 bytes", envelope_id[:15], cek),
         ("wrap-reject-id-17-bytes", "an envelope id of 17 bytes", envelope_id + bytes(1), cek),
@@ -354,7 +508,7 @@ def build():
             v.case(
                 case_id,
                 f"04 §3.1, §3.3: {why}",
-                {"op": "wrapCek", "recipientPublicKey": v.hx(recipient_public), "ephemeralSecretKey": v.hx(eph), "envelopeId": v.b64u(env_id), "cek": v.hx(the_cek)},
+                {"op": "wrapCek", "recipientPublicKey": v.hx(recipient_public), "envelopeId": v.b64u(env_id), "cek": v.hx(the_cek)},
                 {"outcome": "reject"},
             )
         )
@@ -387,9 +541,15 @@ MESSAGE = {
 SCHEMA = v.case_schema(
     SUITE,
     "RFC 9180 HPKE, mode Base, X25519/HKDF-SHA256/AES-256-GCM. `sealSequence`: one sender context "
-    "with a fixed ephemeral key, messages sealed in order. `open`: single-shot open. `wrapCek` / "
-    "`unwrapCek`: 04 §3.3 CEK wrap, info = utf8(\"agentlink/v1/cek\") || raw 16-byte id, empty AAD; "
-    "enc and wk base64url without padding.",
+    "with a fixed ephemeral key, messages sealed in order. `open`: single-shot open. 04 §3.3 (G-46, "
+    "D-66): `deriveFromCek`: the `agentlink/v1/cek-eph` derivation ikm_j (HKDF-SHA256, ikm = CEK, "
+    "empty salt, info = utf8(label) || raw 16-byte id || raw 32-byte recipient key), or a refusal; "
+    "`recipientPublicKey` is absent when the case tests its absence. `wrapCek`: the CEK wrap with "
+    "skE_j = ikm_j as the raw X25519 secret key (no DeriveKeyPair), info = utf8(\"agentlink/v1/cek\") "
+    "|| raw 16-byte id, empty AAD. `wrapCekWithEphemeralKey`: the same seal with the ephemeral secret "
+    "given (the explicit-ephemeral path). `unwrapCek`: open one entry. `checkWrap`: recompute the "
+    "entry from the public key and the CEK and compare the bytes. enc and wk are base64url without "
+    "padding.",
     {
         "sealSequence": (
             {"recipientPublicKey": v.hexn(32), "ephemeralSecretKey": v.hexn(32), "info": v.HEX, "messages": {"type": "array", "items": MESSAGE}},
@@ -399,16 +559,29 @@ SCHEMA = v.case_schema(
             {"recipientSecretKey": v.hexn(32), "enc": v.hexn(32), "info": v.HEX, "aad": v.HEX, "ciphertext": v.HEX},
             [{"plaintext": v.HEX}, v.REJECT],
         ),
+        "deriveFromCek": (
+            {"label": v.STRING, "cek": v.HEX, "envelopeId": v.B64U, "recipientPublicKey": v.HEX},
+            [{"okm": v.hexn(32)}, v.REJECT],
+        ),
         "wrapCek": (
-            {"recipientPublicKey": v.hexn(32), "ephemeralSecretKey": v.hexn(32), "envelopeId": v.B64U, "cek": v.HEX},
+            {"recipientPublicKey": v.hexn(32), "envelopeId": v.B64U, "cek": v.HEX},
             [{"enc": v.B64U, "wk": v.B64U}, v.REJECT],
+        ),
+        "wrapCekWithEphemeralKey": (
+            {"recipientPublicKey": v.hexn(32), "ephemeralSecretKey": v.hexn(32), "envelopeId": v.B64U, "cek": v.hexn(32)},
+            [{"enc": v.B64U, "wk": v.B64U}],
         ),
         "unwrapCek": (
             {"recipientSecretKey": v.hexn(32), "envelopeId": v.B64U, "enc": v.B64U, "wk": v.B64U},
             [{"cek": v.hexn(32)}, v.REJECT],
         ),
+        "checkWrap": (
+            {"recipientPublicKey": v.hexn(32), "envelopeId": v.B64U, "cek": v.hexn(32), "enc": v.B64U, "wk": v.B64U},
+            [v.ACCEPT, v.REJECT],
+        ),
     },
 )
+v.optional_input(SCHEMA, "deriveFromCek", "recipientPublicKey")
 
 if __name__ == "__main__":
     v.main(

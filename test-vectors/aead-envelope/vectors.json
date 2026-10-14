@@ -1,13 +1,65 @@
 {
   "$schema": "../schema/vector-file.schema.json",
   "suite": "aead-envelope",
-  "version": 1,
+  "version": 2,
   "generator": {
     "tool": "python (hashlib, cryptography 50.0.2, coincurve 21.0.0, pyhpke 0.6.5, rfc8785 0.1.4)",
     "version": "cpython 3.12.13",
     "script": "tools/vectors/generate_aead_envelope.py"
   },
   "cases": [
+    {
+      "id": "derive-payload-key",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66): HKDF-SHA256(CEK, salt \"\", utf8(\"agentlink/v1/payload-key\") || id), 32 bytes, for the reference envelope",
+      "input": {
+        "op": "deriveFromCek",
+        "label": "agentlink/v1/payload-key",
+        "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4",
+        "envelopeId": "CWwS0akF74XyLhggaFDzZQ"
+      },
+      "expected": {
+        "okm": "5fe7855e695d8705921157c20a8f5c66a25be5249f573183252556fab7905f39"
+      }
+    },
+    {
+      "id": "derive-payload-commit",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66): HKDF-SHA256(CEK, salt \"\", utf8(\"agentlink/v1/payload-commit\") || id), 32 bytes, for the reference envelope",
+      "input": {
+        "op": "deriveFromCek",
+        "label": "agentlink/v1/payload-commit",
+        "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4",
+        "envelopeId": "CWwS0akF74XyLhggaFDzZQ"
+      },
+      "expected": {
+        "okm": "ab15c57f57e4a688f4f6b8518c19849c722e0e09cb0e3cf110ef780f8f041739"
+      }
+    },
+    {
+      "id": "derive-reject-payload-key-id-15-bytes",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66): payload-key with a 15-byte envelope id; refused",
+      "input": {
+        "op": "deriveFromCek",
+        "label": "agentlink/v1/payload-key",
+        "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4",
+        "envelopeId": "CWwS0akF74XyLhggaFDz"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "derive-reject-payload-commit-cek-33-bytes",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66): payload-commit with a 33-byte CEK; refused",
+      "input": {
+        "op": "deriveFromCek",
+        "label": "agentlink/v1/payload-commit",
+        "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b400",
+        "envelopeId": "CWwS0akF74XyLhggaFDzZQ"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
     {
       "id": "envelope-hash",
       "source": "04 \u00a73.1 envelopeHash = sha256(JCS(envelope without sig))",
@@ -22,35 +74,36 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         }
       },
       "expected": {
-        "envelopeHash": "1fe7a1e9ffb094e7f055b4cabd3912a1cb272e3275fa822e7395dfff4cea63e8"
+        "envelopeHash": "080e039b1c57f464eb494db2d9ee0f883a3e0a5bfc697ccb69774d5a79245938"
       }
     },
     {
@@ -67,34 +120,35 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           }
         }
       },
       "expected": {
-        "envelopeHash": "1fe7a1e9ffb094e7f055b4cabd3912a1cb272e3275fa822e7395dfff4cea63e8"
+        "envelopeHash": "080e039b1c57f464eb494db2d9ee0f883a3e0a5bfc697ccb69774d5a79245938"
       }
     },
     {
@@ -111,40 +165,41 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         }
       },
       "expected": {
-        "aad": "3fe9d823c1ede5c0a1b9544712f5083b2ebc94f610615fe223130be05ecdaec6"
+        "aad": "f1fc742af15ea40acace9f9fa40dfc42bcc1895802a4e25fc7a6b7509441a4d1"
       }
     },
     {
       "id": "encrypt-payload",
-      "source": "04 \u00a73.1 payload AEAD (AES-256-GCM, fixed IV)",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66) payload AEAD: AES-256-GCM under encKey (fixed IV), kc from the CEK",
       "input": {
         "op": "encryptPayload",
         "header": {
@@ -156,23 +211,23 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ]
         },
@@ -181,13 +236,14 @@
         "plaintext": "7b22626f6479223a2248656c6c6f2066726f6d20746865204167656e744c696e6b207465737420766563746f727320e29c93222c2266696c6573223a5b5d2c227265706c79546f223a6e756c6c2c2274797065223a2274657874227d"
       },
       "expected": {
-        "aad": "3fe9d823c1ede5c0a1b9544712f5083b2ebc94f610615fe223130be05ecdaec6",
-        "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+        "aad": "f1fc742af15ea40acace9f9fa40dfc42bcc1895802a4e25fc7a6b7509441a4d1",
+        "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+        "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
       }
     },
     {
       "id": "decrypt-payload",
-      "source": "04 \u00a73.1 payload AEAD open",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66) payload AEAD open: the kc check, then AES-256-GCM under encKey",
       "input": {
         "op": "decryptPayload",
         "envelope": {
@@ -199,36 +255,84 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         },
         "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
       },
       "expected": {
         "plaintext": "7b22626f6479223a2248656c6c6f2066726f6d20746865204167656e744c696e6b207465737420766563746f727320e29c93222c2266696c6573223a5b5d2c227265706c79546f223a6e756c6c2c2274797065223a2274657874227d"
+      }
+    },
+    {
+      "id": "check-commitment",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66): aead.kc matches the kc derived from the CEK",
+      "input": {
+        "op": "checkCommitment",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
+        },
+        "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
+      },
+      "expected": {
+        "outcome": "accept"
       }
     },
     {
@@ -245,38 +349,39 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           }
         },
         "secretKey": "d31a2e1085f273ebfc8337e758da73b1e5a3f1b2cfa49d47af60142946fe8dc2",
         "auxRand": "08e0ec74e709953e3295f3fdb012033c88130f8d5720a647e094188739db5d80"
       },
       "expected": {
-        "envelopeHash": "1fe7a1e9ffb094e7f055b4cabd3912a1cb272e3275fa822e7395dfff4cea63e8",
-        "signatureInput": "450034eea271c8d4a3a768142c7278c367551257e41b2d1b9a78807398ac5029",
-        "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+        "envelopeHash": "080e039b1c57f464eb494db2d9ee0f883a3e0a5bfc697ccb69774d5a79245938",
+        "signatureInput": "d4c3593bb3a4cb322a127317e1a73e50f75a02a7791410f9f490a5b03bece8f8",
+        "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
       }
     },
     {
@@ -293,31 +398,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         }
       },
       "expected": {
@@ -338,35 +444,36 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         }
       },
       "expected": {
-        "envelopeHash": "07f1154605d283fcb4786947d179b24699d7b40e74eda9e3b1a843f8dbfea8c1"
+        "envelopeHash": "86b6aa7540ca8d3738d5637db39bec5e32f1c724201da1c3524dc22e598c68a0"
       }
     },
     {
@@ -383,31 +490,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         },
         "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
       },
@@ -429,31 +537,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         }
       },
       "expected": {
@@ -474,35 +583,36 @@
           "recipients": [
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         }
       },
       "expected": {
-        "envelopeHash": "139074f254d9021d8f84158a1668aa38ecc6f80fb1b312477f3a34a3b78eed2e"
+        "envelopeHash": "02cda8db6f847cde11bc4cf644bc946082eab44987f29c2a0a3f2958680913fc"
       }
     },
     {
@@ -519,31 +629,32 @@
           "recipients": [
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         },
         "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
       },
@@ -565,31 +676,32 @@
           "recipients": [
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         }
       },
       "expected": {
@@ -610,35 +722,36 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         }
       },
       "expected": {
-        "envelopeHash": "c8761f71bda534e9b5d32e3d1ce51b866d379c3489fbe2232afdf7b51b95138c"
+        "envelopeHash": "e775e2b51c648c4ba81f3c1a1f893230f7423ec0f83086f5acdfd3b1f812df6e"
       }
     },
     {
@@ -655,31 +768,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         },
         "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
       },
@@ -701,31 +815,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         }
       },
       "expected": {
@@ -733,8 +848,194 @@
       }
     },
     {
+      "id": "envelope-hash-id",
+      "source": "04 \u00a73.1 envelopeHash changes with another id (kc and encKey are bound to the id)",
+      "input": {
+        "op": "envelopeHash",
+        "envelope": {
+          "v": 1,
+          "id": "s98G6klvCo59NDjZUvQQJg",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
+        }
+      },
+      "expected": {
+        "envelopeHash": "d21ac0421f6ed9cecc78d04640b6156e194595619850637e984df117e7b56719"
+      }
+    },
+    {
+      "id": "decrypt-reject-id",
+      "source": "04 \u00a73.1 AAD binds the header: another id (kc and encKey are bound to the id)",
+      "input": {
+        "op": "decryptPayload",
+        "envelope": {
+          "v": 1,
+          "id": "s98G6klvCo59NDjZUvQQJg",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
+        },
+        "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-id",
+      "source": "04 \u00a73.1 signature covers the header: another id (kc and encKey are bound to the id)",
+      "input": {
+        "op": "verify",
+        "envelope": {
+          "v": 1,
+          "id": "s98G6klvCo59NDjZUvQQJg",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "check-commitment-reject-id",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66): kc is bound to the envelope id",
+      "input": {
+        "op": "checkCommitment",
+        "envelope": {
+          "v": 1,
+          "id": "s98G6klvCo59NDjZUvQQJg",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
+        },
+        "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
       "id": "decrypt-reject-tag-flipped",
-      "source": "04 \u00a73.1 payload AEAD: tampered tag",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66) payload decryption: tampered tag",
       "input": {
         "op": "decryptPayload",
         "envelope": {
@@ -746,31 +1047,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nB"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwl"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         },
         "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
       },
@@ -780,7 +1082,7 @@
     },
     {
       "id": "decrypt-reject-ct-flipped",
-      "source": "04 \u00a73.1 payload AEAD: tampered ciphertext",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66) payload decryption: tampered ciphertext",
       "input": {
         "op": "decryptPayload",
         "envelope": {
@@ -792,31 +1094,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "C-9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DxTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         },
         "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
       },
@@ -826,7 +1129,7 @@
     },
     {
       "id": "decrypt-reject-other-iv",
-      "source": "04 \u00a73.1 payload AEAD: another IV",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66) payload decryption: another IV",
       "input": {
         "op": "decryptPayload",
         "envelope": {
@@ -838,31 +1141,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "gk_SK0nqdxdrFeJB",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         },
         "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
       },
@@ -872,7 +1176,7 @@
     },
     {
       "id": "decrypt-reject-wrong-cek",
-      "source": "04 \u00a73.1 payload AEAD: another CEK",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66) payload decryption: another CEK (its kc does not match)",
       "input": {
         "op": "decryptPayload",
         "envelope": {
@@ -884,31 +1188,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         },
         "cek": "6c220f8bb2e64c6819c0b4212e14c016efa08da357db3e9ef9bbe8e9d879adc7"
       },
@@ -917,8 +1222,429 @@
       }
     },
     {
+      "id": "decrypt-reject-kc-flipped",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66) payload decryption: kc with one bit flipped; GCM under encKey would open, the kc check refuses",
+      "input": {
+        "op": "decryptPayload",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qhXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
+        },
+        "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decrypt-reject-missing-kc",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66) payload decryption: aead without kc",
+      "input": {
+        "op": "decryptPayload",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
+        },
+        "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decrypt-reject-kc-31-bytes",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66) payload decryption: kc of 31 bytes (the 31-byte prefix of the right kc)",
+      "input": {
+        "op": "decryptPayload",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFw",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
+        },
+        "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decrypt-reject-kc-33-bytes",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66) payload decryption: kc of 33 bytes (the right kc and one zero byte)",
+      "input": {
+        "op": "decryptPayload",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzkA",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
+        },
+        "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "check-commitment-reject-wrong-cek",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66): another CEK",
+      "input": {
+        "op": "checkCommitment",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
+        },
+        "cek": "6c220f8bb2e64c6819c0b4212e14c016efa08da357db3e9ef9bbe8e9d879adc7"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "check-commitment-reject-kc-flipped",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66): kc with one bit flipped",
+      "input": {
+        "op": "checkCommitment",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qhXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
+        },
+        "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "check-commitment-reject-missing-kc",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66): aead without kc",
+      "input": {
+        "op": "checkCommitment",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
+        },
+        "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "check-commitment-reject-kc-31-bytes",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66): kc of 31 bytes",
+      "input": {
+        "op": "checkCommitment",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFw",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
+        },
+        "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "check-commitment-reject-kc-33-bytes",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66): kc of 33 bytes",
+      "input": {
+        "op": "checkCommitment",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzkA",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
+        },
+        "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
       "id": "verify-reject-ct-flipped",
-      "source": "04 \u00a73.1 the signature covers aead.ct",
+      "source": "04 \u00a73.1, \u00a73.1.1 the signature covers aead.ct",
       "input": {
         "op": "verify",
         "envelope": {
@@ -930,32 +1656,359 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DxTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-kc-flipped",
+      "source": "04 \u00a73.1, \u00a73.1.1 the signature covers aead.kc",
+      "input": {
+        "op": "verify",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qhXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "decrypt-reject-earlier-form",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66): the earlier form (alg A256GCM, no kc, GCM under the CEK) is not opened",
+      "input": {
+        "op": "decryptPayload",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
             "alg": "A256GCM",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "C-9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgIiFcKsuD5cFHY7gRTJP9v"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "231b8648003189f651bb96dc21bbbf27a56b223e2056d3b7de450d906ba8eb2243426d5d2e8457949bfb9101623555abe37a517205ae11ef3796bc1374234e3e"
+        },
+        "cek": "fdeccc1473c6f8d31340c677f43272e983bcec8a9b309441d48d55d1a2d177b4"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-two-key",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): a two-key ciphertext (its GCM tag is valid under the encKeys of both CEKs; kc commits to the first) is well formed and signed, so only kc can refuse it",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "FhWqVpLUCH967CDK_FwHkQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000200,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "8Oe-GnrRXxYTwx4E-uehoo5tqcqQ_7uYCVR2-rIbY0w",
+              "wk": "aNS5SygmxngidrPcrB7Wvmx3vo3vrV9O0aQS6G_P30Ea1Kv2noLPKBYznvOeZwLg"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "HnNlClrr_eefFsjaSL1QwFHR7UKeanEV5jG1WvG1Bh0",
+              "wk": "dCkGXRZFPeKyJWo33iOLBs6rPioVQKhny4vQpxf3odwL3hsV60HAlgcKZ9i7qwdq"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "QnAamFUqtvfZC7rEab8-L6JDrL_rpoHqkX93mDBFJhg",
+              "wk": "ZSl1MLVc3RN4VT7Cemv9FT_VntjJTjOv7TQWFgEjHOzrHtqLa7lDt7SUAyguksv7"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "Wwjqu14no5pBJ5fDXWp-pkXxdgqn539p-YakvFo7UiA",
+              "wk": "MeLKdGMWhfw0DkeOzDrlYRLR-4eoVgsQHXEN_F0VkRP5qqjlbrhF2jgDS4zRRAlm"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "bLwpW_Un3gb15jn5",
+            "kc": "RqWyZsFICSNPcxNAV8HmOiIrOeKaVnwuLCfsGB-5Z_w",
+            "ct": "X3_hWK88fHOyyozW8E2vKaezGV6vtJDohUKG4hPZYw-1zPzqN3ImuEeOBwfl_Z2f"
+          },
+          "sig": "05a79d03cb7ac4fffac5978e350dc290e1f98c18fc19b1b6e2274ce75669555d196168a66ac0e3bb56b766043c0c4f2f4dacc107cede59c8f28797bf6967330b"
         }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "decrypt-two-key-committed-cek",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66): a two-key ciphertext (its GCM tag is valid under the encKeys of both CEKs; kc commits to the first), opened with the committed CEK",
+      "input": {
+        "op": "decryptPayload",
+        "envelope": {
+          "v": 1,
+          "id": "FhWqVpLUCH967CDK_FwHkQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000200,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "8Oe-GnrRXxYTwx4E-uehoo5tqcqQ_7uYCVR2-rIbY0w",
+              "wk": "aNS5SygmxngidrPcrB7Wvmx3vo3vrV9O0aQS6G_P30Ea1Kv2noLPKBYznvOeZwLg"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "HnNlClrr_eefFsjaSL1QwFHR7UKeanEV5jG1WvG1Bh0",
+              "wk": "dCkGXRZFPeKyJWo33iOLBs6rPioVQKhny4vQpxf3odwL3hsV60HAlgcKZ9i7qwdq"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "QnAamFUqtvfZC7rEab8-L6JDrL_rpoHqkX93mDBFJhg",
+              "wk": "ZSl1MLVc3RN4VT7Cemv9FT_VntjJTjOv7TQWFgEjHOzrHtqLa7lDt7SUAyguksv7"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "Wwjqu14no5pBJ5fDXWp-pkXxdgqn539p-YakvFo7UiA",
+              "wk": "MeLKdGMWhfw0DkeOzDrlYRLR-4eoVgsQHXEN_F0VkRP5qqjlbrhF2jgDS4zRRAlm"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "bLwpW_Un3gb15jn5",
+            "kc": "RqWyZsFICSNPcxNAV8HmOiIrOeKaVnwuLCfsGB-5Z_w",
+            "ct": "X3_hWK88fHOyyozW8E2vKaezGV6vtJDohUKG4hPZYw-1zPzqN3ImuEeOBwfl_Z2f"
+          },
+          "sig": "05a79d03cb7ac4fffac5978e350dc290e1f98c18fc19b1b6e2274ce75669555d196168a66ac0e3bb56b766043c0c4f2f4dacc107cede59c8f28797bf6967330b"
+        },
+        "cek": "c2567704b99931c494cc66d910875036522859f33ef9e9412d3969724bbd043e"
+      },
+      "expected": {
+        "plaintext": "ad6ba0981de068a62788c8202cb90023868f7892c4b7c5028db1f193bdb25feb"
+      }
+    },
+    {
+      "id": "decrypt-reject-two-key-other-cek",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66): a two-key ciphertext (its GCM tag is valid under the encKeys of both CEKs; kc commits to the first), opened with the other CEK: GCM would open, the kc check refuses",
+      "input": {
+        "op": "decryptPayload",
+        "envelope": {
+          "v": 1,
+          "id": "FhWqVpLUCH967CDK_FwHkQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000200,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "8Oe-GnrRXxYTwx4E-uehoo5tqcqQ_7uYCVR2-rIbY0w",
+              "wk": "aNS5SygmxngidrPcrB7Wvmx3vo3vrV9O0aQS6G_P30Ea1Kv2noLPKBYznvOeZwLg"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "HnNlClrr_eefFsjaSL1QwFHR7UKeanEV5jG1WvG1Bh0",
+              "wk": "dCkGXRZFPeKyJWo33iOLBs6rPioVQKhny4vQpxf3odwL3hsV60HAlgcKZ9i7qwdq"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "QnAamFUqtvfZC7rEab8-L6JDrL_rpoHqkX93mDBFJhg",
+              "wk": "ZSl1MLVc3RN4VT7Cemv9FT_VntjJTjOv7TQWFgEjHOzrHtqLa7lDt7SUAyguksv7"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "Wwjqu14no5pBJ5fDXWp-pkXxdgqn539p-YakvFo7UiA",
+              "wk": "MeLKdGMWhfw0DkeOzDrlYRLR-4eoVgsQHXEN_F0VkRP5qqjlbrhF2jgDS4zRRAlm"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "bLwpW_Un3gb15jn5",
+            "kc": "RqWyZsFICSNPcxNAV8HmOiIrOeKaVnwuLCfsGB-5Z_w",
+            "ct": "X3_hWK88fHOyyozW8E2vKaezGV6vtJDohUKG4hPZYw-1zPzqN3ImuEeOBwfl_Z2f"
+          },
+          "sig": "05a79d03cb7ac4fffac5978e350dc290e1f98c18fc19b1b6e2274ce75669555d196168a66ac0e3bb56b766043c0c4f2f4dacc107cede59c8f28797bf6967330b"
+        },
+        "cek": "777ccec60275ab2ed1035b9270c51f58f8f773099933cc420734018fad1a736c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "check-commitment-two-key-committed-cek",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66): a two-key ciphertext (its GCM tag is valid under the encKeys of both CEKs; kc commits to the first), the committed CEK",
+      "input": {
+        "op": "checkCommitment",
+        "envelope": {
+          "v": 1,
+          "id": "FhWqVpLUCH967CDK_FwHkQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000200,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "8Oe-GnrRXxYTwx4E-uehoo5tqcqQ_7uYCVR2-rIbY0w",
+              "wk": "aNS5SygmxngidrPcrB7Wvmx3vo3vrV9O0aQS6G_P30Ea1Kv2noLPKBYznvOeZwLg"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "HnNlClrr_eefFsjaSL1QwFHR7UKeanEV5jG1WvG1Bh0",
+              "wk": "dCkGXRZFPeKyJWo33iOLBs6rPioVQKhny4vQpxf3odwL3hsV60HAlgcKZ9i7qwdq"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "QnAamFUqtvfZC7rEab8-L6JDrL_rpoHqkX93mDBFJhg",
+              "wk": "ZSl1MLVc3RN4VT7Cemv9FT_VntjJTjOv7TQWFgEjHOzrHtqLa7lDt7SUAyguksv7"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "Wwjqu14no5pBJ5fDXWp-pkXxdgqn539p-YakvFo7UiA",
+              "wk": "MeLKdGMWhfw0DkeOzDrlYRLR-4eoVgsQHXEN_F0VkRP5qqjlbrhF2jgDS4zRRAlm"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "bLwpW_Un3gb15jn5",
+            "kc": "RqWyZsFICSNPcxNAV8HmOiIrOeKaVnwuLCfsGB-5Z_w",
+            "ct": "X3_hWK88fHOyyozW8E2vKaezGV6vtJDohUKG4hPZYw-1zPzqN3ImuEeOBwfl_Z2f"
+          },
+          "sig": "05a79d03cb7ac4fffac5978e350dc290e1f98c18fc19b1b6e2274ce75669555d196168a66ac0e3bb56b766043c0c4f2f4dacc107cede59c8f28797bf6967330b"
+        },
+        "cek": "c2567704b99931c494cc66d910875036522859f33ef9e9412d3969724bbd043e"
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "check-commitment-reject-two-key-other-cek",
+      "source": "04 \u00a73.1, \u00a73.3 key commitment (G-46, D-66): a two-key ciphertext (its GCM tag is valid under the encKeys of both CEKs; kc commits to the first), the other CEK",
+      "input": {
+        "op": "checkCommitment",
+        "envelope": {
+          "v": 1,
+          "id": "FhWqVpLUCH967CDK_FwHkQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000200,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "8Oe-GnrRXxYTwx4E-uehoo5tqcqQ_7uYCVR2-rIbY0w",
+              "wk": "aNS5SygmxngidrPcrB7Wvmx3vo3vrV9O0aQS6G_P30Ea1Kv2noLPKBYznvOeZwLg"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "HnNlClrr_eefFsjaSL1QwFHR7UKeanEV5jG1WvG1Bh0",
+              "wk": "dCkGXRZFPeKyJWo33iOLBs6rPioVQKhny4vQpxf3odwL3hsV60HAlgcKZ9i7qwdq"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "QnAamFUqtvfZC7rEab8-L6JDrL_rpoHqkX93mDBFJhg",
+              "wk": "ZSl1MLVc3RN4VT7Cemv9FT_VntjJTjOv7TQWFgEjHOzrHtqLa7lDt7SUAyguksv7"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "Wwjqu14no5pBJ5fDXWp-pkXxdgqn539p-YakvFo7UiA",
+              "wk": "MeLKdGMWhfw0DkeOzDrlYRLR-4eoVgsQHXEN_F0VkRP5qqjlbrhF2jgDS4zRRAlm"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "bLwpW_Un3gb15jn5",
+            "kc": "RqWyZsFICSNPcxNAV8HmOiIrOeKaVnwuLCfsGB-5Z_w",
+            "ct": "X3_hWK88fHOyyozW8E2vKaezGV6vtJDohUKG4hPZYw-1zPzqN3ImuEeOBwfl_Z2f"
+          },
+          "sig": "05a79d03cb7ac4fffac5978e350dc290e1f98c18fc19b1b6e2274ce75669555d196168a66ac0e3bb56b766043c0c4f2f4dacc107cede59c8f28797bf6967330b"
+        },
+        "cek": "777ccec60275ab2ed1035b9270c51f58f8f773099933cc420734018fad1a736c"
       },
       "expected": {
         "outcome": "reject"
@@ -975,31 +2028,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "a957330188c64115bee77147743906fd75dbb53fa0b2a65a82dc9e63f07c6b5f460491bcefe7d9c70e93a2ab1da70fc0a1408f8b6cbbec36f50ac030ce12795c"
+          "sig": "06e6f108540a73e9b26aac0fae9aec75f0c05d70bd75d9f07f2f8b6d53cbf86c127eb39ee6acab790693c628ab3c3d2e36e45eae3a2a310900556a9ae9d7803d"
         }
       },
       "expected": {
@@ -1020,31 +2074,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "84e3736d6d67634a8cc2ee5a59d8f6a9bb1b7dfdb01fdf1d21352ed8e742d9d22c558525df5f3a8572e79e77efabfff25100db8eee3b958197bec3b961ddfc60"
+          "sig": "c6399010609f2f33e5ca1d733f0d33f20f18f911a0a6c6f0f64f852afe87e8953b1c24518fe238d1f68e8c2a1f5484ee3c08ee6f3de056377d4d0a55d2d07d51"
         }
       },
       "expected": {
@@ -1065,31 +2120,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "f1489fe97ca4a73c9c54d1b6142d0c443dafe24bc5e6965f0624f6c3fac8ced65b66f2c06f5194ba549f0a8f0235f2c242ad3c7520e48c2e9afda7b67ac9d19b"
+          "sig": "9842454da33df7d07308f6ca5eb510cd9d41caf75af0626204642f1e86d07fdee92dc5678e2ff052a61c4418ae0e688b9b409b29b1d6df8eb2f4356bfd76e9b3"
         }
       },
       "expected": {
@@ -1110,31 +2166,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "a957330188c64115bee77147743906fd75dbb53fa0b2a65a82dc9e63f07c6b5f460491bcefe7d9c70e93a2ab1da70fc0a1408f8b6cbbec36f50ac030ce12795c"
+          "sig": "06e6f108540a73e9b26aac0fae9aec75f0c05d70bd75d9f07f2f8b6d53cbf86c127eb39ee6acab790693c628ab3c3d2e36e45eae3a2a310900556a9ae9d7803d"
         }
       },
       "expected": {
@@ -1155,31 +2212,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         }
       },
       "expected": {
@@ -1200,31 +2258,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "dccebf394ed931edb42b9b20f184d50146b9bb6cd2c049024be56755307366202b16abf05f471036307a1eb7c631aa81d49ea32203b9e3882ca94337cf54ef4b"
+          "sig": "8d2c9b9bca42555a2e84319c034a0098b43d79506a6ec91159cf42c09ccf8877eb46f0f3034b3642d5c3767e7081df69077ec8b56a1627ceac7c643a3fdd6611"
         }
       },
       "expected": {
@@ -1245,31 +2304,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "f38a85cca264f67cf8e068daaffef75772815d62ad2f2436c8f7335ec560c0940a7782d0965378cf1b363aff0346071e0e3eaefe241c00417209d4e9f7601444",
+          "sig": "0ca27f780bc35cbd231731a88044f9807681b86bb7f0fbfeebc2ea93ed9637261cfed6450a475f5372ae29054ffe4673e9cc90f4130206ba10fa26bf4807a46b",
           "note": "x"
         }
       },
@@ -1291,32 +2351,33 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk",
             "tag": "x"
           },
-          "sig": "04daea70af9317fda15eba0ca10572325cc6ff6e04cac5a8bfe2b32ae021b18806e25115a8940163767926d053310ea6c2854484989d96b6b98d10951c2d681d"
+          "sig": "12b0bd35948e88b437cf97d68f525cf9227f4ff07f40d6c452be0217a31cc34fe882a2138943afa5822171fc28c07c9da12d62ea179c5417c2040feca5ee0f1e"
         }
       },
       "expected": {
@@ -1337,32 +2398,33 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q",
               "note": "x"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "d07c5fa6cc4cff764b9902565b9af77d6be1c745a97fb0aedf94dd396c45b840343fae9cd1f4457eb3f6430e0e78bddf0049b49f95e561f10f3a4572185d0139"
+          "sig": "12da73892a2040b50aae642adf082d4efa808ae19ded7a1938ba75614fdc8b959fd8293193de7088073691ee603f6beb493cd5e9bd832a45575b63278f678ad4"
         }
       },
       "expected": {
@@ -1382,31 +2444,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "e8ba35746329a4dc464d3b4d9f04aa59675134f0e207c8e675397cb41fb0914d81d70c44f87483baba5a9720a672e81786024069fe9f72dc2fb6ee92997ecadb"
+          "sig": "481ce49f3388d9a53794fa5358022af13584792207f5c343b5be7d4a5deed8fc794fbe32968f5b6c2cb761b03b219dc54da4b19e397984aa045397263014b028"
         }
       },
       "expected": {
@@ -1427,31 +2490,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "326467ff299cd700c3e20cf33c8b8bf8856bba58eb9d4e9bc7aa1cc0ef51ad28a75f5055855a74de0738e367279e25a1e74a895a0caa3766df9d72d075b6868a"
+          "sig": "9a643cba006d185129b6e495a1e955c38c8beeac0878e376153c0f5726d0e3a68f52dc4b6eeeedb40e3c6922697021d6453a57ee57126773bb4019a0d4f20c0b"
         }
       },
       "expected": {
@@ -1472,31 +2536,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "de5779dc7a2132fe298611424b140bd7f9bca3dd25e0dd447ea01d8a2155e2e1c11a27651e6c726959efacc3ffde52abfc286bfb362e0152bf96cd7b3a55cb82"
+          "sig": "226b9a73b41388dd4fdf7671186f681af7ef834ea55ecbac45f510a9888bd61431c1294c5b58f609005ff5d58755de5db852723c22214b4543b1fba1b21ad835"
         }
       },
       "expected": {
@@ -1517,31 +2582,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bd3af56a4fa9f03aa3fa32841dd096d1b54e5f14e4644101de59cd6f44c62597f39f97e3530496aa00ce76aeea5a714da175a14f2582f808ea944b0a718123f1"
+          "sig": "f90e3c984b423219cdc2a7b97cfae3765a6ba4f37d013d036a5677c42ca031a71af6aae3e9e5e351f96f337e34a6e9608b8f36af339f6779a2fecec4d95cef8f"
         }
       },
       "expected": {
@@ -1562,31 +2628,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "20ba6f3a87bc07eb38b4212e1d5d3a2b3c4348cdac0bd7a761019cf1770ad620ccb0fcba7c737ff62c66884a3a3678f80705bd36c91eec6426f8816a56b1b8db"
+          "sig": "b3daad907a8da618934498b11cbdabf54819537563eb6d3285c193ef486a967423fc8958a45804f99d4512907730dfd86ccce370c3d1268aa2430ba1f89e3426"
         }
       },
       "expected": {
@@ -1607,31 +2674,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "fce429a7258f170e43793c3cffee5429edeecd6ecf8e2f884c6d5185ef23bc070322c119b4a92c930bef87df1516338b56fd64b443b20912f9864b87d874f756"
+          "sig": "f60e2c1e9664fcfc2018875ede23bbda83aefe6c9cd02f8b1e202642506f445de94253232b7ee89f26fe58f9e7da4dcbd269757dee6acfe6d4c812c1e625b531"
         }
       },
       "expected": {
@@ -1652,31 +2720,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "274a750c64c8bc4e907abb9fc707ff97497a6dff4496e50a1d1649ff1841a435663b96a53a8a4a733370c2e269766f18f384ba86a0fa495f3e07fc4f40db74b1"
+          "sig": "75889a946fa9101b566259b077ecccfb1bb1500a341d2d2c43a975fd502c2f1c261af422499bec7d1f002f50d709e10667780472c2546bd225d0d6ca95349824"
         }
       },
       "expected": {
@@ -1697,31 +2766,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "690ab440f1fd80ae9d1ce793d7efa0be06de2b12829baff80f5179855e7a04cb2ddabc3c53d77c1329695ade7f88f38d7a988978dcadec861c92a1fd391805ff"
+          "sig": "3bd08d00ab40fcb58363206ad6d867b9f1016e5e35a05dfcc6bc87403790ba6e7a914b7a54bef75635114cdd93fae27ab609c99a62ef0eea5885ba4c61333d70"
         }
       },
       "expected": {
@@ -1741,11 +2811,12 @@
           "createdAt": 1760000000,
           "recipients": [],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "e56439bd1c91c7868a38b5f852ec00cfd2f1aa6df7d45b9ce5e7ec1ddee9f813204f0f7221bc5dca6e2ab218fd4739b3f720db982502803f981fe6caf438e2de"
+          "sig": "242ebb457bdb050b39a804a0286892117e3fd5ee2f4012c01f966737498b42df12b8234b6d87ce5656ad4641396c8eae898db16a412fccf87112023af9d84565"
         }
       },
       "expected": {
@@ -1766,31 +2837,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRq",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "2775b645ff014b0e711e97e2f1e3b41349a5544480549ad5d7ec80a643980b4e8d512ff0bdcddf10054a280919a503e762444a8bdb7b0b7e76e3aeb9d96c4e7c"
+          "sig": "ca805822bb88d0ed8f38757f3cbe728e63d0f24b1324ec0ac72c7556682fc59736b92581b2e6abc8f821fb5405caad04bf42d616014ecfdff41cdd0f150f301e"
         }
       },
       "expected": {
@@ -1811,31 +2883,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW+5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "+DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY+M9Bo38tLDUz++LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "b2e5877eb5786a2b0d0aa4aa1db628f03b72c90cb616975b5a7fdc03ee3661d368c91ae1ea5c364eb24934e03e3225432ecabf04e07110c9a22e4a1e0321a317"
+          "sig": "9746fac1ab98bbe0a6d09ec4f87d7ba0eb38dd9944023292d34eabfda36274f533d283d2f2219d472791d0ead651e504946c1703b59bb05ee549c063f0785b17"
         }
       },
       "expected": {
@@ -1844,7 +2917,7 @@
     },
     {
       "id": "validate-reject-alg-a128gcm",
-      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): alg other than A256GCM; rejected, never normalised",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): alg other than A256GCM-KC; rejected, never normalised",
       "input": {
         "op": "validate",
         "envelope": {
@@ -1856,31 +2929,307 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
             "alg": "A128GCM",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "883eee64a9a211cd8bf91396d8d6290c8c5c15a80323521eaaa3bd8cdb60f0ba7e885262491dee2b8b94d2c4aadedfbc057c6903d396eea64be02af007705b00"
+          "sig": "bdd4700c0dcf08703e49b66198c1937af32a5a2134a476d64c8438ea7900aeabd5c4b444f11340c17773d5e9a634e95842467c6ac58ff7d405a17e870640edfd"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-alg-a256gcm",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): the earlier alg A256GCM, with kc present; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "2b9f241ef0df74341c90c1a3f2b7fdfed3aaa28d98f9cc40d7cae4c2a8a9786177bc1e5de0686501a5003360feece84216e72ffc7b256f43f23917a0869cafef"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-missing-kc",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): aead without kc; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "966e3b774efe9ce2d13f128bb668d257d11c0b21cd9ce90d8ec4a7998da7c6c54584116a990268b7972a9a1ea46c9731e0137acad42fa76ec299011d1328a330"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-kc-31-bytes",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): kc of 31 bytes; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFw",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "290e5cff7eba0c5dbf01c485ab2a62a4b1918f24ba7e9ac85e2555808d1a448e93953c55cbe58b99ffec4d6348977a3a7af54e74dc1808463d0bb9c4731c9c05"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-kc-33-bytes",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): kc of 33 bytes; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzkA",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "5f1cf57db7828c5e45203dde52bbd79a729bf48b177803c467f08e47c47841374a1c7aaba6305f8963c3218ae089ee27872c1e20efed15fda92f77c6d0131c74"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-kc-padded",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): kc as padded base64url; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk=",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "9c310603601067e7ce79d45fae15a958d9e18614541165c8d429a7eff60fc8cbb444415f6fd621a430de7c163f87b254eaa60cde5806dcd96d475ea4c063ba95"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-kc-hex",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): kc as hex instead of base64url; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "ab15c57f57e4a688f4f6b8518c19849c722e0e09cb0e3cf110ef780f8f041739",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
+          },
+          "sig": "ab31066f15fec1f470e546c86a7d6bcc5a9384581a9aa90a4a220eac0652a8db81751d1130a97ce4e964c2adbaf5c4908ece51a8ce66ad35b507a81de97416d9"
         }
       },
       "expected": {
@@ -1901,31 +3250,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9o",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "bccc07e70426bb83bc77fed861991bb96a73fc0ce9f49cd512a000605f0f9b8ba21fe0fce7e86f1f1dd0ede188c658da53a74484af02fef4c429f8b9cc0d7a5f"
+          "sig": "eb61ed7c49c2f894a761bfbbcf2193c080a552198629c19c21f50c3c91dbca1bad27643530f0ed9d71bd8b64cc63208b3e08f2787423f275f9068f1743b40315"
         }
       },
       "expected": {
@@ -1946,31 +3296,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC=",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "5dac1c6a6145df24b76ea5ea3b0db8f857307a70736cb6305f04292b0b7df16d8f3fccb5127bd3a40ec065c6da438199e19ad17d5febeec8d4036aa75b3e2c7a"
+          "sig": "41a72a004f2f20f75a23897f0ec879634c4272e81bf7dabcf310316f8b99a6932aa58ada9e76c08608c6097527ec1d4a6dcb53ec364714c09fee542c5a4eaf83"
         }
       },
       "expected": {
@@ -1991,31 +3342,77 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
+            }
+          ],
+          "aead": {
+            "alg": "A256GCM-KC",
+            "iv": "eIyG5R7rczoln9qC",
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti"
+          },
+          "sig": "ee6b29469fe5a57d6ea7646892675c9c2f041f5001182b8a99ce889cbbc9c3a7fcce84b4875e7591cadc4ff00e6a79dc7f2699fa761e48fcccbc69d5551a1960"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "validate-reject-earlier-form",
+      "source": "04 \u00a73.1 envelope v1 structure, \u00a72.4.1 encodings, strict schema (M1-2a): the earlier form: aead {alg A256GCM, iv, ct} without kc, GCM under the CEK; rejected, never normalised",
+      "input": {
+        "op": "validate",
+        "envelope": {
+          "v": 1,
+          "id": "CWwS0akF74XyLhggaFDzZQ",
+          "thread": "Jqgjx2tXGK5rxsnWiTwjtw",
+          "from": "a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec",
+          "createdAt": 1760000000,
+          "recipients": [
+            {
+              "kid": "LGGnk30hbYi4K8I9JxRqQA",
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
+            },
+            {
+              "kid": "eExmdPfwCWg6bBLEtFc46g",
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
+            },
+            {
+              "kid": "MW3kZCPdPhvhhCYviirPTQ",
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
+            },
+            {
+              "kid": "54EhDMUO-6AUwd1daj9E_w",
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
             "alg": "A256GCM",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf"
+            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgIiFcKsuD5cFHY7gRTJP9v"
           },
-          "sig": "0d65c708a5e54d556480dabec2bb4f9e3af7ba9af4822471a45a656028e54b1fdaebc7c1ee53c180ceb1a824b2583086ba501bb78d8e9ff73c983a9f9115db84"
+          "sig": "231b8648003189f651bb96dc21bbbf27a56b223e2056d3b7de450d906ba8eb2243426d5d2e8457949bfb9101623555abe37a517205ae11ef3796bc1374234e3e"
         }
       },
       "expected": {
@@ -2036,31 +3433,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "BB1D06D649864A43F999D2828DAC10477A5B81EB7E1355B40455677772A6AA18C9636FACA956168C3FF272331922B0DFE26EAC3EA51C019EC374FBAEC3C02693"
+          "sig": "59D5AD41B878708E9E4120AB788C5C5B6C9F16B860521E9E33FFA2C183253D7FA3A321E95D6781C26A95F2F63A78D092C68061419CBF28A22CC9DDC318B26B80"
         }
       },
       "expected": {
@@ -2081,31 +3479,32 @@
           "recipients": [
             {
               "kid": "LGGnk30hbYi4K8I9JxRqQA",
-              "enc": "zepwx3jlx6_V5aza_DLxsMqTyaep9dDIPjVWsFU0aiA",
-              "wk": "jn7seaW-5l2hl2JBxwoma4B0rTiDtoz1ICjLwg7AjkfYX3kF8JgSoWGvvAIDZb8d"
+              "enc": "rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ",
+              "wk": "vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q"
             },
             {
               "kid": "eExmdPfwCWg6bBLEtFc46g",
-              "enc": "IE1I1Qduz3DPryj8G3-YD6VFwG2H2HBXvbfI0824T2E",
-              "wk": "HMcXntyck7hZo-2IT9u62us_T_Cc89Mvd85DBbD4U6UnHXNzUeJP57P4vIkJrr5b"
+              "enc": "THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU",
+              "wk": "-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD"
             },
             {
               "kid": "MW3kZCPdPhvhhCYviirPTQ",
-              "enc": "YfN2R56ThqKUaSyc0MaWz_EXQEFOAdu7VHj0JY9jGXY",
-              "wk": "ZX50o4aa1U5Kh7peM15G04iXEbxn1Juu5JYiUwqwvAIln8yFJChhEaLorA8SvGvo"
+              "enc": "lRIqmRE-cNcDIg0efmKJ24JTa-53Nb3C1cBFMfPqpG4",
+              "wk": "enXaB7t8lA1OXHGHXCCorZdvxr56H7iGRa_P6FGauxsVqZfvgJzDryCmTGN3F4_5"
             },
             {
               "kid": "54EhDMUO-6AUwd1daj9E_w",
-              "enc": "k-kvnecx4uoCp3Sjnw5porXY3xiuLrT-OGlegHZVbjE",
-              "wk": "lCHbUgm84-eks__JUaBO6J2AV1A7nQc-0-zdHTTURLDXO34yM9TPjenOilJTHjUb"
+              "enc": "6jSVjm-FZj7QdQk8Vu2XAyzTDq3NrhwNpN2_au1UIiI",
+              "wk": "cqpdsdxAuds7MMc6Vl2s1Cd_idqcbw-RfLbFEmvAOmGdiPvsxOvRYvX4uMb0Zn21"
             }
           ],
           "aead": {
-            "alg": "A256GCM",
+            "alg": "A256GCM-KC",
             "iv": "eIyG5R7rczoln9qC",
-            "ct": "Cu9rWGPO-mZNFSnVvakf27q8TC1vdUkTvuNISTmotFtvRuwoN9WuTgFZo781jevZuv8IZslWN3lonFuLZiD_YLEBOihtJ1vAedbMZ77gn3bKGNXy9ykYNzG2eNgaJgL8xYQVG4605q5Kn-nA"
+            "kc": "qxXFf1fkpoj09rhRjBmEnHIuDgnLDjzxEO94D48EFzk",
+            "ct": "DhTMLvL8fTFxHsMMuOti-1sDzhTAdrD0Y7vdpw31rODqZe2rhCmKeD2VhH10wgFofsOkYe4VKaV6VjMTkjByMQKZXh0Vd6w11x_xgOMlVY3x7eL6vBbYseFC9bfJIrLMymr1-C9MBKh8Hrwk"
           },
-          "sig": "0xbb1d06d649864a43f999d2828dac10477a5b81eb7e1355b40455677772a6aa18c9636faca956168c3ff272331922b0dfe26eac3ea51c019ec374fbaec3c02693"
+          "sig": "0x59d5ad41b878708e9e4120ab788c5c5b6c9f16b860521e9e33ffa2c183253d7fa3a321e95d6781c26a95f2f63a78d092c68061419cbf28a22cc9ddc318b26b80"
         }
       },
       "expected": {

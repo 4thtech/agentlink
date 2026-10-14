@@ -1,7 +1,7 @@
 {
   "$schema": "../schema/vector-file.schema.json",
   "suite": "hpke",
-  "version": 1,
+  "version": 2,
   "generator": {
     "tool": "python (hashlib, cryptography 50.0.2, pyhpke 0.6.5)",
     "version": "cpython 3.12.13",
@@ -69,29 +69,181 @@
       }
     },
     {
+      "id": "derive-cek-eph-recipient-agent",
+      "source": "04 \u00a73.3 (G-46, D-66) derivation from the CEK: HKDF-SHA256(CEK, salt \"\", utf8(\"agentlink/v1/cek-eph\") || id || pk_j), 32 bytes; it is skE_j, used raw",
+      "input": {
+        "op": "deriveFromCek",
+        "label": "agentlink/v1/cek-eph",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33"
+      },
+      "expected": {
+        "okm": "f63f246a843a801066ccb41562a5227cddfc9d544cbc82b5fda70904cd1f0d78"
+      }
+    },
+    {
+      "id": "derive-cek-eph-recipient-owner",
+      "source": "04 \u00a73.3 (G-46, D-66) derivation from the CEK: HKDF-SHA256(CEK, salt \"\", utf8(\"agentlink/v1/cek-eph\") || id || pk_j), 32 bytes; it is skE_j, used raw",
+      "input": {
+        "op": "deriveFromCek",
+        "label": "agentlink/v1/cek-eph",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "recipientPublicKey": "701d72225989369105bd567b8b037ac58c4fcfa4b48a9a182824d77014d78e55"
+      },
+      "expected": {
+        "okm": "8edcfc38ad5c3a5c3a9dded6b4531f3924ec4e23f6f42cd6bdab65c78b00366b"
+      }
+    },
+    {
+      "id": "derive-cek-eph-sender-owner",
+      "source": "04 \u00a73.3 (G-46, D-66) derivation from the CEK: HKDF-SHA256(CEK, salt \"\", utf8(\"agentlink/v1/cek-eph\") || id || pk_j), 32 bytes; it is skE_j, used raw",
+      "input": {
+        "op": "deriveFromCek",
+        "label": "agentlink/v1/cek-eph",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "recipientPublicKey": "7dde838c25a616c9715022120040e2bbb3c3196a896ecdca598c26cea6bb8a6c"
+      },
+      "expected": {
+        "okm": "1b426addecd61f0c1a5fc7287ef0367f66af58d8ea2bd00d68fae13199825d70"
+      }
+    },
+    {
+      "id": "derive-cek-eph-sender-agent",
+      "source": "04 \u00a73.3 (G-46, D-66) derivation from the CEK: HKDF-SHA256(CEK, salt \"\", utf8(\"agentlink/v1/cek-eph\") || id || pk_j), 32 bytes; it is skE_j, used raw",
+      "input": {
+        "op": "deriveFromCek",
+        "label": "agentlink/v1/cek-eph",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "recipientPublicKey": "8cd8207e1c744ef984b91d22395a3416edfac7baae77d1db87d4ed95fe6d8005"
+      },
+      "expected": {
+        "okm": "04b5c8fb8c1d758c9d03c2c94ba4ecaab14c3f727693b8f36584649c5ca0759b"
+      }
+    },
+    {
+      "id": "derive-reject-unknown-label",
+      "source": "04 \u00a73.3 (G-46, D-66) derivation from the CEK: a label that is not one of the three (the HPKE info label agentlink/v1/cek); refused (fixed-length info, 04 \u00a73.3)",
+      "input": {
+        "op": "deriveFromCek",
+        "label": "agentlink/v1/cek",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "derive-reject-label-prefix",
+      "source": "04 \u00a73.3 (G-46, D-66) derivation from the CEK: a label that is a prefix of agentlink/v1/cek-eph; refused (fixed-length info, 04 \u00a73.3)",
+      "input": {
+        "op": "deriveFromCek",
+        "label": "agentlink/v1/cek-e",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "derive-reject-cek-eph-without-key",
+      "source": "04 \u00a73.3 (G-46, D-66) derivation from the CEK: cek-eph without the recipient key; refused (fixed-length info, 04 \u00a73.3)",
+      "input": {
+        "op": "deriveFromCek",
+        "label": "agentlink/v1/cek-eph",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "derive-reject-cek-eph-key-31-bytes",
+      "source": "04 \u00a73.3 (G-46, D-66) derivation from the CEK: cek-eph with a 31-byte recipient key; refused (fixed-length info, 04 \u00a73.3)",
+      "input": {
+        "op": "deriveFromCek",
+        "label": "agentlink/v1/cek-eph",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "derive-reject-cek-eph-key-33-bytes",
+      "source": "04 \u00a73.3 (G-46, D-66) derivation from the CEK: cek-eph with a 33-byte recipient key; refused (fixed-length info, 04 \u00a73.3)",
+      "input": {
+        "op": "deriveFromCek",
+        "label": "agentlink/v1/cek-eph",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e3300"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "derive-reject-cek-eph-id-15-bytes",
+      "source": "04 \u00a73.3 (G-46, D-66) derivation from the CEK: cek-eph with a 15-byte envelope id; refused (fixed-length info, 04 \u00a73.3)",
+      "input": {
+        "op": "deriveFromCek",
+        "label": "agentlink/v1/cek-eph",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrq",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "derive-reject-cek-eph-cek-31-bytes",
+      "source": "04 \u00a73.3 (G-46, D-66) derivation from the CEK: cek-eph with a 31-byte CEK; refused (fixed-length info, 04 \u00a73.3)",
+      "input": {
+        "op": "deriveFromCek",
+        "label": "agentlink/v1/cek-eph",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae21",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
       "id": "wrap-cek-recipient-agent",
-      "source": "04 \u00a73.3 CEK wrap (fixed ephemeral key)",
+      "source": "04 \u00a73.3 (G-46, D-66) CEK wrap with the ephemeral key derived from the CEK (skE_j = ikm_j, raw X25519)",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
-        "ephemeralSecretKey": "86913a7ed271c14cb35dee75ffe31735845ae7d49203b5dbf8ea8f30b9742742",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
       "expected": {
-        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
-        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWwxk"
+        "enc": "adpMkQ6UXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "ujMQFyBzEtYGtWchOcOytzYH_a3alaXyVXGH8QIAzvMhr_O751KLxMTEVwGvNRzu"
       }
     },
     {
       "id": "unwrap-cek-recipient-agent",
-      "source": "04 \u00a73.3 CEK unwrap",
+      "source": "04 \u00a73.3 (G-46, D-66) CEK unwrap",
       "input": {
         "op": "unwrapCek",
         "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
-        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
-        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWwxk"
+        "enc": "adpMkQ6UXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "ujMQFyBzEtYGtWchOcOytzYH_a3alaXyVXGH8QIAzvMhr_O751KLxMTEVwGvNRzu"
       },
       "expected": {
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
@@ -99,28 +251,27 @@
     },
     {
       "id": "wrap-cek-recipient-owner",
-      "source": "04 \u00a73.3 CEK wrap (fixed ephemeral key)",
+      "source": "04 \u00a73.3 (G-46, D-66) CEK wrap with the ephemeral key derived from the CEK (skE_j = ikm_j, raw X25519)",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "701d72225989369105bd567b8b037ac58c4fcfa4b48a9a182824d77014d78e55",
-        "ephemeralSecretKey": "dcc61cc8f518cb2d02c943c316700d5a89720056d2280a2c6f86403900c7eba0",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
       "expected": {
-        "enc": "RMCEq9DzRbxXXXToNf133o0O-hW7C2gua4kGlbupmUk",
-        "wk": "Ksy-i-4q2xoTU_7sdfUKtOI2ZP2bKtE-XuMZ2pS-2oj-aRwXFF3RTDQkgCHDpTHR"
+        "enc": "AdLtFMl5LBZOQwdlUpPgQck0wPqL_RSykzhkzZ8K12E",
+        "wk": "r-Ah0SAZgTlcDNoy9s3ka3qmSlE-7qF00Gs5qUKHAuqGAFWIp5bbC1Kr2BlIhUKQ"
       }
     },
     {
       "id": "unwrap-cek-recipient-owner",
-      "source": "04 \u00a73.3 CEK unwrap",
+      "source": "04 \u00a73.3 (G-46, D-66) CEK unwrap",
       "input": {
         "op": "unwrapCek",
         "recipientSecretKey": "f07b4d6be5dffcb9d19cce6aef2ae53cb207e805ec824ddfad375fa6aafacb4e",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
-        "enc": "RMCEq9DzRbxXXXToNf133o0O-hW7C2gua4kGlbupmUk",
-        "wk": "Ksy-i-4q2xoTU_7sdfUKtOI2ZP2bKtE-XuMZ2pS-2oj-aRwXFF3RTDQkgCHDpTHR"
+        "enc": "AdLtFMl5LBZOQwdlUpPgQck0wPqL_RSykzhkzZ8K12E",
+        "wk": "r-Ah0SAZgTlcDNoy9s3ka3qmSlE-7qF00Gs5qUKHAuqGAFWIp5bbC1Kr2BlIhUKQ"
       },
       "expected": {
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
@@ -128,28 +279,27 @@
     },
     {
       "id": "wrap-cek-sender-owner",
-      "source": "04 \u00a73.3 CEK wrap (fixed ephemeral key)",
+      "source": "04 \u00a73.3 (G-46, D-66) CEK wrap with the ephemeral key derived from the CEK (skE_j = ikm_j, raw X25519)",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "7dde838c25a616c9715022120040e2bbb3c3196a896ecdca598c26cea6bb8a6c",
-        "ephemeralSecretKey": "859467a7a9c246e5ef112e9856d938225893e46a34566c00a00a225ffb08822b",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
       "expected": {
-        "enc": "x8Lu1z-ay1fQtLO5KrQek9_8iCdFNzgmgWYRCKUQvSs",
-        "wk": "QTW5LgpWXDzH_h8A9E6OBQ379vTWv3VtcTgOUNPWO5evZik7ZyOUywtagXyHOxxe"
+        "enc": "B71iTE9vyw5ftqspVIRZC5bSfYREOG_bWqNr0AXdHxk",
+        "wk": "9qJJo2cynSDHqMh82pAvjv4JoMu7NlHtSxGKHtbphBELzR9ZKrXtSpTYGmfzWlfN"
       }
     },
     {
       "id": "unwrap-cek-sender-owner",
-      "source": "04 \u00a73.3 CEK unwrap",
+      "source": "04 \u00a73.3 (G-46, D-66) CEK unwrap",
       "input": {
         "op": "unwrapCek",
         "recipientSecretKey": "e91a7040920e5c94769a40c993edd672a3656465467a00b7e004e3a36a25e395",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
-        "enc": "x8Lu1z-ay1fQtLO5KrQek9_8iCdFNzgmgWYRCKUQvSs",
-        "wk": "QTW5LgpWXDzH_h8A9E6OBQ379vTWv3VtcTgOUNPWO5evZik7ZyOUywtagXyHOxxe"
+        "enc": "B71iTE9vyw5ftqspVIRZC5bSfYREOG_bWqNr0AXdHxk",
+        "wk": "9qJJo2cynSDHqMh82pAvjv4JoMu7NlHtSxGKHtbphBELzR9ZKrXtSpTYGmfzWlfN"
       },
       "expected": {
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
@@ -157,31 +307,239 @@
     },
     {
       "id": "wrap-cek-sender-agent",
-      "source": "04 \u00a73.3 CEK wrap (fixed ephemeral key)",
+      "source": "04 \u00a73.3 (G-46, D-66) CEK wrap with the ephemeral key derived from the CEK (skE_j = ikm_j, raw X25519)",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "8cd8207e1c744ef984b91d22395a3416edfac7baae77d1db87d4ed95fe6d8005",
-        "ephemeralSecretKey": "aafc591b3c92eb8a707ccfcd23253388806bd8f2e23f76a731894b05ed034f8f",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
       "expected": {
-        "enc": "Lc0x2k2ATZB_0KsDQXZ4IiBXNjh1LrooOhzH2MCpzkg",
-        "wk": "gul3ntUVnfCqvTyJLeLpDlZrXE2ikX8QUtY4Od-v_PQpmcVcYf1Mzuxl9um0KsYK"
+        "enc": "68IlnK09YA5i-zWDFBW3em6rxPof_4KNItgQy_0ucW0",
+        "wk": "B497DuIn0xaBod4mW33dw6PJ7iVb2ZYlvkvqiUNi0zHCr6CAJomlBEFtZdoqzzuf"
       }
     },
     {
       "id": "unwrap-cek-sender-agent",
-      "source": "04 \u00a73.3 CEK unwrap",
+      "source": "04 \u00a73.3 (G-46, D-66) CEK unwrap",
       "input": {
         "op": "unwrapCek",
         "recipientSecretKey": "92869ba1cdbf27971ab89eb824a5e9102c91b59fdf67b14461223c6abf80756b",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
-        "enc": "Lc0x2k2ATZB_0KsDQXZ4IiBXNjh1LrooOhzH2MCpzkg",
-        "wk": "gul3ntUVnfCqvTyJLeLpDlZrXE2ikX8QUtY4Od-v_PQpmcVcYf1Mzuxl9um0KsYK"
+        "enc": "68IlnK09YA5i-zWDFBW3em6rxPof_4KNItgQy_0ucW0",
+        "wk": "B497DuIn0xaBod4mW33dw6PJ7iVb2ZYlvkvqiUNi0zHCr6CAJomlBEFtZdoqzzuf"
       },
       "expected": {
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      }
+    },
+    {
+      "id": "wrap-cek-recipient-agent-other-envelope-id",
+      "source": "04 \u00a73.3 (G-46, D-66): the same CEK and key under another envelope id give another enc",
+      "input": {
+        "op": "wrapCek",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
+        "envelopeId": "8H4hcfHEGtCG8wNSR8rkmg",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "enc": "6wiSzz3XpIXv3CSTKeEuts64TBjTNQvJCTXO2IoKRgE",
+        "wk": "IZ3iEWzjcaB1U1QXyOZ_tCxPkHV6ZGp5n26mTY_8SPSNa2VLaIvXZV3ERZ_Nnypz"
+      }
+    },
+    {
+      "id": "wrap-cek-with-ephemeral-key-raw-ikm",
+      "source": "04 \u00a73.3 (G-46, D-66): the explicit-ephemeral path given ikm_j as the raw X25519 secret gives exactly wrap-cek-recipient-agent",
+      "input": {
+        "op": "wrapCekWithEphemeralKey",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
+        "ephemeralSecretKey": "f63f246a843a801066ccb41562a5227cddfc9d544cbc82b5fda70904cd1f0d78",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "enc": "adpMkQ6UXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "ujMQFyBzEtYGtWchOcOytzYH_a3alaXyVXGH8QIAzvMhr_O751KLxMTEVwGvNRzu"
+      }
+    },
+    {
+      "id": "wrap-cek-with-ephemeral-key-derive-key-pair-path",
+      "source": "04 \u00a73.3 (G-46, D-66): the explicit-ephemeral path given RFC 9180 DeriveKeyPair(ikm_j)'s secret (what the library does with ikm bytes) gives other bytes than wrap-cek-recipient-agent; 04 \u00a73.3 never uses this path (IR-D-66-1 L-5)",
+      "input": {
+        "op": "wrapCekWithEphemeralKey",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
+        "ephemeralSecretKey": "4da1e5833d8fa5e70c7d3146ed02de6e408b45b094adb9e2fb5c0e7581ae11ed",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
+      },
+      "expected": {
+        "enc": "pZCtpJgM0vh5LoPP1WVFSuhJne-aeK8MUWVF97xa_2E",
+        "wk": "Rfutd-jbkneOmGrIDmQmNP9IxZl9JQkY6hTy__Y4nRrE8YgBdZUs365Hl1aHCw-d"
+      }
+    },
+    {
+      "id": "check-wrap-recipient-agent",
+      "source": "04 \u00a73.3 (G-46, D-66) wrap check: the recomputed entry is byte-identical",
+      "input": {
+        "op": "checkWrap",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "enc": "adpMkQ6UXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "ujMQFyBzEtYGtWchOcOytzYH_a3alaXyVXGH8QIAzvMhr_O751KLxMTEVwGvNRzu"
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "check-wrap-recipient-owner",
+      "source": "04 \u00a73.3 (G-46, D-66) wrap check: the recomputed entry is byte-identical",
+      "input": {
+        "op": "checkWrap",
+        "recipientPublicKey": "701d72225989369105bd567b8b037ac58c4fcfa4b48a9a182824d77014d78e55",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "enc": "AdLtFMl5LBZOQwdlUpPgQck0wPqL_RSykzhkzZ8K12E",
+        "wk": "r-Ah0SAZgTlcDNoy9s3ka3qmSlE-7qF00Gs5qUKHAuqGAFWIp5bbC1Kr2BlIhUKQ"
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "check-wrap-sender-owner",
+      "source": "04 \u00a73.3 (G-46, D-66) wrap check: the recomputed entry is byte-identical",
+      "input": {
+        "op": "checkWrap",
+        "recipientPublicKey": "7dde838c25a616c9715022120040e2bbb3c3196a896ecdca598c26cea6bb8a6c",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "enc": "B71iTE9vyw5ftqspVIRZC5bSfYREOG_bWqNr0AXdHxk",
+        "wk": "9qJJo2cynSDHqMh82pAvjv4JoMu7NlHtSxGKHtbphBELzR9ZKrXtSpTYGmfzWlfN"
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "check-wrap-sender-agent",
+      "source": "04 \u00a73.3 (G-46, D-66) wrap check: the recomputed entry is byte-identical",
+      "input": {
+        "op": "checkWrap",
+        "recipientPublicKey": "8cd8207e1c744ef984b91d22395a3416edfac7baae77d1db87d4ed95fe6d8005",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "enc": "68IlnK09YA5i-zWDFBW3em6rxPof_4KNItgQy_0ucW0",
+        "wk": "B497DuIn0xaBod4mW33dw6PJ7iVb2ZYlvkvqiUNi0zHCr6CAJomlBEFtZdoqzzuf"
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "check-wrap-reject-other-cek",
+      "source": "04 \u00a73.3 (G-46, D-66) wrap check: the entry seals another CEK (a correct derived wrap of that CEK)",
+      "input": {
+        "op": "checkWrap",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "enc": "3ahlDV7c0_zyUBkwoDXc5oKdlSdIN1BbE-QLmKDbBnU",
+        "wk": "G0GL8WD1ZY8oGZsrKp98mqTpMXr2IFvwf3HQKrpGjHHqjIyqKQnhDE7TI0cUR-xB"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "check-wrap-reject-non-derived-ephemeral",
+      "source": "04 \u00a73.3 (G-46, D-66) wrap check: the entry seals this CEK under a non-derived ephemeral key; it unwraps, but is not the committed entry",
+      "input": {
+        "op": "checkWrap",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "enc": "GGyeNLO3ddjSrQNWWJy6Rq3mS8lT8iOsP3xoznlCSm8",
+        "wk": "9nZAiNpZoQ1JfTnsyAQTNdEB0ZVnw3QDAKxEmlepXVJ7MUgwHwoSB6VJDDBOhQJl"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "check-wrap-reject-derive-key-pair-path",
+      "source": "04 \u00a73.3 (G-46, D-66) wrap check: the entry was built through RFC 9180 DeriveKeyPair(ikm_j) (IR-D-66-1 L-5)",
+      "input": {
+        "op": "checkWrap",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "enc": "pZCtpJgM0vh5LoPP1WVFSuhJne-aeK8MUWVF97xa_2E",
+        "wk": "Rfutd-jbkneOmGrIDmQmNP9IxZl9JQkY6hTy__Y4nRrE8YgBdZUs365Hl1aHCw-d"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "check-wrap-reject-other-recipient",
+      "source": "04 \u00a73.3 (G-46, D-66) wrap check: the recipient-owner entry checked against the recipient-agent key",
+      "input": {
+        "op": "checkWrap",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "enc": "AdLtFMl5LBZOQwdlUpPgQck0wPqL_RSykzhkzZ8K12E",
+        "wk": "r-Ah0SAZgTlcDNoy9s3ka3qmSlE-7qF00Gs5qUKHAuqGAFWIp5bbC1Kr2BlIhUKQ"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "check-wrap-reject-other-envelope-id",
+      "source": "04 \u00a73.3 (G-46, D-66) wrap check: the entry checked under another envelope id",
+      "input": {
+        "op": "checkWrap",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
+        "envelopeId": "8H4hcfHEGtCG8wNSR8rkmg",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "enc": "adpMkQ6UXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "ujMQFyBzEtYGtWchOcOytzYH_a3alaXyVXGH8QIAzvMhr_O751KLxMTEVwGvNRzu"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "check-wrap-reject-enc-flipped",
+      "source": "04 \u00a73.3 (G-46, D-66) wrap check: enc with one bit flipped",
+      "input": {
+        "op": "checkWrap",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "enc": "adpMkQ6VXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "ujMQFyBzEtYGtWchOcOytzYH_a3alaXyVXGH8QIAzvMhr_O751KLxMTEVwGvNRzu"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "check-wrap-reject-wk-flipped",
+      "source": "04 \u00a73.3 (G-46, D-66) wrap check: wk with one bit flipped",
+      "input": {
+        "op": "checkWrap",
+        "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
+        "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
+        "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c",
+        "enc": "adpMkQ6UXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "uzMQFyBzEtYGtWchOcOytzYH_a3alaXyVXGH8QIAzvMhr_O751KLxMTEVwGvNRzu"
+      },
+      "expected": {
+        "outcome": "reject"
       }
     },
     {
@@ -191,8 +549,8 @@
         "op": "unwrapCek",
         "recipientSecretKey": "f07b4d6be5dffcb9d19cce6aef2ae53cb207e805ec824ddfad375fa6aafacb4e",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
-        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
-        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWwxk"
+        "enc": "adpMkQ6UXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "ujMQFyBzEtYGtWchOcOytzYH_a3alaXyVXGH8QIAzvMhr_O751KLxMTEVwGvNRzu"
       },
       "expected": {
         "outcome": "reject"
@@ -205,8 +563,8 @@
         "op": "unwrapCek",
         "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
         "envelopeId": "8H4hcfHEGtCG8wNSR8rkmg",
-        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
-        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWwxk"
+        "enc": "adpMkQ6UXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "ujMQFyBzEtYGtWchOcOytzYH_a3alaXyVXGH8QIAzvMhr_O751KLxMTEVwGvNRzu"
       },
       "expected": {
         "outcome": "reject"
@@ -219,8 +577,8 @@
         "op": "unwrapCek",
         "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
-        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
-        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWwxl"
+        "enc": "adpMkQ6UXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "ujMQFyBzEtYGtWchOcOytzYH_a3alaXyVXGH8QIAzvMhr_O751KLxMTEVwGvNRzv"
       },
       "expected": {
         "outcome": "reject"
@@ -233,8 +591,8 @@
         "op": "unwrapCek",
         "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
-        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
-        "wk": "Q8wHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWwxk"
+        "enc": "adpMkQ6UXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "uzMQFyBzEtYGtWchOcOytzYH_a3alaXyVXGH8QIAzvMhr_O751KLxMTEVwGvNRzu"
       },
       "expected": {
         "outcome": "reject"
@@ -247,8 +605,8 @@
         "op": "unwrapCek",
         "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
-        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
-        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWww"
+        "enc": "adpMkQ6UXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "ujMQFyBzEtYGtWchOcOytzYH_a3alaXyVXGH8QIAzvMhr_O751KLxMTEVwGvNRw"
       },
       "expected": {
         "outcome": "reject"
@@ -261,8 +619,8 @@
         "op": "unwrapCek",
         "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
-        "enc": "HjOr9Qs0ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
-        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBUEfFFTTf5NLGtMWj6yWwxk"
+        "enc": "adpMkQ6VXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "ujMQFyBzEtYGtWchOcOytzYH_a3alaXyVXGH8QIAzvMhr_O751KLxMTEVwGvNRzu"
       },
       "expected": {
         "outcome": "reject"
@@ -275,8 +633,8 @@
         "op": "unwrapCek",
         "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
-        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
-        "wk": "kP6KxPSdwlmqclgwOZv7bnI1sYxwK9DuUih8_RF5wYAowWQ4P6H4o4kR_Ia9Zhdk"
+        "enc": "adpMkQ6UXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "xP6RBM-HDSLrqmSeFBkyyvHL3rHuUF_x2D4G0ukRVkiBSOY_5Pq8rQvWOSu7BOey"
       },
       "expected": {
         "outcome": "reject"
@@ -289,8 +647,8 @@
         "op": "unwrapCek",
         "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
-        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
-        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRBVa5L4a8Byyt7o5xBaGIqq_"
+        "enc": "adpMkQ6UXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "ujMQFyBzEtYGtWchOcOytzYH_a3alaXyVXGH8QIAzvP33QrXOojvSEHt-p2Li02o"
       },
       "expected": {
         "outcome": "reject"
@@ -312,11 +670,10 @@
     },
     {
       "id": "wrap-reject-small-order-recipient-zero",
-      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output (under the ephemeral key derived from the CEK) is all zero",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "0000000000000000000000000000000000000000000000000000000000000000",
-        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
@@ -340,11 +697,10 @@
     },
     {
       "id": "wrap-reject-small-order-recipient-one",
-      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output (under the ephemeral key derived from the CEK) is all zero",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "0100000000000000000000000000000000000000000000000000000000000000",
-        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
@@ -368,11 +724,10 @@
     },
     {
       "id": "wrap-reject-small-order-recipient-order-8-a",
-      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output (under the ephemeral key derived from the CEK) is all zero",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800",
-        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
@@ -396,11 +751,10 @@
     },
     {
       "id": "wrap-reject-small-order-recipient-order-8-b",
-      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output (under the ephemeral key derived from the CEK) is all zero",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157",
-        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
@@ -424,11 +778,10 @@
     },
     {
       "id": "wrap-reject-small-order-recipient-p-minus-1",
-      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output (under the ephemeral key derived from the CEK) is all zero",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
-        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
@@ -452,11 +805,10 @@
     },
     {
       "id": "wrap-reject-small-order-recipient-p",
-      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output (under the ephemeral key derived from the CEK) is all zero",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
-        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
@@ -480,11 +832,10 @@
     },
     {
       "id": "wrap-reject-small-order-recipient-p-plus-1",
-      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output (under the ephemeral key derived from the CEK) is all zero",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
-        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
@@ -508,11 +859,10 @@
     },
     {
       "id": "wrap-reject-small-order-recipient-zero-high-bit",
-      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output (under the ephemeral key derived from the CEK) is all zero",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "0000000000000000000000000000000000000000000000000000000000000080",
-        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
@@ -536,11 +886,10 @@
     },
     {
       "id": "wrap-reject-small-order-recipient-one-high-bit",
-      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output (under the ephemeral key derived from the CEK) is all zero",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "0100000000000000000000000000000000000000000000000000000000000080",
-        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
@@ -564,11 +913,10 @@
     },
     {
       "id": "wrap-reject-small-order-recipient-order-8-a-high-bit",
-      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output (under the ephemeral key derived from the CEK) is all zero",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b880",
-        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
@@ -592,11 +940,10 @@
     },
     {
       "id": "wrap-reject-small-order-recipient-order-8-b-high-bit",
-      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output (under the ephemeral key derived from the CEK) is all zero",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f11d7",
-        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
@@ -620,11 +967,10 @@
     },
     {
       "id": "wrap-reject-small-order-recipient-p-minus-1-high-bit",
-      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output (under the ephemeral key derived from the CEK) is all zero",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
@@ -648,11 +994,10 @@
     },
     {
       "id": "wrap-reject-small-order-recipient-p-high-bit",
-      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output (under the ephemeral key derived from the CEK) is all zero",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
@@ -676,11 +1021,10 @@
     },
     {
       "id": "wrap-reject-small-order-recipient-p-plus-1-high-bit",
-      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output is all zero",
+      "source": "RFC 9180 \u00a77.1.4: the recipient key is a small-order X25519 point, so the sender's DH output (under the ephemeral key derived from the CEK) is all zero",
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-        "ephemeralSecretKey": "8c6015fb1a398b388c5a6ff0740d2877df28d246efcac02bfdc142967130e751",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
@@ -694,7 +1038,6 @@
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
-        "ephemeralSecretKey": "86913a7ed271c14cb35dee75ffe31735845ae7d49203b5dbf8ea8f30b9742742",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrq",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
@@ -708,7 +1051,6 @@
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
-        "ephemeralSecretKey": "86913a7ed271c14cb35dee75ffe31735845ae7d49203b5dbf8ea8f30b9742742",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqugA",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c"
       },
@@ -722,7 +1064,6 @@
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
-        "ephemeralSecretKey": "86913a7ed271c14cb35dee75ffe31735845ae7d49203b5dbf8ea8f30b9742742",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae21"
       },
@@ -736,7 +1077,6 @@
       "input": {
         "op": "wrapCek",
         "recipientPublicKey": "97175c64a433c87a028bc1950d090c88b6f6a4ab4fe38ca0a3c0e0df642b5e33",
-        "ephemeralSecretKey": "86913a7ed271c14cb35dee75ffe31735845ae7d49203b5dbf8ea8f30b9742742",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
         "cek": "1adea3822ccb0751954a10573183fbeb7ac7432a591c390655273abbb8ae218c00"
       },
@@ -751,8 +1091,8 @@
         "op": "unwrapCek",
         "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrq",
-        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
-        "wk": "-7HzBZ9PhOPIdj384N-tAUiwMB1x4g8PZX5IfaHSldRey7sT9u6CPQpcWFCZD4im"
+        "enc": "adpMkQ6UXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "nOj07zHC208WL6V0W-JpQMf_97IXJjq5Y7NmpsfxuPDywLp8iRt5RBZSVW-yDAMo"
       },
       "expected": {
         "outcome": "reject"
@@ -765,8 +1105,8 @@
         "op": "unwrapCek",
         "recipientSecretKey": "988c4e29f0efc64c43f004993d459fc9edbfb0bd689bb7668b09ffe614eea8aa",
         "envelopeId": "N6tEXlVqXDZw1GEeDmrqug",
-        "enc": "HjOr9Qs1ucAnI6ZM1aXL2rccNgx4g1FLDgAs-cNKKnc",
-        "wk": "QswHQRzikRMtyIN-7BwPviP3YVEwxur8KYOJYbybRGX8QCCkS-XU2tQOpSXqggk"
+        "enc": "adpMkQ6UXiRLqsx43LI-PdKsCnlt9H74Hbq9XMZwmzo",
+        "wk": "ujMQFyBzEtYGtWchOcOytzYH_a3alaXyVXGH8QIAzifOI9k_bRThLaearTmZoHM"
       },
       "expected": {
         "outcome": "reject"

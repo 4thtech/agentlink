@@ -1,12 +1,16 @@
-// Suite `aead-envelope` (M1-1c): the 04 §3.1 envelope through @agentlink/crypto. `envelopeHash` and
-// `aad` hash the given envelope; `encryptPayload` encrypts under the given IV through the test
-// seam; `decryptPayload` opens the envelope's aead; `sign` returns the hash, the tagged signature
-// input and the signature; `verify` checks the signature; `validate` parses the envelope strictly
-// (structure and encodings) and then checks the signature. Inputs go to the code under test
-// unchecked, so its own refusals (CryptoInputError) and a failed verification are what
-// `outcome: reject` measures; any other error is a bug and fails the case.
+// Suite `aead-envelope` (M1-1c; key commitment M1-1l, G-46, D-66): the 04 §3.1 envelope through
+// @agentlink/crypto. `envelopeHash` and `aad` hash the given envelope; `encryptPayload` encrypts
+// under the given IV through the test seam and returns the AAD, `kc` and `ct`; `decryptPayload`
+// opens the envelope's aead (kc first, then AES-GCM); `checkCommitment` checks `aead.kc` against
+// the CEK alone; `deriveFromCek` runs one 04 §3.3 derivation by its label through the test seam;
+// `sign` returns the hash, the tagged signature input and the signature; `verify` checks the
+// signature; `validate` parses the envelope strictly (structure and encodings) and then checks the
+// signature. Inputs go to the code under test unchecked, so its own refusals (CryptoInputError)
+// and a failed check are what `outcome: reject` measures; any other error is a bug and fails the
+// case.
 import {
   CryptoInputError,
+  checkKeyCommitment,
   decodeBase64url,
   decryptPayload,
   envelopeAad,
@@ -19,14 +23,15 @@ import {
   type UnsignedEnvelope,
 } from '@agentlink/crypto';
 import { signEnvelopeHash } from '@agentlink/crypto/keystore';
-import { encryptPayloadWithIv } from '@agentlink/crypto/testing';
+import { deriveFromCek, encryptPayloadWithIv } from '@agentlink/crypto/testing';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 
 type AeadEnvelopeInput =
   | { op: 'envelopeHash' | 'aad' | 'verify' | 'validate'; envelope: object }
   | { op: 'encryptPayload'; header: object; cek: string; iv: string; plaintext: string }
-  | { op: 'decryptPayload'; envelope: object; cek: string }
+  | { op: 'decryptPayload' | 'checkCommitment'; envelope: object; cek: string }
+  | { op: 'deriveFromCek'; label: string; cek: string; envelopeId: string }
   | { op: 'sign'; envelope: object; secretKey: string; auxRand: string };
 
 const ENVELOPE_OPS = new Set(['envelopeHash', 'aad', 'verify', 'validate']);
@@ -41,7 +46,16 @@ function parseInput(input: unknown): AeadEnvelopeInput {
   if (i?.op === 'encryptPayload' && obj('header') && str('cek', 'iv', 'plaintext')) {
     return i as AeadEnvelopeInput;
   }
-  if (i?.op === 'decryptPayload' && obj('envelope') && str('cek')) return i as AeadEnvelopeInput;
+  if (
+    (i?.op === 'decryptPayload' || i?.op === 'checkCommitment') &&
+    obj('envelope') &&
+    str('cek')
+  ) {
+    return i as AeadEnvelopeInput;
+  }
+  if (i?.op === 'deriveFromCek' && str('label', 'cek', 'envelopeId')) {
+    return i as AeadEnvelopeInput;
+  }
   if (i?.op === 'sign' && obj('envelope') && str('secretKey', 'auxRand')) {
     return i as AeadEnvelopeInput;
   }
@@ -81,6 +95,7 @@ async function evaluateInput(input: AeadEnvelopeInput): Promise<readonly Compari
       );
       return [
         { field: 'aad', actual: bytesToHex(envelopeAad(header)) },
+        { field: 'kc', actual: aead.kc },
         { field: 'ct', actual: aead.ct },
       ];
     }
@@ -88,6 +103,17 @@ async function evaluateInput(input: AeadEnvelopeInput): Promise<readonly Compari
       const envelope = input.envelope as UnsignedEnvelope;
       const plaintext = await decryptPayload(envelope, hexToBytes(input.cek));
       return [{ field: 'plaintext', actual: bytesToHex(plaintext) }];
+    }
+    case 'checkCommitment':
+      return outcome(checkKeyCommitment(input.envelope as UnsignedEnvelope, hexToBytes(input.cek)));
+    case 'deriveFromCek': {
+      // The id is decoded without a length, so a wrong-length id reaches the code under test.
+      const okm = deriveFromCek(
+        input.label,
+        hexToBytes(input.cek),
+        decodeBase64url(input.envelopeId),
+      );
+      return [{ field: 'okm', actual: bytesToHex(okm) }];
     }
     case 'sign': {
       const digest = envelopeHash(input.envelope as UnsignedEnvelope);

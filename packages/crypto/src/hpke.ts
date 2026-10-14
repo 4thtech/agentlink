@@ -5,6 +5,14 @@
 // - info = utf8("agentlink/v1/cek") || the envelope id as its raw 16 bytes; AAD empty.
 // - One independent seal per recipient: enc (32 bytes) and wk (the 32-byte CEK sealed, 48 bytes).
 // - Sender authenticity comes from the envelope `sig`, not from HPKE Auth mode (04 §3.3).
+// - Every wrap is derived from the CEK (M1-1l, G-46, D-66): the ephemeral secret key of entry j is
+//   ikm_j = HKDF-SHA256(ikm = CEK, salt = empty, info = "agentlink/v1/cek-eph" ‖ id ‖ pk_j, 32),
+//   used as a raw X25519 secret key (clamped by the library). It reaches @hpke/core's `ekm` as an
+//   imported key pair, never as bytes, which the library would route through RFC 9180
+//   DeriveKeyPair. So the same (pk_j, id, CEK) always gives the same (enc_j, wk_j), and checkWrap
+//   lets any holder of the CEK and pk_j recompute an entry and compare it byte for byte.
+// - A CEK-derived ephemeral key seals exactly the 32-byte CEK, once: a wrap's HPKE context is never
+//   used for `export` or a second message (04 §3.3, security conditions).
 //
 // All-zero shared secret (RFC 9180 §7.1.4, RFC 7748 §6.1): before any HPKE work, both directions
 // compute the X25519 output with @noble/curves and refuse it when it is all zero (a small-order
@@ -24,15 +32,17 @@ import {
   OpenError,
 } from '@hpke/core';
 import { x25519 } from '@noble/curves/ed25519.js';
-import { assertBytes, concatBytes } from './bytes.js';
+import { assertBytes, concatBytes, equalBytes } from './bytes.js';
 import { encodeUtf8 } from './encoding.js';
 import { CEK_LENGTH, ENVELOPE_ID_LENGTH, HPKE_ENC_LENGTH, WRAPPED_CEK_LENGTH } from './envelope.js';
 import { CryptoInputError } from './errors.js';
-import { randomBytes } from './random.js';
+import { hkdfSha256 } from './hkdf.js';
 import { wipe } from './wipe.js';
 
 /** 04 §3.3: the label that starts the HPKE info of a CEK wrap. */
 export const CEK_INFO_LABEL = 'agentlink/v1/cek';
+/** 04 §3.3: the HKDF label of a wrap's ephemeral secret key (info = label ‖ id ‖ pk_j). */
+export const CEK_EPH_LABEL = 'agentlink/v1/cek-eph';
 
 /** X25519 keys are 32 bytes (RFC 7748). */
 const X25519_KEY_LENGTH = 32;
@@ -132,8 +142,10 @@ function openFailed(): CryptoInputError {
 }
 
 /**
- * Seals `cek` to `recipientEncPublicKey` under a given ephemeral secret key. wrapCek calls it with
- * fresh random bytes; the test seam calls it with a fixed key to reproduce vectors.
+ * Seals `cek` to `recipientEncPublicKey` under a given raw X25519 ephemeral secret key, passed to
+ * @hpke/core as an imported key pair (never as `ekm` bytes, which would go through DeriveKeyPair).
+ * wrapCek calls it with the key derived from the CEK; the test seam calls it with a fixed key to
+ * reproduce vectors. It seals exactly one message, the 32-byte CEK, and the context is dropped.
  */
 export async function wrapCekWithEphemeralKey(
   recipientEncPublicKey: Uint8Array,
@@ -160,25 +172,80 @@ export async function wrapCekWithEphemeralKey(
 }
 
 /**
+ * Test seam (04 §3.3): ikm_j = HKDF-SHA256(ikm = CEK, salt = empty, info =
+ * utf8("agentlink/v1/cek-eph") ‖ id ‖ pk_j, 32), with `id` the raw 16-byte envelope id and `pk_j`
+ * the raw 32-byte X25519 `enc` key of the entry. It is the entry's ephemeral X25519 secret key,
+ * used as is (no RFC 9180 DeriveKeyPair). The caller wipes it. Not exported from any entry.
+ */
+export function deriveWrapEphemeralKey(
+  recipientEncPublicKey: Uint8Array,
+  envelopeId: Uint8Array,
+  cek: Uint8Array,
+): Uint8Array {
+  assertLength(recipientEncPublicKey, X25519_KEY_LENGTH, 'cek-eph: recipientEncPublicKey');
+  assertLength(envelopeId, ENVELOPE_ID_LENGTH, 'cek-eph: envelopeId');
+  assertLength(cek, CEK_LENGTH, 'cek-eph: cek');
+  const info = concatBytes(encodeUtf8(CEK_EPH_LABEL), envelopeId, recipientEncPublicKey);
+  return hkdfSha256(cek, EMPTY, info, X25519_KEY_LENGTH);
+}
+
+/**
  * 04 §3.3: seals the 32-byte CEK to one recipient's X25519 `agentEnc`/`ownerEnc` key, bound to the
- * envelope id through info, with a fresh ephemeral key. Call it once per recipient (04 §3.2).
- * Refuses a small-order recipient key (`invalid_public_key`). Inputs are not modified.
+ * envelope id through info, with the ephemeral key derived from the CEK, the id and that key
+ * (`agentlink/v1/cek-eph`). Deterministic: the same (key, id, CEK) always gives the same bytes, and
+ * a changed key or id gives a different `enc`. Call it once per recipient (04 §3.2). Refuses a
+ * small-order recipient key (`invalid_public_key`). Inputs are not modified; the derived ephemeral
+ * key is wiped.
  */
 export async function wrapCek(
   recipientEncPublicKey: Uint8Array,
   envelopeId: Uint8Array,
   cek: Uint8Array,
 ): Promise<WrappedCek> {
-  // Checked before drawing randomness, so a bad argument costs nothing.
   assertLength(recipientEncPublicKey, X25519_KEY_LENGTH, 'wrapCek: recipientEncPublicKey');
   assertLength(envelopeId, ENVELOPE_ID_LENGTH, 'wrapCek: envelopeId');
   assertLength(cek, CEK_LENGTH, 'wrapCek: cek');
-  const ephemeral = randomBytes(X25519_KEY_LENGTH);
+  const ephemeral = deriveWrapEphemeralKey(recipientEncPublicKey, envelopeId, cek);
   try {
     return await wrapCekWithEphemeralKey(recipientEncPublicKey, envelopeId, cek, ephemeral);
   } finally {
     wipe(ephemeral);
   }
+}
+
+/**
+ * 04 §3.3 wrap check (G-46, D-66): recomputes the entry for `recipientEncPublicKey` from the CEK and
+ * the envelope id (the same derivation as wrapCek) and compares `enc` and `wk` with `entry` byte for
+ * byte. True means the holder of the matching secret key opens exactly this CEK; false is a
+ * mismatch (the sender signed entries that carry different keys, 04 §3.1.1 step 8). It needs the
+ * public key and the CEK only, never a secret key. Run it after the `kc` check. The core finds the
+ * entry by `kid` and decodes its base64url `enc` and `wk`. A wrong-length or non-byte argument is
+ * refused (`invalid_length`, `invalid_argument`), and a small-order key `invalid_public_key`, as in
+ * wrapCek. Inputs are not modified.
+ */
+export async function checkWrap(
+  recipientEncPublicKey: Uint8Array,
+  envelopeId: Uint8Array,
+  cek: Uint8Array,
+  entry: WrappedCek,
+): Promise<boolean> {
+  assertLength(recipientEncPublicKey, X25519_KEY_LENGTH, 'checkWrap: recipientEncPublicKey');
+  assertLength(envelopeId, ENVELOPE_ID_LENGTH, 'checkWrap: envelopeId');
+  assertLength(cek, CEK_LENGTH, 'checkWrap: cek');
+  if (typeof entry !== 'object' || entry === null) {
+    throw new CryptoInputError('invalid_argument', 'checkWrap: entry must be {enc, wk}');
+  }
+  const { enc, wk } = entry;
+  assertLength(enc, HPKE_ENC_LENGTH, 'checkWrap: enc');
+  assertLength(wk, WRAPPED_CEK_LENGTH, 'checkWrap: wk');
+  // Copied before the await, so the bytes compared are the bytes passed in.
+  const encCopy = enc.slice();
+  const wkCopy = wk.slice();
+  const expected = await wrapCek(recipientEncPublicKey, envelopeId, cek);
+  // Both comparisons always run (no short-circuit on the first).
+  const encEqual = equalBytes(expected.enc, encCopy);
+  const wkEqual = equalBytes(expected.wk, wkCopy);
+  return encEqual && wkEqual;
 }
 
 /**
