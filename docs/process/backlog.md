@@ -1050,7 +1050,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `SignatureChecker.isValidSignatureNow` (EOA + ERC-1271); deadlines; pause; one-way `freezeUpgrades()`.
   - CI parity job: EIP-712 hashes equal the canonical public vectors at the pinned commit.
   - Open Low (IR-M1-3a-1 L-3): the Notary's freeze goes through a `_beforeUpgrade` hook, not an override of `_authorizeUpgrade` (see M1-3b), so the role check stays in the base.
-  - Follow-up (IR-M1-3b-1 I-3): the Notary's direct-payment functions call `depositFromModule` with `payer = msg.sender`, never a signer or payer taken from calldata, so a submitter-agnostic notarization can never reach a third party's standing allowance.
+  - Follow-up (IR-M1-3b-1 I-3): the Notary's direct-payment functions call `depositFromModule` with `payer = msg.sender`, never a signer or payer taken from calldata; a module charges only the payer's own credits.
 - **Acceptance:**
   - Tests first; unit test for every function and revert (`Expired`, `InvalidSignature`, `RecordExists`, `RecordNotFound`, `ReceiptExists`, `ConflictingReceipt`, `NotRecipient`, `NotSigner`, `FeeAboveMax`, `EnforcedPause`, `ExpectedPause`, `UpgradesAreFrozen`).
   - Role tests run against the real contract (IR-M1-3a-1 M-2): switch `RoleFixture._deploy` from the `NotaryHarness` stub to `OCCNotary`, so `RoleMap` and `RoleBound` (including `freezeUpgrades` → `FREEZER`, `pause`/`unpause`, `upgradeToAndCall`) cover shipping code; the "every non-view selector is in `docs/roles.md` or callable by an outsider" test from M1-3b covers the Notary too.
@@ -1071,7 +1071,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - ERC-1271 signers: Safe-style (threshold owners) and passkey-style (P-256/WebAuthn) smart-account mocks, including invalid and reverting `isValidSignature`.
   - Slither and Aderyn: clean, or each finding justified in `audits/static-analysis.md`.
   - Open Low and Info (IR-M1-3a-1 L-4, I-1): `OCCRoleSetup` is S2 and contains assembly but is skipped by Slither (`--skip ./script/**`) and Aderyn (`src/` only), so move it to `src/libraries/` (scripts can still import it). Anchor the CI path filter as `(^|/)(lib|test|script)/`, so a future `src/lib/` is not hidden.
-  - Follow-up (IR-M1-3b-1, owner spec decisions before the M3-1 audit; no change until decided): a two-step integrator handover; saturating arithmetic for the integrator cap; an immediate way to lower the integrator multiple. Each is decided and recorded, or accepted as a documented residual.
+  - Follow-up (IR-M1-3b-1): integrator cap arithmetic and integrator handover per the private spec.
 - **Acceptance:**
   - Invariant suite runs in `contracts-gate` with the CI fuzz profile and nightly with a deep profile (runs/depth recorded).
   - ERC-1271 record and receipt paths pass; every static-analysis finding has a disposition.
@@ -1156,7 +1156,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - `OCCFeeVault.quote`; USD at 1:1 for every launch fee token (all USD stablecoins, D-46), no price endpoint; protocol and integrator parts shown separately (12 §5); never used on-chain.
   - `creditsOf` across the supported chains and tokens; `deposit` helper (direct mode). Which chain pays (auto-detection and auto-selection, D-40) is M1-26.
-  - Follow-up (IR-M1-3b-1 I-2): the client ignores zero-amount `Deposited`, `Swept` and `IntegratorWithdrawn` events when it reads credits or history, because anyone can emit them.
+  - Follow-up (IR-M1-3b-1 I-2): the client ignores zero-amount `Deposited`, `Swept` and `IntegratorWithdrawn` events when it reads credits or history; events are verified against the canonical contract address.
 - **Acceptance:**
   - Quotes equal the contract's `quote` including the integrator cap, with the protocol and integrator parts in USD; `creditsOf` read on every supported chain (fork or mocked RPC); a fee token outside the configured stablecoin allowlist is never priced or offered.
 
