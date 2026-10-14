@@ -63,7 +63,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 
 | Section | Cards |
 |---|---|
-| M0 Foundations | 34 (incl. 7 in the D-25 group; 9 `done (setup)`; 3 follow-ups from CI findings: M0-2h, M0-10d, M0-26) |
+| M0 Foundations | 35 (incl. 7 in the D-25 group; 9 `done (setup)`; 4 follow-ups from CI findings: M0-2h, M0-10d, M0-10e, M0-26) |
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
@@ -390,6 +390,19 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - Also a tools-wide Vitest `testTimeout` of 20 s (and `hookTimeout` 60 s) in `tools/vitest.config.mjs` (the per-test timeout is therefore 20 s for the whole tools suite, no longer the 5 s default), because the load grows with every package that adds tests. Measured locally (3 runs, 508 tests): slowest test 0.5 s (`policy` repo scan) and the cold first lint 0.37-0.47 s; with the CPU oversubscribed twofold (28 spinners plus crypto and types tests in parallel) the cold first lint took 1.8 s and the repo scan 1.4 s. After the fix the cold start sits in `beforeAll` and the slowest test under the same load is 1.5 s. CI runners were 3-10x slower than that (cold start over 5 s), so 20 s keeps about 10x headroom over the loaded local worst case. `policy.test.mjs` keeps its own explicit 30 s.
 - **Acceptance:**
   - No assertion changes; the suite passes repeatedly, also in parallel with the crypto tests, and a deliberately slow first `lintText` no longer fails the first test.
+
+#### M0-10e · Package tests: one 20 s timeout policy (new)
+- **Status:** in-progress · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (the config files are S0 or S1 by package path; the card is S1 because it edits `docs/process/**`, as M0-10c and M0-10d did)
+- **Repo/path:** agentlink · packages/*/vitest.config.ts, docs/process/repo-reference.md
+- **Depends on:** M0-10d
+- **Spec:** `audit-rules.md` §2; `ci-cd.md`; same pattern as M0-10d (tools)
+- **Invariants:** —
+- **Scope:**
+  - Observed on push CI of 14 Oct 2026: `packages/transport-nostr` `gift-wrap.test.ts` timed out at the 5 s Vitest default under load; push and rerun passed. Earlier cases led to a 20 s limit in `tools/` (M0-10d), 60 s in the three crypto Argon2id files and 30 s in `packages/types`. The flakes grow with every package and test that lands.
+  - One policy: `testTimeout: 20_000` in the `vitest.config.ts` of every package under `packages/*` (six packages got a new minimal config; `core` and `transport-nostr` got the line). Longer existing limits stay and none is lowered (crypto `vi.setConfig` 60 s, types 30 s). The policy is recorded in `repo-reference.md` (Testing expectations). A shared base file is not possible: the boundary guard forbids a relative import that leaves a package, and the guard is not weakened.
+  - Measured (3 runs; all nine packages in parallel plus 28 CPU spinners on 14 cores): slowest test per package 1.6 s `crypto` (`keystore-file` wrong-passphrase test, outside the 60 s Argon2id limit), 1.2 s `types` (`envelope` 24 KB test, five runtimes), 0.5 s `transport-nostr` (`gift-wrap` created_at randomisation), 0.4 s `core` (`contacts` pairing), 0.2 s `log` (canary); `chain`, `node`, `storage` and `ui` 1 ms. CI runners were 3-10x slower than a loaded laptop, so 20 s keeps about 12x headroom over the worst loaded local test.
+- **Acceptance:**
+  - Only config files, this card, `repo-reference.md` and the changelog change; no test file changes (`git diff` shows no `*.test.ts`); all tests pass in every package; `pnpm lint` green.
 
 #### M0-11 · Curator project context (new)
 - **Status:** done (setup) · **Size:** S · **Tier:** Owner · **Security:** S0
