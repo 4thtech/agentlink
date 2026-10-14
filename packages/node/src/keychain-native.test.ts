@@ -5,7 +5,13 @@
 import { encodeHex, randomBytes } from '@agentlink/crypto';
 import { deriveAgentId } from '@agentlink/crypto/keystore';
 import { afterAll, describe, expect, it } from 'vitest';
-import { KeychainKeyStore, createKeychainAgent, keychainAccount, osKeychain, probeKeychain } from './index.js';
+import {
+  KeychainKeyStore,
+  createKeychainAgent,
+  keychainAccount,
+  osKeychain,
+  probeKeychain,
+} from './index.js';
 
 const service = `agentlink-test-${encodeHex(randomBytes(8))}`;
 const keychain = osKeychain(service);

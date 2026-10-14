@@ -214,7 +214,12 @@ describe('KeychainKeyStore (KeyStore contract, 04 §3.1.1)', () => {
   });
 
   it('signs Nostr events with the current Nostr key', async () => {
-    const event = await store.signNostr({ kind: 13, created_at: 1, tags: [['p', 'x']], content: 'c' });
+    const event = await store.signNostr({
+      kind: 13,
+      created_at: 1,
+      tags: [['p', 'x']],
+      content: 'c',
+    });
     expect(verifyNostrEvent(event)).toBe(true);
     expect(event.pubkey).toBe(encodeHex(derivePublicIdentity(SEED_A, 2).agentNostr));
     expect(Object.isFrozen(event)).toBe(true);
@@ -226,10 +231,13 @@ describe('KeychainKeyStore (KeyStore contract, 04 §3.1.1)', () => {
     const peer = await KeychainKeyStore.open(keychain, ID_B);
     const peerHex = encodeHex(derivePublicIdentity(SEED_B, 0).agentNostr);
     const payload = await store.nip44Encrypt(peerHex, 'hello');
-    expect(await peer.nip44Decrypt(encodeHex(derivePublicIdentity(SEED_A, 2).agentNostr), payload)).toBe(
-      'hello',
+    expect(
+      await peer.nip44Decrypt(encodeHex(derivePublicIdentity(SEED_A, 2).agentNostr), payload),
+    ).toBe('hello');
+    const old = await peer.nip44Encrypt(
+      encodeHex(derivePublicIdentity(SEED_A, 1).agentNostr),
+      'old',
     );
-    const old = await peer.nip44Encrypt(encodeHex(derivePublicIdentity(SEED_A, 1).agentNostr), 'old');
     expect(await store.nip44Decrypt(peerHex, old, { epoch: 1 })).toBe('old');
     expect(await codeOf(() => store.nip44Decrypt(peerHex, old, { epoch: 3 }))).toBe(
       'epoch_unavailable',
@@ -389,6 +397,9 @@ describe('probeKeychain and backend selection at init (04 §2.8, 07 §9.1)', () 
     expect(result).toMatchObject({ ok: false, status: 'needs_setup', reason: 'no_keychain' });
     expect(result.ok ? '' : result.message).toContain('agentlink init --keystore file');
     expect(result).toMatchObject({ fix: 'Fix it.' });
-    expect(selectKeyStoreBackend(failed, { fileOptIn: true })).toEqual({ ok: true, backend: 'file' });
+    expect(selectKeyStoreBackend(failed, { fileOptIn: true })).toEqual({
+      ok: true,
+      backend: 'file',
+    });
   });
 });
