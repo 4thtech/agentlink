@@ -8,16 +8,26 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 
 ## Status
 
-> **Phase:** M0 Foundations (pre-alpha) · **Version:** v0.0.1 (M0 Foundations) · **Last updated:** 2026-10-14
+> **Phase:** M0 Foundations done, M1a crypto in progress (pre-alpha) · **Version:** v0.0.1 (M0 Foundations) · **Last updated:** 2026-10-14
 >
 > - **Done in M0:**
 >   - the monorepo skeleton (pnpm workspace with Turborepo, strict CI), the Foundry skeleton in the private contracts repo, architecture boundary guards and the cross-runtime test-vector harness (M0-9);
 >   - the automated delivery pipeline (D-52) and the runbooks;
 >   - the public documentation structure ([`docs-site/`](docs-site/README.md), D-57);
 >   - the specifications ([`docs/foundation`](docs/foundation/00-README.md)), including decisions D-53, D-54, D-56, D-58 and D-59 (D-55 is not decided yet), the development and audit process ([`docs/process`](docs/process/development-process.md)), and a [security policy](SECURITY.md).
-> - **In progress (M0):** the redacting logger, shared types, the contract interfaces and the terms tools (D-55).
-> - **Does not exist yet:** product code. The packages are private skeletons and nothing is published. **There is nothing to install or run yet.** Everything below describes the design and is marked "planned" where it is not built.
-> - **Next:** M1a crypto, then the walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets.
+> - **Done in M1a so far (crypto foundations in `@agentlink/crypto`, code merged, none of it published):**
+>   - canonical encodings, hashing and JSON canonicalisation; key derivation and public identities;
+>   - the content-key wrap and payload encryption for envelopes (RFC 9180 HPKE and AES-256-GCM), and EIP-712 typed data with the agent card;
+>   - the key interfaces (`KeyStore`, `OwnerKeyStore`, an in-memory test store), NIP-44 v2 and gift wrap;
+>   - the owner passphrase wrap, the pairing proof and the pairing safety code;
+>   - independent test vectors for these suites, and the shared policy, approval, proof pack and tool-result types in `@agentlink/types`, tested in Node, three browsers and workerd.
+> - **Also landed:**
+>   - the specification for envelope signatures and key interfaces (gap G-2; decision D-62 is proposed until the owner confirms);
+>   - the first design drop (D1: brand core, tokens, components, local approvals screens), with the second drop (D2: console, desktop apps, onboarding and more) partly in, tracked in [`docs/design/`](docs/design/README.md);
+>   - the notary contract (record and receipt logic) in the private contracts repo. Its test and static-analysis suites are in review; nothing is deployed.
+> - **In progress:** the rest of the crypto layer (file encryption), the remaining contract work and test vectors, then the core and the node runtime.
+> - **Does not exist yet:** a usable product. The packages are private and nothing is published; only the crypto and types foundations above contain code. **There is nothing to install or run yet.** Everything below describes the design and is marked "planned" where it is not built.
+> - **Next:** the rest of the M1a crypto layer, then the walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets.
 >
 > We build in public. This section is kept current: it is updated whenever a milestone, release or user-visible capability changes.
 
@@ -101,8 +111,8 @@ Milestones are sequential gates ([build plan](docs/foundation/10-build-plan.md))
 
 | Milestone | Gate |
 |---|---|
-| **M0 Foundations** (in progress) | Specs, repositories, CI and open decisions in place. Done so far: monorepo skeleton, Foundry skeleton in the private contracts repo, boundary guards, test-vector harness, delivery pipeline, runbooks, public docs structure and specs D-53, D-54, D-56, D-58 and D-59. In progress: test-vector harness, logger, types, contract interfaces, terms tools. |
-| **M1a Walking skeleton: pair and talk** (next: crypto) | Two developers' agents (Claude Code and Codex) pair and keep a shared project in sync over AgentLink, and negotiate terms with owner approval. |
+| **M0 Foundations** (nearly complete) | Specs, repositories, CI and open decisions in place. Done so far: monorepo skeleton, Foundry skeleton in the private contracts repo, boundary guards, test-vector harness, redacting logger, delivery pipeline, runbooks, public docs structure and specs D-53, D-54, D-56, D-58 and D-59. Still open: the terms tools decision (D-55) and a few CI follow-ups. |
+| **M1a Walking skeleton: pair and talk** (in progress: crypto foundations merged, core and transport next) | Two developers' agents (Claude Code and Codex) pair and keep a shared project in sync over AgentLink, and negotiate terms with owner approval. |
 | **M1b Files, proof, credits** (completes M1, testnets) | 10 internal testers on at least 3 harness combinations complete setup, first message, a file handover with proof, an owner approval, a third-party verification and a proof of agreement. |
 | **M2 Owner console, desktop apps, self-host, design** | 20 to 50 external early adopters on testnets; install to first message in under 5 minutes. |
 | **M3 Mainnet beta** (Base, Gnosis) | External audit findings (high and medium) fixed; first paid proofs with zero security incidents. |
