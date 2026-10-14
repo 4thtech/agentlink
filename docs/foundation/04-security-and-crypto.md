@@ -51,8 +51,11 @@ okm = HKDF-SHA256(
 |---|---|---|
 | Local | OS keychain (service `agentlink`, account `<agentId>`) | **Never stored in plaintext on the agent machine.** Wrapped with a key from a **localhost passkey (WebAuthn PRF)** created in the local UI, or with the owner passphrase (Argon2id). Or not present at all: the owner uses the console |
 | Local, desktop app (M2) | OS keychain, as above | **Never stored in plaintext.** Wrapped with a key that the OS keystore releases only after an OS user-presence check, and only to the signed app: **macOS** Keychain item with access control requiring user presence (Touch ID or device password), readable only by the app's code-signing identity; **Windows** a Windows Hello key credential that requires a gesture (DPAPI only as an extra at-rest layer, because DPAPI alone does not stop same-user processes); **Linux** the owner passphrase (Argon2id) or a polkit prompt, documented as **weaker** because neither binds the key to the app binary. See §2.5 and 08 §8 |
+| Local, headless (no OS keychain; opt-in, D-54) | Passphrase-locked **file KeyStore** in `~/.agentlink/keystore/` (Argon2id + AES-256-GCM, §2.8). Only where no OS keychain is usable **and** the user opts in; never chosen silently | As **Local**: wrapped with the owner passphrase and unlocked only at an interactive prompt, never from an environment variable or file (§2.8); or not present at all, with owner operations done from the owner's other device (console, M2) |
 | Self-host Worker | Worker secret / Durable Object storage in the **user's** Cloudflare account | Not present |
 | Console (browser) | — | IndexedDB, wrapped with a key derived from the owner passkey's **PRF** output |
+
+Headless machines (containers, WSL, SSH sessions) without a usable OS keychain follow §2.8.
 
 Rationale: harness agents (Claude Code, Codex, Gemini CLI…) can run shell commands as the same OS user. They can read anything the agent process can read, including the agent seed. They must **not** be able to obtain the owner key, which is why owner operations require user presence (§2.5).
 
@@ -117,6 +120,113 @@ An owner can prove control of a domain, so contacts see "verified domain" instea
 - **Registry.** OCCRegistry (M2) may record a hash of the claim with the verified registration (F-41), timestamping when it was made; the live check still decides the label.
 - **Labels:** "verified domain" (exact domain shown; internationalized names also shown in punycode) vs "self-declared".
 - **What it proves:** whoever controlled the domain at check time vouched for this owner key. Not legal identity: EU qualified e-signature (eIDAS) integration is researched in M4 (F-08, P2).
+
+### 2.8 Headless file KeyStore (D-54, G-31)
+
+Coding agents often run where no OS keychain is usable: Linux containers and devcontainers, WSL, SSH sessions, servers without a desktop session (no Secret Service), and macOS over SSH with a locked login keychain. For these machines the agent's keychain items (the agent seed, the store key of 07 §3 and any S3-compatible storage credentials, 07 §5.2) can live in a **passphrase-locked file** instead. The owner key is not affected: it stays as in §2.2 (Local) and §2.5.
+
+**Selection (never silent).**
+
+1. **Keychain first.** At `init`, `@agentlink/node` probes the OS keychain (write, read and delete a probe item). If the probe succeeds, the keychain is used and the file KeyStore is refused.
+2. **No keychain, no opt-in → `needs_setup`** with a one-sentence explanation and the command to run (07 §9.4). This is the default.
+3. **No keychain, explicit opt-in → file KeyStore.** The opt-in is `agentlink init --keystore file` or a "yes" to the `init` question, both in an interactive terminal. A run without a TTY (the agent-run `init` of 06 §7) never creates a file KeyStore; it returns `needs_setup`, so the passphrase never passes through the agent's context or its transcripts. The TTY check is a UX guard, not a security boundary: a shell-capable agent can fake a terminal.
+4. **The choice is recorded per agent** (07 §9.1). A keychain that later appears or disappears never switches the backend, never falls back to the other one and never creates a new identity; a missing or unreadable keystore file is an error with a fix, not a reset.
+
+**File format `ALKS` v1.** One file per agent, `~/.agentlink/keystore/<agentId>.alks`:
+
+```
+magic    "ALKS"                 4 B
+version  u8 = 1
+kdf      u8 = 1                 Argon2id v1.3 (RFC 9106)
+m        u32be                  memory in KiB
+t        u8                     iterations
+p        u8                     lanes
+salt     16 B                   random; new on create and on every passphrase change
+aead     u8 = 1                 AES-256-GCM
+nonce    12 B                   random; new on every write
+idLen    u8
+agentId  idLen B (UTF-8)
+ct       ciphertext || 16-byte tag
+```
+
+- `kek = HKDF-SHA256(ikm = Argon2id(passphrase, salt, m, t, p, L = 32), salt = "", info = utf8("agentlink/v1/keystore-file"), L = 32)`. The label separates this key from the owner-seed wrap (§2.2, M1-1f), so a file KeyStore blob and an owner blob are never interchangeable.
+- **AAD = every header byte** from `magic` through `agentId`. A changed parameter, salt, nonce or agent ID, a file copied to another agent's name, a truncated file or a changed ciphertext all fail authentication.
+- **Plaintext:** a list of entries `u16be nameLen | name (UTF-8) | u32be valueLen | value`, one per keychain item that the keychain backend would hold for this agent (names as the keychain account suffixes, e.g. `seed`, `store-key`, `s3:<id>`). At most 64 KiB in total. Values stay in `Uint8Array` and never become JS strings.
+- **Passphrase normalisation:** UTF-8, Unicode NFKC. A passphrase file loses exactly one trailing `\n` or `\r\n`. A generated unlock code is upper-cased with spaces and dashes removed before the KDF.
+- All of this runs through `@agentlink/crypto` (Argon2id and HKDF from `@noble/hashes`, AES-256-GCM via WebCrypto or `@noble/ciphers`) and the `KeyStore` interface (§8.1). `@agentlink/node` implements only file handling and never calls a primitive itself.
+
+**KDF choice and parameters.** Argon2id, because the spec already uses it for the owner passphrase and the recovery code (§2.3, M1-1f): one implementation, one vector suite and one review instead of two. Argon2id is memory-hard, resists side-channel attacks and is standardised (RFC 9106). scrypt (`@noble/hashes`, N = 2^17, r = 8, p = 1) was the alternative and was rejected only for this consistency.
+
+| | Value | Reason |
+|---|---|---|
+| Default for new files | m = 64 MiB, t = 3, p = 1 | The same as the owner passphrase wrap. RFC 9106's second recommended set uses p = 4; p = 1 because the pure-JS implementation does not run lanes in parallel |
+| Target | Unlock ≤ 2 s on a 2-vCPU container with a 512 MiB memory limit (Node LTS) | Unlock happens once per server start (below), not per operation. The 64 MiB is a short allocation that fits typical container limits |
+| If the target is missed | M1-8f records the measurement in its PR; any change of default is an owner decision recorded here | Parameters are never lowered silently |
+| Floor and cap on read | Refuse before running the KDF if m < 19 MiB, t < 2, m > 1 GiB, t > 10 or p > 4 | The floor is the OWASP minimum (m = 19 MiB, t = 2). The cap stops a planted header from exhausting memory or CPU |
+| Runtimes | Node only | Browsers use the passkey PRF (§2.3) and Workers use Worker secrets (§2.2), so neither has a file KeyStore. Argon2id timing in browsers and Workers belongs to M1-1f |
+
+**Passphrase strength.** The default is a **generated unlock code**: 120 random bits shown as 24 base32 characters in groups, the recovery-code encoding of §2.3. With it, offline guessing of a stolen file is infeasible. A passphrase the user chooses is allowed at the interactive prompt only, must have at least 12 characters, and comes with a warning that a weak passphrase can be guessed if the file leaks. The agent passphrase must differ from the owner passphrase: `init` and `agentlink keystore passphrase` refuse a candidate that unlocks the owner's wrapped seed. The agent passphrase often sits where the agent can read it, so reusing it would hand over the owner key.
+
+**Unlocking the agent key.** The MCP server is started by the harness over stdio. It has no terminal to prompt in, so it reads the passphrase from one of these sources, in this order (07 §9.2):
+
+1. **Passphrase file** (`AGENTLINK_KEYSTORE_PASSPHRASE_FILE=<path>`). Recommended. It points to a secret mounted at run time (Docker or Kubernetes secrets, a tmpfs mount, a file provisioned from the host's secret store), outside the persisted home directory and the image. Path rules (§4): `realpath`; a regular file; not writable by group or others; at most 1 KiB. A file readable by group or others is accepted with a `doctor` warning, because container secret mounts are often mode 0444.
+2. **Environment variable** (`AGENTLINK_KEYSTORE_PASSPHRASE`). Allowed and documented as weaker. Environment variables leak more easily: `docker inspect`, process listings, CI logs, crash reports, child processes, and MCP config files that store them in plaintext. The server reads it once and deletes it from `process.env` before it starts any child process. JS strings cannot be wiped, so its value remains in memory until garbage collection.
+3. **Interactive prompt** for CLI commands run in a terminal (`agentlink doctor`, `agentlink keystore passphrase`). Input is read as bytes without echo.
+
+The server derives `kek` once at start-up and keeps only `kek` in memory while it runs. It decrypts entries for each operation, uses them and wipes them, matching the keychain backend's "in memory only as long as needed". With no source available, tools return `needs_setup` (`keystore_locked`) and name the fix without revealing anything about the file.
+
+**The owner key is never unlocked non-interactively.** This is unchanged from §2.5 and binding for headless machines:
+
+- `OwnerKeyStore` reads the owner passphrase only from an interactive prompt (M1-8c) or uses a passkey (M1-8e). No environment variable, file, argument, stdin pipe or MCP tool can supply it. An `AGENTLINK_OWNER_*` variable has no effect, and `doctor` warns that it is set and ignored.
+- **Owner operations from a headless machine:**
+  - **M1a:** the owner runs `agentlink approve <id>` (or another † command) in a terminal the agent does not control, such as an SSH session or `docker exec -it`, and types the owner passphrase there. Until the local approval server lands, `pending_approval` results name that command as `nextStep` (06 §2.5, M1-9c).
+  - **M1b:** the local approval server also works through port forwarding (`ssh -L`, or devcontainer port forwarding) with the localhost passkey in the owner's own browser. The shared-`localhost` weakness of §2.5 applies unchanged.
+  - **M2:** the owner approves from the console on their own device. The console sends an owner-signed `approval` or `policy` envelope (§2.5), and the core verifies it as usual, so the owner key need not be on the headless machine at all. This is the recommended setup when the agent has unrestricted shell access (G-1).
+- The G-1 residual risk applies unchanged. If the owner types the passphrase on the same machine and as the same OS user as the agent, a tampered installation could capture it. A TTY shows presence, not intent.
+
+**File handling.**
+
+- **Permissions.** `~/.agentlink/keystore/` has mode 0700 and each `.alks` file has mode 0600. Both are created with explicit modes that do not depend on the umask, and then checked.
+- **Checks before every read.** Refuse when:
+  - the directory or the file is a symlink (`lstat`, `O_NOFOLLOW` where available);
+  - `realpath` resolves outside `~/.agentlink/keystore/`;
+  - the owner differs from the process user;
+  - any group or other permission bit is set (like `ssh` for private keys).
+  The error says how to fix it.
+- **Filesystems without POSIX modes are refused**, for example WSL DrvFs (`/mnt/c`) without the `metadata` mount option. The keystore must live on the Linux filesystem.
+- **Atomic writes.** Write a temporary file (`O_CREAT | O_EXCL`, mode 0600) in the same directory, fsync it, rename it over the target and fsync the directory. Writes take the agent's inter-process lock (07 §3, 06 §6), so several harness sessions sharing one agent never lose an update. A crash leaves either the old file or the new one, both valid.
+- **Writes:** create, add or remove an item (for example storage credentials, an owner operation per §2.5 that the CLI performs while the agent store is unlocked), and change the passphrase. Each write uses a fresh nonce. A passphrase change also uses a fresh salt and re-runs the KDF.
+- **Zeroisation (§8.3).**
+  - `kek`, the Argon2id output, decrypted entries and passphrase bytes from a file or prompt are `Uint8Array` buffers, filled with zeros after use and on exit.
+  - Residuals: JS strings (the environment variable), the garbage collector's copies and the KDF's working memory cannot be wiped reliably. M1-8f checks whether `@noble/hashes` clears its Argon2id buffers and records the answer.
+  - Core dumps can contain `kek`. The quickstart recommends disabling them in containers.
+- **Logging (I-7).** No passphrase, unlock code, `kek`, entry name with value, or file contents appear in any log, error, tool result or `doctor` output. The redacting logger treats both environment variable names as secret-bearing.
+
+**Threat model delta (compared with the OS keychain).**
+
+| | Keychain (§2.2 Local) | File KeyStore |
+|---|---|---|
+| Shell-capable agent, same OS user | Can read the agent seed (§2.2 rationale) | **No change.** Whatever the server can read to unlock, the agent can read too (passphrase file, environment, process memory). The agent key was never protected from a same-user agent |
+| Owner key, policies, approvals | Owner presence (§2.5) | **No change.** Unlocked only interactively or from another device; I-4 holds as written |
+| Copy of the home directory, volume, image layer, backup or dotfile sync | OS keychain storage, usually bound to the OS login | **Weaker.** The file travels with copies. It stays protected only if the passphrase source is not copied with it. With a generated code that is kept elsewhere, offline guessing is infeasible; with a weak chosen passphrase, it is not |
+| Passphrase source stored on the same disk (for example in an MCP config) | — | **No at-rest protection beyond disk encryption.** The quickstart and `doctor` say so |
+| Other OS users on the machine | Keychain access control | File modes (0700/0600); root can read both |
+| Stolen machine or disk | OS login and disk encryption | Passphrase (if its source is not on the disk) and disk encryption |
+| Forward secrecy (§6) | "Keychain storage" mitigation | Weaker at rest, as in the copy row; key rotation and short file expiry are unchanged |
+
+What stays protected in every case: the owner key and everything owner-signed (I-4), content and keys never leaving the machine (I-1, I-2), export and recovery (I-10, through the recovery kit and `backup export`). The user is told the trade-off once, in plain words, at opt-in, and `doctor` repeats it (07 §9.4).
+
+**Required tests** (M1-8f, tests first):
+
+- **Canary (I-7):** a canary passphrase, unlock code and seed never appear in logs (debug included), errors, tool results, `doctor` output, crash traces, the SQLite file or any file other than the `.alks` ciphertext.
+- **Wrong passphrase:** one generic error, no partial output, no difference between "wrong passphrase" and "tampered file" in messages or exit codes.
+- **Tamper detection:** flipping any byte of the header, salt, nonce, ciphertext or tag fails; a truncated file fails; a file renamed to another agent's ID fails; unknown `version`, `kdf` or `aead` values are refused; out-of-bounds KDF parameters are refused before the KDF runs.
+- **Permissions:** modes 0700/0600 under umask 000 and 077; refusal for group or other bits, another owner, a symlinked directory or file, a `realpath` escape, and DrvFs without metadata; the passphrase-file rules.
+- **Atomicity and locking:** a simulated crash between write and rename leaves a valid file; concurrent writers under the lock lose no update.
+- **Selection:** keychain available → file KeyStore refused; no keychain and no opt-in → `needs_setup`; opt-in without a TTY → `needs_setup`; the recorded backend never switches.
+- **Owner key:** no non-interactive source unlocks `OwnerKeyStore` (`AGENTLINK_OWNER_*`, file, argument, piped stdin); an agent passphrase equal to the owner passphrase is refused; the M1-8c same-user test passes on the file backend with the agent passphrase readable by the test script.
+- **Environment:** the variable is removed from `process.env` after reading, and child processes do not inherit it.
+- **Vectors:** `ALKS` v1 vectors (fixed passphrase, salt, nonce and entries) from M1-1h, checked in CI; the CI job on Ubuntu without D-Bus or Secret Service runs the file backend end to end.
 
 ---
 
@@ -284,7 +394,7 @@ All binary values are base64url **without padding** in JSON unless noted.
 
 ## 6. Forward secrecy (explicit trade-off)
 
-Static recipient keys mean a stolen encryption key decrypts past envelopes addressed to it. This is accepted for beta because owners must be able to read history (I-9) and agents run asynchronously. Mitigations: keychain storage, key rotation (epochs), short file expiry, crypto-shredding. A later version may use per-epoch keys with owner escrow.
+Static recipient keys mean a stolen encryption key decrypts past envelopes addressed to it. This is accepted for beta because owners must be able to read history (I-9) and agents run asynchronously. Mitigations: keychain storage (or the passphrase-locked file KeyStore on headless machines, which is weaker at rest, §2.8), key rotation (epochs), short file expiry, crypto-shredding. A later version may use per-epoch keys with owner escrow.
 
 ---
 
@@ -306,6 +416,7 @@ Static recipient keys mean a stolen encryption key decrypts past envelopes addre
 | **Malicious counterparty: SSRF via file URLs** | §4 SSRF rules |
 | **Malicious files / symlink tricks** | Never executed; sanitized names; realpath checks; size limits |
 | **Stolen laptop** | Keychain protection (OS login); owner key needs passkey/passphrase; owner can revoke the agent (revocation envelope + on-chain revoke if registered) |
+| **Leaked file KeyStore on a headless machine** (D-54: home directory, volume, image layer or backup copied; passphrase in an environment variable or config) | Opt-in only, after a plain-words warning; Argon2id + AES-256-GCM with authenticated header; generated 120-bit unlock code by default; passphrase file from a run-time secret mount recommended over environment variables; 0700/0600 modes, symlink and `realpath` checks; `doctor` warnings; the owner key is never unlocked non-interactively, so a leak exposes the agent key only (revoke and rotate). Residual: a passphrase stored on the same disk gives no at-rest protection beyond disk encryption (§2.8) |
 | **Phishing invites** | Invites show name, owner fingerprint and safety code; expire; single use; owner approval by default |
 | **Replay of records / receipts / authorizations** | EIP-712 domain, nonces, deadlines, one-time receipt flags; EIP-3009 nonces |
 | **Abuse of a public agent card** (e.g. registering it with attacker fees) | Registration requires a separate owner signature over fee parameters (05 §4) |

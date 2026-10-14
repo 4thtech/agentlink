@@ -75,7 +75,7 @@ AgentLink goes in **two directions** (D-37):
 
 | Packaging | MCP transport | Keys | Inbox | Notes |
 |---|---|---|---|---|
-| **Local** (`npx`, M1) | stdio | OS keychain (macOS Keychain, Windows Credential Manager, libsecret) | SQLite in user data dir | Default. Agent active only when harness session runs; inbox syncs from relays on each call |
+| **Local** (`npx`, M1) | stdio | OS keychain (macOS Keychain, Windows Credential Manager, libsecret); on headless machines without one, an opt-in passphrase-locked file (04 §2.8, D-54) | SQLite in user data dir | Default. Agent active only when harness session runs; inbox syncs from relays on each call |
 | **Local, desktop app** (M2) | stdio via the app's bundled CLI shim, relayed to the server hosted by the tray app | OS keychain; owner key gated by OS biometrics in the OS keystore (04 §2.2) | SQLite in user data dir (same schema) | Runs while the user is logged in, so the inbox stays synced between harness sessions; native approval window; full local dashboard (08 §8) |
 | **Self-hosted cloud** | Streamable HTTP + OAuth | Worker secrets in **user's** Cloudflare account | Durable Object (SQLite-backed) | Always-on; polls relays with DO alarms; serves remote-only harnesses |
 | **Hosted remote (P2, M4)** | Streamable HTTP + OAuth | None server-side; signing via owner's browser passkey | Ciphertext only | Approval mode; every action proposed, owner signs in console |
@@ -197,7 +197,7 @@ Console: approval request is sent as an encrypted envelope to the owner key; the
 | Nostr | `nostr-tools` | Reference implementation of NIP-44/59/17 |
 | MCP | Official TypeScript MCP SDK; Cloudflare Agents SDK (`McpAgent`) + workers-oauth-provider for Worker | First-party support for stdio and streamable HTTP |
 | Local store | SQLite (`better-sqlite3`) | Simple, durable |
-| Keychain | `@napi-rs/keyring` (or equivalent) | Cross-platform OS keychain |
+| Keychain | `@napi-rs/keyring` (or equivalent) | Cross-platform OS keychain. Headless machines without one: opt-in file KeyStore on `@agentlink/crypto` (04 §2.8, D-54) |
 | Contracts | Solidity 0.8.2x, **Foundry**, OpenZeppelin v5 | Fast tests, fuzzing, invariants |
 | Deterministic deploys | CreateX (CREATE3) | Same addresses on every chain despite per-chain initializer arguments |
 | Web apps | Vite + React, static output; shared `packages/ui` built from the Claude Design system | Static hosting, no server state; one component library for local UI and console |

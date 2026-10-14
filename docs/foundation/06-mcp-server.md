@@ -179,6 +179,7 @@ A matching **skill / agent instructions file** (`skills/agentlink/SKILL.md`, als
 - **Interactive terminal:** a prompt.
 - **Run by an agent (no TTY):** `init` prints the diff and a one-time confirmation code, then exits without writing. The agent shows the diff to the user and re-runs `init --confirm <code>` only after the user agrees in chat. This confirmation is for transparency, not a security boundary: a shell-capable agent could edit its harness config anyway. Owner operations stay protected by owner presence (04 §2.5).
 - **Owner setup never goes through the agent:** `init` opens the local setup page (or the desktop app) where the user creates the passkey or owner passphrase. It never prints secrets and never accepts an owner passphrase as an argument or environment variable.
+- **No OS keychain (containers, WSL, SSH; D-54):** `init` returns `needs_setup` and names the opt-in command. The passphrase-locked file KeyStore is created only by `agentlink init --keystore file` in an interactive terminal, never by an agent-run `init` (04 §2.8, 07 §9).
 - The **desktop app** (M2) runs the same detection and confirmation from its setup screen, pointing harness configs to its bundled CLI shim (08 §8).
 
 | Harness | Configuration |
@@ -210,7 +211,8 @@ Each harness gets a short prompt the user pastes to their own agent (F-09). It i
 Commands marked † are owner operations: they require owner presence (passkey via the local UI, or the owner passphrase prompt) and produce owner-signed actions (04 §2.5). An agent running shell commands cannot complete them.
 
 ```
-agentlink init [--agent <name>]          # create identity, configure harnesses
+agentlink init [--agent <name>] [--keystore file]   # create identity, configure harnesses; file KeyStore only without an OS keychain (07 §9)
+agentlink keystore passphrase            # file KeyStore only: change its passphrase or unlock code (terminal only)
 agentlink ui                             # open local approval/settings UI
 agentlink invite | accept <url>
 agentlink contacts [--verify <id>]
@@ -220,7 +222,7 @@ agentlink credits [--topup]              # shows agent address, balances, top-up
 agentlink backup export | restore <file>   †
 agentlink verify <proof.json>
 agentlink approve <approvalId> | deny <approvalId>   †
-agentlink doctor                         # diagnostics (relays, RPC, keychain, storage)
+agentlink doctor                         # diagnostics (relays, RPC, keychain or file KeyStore, storage)
 ```
 
 ---

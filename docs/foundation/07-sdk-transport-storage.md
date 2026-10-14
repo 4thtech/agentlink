@@ -14,7 +14,7 @@ All packages live in the public `agentlink` monorepo (see 09). Every package mus
 | `@agentlink/transport-nostr` | nostr-tools, crypto | `Transport` implementation: relay pool, gift wrap/unwrap, subscriptions, sync cursors |
 | `@agentlink/storage` | crypto | `StorageAdapter` interface; `inline`, `drop` (default, D-48) and `s3` adapters (P0); `gdrive`, `dropbox`, `onedrive` connectors (P1, M2, D-49); `ipfs-pinning` (P2); storage selection (§5.6) |
 | `@agentlink/core` | all above | `AgentLinkClient`: identity, contacts, envelopes, threads, files, proofs, policies, approvals; `KeyStore`, `Store`, `ApprovalChannel` interfaces |
-| `@agentlink/node` | core | Node implementations: keychain `KeyStore`, SQLite `Store`, local approval server (Node only) |
+| `@agentlink/node` | core | Node implementations: keychain `KeyStore` and the opt-in passphrase-locked file `KeyStore` for headless machines (§9, D-54), SQLite `Store`, local approval server (Node only) |
 | `@4thtech/agentlink` | node, core | CLI + MCP server (stdio) (Node only) |
 
 Integrators use `@agentlink/core` directly (with their own `KeyStore`/`Store`) and pass their `appId` to earn integrator fees.
@@ -65,7 +65,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | `policies` | key, value_json, updated_at |
 | `sync_cursors` | relay_url, last_seen |
 
-**At rest:** all sensitive columns (decrypted payloads, contact names, file names, URLs, file keys, salts, policies' parameters) are encrypted with a local **store key** (random, kept in the keychain). Non-sensitive columns (IDs, timestamps, statuses) stay in clear for indexing. Without the store key, the database reveals only activity timing and counts.
+**At rest:** all sensitive columns (decrypted payloads, contact names, file names, URLs, file keys, salts, policies' parameters) are encrypted with a local **store key** (random, kept in the keychain, or in the file KeyStore on headless machines, §9). Non-sensitive columns (IDs, timestamps, statuses) stay in clear for indexing. Without the store key, the database reveals only activity timing and counts.
 
 ---
 
@@ -271,3 +271,57 @@ Cloudflare Worker; stateless except rate-limit counters (Durable Object). It nev
   "exportedAt": "…"
 }
 ```
+
+---
+
+## 9. Node KeyStore backends (D-54)
+
+`@agentlink/node` ships two `KeyStore` backends with the same interface (03 §3): the **OS keychain** (default, 04 §2.2) and the **passphrase-locked file KeyStore** for headless machines (opt-in, 04 §2.8). Formats, KDF parameters, the threat model and the required tests are in 04 §2.8; this section covers runtime behaviour. Neither backend changes `OwnerKeyStore` (04 §2.5).
+
+### 9.1 Selection and the recorded backend
+
+| Situation at `init` | Result |
+|---|---|
+| The OS keychain probe succeeds | Keychain. `--keystore file` is refused: "This machine has a system keychain. AgentLink uses it." |
+| No usable keychain, no opt-in | `needs_setup` (reason `no_keychain`); nothing is written |
+| No usable keychain, `--keystore file` or "yes" to the question, in an interactive terminal | File KeyStore at `~/.agentlink/keystore/<agentId>.alks` |
+| No usable keychain, opt-in without a TTY (an agent-run `init`) | `needs_setup` (reason `no_keychain`), naming the command the user runs in their own terminal |
+
+`init` records the backend in the agent's local config (`keyStore: "keychain" | "file"`). Every later start uses the recorded backend only: no fallback, no switch and no new identity when the other backend appears or the file is missing. Moving an agent between backends goes through `backup export` / `restore` († , 06 §8); a dedicated move command is out of scope for now. The recorded value is not owner-signed: changing it can only make the agent fail to start, never weaken the key protection.
+
+### 9.2 Unlocking a file KeyStore
+
+| Source | Where | Notes |
+|---|---|---|
+| `AGENTLINK_KEYSTORE_PASSPHRASE_FILE=<path>` | MCP server and CLI | Recommended. A secret mounted at run time (Docker or Kubernetes secret, tmpfs, host secret store), never inside the image, a committed `devcontainer.json` or the persisted home directory. Path checks per 04 §2.8 |
+| `AGENTLINK_KEYSTORE_PASSPHRASE=<value>` | MCP server and CLI | Weaker (04 §2.8). Read once, then deleted from `process.env` before any child process starts |
+| Interactive prompt (no echo) | CLI in a terminal only | Never on the MCP stdio channel |
+
+The file source is tried before the environment variable. If both are set, the server uses the file and `doctor` warns. The harness passes the variable to the MCP server in its MCP config (for example `claude mcp add agentlink -e AGENTLINK_KEYSTORE_PASSPHRASE_FILE=/run/secrets/agentlink -- npx -y @4thtech/agentlink mcp`). The path is not a secret; the passphrase never goes into a harness config that the quickstart tells users to commit. When no source works, every tool returns `needs_setup` (reason `keystore_locked`) and no other tool runs.
+
+**No source exists for the owner passphrase.** `OwnerKeyStore` reads it only from an interactive prompt or uses a passkey (04 §2.5, §2.8). `AGENTLINK_OWNER_*` variables are ignored, and `doctor` warns if one is set.
+
+### 9.3 CLI surface
+
+```
+agentlink init --keystore file             # opt-in, interactive terminal only (06 §7)
+agentlink keystore passphrase              # change the passphrase or unlock code; interactive terminal only
+agentlink doctor                           # reports the backend, the unlock source and its warnings
+```
+
+The CLI and MCP server never print, log or return the passphrase or unlock code (I-7). `init` shows a generated unlock code exactly once, on the terminal, and offers to write it to a path the user names (mode 0600, refused under `~/.agentlink`).
+
+### 9.4 What the user is told (11 §5)
+
+No "wallet", "seed phrase", "private key" or "encryption key" in default output. Proposed strings for the design pass (string keys per 11 §5.4):
+
+| Moment | Copy |
+|---|---|
+| `needs_setup` `no_keychain` (agent relays it) | "This machine has no system keychain (common in containers, WSL and SSH sessions), so AgentLink can't protect your agent's identity here yet. To keep it in a passphrase-locked file instead, run `agentlink init --keystore file` in your own terminal." |
+| Opt-in question | "No system keychain found. Keep this agent's identity in a passphrase-locked file? It's weaker than a keychain: anyone who gets both the file and its passphrase can act as your agent. Your approvals stay protected by your owner passphrase. [y/N]" |
+| Unlock-code choice | "Use a generated unlock code (recommended) or your own passphrase?" |
+| Generated code, shown once | "Your unlock code: {code}. Put it in your password manager or your container's secret store, not in your project files. If you lose it, restore this agent from your recovery kit." |
+| Own passphrase too short or equal to the owner passphrase | "Use at least 12 characters." · "Use a different passphrase from your owner passphrase." |
+| `needs_setup` `keystore_locked` (agent relays it) | "AgentLink can't unlock your agent's identity on this machine. Set AGENTLINK_KEYSTORE_PASSPHRASE_FILE to the file that holds your unlock code, then restart your AI app." |
+| `doctor`, file backend | "Agent identity: passphrase-locked file (no system keychain). Unlocked from: secret file." Warnings: "Unlocked from an environment variable, which leaks more easily than a secret file." · "The unlock code is stored on the same disk as the file, so a copy of this disk is not protected." (shown when the passphrase file is on the same filesystem as the keystore and not on tmpfs) · "AGENTLINK_OWNER_PASSPHRASE is set and ignored: approvals always ask in your terminal." |
+| Approval needed on a headless machine (M1a) | "Approval needed. In your own terminal, run `agentlink approve {approvalId}`. Your AI can't approve for you." |
