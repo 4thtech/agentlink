@@ -16,6 +16,8 @@
 //                `workspace:<name>@` alias, a spec that resolves from a path, URL or git host, a
 //                primitive library declared outside its zone, a runtime dependency that is not in
 //                the per-package allowlist, an `imports` map, a dependency cycle (on resolved names).
+//   files      - a test-like file name other than *.test.ts (`.test.mts`, `.spec.ts`, ...): builds
+//                exclude only *.test.ts, so it would be built (IR-M1-1c-G2-1 L-1).
 //   source     - an import (static, dynamic, require, import type) that violates policy.violationFor,
 //                a relative import that leaves its package, `crypto.subtle` outside packages/crypto
 //                (also through Reflect.get or a computed key), a dynamic import with a non-literal
@@ -39,6 +41,7 @@ import {
   libraryAllowed,
   libraryMessage,
   matchesGroup,
+  misnamedTestFile,
   testSeamViolation,
   violationFor,
   workspaceNameOf,
@@ -513,6 +516,8 @@ export function runChecks(root) {
           `${relative(root, file)}: CommonJS (.cjs) files are not allowed in packages/ and apps/; use ESM`,
         );
       }
+      const misnamed = misnamedTestFile(relative(root, file).split('\\').join('/'));
+      if (misnamed !== null) problems.push(`${relative(root, file)}: ${misnamed}`);
       files += 1;
       problems.push(...checkSource(zone, file, readFileSync(file, 'utf8'), root));
     }

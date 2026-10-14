@@ -951,6 +951,19 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Type-level test: no `KeyStore`, `OwnerSession` or `EnvelopeKeys` exports `hpkeOpen` or any open that takes an `info`, and no signing method takes an epoch (G-2, IR-M1-1c-1 F5).
   - G-2: an `OwnerSession` signs an envelope hash, a seal and an AUTH event, refuses any other Nostr kind, and opens an owner entry. The owner seal and envelope both verify under the owner key. A wall-clock rollback does not extend a session. A deps-check regression refuses the test-double entry point in a production `src` file.
 
+#### M1-1g-b · Test seam usable from package test files (new, IR-M1-1g-G2-1 R2-L-1)
+- **Status:** in progress · **Size:** S · **Tier:** Opus · **Security:** S1 (boundary policy, `tools/deps-check/policy.mjs`) · **Phase:** M1a
+- **Repo/path:** agentlink · tools/deps-check/, eslint.config.mjs, packages/core, packages/transport-nostr
+- **Depends on:** M1-1g
+- **Spec:** 04 §3.1.1 (Key interfaces, Location: the test doubles are in an entry point "that deps-check allows only in tests, `test-vectors` and e2e, never in production `src`"); 04 §8.1
+- **Invariants:** I-1, I-8
+- **Scope:**
+  - The guards allowed `@agentlink/crypto/testing` only in `test-vectors`, which is stricter than 04 §3.1.1, and M1-5a and M1-7a need `MemoryKeyStore` in their tests. `*.test.ts` files of `packages/core` and `packages/transport-nostr` may import it by that exact name (no subpath); `e2e/` may use it. Production files of every package stay refused by name, relative path and deep `dist/`/`src/` path. Another package's tests are a reviewed widening of the policy entry.
+  - Each consuming package resolves the seam only through its Vitest alias and its noEmit `tsconfig.test.json` `paths` (both map `@agentlink/crypto` to the same source, so tests see one copy of the module); no build config can resolve it.
+  - IR-M1-1c-G2-1 L-1: a test file is exactly `*.test.ts`, the one name every build excludes. Other test-like names (`.test.mts`, `.test.cts`, `.test.tsx`, `.test.js`, `.spec.*`) count as production code and deps-check reports them.
+- **Acceptance:**
+  - deps-check and ESLint regressions: test files of the two packages are allowed; their production files, deep and relative paths, subpaths, other zones' tests and a `src/x.test.mts` are refused. Repository tests: every build excludes `src/**/*.test.ts` and maps no paths, and no `dist/` contains the seam.
+
 ### Types (`@agentlink/types`)
 
 #### M1-2a · types: constants and envelope, payload, card, invite schemas
