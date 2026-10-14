@@ -1,0 +1,12 @@
+# gitleaks configuration. The default rules apply everywhere.
+# The secret scan reads every branch of this public repository: anything pushed is public.
+[extend]
+useDefault = true
+
+# Published cross-runtime test vectors (M0-9, M1-1h) contain test-only keys taken from RFCs, BIPs and
+# NIPs or generated for tests (development-process.md §9.1). They are public by design and never real
+# secrets. The allowlist covers only the vector data files, by exact path shape; generators, scripts
+# and every other file under test-vectors/ stay scanned. Widening it is a reviewed change (S2).
+[[allowlists]]
+description = "Public cross-runtime test vectors: test-only keys, never real secrets"
+paths = ['''^test-vectors/[a-z0-9-]+/vectors\.json$''']
