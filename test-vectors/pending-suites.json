@@ -1,5 +1,5 @@
 {
-  "description": "Suites whose vectors are committed before the code under test (M1-1h). Each runs no cases until its card adds the suite module and removes the entry. Fail closed: see test-vectors/README.md, Pending suites. The list may only shrink against main (tools/vectors/check-pending.mjs), and a release fails while a suite of a gated phase is pending.",
+  "description": "Suites whose vectors are committed before the code under test (M1-1h). Each runs no cases until its card adds the suite module and removes the entry. Fail closed: see test-vectors/README.md, Pending suites. The list may only shrink against main (tools/vectors/check-pending.mjs), and a release fails while a suite of a gated phase is pending. `cases` lists single cases of an implemented suite that a later card implements (M1-7d): each records a passing pending-case marker instead of a result, and the same rules apply (only shrink, card and phase from the backlog, release gate).",
   "suites": {
     "encodings": {
       "card": "M1-2a",
@@ -9,13 +9,26 @@
       "card": "M1-7c",
       "phase": "M1a"
     },
-    "owner-action": {
-      "card": "M1-7d",
-      "phase": "M1a"
-    },
     "safety-code-recompute": {
       "card": "M1-1c",
       "phase": "M1a"
+    }
+  },
+  "cases": {
+    "owner-action": {
+      "card": "M1-7c-b",
+      "phase": "M1a",
+      "ids": [
+        "verify-contact-check",
+        "verify-contact-check-at-expiry",
+        "verify-contact-check-reject-contact-uppercase",
+        "verify-contact-check-reject-digest-mismatch",
+        "verify-contact-check-reject-wrong-signer",
+        "verify-contact-check-reject-expired",
+        "verify-contact-check-reject-lifetime",
+        "verify-contact-check-reject-unknown-contact",
+        "verify-contact-check-reject-stored-ack-tampered"
+      ]
     }
   }
 }
