@@ -16,9 +16,13 @@ const BOUNDARY = new Set([
 ]);
 
 let eslint;
-beforeAll(() => {
+// The first lintText loads the config, the TypeScript parser and the plugins, which can take more
+// than a test's 5 s on a cold CI runner. Warm up here, under an explicit hook timeout, so every test
+// keeps its own default timeout.
+beforeAll(async () => {
   eslint = new ESLint({ cwd: REPO, overrideConfigFile: join(REPO, 'eslint.config.mjs') });
-});
+  await eslint.lintText('export {};\n', { filePath: join(REPO, 'packages/core/src/warmup.ts') });
+}, 60_000);
 
 async function lint(filePath, code) {
   const [result] = await eslint.lintText(code, { filePath: join(REPO, filePath) });

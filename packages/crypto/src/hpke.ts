@@ -115,8 +115,16 @@ async function importPublicKey(publicKey: Uint8Array) {
 }
 
 /** An error that is not ours to explain: the runtime could not run the suite. No input in it. */
+class HpkePlatformError extends Error {}
+
 function platformError(cause: unknown): Error {
-  return new Error('hpke: this runtime could not run X25519/HKDF-SHA256/AES-256-GCM', { cause });
+  return new HpkePlatformError('hpke: this runtime could not run X25519/HKDF-SHA256/AES-256-GCM', {
+    cause,
+  });
+}
+
+function isPlatformError(error: unknown): boolean {
+  return error instanceof HpkePlatformError;
 }
 
 function openFailed(): CryptoInputError {
@@ -137,18 +145,9 @@ export async function wrapCekWithEphemeralKey(
   assertLength(envelopeId, ENVELOPE_ID_LENGTH, 'wrapCek: envelopeId');
   assertLength(cek, CEK_LENGTH, 'wrapCek: cek');
   assertLength(ephemeralSecretKey, X25519_KEY_LENGTH, 'wrapCek: ephemeralSecretKey');
-  if (!sharedSecretIsNonZero(ephemeralSecretKey, recipientEncPublicKey)) {
-    throw new CryptoInputError(
-      'invalid_public_key',
-      'wrapCek: the recipient key is a small-order X25519 point (all-zero shared secret)',
-    );
-  }
-  const sealed = await sealSequence(
-    recipientEncPublicKey,
-    ephemeralSecretKey,
-    cekInfo(envelopeId),
-    [{ aad: EMPTY, plaintext: cek }],
-  );
+  const sealed = await checkedSeal(recipientEncPublicKey, ephemeralSecretKey, cekInfo(envelopeId), [
+    { aad: EMPTY, plaintext: cek },
+  ]);
   const wk = sealed.ciphertexts[0];
   if (
     wk === undefined ||
@@ -222,16 +221,15 @@ export async function hpkeSealSequence(
   assertLength(recipientPublicKey, X25519_KEY_LENGTH, 'hpke: recipientPublicKey');
   assertLength(ephemeralSecretKey, X25519_KEY_LENGTH, 'hpke: ephemeralSecretKey');
   assertBytes(info, 'hpke: info');
-  if (!sharedSecretIsNonZero(ephemeralSecretKey, recipientPublicKey)) {
-    throw new CryptoInputError(
-      'invalid_public_key',
-      'hpke: the recipient key is a small-order X25519 point (all-zero shared secret)',
-    );
-  }
-  return sealSequence(recipientPublicKey, ephemeralSecretKey, info, messages);
+  return checkedSeal(recipientPublicKey, ephemeralSecretKey, info, messages);
 }
 
-async function sealSequence(
+/**
+ * The one sealing path. Copies every caller-owned buffer once, before any await, then refuses an
+ * all-zero shared secret (RFC 9180 §7.1.4) on the copies before any HPKE or WebCrypto work, and
+ * seals the same copies, so a buffer changed during an await cannot swap in a key after the check.
+ */
+async function checkedSeal(
   recipientPublicKey: Uint8Array,
   ephemeralSecretKey: Uint8Array,
   info: Uint8Array,
@@ -241,7 +239,30 @@ async function sealSequence(
     assertBytes(message.aad, 'hpke: aad');
     assertBytes(message.plaintext, 'hpke: plaintext');
   }
-  // The ephemeral key is ours: if WebCrypto cannot import it, the runtime lacks the suite. The
+  const publicKey = recipientPublicKey.slice();
+  const secretKey = ephemeralSecretKey.slice();
+  const infoCopy = info.slice();
+  const copies = messages.map((m) => ({ aad: m.aad.slice(), plaintext: m.plaintext.slice() }));
+  try {
+    if (!sharedSecretIsNonZero(secretKey, publicKey)) {
+      throw new CryptoInputError(
+        'invalid_public_key',
+        'hpke: the recipient key is a small-order X25519 point (all-zero shared secret)',
+      );
+    }
+    return await sealSequence(publicKey, secretKey, infoCopy, copies);
+  } finally {
+    wipe(secretKey, ...copies.map((m) => m.plaintext));
+  }
+}
+
+async function sealSequence(
+  recipientPublicKey: Uint8Array,
+  ephemeralSecretKey: Uint8Array,
+  info: Uint8Array,
+  messages: readonly { readonly aad: Uint8Array; readonly plaintext: Uint8Array }[],
+): Promise<HpkeSealed> {
+  // Only reached through checkedSeal, with copies already checked. The ephemeral key is ours: if WebCrypto cannot import it, the runtime lacks the suite. The
   // recipient key is input: a runtime that refuses it (one that rejects a non-canonical encoding,
   // say) refuses an input, the same refusal in every runtime.
   let ekm;
@@ -300,21 +321,29 @@ export async function hpkeOpen(
   assertBytes(info, 'hpke: info');
   assertBytes(aad, 'hpke: aad');
   assertBytes(ciphertext, 'hpke: ciphertext');
-  if (!sharedSecretIsNonZero(recipientSecretKey, enc)) throw openFailed();
-  let recipientKey;
+  // Copy every caller-owned buffer once, before any await: the check and the open use the same
+  // bytes, so a buffer changed during an await cannot swap in a small-order enc after the check.
+  const secretKey = recipientSecretKey.slice();
+  const encCopy = enc.slice();
+  const infoCopy = info.slice();
+  const aadCopy = aad.slice();
+  const ciphertextCopy = ciphertext.slice();
   try {
-    recipientKey = await importKeyPair(recipientSecretKey);
-  } catch (error) {
-    throw platformError(error);
-  }
-  try {
+    if (!sharedSecretIsNonZero(secretKey, encCopy)) throw openFailed();
+    let recipientKey;
+    try {
+      recipientKey = await importKeyPair(secretKey);
+    } catch (error) {
+      throw platformError(error);
+    }
     const plaintext = await cipherSuite().open(
-      { recipientKey, enc: enc.slice(), info },
-      ciphertext,
-      aad,
+      { recipientKey, enc: encCopy, info: infoCopy },
+      ciphertextCopy,
+      aadCopy,
     );
     return new Uint8Array(plaintext);
   } catch (error) {
+    if (error instanceof CryptoInputError || isPlatformError(error)) throw error;
     // The recipient key already imported, so a refused enc (DeserializeError) is input, like a
     // refused DH (DecapError) or a failed tag (OpenError).
     if (
@@ -325,5 +354,7 @@ export async function hpkeOpen(
       throw openFailed();
     }
     throw platformError(error);
+  } finally {
+    wipe(secretKey);
   }
 }

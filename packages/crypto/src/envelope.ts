@@ -153,6 +153,8 @@ function readRecipients(value: unknown): readonly EnvelopeRecipient[] {
   const prototype: unknown = Object.getPrototypeOf(value);
   if (prototype !== Array.prototype) refuse('recipients must be a plain JSON array');
   const length = value.length;
+  // TODO(G-2): an upper bound on the recipient count comes from the G-2 spec work; none is
+  // invented here (IR-M1-1c-1 F3).
   if (length === 0) refuse('recipients must not be empty');
   // Own index properties 0..length-1 and `length`, nothing else: no holes, no extra properties.
   if (Object.getOwnPropertyNames(value).length !== length + 1) {
@@ -198,6 +200,8 @@ function readAead(value: unknown): EnvelopeAead {
   return Object.freeze({
     alg: AEAD_ALG,
     iv: readBase64url(raw.iv, 'aead.iv', { length: AEAD_IV_LENGTH }),
+    // TODO(G-2): the maximum `ct` size (and the raw envelope byte cap, checked before JSON.parse)
+    // comes from the G-2 spec work; none is invented here (IR-M1-1c-1 F3).
     ct: readBase64url(raw.ct, 'aead.ct', { minimum: AEAD_TAG_LENGTH }),
   });
 }
