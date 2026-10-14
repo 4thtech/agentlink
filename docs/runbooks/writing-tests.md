@@ -11,14 +11,15 @@ The builder, at the tier on the card. The orchestrator checks the result in the 
 
 ## Preconditions
 - The acceptance criteria are written as AC-1 … AC-n in the brief.
-- The monorepo skeleton is on `main` (M0-2d); until then there is nothing to run. Commands: [`repo-reference.md`](../process/repo-reference.md).
+- The monorepo skeleton (M0-2d) is on `main`; packages are still stubs. Commands: [`repo-reference.md`](../process/repo-reference.md).
 
 ## Steps
 1. **Map each AC to a test** before writing code. Name the test after the behaviour, not the function.
 2. **Drive the real path.** Test through the real handler, MCP tool or endpoint the user reaches, not only a helper it calls. A helper-only test once let a job ship disconnected (`delivery-process.md` §3.3).
 3. **Fakes must not write what they assert.** If a test double produces the field the test checks, the test proves only the fake. Assert on what the code under test produced.
-4. **Use the shapes real users produce**: long inputs, unicode, empty values, the inbound payloads of 06 §9, not only a tidy example.
-5. **S2: commit the failing tests first.**
+4. **Area rules from the specs**, for example: every MCP tool gets a schema test and a behaviour test per `status` value, and the D-53 assertions (name starts with `agentlink_`, the four annotations set as in 06 §2.0, `approvalId` on every tool that can return `pending_approval`; card M1-9e); owner-presence tests cover both KeyStore backends, the OS keychain and the file KeyStore of D-54, and never feed an owner secret from an environment variable, file or piped input (`development-process.md` §10).
+5. **Use the shapes real users produce**: long inputs, unicode, empty values, the inbound payloads of 06 §9, not only a tidy example.
+6. **S2: commit the failing tests first.**
    ```bash
    pnpm --filter <package> test        # red: record the failing test names
    git commit -m "<TASK-ID>: add failing tests for <behaviour>"
@@ -26,7 +27,7 @@ The builder, at the tier on the card. The orchestrator checks the result in the 
    ```
    A builder pushes only its own task branch, and only when the brief says so (`development-process.md` §4.2); otherwise it hands back and the orchestrator pushes.
    Then implement in a later commit. Put the red commit SHA and the CI run link in the PR's **Tests-first evidence** section.
-6. **Negative control for every new test.** Break the behaviour on purpose (invert a condition, return early, drop the field), run the test and watch it go red, then restore exactly:
+7. **Negative control for every new test.** Break the behaviour on purpose (invert a condition, return early, drop the field), run the test and watch it go red, then restore exactly:
    ```bash
    pnpm --filter <package> exec vitest run <test-file>   # must FAIL with the sabotage
    git checkout -- <source-file>                         # restore exactly
@@ -34,8 +35,8 @@ The builder, at the tier on the card. The orchestrator checks the result in the 
    pnpm --filter <package> exec vitest run <test-file>   # green again
    ```
    Record each control in the PR under **Tests added**: "control: removed X → test Y failed".
-7. **Never weaken** a test, assertion, vector, threshold or lint rule to get green: no `.skip`, `.only`, `--passWithNoTests`, broadened `expect`, lowered coverage. If a test must change, stop and escalate (`development-process.md` §3.3).
-8. Run the full set before handing back:
+8. **Never weaken** a test, assertion, vector, threshold or lint rule to get green: no `.skip`, `.only`, `--passWithNoTests`, broadened `expect`, lowered coverage. If a test must change, stop and escalate (`development-process.md` §3.3).
+9. Run the full set before handing back:
    ```bash
    pnpm lint && pnpm typecheck && pnpm test
    ```

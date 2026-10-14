@@ -17,6 +17,7 @@ A lesson explains a rule; it does not create one. When a lesson needs a binding 
 | [LL-09](LL-09-shared-scratch-files.md) | Parallel agents overwrite each other's scratch files |
 | [LL-10](LL-10-zsh-glob-in-gh-api.md) | zsh treats `?` in a URL as a glob |
 | [LL-11](LL-11-ambiguous-go-ahead.md) | An ambiguous owner message is not a merge go-ahead |
+| [LL-12](LL-12-stacked-pr-after-squash.md) | A stacked PR conflicts after its base is squash-merged |
 
 ## Adding a lesson
 

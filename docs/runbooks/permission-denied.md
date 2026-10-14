@@ -14,7 +14,7 @@ None.
 
 ## Steps
 1. **Stop that line of work.** A denial is final for you (`delivery-process.md` §3.2).
-2. **Do not route around it.** Not in smaller pieces, not with another tool, not through a subagent, not with a raw API call or a different flag, not by editing the rule that blocked you. Each of those is the same action.
+2. **Do not route around it.** Not in smaller pieces, not with another tool, not through a subagent, not with a raw API call or a different flag, not by faking an interactive terminal for an owner command such as `owner init` (D-54), not by editing the rule that blocked you. Each of those is the same action.
 3. Write down exactly what happened: the command or action, the denial text quoted, and what you were trying to achieve.
 4. Tell the owner (worker: report `STATUS: blocked` with those three items):
    - why the action seemed necessary;

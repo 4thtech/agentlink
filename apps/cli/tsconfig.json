@@ -1,0 +1,36 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"],
+  "references": [
+    {
+      "path": "../../packages/node"
+    },
+    {
+      "path": "../../packages/core"
+    },
+    {
+      "path": "../../packages/types"
+    },
+    {
+      "path": "../../packages/crypto"
+    },
+    {
+      "path": "../../packages/chain"
+    },
+    {
+      "path": "../../packages/transport-nostr"
+    },
+    {
+      "path": "../../packages/storage"
+    },
+    {
+      "path": "../../packages/ui"
+    }
+  ]
+}
