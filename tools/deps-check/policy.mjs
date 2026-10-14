@@ -375,6 +375,28 @@ export function isDeepImport(name, specifier) {
   );
 }
 
+/** The npm scopes of the workspace packages (`@agentlink/`, `@4thtech/`). */
+const WORKSPACE_SCOPES = [...new Set(WORKSPACE_NAMES.map((name) => `${name.split('/')[0]}/`))];
+
+/**
+ * True for a specifier in a workspace scope that is not in canonical form (IR-M1-1g-b-1 L-2): an
+ * upper-case letter, or an empty, `.` or `..` segment (`@agentlink/crypto//testing`,
+ * `@agentlink/crypto/Testing`, `@agentlink/crypto/./testing`, a trailing `/`). The policy matches
+ * exact, lower-case names; a case-insensitive file system or a lenient resolver could map such a
+ * spelling onto a restricted entry point, so every guard refuses it outright.
+ */
+export function isNonCanonicalWorkspaceSpecifier(specifier) {
+  const lower = specifier.toLowerCase();
+  if (!WORKSPACE_SCOPES.some((scope) => lower.startsWith(scope))) return false;
+  return (
+    specifier !== lower ||
+    specifier.split('/').some((segment) => segment === '' || segment === '.' || segment === '..')
+  );
+}
+
+export const nonCanonicalMessage = (specifier) =>
+  `"${specifier}" is a non-canonical specifier for a workspace package (upper case, or an empty, "." or ".." segment); import the package by its exact name or a subpath its package.json "exports" declares (IR-M1-1g-b-1 L-2).`;
+
 export const deepImportMessage = (name) =>
   `${name}: deep import into the package's build or sources is not allowed; import ${name} or a subpath its package.json "exports" declares (IR-M1-1f-1 L-2).`;
 
@@ -407,6 +429,7 @@ export function violationFor(zone, specifier, file) {
     }
     return null;
   }
+  if (isNonCanonicalWorkspaceSpecifier(specifier)) return nonCanonicalMessage(specifier);
   const workspace = workspaceNameOf(specifier);
   if (workspace !== null && isDeepImport(workspace, specifier)) return deepImportMessage(workspace);
   for (const entry of RESTRICTED_ENTRY_POINTS) {

@@ -989,6 +989,18 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - deps-check and ESLint regressions: test files of the two packages are allowed; their production files, deep and relative paths, subpaths, other zones' tests and a `src/x.test.mts` are refused. Repository tests: every build excludes `src/**/*.test.ts` and maps no paths, and no `dist/` contains the seam.
 
+#### M1-1g-c · Boundary guards scan e2e/ (new, IR-M1-1g-b-1 C-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 (boundary policy, `tools/deps-check/policy.mjs`) · **Phase:** M1a
+- **Repo/path:** agentlink · tools/deps-check/, eslint.config.mjs, e2e/
+- **Depends on:** M1-1g-b; lands before or with M1-13a
+- **Spec:** 04 §3.1.1 (test doubles allowed in e2e), §8.1; development-process.md §11
+- **Invariants:** I-1, I-8
+- **Scope:**
+  - deps-check (`check.mjs`) and the root ESLint config scan neither `e2e/` nor give it zone rules, so an `e2e/src/a.ts` importing `@noble/curves`, `@agentlink/crypto/keystore`, the test seam or `crypto.subtle` passes both tools. e2e is never built or published and may use the seam (04 §3.1.1), but its suites touch real crypto paths.
+  - Give `e2e` a deps-check zone and an ESLint block: primitive libraries refused, the `/keystore` entry refused, `crypto.subtle` refused, Node built-ins as M1-13 decides, the seam allowed.
+- **Acceptance:**
+  - Regressions in `tools/deps-check`: each of those imports planted in `e2e/` fails both tools, and the seam import passes. The repository scan covers `e2e/`.
+
 ### Types (`@agentlink/types`)
 
 #### M1-2a · types: constants and envelope, payload, card, invite schemas
@@ -2005,7 +2017,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-13a · e2e: two agents on two harnesses
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · e2e/, .github/workflows/e2e.yml
-- **Depends on:** M1-9c, M1-12a; DECISION NEEDED: where e2e runs and how its credentials are held (`development-process.md` §10)
+- **Depends on:** M1-9c, M1-12a, M1-1g-c (boundary guards scan e2e/); DECISION NEEDED: where e2e runs and how its credentials are held (`development-process.md` §10)
 - **Spec:** 10 M1-13; 06 §9; 02 J1, J9
 - **Invariants:** I-1, I-2, I-5
 - **Scope:**

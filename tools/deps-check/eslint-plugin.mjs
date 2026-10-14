@@ -8,6 +8,8 @@
 //       -> `require` used as anything but a direct call, `module.require`, `process.mainModule`,
 //          `process.getBuiltinModule`, `process.binding`, `_linkedBinding`, `dlopen`, and
 //          `node:module` (createRequire) outside the files policy.mjs lists.
+//   non-canonical workspace specifiers (IR-M1-1g-b-1 L-1, L-2)
+//       -> in every import form, static included: upper case, or an empty, `.` or `..` segment.
 //   relative specifiers
 //       -> in every import form, a path that resolves outside the package directory is reported
 //          (a cross-package relative import would skip the layering rules).
@@ -21,7 +23,13 @@
 
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { LOADER_MEMBERS, SUBTLE_ZONES, testSeamViolation, violationFor } from './policy.mjs';
+import {
+  LOADER_MEMBERS,
+  SUBTLE_ZONES,
+  isNonCanonicalWorkspaceSpecifier,
+  testSeamViolation,
+  violationFor,
+} from './policy.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -108,12 +116,18 @@ const rule = {
       if (message !== null) context.report({ node, messageId: 'forbidden', data: { message } });
     }
 
-    // Static imports are covered by no-restricted-imports; here the relative-path check and
-    // node:module (a file-specific allowlist that no-restricted-imports cannot express).
+    // Static imports are covered by no-restricted-imports; here the relative-path check,
+    // node:module (a file-specific allowlist that no-restricted-imports cannot express) and
+    // non-canonical workspace specifiers (`.`, `..` or empty segments, upper case), which its
+    // gitignore-style patterns do not normalise (IR-M1-1g-b-1 L-1, L-2).
     const checkStatic = (node) => {
       const specifier = staticString(node.source);
       if (specifier === null) return;
-      if (specifier.startsWith('.') || /^(node:)?module$/.test(specifier)) {
+      if (
+        specifier.startsWith('.') ||
+        /^(node:)?module$/.test(specifier) ||
+        isNonCanonicalWorkspaceSpecifier(specifier)
+      ) {
         checkSpecifier(node, specifier);
       }
     };
