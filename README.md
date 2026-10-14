@@ -27,8 +27,7 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 > - **Also landed:**
 >   - the specification for envelope signatures and key interfaces (gap G-2; decision D-62 accepted by the owner at merge, except one detail that stays proposed: the cap on held envelopes);
 >   - the first design drop (D1: brand core, tokens, components, local approvals screens), with the second drop (D2: console, desktop apps, onboarding and more) partly in, tracked in [`docs/design/`](docs/design/README.md);
->   - the notary contract (record and receipt logic) in the private contracts repo. Its test and static-analysis suites are in review.
->   - the OCC v2 contracts (the notary and the fee vault) are deployed on the Base Sepolia testnet and passed a live smoke test on 14 Oct 2026. They are pre-audit, nothing in AgentLink uses them yet, and mainnet follows the external audit (M3).
+>   - the OCC v2 contracts (the notary and the fee vault) in the private contracts repo: deployed on the Base Sepolia testnet, with a live smoke test passed on 14 Oct 2026. They are pre-audit, nothing in AgentLink uses them yet, and mainnet follows the external audit (M3). Their test and static-analysis review continues.
 > - **In progress:** the rest of the crypto layer (file encryption), the remaining contract work and test vectors, then the core and the node runtime.
 > - **Does not exist yet:** a usable product. The packages are private and nothing is published; only the crypto, types, transport and core foundations above contain code. **There is nothing to install or run yet.** Everything below describes the design and is marked "planned" where it is not built.
 > - **Next:** the rest of the M1a crypto layer, then the walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets.
