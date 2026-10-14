@@ -37,7 +37,13 @@ export type CoreErrorCode =
   | 'type_not_sendable'
   | 'payload_invalid'
   | 'thread_invalid'
-  | 'envelope_too_large';
+  | 'envelope_too_large'
+  // Pairing (04 §3.6, §3.6.1; M1-7c)
+  | 'invite_invalid'
+  | 'invite_too_large'
+  | 'invite_expired'
+  | 'invite_options_invalid'
+  | 'safety_code_unavailable';
 
 export class CoreError extends Error {
   readonly code: CoreErrorCode;
