@@ -349,6 +349,31 @@ describe('wrapEnvelope', () => {
     ).toBe('sender_mismatch');
   });
 
+  it('refuses a seal from the signer whose tags, created_at or kind differ from the request (IR-M1-5a-1 L-4)', async () => {
+    const NOW = 1_760_000_000;
+    const sender = referenceKeys();
+    const tamperings: ((event: UnsignedNostrEvent) => UnsignedNostrEvent)[] = [
+      (event) => ({ ...event, tags: [['x', 'y']] }),
+      (event) => ({ ...event, created_at: event.created_at + 1 }),
+      (event) => ({ ...event, created_at: NOW + 10 }),
+      (event) => ({ ...event, created_at: NOW - GIFT_WRAP_MAX_BACKDATE_SECONDS - 1 }),
+      (event) => ({ ...event, kind: 1 }),
+    ];
+    for (const tamper of tamperings) {
+      const faulty = {
+        ...sender,
+        signNostr: (event: UnsignedNostrEvent) => sender.signNostr(tamper(event)),
+      };
+      expect(
+        await codeOf(
+          wrapEnvelope(makeEnvelope(sender.pubkey), [referenceKeys().pubkey], faulty, {
+            now: () => NOW,
+          }),
+        ),
+      ).toBe('invalid_seal');
+    }
+  });
+
   it('refuses a missing, empty, oversized or malformed recipient list', async () => {
     const sender = spied(referenceKeys());
     const envelope = makeEnvelope(sender.pubkey);
