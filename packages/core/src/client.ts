@@ -9,6 +9,7 @@ import { createLogger, type Logger } from '@agentlink/log';
 import type { ApprovalChannel } from './approval-channel.js';
 import { STORE_SCHEMA_VERSION } from './constants.js';
 import { ContactBook } from './contacts.js';
+import { EnvelopeService } from './envelopes.js';
 import type { CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import { IdentityService, finishPendingRotation } from './identity.js';
@@ -34,12 +35,15 @@ export class AgentLinkClient {
   readonly agentId: string;
   readonly identity: IdentityService;
   readonly contacts: ContactBook;
+  /** Envelope build, receive and processing (M1-7b; 04 §3.1.1). */
+  readonly envelopes: EnvelopeService;
   readonly approvals: ApprovalChannel;
 
   private constructor(agentId: string, ctx: CoreContext, approvals: ApprovalChannel) {
     this.agentId = agentId;
     this.identity = new IdentityService(ctx);
     this.contacts = new ContactBook(ctx);
+    this.envelopes = new EnvelopeService(ctx, this.identity, this.contacts);
     this.approvals = approvals;
   }
 
