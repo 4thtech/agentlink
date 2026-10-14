@@ -87,8 +87,8 @@ Every mutating call runs: **policy check → (approval) → action → store →
 **At rest:** all sensitive columns (decrypted payloads, contact names, file names, URLs, file keys, salts, invite proof keys, policies' parameters) are encrypted with a local **store key** (random, kept in the keychain, or in the file KeyStore on headless machines, §9). Non-sensitive columns (IDs, timestamps, statuses) stay in clear for indexing. Without the store key, the database reveals only activity timing and counts.
 
 **Pairing and identity columns (04 §2.9, §3.6.1; proposed, G-23 and G-28; owner confirms at merge).**
-- `contacts.contact_id` is the contact's agent ID, unique per store. `contacts` also holds `pairing` (`pending`, `complete` or `mismatch`), `pairing_digest`, the pending pairing data until the ack (`codeCommit`, `nonceB`), and `safety_check`: the owner's signed `contact.check`, re-verified on load. `verified` is only a cache of `safety_check`.
-- `invites` also holds `nonce_a`, encrypted at rest and dropped once the ack has left the outbox.
+- `contacts.contact_id` is the contact's agent ID, unique per store. `contacts` also holds `pairing` (`pending`, `complete` or `mismatch`), the envelope IDs of the pairing's signed `handshake` and `handshake-ack` (kept for as long as the contact exists; every display of the safety code recomputes it from them, never from a stored digest), the pending pairing data until completion (`codeCommit`, `nonceB`), and `safety_check`: the owner's signed `contact.check`, re-verified on load. `safety_code_checked` is only a cache of `safety_check`. A re-pair replaces these columns only when it completes (04 §2.9).
+- `invites` also holds `nonce_a`, encrypted at rest. After pairing it is in the signed ack, as `codeReveal`.
 
 ---
 

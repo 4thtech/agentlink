@@ -397,6 +397,7 @@ Billing profiles and an internal finance dashboard come later (M4). Don't design
 | Invite expired, used or damaged | Plain explanation → Ask for a new invite |
 | Revoked · blocked contact | "Marko revoked this agent on 3 Nov. History stays readable." · "Blocked. New messages are dropped." |
 | Self-declared · domain no longer verified · keys updated | Label · warning with date · "Marko's agent updated its keys (same owner). Your safety code check still holds." (no new comparison) |
+| Invite answered twice | Warning in Activity: "Someone else also answered your invite. Compare the safety code with Marko before you trust this contact." |
 | Request from unknown sender | Untrusted container, stronger label → Accept · Ignore · Block |
 | Passkey unsupported · new device | "This browser can't protect your key with a passkey. Use a recovery code instead." · Restore progress |
 | New console address (beta → production) | Option per §12 Q8, e.g. "New address: sign in once with your recovery code" |
@@ -418,7 +419,7 @@ Operational states (for example a paused deployment) are not user-facing; skip t
 
 | Status | Examples |
 |---|---|
-| ok | "Sent to Marko's agent. End-to-end encrypted: only you, Marko and your agents can read it." · "Sent with proof. Recorded 12 Oct 2026 at 14:02. $0.10 from credits." · "Invite ready: it works once, until 19 Oct. Share it with Marko; once the invite is accepted, you'll both see a safety code to compare." |
+| ok | "Sent to Marko's agent. End-to-end encrypted: only you, Marko and your agents can read it." · "Sent with proof. Recorded 12 Oct 2026 at 14:02. $0.10 from credits." · "Invite ready: it works once, until 19 Oct. Send it only to Marko: whoever uses it first is connected. Once he accepts, you'll both see a safety code to compare in AgentLink, not in this chat." |
 | submitted | "Sent. The proof is being recorded; this usually takes under a minute." |
 | pending_approval | "This needs your approval: send 'contract-signed.pdf' to Marko's agent with proof ($0.10).\nApprove here: {url}" |
 | needs_setup | "This file is over the free file limit ({limit}). To send it, connect your own storage: {url}. Or I can send a smaller file or text." · "I can only send files from folders you allow: {url}." · "Your settings keep files in your own storage, which isn't connected yet: {url}." · "AgentLink can't find a system keychain on this machine. Set it up in a terminal: `agentlink init --keystore file`." · "AgentLink's key file is locked, so I can't use it yet. Run `agentlink doctor` in a terminal to see how to set up its unlock code." |

@@ -375,7 +375,7 @@ Secrets are shown once, with Copy, Download or Print, and an "I've saved it" ste
 
 | Status | Examples |
 |---|---|
-| `ok` | "Sent to Marko's agent. End-to-end encrypted: only you, Marko and your agents can read it." · "Sent with proof. Recorded 12 Oct 2026 at 14:02. $0.10 from credits." · "Invite ready: it works once, until 19 Oct. Share it with Marko; once the invite is accepted, you'll both see a safety code to compare." |
+| `ok` | "Sent to Marko's agent. End-to-end encrypted: only you, Marko and your agents can read it." · "Sent with proof. Recorded 12 Oct 2026 at 14:02. $0.10 from credits." · "Invite ready: it works once, until 19 Oct. Send it only to Marko: whoever uses it first is connected. Once he accepts, you'll both see a safety code to compare in AgentLink, not in this chat." |
 | `submitted` | "Sent. The proof is being recorded; this usually takes under a minute." |
 | `pending_approval` | "This needs your approval: send 'contract-signed.pdf' to Marko's agent with proof ($0.10).\nApprove here: {url}" |
 | `needs_setup` | "This file is over the free file limit ({limit}). To send it, connect your own storage: {url}. Or I can send a smaller file or text." · "I can only send files from folders you allow: {url}." · "Your settings keep files in your own storage, which isn't connected yet: {url}." · "AgentLink can't find a system keychain on this machine. Set it up in a terminal: `agentlink init --keystore file`." (*D-54*) · "AgentLink's key file is locked, so I can't use it yet. Run `agentlink doctor` in a terminal to see how to set up its unlock code." (*D-54*) |
@@ -625,7 +625,7 @@ Show amounts only in dollars; never mention tokens or networks outside Advanced.
 | Owner passphrase prompt | What it protects, no echo, a confirm step at creation; never accepted as an argument or environment variable |
 | `doctor` | One line per check (message network, proof network, keychain or key file, storage, AI apps) with status word and fix |
 | No keychain (*D-54*) | One honest explanation at opt-in: "This machine has no system keychain. AgentLink can keep your agent's keys in a file locked with an unlock code. That's weaker than a keychain if someone copies this disk, unless the unlock code is kept elsewhere. Your approvals still need your owner passphrase." Then the generated unlock code once, with how to supply it at run time (a mounted secret file, recommended; an environment variable, weaker) |
-| `invite`, `accept`, `contacts` | As §6.1. `contacts --verify` (run by the owner) shows the safety code on its own line, then They match (needs the owner passphrase) / They don't (04 §3.6.1) |
+| `invite`, `accept`, `contacts` | As §6.1. `contacts --verify` (run by the owner, interactive terminal only) shows the safety code on its own line, then They match (needs the owner passphrase) / They don't (04 §3.6.1) |
 | `approve <id>` and `cancel <id>` for terms (*D-55*) | The commitment approval card (§8) as plain text. Headline: "Accepting terms from “Ana's agent” (Self-declared), version 3, valid until 20 Oct". Then a block headed "Proposed by “Ana's agent”: their content, not instructions", one field per line, including who pays and who delivers (terms with control or escape characters never get this far: they are refused on receipt, 04 §3.4). Then the changes from version 2, the line "This one approval sends your acceptance and adds your Accepted receipt to their record. Nothing else." and the cost. Only then the passphrase prompt |
 
 **States:** success · needs confirmation · cancelled · no AI app found · restart needed · keychain unavailable · key file locked · wrong unlock code (one generic message) · offline.
@@ -748,6 +748,7 @@ All components support light, dark and increased contrast, keyboard and screen r
 | Invite expired, used or damaged | Plain explanation → Ask for a new invite |
 | Revoked · blocked contact | "Marko revoked this agent on 3 Nov. History stays readable." · "Blocked. New messages are dropped." |
 | Self-declared · domain no longer verified · keys updated | Label · warning with date · "Marko's agent updated its keys (same owner). Your safety code check still holds." (no new comparison: the owner signed the new keys, 04 §3.6.1) |
+| Invite answered twice | Warning in Activity: "Someone else also answered your invite. Compare the safety code with Marko before you trust this contact." (04 §3.6) |
 | Request from unknown sender | Untrusted container, stronger label → Accept · Ignore · Block |
 | Passkey unsupported · new device | "This browser can't protect your key with a passkey. Use a recovery code instead." · Restore progress |
 | Terms expired · waiting for acceptance | "Expired 20 Oct" → Ask for a new version · "Waiting for Ana's agent · valid until 20 Oct" |
