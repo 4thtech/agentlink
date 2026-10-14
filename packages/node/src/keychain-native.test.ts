@@ -1,29 +1,33 @@
 // M1-8a against the real OS keychain (macOS Keychain, Windows Credential Manager, the Linux Secret
-// Service through @napi-rs/keyring). It skips itself where the probe finds no usable keychain, as on
-// a headless Linux CI runner without a D-Bus session. Items go under a random test service and are
-// deleted afterwards, so the user's `agentlink` items are never touched.
+// Service through @napi-rs/keyring). Opt-in (IR-M1-8a-1 L-2): it runs only with
+// AGENTLINK_REQUIRE_KEYCHAIN=1, so a plain `pnpm test` never writes to a developer's keychain. When
+// the flag is set, a keychain that fails the probe FAILS the suite instead of skipping it (M-1: the
+// CI keychain matrix sets the flag, so a runner without a keychain cannot pass green). Items go
+// under a random test service and are deleted afterwards; `agentlink` items are never touched.
 import { encodeHex, randomBytes } from '@agentlink/crypto';
 import { deriveAgentId } from '@agentlink/crypto/keystore';
 import { afterAll, describe, expect, it } from 'vitest';
-import {
-  KeychainKeyStore,
-  createKeychainAgent,
-  keychainAccount,
-  osKeychain,
-  probeKeychain,
-} from './index.js';
+import { KeychainKeyStore, createKeychainAgent } from './keychain-keystore.js';
+import { keychainAccount, osKeychain, probeKeychain } from './keychain.js';
 
+const required = process.env['AGENTLINK_REQUIRE_KEYCHAIN'] === '1';
 const service = `agentlink-test-${encodeHex(randomBytes(8))}`;
 const keychain = osKeychain(service);
-const probe = await probeKeychain(keychain, { timeoutMs: 5_000 });
 const created: string[] = [];
 
-describe.skipIf(!probe.ok)(`the OS keychain (${process.platform})`, () => {
+describe.skipIf(!required)(`the OS keychain (${process.platform})`, () => {
   afterAll(async () => {
-    for (const agentId of created) {
-      await keychain.delete(keychainAccount(agentId, 'seed'));
-      await keychain.delete(keychainAccount(agentId, 'store-key'));
-    }
+    // Every delete is attempted, whatever happens to the others.
+    await Promise.allSettled(
+      created.flatMap((agentId) => [
+        keychain.delete(keychainAccount(agentId, 'seed')),
+        keychain.delete(keychainAccount(agentId, 'store-key')),
+      ]),
+    );
+  });
+
+  it('the keychain probe succeeds (a failure here fails the run, never skips it)', async () => {
+    expect(await probeKeychain(keychain, { timeoutMs: 5_000 })).toEqual({ ok: true });
   });
 
   it('stores and returns bytes exactly, and reports a missing item as null', async () => {

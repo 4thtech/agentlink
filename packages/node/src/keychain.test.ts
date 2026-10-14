@@ -21,18 +21,22 @@ import {
 } from '@agentlink/crypto';
 import { deriveAgentId, derivePublicIdentity } from '@agentlink/crypto/keystore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+// The raw keychain backend is internal (IR-M1-8a-1 M-2): tests reach it through the modules, never
+// through the package entry, which exports only opaque entry points (fence.test.ts).
+import { NodeKeyStoreError } from './errors.js';
+import {
+  KeychainKeyStore,
+  createKeychainAgent,
+  openRecordedKeyStore,
+} from './keychain-keystore.js';
 import {
   KEYCHAIN_LINUX_STORE,
   KEYCHAIN_SERVICE,
-  KeychainKeyStore,
-  NodeKeyStoreError,
-  createKeychainAgent,
   keychainAccount,
-  openRecordedKeyStore,
   probeKeychain,
   selectKeyStoreBackend,
   type KeychainBackend,
-} from './index.js';
+} from './keychain.js';
 
 const SEED_A = Uint8Array.from({ length: 32 }, (_, i) => i + 1);
 const SEED_B = Uint8Array.from({ length: 32 }, (_, i) => 200 - i);
@@ -284,6 +288,18 @@ describe('KeychainKeyStore (KeyStore contract, 04 §3.1.1)', () => {
     expect(length).toBe(32);
     expect(allZero(seen as Uint8Array)).toBe(true);
   });
+
+  it('refuses a store key of the wrong length with its own code (IR-M1-8a-1 L-6)', async () => {
+    keychain.items.set(keychainAccount(ID_A, 'store-key'), new Uint8Array(31));
+    expect(await codeOf(() => store.withStoreKey(() => undefined))).toBe('store_key_invalid');
+  });
+
+  it('a keychain call that does not answer fails with keychain_failed (IR-M1-8a-1 L-4)', async () => {
+    const slow = await KeychainKeyStore.open(keychain, ID_A, { timeoutMs: 20 });
+    keychain.hanging = true;
+    expect(await codeOf(() => slow.getPublicBundle())).toBe('keychain_failed');
+    expect(await codeOf(() => slow.withStoreKey(() => undefined))).toBe('keychain_failed');
+  });
 });
 
 describe('KeychainKeyStore.open (04 §2.9: the seed must derive the agent ID)', () => {
@@ -339,6 +355,20 @@ describe('KeychainKeyStore.open (04 §2.9: the seed must derive the agent ID)', 
     keychain.put(ID_A, SEED_A);
     const store = await openRecordedKeyStore('keychain', ID_A, { keychain });
     expect((await store.getPublicBundle()).agentId).toBe(ID_A);
+    // Only the KeyStore interface: no store key, no backend, nothing to reach a seed (M-2).
+    expect(Object.keys(store).sort()).toEqual([
+      'close',
+      'getPublicBundle',
+      'nip44Decrypt',
+      'nip44Encrypt',
+      'sign712',
+      'signEnvelopeHash',
+      'signNostr',
+      'unwrapCek',
+    ]);
+    expect(Object.isFrozen(store)).toBe(true);
+    await store.close();
+    expect(await codeOf(() => store.getPublicBundle())).toBe('keystore_closed');
     expect(await codeOf(() => openRecordedKeyStore('file', ID_A, { keychain }))).toBe(
       'backend_unavailable',
     );

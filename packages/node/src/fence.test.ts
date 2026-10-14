@@ -1,0 +1,36 @@
+// IR-M1-8a-1 M-2: the package entry is the fence around the agent seed (04 §8.1). It exports only
+// opaque entry points: a KeyStore, an agent ID, a probe result. Nothing that returns raw keychain
+// bytes (the backend, account names, the store key) is reachable from `@agentlink/node`, so the CLI
+// and MCP tool code cannot read a seed through it. Deep imports into dist/ or src/ are refused by
+// package.json `exports` and by deps-check and ESLint (IR-M1-1f-1 L-2).
+import { describe, expect, it } from 'vitest';
+import * as entry from './index.js';
+
+describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
+  it('exports exactly the opaque entry points', () => {
+    expect(Object.keys(entry).sort()).toEqual([
+      'KEYCHAIN_SERVICE',
+      'NodeKeyStoreError',
+      'assertAgentId',
+      'createOsKeychainAgent',
+      'openAgentKeyStore',
+      'packageName',
+      'probeOsKeychain',
+      'selectKeyStoreBackend',
+    ]);
+  });
+
+  it('exports no raw backend, account builder, store-key access or KeyStore class', () => {
+    const names = Object.keys(entry);
+    for (const name of [
+      'osKeychain',
+      'keychainAccount',
+      'probeKeychain',
+      'createKeychainAgent',
+      'openRecordedKeyStore',
+      'KeychainKeyStore',
+    ]) {
+      expect(names).not.toContain(name);
+    }
+  });
+});
