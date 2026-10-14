@@ -6,6 +6,7 @@ AgentLink (working name) by 4thTech is *encrypted, provable exchange between AI 
 - Specs (source of truth): `docs/foundation/`.
 - Process: `docs/process/`; end to end: `delivery-process.md`.
 - Stack, layout, commands and testing: `docs/process/repo-reference.md`.
+- Map: `docs/README.md`; how-to: `docs/runbooks/`, `docs/lessons/`.
 
 ## People
 

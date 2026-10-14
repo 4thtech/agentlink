@@ -63,7 +63,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 
 | Section | Cards |
 |---|---|
-| M0 Foundations | 29 (incl. 7 in the D-25 group; 9 `done (setup)`) |
+| M0 Foundations | 31 (incl. 7 in the D-25 group; 9 `done (setup)`) |
 | Legacy OPS-L | 9 |
 | Design drops (owner, D-30) | 3 |
 | M1 Local beta | 84 (M1a 38, M1b 46; incl. 11 split-off, 7 new cards from D-31…D-41 and 4 from D-48) |
@@ -477,6 +477,36 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:**
   - A test PR opened from an agent worktree shows `4thtech-agent` as author and Tali's identity on the commits; the preflight fails closed when the profile is missing or is the owner's.
   - No file in the repo, the worktree or the sync branch contains the token; the secret scan stays green.
+
+#### M0-24 · Docs-consistency check: links and runbook template (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · tools/ (a check script and its test), root `package.json` script wiring
+- **Depends on:** M0-2d
+- **Spec:** `docs/runbooks/README.md` (template); `docs/lessons/README.md`; `development-process.md` §10
+- **Invariants:** —
+- **Scope:**
+  - A Node script under `tools/` (no new dependency) that fails when a relative Markdown link in `docs/**`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `README.md` or `CONTRIBUTING.md` points to a missing file, or to a missing heading anchor where one is given.
+  - Every `docs/runbooks/*.md` except `README.md` has, in order, the sections Purpose, When to use, Who runs it, Preconditions, Steps, Verify, If it fails, Related; its title starts with `RB-<nn>`, and it is listed in the runbooks index. Every `docs/lessons/LL-*.md` has Problem, Symptom, Cause, Rule and Source, and is listed in the lessons index.
+  - Runs inside `pnpm lint` (so `ci-gate` enforces it); no network access, so external links are not checked.
+  - A good first task for a new developer (`docs/README.md` §2).
+- **Acceptance:**
+  - Green on the current tree; a fixture with a broken link, a runbook missing "Verify" and an unlisted lesson each fail (negative controls recorded in the PR).
+  - Strict mode stays on; no change to `.github/**`.
+
+#### M0-25 · Harness pointer files: classification and Copilot instructions (new)
+- **Status:** backlog · **Size:** S · **Tier:** Owner · **Security:** S1
+- **Repo/path:** agentlink · `.github/workflows/review-gate.yml`, `.github/CODEOWNERS`, `.github/copilot-instructions.md`, `docs/process/audit-rules.md` §2.2
+- **Depends on:** —
+- **Spec:** `audit-rules.md` §2.2 (agent instructions are S1; the table is mirrored in `review-gate.yml` and CODEOWNERS); `docs/README.md` §3 (harness table)
+- **Invariants:** I-5 (agent-facing instructions are a control surface)
+- **Scope:**
+  - Classify `GEMINI.md` like `AGENTS.md` and `CLAUDE.md`: S1, a sensitive path, code-owned. Today it falls under "anything else" (S0), so a PR could change what Gemini CLI loads with no review.
+  - Decide whether `docs/runbooks/**` and `docs/lessons/**` are S1 like `docs/process/**` and `skills/**` (agent-facing procedures) or stay S0; update the §2.2 table, `review-gate.yml` and the PR template wording together.
+  - Add `.github/copilot-instructions.md` as a one-line pointer to `AGENTS.md` if Copilot Chat in the IDE is used (the Copilot coding agent already reads `AGENTS.md`).
+  - These are `.github` and process changes: prepared by an agent, merged by the owner.
+- **Acceptance:**
+  - A fixture PR touching only `GEMINI.md` is derived as S1 by `review-gate`.
+  - The §2.2 table, `review-gate.yml` and CODEOWNERS agree (checked by the independent review).
 
 ### Legacy security (OPS-L)
 
