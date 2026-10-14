@@ -4,9 +4,10 @@
 // Everything here except the owner-signed objects is untrusted content from another party (I-5):
 // these schemas bound and shape it; they never make it safe to execute or to show unwrapped.
 import { z } from 'zod';
+import { approvalActionSchema, commitmentScopeOf } from './approval.js';
 import {
   APPROVAL_SUMMARY_MAX_CHARS,
-  APPROVAL_TOOL_NAMES,
+  APPROVAL_TTL_SECONDS,
   BYTE_LENGTHS,
   FILE_PAYLOAD_TYPES,
   MAX_ENVELOPE_BYTES,
@@ -26,6 +27,7 @@ import {
   bytes32Hex,
   base64urlBounded,
   evmAddress,
+  hasControlOrFormat,
   ijsonString,
   isWellFormedString,
   jsonByteLength,
@@ -174,22 +176,17 @@ export const revokeBodySchema = z.strictObject({ signed: signedAgentRevokeSchema
 
 // `summary` is core-generated template text: no control or format characters (newlines, bidi,
 // zero-width), so it can never fake structure in the console (I-5).
-const CONTROL_OR_FORMAT = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
 const approvalSummary = ijsonString({ min: 1, max: APPROVAL_SUMMARY_MAX_CHARS }).refine(
-  (s) => !CONTROL_OR_FORMAT.test(s),
+  (s) => !hasControlOrFormat(s),
   'summary must not contain control or format characters',
 );
 
 /**
- * `approval-request` (04 §3.4.1). `action.args` is the tool input and `action.context` the facts the
- * core bound; their per-tool schemas (and the commitment scope, 04 §3.4.2) plug in from M1-2b.
+ * `approval-request` (04 §3.4.1). `action` is `{tool, args, context}` with one strict context per
+ * tool (approval.ts). Static checks here, with no clock: the G-7 TTL (`expiresAt = requestedAt +
+ * 86 400`, or the commitment scope's `expiresAt` if sooner) and, for a commitment, that the scope
+ * belongs to the requesting agent.
  */
-export const approvalActionSchema = z.strictObject({
-  tool: z.enum(APPROVAL_TOOL_NAMES),
-  args: jsonObjectSchema,
-  context: jsonObjectSchema,
-});
-
 export const approvalRequestBodySchema = z
   .strictObject({
     approvalId: approvalIdSchema,
@@ -200,9 +197,34 @@ export const approvalRequestBodySchema = z
     requestedAt: uint53,
     expiresAt: uint53,
   })
-  .refine((b) => b.expiresAt > b.requestedAt, {
-    message: 'expiresAt must be after requestedAt',
-    path: ['expiresAt'],
+  .superRefine((b, ctx) => {
+    if (!(b.expiresAt > b.requestedAt)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'expiresAt must be after requestedAt',
+        path: ['expiresAt'],
+      });
+      return;
+    }
+    const scope = commitmentScopeOf(b.action);
+    let expected = b.requestedAt + APPROVAL_TTL_SECONDS;
+    if (scope !== undefined) {
+      if (typeof scope.expiresAt === 'number') expected = Math.min(expected, scope.expiresAt);
+      if (scope.agentId !== b.agent) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'a commitment scope must belong to the requesting agent',
+          path: ['action', 'context', 'scope', 'agentId'],
+        });
+      }
+    }
+    if (b.expiresAt !== expected) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'expiresAt must be requestedAt + 86400, or the commitment scope expiry if sooner',
+        path: ['expiresAt'],
+      });
+    }
   });
 
 // --- Payload -------------------------------------------------------------------------------------
@@ -279,6 +301,5 @@ export type CardUpdateBody = z.infer<typeof cardUpdateBodySchema>;
 export type ApprovalBody = z.infer<typeof approvalBodySchema>;
 export type PolicyBody = z.infer<typeof policyBodySchema>;
 export type RevokeBody = z.infer<typeof revokeBodySchema>;
-export type ApprovalAction = z.infer<typeof approvalActionSchema>;
 export type ApprovalRequestBody = z.infer<typeof approvalRequestBodySchema>;
 export type Payload = z.infer<typeof payloadSchema>;

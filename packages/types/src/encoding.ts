@@ -48,6 +48,29 @@ export function utf8ByteLength(s: string): number {
   return n;
 }
 
+// Control (Cc), format (Cf: bidi, zero-width…) and line or paragraph separator characters.
+const CONTROL_OR_FORMAT = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+
+/**
+ * True when the string has a control, format (bidi, zero-width) or line/paragraph separator
+ * character: text we generate (summaries, `nextStep`) must have none, so it can never fake
+ * structure (I-5).
+ */
+export const hasControlOrFormat = (s: string): boolean => CONTROL_OR_FORMAT.test(s);
+
+/**
+ * True when every item is a string and the list is in strictly ascending code-unit order (hence
+ * free of duplicates). For canonical lowercase hex of one length this is byte order.
+ */
+export function isStrictlyAscending(items: readonly unknown[]): boolean {
+  for (let i = 1; i < items.length; i++) {
+    const a = items[i - 1];
+    const b = items[i];
+    if (typeof a !== 'string' || typeof b !== 'string' || !(a < b)) return false;
+  }
+  return items.every((item) => typeof item === 'string');
+}
+
 /** An I-JSON string of `min`..`max` code points. */
 export const ijsonString = ({ min = 0, max }: { min?: number; max: number }) =>
   z
