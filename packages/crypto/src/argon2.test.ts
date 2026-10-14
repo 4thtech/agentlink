@@ -1,10 +1,14 @@
 // M1-1f: Argon2id v1.3 (RFC 9106) through @noble/hashes, the KDF of the owner passphrase wrap, the
 // file KeyStore and the recovery code (04 §2.3, §2.8). The cross-runtime vectors are in
 // test-vectors/owner-wrap; these tests pin the API rules.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { CryptoInputError, encodeHex, encodeUtf8, type Argon2idParams } from './index.js';
 import { argon2id } from './keystore.js';
 import { argon2idWithSecretAndAd } from './testing.js';
+
+// Each test here runs Argon2id (m = 19 MiB) several times. On a loaded CI runner that can exceed
+// Vitest's default 5 s per test, so this file allows 60 s. Assertions are unchanged.
+vi.setConfig({ testTimeout: 60_000 });
 
 const SMALL = { memoryKiB: 32, iterations: 3, parallelism: 4 } as const;
 const FLOOR = { memoryKiB: 19456, iterations: 2, parallelism: 1 } as const;

@@ -5,7 +5,7 @@
 // generic error for a wrong secret or a tampered file, and no secret in any error (I-7).
 // The KDF runs at the floor (m = 19 MiB, t = 2, p = 1) to keep the suite fast; the defaults run in
 // the vectors.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   CryptoInputError,
   KEYSTORE_KDF_BOUNDS,
@@ -28,6 +28,10 @@ import {
   sealKeystoreFile,
   sealOwnerSeed,
 } from './keystore.js';
+
+// Each test here runs Argon2id (m = 19 MiB) several times. On a loaded CI runner that can exceed
+// Vitest's default 5 s per test, so this file allows 60 s. Assertions are unchanged.
+vi.setConfig({ testTimeout: 60_000 });
 
 const FLOOR = { memoryKiB: 19456, iterations: 2, parallelism: 1 } as const;
 const PHRASE = encodeUtf8('correct horse battery staple');

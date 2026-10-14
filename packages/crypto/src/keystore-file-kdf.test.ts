@@ -6,6 +6,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CryptoInputError, encodeUtf8, sha256 } from './index.js';
 import { deriveAgentId, derivePublicKey, openKeystoreFile, openOwnerSeed } from './keystore.js';
 
+// Each test here runs Argon2id (m = 19 MiB) several times. On a loaded CI runner that can exceed
+// Vitest's default 5 s per test, so this file allows 60 s. Assertions are unchanged.
+vi.setConfig({ testTimeout: 60_000 });
+
 const spy = vi.hoisted(() => ({ calls: 0 }));
 vi.mock('./argon2.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('./argon2.js')>();
