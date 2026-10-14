@@ -345,7 +345,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
 - **Status:** in progress · **Size:** XS · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · tools/deps-check/eslint-rules.test.mjs
 - **Depends on:** M0-10
-- **Spec:** `audit-rules.md` (guard tooling is S1); `ci-cd.md`
+- **Spec:** `audit-rules.md` §2 (`tools/**` is S0; this card is S1 because it edits `docs/process/**`); `ci-cd.md`
 - **Invariants:** I-8
 - **Scope:**
   - The first `lintText` call pays the cold ESLint start (config and plugin load), which exceeded the 5 s default test timeout under CI load, so the first test flaked and a rerun passed. Do the cold start once in `beforeAll`, with its own generous hook timeout; the per-test timeout stays at the default for warm runs.
