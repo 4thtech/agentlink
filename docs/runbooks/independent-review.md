@@ -12,7 +12,7 @@ The orchestrator spawns it and handles the result. The reviewer is a **different
 ## Preconditions
 - The builder's work is committed and pushed to its task branch; CI has run on the head commit (`gh run list --branch <branch>`). There is no PR yet.
 - You know the class and the areas touched (to choose the `audit-rules.md` §5 checklists).
-- S2: you have the RED commit SHA, its test command and the stated failure reason from the builder's report (they reach the PR body later). They are facts to reproduce, not the builder's rationale.
+- S2: you have the RED commit SHA, its test command and the stated failure reason from the builder's PR-body file (its **Tests-first evidence** section; the builder's brief requires it, RB-03). Take only those three items from it, never the rest of the file. They are facts to reproduce, not the builder's rationale.
 - Review number `<k>` is 1 for the first review of a task, then 2, 3 … for each delta review (for example `IR-M1-5a-1`, then `IR-M1-5a-2`).
 
 ## Steps
