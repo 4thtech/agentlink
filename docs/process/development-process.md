@@ -306,7 +306,7 @@ S0 tasks MAY skip `audit`. A task that hits stop-the-line (`audit-rules.md` §10
 
 - Subject: `<TASK-ID>: <imperative summary>` (≤ 72 chars). Body explains why.
 - Attribution trailers on AI-authored commits follow the current harness or session instructions; do not add them otherwise.
-- S2: the commit adding failing tests MUST precede the implementation commit (tests-first evidence).
+- S2: the commit adding failing tests (subject prefix `RED (expected):`) MUST precede the implementation commit (tests-first evidence). It is run locally and NOT pushed on its own: push the branch only with the implementation on top, so CI's first run is green (`audit-rules.md` §3.4, LL-14).
 - After review starts, add commits rather than rewriting history, so reviewers see deltas.
 
 ### 7.3 Pull requests
@@ -372,7 +372,7 @@ No step may merge before the previous one has merged. Each PR references the oth
 
 | Area | Requirement | Source |
 |---|---|---|
-| S2 code (crypto, policy engine, anything that signs, contracts) | Tests first: failing tests committed before implementation; red run recorded in the PR's "Tests-first evidence" section | `repo-reference.md` (testing), 10 §7 |
+| S2 code (crypto, policy engine, anything that signs, contracts) | Tests first: failing tests committed before implementation (`RED (expected):`); the local red run (SHA, command, output excerpt) recorded in the PR's "Tests-first evidence" section | `repo-reference.md` (testing), 10 §7 |
 | Test vectors | Key derivation, envelope hash/sign, HPKE wrap, STREAM file encryption, pairing proof, EIP-712 (incl. chain-agnostic AgentCard domain) committed and run in **Node, browser (Playwright) and Workers (Miniflare)** via `pnpm vectors:check`. Vectors change only with a spec change | 04 §8.2, 05 §8 |
 | MCP tools | Schema test + behaviour test for each `status` value; MCP Inspector validation; tool-list review test asserting no tool changes policy, exports keys, adds storage credentials or bypasses approvals | `repo-reference.md` (testing), 06 §9 |
 | Policy engine | Unit test per rule of `evaluate(policy, action, context)` | 07 §2 |

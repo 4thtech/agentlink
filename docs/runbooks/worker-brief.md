@@ -33,7 +33,7 @@ The orchestrator (Opus 5.5). It picks the worker's tier with the routing procedu
    Report:               §4.3 format, at most 400 words; long output goes to files.
    ```
 3. Paste the forbidden-actions list of §4.2 verbatim, plus any task-specific ones.
-4. State the acceptance criteria as AC-1 … AC-n, each mapped to a test or a command. For new tests, require a negative control ([RB-05](writing-tests.md)).
+4. State the acceptance criteria as AC-1 … AC-n, each mapped to a test or a command. For new tests, require a negative control ([RB-05](writing-tests.md)). For S2, require the tests-first evidence: a `RED (expected):` commit, run locally, not pushed alone, with its SHA, command and output excerpt in the report ([RB-05](writing-tests.md) step 6).
 5. Name the exact commands to run (`pnpm lint`, `pnpm typecheck`, `pnpm test`, or the package-scoped variants).
 6. Launch. In Claude Code: the Agent tool with `model` set per the routing table and `isolation: "worktree"` for parallel writers. Run independent workers in parallel and in the background.
 

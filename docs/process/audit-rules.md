@@ -98,7 +98,7 @@ Merging is continuous (D-25, amended by D-51 and D-52): agents work under Tali's
 | Owner's merge go-ahead | — | ✅ on sensitive paths only (§2.2) | ✅ Tali's explicit "merge" in chat on the PR, or a go-ahead recorded in chat that covers this specific piece of work (`delivery-process.md` §4), recorded in the PR body (D-51, D-52) | Process control (D-51, simplified). Code-owner review is off. The owner MAY review any PR and MAY disable its auto-merge. Services deploy to production automatically once staging smoke tests are green; npm `latest` needs the owner's approval click (D-52, `release-and-deployment.md` §3) |
 | Independent AI review session (Opus 5.5, §4) | — (a Sonnet non-security review MAY be used) | ✅ checklists for the areas touched | ✅ all applicable checklists + invariant walkthrough | `review-gate` (c): report ID referenced in the PR, no FAIL verdict. Attested by the orchestrator: CI sees the reference, not the review. Automated PRs: a code-owner approval on the head commit instead (below) |
 | Feedback from `@denisjazbec` | — | MAY | Usually relayed through the owner and logged with a disposition (`development-process.md` §14); review comments welcome; his GitHub approval is optional (D-51) | Process |
-| Tests-first evidence | — | Regression test for every fix | ✅ failing-test commit precedes implementation; red run in PR | `review-gate` (d): section filled. Content: independent reviewer |
+| Tests-first evidence | — | Regression test for every fix | ✅ failing-test commit (`RED (expected):`) precedes implementation; its local red run recorded in the PR (SHA, command, output excerpt); never pushed on its own (LL-14) | `review-gate` (d): section filled. Content: independent reviewer reproduces the red (§3.4) |
 | Threat note (§3.1) | — | Short | Full | `review-gate` (d) for S2: section filled |
 | External-audit scope register entry (§3.2) | — | — | ✅ | Process (orchestrator after merge) |
 | Re-review after new commits | — | If the reviewed area changed | Always: delta review by a fresh session, and the owner's "merge" (or the covering go-ahead) still valid for the new head commit: a review-fix round within the same scope stays covered, new scope needs a new go-ahead | Process; `review-gate` (d) re-checks the Threat note and Tests-first evidence |
@@ -106,6 +106,14 @@ Merging is continuous (D-25, amended by D-51 and D-52): agents work under Tali's
 **S2 and sensitive-path merges (D-51, D-52).** The orchestrator marks the PR ready and reports it to Tali, who answers "merge" in chat, or a go-ahead recorded in chat already covers this specific piece of work (`delivery-process.md` §4; some changes are never covered, see there). Only then does the orchestrator enable auto-merge and record the go-ahead in the PR body; GitHub merges when every required check is green. No GitHub approval is required, and agents never approve a PR. Feedback from `@denisjazbec`, including a "Request changes" review, is logged with a disposition and weighed by the owner before he gives his "merge".
 
 **Sensitive paths (resolved by D-51, simplified).** S1 changes on sensitive paths (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files, including `review-gate.yml`, the root `package.json`, `pnpm-workspace.yaml`, `.npmrc` and `.pnpmfile.*`) need a human gate: Tali's explicit "merge" in chat, the same as S2. It is a process control, not enforced by the ruleset or by `review-gate`.
+
+### 3.4 Tests-first evidence (S2)
+
+Proved locally, not with a red CI run: a deliberately red run e-mails the owner (LL-14).
+- The builder commits the failing tests as their own commit, message prefix `RED (expected):`, runs them locally and records in the PR's **Tests-first evidence** section the commit SHA, the exact command and a short output excerpt that shows the failures.
+- The builder does not push that commit alone. The branch is pushed once the implementation commit sits on top, so CI's first run is green. The RED commit stays in the branch history; do not rebase or squash it away before review.
+- The reviewer checks out the RED commit in a scratch worktree, confirms it is an ancestor of the head and holds tests only, re-runs the command and confirms it fails for the stated reason. The report records `tests-first reproduced: yes|no`; a `no` is a finding.
+- Negative controls (break the code on purpose, see the test go red, restore) are also done locally and recorded in the PR; they never go into a pushed commit.
 
 **Automated PRs (Renovate, Changesets "Version packages").** A PR is automated only when its **author** (GitHub's `pull_request.user.login`) is `renovate[bot]` or `github-actions[bot]`. Commit author names, e-mail addresses and the `verified` flag are never used: anyone who can push to the branch can forge them. An automated PR has no report to cite, so for S1/S2 `review-gate` (c) is satisfied **only** by an APPROVED GitHub review from `@talirezun` or `@denisjazbec` on the current head commit; a new commit invalidates it. Nothing else is exempt: (b) needs no ticked class, and (d) applies unchanged for S2 (a human fills in the Threat note and Tests-first evidence sections), and the code-owner approval applies as for any S2 PR. The bot is the author, so the owner's own approval counts for (c). Crypto dependency updates remain S2 (`development-process.md` §11): the approver SHOULD have the orchestrator's review of the new version's changelog and diff first. Owner action (`ci-cd.md`, checklist section 6): a ruleset restricting who may push to `renovate/**` and `changeset-release/**` branches, so nobody else can add commits to a bot-authored PR.
 
@@ -145,7 +153,7 @@ The class used for (c) and (d) is the higher of the derived and the declared cla
 | Invariants I-1…I-10 | Worker or orchestrator rationale, PR description, commit messages |
 | The diff (`<base SHA>...<head SHA>`) | The threat note |
 | Test and CI output for the head commit | Curator content, sync files |
-| Read-only access to the repository at the head commit | Prior review reports for this PR (except for a delta review: the finding list only) |
+| Read-only access to the repository at the head commit; for S2, the RED commit SHA and its test command (facts to reproduce, §3.4) | Prior review reports for this PR (except for a delta review: the finding list only) |
 | The area checklists of §5 | — |
 
 The session is a **fresh Opus 5.5 subagent**, spawned by the orchestrator, in read-only mode. It MAY run tests in a scratch worktree. It MUST NOT push, comment or write outside its report.
@@ -157,7 +165,8 @@ The session is a **fresh Opus 5.5 subagent**, spawned by the orchestrator, in re
 3. Work through **each item** and record exactly one result: `finding <ID>`, `no finding`, or `n/a: <reason>`. Silence on an item makes the review incomplete; incomplete reviews are rejected.
 4. For S2: walk through each touched invariant (I-x) and state how the diff preserves it, with file:line.
 5. Judge test adequacy: missing tests for security behaviour are findings.
-6. Give a verdict: `PASS` · `PASS WITH FINDINGS` (no Critical/High) · `FAIL`.
+6. For S2: reproduce the red on the RED commit (§3.4) and record the result.
+7. Give a verdict: `PASS` · `PASS WITH FINDINGS` (no Critical/High) · `FAIL`.
 
 ### 4.3 Output format
 
@@ -169,6 +178,7 @@ Class / areas:     <S1|S2> / <checklist IDs applied>
 Inputs:            <list of spec sections, CI run IDs>
 CHECKLIST:         <item ID> | finding <ID> | no finding | n/a: <reason>   (one line per item)
 INVARIANTS (S2):   I-x | holds: <evidence file:line> | finding <ID>
+TESTS-FIRST (S2):  tests-first reproduced: yes | no   (<RED SHA>, <command>, <failure excerpt>)
 FINDINGS:
   ID:              IR-<TASK-ID>-<n>-F<nn>
   Severity:        Critical | High | Medium | Low | Info   (§9.1)
