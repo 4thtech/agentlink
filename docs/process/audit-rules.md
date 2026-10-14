@@ -291,7 +291,7 @@ Reviewers apply every checklist the diff touches. Item IDs are stable; new items
 - CT-11 Replay: `recordId = keccak256(abi.encode(chainid, this, signer, nonce))` single use; deadlines enforced; one receipt per type; ACCEPTED/REJECTED exclusive; Registry `regOwnerSig` and `revoke` nonces; EIP-3009 nonces.
 - CT-12 Signatures via `SignatureChecker.isValidSignatureNow`; malleable EOA signatures rejected.
 - CT-13 Fees: `protocolFee ≤ maxProtocolFee`; integrator cap applied at charge time; `integratorFeeCapMultiple ≤ 10`; `total ≤ maxTotal`; inactive app reverts.
-- CT-14 Gas targets met with snapshots: `notarize` ≤ 160k, `acknowledge` ≤ 75k, `notarizeBatch` ≤ 120k per item (n=20).
+- CT-14 Gas targets met with snapshots: `notarize` ≤ 170k, `acknowledge` ≤ 75k, `notarizeBatch` ≤ 120k per item (n=20).
 - CT-15 Slither and Aderyn clean, or each justification reviewed and recorded.
 - CT-16 Deploy script: CreateX CREATE3 with a deployer-guarded salt (no cross-chain front-running); all roles transferred to the Safe in the same script; deployer holds no role; per-chain config verified; Solidity and `evm_version` pinned and supported on every target chain.
 - CT-17 Clean-room: no OCC v1 code copied.

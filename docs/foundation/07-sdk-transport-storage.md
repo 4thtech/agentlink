@@ -283,6 +283,7 @@ Requests and responses use the JSON form of 05 §3.1 (04 §2.4.1): `0x` + lowerc
 
 - Gas wallets per chain (hot keys in Workers secrets, low balances, auto-alerts). Gas costs are recovered through protocol fees.
 - Per-signer and per-IP rate limits; reject if simulated credits are insufficient.
+- Batches follow 05 §3.3 (G-4): all-or-nothing, except that items already on-chain in identical form are skipped. The submitter rule (per-item simulation, one resubmission without the failing items, per-item status `recorded`, `skipped` or `failed`) is there too.
 - Anyone can run a submitter (same code); clients accept a list.
 - No request logging beyond aggregate metrics; never log signatures linked to IPs.
 

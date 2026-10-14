@@ -1069,20 +1069,30 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-3d · contracts: OCCNotary (records, receipts, freeze)
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · src/OCCNotary.sol, test/unit
-- **Depends on:** M1-3a (uses `IOCCFeeVault` with a mock until M1-3b lands), M1-1i; gap G-4 resolved
+- **Depends on:** M1-3a (uses `IOCCFeeVault` with a mock until M1-3b lands), M1-1i; gap G-4 resolved (owner decision, 14 Oct 2026; 05 §3.3)
 - **Spec:** 05 §3.1–§3.4, §5 (freeze), §5.2, §6, §7; 04 §5
 - **Invariants:** I-6
 - **Scope:**
   - EIP-712 `Record`/`Receipt`; `notarize`, `notarizeBatch` (semantics per G-4), `notarizeDirect` (payable; `msg.sender == r.signer`; `depositFromModule` then `charge`), `acknowledge`, `acknowledgeBatch`, `getRecord`, `computeRecordId`.
   - recordId = keccak256(abi.encode(block.chainid, address(this), signer, nonce)) (also the single-use nonce); `RecordState` packed into 5 slots incl. `recordStructHash`; receipt flags; ACCEPTED/REJECTED exclusive; commitment check `keccak256(abi.encode(rc.signer, rc.salt)) == recipientCommitment`.
   - `SignatureChecker.isValidSignatureNow` (EOA + ERC-1271); deadlines; pause; one-way `freezeUpgrades()`.
+  - Owner decisions of 14 Oct 2026:
+    - G-4 batches (05 §3.3): an identical existing record or receipt is skipped and emits `RecordSkipped` or `ReceiptSkipped`; every other failure reverts the batch.
+    - Pause blocks `acknowledge` and `acknowledgeBatch`, and pause and unpause still work after `freezeUpgrades` (05 §5.1).
   - CI parity job: EIP-712 hashes equal the canonical public vectors at the pinned commit.
   - Open Low (IR-M1-3a-1 L-3): the Notary's freeze goes through a `_beforeUpgrade` hook, not an override of `_authorizeUpgrade` (see M1-3b), so the role check stays in the base.
   - Follow-up (IR-M1-3b-1 I-3): the Notary's direct-payment functions call `depositFromModule` with `payer = msg.sender`, never a signer or payer taken from calldata; a module charges only the payer's own credits.
 - **Acceptance:**
   - Tests first; unit test for every function and revert (`Expired`, `InvalidSignature`, `RecordExists`, `RecordNotFound`, `ReceiptExists`, `ConflictingReceipt`, `NotRecipient`, `NotSigner`, `FeeAboveMax`, `EnforcedPause`, `ExpectedPause`, `UpgradesAreFrozen`).
   - Role tests run against the real contract (IR-M1-3a-1 M-2): switch `RoleFixture._deploy` from the `NotaryHarness` stub to `OCCNotary`, so `RoleMap` and `RoleBound` (including `freezeUpgrades` → `FREEZER`, `pause`/`unpause`, `upgradeToAndCall`) cover shipping code; the "every non-view selector is in `docs/roles.md` or callable by an outsider" test from M1-3b covers the Notary too.
-  - Gas snapshots meet 05 §3.4: `notarize` (credits, EOA) ≤ 160k, `acknowledge` ≤ 75k, `notarizeBatch` per item (n = 20) ≤ 120k; CI fails on regression.
+  - Batch tests (G-4):
+    - an identical record is skipped (no charge, event emitted, no deadline or signature check);
+    - the same `recordId` with a different struct hash reverts the batch;
+    - an identical receipt is skipped; a conflicting receipt or a wrong salt reverts;
+    - one expired, unsigned or underfunded item reverts the batch;
+    - a duplicate within one batch is skipped.
+  - Pause tests: `acknowledge` reverts with `EnforcedPause` while paused, and `pause` and `unpause` still work after `freezeUpgrades`.
+  - Gas snapshots meet 05 §3.4: `notarize` (credits, EOA) ≤ 170k, `acknowledge` ≤ 75k, `notarizeBatch` per item (n = 20) ≤ 120k; CI fails on regression.
   - A test recomputes `recordStructHash` from a full `Record` and matches `getRecord` (verification without logs).
   - Cross-chain, cross-contract and high-s signature replays rejected.
   - A test shows that a direct payment with a signer other than the caller cannot draw on that signer's allowance (IR-M1-3b-1 I-3); the independent review checks this path by name.
@@ -1737,12 +1747,21 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 07 §7; 03 §4.3; 04 §7 (malicious submitter, gas griefing); 05 §3.2
 - **Invariants:** I-3, I-7
 - **Scope:**
-  - `POST /v1/notarize`, `POST /v1/receipt`, `GET /v1/status/:txHash`, `GET /v1/health`; signature validation and `eth_call` simulation (incl. credits) before sending; batching per G-4.
+  - `POST /v1/notarize`, `POST /v1/receipt`, `GET /v1/status/:txHash`, `GET /v1/health`; signature validation and `eth_call` simulation (incl. credits) before sending; batching per G-4 (05 §3.3):
+    - per-item simulation, and the failing items left out;
+    - after an on-chain revert, one resubmission without the failing items;
+    - a signer that caused a revert is submitted alone for a cooling-off period;
+    - per-item status `recorded`, `skipped` or `failed`.
   - Per-signer and per-IP rate limits and per-chain transaction-nonce serialisation in Durable Objects; gas keys only from Worker secrets.
   - The submitter uses viem only through `@agentlink/chain` (M0-10 policy: `apps/submitter` is not in the viem zone); needs from chain (simulation, signature checks, gas-key wallet) are added to `@agentlink/chain`, not by widening the zone.
   - No request logging beyond aggregate metrics; never signatures together with IPs. `/v1/deposit-authorization` present but disabled until M3-4b.
 - **Acceptance:**
   - Miniflare tests per endpoint: invalid signature, insufficient credits (rejected before sending), rate limit, concurrent nonce handling.
+  - G-4 tests:
+    - an item already on-chain reports `skipped`;
+    - a batch whose item loses its credits after simulation is resubmitted once without that item, and the others are `recorded`;
+    - an item that fails twice is `failed`.
+  - A paused Notary: items are held, not reported `failed`, until their deadline.
   - Testnet integration with M1-4c; captured logs contain no IPs or signatures; `/v1/health` reports gas balances and queue depth.
 
 #### M1-10b · testnet credits faucet
@@ -3207,7 +3226,12 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 
    *Was:* 03 §3; 07 §1, §4.1; 04 §2.6, §3.1. The interface lived "in core", but `transport-nostr` depends only on `crypto` (a dependency cycle). Missing were envelope-hash signing (`signNostr` signs events, while the envelope signature is BIP-340 over a tagged hash) and epoch selection for decrypting with old keys. The first proposal was to define `KeyStore`/`OwnerKeyStore` in `@agentlink/crypto` and add `signEnvelopeHash` and epoch parameters. *Blocks:* M1-1g, M1-5a, M1-7b.
 3. **G-3 (H) AccessManager role mapping.** Resolved by PR #11 (D-59, confirmed by the owner at merge): 05 §5.1 role map with role IDs, selectors, holders (mainnet Safe and ops hardware key; separate testnet Safe and key with scaled delays), execution and grant delays, `GUARDIAN` (cancel only), role admins, 7-day target admin delays and the OZ default `minSetback`. The AccessManager delays are the timelock (no `TimelockController`). `ADMIN_ROLE` moves to 7 days, and module registration and every upgrade move to 7 days, because any module can charge credits. The cap is lowered and raised through two functions (`InvalidCapChange()`). `unpause` is Safe-only. Mainnet contracts start paused until the configured delays are in effect. *Was:* per-function delays that AccessManager cannot express; two UPGRADER delays; `freezeUpgrades` under the 48 h ADMIN; guardians, grant delays and `minSetback` unspecified. *Blocks:* M1-3a, M1-3b, M1-3g.
-4. **G-4 (H) Batch failure semantics.** 05 §3.2; 07 §7. Whether one failing item reverts `notarizeBatch`/`acknowledgeBatch` is unspecified; the submitter batches across signers, so one item (e.g. credits spent between simulation and inclusion) can grief the rest. *Proposed:* specify all-or-nothing with per-item pre-simulation and retry without the failing item, or skip-and-emit with per-item status; keep 05 §3.4 gas targets. *Blocks:* M1-3d, M1-10a.
+4. **G-4 (H) Batch failure semantics.** Resolved (decided by the owner in chat, 14 Oct 2026; wording confirmed at merge; recorded by branch `docs/G-2-envelope-signatures`), in 05 §3.3.
+   - Batches are all-or-nothing. The exception is an item that is already on-chain in identical form: a Record with the same `recordStructHash`, or a receipt type already set by the committed recipient. Such an item is skipped, with no charge and no revert, and emits `RecordSkipped` or `ReceiptSkipped`. Any other failure reverts the whole batch. Single calls still revert.
+   - **Submitter (M1-10a):** simulate per item and then as a batch, and leave out every failing item. If a sent batch reverts, resubmit once without the failing items; an item that fails twice is `failed`. A signer that caused a revert is submitted alone for a while. Per-item status is `recorded`, `skipped` or `failed`.
+   - Same decision: the `notarize` gas target is ≤ 170k (05 §3.4). Pause also blocks receipts, and it still applies after freeze (05 §5.1). Every Record has a fresh random salt (04 §5).
+
+   *Was:* 05 §3.2; 07 §7. Whether one failing item reverts `notarizeBatch`/`acknowledgeBatch` was unspecified. The submitter batches across signers, so one item (for example credits spent between simulation and inclusion) could grief the rest. *Blocks:* M1-3d, M1-10a.
 5. **G-5 (M) J1 key storage wording.** RESOLVED by 02 §5 J1 steps 2–3: `init` puts only the agent keys in the OS keychain (step 2); the owner key is created and wrapped in the setup step (step 3, 04 §2.2). *Was:* J1 step 2 stored "owner and agent keys" in the OS keychain, against 04 §2.2. *Blocked:* M1-9a, M1-12b.
 6. **G-6 (H) Policy fail-open.** Resolved for the fallback by branch `docs/m12b-spec-fixes` (pending owner; proposed, owner confirms at merge; review IR-M1-2b-1). The version in an owner-signed object and the KeyStore high-water mark were already in 04 §2.5.1. 06 §3 (last paragraph) now says that once any policy version has been applied, a missing, unsigned, tampered, rolled-back or unparseable policy never falls back to the defaults: every paid action, commitment and owner-gated action needs the owner's approval, unknown senders are queued, no contact rule or auto-accept applies, and the owner is told to confirm the policy again. A `deny` that can no longer be read becomes `approval`, never `allow`. *Was:* 06 §3 (last paragraph): unsigned or tampered policies fell back to defaults, which can be looser than the owner's policy (e.g. `proofs.notarize: deny` → `allow`), and deleting the signed row downgraded policy. *Blocks:* M1-7d.
 7. **G-7 (M) Lifetimes.** Resolved by branch `docs/G-7-G-32` (pending owner; proposed, owner confirms at merge). The values are in 04 §2.5.1 (lifetimes, skew and nonces), 04 §3.4.1 (approval TTL) and 06 §3 (daily budget window).

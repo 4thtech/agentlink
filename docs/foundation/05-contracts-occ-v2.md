@@ -177,6 +177,18 @@ Signatures are verified with OpenZeppelin `SignatureChecker.isValidSignatureNow(
 4. Set flag and `receiptAt[type]`; emit `ReceiptRecorded`.
 5. **No fee:** receipts are included in the record fee.
 
+**Batches (G-4; decided by the owner in chat, 14 Oct 2026; wording confirmed at merge).** `notarizeBatch` and `acknowledgeBatch` are all-or-nothing, with one exception: an item that is already on-chain in identical form is skipped.
+- **Record item.** If `records[recordId]` exists and its `recordStructHash` equals the item's EIP-712 struct hash, the item is skipped. A skipped item has no charge, no revert, no state change and emits `RecordSkipped(recordId)`. This check runs first, so a skipped item's deadline and signature are not checked: nothing it carries is used. A `recordId` that exists with a different struct hash reverts the whole batch (`RecordExists()`).
+- **Receipt item.** The contract stores no receipt struct hash, so "identical" is read as follows. The same `receiptType` is already set on that `recordId`, and the item's `signer` and `salt` open its `recipientCommitment`. Only the committed recipient can set a type, and only once, so the on-chain outcome is the same. Such an item is skipped and emits `ReceiptSkipped(recordId, receiptType)`. If the commitment does not open, the whole batch reverts (`NotRecipient()`), and so does an `ACCEPTED` for a record with `REJECTED` set, or the reverse (`ConflictingReceipt()`). Only the deadline is not compared, because it is not stored.
+- **Any other failure reverts the whole batch.** This includes an expired deadline, an invalid signature, insufficient credits, a fee above `maxFee` and a pause. An identical item repeated within one batch is skipped the second time.
+- **Single calls are unchanged.** `notarize` and `acknowledge` still revert on an existing record (`RecordExists()`) or receipt (`ReceiptExists()`).
+- **Submitter rule (M1-10a, 07 §7).**
+  - Before sending, the submitter simulates each item alone and then the batch (`eth_call`). It leaves out every item that fails for a reason other than an identical existing entry, and reports that item to its client as `failed` with the error.
+  - If a sent batch still reverts (state changed between simulation and inclusion, for example credits spent), it re-simulates per item, leaves out the failing items and resubmits the rest once. An item that fails twice is reported `failed` and never retried.
+  - A signer whose item caused an on-chain batch revert is submitted alone, outside batches, for a cooling-off period, so that one signer cannot grief other signers' items.
+  - Per-item status to clients: `recorded`, `skipped` (already on-chain, which a client treats as success, with the existing `recordId`) or `failed`.
+  - A pause is not an item failure. While the Notary is paused, the submitter holds items and sends them after unpause. An item whose deadline passes in the meantime is `failed` (`Expired()`), and the client signs again under §5.1.
+
 > Privacy note: a receipt reveals the salt, linking the recipient's agent address to the record. Records without receipts reveal only the salted commitment. Per-relationship agent keys (P2) reduce linkability.
 
 Verifiers can check everything shown in a proof (signer, time, envelope hash, recipient, receipts with timestamps, and all other record fields via `recordStructHash`) from `getRecord` alone. That matters because some RPCs prune old logs.
@@ -185,7 +197,7 @@ Verifiers can check everything shown in a proof (signer, time, envelope hash, re
 
 | Function | Target |
 |---|---|
-| `notarize` (credits, EOA) | ≤ 160k |
+| `notarize` (credits, EOA) | ≤ 170k (decided by the owner in chat, 14 Oct 2026; wording confirmed at merge) |
 | `acknowledge` | ≤ 75k |
 | `notarizeBatch` per item (n = 20) | ≤ 120k |
 
@@ -250,7 +262,12 @@ OpenZeppelin Contracts v5 `AccessManager`; the role map below is **decided (D-59
 - **Why `ADMIN_ROLE` is 7 days** (decided, D-59). With every AccessManager change at 7 days, no path to a 7-day power is shorter than 7 days. Grant delays and target admin delays add a second, independent layer. The only exceptions are the 0-delay emergency and fee roles above. Execution delays of existing members can be lowered only after the reduction (OZ); a revoke-and-regrant counts as a new grant and waits for the grant delay.
 - **Bound (tested in M1-3a).** With the Safe compromised, every path to `UPGRADER`, `MODULE_ADMIN`, `TREASURY_ADMIN`, `CAP_RAISER` or `FREEZER` power takes at least 7 days on-chain. That covers using the role, granting it to a new account, remapping the function, switching the authority, and lowering a delay first. `CONFIG_ADMIN` power takes at least 48 h.
 - **Emergency.**
-  - **Pause.** `PAUSER` (either ops key or the Safe) pauses at once. **Pause scope:** pause blocks charges, deposits, notarization and registration. It **never** blocks `withdraw`, `withdrawIntegrator`, `sweep` or the Registry `revoke` (resolves G-39; decided, D-59). A stolen ops key therefore cannot trap funds or stop the revocation of a compromised agent.
+  - **Pause.** `PAUSER` (either ops key or the Safe) pauses at once. **Pause scope:** pause blocks charges, deposits, notarization, **receipts** (`acknowledge`, `acknowledgeBatch`; decided by the owner in chat, 14 Oct 2026; wording confirmed at merge) and registration. It **never** blocks `withdraw`, `withdrawIntegrator`, `sweep` or the Registry `revoke` (resolves G-39; decided, D-59). A stolen ops key therefore cannot trap funds or stop the revocation of a compromised agent.
+    - **Receipts and D-55 commitments** (this reading of the scope is stated here for the owner's confirmation). While the Notary is paused, a commitment scope's receipt or Record part (04 §3.4.2) stays claimed in the store, with its signed item kept, and is not used up. After unpause, the submitter sends the stored item if its `deadline` has not passed.
+      - **Receipt.** If the deadline has passed, the core may sign a new Receipt for the same `recordId` and `receiptType` with a new deadline, without asking the owner again, while the scope's `expiresAt` has not passed. It is the same part, and the one-time flag (§3.3) lets at most one receipt land.
+      - **Record.** A Record is signed again (new nonce, so a new `recordId`) only after the earlier signed Record's `deadline` has passed. Until then the earlier one could still land, and two Records would be charged twice. This matches the budget release rule (06 §3).
+      - **Scope expiry.** After the scope's `expiresAt`, the unused parts are void (04 §3.4.2) and the owner is asked again.
+    - **Pause after freeze.** `freezeUpgrades` disables only `_authorizeUpgrade`. `pause`, `unpause` and the role map are unaffected, so a frozen Notary can still be paused, and only the Safe unpauses it (decided by the owner in chat, 14 Oct 2026; wording confirmed at merge).
     - **Accepted residual risk (decided, D-59).** Because pause never blocks `withdrawIntegrator`, pause cannot stop an integrator withdrawing a balance inflated by a bug. The M3-1 audit scope must cover this path.
   - **Unpause.** Only the Safe unpauses (`PAUSE_ADMIN`), so a stolen ops key cannot undo a pause during an incident. It can only pause again (denial of service), or cancel scheduled operations as `GUARDIAN`.
   - **Stolen ops key.** The Safe revokes `PAUSER` and `GUARDIAN` from it **at once**, in the same Safe batch before unpausing, because `PAUSE_ADMIN` administers both roles with no delay. Trade-off: a compromised Safe can also remove the guardians at once, so the guardian adds no time beyond the 7-day bound against a compromised Safe. It is a fast veto for honest mistakes and for operations nobody expected.
@@ -277,7 +294,7 @@ OpenZeppelin Contracts v5 `AccessManager`; the role map below is **decided (D-59
   - **`minSetback` is not scaled.** It stays 5 days on testnets, so delays set at deployment, and rehearsals of delay changes, take effect after 5 days.
 - Mainnet configuration, upgrades and Safe operations are owner-only (D-25, D-52): agents prepare evidence; they never schedule, sign, execute or cancel (`release-and-deployment.md` §4.4).
 
-**Freeze:** the Notary has a one-way `freezeUpgrades()` (`FREEZER`, 7-day delay). After it runs, `_authorizeUpgrade` always reverts, regardless of roles. It is executed at GA so records stay permanently neutral. The vault stays upgradeable with a 7-day delay.
+**Freeze:** the Notary has a one-way `freezeUpgrades()` (`FREEZER`, 7-day delay). After it runs, `_authorizeUpgrade` always reverts, regardless of roles. It is executed at GA so records stay permanently neutral. Freeze does not remove pause (§5.1). The vault stays upgradeable with a 7-day delay.
 
 Contracts are UUPS proxies with ERC-7201 namespaced storage; `_authorizeUpgrade` is restricted to `UPGRADER`. The AccessManager itself is not upgradeable.
 
@@ -345,6 +362,8 @@ MinDepositSet(address indexed token, uint256 amount)
 IntegratorFeeCapMultipleSet(uint16 multiple)
 IntegratorChanged(bytes32 indexed appId, address indexed oldIntegrator, address indexed newIntegrator)
 IntegratorWithdrawn(bytes32 indexed appId, address indexed token, address indexed to, uint256 amount)
+RecordSkipped(bytes32 indexed recordId)                      -- Notary, notarizeBatch (G-4)
+ReceiptSkipped(bytes32 indexed recordId, uint8 receiptType)  -- Notary, acknowledgeBatch (G-4)
 ```
 
 | Event | Emitted by | Meaning |
