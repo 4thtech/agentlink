@@ -309,11 +309,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export KEYRING_PASSWORD="$(openssl rand -hex 16)"
           dbus-run-session -- bash -euo pipefail -c '
-            eval "$(printf "%s" "$KEYRING_PASSWORD" | gnome-keyring-daemon --unlock --components=secrets)"
+            keyring_env="$(openssl rand -hex 16 | gnome-keyring-daemon --unlock --components=secrets)"
+            eval "$keyring_env"
             export GNOME_KEYRING_CONTROL
-            unset KEYRING_PASSWORD
             pnpm --filter @agentlink/node exec vitest run --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
           '
 
