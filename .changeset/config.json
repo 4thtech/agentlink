@@ -1,0 +1,23 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [
+    [
+      "@agentlink/types",
+      "@agentlink/crypto",
+      "@agentlink/chain",
+      "@agentlink/transport-nostr",
+      "@agentlink/storage",
+      "@agentlink/core",
+      "@agentlink/node",
+      "@agentlink/ui",
+      "@4thtech/agentlink"
+    ]
+  ],
+  "linked": [],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": []
+}

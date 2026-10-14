@@ -109,13 +109,13 @@ sequenceDiagram
   participant R as Relays
   participant MB as MCP B (core)
   participant B as Agent B (harness)
-  A->>MA: send_message(to=B, text)
+  A->>MA: agentlink_send(to=B, text)
   MA->>MA: policy check (contact allowed)
   MA->>MA: build Envelope: random CEK, AES-GCM(payload), HPKE-wrap CEK to {B agent, B owner, A owner, A agent}
   MA->>MA: sign envelope (A agent key)
   MA->>R: publish NIP-59 gift wrap to B agent, B owner, A owner (copies)
   MA-->>A: {envelopeId, status: sent}
-  B->>MB: check_inbox()
+  B->>MB: agentlink_inbox()
   MB->>R: fetch gift wraps since cursor
   MB->>MB: unwrap, verify sender sig + contact, decrypt
   MB-->>B: messages (marked as UNTRUSTED content)
@@ -198,7 +198,7 @@ Console: approval request is sent as an encrypted envelope to the owner key; the
 | MCP | Official TypeScript MCP SDK; Cloudflare Agents SDK (`McpAgent`) + workers-oauth-provider for Worker | First-party support for stdio and streamable HTTP |
 | Local store | SQLite (`better-sqlite3`) | Simple, durable |
 | Keychain | `@napi-rs/keyring` (or equivalent) | Cross-platform OS keychain. Headless machines without one: opt-in file KeyStore on `@agentlink/crypto` (04 §2.8, D-54) |
-| Contracts | Solidity 0.8.2x, **Foundry**, OpenZeppelin v5 | Fast tests, fuzzing, invariants |
+| Contracts | Solidity 0.8.x (exact pin in the contracts repo), **Foundry**, OpenZeppelin v5 | Fast tests, fuzzing, invariants |
 | Deterministic deploys | CreateX (CREATE3) | Same addresses on every chain despite per-chain initializer arguments |
 | Web apps | Vite + React, static output; shared `packages/ui` built from the Claude Design system | Static hosting, no server state; one component library for local UI and console |
 | Desktop app (M2) | `DECISION NEEDED (architecture task, security review)`: e.g. Tauri with a Node sidecar vs Electron | Reuse `@agentlink/core` in Node; OS keystore with biometrics; signed auto-update; shares `packages/ui` with the console (08 §8) |
