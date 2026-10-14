@@ -40,7 +40,7 @@ The orchestrator (Opus), or a human builder for their own task. Workers never wr
 
 ## If it fails
 - **Someone claimed it at the same time:** the earlier board row wins. Delete your branch (`git push origin --delete <branch>`), remove your row, remove the worktree (`git worktree remove ../agentlink-<TASK-ID>`).
-- **CI red on the first push:** expected for tests-first S2 work (that is the evidence); otherwise [RB-08](ci-red.md).
+- **CI red on the first push:** never expected, not even for tests-first S2 work (the red is proved locally, [RB-05](writing-tests.md)); see [RB-08](ci-red.md).
 - **Releasing a claim:** only the claimant or the owner releases it; remove the row and delete the branch, or close or hand over the PR if one is open.
 
 ## Related

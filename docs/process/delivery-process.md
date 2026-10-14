@@ -26,7 +26,7 @@
 | 1 | **Investigate** | Orchestrator, read-only | Evidence from code, specs, logs and live data; a plain-English diagnosis |
 | 2 | **Plan and decide** | Orchestrator, then owner | Options with value, risk and effort; the owner picks; product calls become a D-number in `docs/foundation/00-README.md` |
 | 3 | **Delegate** | Orchestrator | A complete brief per builder (`development-process.md` §4) naming owned and forbidden files |
-| 4 | **Build** | Builder | Code, tests with negative controls and docs on its own branch and worktree, pushed to the branch (CI runs on the push; S2 tests-first red runs are recorded this way); **no PR yet** |
+| 4 | **Build** | Builder | Code, tests with negative controls and docs on its own branch and worktree, pushed to the branch (CI runs on the push, first run green; S2 tests-first red is proved by a local run, `audit-rules.md` §3.4); **no PR yet** |
 | 5 | **Independent review** | Reviewer, on the branch diff | `IR-<task>-<n>`; required for S1 and S2, optional Sonnet review for S0 |
 | 6 | **Fix rounds** | Builder, reviewer re-checks | Every finding fixed or dispositioned; judgement calls decided in favour of safety or escalated to the owner |
 | 7 | **Orchestrator audit** | Orchestrator | The verification protocol (`development-process.md` §5), including checking load-bearing claims against reality |
@@ -76,13 +76,13 @@ Each rule exists because something went wrong, or nearly did, without it.
 
 ### 3.3 Quality: the "green but wrong" defence
 
-- **Negative controls on every new test.** Break the behaviour on purpose, watch the test go red, restore it exactly. A test that stays green with the feature removed proves nothing. Record the control in the PR.
+- **Negative controls on every new test.** Break the behaviour on purpose, watch the test go red, restore it exactly. A test that stays green with the feature removed proves nothing. Do it locally and record the control in the PR; never push the broken state (LL-14).
 - **Drive the real path.** Test through the real handler, tool or endpoint, not only a helper. A helper-only test once let a job ship disconnected.
 - **Fakes must not write what they assert.** If the test double produces the field the test checks, the test proves nothing.
 - **Test the shapes real users produce**, not only a tidy example.
 - **Local tests do not catch everything.** Anything configuration-like (Worker bindings, headers, Environment settings) is verified on staging before production.
 - **Lint-warning ratchet.** The warning count may go down, never up; nobody silences a warning to get green. If no ceiling is configured yet, adding one is a CI card.
-- Tests-first for S2, vectors and invariants stay as in `development-process.md` §10 and `audit-rules.md`.
+- Tests-first for S2, vectors and invariants stay as in `development-process.md` §10 and `audit-rules.md`. For S2 the failing tests go in their own `RED (expected):` commit, run locally with the evidence recorded in the PR (SHA, command, output excerpt), and are pushed only with the implementation on top; the reviewer reproduces the red (`audit-rules.md` §3.4, LL-14).
 
 ### 3.4 Production safety
 

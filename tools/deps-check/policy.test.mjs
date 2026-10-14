@@ -67,8 +67,12 @@ describe('policy data', () => {
     expect(allowedWorkspaceNames('packages/chain')).toEqual([
       '@agentlink/chain',
       '@agentlink/types',
+      '@agentlink/log',
       '@agentlink/crypto',
     ]);
+    // The logger (M0-8) imports no workspace package, and the trusted base does not import it.
+    expect(violationFor('packages/log', '@agentlink/types')).toMatch(/layering/);
+    expect(violationFor('packages/crypto', '@agentlink/log')).toMatch(/layering/);
     expect(violationFor('packages/crypto', '@agentlink/core')).toMatch(/layering/);
     expect(violationFor('packages/chain', '@agentlink/storage')).toMatch(/layering/);
     expect(violationFor('packages/core', '@agentlink/node')).toMatch(/layering/);
