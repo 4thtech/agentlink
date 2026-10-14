@@ -26,9 +26,13 @@ export {
   type InboundCard,
   type InboundScreen,
   type InboundSender,
+  type PairingCompletion,
   type PairingState,
   type PreparedCardUpdate,
+  type PreparedCompletion,
+  type PreparedStage,
   type StagePairingInput,
+  type StagedPairing,
 } from './contacts.js';
 export {
   EnvelopeService,
@@ -39,12 +43,41 @@ export {
   type BuiltEnvelope,
   type EnvelopeDestination,
   type InboundOutcome,
+  type InboundPairing,
   type InboundReason,
+  type PairingHandler,
+  type PairingOutcome,
   type InboundReport,
   type ReceiveInput,
   type ReceiveResult,
   type ReceiveStatus,
 } from './envelopes.js';
+// M1-7c: invites and pairing (04 §3.6, §3.6.1, D-69).
+export {
+  PairingService,
+  type AcceptInviteInput,
+  type AcceptInviteResult,
+  type CreateInviteInput,
+  type CreatedInvite,
+  type OwnerSafetyCode,
+  type PendingContact,
+} from './pairing.js';
+export {
+  INVITE_INFLATE_SLICE_BYTES,
+  INVITE_LINK_PREFIX,
+  INVITE_MAX_JSON_BYTES,
+  INVITE_MAX_PAYLOAD_CHARS,
+  decodeInviteLink,
+  encodeInviteLink,
+} from './invite-link.js';
+export {
+  openPairingMessage,
+  recomputeSafetyCode,
+  verifyPairingTranscript,
+  type OpenedPairingMessage,
+  type PairingTranscript,
+} from './safety-code.js';
+export { renderContactName, restrictName } from './names.js';
 export {
   computeActionDigest,
   ownerActionHash,

@@ -10,7 +10,12 @@
     "resolveJsonModule": true,
     // The crypto test seam (M1-1c, M1-1f) is never built and has no package export: type-check it from
     // source, as vitest.config.ts resolves it.
-    "paths": { "@agentlink/crypto/testing": ["../packages/crypto/src/testing.ts"] },
+    // M1-7c: two @agentlink/core modules, from source as vitest.config.ts resolves them.
+    "paths": {
+      "@agentlink/crypto/testing": ["../packages/crypto/src/testing.ts"],
+      "@agentlink/core/invite-link": ["../packages/core/src/invite-link.ts"],
+      "@agentlink/core/safety-code": ["../packages/core/src/safety-code.ts"]
+    },
     "composite": false,
     "declaration": false,
     "noEmit": true

@@ -4,14 +4,6 @@
     "encodings": {
       "card": "M1-2a",
       "phase": "M1a"
-    },
-    "invite-link": {
-      "card": "M1-7c",
-      "phase": "M1a"
-    },
-    "safety-code-recompute": {
-      "card": "M1-1c",
-      "phase": "M1a"
     }
   },
   "cases": {

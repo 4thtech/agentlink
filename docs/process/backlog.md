@@ -67,7 +67,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 117 (M1a 62, M1b 55; recounted from the cards on 2026-10-14; M1-8g added from IR-M1-7d-1 F-2; incl. 11 split-off, 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| M1 Local beta | 118 (M1a 63, M1b 55; recounted from the cards on 2026-10-14; M1-8g added from IR-M1-7d-1 F-2; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 21 (incl. 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
@@ -1165,7 +1165,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Each Low is fixed with a negative control, or recorded as covered by the spec PR.
 
 #### M1-2d · types: G-24 relay schema changes (new)
-- **Status:** ready · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#71, merged 2026-10-14) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types, tools/vectors, test-vectors
 - **Depends on:** M1-2a; gap G-24 resolved (branch `docs/G-24-owner-copy-relays`, pending owner)
 - **Spec:** 04 §3.4 (`relays` 2–16), §3.4.1 (`handshake-ack` `relays`), §3.6; 07 §4.3
@@ -1203,7 +1203,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Invariants:** I-4
 - **Scope:**
   - `contact.check` params schema: exactly `contact` (agent ID, `0x` + 40 lowercase hex) and `pairingDigest` (bare hex 64); any other key, an uppercase or `0x` digest, or another `op`'s params is rejected, never normalised. Today only its lifetime constant exists in `@agentlink/types` (`constants.ts` notes the schema lands "with the task that builds it"); no card owned it.
-  - Core verification and the `contacts.safety_check` write are M1-7c; signing from `agentlink contacts --verify <id>` is M1-9a.
+  - Core verification and the `contacts.safety_check` write are M1-7c-b (split from M1-7c); signing from `agentlink contacts --verify <id>` is M1-9a.
 - **Acceptance:**
   - The schema accepts the `contact.check` signing vector and rejects every `contact.check` reject vector in every runtime the suite declares.
 - **Threat note (draft):** a malformed `contact.check` could (a) mark a contact "Safety code checked" for another contact or another pairing than the owner compared, if a verifier normalised `contact` (EIP-55 or upper-case hex) or `pairingDigest` (upper case, `0x`, base64url) before comparing, so two spellings of one signed body read differently; (b) carry extra keys that a later reader treats as meaning, beside what the owner signed; (c) be read as another op's params, or another op's body as a `contact.check`. Stopped by: the strict schema, which rejects instead of normalising (04 §2.4.1, §2.5.1); `op` and `params` inside the signed body under the owner-action tag; the core's comparison against a digest recomputed from the signed `handshake` and `handshake-ack` on every load, never a stored one (04 §3.6.1, 07 §3; M1-7c); I-4 (no MCP tool creates or passes a `contact.check`). Residual: a modified installation can show one code and have another digest signed (G-1, 04 §2.5); important contacts are compared on the console.
@@ -1801,9 +1801,9 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (IR-M1-7a-1 R2-M1) A blocked or removed contact that rotates keys: its `card-update` is dropped, so its new key stays unknown. An envelope from an unknown key whose recipients include the `ownerEnc` `kid` of a **blocked or removed** contact's owner is dropped (recorded in `seen` after step 4), never held and never queued as a request, also after 48 h. Only active contacts' owner kids hold. Test, replacing the `it.todo` in `packages/core/src/contacts.test.ts`.
 
 #### M1-7c · core: pairing protocol (invite, accept, handshake)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** ready · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
-- **Depends on:** M1-7b, M1-1f, M1-5a, M1-2d, M1-2f; gap G-12 resolved (D-69, 4thtech/agentlink#70, pending owner; decoder rules proposed, owner confirms at merge)
+- **Depends on:** M1-7b, M1-1f, M1-5a, M1-2d; gap G-12 resolved (D-69, 4thtech/agentlink#70). The `contact.check` verify-and-store item moved to M1-7c-b, which depends on M1-2f (orchestrator, 2026-10-14)
 - **Spec:** 04 §3.6 (with the G-24 hash checks and the D-69 encoding), §3.4.1 (`handshake-ack` `relays`); 07 §4.3; 06 §2.1 (`agentlink_create_invite`, `agentlink_accept_invite`); 02 F-10–F-12; D-17
 - **Invariants:** I-1, I-4, I-5
 - **Scope:**
@@ -1821,8 +1821,9 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (hand-off from M1-7a, IR-M1-7a-1 M-2) Use the core's two-step pairing: `contacts.stagePairing` when a card arrives (nothing in `contacts` changes), `contacts.completePairing` with both stored pairing envelopes on completion (one transaction; the counterparty's envelope must be stored as received from the card's key), and `contacts.abortPairing` for a pairing that fails. Decide where the pending pairing data (`codeCommit`, `nonceB`) lives for a first pairing, since no contact row exists before completion (07 §3 `pairings`).
   - (IR-M1-7a-1 R2-L1) Tie the completion evidence to its pairing: `completePairing` today checks only that a `handshake` and a `handshake-ack` with the right directions and sender key are stored. M1-7c must bind them to the staged pairing (the invite ID, `handshakeHash` in the ack, `inviterCardHash`), so another pairing's envelopes cannot complete this one. Add the binding to the core check and test it.
   - (IR-M1-7a-1 R2-L2) Crossed invites: today the pairing that finishes later wins. Apply the 04 §2.9 tie-break: keep the completed pairing whose `handshake` has the later `createdAt`, with ties broken by the larger `envelopeHash`, so both sides converge on the same pairing. Test with two crossed pairings completing in both orders.
-  - (G-28 hand-off, M1-2f) Verify a `contact.check` (04 §2.5.1, §3.6.1) like any `SignedOwnerAction` and store it in `contacts.safety_check` (07 §3) only when its `pairingDigest` equals the digest recomputed from the stored signed `handshake` and `handshake-ack`; `safetyCodeChecked` is derived from that stored object on every read, never from a flag.
+  - (G-28 hand-off) The `contact.check` verify-and-store step is M1-7c-b. Here `safetyCodeChecked` is derived from the stored `contacts.safety_check` object on every read (false while none is stored), never from a flag.
   - G-23/G-28 additions (04 §2.9, §3.6, §3.6.1, §3.4.1): the invite also carries `cardAgentSig` and `codeCommit`, and A keeps `nonceA` with it. B also verifies `cardAgentSig` and refuses `agentEvm = ownerEvm`. Its approval shows name, label and owner fingerprint, and no safety code. The `handshake` adds `cardAgentSig`, `codeNonce`, `codeCommit` (copied) and `inviterCardHash`, and A accepts it only if the envelope `from` and seal key equal `card.agentNostr`. The `handshake-ack` adds `handshakeHash`, `codeReveal`, `card` and `cardSig`, and B completes only if `codeReveal` opens `codeCommit`. A second valid answer to a used invite is refused and reported to A's owner.
+- **Threat note (draft):** pairing is where a contact's keys enter the store, so a flaw here hands a stranger or a MITM a trusted contact. Threats: (a) a forged, replayed or tampered card or invite (wrong `cardSig` or `cardAgentSig`, `agentEvm = ownerEvm`, `nameHash`/`relaysHash` mismatch) is accepted; (b) a `handshake` from a stranger, a replayed one, one for an expired or used invite, one with a wrong HMAC proof, or one that replays a third party's real card from another Nostr key is accepted, or a flood of unsolicited handshakes fills the store or the requests queue; (c) another pairing's `handshake` or `handshake-ack` completes this one, or crossed pairings diverge (04 §2.9); (d) an ack whose `codeReveal` does not open `codeCommit` completes, so a MITM is not shown as two different codes (04 §3.6.1); (e) the safety code is read from a stored digest or column that can be edited, or leaks into a tool result, log or error; (f) the invite secret, or a value derived from it, reaches a log, error, relay-visible field or store row in the clear (I-1, I-5); (g) the link decoder has two readings of one link (zlib/gzip wrapper, trailing bytes, non-canonical base64url, percent-encoding, another host or path) or inflates without a cap (a deflate bomb), or crashes on malformed input. Stopped by: card and owner checks reused from M1-7a (`checkCard`); the stored `proofKey` (HKDF of the secret, never the secret) and a constant-time HMAC compare; single-use, expiring invites checked and marked used in one store transaction; the pairing binding (`inviteId`, `handshakeHash`, `inviterCardHash`) checked in `completePairing`; the commit-then-reveal check; the safety code recomputed from the stored signed envelopes on every display and never returned by a tool; M1-7b's bounded drop for keys with no invite; the 04 §3.6 decoder rules (bounded input, streamed inflate with a 16 384-byte cap, re-inflate trailing check); I-1, I-4, I-5. Residual: a user who never compares safety codes cannot detect a MITM (by design, 04 §3.6.1); `contact.check` storage lands in M1-7c-b, so "Safety code checked" stays false until then.
 - **Acceptance:**
   - In-process two-client test over a local relay: pairing completes and both safety codes match.
   - MITM test (a third client swaps the invite towards B and uses a copy towards A): both pairings complete, with different codes. An ack whose `codeReveal` does not open `codeCommit` leaves B's pairing pending with no code. These are refused:
@@ -1837,6 +1838,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Hash checks (G-24, 04 §3.6, §3.4.1): an invite, `handshake` or `handshake-ack` whose `name` or `relays` does not match the card's `nameHash` or `relaysHash` is rejected as a whole (reuse M1-7a's `checkCard`, PR #48); an ack whose `relays` differs from the invite's is rejected; a list with fewer than 2 relays is rejected; the invitee's owner copy of the ack carries the inviter's list.
   - Default policy yields `pending_approval`; the invite secret never appears in logs or in any relay-visible field (canary).
   - `restrictName` table tests: control, format, bidi and zero-width characters, `<`, `>`, `:`, `/`, `(`, `)`, `[`, `]`, `"`, newlines and a 200-character name are reduced to the allowed set and ≤ 32 code points; fullwidth and mathematical letters are folded (NFKC); a mixed-script name (`Тali`), `ǃ`/`ǀ` look-alikes and a look-alike label (`Marko Verified domain acme com`) fall back to "Contact" plus the fingerprint; an empty result falls back too; an agent-written invite `label` with the same content is shown restricted until the owner confirms it.
+
+#### M1-7c-b · core: `contact.check` verify and store (new, split from M1-7c)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/core
+- **Depends on:** M1-2f, M1-7c
+- **Spec:** 04 §2.5.1, §3.6.1; 07 §3 (`contacts.safety_check`); G-28
+- **Invariants:** I-4
+- **Scope:**
+  - (G-28 hand-off, M1-2f; moved from M1-7c by the orchestrator, 2026-10-14) Verify a `contact.check` (04 §2.5.1, §3.6.1) like any `SignedOwnerAction` and store it in `contacts.safety_check` (07 §3) only when its `pairingDigest` equals the digest recomputed from the stored signed `handshake` and `handshake-ack`; `safetyCodeChecked` is derived from that stored object on every read, never from a flag.
+- **Acceptance:**
+  - The item above as written: a valid `contact.check` whose `pairingDigest` matches is stored and `safetyCodeChecked` becomes true; a mismatched digest, a bad owner signature or a reused nonce is refused and nothing is stored; editing the stored object makes `safetyCodeChecked` false.
 
 #### M1-7d · core: policy engine and owner-signed policies
 - **Status:** ready (planning 2026-10-15: dependencies M1-7a #48, M1-2b #31, M1-2e #72 merged; G-6 and G-7 resolved in 04 §2.5.1 and 06 §3) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a

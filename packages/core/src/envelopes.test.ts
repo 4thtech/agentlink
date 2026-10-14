@@ -487,7 +487,7 @@ describe('04 §3.1.1 step 7: sender role', () => {
     });
   });
 
-  it('a handshake-ack from an unknown key is dropped until the pairing flow exists, never queued as a request', async () => {
+  it('a handshake-ack from an unknown key with no pairing in progress is dropped, never queued as a request', async () => {
     const { a } = await world();
     const s = await makeAgent(clock, new MemoryKeyStore(seed(9)), ownerS, 'stranger');
     const env = await craft({
@@ -500,9 +500,9 @@ describe('04 §3.1.1 step 7: sender role', () => {
       payload: handshakeAckPayload(await s.client.identity.signedCard()),
       createdAt: clock.t,
     });
-    // No pairing can exist before M1-7c, so it is dropped, never parked (IR-M1-7b-1 M-1).
+    // No pairing in progress from that key (M1-7c): dropped, never parked (IR-M1-7b-1 M-1).
     expect(await deliver(a, env)).toEqual([
-      { envelopeId: env.id, outcome: 'dropped', reason: 'type_unhandled', flagged: false },
+      { envelopeId: env.id, outcome: 'dropped', reason: 'pairing_unknown', flagged: false },
     ]);
     expect(await row(a, env.id)).toBeUndefined();
     expect(await a.store.transaction((tx) => tx.count('envelopes', { state: 'request' }))).toBe(0);
@@ -1154,10 +1154,10 @@ describe('review IR-M1-7b-1', () => {
       payload: textPayload(),
     });
     expect((await a.client.envelopes.receive({ envelope: honest.envelope })).status).toBe('retry');
-    // One pass drops every one (no pairing can exist before M1-7c): nothing stays parked.
+    // One pass drops every one (no pairing in progress from that key, M1-7c): nothing stays parked.
     const reports = await a.client.envelopes.processReceived();
     expect(reports).toHaveLength(1_000);
-    expect(reports.every((r) => r.outcome === 'dropped' && r.reason === 'type_unhandled')).toBe(
+    expect(reports.every((r) => r.outcome === 'dropped' && r.reason === 'pairing_unknown')).toBe(
       true,
     );
     expect(await a.store.transaction((tx) => tx.count('envelopes', { state: 'received' }))).toBe(0);
