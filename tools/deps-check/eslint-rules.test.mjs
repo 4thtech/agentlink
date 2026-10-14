@@ -7,7 +7,13 @@ import { ESLint } from 'eslint';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const BOUNDARY = new Set(['no-restricted-imports', 'boundaries/no-bypass']);
+const BOUNDARY = new Set([
+  'no-restricted-imports',
+  'boundaries/no-bypass',
+  'no-eval',
+  'no-new-func',
+  'no-implied-eval',
+]);
 
 let eslint;
 beforeAll(() => {
@@ -123,5 +129,39 @@ describe('boundaries/no-bypass (forms no-restricted-imports cannot see)', () => 
     expect(rules(await lint('packages/chain/test/a.test.ts', `import 'node:fs';`))).toEqual([
       'no-restricted-imports',
     ]);
+  });
+});
+
+// String timers are covered by deps-check (regressions.test.mjs): the core no-implied-eval rule only
+// sees timers that resolve to a declared global, and shared packages declare none.
+describe('review IR-M0-10-1 regressions (ESLint side)', () => {
+  it.each([
+    [`process.getBuiltinModule('crypto').createHash('sha256');`, 'apps/cli'],
+    [`process['getBuiltinModule']('crypto');`, 'packages/core'],
+    [`const { getBuiltinModule } = process; void getBuiltinModule;`, 'apps/cli'],
+    [`process.binding('crypto');`, 'apps/cli'],
+    [`process.mainModule.require('crypto');`, 'packages/node'],
+    [`module.require('node:crypto');`, 'apps/cli'],
+    [`const r = require; r('node:crypto');`, 'apps/cli'],
+    [`require.call(null, 'viem');`, 'packages/core'],
+    [`import { createRequire } from 'node:module'; createRequire(import.meta.url);`, 'apps/cli'],
+    [`import { createRequire } from 'module'; createRequire(import.meta.url);`, 'packages/node'],
+    [`Reflect.get(globalThis.crypto, 'subtle');`, 'packages/core'],
+    [`Object.getOwnPropertyDescriptor(crypto, 'subtle');`, 'packages/core'],
+    [`declare const k: string; void globalThis.crypto[k];`, 'packages/core'],
+    [`eval('1');`, 'packages/core'],
+    [`new Function('return import("viem")');`, 'packages/core'],
+  ])('rejects %s in %s', async (code, zone) => {
+    expect((await lint(`${zone}/src/a.ts`, code)).length).toBeGreaterThan(0);
+  });
+
+  it('lints files in a src/dist directory (build output is ignored only at the package root)', async () => {
+    const messages = await lint('packages/core/src/dist/x.ts', `export * from 'viem';`);
+    expect(rules(messages)).toEqual(['no-restricted-imports']);
+  });
+
+  it('allows a direct literal require, a declared require and unrelated binding/require names', async () => {
+    const code = `declare function require(n: string): unknown;\nrequire('node:fs');\nconst o = { binding: 1 }; void o.binding;`;
+    expect(await lint('packages/node/src/a.ts', code)).toEqual([]);
   });
 });

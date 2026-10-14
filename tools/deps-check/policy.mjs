@@ -26,15 +26,51 @@ export const BUILTINS = builtinModules.filter((name) => !name.startsWith('node:'
  * `apps/pay` is the deposit page on the isolated `pay.` origin (08 §2.3, M2-2f); it does not exist yet.
  */
 export const LIBRARIES = [
-  { group: ['@noble/*'], zones: ['packages/crypto'] },
-  { group: ['@hpke/*'], zones: ['packages/crypto'] },
+  { group: ['@noble/*'], zones: ['packages/crypto'], via: '@agentlink/crypto' },
+  { group: ['@hpke/*'], zones: ['packages/crypto'], via: '@agentlink/crypto' },
   {
     group: ['nostr-tools', 'nostr-tools/*'],
     zones: ['packages/crypto', 'packages/transport-nostr'],
+    via: '@agentlink/transport-nostr',
   },
-  { group: ['viem', 'viem/*'], zones: ['packages/crypto', 'packages/chain', 'apps/pay'] },
-  { group: ['aws4fetch'], zones: ['packages/storage'] },
+  {
+    group: ['viem', 'viem/*'],
+    zones: ['packages/crypto', 'packages/chain', 'apps/pay'],
+    via: '@agentlink/chain',
+  },
+  { group: ['aws4fetch'], zones: ['packages/storage'], via: '@agentlink/storage' },
+  {
+    // Other crypto libraries are not on the 04 §8.1 allowlist: no zone may use them. Adding one is a
+    // decision (D-xx) with the owner's approval, then an entry here.
+    group: [
+      'tweetnacl',
+      'ethers',
+      'elliptic',
+      'crypto-js',
+      'node-forge',
+      'libsodium',
+      'libsodium-wrappers',
+      'libsodium-wrappers-sumo',
+      'sodium-native',
+      'js-sha3',
+      'hash-wasm',
+      'ethereum-cryptography',
+      'ethereum-cryptography/*',
+      '@scure/*',
+    ],
+    zones: [],
+    via: '@agentlink/crypto',
+  },
 ];
+
+/**
+ * Files that may import `node:module` (createRequire can resolve code from another package's
+ * directory). Each entry needs a reason. Empty: nothing needs it today.
+ */
+export const NODE_MODULE_FILES = [];
+
+/** Property names that reach Node's module loader or native bindings around the import checks. */
+export const LOADER_MEMBERS = ['getBuiltinModule', '_linkedBinding', 'dlopen', 'mainModule'];
 
 /** Only this zone may touch `crypto.subtle` (backlog M0-10). */
 export const SUBTLE_ZONES = ['packages/crypto'];
@@ -80,7 +116,10 @@ export const ZONES = {
     [],
     [
       { pattern: '@noble/*', reason: 'the only package that implements primitives (04 §8.1)' },
-      { pattern: '@hpke/*', reason: 'HPKE seal/open (04 §8.1, 07 §1)' },
+      {
+        pattern: '@hpke/core',
+        reason: 'HPKE seal/open; only @hpke/core is on the 04 §8.1 allowlist',
+      },
     ],
   ),
   'packages/chain': entry(
@@ -180,7 +219,9 @@ export const NODE_MSG = 'Node built-ins are allowed only in @agentlink/node and 
 export const CRYPTO_MSG =
   'Node crypto is a primitive entry point; use @agentlink/crypto (AGENTS.md hard rules).';
 export const libraryMessage = (lib) =>
-  `${lib.group[0]} may be imported only in ${lib.zones.join(', ')}; everything else uses @agentlink/crypto (AGENTS.md).`;
+  lib.zones.length === 0
+    ? `${lib.group[0]} is not on the crypto allowlist (04 §8.1); adding a library needs a decision and the owner's approval.`
+    : `${lib.group[0]} may be imported only in ${lib.zones.join(', ')}; everything else uses ${lib.via} (AGENTS.md).`;
 export const layerMessage = (zone, name) =>
   ZONES[zone]
     ? `${zone} may not import ${name} (package layering: tools/deps-check/policy.mjs, 07 §1).`
@@ -188,13 +229,21 @@ export const layerMessage = (zone, name) =>
 
 /**
  * The one decision function for a non-relative import specifier. Returns a message when `zone` (a key
- * of ZONES, or null for a directory the policy does not know) may NOT use `specifier`, else null.
+ * of ZONES, or null for a directory the policy does not know) may NOT use `specifier` in `file`
+ * (path relative to the repository root), else null.
  * eslint.config.mjs derives its static zones from the same data.
  */
-export function violationFor(zone, specifier) {
+export const MODULE_MSG =
+  'node:module (createRequire) is allowed only in the files listed in NODE_MODULE_FILES (tools/deps-check/policy.mjs).';
+
+export function violationFor(zone, specifier, file) {
   if (isBuiltin(specifier)) {
     if (!NODE_ZONES.includes(zone)) return NODE_MSG;
-    return isNodeCrypto(specifier) ? CRYPTO_MSG : null;
+    if (isNodeCrypto(specifier)) return CRYPTO_MSG;
+    if (/^(node:)?module$/.test(specifier) && !NODE_MODULE_FILES.some((f) => f.file === file)) {
+      return MODULE_MSG;
+    }
+    return null;
   }
   for (const lib of LIBRARIES) {
     if (matchesGroup(specifier, lib.group) && !lib.zones.includes(zone)) return libraryMessage(lib);

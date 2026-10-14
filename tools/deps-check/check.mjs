@@ -1,28 +1,35 @@
 // deps-check: architecture boundary guard that ESLint alone cannot give.
 //
 // Why a script on top of the ESLint zones: an inline `eslint-disable`, a plain .js/.mjs file, a
-// package.json dependency (declared but not yet imported), or an npm alias can all slip past ESLint.
-// This scan cannot be switched off from inside the code it checks, and it runs in `pnpm lint`
-// (turbo task `check`), therefore in `ci-gate`.
+// package.json dependency (declared but not yet imported), an alias, or a file ESLint ignores can
+// all slip past ESLint. This scan cannot be switched off from inside the code it checks, and it runs
+// in `pnpm lint` (turbo task `check`), therefore in `ci-gate`.
 //
 // Scope: every package under packages/* and apps/* (the same scope as the ESLint zones). tools/,
 // e2e/ and test-vectors/ are not scanned; the vectors task (M0-9) owns test-vectors/.
+// Files: every file the repository tracks (or would track: not ignored) under those packages, at any
+// depth. Nothing is skipped by directory name, so `src/dist/` or `src/.claude/` cannot hide code.
 //
 // Problems reported:
 //   manifest   - a workspace package name that differs from the policy, a package without a policy
-//                entry, a forbidden workspace dependency (layering), a primitive library declared
-//                outside its zone (also behind an `npm:` alias), a runtime dependency that is not in
-//                the per-package allowlist, a dependency cycle between workspace packages.
+//                entry, a forbidden workspace dependency (layering) even behind an `npm:` or
+//                `workspace:<name>@` alias, a spec that resolves from a path, URL or git host, a
+//                primitive library declared outside its zone, a runtime dependency that is not in
+//                the per-package allowlist, an `imports` map, a dependency cycle (on resolved names).
 //   source     - an import (static, dynamic, require, import type) that violates policy.violationFor,
-//                a relative import that leaves its package, `crypto.subtle` outside packages/crypto,
-//                a dynamic import with a non-literal specifier, an eslint-disable that switches the
-//                boundary rules off (or is blanket).
+//                a relative import that leaves its package, `crypto.subtle` outside packages/crypto
+//                (also through Reflect.get or a computed key), a dynamic import with a non-literal
+//                specifier, `require` used other than as a direct call, `module.require`,
+//                `process.getBuiltinModule` and the other loader members, eval and Function, an
+//                eslint-disable or inline eslint config that switches the boundary rules off.
 
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 import {
   LIBRARIES,
+  LOADER_MEMBERS,
   SUBTLE_ZONES,
   ZONES,
   allowedWorkspaceNames,
@@ -33,18 +40,57 @@ import {
   workspaceNameOf,
 } from './policy.mjs';
 
-const SKIP_DIRS = new Set(['node_modules', '.git', '.claude', 'dist', '.turbo', 'coverage']);
+// Only the fallback walk (no repository metadata) skips anything, and only these.
+const SKIP_DIRS = new Set(['node_modules', '.git']);
 const SOURCE_EXT = /\.(?:[cm]?[jt]s|[jt]sx)$/;
 const RUNTIME_FIELDS = ['dependencies', 'peerDependencies', 'optionalDependencies'];
 const ALL_FIELDS = [...RUNTIME_FIELDS, 'devDependencies'];
-const BOUNDARY_RULES = ['no-restricted-imports', 'no-restricted-syntax', 'boundaries/no-bypass'];
+const BOUNDARY_RULES = [
+  'no-restricted-imports',
+  'no-restricted-syntax',
+  'boundaries/no-bypass',
+  'no-eval',
+  'no-new-func',
+  'no-implied-eval',
+];
 
-/** The package an `npm:` alias really installs: `"foo": "npm:@scope/pkg@1"` -> `@scope/pkg`. */
+/**
+ * The package a dependency really installs. `"foo": "npm:@scope/pkg@1"` and
+ * `"foo": "workspace:@scope/pkg@*"` both install `@scope/pkg`, whatever the key says.
+ */
 export function realPackageName(name, spec) {
-  if (typeof spec !== 'string' || !spec.startsWith('npm:')) return name;
-  const target = spec.slice(4);
-  const at = target.indexOf('@', 1);
-  return at === -1 ? target : target.slice(0, at);
+  if (typeof spec !== 'string') return name;
+  if (spec.startsWith('npm:')) {
+    const target = spec.slice(4);
+    const at = target.indexOf('@', 1);
+    return at === -1 ? target : target.slice(0, at);
+  }
+  if (spec.startsWith('workspace:')) {
+    const named = /^(@[^/@]+\/[^/@]+|[^/@.][^/@]*)@/.exec(spec.slice('workspace:'.length));
+    if (named) return named[1];
+  }
+  return name;
+}
+
+/**
+ * Why a dependency spec is not acceptable, or null. Allowed: a registry version, range or tag,
+ * `workspace:` (version forms and `workspace:<name>@<range>`) and `npm:` aliases. Everything that
+ * resolves from a path, a URL or a git host (`link:`, `file:`, `portal:`, `github:`, `jsr:`, tarball
+ * URLs, `user/repo`) or from a catalog is refused: it can hide any package behind any name.
+ */
+export function specProblem(spec) {
+  if (typeof spec !== 'string') return 'the version spec must be a string';
+  if (spec.startsWith('npm:')) return null;
+  if (spec.startsWith('workspace:')) {
+    return /^[./]/.test(spec.slice('workspace:'.length))
+      ? 'workspace: path specs are not allowed; use workspace:*'
+      : null;
+  }
+  if (spec.startsWith('catalog:')) return 'catalog: specs are not supported by deps-check';
+  if (/[:/]/.test(spec)) {
+    return `"${spec}" resolves from a path, URL or git host; only registry versions, workspace: and npm: specs are allowed`;
+  }
+  return null;
 }
 
 // --- Manifest checks ------------------------------------------------------------------------------
@@ -66,6 +112,11 @@ export function checkManifest(zone, manifest) {
       `${zone}: package name is ${JSON.stringify(manifest.name)}, policy.mjs expects "${policy.name}"`,
     );
   }
+  if (manifest.imports !== undefined) {
+    problems.push(
+      `${zone}: the package.json "imports" map is not allowed (its targets are not checked)`,
+    );
+  }
   const allowed = allowedWorkspaceNames(zone);
 
   for (const field of ALL_FIELDS) {
@@ -73,6 +124,17 @@ export function checkManifest(zone, manifest) {
       const real = realPackageName(declared, spec);
       const where = `${zone}: ${field}.${declared}`;
       const alias = real === declared ? '' : ` (alias of ${real})`;
+
+      const bad = specProblem(spec);
+      if (bad !== null) {
+        problems.push(`${where}: ${bad}`);
+        continue;
+      }
+      if (spec.startsWith('workspace:') && real !== declared) {
+        problems.push(
+          `${where}: a workspace: alias must not point to a different package (${real})`,
+        );
+      }
 
       const workspaceName = workspaceNameOf(real);
       if (workspaceName !== null) {
@@ -135,6 +197,20 @@ function scriptKind(file) {
   return /\.[cm]?js$/.test(file) ? ts.ScriptKind.JS : ts.ScriptKind.TS;
 }
 
+/** `crypto` or `<something>.crypto`. */
+function isCryptoReceiver(node) {
+  if (ts.isIdentifier(node)) return node.text === 'crypto';
+  return ts.isPropertyAccessExpression(node) && node.name.text === 'crypto';
+}
+
+/** True when this `require` identifier names a declaration or a property rather than reading it. */
+function isRequireName(node) {
+  const parent = node.parent;
+  if (ts.isShorthandPropertyAssignment(parent)) return false;
+  if (ts.isPropertyAccessExpression(parent)) return parent.name === node;
+  return parent.name === node || parent.propertyName === node;
+}
+
 /**
  * Problems in one source file. `zone` is the package directory, `file` is the absolute path,
  * `text` the file content. `root` resolves relative imports against the package directory.
@@ -142,6 +218,7 @@ function scriptKind(file) {
 export function checkSource(zone, file, text, root) {
   const problems = [];
   const shown = `${zone}/${relative(join(root, zone), file)}`;
+  const repoPath = relative(root, file).split('\\').join('/');
   const sourceFile = ts.createSourceFile(
     file,
     text,
@@ -165,7 +242,7 @@ export function checkSource(zone, file, text, root) {
       }
       return;
     }
-    const message = violationFor(zone, specifier);
+    const message = violationFor(zone, specifier, repoPath);
     if (message !== null) report(node, `import of "${specifier}": ${message}`);
   }
 
@@ -179,6 +256,20 @@ export function checkSource(zone, file, text, root) {
   }
 
   const subtleAllowed = SUBTLE_ZONES.includes(zone);
+  const subtle = (node) => report(node, 'crypto.subtle may be used only in packages/crypto');
+  const loader = (node, name) =>
+    report(node, `"${name}" reaches the module loader around the import checks`);
+
+  /** Name of a property access / element access / binding, or null when it is computed. */
+  function memberName(node) {
+    if (ts.isPropertyAccessExpression(node)) return node.name.text;
+    if (ts.isElementAccessExpression(node)) return staticText(node.argumentExpression) ?? null;
+    if (ts.isBindingElement(node)) {
+      const key = node.propertyName ?? node.name;
+      return ts.isIdentifier(key) || ts.isStringLiteralLike(key) ? key.text : null;
+    }
+    return null;
+  }
 
   function visit(node) {
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
@@ -191,34 +282,77 @@ export function checkSource(zone, file, text, root) {
     } else if (ts.isImportTypeNode(node)) {
       const literal = ts.isLiteralTypeNode(node.argument) ? node.argument.literal : undefined;
       checkDynamic(node, literal);
-    } else if (ts.isCallExpression(node)) {
+    } else if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
       const callee = node.expression;
-      if (callee.kind === ts.SyntaxKind.ImportKeyword) {
+      if (ts.isCallExpression(node) && callee.kind === ts.SyntaxKind.ImportKeyword) {
+        checkDynamic(node, node.arguments?.[0]);
+      } else if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(callee) &&
+        callee.text === 'require'
+      ) {
         checkDynamic(node, node.arguments[0]);
-      } else if (ts.isIdentifier(callee) && callee.text === 'require') {
-        checkDynamic(node, node.arguments[0]);
+      } else if (ts.isIdentifier(callee) && ['eval', 'Function'].includes(callee.text)) {
+        report(
+          node,
+          `${callee.text} builds code from a string and hides imports from the boundary checks`,
+        );
+      } else if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(callee) &&
+        ['setTimeout', 'setInterval'].includes(callee.text) &&
+        node.arguments[0] &&
+        ts.isStringLiteralLike(node.arguments[0])
+      ) {
+        report(node, `${callee.text} with a string argument is eval`);
+      } else if (
+        ts.isCallExpression(node) &&
+        !subtleAllowed &&
+        ts.isPropertyAccessExpression(callee) &&
+        ts.isIdentifier(callee.expression) &&
+        ['Reflect', 'Object'].includes(callee.expression.text) &&
+        node.arguments.some((argument) => staticText(argument) === 'subtle')
+      ) {
+        subtle(node);
       }
-    } else if (!subtleAllowed) {
-      if (ts.isPropertyAccessExpression(node) && node.name.text === 'subtle') {
-        report(node, 'crypto.subtle may be used only in packages/crypto');
-      } else if (
-        ts.isElementAccessExpression(node) &&
-        staticText(node.argumentExpression) === 'subtle'
-      ) {
-        report(node, 'crypto.subtle may be used only in packages/crypto');
-      } else if (
-        ts.isBindingElement(node) &&
-        ts.isObjectBindingPattern(node.parent) &&
-        (node.propertyName ?? node.name).getText(sourceFile).replace(/['"]/g, '') === 'subtle'
-      ) {
-        report(node, 'crypto.subtle may be used only in packages/crypto');
+    } else if (ts.isIdentifier(node) && node.text === 'require') {
+      // `require` anywhere but as the callee of a direct call: const r = require; require.call(...)
+      const parent = node.parent;
+      const direct = ts.isCallExpression(parent) && parent.expression === node;
+      if (!direct && !isRequireName(node)) {
+        report(node, '"require" may only be called directly with a string literal');
+      }
+    }
+
+    if (
+      ts.isPropertyAccessExpression(node) ||
+      ts.isElementAccessExpression(node) ||
+      ts.isBindingElement(node)
+    ) {
+      const name = memberName(node);
+      const receiver = ts.isBindingElement(node) ? undefined : node.expression;
+      if (name !== null && LOADER_MEMBERS.includes(name)) loader(node, name);
+      if (receiver && ts.isIdentifier(receiver)) {
+        if (name === 'require' && receiver.text === 'module') loader(node, 'module.require');
+        if (name === 'binding' && receiver.text === 'process') loader(node, 'process.binding');
+      }
+      if (!subtleAllowed) {
+        if (name === 'subtle') subtle(node);
+        else if (
+          name === null &&
+          receiver &&
+          ts.isElementAccessExpression(node) &&
+          isCryptoReceiver(receiver)
+        ) {
+          subtle(node); // crypto[k] with a computed key could be 'subtle'
+        }
       }
     }
     ts.forEachChild(node, visit);
   }
   visit(sourceFile);
 
-  // Directives that switch the boundary rules off. Matched on comments only.
+  // Directives and inline config comments that switch the boundary rules off. Matched on comments only.
   const directive = /(?:\/\/|\/\*)\s*eslint-disable(?:-next-line|-line)?\b([^\n]*)/g;
   for (const match of text.matchAll(directive)) {
     const listed = match[1]
@@ -234,21 +368,57 @@ export function checkSource(zone, file, text, root) {
       );
     }
   }
+  for (const match of text.matchAll(/\/\*\s*eslint\s([\s\S]*?)\*\//g)) {
+    if (BOUNDARY_RULES.some((rule) => match[1].includes(rule))) {
+      const line = text.slice(0, match.index).split('\n').length;
+      problems.push(
+        `${shown}:${line}: an inline eslint config comment must not change the boundary rules`,
+      );
+    }
+  }
   return problems;
 }
 
 // --- Repository scan ------------------------------------------------------------------------------
 
-function sourceFiles(dir) {
+function walk(dir) {
   const found = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name)) found.push(...sourceFiles(join(dir, entry.name)));
-    } else if (SOURCE_EXT.test(entry.name)) {
+      if (!SKIP_DIRS.has(entry.name)) found.push(...walk(join(dir, entry.name)));
+    } else {
       found.push(join(dir, entry.name));
     }
   }
   return found;
+}
+
+/**
+ * Absolute paths of every source file under `dir` (a package directory). Inside a repository: the
+ * tracked files plus untracked files that are not ignored, so an ignored build directory is left out
+ * but `git add -f src/dist/x.ts` is still scanned. Without repository metadata: a full walk that
+ * skips only node_modules.
+ */
+export function listSourceFiles(root, dir) {
+  const zonePath = relative(root, dir).split('\\').join('/');
+  let paths;
+  try {
+    const out = execFileSync(
+      'git',
+      ['-C', root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', zonePath],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    );
+    paths = out
+      .split('\0')
+      .filter(Boolean)
+      .map((path) => join(root, path));
+  } catch {
+    paths = walk(dir);
+  }
+  return paths
+    .filter((path) => SOURCE_EXT.test(path) && !path.split(/[\\/]/).includes('node_modules'))
+    .filter((path) => existsSync(path))
+    .sort();
 }
 
 /** Workspace directories under packages/* and apps/*: [{ zone, dir }]. */
@@ -294,7 +464,7 @@ export function runChecks(root) {
       );
     }
     if (!ZONES[zone]) continue; // already reported; do not guess its policy
-    for (const file of sourceFiles(dir)) {
+    for (const file of listSourceFiles(root, dir)) {
       files += 1;
       problems.push(...checkSource(zone, file, readFileSync(file, 'utf8'), root));
     }

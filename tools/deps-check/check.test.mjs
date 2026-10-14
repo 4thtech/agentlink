@@ -303,11 +303,11 @@ describe('runChecks on a fixture repository', () => {
     );
   });
 
-  it('ignores node_modules, dist and nested worktree directories', () => {
+  it('ignores node_modules at any depth and nothing else (full walk without repository data)', () => {
     const root = repo({
       'packages/crypto/package.json': pkg('@agentlink/crypto'),
       'packages/crypto/node_modules/dep/index.js': `require('node:fs')`,
-      'packages/crypto/dist/index.js': `import fs from 'node:fs';`,
+      'packages/crypto/src/node_modules/dep/index.js': `require('node:fs')`,
     });
     expect(runChecks(root)).toMatchObject({ problems: [], files: 0 });
   });

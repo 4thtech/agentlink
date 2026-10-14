@@ -49,7 +49,16 @@ function restrictionsFor(zone) {
 }
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', '**/.turbo/**', '**/coverage/**', 'docs/**'] },
+  {
+    // Build output is ignored only where a build writes it (the root of a workspace), never at any
+    // depth: `packages/core/src/dist/x.ts` is source and must be linted (boundary review IR-M0-10-1).
+    ignores: [
+      '**/node_modules/**',
+      '{packages,apps,tools,e2e,test-vectors}/*/{dist,coverage,.turbo}/**',
+      '{dist,coverage,.turbo}/**',
+      'docs/**',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -62,7 +71,13 @@ export default tseslint.config(
     // Directories the policy does not know get the strictest set until they get an entry.
     files: [`packages/**/*.${SOURCE}`, `apps/**/*.${SOURCE}`],
     plugins: { boundaries },
-    rules: restrictionsFor(null),
+    // eval, new Function and string timers build code the import checks cannot see.
+    rules: {
+      ...restrictionsFor(null),
+      'no-eval': 'error',
+      'no-new-func': 'error',
+      'no-implied-eval': 'error',
+    },
   },
   ...Object.keys(ZONES).map((zone) => ({
     files: [`${zone}/**/*.${SOURCE}`],
