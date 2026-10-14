@@ -13,6 +13,7 @@ export type CoreErrorCode =
   | 'identity_mismatch'
   | 'identity_revoked'
   | 'key_epoch_mismatch'
+  | 'rotation_pending'
   | 'owner_keys_changed'
   | 'card_invalid'
   | 'card_owner_signature_invalid'
@@ -27,7 +28,10 @@ export type CoreErrorCode =
   | 'contact_conflict'
   | 'repair_owner_changed'
   | 'repair_epoch_lower'
-  | 'card_update_not_newer';
+  | 'card_update_not_newer'
+  | 'pairing_not_found'
+  | 'pairing_expired'
+  | 'pairing_evidence_missing';
 
 export class CoreError extends Error {
   readonly code: CoreErrorCode;

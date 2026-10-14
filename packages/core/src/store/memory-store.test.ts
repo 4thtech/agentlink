@@ -43,6 +43,7 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
       [
         'identity',
         'contacts',
+        'pairings',
         'invites',
         'envelopes',
         'files',

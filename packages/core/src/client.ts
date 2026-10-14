@@ -71,7 +71,9 @@ export class AgentLinkClient {
           'The keys do not belong to the agent in this store.',
         );
       }
-      // The KeyStore is at the stored epoch, or one ahead while a rotation is completed (identity.rotate).
+      // The KeyStore is at the stored epoch, or one ahead until the owner completes identity.rotate.
+      // In that state the client opens but must not send: identity.sendState() is `rotation_pending`
+      // and assertCanSend() refuses (IR-M1-7a-1 L-1; the epoch advance itself is M1-1g-d).
       if (bundle.keyEpoch !== row.key_epoch && bundle.keyEpoch !== row.key_epoch + 1) {
         throw new CoreError('key_epoch_mismatch', 'The key store epoch does not match this agent.');
       }

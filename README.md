@@ -20,13 +20,14 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 >   - the content-key wrap and payload encryption for envelopes (RFC 9180 HPKE and AES-256-GCM), and EIP-712 typed data with the agent card;
 >   - the key interfaces (`KeyStore`, `OwnerKeyStore`, an in-memory test store), NIP-44 v2 and gift wrap;
 >   - the owner passphrase wrap, the pairing proof and the pairing safety code;
->   - independent test vectors for these suites, and the shared policy, approval, proof pack and tool-result types in `@agentlink/types`, tested in Node, three browsers and workerd.
+>   - independent test vectors for these suites, and the shared policy, approval, proof pack and tool-result types in `@agentlink/types`, tested in Node, three browsers and workerd;
+>   - the core skeleton in `@agentlink/core`: the agent's identity and signed card, contacts (pairing commit, block, remove), and the store and approval-channel interfaces with an in-memory test store. Nothing in it is user-runnable yet.
 > - **Also landed:**
 >   - the specification for envelope signatures and key interfaces (gap G-2; decision D-62 accepted by the owner at merge, except one detail that stays proposed: the cap on held envelopes);
 >   - the first design drop (D1: brand core, tokens, components, local approvals screens), with the second drop (D2: console, desktop apps, onboarding and more) partly in, tracked in [`docs/design/`](docs/design/README.md);
 >   - the notary contract (record and receipt logic) in the private contracts repo. Its test and static-analysis suites are in review; nothing is deployed.
 > - **In progress:** the rest of the crypto layer (file encryption), the remaining contract work and test vectors, then the core and the node runtime.
-> - **Does not exist yet:** a usable product. The packages are private and nothing is published; only the crypto and types foundations above contain code. **There is nothing to install or run yet.** Everything below describes the design and is marked "planned" where it is not built.
+> - **Does not exist yet:** a usable product. The packages are private and nothing is published; only the crypto, types and core foundations above contain code. **There is nothing to install or run yet.** Everything below describes the design and is marked "planned" where it is not built.
 > - **Next:** the rest of the M1a crypto layer, then the walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets.
 >
 > We build in public. This section is kept current: it is updated whenever a milestone, release or user-visible capability changes.

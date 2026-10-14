@@ -278,7 +278,11 @@ export interface MemoryStoreOptions {
   readonly schemaVersion?: number;
 }
 
-/** An in-memory Store. For tests and development only; nothing persists. */
+/**
+ * An in-memory Store. NOT FOR PRODUCTION: for tests and development only. Nothing persists, so a
+ * restart forgets owner-action nonces, the seen-set and idempotency results, which reopens replay
+ * windows (IR-M1-7a-1 L-6).
+ */
 export class MemoryStore implements Store {
   readonly schemaVersion: number;
   #data: Data = new Map(TABLE_NAMES.map((t) => [t, []]));

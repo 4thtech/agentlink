@@ -5,16 +5,78 @@ import {
   AGENT_CARD_TYPES,
   agentCardNameHash,
   agentCardRelaysHash,
+  canonicalize,
+  decodeHex0x,
+  encodeHex,
   encodeHex0x,
+  ownerFingerprint,
   parseAgentCard,
+  parseJson,
   verifyCardAgentSig,
   verifyCardOwnerSig,
   type AgentCard,
+  type JsonValue,
   type OwnerPublicKeys,
   type TypedData,
 } from '@agentlink/crypto';
 import { displayNameSchema, relayListSchema } from '@agentlink/types';
 import { CoreError } from './errors.js';
+
+/** A card with its signatures as the store keeps it, sealed in `agent_card_json` (07 §3, M-3). */
+export interface StoredCard {
+  readonly card: AgentCard;
+  readonly cardSig: string;
+  /** Null after a card-update, which carries no agent signature (04 §3.4.1). */
+  readonly cardAgentSig: string | null;
+}
+
+/** The plaintext of a sealed `agent_card_json`: JCS of {card, cardSig, cardAgentSig}. */
+export function storedCardText(stored: StoredCard): string {
+  return canonicalize({
+    card: stored.card as unknown as JsonValue,
+    cardSig: stored.cardSig,
+    cardAgentSig: stored.cardAgentSig,
+  });
+}
+
+/**
+ * Reads a stored card back and checks it again: the card parses strictly and `cardSig` is by
+ * `ownerEvm`; `cardAgentSig`, when present, is by `agentEvm`. Anything else is unreadable (fail
+ * closed), never trusted.
+ */
+export function parseStoredCard(text: string): StoredCard {
+  const unreadable = (): never => {
+    throw new CoreError('store_unreadable', 'A stored agent card could not be read.');
+  };
+  let value: unknown;
+  try {
+    value = parseJson(text, { integersOnly: true });
+  } catch {
+    return unreadable();
+  }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return unreadable();
+  const { card: rawCard, cardSig, cardAgentSig } = value as Record<string, unknown>;
+  let card: AgentCard;
+  try {
+    card = parseAgentCard(rawCard);
+  } catch {
+    return unreadable();
+  }
+  if (typeof cardSig !== 'string' || !verifyCardOwnerSig(card, cardSig)) return unreadable();
+  if (cardAgentSig !== null && !verifyCardAgentSig(card, cardAgentSig)) return unreadable();
+  return { card, cardSig, cardAgentSig: cardAgentSig as string | null };
+}
+
+/** The long owner fingerprint (04 §2.9) of a card, 64 lowercase hex. A hash of public keys only. */
+export function ownerFingerprintHex(card: AgentCard): string {
+  return encodeHex(
+    ownerFingerprint(
+      decodeHex0x(card.ownerEvm, { length: 20 }),
+      decodeHex0x(card.ownerNostr, { length: 32 }),
+      decodeHex0x(card.ownerEnc, { length: 32 }),
+    ),
+  );
+}
 
 /** A card with the signatures and off-chain fields that travel with it (invite, handshake, 04 §3.6). */
 export interface SignedCard {

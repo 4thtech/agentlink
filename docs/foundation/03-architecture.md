@@ -107,7 +107,9 @@ interface OwnerSession extends EnvelopeKeys {  // short-lived; never reachable f
 }
 // @agentlink/core
 interface Store { /* contacts, threads, envelopes, records, approvals, policies */ }
-interface ApprovalChannel { request(a: ApprovalRequest): Promise<ApprovalId>; status(id): Promise<ApprovalStatus>; }
+// Delivery only (I-4): `status` hands back the owner's signed object as unverified text; the core
+// verifies it. `request` returns the approval ID and, where the channel has one, the page URL.
+interface ApprovalChannel { request(a: ApprovalRequest): Promise<{ approvalId; url? }>; status(id): Promise<ApprovalChannelStatus>; }
 ```
 
 ---

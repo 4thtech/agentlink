@@ -14,6 +14,15 @@
 // - Forward migrations only: a store whose schema version is newer than the code refuses to open,
 //   and is never downgraded (the core checks `schemaVersion`, client.ts).
 // - Fail closed: a read error throws; it never comes back as an absent or empty row.
+//
+// Rules the core enforces inside its store transactions, not the schema (IR-M1-7a-1 L-5; a SQLite
+// store may add triggers as a second layer):
+// - an envelope ID is unique across `envelopes` and `held_envelopes` (07 §3.2; M1-7b);
+// - per scope_key, at most one approved scope with a part still `unclaimed` (§3.5; M1-7e, M1-32);
+// - `revoked_agents` rows are never deleted, and contact status `revoked` is final (§3.4; M1-7a for
+//   contacts, M1-7d for the revoke path);
+// - a contact's keys are not claimed by another card (contacts.ts, M1-7a);
+// - pruning per table with its retention (§3.7) runs in its own transaction (M1-7b, M1-8b).
 import type { ColumnName, PrimaryKey, Row, Sealed, StoreValue, TableName } from './schema.js';
 
 /** A condition on one column. A bare value means equality; `null` matches only null. */

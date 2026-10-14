@@ -68,14 +68,13 @@ export interface TableSpec {
 export const SINGLETON_SLOT = 'current' as const;
 
 export const TABLES = {
-  // 07 §3; G-23. Added: card_sig, card_agent_sig (the signatures that travel with the card), name and
-  // relays (the off-chain card fields, `enc`), updated_at.
+  // 07 §3; G-23. agent_card_json is `enc` and holds the signed card, {card, cardSig, cardAgentSig}
+  // (IR-M1-7a-1 M-3: a clear card exposes nameHash and relaysHash). Added: name and relays (the
+  // off-chain card fields, `enc`), updated_at.
   identity: {
     columns: {
       agent_id: id,
-      agent_card_json: json,
-      card_sig: id,
-      card_agent_sig: id,
+      agent_card_json: enc,
       name: enc,
       relays: enc,
       key_epoch: int,
@@ -87,26 +86,25 @@ export const TABLES = {
     primaryKey: ['agent_id'],
     maxRows: 1,
   },
-  // 07 §3 and the pairing columns (04 §2.9, §3.6.1). contact_id is the contact's agentId. Added:
-  // name_source (06 §2.1), card_sig, card_agent_sig (null after a card-update, which carries none),
-  // relays (`enc`), agent_nostr (the current card's key, unique, for sender lookup), key_epoch,
-  // nostr_keys (every agentNostr seen in a stored card, oldest first: superseded-key refusal, 04 §3.1.1
-  // step 7, and the revoked set, §3.4), updated_at.
+  // 07 §3 and the pairing columns (04 §2.9, §3.6.1). contact_id is the contact's agentId.
+  // agent_card_json is `enc`: {card, cardSig, cardAgentSig} (cardAgentSig null after a card-update).
+  // Added: name_source (06 §2.1), relays (`enc`), agent_nostr (the current card's key, unique, for
+  // sender lookup), key_epoch, nostr_keys (every agentNostr of a stored card, oldest first: superseded
+  // keys, 04 §3.1.1 step 7, and the revoked set, §3.4), updated_at. Status `removed` is a tombstone
+  // (02 F-14): the keys stay so later envelopes from them are dropped.
   contacts: {
     columns: {
       contact_id: id,
       name: enc,
       name_source: oneOf('counterparty', 'owner'),
-      agent_card_json: json,
-      card_sig: id,
-      card_agent_sig: opt('id'),
+      agent_card_json: enc,
       relays: enc,
       agent_nostr: id,
       key_epoch: int,
       nostr_keys: json,
       owner_fingerprint: id,
       verified: flag,
-      status: oneOf('active', 'blocked', 'revoked'),
+      status: oneOf('active', 'blocked', 'removed', 'revoked'),
       pairing: oneOf('pending', 'complete', 'mismatch'),
       handshake_envelope_id: opt('id'),
       handshake_ack_envelope_id: opt('id'),
@@ -119,6 +117,26 @@ export const TABLES = {
     },
     primaryKey: ['contact_id'],
     unique: [{ columns: ['agent_nostr'] }],
+  },
+  // Staged pairings (IR-M1-7a-1 M-2; proposed 07 §3 amendment): a verified card waiting for its
+  // handshake to complete. Nothing in `contacts` changes until completion, which writes the contact
+  // and deletes this row in one store transaction (04 §2.9). Deleted on completion or abort, and
+  // pruned after expires_at (the invite's expiry).
+  pairings: {
+    columns: {
+      pairing_id: id,
+      contact_id: id,
+      role: oneOf('inviter', 'invitee'),
+      agent_nostr: id,
+      key_epoch: int,
+      owner_fingerprint: id,
+      agent_card_json: enc,
+      name: enc,
+      relays: enc,
+      created_at: int,
+      expires_at: int,
+    },
+    primaryKey: ['pairing_id'],
   },
   // 07 §3 (and nonce_a, 04 §3.6.1). Added: created_at.
   invites: {

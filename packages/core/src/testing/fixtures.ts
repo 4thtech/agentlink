@@ -11,7 +11,7 @@ import {
   type OwnerPresence,
 } from '@agentlink/crypto';
 import type { Sealed } from '../store/schema.js';
-import type { SealContext, StoreCipher } from '../store/store.js';
+import type { SealContext, Store, StoreCipher } from '../store/store.js';
 import type {
   ApprovalChannel,
   ApprovalChannelStatus,
@@ -80,3 +80,41 @@ export const passphrase = (text = 'correct horse'): OwnerPresence => ({
 });
 
 export const RELAYS = Object.freeze(['wss://relay.agentlink.dev', 'wss://nos.lol']);
+
+let envelopeCounter = 0;
+
+/**
+ * Stores a processed pairing envelope (the evidence completePairing looks for, 04 §2.9, §3.6). The
+ * real handshake and ack are built, verified and stored by M1-7c; here only the row exists.
+ */
+export async function storePairingEnvelope(
+  store: Store,
+  options: {
+    readonly type: 'handshake' | 'handshake-ack';
+    readonly direction: 'in' | 'out';
+    readonly from: string;
+    readonly createdAt?: number;
+  },
+): Promise<string> {
+  envelopeCounter += 1;
+  const id = `env-${envelopeCounter}`;
+  await store.transaction((tx) =>
+    tx.insert('envelopes', {
+      envelope_id: id,
+      envelope_hash: `0x${envelopeCounter.toString(16).padStart(64, '0')}`,
+      thread_id: 'thread',
+      direction: options.direction,
+      contact_id: null,
+      from_key: options.from,
+      type: options.type,
+      state: 'ok',
+      refused_reason: null,
+      created_at: options.createdAt ?? 1,
+      envelope_json: '{}',
+      payload_json: null,
+      read_at: null,
+      delivery: options.direction === 'out' ? 'sent' : null,
+    }),
+  );
+  return id;
+}

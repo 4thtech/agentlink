@@ -75,6 +75,11 @@ describe('identity.init (04 §2.4, §2.9)', () => {
     }));
     expect(rows.identity).toHaveLength(1);
     expect(rows.identity[0]?.name).not.toContain('Tali');
+    // M-3: the card is sealed too, so its nameHash and relaysHash are not in clear.
+    const clear = JSON.stringify(rows.identity[0]);
+    expect(clear).not.toContain(view.card.nameHash.slice(2));
+    expect(clear).not.toContain(view.card.relaysHash.slice(2));
+    expect(clear).not.toContain(view.card.ownerNostr.slice(2));
     expect(rows.budget).toEqual([
       {
         slot: 'current',
@@ -309,5 +314,62 @@ describe('identity.rotate (04 §2.6)', () => {
         ownerKeys: await first.owner.getPublicKeys(),
       }),
     ).rejects.toMatchObject({ code: 'identity_revoked' });
+  });
+});
+
+describe('revoked own agent (07 §3.4: the core stops sending and signing)', () => {
+  it('serves no card for invites once revoked (L-3)', async () => {
+    const { client, owner, store, clock } = await setup();
+    await client.identity.init({
+      owner: await owner.unlock(passphrase()),
+      ownerKeys: await owner.getPublicKeys(),
+      name: 'n',
+      relays: RELAYS,
+    });
+    await store.transaction((tx) => tx.update('identity', {}, { revoked_at: clock.t }));
+    await expect(client.identity.signedCard()).rejects.toMatchObject({ code: 'identity_revoked' });
+    await expect(client.identity.assertCanSend()).rejects.toMatchObject({
+      code: 'identity_revoked',
+    });
+  });
+});
+
+describe('send readiness (L-1: the KeyStore one epoch ahead)', () => {
+  it('refuses to send until the owner completes the rotation, then allows it', async () => {
+    const first = await setup({ keyEpoch: 0 });
+    expect(await first.client.identity.sendState()).toBe('no_identity');
+    await expect(first.client.identity.assertCanSend()).rejects.toMatchObject({
+      code: 'identity_missing',
+    });
+    await first.client.identity.init({
+      owner: await first.owner.unlock(passphrase()),
+      ownerKeys: await first.owner.getPublicKeys(),
+      name: 'n',
+      relays: RELAYS,
+    });
+    expect(await first.client.identity.sendState()).toBe('ready');
+    await first.client.identity.assertCanSend();
+
+    const ahead = await AgentLinkClient.create({
+      keyStore: new MemoryKeyStore(seed(1), { keyEpoch: 1 }),
+      store: first.store,
+      cipher: first.cipher,
+      approvals: new RecordingApprovalChannel(),
+      clock: first.clock.now,
+    });
+    expect(await ahead.identity.sendState()).toBe('rotation_pending');
+    await expect(ahead.identity.assertCanSend()).rejects.toMatchObject({
+      code: 'rotation_pending',
+    });
+    await ahead.identity.rotate({
+      owner: await first.owner.unlock(passphrase()),
+      ownerKeys: await first.owner.getPublicKeys(),
+    });
+    expect(await ahead.identity.sendState()).toBe('ready');
+    // A client still on the old epoch is now behind the stored card: it may not send either.
+    expect(await first.client.identity.sendState()).toBe('key_epoch_mismatch');
+    await expect(first.client.identity.assertCanSend()).rejects.toMatchObject({
+      code: 'key_epoch_mismatch',
+    });
   });
 });
