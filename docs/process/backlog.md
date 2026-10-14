@@ -1261,23 +1261,26 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-3g · contracts: CREATE3 deploy script and testnet deployment
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · script/Deploy.s.sol, script/config/*.json, .github/workflows/deploy-testnet.yml
-- **Depends on:** M1-3e, M1-14; gap G-8 resolved
-- **Spec:** 05 §5, §9; 03 §6–§7; `release-and-deployment.md` §4.2
+- **Depends on:** M1-3e, M1-14 (Base Sepolia entries; the Chiado entries before the Chiado run); gap G-8 resolved by branch `docs/G-8-create3-salt` (05 §9.1; pending owner, proposed, owner confirms at merge); D-63
+- **Spec:** 05 §5, §9, §9.1; 03 §6–§7; `release-and-deployment.md` §4.2; D-63
 - **Invariants:** I-6
 - **Scope:**
-  - Foundry script: implementations and UUPS proxies via CreateX CREATE3 with deploy-and-initialise in one call; salt scheme per G-8; per-chain config (fee tokens with EIP-3009 flags, fees, caps, min deposits, treasury Safe, role holders, delays).
+  - Foundry script: UUPS proxies and the AccessManager via CreateX CREATE3 with deploy-and-initialise in one call, implementations via CreateX CREATE2; salt layout, labels, guards and stage deployer per 05 §9.1 (guard ‖ `0x00` ‖ `bytes11(keccak256(label))`, chain ID off); the campaign's address file committed from the first fork dry-run; per-chain config (fee tokens with EIP-3009 flags, fees, caps, min deposits, treasury Safe, role holders, delays).
   - In the same script: all roles granted to the testnet Safe and the testnet ops key per 05 §5.1 (mainnet layout, scaled delays), Notary registered as vault module, every deployer role revoked. Mainnet variant (M3-2c): contracts initialised paused until the grant and target admin delays are in effect.
-  - No deployer-only window (IR-M1-3a-1 M-1). Until `OCCRoleSetup.configure` runs, every selector is unmapped and defaults to `ADMIN_ROLE`, so the deployer would hold 0-delay `upgradeToAndCall`, `setTreasury` and `registerModule` on live proxies. The vault's initial configuration therefore goes in its initializer (M1-3b), and the script either (a) does manager deployment, proxies, initialisation and `OCCRoleSetup` in one transaction through a one-shot deployer contract, or (b) calls `configure` against the CREATE3-predicted proxy addresses before deploying the proxies. The Notary is registered as a module through the initializer, not by a later call.
-  - Post-deploy check script (in CI): deployer holds no role; delays equal `docs/roles.md`; addresses identical on both chains; the ERC-1967 implementation slot of each proxy equals the expected implementation; `authority()`, `paused()` and the vault configuration read back as configured.
+  - No deployer-only window (IR-M1-3a-1 M-1). Until `OCCRoleSetup.configure` runs, every selector is unmapped and defaults to `ADMIN_ROLE`, so the deployer would hold 0-delay `upgradeToAndCall`, `setTreasury` and `registerModule` on live proxies. The vault's initial configuration therefore goes in its initializer (M1-3b), and the script either (a) does manager deployment, proxies, initialisation and `OCCRoleSetup` in one transaction through a one-shot deployer contract, or (b) calls `configure` against the CREATE3-predicted proxy addresses before deploying the proxies. The Notary is registered as a module through the initializer, not by a later call. 05 §9.1 (proposed) adopts (a), the stage deployer: with (b) the deployer key would still hold `ADMIN_ROLE` across several transactions, before the configured grant delays take effect.
+  - Post-deploy check script (in CI): deployer holds no role; delays equal `docs/roles.md`; addresses equal the campaign's address file (05 §9.1); the ERC-1967 implementation slot of each proxy equals the expected implementation; `authority()`, `paused()` and the vault configuration read back as configured.
   - Open Lows (IR-M1-3a-1 L-1, L-2, I-2): `OCCRoleSetup.calls` checks the mainnet delay floor itself (make it `view` and call `checkDelays` first), not only `configure`; on a mainnet `configure` reverts unless the vault, the Notary (and the Registry, if set) report `paused()` true, with a test; on a mainnet it requires exactly two ops keys (05 §5.1).
-  - Deploy runs from CI in the private repo, triggered manually by the owner (Free plan: no environment protection); testnet-only key, low balance. Agents never broadcast from a workstation.
+  - Deploy runs from CI in the private repo, triggered manually by the owner (Free plan: no environment protection); testnet-only key, low balance, kept for the life of the testnet campaign (05 §9.1). Agents never broadcast from a workstation.
+  - Order (D-63, build-plan deviation announced by the owner, 14 Oct 2026): **Base Sepolia first.** Gnosis Chiado follows later with the same testnet deployer key, campaign label and salts; its run fails unless the predicted and deployed addresses equal the published Base Sepolia addresses. The stage transaction is sized for the lower of the two block gas limits now, so the Chiado run can reproduce it (05 §9.1).
   - Resolved (D-11, D-19): no explorer or Sourcify source verification on testnets; the source stays private until mainnet verification (M3-6). Testnet deploys publish ABIs and addresses only (`release-and-deployment.md` §4.2).
   - Follow-up (IR-M1-3b-1 choice 12): promote the one-transaction deployer pattern to the script with CreateX CREATE3 deploy-and-init, keep the one-transaction property, and include the post-deploy implementation-slot check.
   - Config assertions (IR-M1-3b-1 L-2; shared with M1-14): the script refuses to deploy or configure unless every allowlisted fee token has a nonzero `NOTARIZE` and `REGISTER` fee and cap, the native coin is allowlisted only on Gnosis chain IDs (D-46), and no allowlisted token is fee-on-transfer or rebasing.
   - Runbook step (IR-M1-3b-1 L-2, choice 11): adding a fee token to the allowlist follows a fixed order, with its fees and caps effective before the allowlisting executes; the runbook also notes that a second `pause` or `unpause` that changes nothing reverts (`EnforcedPause()` / `ExpectedPause()`).
 - **Acceptance:**
-  - Identical proxy addresses on Base Sepolia and Gnosis Chiado (script output in PR).
-  - `deployer-holds-no-role` passes on both chains; fork dry-run in CI before broadcast.
+  - Base Sepolia: proxy and AccessManager addresses equal the fork dry-run's predictions and the committed address file (script output in PR).
+  - Gnosis Chiado, when it deploys (D-63): the same addresses as Base Sepolia, checked by the script before broadcast and after (script output in that PR).
+  - `deployer-holds-no-role` passes on Base Sepolia, and on Chiado when it deploys; fork dry-run in CI before every broadcast.
+  - Negative tests for the salt rules (05 §9.1): a salt whose guard bytes differ from the caller, byte 20 not `0x00`, and a predicted address that already has code each make the script fail before broadcast; a fork test shows the offline address computation equals the address CreateX deploys to.
   - Addresses published in the next `@agentlink/occ-v2-abi` prerelease (M1-3f).
   - Negative tests for the config assertions: an allowlisted token with a zero fee or cap, the native coin on a non-Gnosis chain, and a fee-on-transfer mock each make the script fail.
 
@@ -1330,7 +1333,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-4c · chain: submission, direct mode, inclusion tracking
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain
-- **Depends on:** M1-4a, M1-3g (testnet addresses); M1-10a for integration (mock before)
+- **Depends on:** M1-4a, M1-3g (Base Sepolia addresses; Chiado once deployed, D-63); M1-10a for integration (mock before)
 - **Spec:** 07 §6.2, §7; 03 §4.3; 05 §3.2, §3.3; 04 §5, §7 (malicious submitter)
 - **Invariants:** I-3, I-6
 - **Scope:**
@@ -2594,7 +2597,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Scope:**
   - `register(card, cardOwnerSig, cardAgentSig, reg, regOwnerSig)`: both card signatures over the chain-agnostic AgentCard domain; `regOwnerSig` over `Registration` in the OCC v2 chain domain authorises fees; `REGISTER` fee charged to `card.ownerEvm` through the vault.
   - Higher `keyEpoch` from the same owner replaces the entry; `revoke` with an owner signature (struct per G-20); `getAgent`; events.
-  - Registered as a vault module; CREATE3 deployment to both testnets via the M1-3g script (private repo, Free-plan controls apply).
+  - Registered as a vault module; CREATE3 deployment to both testnets via the M1-3g script as stage `m2-registry` of the testnet campaign (05 §9.1), on each chain after its M1 stage (private repo, Free-plan controls apply).
 - **Acceptance:**
   - Registering a public card with an attacker-chosen `appId` and no `regOwnerSig` fails; replayed registration and revoke rejected; ERC-1271 owner works.
   - Invariant suite extended (entries change only through owner-signed operations); identical address on both testnets; vector parity green.
@@ -2970,7 +2973,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Spec:** 05 §2.6, §5; 10 M3-2; `release-and-deployment.md` §6
 - **Invariants:** I-10
 - **Scope:**
-  - ≥ 2-of-3 Safes per chain with hardware signers; two ops hardware keys holding `PAUSER` and `GUARDIAN` (Tali and Denis, never Safe-signer devices; 05 §5.1) plus the Safe; fresh hardware-backed mainnet deployer key retained per G-8 for later chains; role-assignment plan mapping every role in `docs/roles.md` to its holder.
+  - ≥ 2-of-3 Safes per chain with hardware signers; two ops hardware keys holding `PAUSER` and `GUARDIAN` (Tali and Denis, never Safe-signer devices; 05 §5.1) plus the Safe; fresh hardware-backed mainnet deployer key, kept in cold storage while any chain or stage of the mainnet campaign is planned (05 §9.1); role-assignment plan mapping every role in `docs/roles.md` to its holder.
 - **Acceptance:**
   - A script reads each Safe's owners and threshold on-chain and matches the plan; no seed or signer secret in any repository.
 
@@ -2981,7 +2984,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Spec:** 05 §5, §9; 10 M3-2; `release-and-deployment.md` §3 rule 2, §4.3
 - **Invariants:** I-6, I-10
 - **Scope:**
-  - Only the audited commit (bytecode rebuilt and compared); fork dry-run; the owner runs the deploy locally with the hardware deployer key while a second person (by agreement, @denisjazbec) witnesses and independently verifies; identical addresses on both chains; all roles to the Safes; deployer roles revoked in the same script.
+  - Only the audited commit (bytecode rebuilt and compared); fork dry-run; the owner runs the deploy locally with the hardware deployer key while a second person (by agreement, @denisjazbec) witnesses and independently verifies; identical addresses on both chains, equal to the mainnet campaign's address file (05 §9.1); all roles to the Safes; deployer roles revoked in the same script.
   - New `@agentlink/occ-v2-abi` version with mainnet addresses.
 - **Acceptance:**
   - Scripted check "deployer holds no role" passes on both chains; delays equal `docs/roles.md`; addresses identical; deployed bytecode matches the audited build; witness record stored.
@@ -3274,7 +3277,7 @@ Epics are decomposed into cards (same format, same rules) when the milestone sta
 - **Spec:** 10 M4; 03 §7; 04 §2.7 (what domain verification proves); 12 §7.1 (D-50); 05 §1 (OCCAnchor), §2.2 (`PRICE_UPDATER`), §5 (freeze); 07 §4.1, §5.7, §6.2; 08 §5; 12 §3.4; 02 F-08, F-24, F-35, F-48, F-72, F-73; D-34, D-37, D-46
 - **Invariants:** I-1 … I-10
 - **Scope:**
-  - Deployments to Arbitrum One, Optimism, Polygon PoS (+ testnets) with identical addresses (deployer-key lifecycle, G-8); chain verification per M3-2a.
+  - Deployments to Arbitrum One, Optimism, Polygon PoS (+ testnets) with identical addresses (deployer-key lifecycle, 05 §9.1); chain verification per M3-2a.
   - Batched receipts tier: `OCCAnchor` contract + client (F-48), external audit delta.
   - ERC-8004 bridge for registered agents.
   - Hosted remote MCP in approval mode (F-73, P2) — only after a design review against I-1–I-3 (08 §5); self-hosting in the user's own Cloudflare account stays the default cloud path (D-37).
@@ -3387,7 +3390,15 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
    - Review IR-G732-1 fixes: the budget check and the reservation of the Record's `maxFee` run in one transaction, so paid actions are serialized per agent. A reservation is released only when the Record can no longer be charged. A broken ledger fails closed, and the residuals are in 04 §7. Nonce check, record and apply run in one transaction. `approval.cancel` also voids an approved, unused non-commitment approval. USD amounts have one spelling (04 §2.4.1).
 
    *Was:* 04 §2.5.1 (`SignedOwnerAction` `nonce`, `issuedAt`, `expiresAt`), 06 §2.5 and 06 §3 (`dailyBudgetUSD`) had no freshness window, nonce retention, approval TTL or budget day boundary. The first proposal was a flat 10 minutes, 30-day nonces, a 24 h TTL and a UTC day. *Blocks:* M1-2b, M1-7d, M1-7e.
-8. **G-8 (H) CREATE3 salts and deployer lifecycle.** 05 §9; `release-and-deployment.md` §4.2. CreateX guarded salts bind addresses to the deployer; identical addresses for the Registry (M2) and M4 chains need the same deployer and salt scheme; proxies must be deployed and initialised atomically; testnet and mainnet deployers differ, so testnet and mainnet addresses differ. *Proposed:* specify salt layout (deployer-guarded, no cross-chain redeploy protection), deploy-and-init, and cold-storage retention of the mainnet deployer key until all planned chains are deployed. *Blocks:* M1-3g, M3-2b, M3-2c, M4-EPIC.
+8. **G-8 (H) CREATE3 salts and deployer lifecycle.** Resolved by branch `docs/G-8-create3-salt` (pending owner; proposed, owner confirms at merge; D-63), in 05 §9.1, with `release-and-deployment.md` §4.2, §4.3 and §6 aligned.
+   - **Salt layout.** Guard (bytes 0–19, the account calling CreateX, so the address is permissioned and cannot be front-run) ‖ `0x00` (byte 20: no cross-chain redeploy protection, so addresses match across chains) ‖ `bytes11(keccak256(label))` (bytes 21–31), labels `agentlink/occ-v2/<campaign>/…`. The script refuses any other guard or flag.
+   - **Families.** One-shot stage deployer via CREATE3 under the deployer key; AccessManager and proxies via CREATE3 under the stage deployer, which does the whole stage (deploy and initialise, `OCCRoleSetup`, grants, renounce) in one transaction; implementations via CREATE2 with a version label. Proxy addresses never change on upgrade; only the implementation slot does, and no upgrade needs the deployer key.
+   - **Chain ID off.** Needed for identical addresses. Accepted risk: a deployer-key holder can put any code at the campaign's addresses on a chain not yet deployed. Controls: clients use addresses only from the per-chain config; mainnet key in cold storage while chains or stages are planned; testnet key kept for its campaign (rotation starts a new campaign); pre-broadcast check.
+   - **Keys.** Testnet and mainnet keys differ, so their addresses differ (intended, `release-and-deployment.md` §4.2, §4.3).
+   - **Before broadcast.** Fork dry-run: CreateX code hash, predictions equal the committed address file, no predicted address in use, post-deploy checks on the fork. A used salt fails closed; the script never picks another salt.
+   - **Testnet order (D-63, build-plan deviation announced by the owner in chat, 14 Oct 2026):** Base Sepolia first; Gnosis Chiado later at the same addresses, checked when it deploys.
+
+   *Was:* 05 §9; `release-and-deployment.md` §4.2. CreateX guarded salts bind addresses to the deployer; identical addresses for the Registry (M2) and M4 chains need the same deployer and salt scheme; proxies must be deployed and initialised atomically; testnet and mainnet deployers differ, so testnet and mainnet addresses differ. The first proposal was a deployer-guarded salt without cross-chain redeploy protection, deploy-and-init, and cold-storage retention of the mainnet deployer key until all planned chains are deployed. *Blocks:* M1-3g, M3-2b, M3-2c, M4-EPIC.
 9. **G-9 (M) Store schema gaps.** Resolved by branch `docs/G-9-store-schema` (pending owner; proposed, owner confirms at merge), in 07 §3.1–§3.7.
    - **Delivery (§3.2).** `outbox`: one row per gift wrap, stored with the envelope before the first publish, retried for 24 h with the same stored event. `seen`: kept at least 7 days and written only with the item's outcome. `held_envelopes`: at most 100 per owner `kid` in their own pool, outside the requests limits (cap, count and oldest-drop in one store transaction; amends D-62 in 04 §3.1.1 step 7), released by a `card-update` or after 48 h. Requests are `envelopes` rows with `state = request`, at most 5 per unknown sender and 200 in total. `received` holds stored, unprocessed envelopes (at most 1 000). `rate_counters`: a sliding hour in one-minute buckets, incremented with the stored envelope.
    - **Idempotency (§3.3).** Keyed by tool, `clientRequestId` and `approvalId`, with a keyed request digest, the durable effects and the original result, encrypted at rest. An execution lease with a run ID, and a compare-and-set on the row in every effect transaction, so a crash and a concurrent call can never both make an effect. Kept max(7 days, scope expiry + `S`). A reused key with a different request returns `IDEMPOTENCY_KEY_REUSED`.
@@ -3469,7 +3480,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | OPS-L2, OPS-L3 | Withdraw v1 fees to EOAs; create/verify Safes; sign 20 `transferOwnership` calls |
 | OPS-L6, OPS-L7 | Decide whether PollinationX stays live |
 | OPS-L8 | Rotate every live credential found |
-| M1-3g | Testnet deployer key and testnet Safe; fund with low balances; trigger the private-repo deploy workflow (no testnet explorer verification: D-11, D-19) |
+| M1-3g | Testnet deployer key and testnet Safe; fund with low balances; trigger the private-repo deploy workflow, Base Sepolia first and Gnosis Chiado later with the same key (D-63); keep the testnet deployer key for the life of the testnet campaign (05 §9.1) (no testnet explorer verification: D-11, D-19) |
 | M1-3f | **DECISION NEEDED:** where `@agentlink/occ-v2-abi` is built and published (G-10) |
 | M1-9f | **DECISION NEEDED:** Claude Desktop bundle build, signing and distribution |
 | M1-10c | Set submitter and faucet keys with `wrangler secret put`; fund them; approve promotions; **DECISION NEEDED:** Cloudflare staging account vs environments, environment names, beta environment (G-40) |

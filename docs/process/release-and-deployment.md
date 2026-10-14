@@ -144,14 +144,14 @@ Testnet contract deploys stay CI-driven from the private repo (§4.2).
 ### 4.2 Contracts: testnet
 
 1. `contracts-gate` green on the commit; the commit is tagged in the private repo.
-2. CI in the private repo runs `script/Deploy.s.sol` per chain with the per-chain config: **CreateX CREATE3**, deployer-guarded salt, all roles transferred to the testnet Safe in the same script. The owner triggers the workflow manually (Free plan, §9).
-3. Post-deploy checks in CI: identical proxy addresses on Base Sepolia and Gnosis Chiado; roles check; deployer holds no role.
+2. CI in the private repo runs `script/Deploy.s.sol` per chain with the per-chain config: **CreateX CREATE3**, deployer-guarded salts per 05 §9.1, all roles transferred to the testnet Safe in the same script, after a fork dry-run (05 §9.1). The owner triggers the workflow manually (Free plan, §9). Order (D-63): Base Sepolia first; Gnosis Chiado later, with the same testnet deployer key and campaign.
+3. Post-deploy checks in CI: proxy addresses equal the campaign's address file (05 §9.1), and on Gnosis Chiado equal to the published Base Sepolia addresses; roles check; deployer holds no role.
 4. ABIs and addresses published as an `@agentlink/occ-v2-abi` prerelease (`next`); `@agentlink/chain` bumped by PR (`development-process.md` §9.3).
 5. Faucet configured against the new vault (§4.5).
 
 **No explorer or Sourcify source verification on testnets.** The source stays private during the beta (D-11), and 05 §9 verifies at mainnet. Testnet deploys publish ABIs and addresses only.
 
-The testnet deployer key is testnet-only and never reused on mainnet. Testnet Safes SHOULD mirror the mainnet role layout so the role transfer and AccessManager flows are rehearsed. The private repo has no Environment protection on the Free plan (D-27): anyone with write access could trigger the deploy workflow and reach its key, so the key is testnet-only, balances stay low, and write access is limited to the owner and named engineers.
+The testnet deployer key is testnet-only and never reused on mainnet, so testnet and mainnet addresses differ (05 §9.1). It is kept for the life of its testnet campaign, so that Chiado and the M2 Registry land at the Base Sepolia addresses; rotating it starts a new testnet campaign with new addresses (05 §9.1). Testnet Safes SHOULD mirror the mainnet role layout so the role transfer and AccessManager flows are rehearsed. The private repo has no Environment protection on the Free plan (D-27): anyone with write access could trigger the deploy workflow and reach its key, so the key is testnet-only, balances stay low, and write access is limited to the owner and named engineers.
 
 ### 4.3 Contracts: mainnet
 
@@ -165,7 +165,8 @@ The testnet deployer key is testnet-only and never reused on mainnet. Testnet Sa
 - [ ] `evm_version` and Solidity version supported on each chain.
 - [ ] Safes created per chain (≥ 2-of-3); each signer has confirmed their signer address on their own hardware device; the two ops hardware keys (`PAUSER`, `GUARDIAN`) set up.
 - [ ] Fork dry-run on anvil (`anvil --fork-url <chain>`) of the exact script, including the role transfer; roles check and deployer-holds-no-role script pass on the fork; smoke notarization on the fork.
-- [ ] Fresh hardware-backed deployer key, used for nothing else, funded with only the gas needed. It never touches GitHub.
+- [ ] The mainnet campaign's hardware-backed deployer key (05 §9.1): fresh for the campaign's first session, the same key for every later chain and stage of the campaign; used for nothing else, funded with only the gas needed, kept in cold storage between sessions. It never touches GitHub.
+- [ ] Predicted addresses equal the campaign's address file (05 §9.1), and none of them has code.
 - [ ] Monitoring (§7.1) armed for the predicted addresses.
 - [ ] D-11 licence confirmed before publishing verified source (M3-6). M3-7 legal sign-off is required before public launch.
 
@@ -183,7 +184,7 @@ DECISION NEEDED (owner): who witnesses when `@denisjazbec` is unavailable.
 **Post-deploy verification:**
 
 - Sourcify and explorer verification (at M3-6, BUSL-1.1 source).
-- Proxy addresses identical across chains.
+- Proxy addresses identical across chains and equal to the campaign's address file (05 §9.1).
 - Roles: AccessManager members exactly as configured. AccessManager has no member enumeration, so members are reconstructed from the `RoleGranted`/`RoleRevoked` events since the deployment block. The check also confirms: no open `OperationScheduled`; per target, `authority()`, `isTargetClosed` and `getTargetFunctionRole` for every selector, with no restricted selector left at role 0; `getRoleAdmin`, `getRoleGuardian` and `getRoleGrantDelay` for every role; `hasRole(id, deployer)` false for every ID, including 0. Deployer holds no role; selector-to-role mapping, execution delays, grant delays, guardians, role admins and target admin delays as in 05 §5.1, with each delay tier on its own role (`audit-rules.md` CT-5).
 - Implementations have initializers disabled; proxies initialised; config read back (tokens, fees, caps, `minDeposit`, treasury).
 - Contracts stay paused (05 §5.1). Order: role check (above) → wait until `getRoleGrantDelay` and `getTargetAdminDelay` return the configured values (deployment + 5 days) → the Safe unpauses (`PAUSE_ADMIN`) → smoke test → publish. Each step is recorded.
@@ -304,8 +305,8 @@ Secrets MUST NEVER appear in a repository (incl. `sync`), logs, CI output, Curat
 | Secret | Purpose | Lives in | Held by | Rotation |
 |---|---|---|---|---|
 | User agent and owner seeds | User identities | User's devices / user's Cloudflare account | Users only | Never held by 4thTech (I-1) |
-| Mainnet deployer key | One deployment campaign | Hardware wallet; never touches GitHub | Owner | New key per campaign; holds no role afterwards |
-| Testnet deployer key | Testnet deploys | Private-repo CI secret (no Environment protection on Free, D-27) | Owner | Per milestone, and on any suspicion; low balance |
+| Mainnet deployer key | One deployment campaign: every chain and stage of one address set (05 §9.1) | Hardware wallet in cold storage between sessions; never touches GitHub | Owner | New key per campaign; retained while any chain or stage of the campaign is planned; holds no role afterwards (proposed, G-8; owner confirms at merge) |
+| Testnet deployer key | Testnet deploys | Private-repo CI secret (no Environment protection on Free, D-27) | Owner | Per testnet campaign, and on any suspicion; a new key starts a new testnet campaign with new addresses (05 §9.1); low balance (proposed, G-8; owner confirms at merge) |
 | Safe signer keys | Governance per chain | Signers' hardware wallets | DECISION NEEDED: signer set (private) | Safe owner swap on change or suspicion |
 | Two ops hardware keys (`PAUSER`, `GUARDIAN`) | Emergency pause; cancelling unexpected scheduled operations | Dedicated hardware wallets, never a Safe-signer device, CI, agent machine or hot wallet | Tali and Denis, one each (proposed, 05 §5.1; owner confirms at merge) | On suspicion: the Safe revokes both roles at once via `PAUSE_ADMIN` |
 | Submitter gas keys | Gas per chain and environment | Worker secrets (`wrangler secret put`), staging and production | Owner | On suspicion; DECISION NEEDED: periodic interval |
