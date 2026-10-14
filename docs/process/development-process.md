@@ -19,7 +19,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 | **Owner** | Tali Režun (`@talirezun`) | **Leads development.** The owner's orchestrated agents build. The owner decides (D-xx), performs the owner-only actions (§1.1) and releases every S2 and sensitive-path PR with a one-word "merge" in chat (D-51, D-52). MAY review any PR and MAY disable its auto-merge. | Delegate owner-only actions to an agent; be a ruleset bypass actor. |
 | **4thTech engineer** | Denis Jazbec (`@denisjazbec`), repo admin, author of OCC v1 | **Feedback reviewer.** Feedback reaches the build through the owner and is logged with a disposition; review comments on PRs are welcome (§14). Stays a code owner (notified on code-owned paths); his GitHub approval is optional (D-51). His review is recommended for contract releases; by agreement he witnesses mainnet contract deployment. May take over specific parts later, decided case by case by the owner and recorded on the sync board (`sync-protocol.md`). | Approve a change he authored; let an agent approve on his behalf. |
 | **Orchestrator** | Main Claude Code session of the owner, **Opus 5.5** | **Orchestrates, deploys workers and audits** (§3.5). It plans and decomposes tasks, assigns Tier and Security class, and writes worker briefs (§4). It verifies worker output with targeted checks and, for S1/S2, an independent auditor worker (§5). It pushes task branches and opens PRs under Tali's account (§1.3), and MAY enable auto-merge once §5 is complete on S0/S1 PRs; S2 and sensitive-path PRs merge only after Tali's "merge" (§1.2). It MAY set `DEPLOY_FREEZE`. It prepares releases (notes, changelog, deploy record, rollback plan). It **alone** writes Curator state and the owner's sync file (§13). | Implement bulk changes or read entire S1/S2 diffs itself (§3.5); merge with admin bypass; push to `main`; approve PRs, deployments or environments; clear `DEPLOY_FREEZE`; change rulesets, CODEOWNERS or environments; deploy from a workstation; write code it then reviews for the record. |
-| **Worker** | Subagent on Haiku 5.5, Sonnet 5.5 or Opus 5.5 (§3) | Executes exactly one brief inside its allowed paths; reports in ≤ 400 words in the required format (§4.3), with details in files. | Merge PRs or enable auto-merge; push anything except its own task branch, or open any PR except a draft PR for that branch (both only when the brief says so); touch `main`; deploy; clear `DEPLOY_FREEZE` (it MAY set it on a documented trigger, `release-and-deployment.md` §3.1, and reports that at once); write Curator; act outside its brief; expand its own scope. |
+| **Worker** | Subagent on Haiku 5.5, Sonnet 5.5 or Opus 5.5 (§3) | Executes exactly one brief inside its allowed paths; reports in ≤ 400 words in the required format (§4.3), with details in files. | Merge PRs or enable auto-merge; push anything except its own task branch, or open a PR before its independent review has passed (it may push the branch, and open a non-draft PR with the `IR-…` line after the review, only when the brief says so); touch `main`; deploy; clear `DEPLOY_FREEZE` (it MAY set it on a documented trigger, `release-and-deployment.md` §3.1, and reports that at once); write Curator; act outside its brief; expand its own scope. |
 | **Independent reviewer** | Fresh Opus 5.5 subagent with no implementation context (the independent auditor worker, §3.5), or a non-author human engineer | Reviews per `audit-rules.md` §4 using the area checklists. | Have seen the implementation transcript, worker reports or worker rationale. |
 | **External auditor** | External firm (contracts) and independent reviewer (crypto, core) for M3-1 | Audit the S2 scope register at a pinned commit; verify fixes (`audit-rules.md` §8). | — |
 
@@ -198,7 +198,7 @@ Report format:        §4.3
 
 ### 4.2 Standard forbidden actions (always included)
 
-- No merge, auto-merge, tag, release or force-push; no commit on or push to `main`; no push except to the worker's own task branch and no PR except a draft PR for it, each only when the brief says so; no PR comments or reviews; no repository variable or settings changes.
+- No merge, auto-merge, tag, release or force-push; no commit on or push to `main`; no push except to the worker's own task branch, and no PR until the independent review has passed (then a non-draft PR carrying the `IR-…` line), each only when the brief says so; no PR comments or reviews; no repository variable or settings changes.
 - No network writes: no publish, deploy, broadcast, upload or form submission.
 - No installs or dependency changes unless the brief grants them; never a `postinstall` script.
 - No Curator writes.
@@ -258,8 +258,8 @@ For S1/S2, invariant and spec conformance come from step 8, not from the orchest
 |---|---|---|
 | `backlog` | Task card exists | Orchestrator / owner |
 | `ready` | Definition of Ready met | Orchestrator |
-| `in-progress` | Task claimed on `board.md` and as a draft PR titled with the task ID; brief issued; worktree and branch created | Orchestrator |
-| `in-review` | §5 protocol complete; PR open (draft → ready); CI running; auto-merge MAY be enabled | Orchestrator |
+| `in-progress` | Task claimed on `board.md` with its branch name; brief issued; worktree and branch created (no PR yet) | Orchestrator |
+| `in-review` | Independent review passed and §5 protocol complete; PR open (not a draft) with the `IR-…` line; CI running; auto-merge MAY be enabled | Orchestrator |
 | `audit` | S1/S2: independent review in progress, S2 or sensitive path waiting for the owner's "merge", or findings being closed | Orchestrator |
 | `done` | Definition of Done met; merged through the gates | Orchestrator, after the merge |
 
@@ -313,7 +313,7 @@ S0 tasks MAY skip `audit`. A task that hits stop-the-line (`audit-rules.md` §10
 
 - Title: `<TASK-ID> <summary>` (validated by `pr-hygiene`).
 - Body: the repository PR template under `.github/` is authoritative for headings (validated by `pr-hygiene` and `review-gate`). It MUST cover: task ID; security class; spec sections implemented; invariants touched and how they hold; tests added and acceptance evidence; dependencies changed; docs/spec updated; verification protocol results (§5); independent review report line; threat note; tests-first evidence; open questions.
-- PRs open as **draft** until §5 is complete.
+- The PR is opened only once the independent review has passed and §5 is complete, so it is never a draft and already carries the `IR-…` line. Until then the branch is pushed (CI runs on every branch push) and reviewed as a branch diff. Draft PRs are not task claims; claims live on `board.md`.
 - Merge: once §5 is complete and the PR is ready, the orchestrator MAY enable auto-merge (`gh pr merge --auto --squash`). GitHub then merges when every required check is green. On S2 and sensitive paths the orchestrator enables it only after Tali's "merge" in chat, recorded in the PR body (D-51, D-52). The owner MAY merge manually or disable auto-merge. Never admin bypass. Squash only, so the title (with task ID) lands on `main`. Owner-approval changes (§1.1, §8) are merged by the owner, or set to auto-merge by the orchestrator only after the owner's explicit "merge" in chat for that specific PR, recorded in the PR body.
 
 ### 7.4 Size guideline

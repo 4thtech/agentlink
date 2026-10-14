@@ -43,8 +43,8 @@ Contents: §1 How to read a card · §2 M0 Foundations (incl. legacy OPS-L items
 |---|---|
 | `backlog` | Card exists; not yet ready |
 | `ready` | Definition of Ready met (`development-process.md` §6.2) |
-| `in-progress` | Claimed on `board.md` and as a draft PR; worktree and branch exist |
-| `in-review` | PR open and ready for review; CI running |
+| `in-progress` | Claimed on `board.md` with its branch name; worktree and branch exist (no PR yet) |
+| `in-review` | Independent review passed; PR open (not a draft); CI running |
 | `audit` | S1/S2: independent review and human approvals in progress, or findings being closed |
 | `done` | Definition of Done met; owner merged |
 | `done (setup)` | Produced in the 12 Oct 2026 setup session; becomes `done` when the bootstrap commit is on `main` (M0-2b) |

@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Process (DOCS-RB): runbooks for every repeatable procedure (`docs/runbooks/`), lessons learned (`docs/lessons/`), a role-based "Start here" map with a time-boxed onboarding track (`docs/README.md`), and a `GEMINI.md` pointer so Gemini CLI loads `AGENTS.md`.
 
 ### Changed
+- CI and process (CHORE CI-PUSH): CI now runs on every branch push (except `sync`), so tests-first red runs, lint and tests show before a PR exists. Pull requests are opened only after the independent review passes, already carrying the `IR-…` line, so `review-gate` is green on its first run; task claims move from draft PRs to `board.md` rows with the branch name. Once a PR exists, each push runs CI twice (push and pull request).
 - Process (D-58, D-59): the owner confirmed the owner-operation bodies (G-29: `SignedOwnerAction`, permanent per-agent revocation) and the contract roles and delays (G-3: 7-day delays, two ops hardware keys, a paused mainnet launch, with the pause residual risk in the M3-1 audit scope); README status updated for the M0 skeleton work.
 - CI: `review-gate` fails fast on draft PRs with a one-line reason instead of a full set of errors; it runs in full once the PR is marked ready.
 

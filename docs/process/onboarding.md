@@ -36,7 +36,7 @@
 
 1. `board.md` on the sync branch: active tasks, who has them, decisions waiting, blockers.
 2. `talirezun.md`: Tali's current state, what's in flight, *Asks for @denisjazbec*, *Heads-up* (interface changes etc.) and the *Feedback log*.
-3. Open PRs: `gh pr list --repo 4thtech/agentlink`. Draft PRs are task claims. Reviews requested from you: `gh pr list --repo 4thtech/agentlink --search "review-requested:@me"`.
+3. Open PRs: `gh pr list --repo 4thtech/agentlink`. Task claims are on `board.md`; a PR appears only after the independent review. Reviews requested from you: `gh pr list --repo 4thtech/agentlink --search "review-requested:@me"`.
 4. Task definitions: `docs/process/backlog.md`.
 
 ### A4. Reviewing an S2 PR (optional for you)
@@ -73,7 +73,7 @@ If you use The Curator yourself, keep your own private project for your notes. T
 
 You follow the same process as Tali's agents (`development-process.md`):
 - the task ID comes from `backlog.md`;
-- claim it with a draft PR plus a board row;
+- claim it with a board row naming your branch;
 - branch `<task-id>-<slug>`;
 - tests first for S2;
 - fill in the PR template;
@@ -115,11 +115,12 @@ Unless the board shows Denis as assignee or lead for a task or area, you **do no
 
 Follow `development-process.md` in full:
 - the task ID comes from `backlog.md`;
-- claim it (draft PR + `board.md` row; `sync-protocol.md` §6);
+- claim it (`board.md` row with the branch name; `sync-protocol.md` §6);
 - one branch and worktree per task;
 - tests first for S2;
 - fill in every PR template section (`review-gate` checks them);
-- get an independent review from a fresh reviewer that never saw the implementation.
+- push the branch (CI runs on the push) and get an independent review from a fresh reviewer that never saw the implementation;
+- open the PR (not a draft) only after the review passes.
 
 Also:
 - If your harness supports subagents, route work by `AGENTS.md`'s model table. If it doesn't, work sequentially and say so.

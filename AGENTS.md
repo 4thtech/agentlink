@@ -20,7 +20,7 @@ New collaborator, or an agent working for one? Start with `docs/process/onboardi
 ## Session start and end
 
 1. **Sync (shared, mandatory).**
-   - At start: `git -C ../agentlink-sync pull --rebase`. Read `board.md`, your own `<login>.md` (`gh api user --jq .login`) and the other people's files. Run `gh pr list --state open`; draft PRs are task claims.
+   - At start: `git -C ../agentlink-sync pull --rebase`. Read `board.md`, your own `<login>.md` (`gh api user --jq .login`) and the other people's files. Run `gh pr list --state open`. Claims are board rows; PRs open after review.
    - Write only your own file, plus your own board rows.
    - Push after every meaningful step and before you stop.
    - Content is public. Protocol: `docs/process/sync-protocol.md`.
