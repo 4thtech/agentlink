@@ -160,7 +160,7 @@ type ProofStatus = {
 };
 ```
 
-`fee.token` is the Record's `feeToken` (05 §3.1): `0x` + 40 lowercase hex, the zero address for the native token. `fee.amount` is a token amount in base units, a decimal `uint256` string like `maxFee` (04 §2.4.1): the Record's `maxFee` until the record is confirmed on-chain, then the fee charged. `usd` is that amount valued 1:1 (D-46) in the USD spelling of 04 §2.4.1. An approval's `context.fee` uses the same fields, with `amount` equal to the signed `maxFee` (04 §3.4.1; proposed, owner confirms at merge).
+`fee.token` is the Record's `feeToken` (05 §3.1): `0x` + 40 lowercase hex. At launch fee tokens are USD stablecoins only (D-46, 07 §6.1 `feeTokens`); the zero address (a chain's native token) is allowed only where that token is itself a USD stablecoin (xDAI on Gnosis), and any other native coin only if the owner decides so later. `fee.amount` is a token amount in the token's base units, a decimal `uint256` string like `maxFee` (04 §2.4.1), and the token's decimals come from the token (07 §6.1 `feeTokens`), never from the amount: the Record's `maxFee` until the record is confirmed on-chain, then the fee charged (at most `maxFee`). `usd` is `amount / 10^decimals` valued 1:1 (D-46), rounded up to 6 decimals, in the USD spelling of 04 §2.4.1. Before confirmation the core signs `maxFee` equal to the quoted total (12 §4), and `protocolUsd` and `integratorUsd` are the split of the charged fee, so they are present only once it is known and `usd = protocolUsd + integratorUsd` holds for that fee. An approval's `context.fee` uses the same fields, with `amount` equal to the signed `maxFee` (04 §3.4.1; proposed, owner confirms at merge).
 
 Binary values in tool inputs and results use the canonical encodings of 04 §2.4.1, and an input in any other form is rejected with an error naming the expected form, never normalised. For example, `recordId`, `txHash`, `envelopeHash` and agent IDs are `0x` + lowercase hex; `termsHash` and `plaintextSha256` are 64 lowercase hex characters; `envelopeId` is base64url.
 
@@ -287,10 +287,11 @@ Policies are owner-signed documents (04 §2.5; G-6 resolved for this point, prop
 
 - every paid action (`proofs`, including the proof part of a commitment) and every commitment (`commitments.accept`, `agentlink_respond_to_terms`, `accept` and `reject` acknowledgements, firm offers) needs the owner's approval, and so does every owner-gated action (new contacts, file access, key disclosure); nothing is auto-accepted, no `contactRules` entry applies, and no budget or auto-accept grant is read from the stored policy;
 - unknown senders are queued, not dropped, and no folder is allowed (`files.allowedFolders` is treated as empty);
-- an invalid stored policy is never partly applied: no value is taken from it;
+- limits that grant nothing use the built-in defaults as hard caps (`rateLimitPerContactPerHour`, `maxSendSizeMB`, `maxReceiveSizeMB`, `defaultExpiryDays`, `maxEnvelopeKB`, `deleteAfter: "expiry"`); no receipt is signed automatically (`autoDelivered` and `autoOpened` are treated as `false`); and nothing is uploaded, because sending a file needs an allowed folder;
+- an invalid stored policy is never partly applied: no decision value is taken from it, and a `deny` in it cannot be trusted, so it becomes `approval`, never `allow`; the approval card says the policy is not valid;
 - the local UI and the console say "policy not valid, confirm it again" until the owner signs a new `policy.set` with presence.
 
-The built-in defaults are used only while the KeyStore high-water mark for the policy version is 0; M1-7d tests that they are never used afterwards.
+The built-in defaults are used only while the KeyStore high-water mark for the policy version is 0 **and** no stored policy row exists. A stored signed policy with a mark of 0 (the KeyStore item was deleted, G-1) is handled as a mismatch and fails closed. M1-7d tests that the defaults are never used otherwise.
 
 ---
 
