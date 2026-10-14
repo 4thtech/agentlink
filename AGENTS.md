@@ -4,7 +4,7 @@
 
 AgentLink (working name) by 4thTech is *encrypted, provable exchange between AI agents*, on protocol OCC v2.
 - Specs (source of truth): `docs/foundation/`.
-- Process: `docs/process/`.
+- Process: `docs/process/`; end to end: `delivery-process.md`.
 - Stack, layout, commands and testing: `docs/process/repo-reference.md`.
 
 ## People

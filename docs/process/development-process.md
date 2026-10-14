@@ -5,7 +5,7 @@
 | **Purpose** | How AgentLink work is planned, delegated, built, verified and merged. |
 | **Applies to** | Every contributor, human or AI, working on `4thtech/agentlink` (public) and `4thtech/occ-v2-contracts` (private). |
 | **Status** | Normative · v0.3 · 13 Oct 2026 (merge rules D-51; continuous delivery D-25, context economy) |
-| **Companions** | `audit-rules.md` (review and audit regime) · `release-and-deployment.md` (environments, releases) · `ci-cd.md` (workflows, owner setup) · `repo-reference.md` (stack, layout, commands, testing) · `backlog.md` (task cards) · `sync-protocol.md` (shared `sync` branch) · `onboarding.md` (collaborators) |
+| **Companions** | `delivery-process.md` (end-to-end delivery, safety nets, owner go-ahead, definition of done) · `audit-rules.md` (review and audit regime) · `release-and-deployment.md` (environments, releases) · `ci-cd.md` (workflows, owner setup) · `repo-reference.md` (stack, layout, commands, testing) · `backlog.md` (task cards) · `sync-protocol.md` (shared `sync` branch) · `onboarding.md` (collaborators) |
 | **Source of truth** | `docs/foundation/` governs product behaviour. This document governs process. Conflicts are raised to the owner (§2.3), never resolved silently. |
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119 / RFC 8174.
