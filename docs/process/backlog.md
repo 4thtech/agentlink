@@ -1341,7 +1341,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Resolved (D-11, D-19): no explorer or Sourcify source verification on testnets; the source stays private until mainnet verification (M3-6). Testnet deploys publish ABIs and addresses only (`release-and-deployment.md` §4.2).
   - Follow-up (IR-M1-3b-1 choice 12): promote the one-transaction deployer pattern to the script with CreateX CREATE3 deploy-and-init, keep the one-transaction property, and include the post-deploy implementation-slot check.
   - Config assertions (IR-M1-3b-1 L-2; shared with M1-14): the script refuses to deploy or configure unless every allowlisted fee token has a nonzero `NOTARIZE` and `REGISTER` fee and cap, the native coin is allowlisted only on Gnosis chain IDs (D-46), and no allowlisted token is fee-on-transfer or rebasing.
-  - Runbook step (IR-M1-3b-1 L-2, choice 11): adding a fee token to the allowlist follows a fixed order, with its fees and caps effective before the allowlisting executes; the runbook also notes that a second `pause` or `unpause` that changes nothing reverts (`EnforcedPause()` / `ExpectedPause()`).
+  - Runbook step (IR-M1-3b-1 L-2, choice 11): adding a fee token to the allowlist follows a fixed order, with its fees and caps effective before the allowlisting executes; the runbook also notes that a second `pause` or `unpause` that changes nothing reverts (`EnforcedPause()` / `ExpectedPause()`). The fee-token order is written in occ-v2-contracts `docs/add-fee-token.md` (M1-14).
 - **Acceptance:**
   - Base Sepolia: proxy and AccessManager addresses equal the fork dry-run's predictions and the committed address file (script output in PR).
   - `deployer-holds-no-role` passes on Base Sepolia, and neither CreateX nor any CREATE3 intermediate address holds a role; fork dry-run in CI before every broadcast.
@@ -1840,7 +1840,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Node runtime (`@agentlink/node`)
 
 #### M1-8a · node: OS keychain KeyStore
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** in review (branch `feat/M1-8a-keychain-keystore`; IR-M1-8a-1 PASS WITH FINDINGS, fix round 1 done) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/node
 - **Depends on:** M1-1g; gap G-23 resolved (G-31 resolved by D-54)
 - **Spec:** 04 §2.2 (service `agentlink`, account `<agentId>`), §2.8 (selection); 07 §9.1; 03 §6 (`@napi-rs/keyring`); 10 M1-8
@@ -1852,6 +1852,35 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - CI matrix on macOS, Windows and Ubuntu (gnome-keyring in a D-Bus session) runs the keychain tests.
   - A filesystem diff during `init` shows the seed in no file; missing keychain → `needs_setup`.
+- **Residuals after IR-M1-8a-1 (recorded at merge):**
+  - **M-1, open acceptance:** the CI matrix runs in no job yet; it needs a `.github` change, carded as M1-8a-b (sensitive PR). Until it lands, the real-keychain suite has run on macOS only (locally), and Windows and the Secret Service path are untested.
+  - L-5: the sign and decrypt core is duplicated from `MemoryKeyStore`; carded as M1-8a-c, due before M1-8f.
+  - L-8: the filesystem-diff test runs against an in-memory keychain and the code under test has no file I/O; redo it with the real `init` (M1-9a) in the M1-8a-b job.
+  - L-9: native copies of the seed (keyring-rs `Vec<u8>`, N-API buffers, macOS `CFData`) are not zeroized; 04 §8 rule 3 ("where the platform allows").
+  - L-10: a failed rollback or an interrupted probe can leave an unrecorded seed item or a random `probe:` item in the user's keychain; `doctor` should list and offer to remove them (M1-9 doctor card).
+
+#### M1-8a-b · CI: keychain test matrix on macOS, Windows and Ubuntu (new, IR-M1-8a-1 M-1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (sensitive path `.github/**`: merges only on Tali's "merge") · **Phase:** M1a
+- **Repo/path:** agentlink · .github/workflows/ci.yml
+- **Depends on:** M1-8a
+- **Spec:** M1-8a acceptance; 04 §2.2, §2.8; docs/process/ci-cd.md
+- **Invariants:** I-1
+- **Scope:**
+  - A `keychain` job on `macos-latest`, `windows-latest` and `ubuntu-latest` (gnome-keyring under `dbus-run-session` with an unlocked login collection) that runs the `packages/node` tests with `AGENTLINK_REQUIRE_KEYCHAIN=1`. With the flag the real-keychain suite runs, and a failed probe fails the job instead of skipping it, so a runner without a keychain cannot pass green.
+  - Pinned action SHAs; no secrets; added to the required checks only by the owner.
+- **Acceptance:**
+  - All three runners run `keychain-native.test.ts` with no skipped test; removing the keychain service on Ubuntu makes the job fail.
+
+#### M1-8a-c · crypto: shared seed KeyStore core for the Memory, Keychain and File backends (new, IR-M1-8a-1 L-5)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (before M1-8f)
+- **Repo/path:** agentlink · packages/crypto (`/keystore`), packages/node
+- **Depends on:** M1-8a
+- **Spec:** 04 §3.1.1, §8.1
+- **Invariants:** I-1, I-8
+- **Scope:**
+  - Move one `KeyStore` core over an async `loadSeed()` (wipe after use) into `@agentlink/crypto/keystore`, with `signNostrEvent` used from there instead of the copy in `packages/node`. `MemoryKeyStore`, the keychain backend and the file backend share it.
+- **Acceptance:**
+  - One conformance suite runs against every backend; the node package keeps no copy of the sign and decrypt logic.
 
 #### M1-8b · node: SQLite Store with encrypted sensitive columns
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a

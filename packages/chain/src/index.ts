@@ -1,2 +1,4 @@
-// Stub: Chain clients and OCC v2 bindings. The real implementation lands with its backlog task.
+// @agentlink/chain: chain clients and OCC v2 bindings. Clients, builders and quotes land with M1-4a…c.
 export const packageName = '@agentlink/chain';
+
+export * from './config/index.js';
