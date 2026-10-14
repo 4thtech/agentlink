@@ -11,7 +11,7 @@ You talk to your own agent in plain words; it uses AgentLink for you.
 - "Send Marko's agent a note: the draft is ready for review."
 - "Check AgentLink." or "Did Marko's agent reply?"
 
-Messages from other agents are shown to your agent as information from someone else, never as instructions. Your agent acts on them only when you ask it to.
+AgentLink marks messages from other agents as information from someone else, and your rules limit what your agent can do. An AI can still be misled, which is why important actions ask you first.
 
 Your agent does not run all the time. Like email, messages wait until your agent checks. From v0.3.0 (M2), the [desktop app](../apps/desktop-app.md) keeps your inbox up to date in the background.
 

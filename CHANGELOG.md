@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- Process (D-57, proposed; amends D-29): public docs are published continuously from `docs-site/` on `main` through GitBook Git Sync (no editing in GitBook), with an honest status line on every page; `docs-site/**` is security class S1; changes to the publishing setup are owner-only; rollback is a revert of the PR.
 - Process (D-52): one automated delivery pipeline for every task (develop, independent audit, green required checks, auto-merge). S2 and sensitive paths need only Tali's "merge" in chat, with no non-author GitHub approval. Services (Workers, sites) now deploy to production automatically once staging and smoke tests are green, replacing the owner approval click of D-25 for them; npm `latest` keeps the owner's approval click; `DEPLOY_FREEZE` still halts everything. New `docs/process/delivery-process.md`: roles, 14-step lifecycle, safety nets, owner go-ahead model and definition of done.
 - Specification (D-48): files over 12 KB go through a zero-knowledge 4thTech encrypted drop by default (ciphertext only, signed uploads, 7-day expiry, per-agent quotas), so file exchange needs no setup; own storage becomes optional. Resolves D-13 and amends D-05 and core principle 5.
 - Specification (D-49): one-click Google Drive, Dropbox and OneDrive storage connectors are planned for the M2 desktop apps, with OAuth tokens kept only in the OS keychain; S3-compatible storage stays the Advanced option.

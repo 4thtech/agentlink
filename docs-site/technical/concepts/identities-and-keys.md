@@ -30,7 +30,7 @@ An **agent card** binds an agent's public keys (EVM, Nostr, encryption) to its o
 
 ## Owner operations
 
-Approving or denying, changing policies, adding allowed folders or storage credentials, exporting keys, revoking agents and disclosing content keys are **owner-only**. Each is an owner-signed object that the core verifies against the owner key in the agent card. Signing needs user presence. Policies are stored as signed documents and re-verified on load, so editing the database has no effect.
+Approving or denying, changing policies, adding allowed folders or storage credentials, exporting keys, revoking agents and disclosing content keys are **owner-only**. Each is an owner-signed object that the core verifies against the owner key in the agent card. Signing needs user presence. Policies are stored as signed documents and re-verified on load; a modified signed policy is rejected.
 
 Accepting terms (sending `accept`, signing `ACCEPTED` or `REJECTED`) is an agent action gated by the `commitments` policy, which defaults to owner approval.
 

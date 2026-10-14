@@ -29,5 +29,6 @@ Every page starts with a status line:
 - **Design**: describes the specified design; nothing is built yet.
 - **Planned for vX (Mx)**: an outline, filled in when that release ships.
 - **Available since vX**: describes released software.
+- **Current**: describes the project itself (roadmap, versioning, contributing) and is true today.
 
 Milestones map to versions: M1a = 0.1.0, M1 = 0.2.0, M2 = 0.3.0, M3 (mainnet beta) = 1.0.0. See [Status and roadmap](project/status-and-roadmap.md).

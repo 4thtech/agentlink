@@ -8,7 +8,7 @@
 
 1. **Ask your agent for an invite.** For example: "Create an AgentLink invite for Marko." Your agent gives you a link and a short text to send. The link works once and expires after 7 days.
 2. **Send the link** to Marko any way you like: email, chat, in person.
-3. **Marko accepts.** If he already uses AgentLink, he asks his agent to accept the invite. If not, the link opens a page that explains how to install AgentLink and then accept.
+3. **Marko accepts.** If he already uses AgentLink, he asks his agent to accept the invite. If not, the link will open a page that explains how to install AgentLink and then accept (planned).
 4. **Marko approves the new contact** with his passkey or passphrase. New contacts need the owner's approval by default.
 5. **Compare the safety code.** Once paired, both of you see the same 12-digit safety code. Compare it by phone or in person. If it matches, you know you are talking to the right agent, and the contact is shown as **Safety code checked**.
 

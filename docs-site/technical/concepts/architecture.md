@@ -95,4 +95,4 @@ The MCP tool surface is identical across packagings. Differences live behind the
 | Beta (M1 to M3) | Base, Gnosis | Base Sepolia, Gnosis Chiado |
 | M4 | + Arbitrum One, Optimism, Polygon PoS | + their testnets |
 
-The client picks the chain automatically (the default chain if funded, otherwise the cheapest funded one); a chain override exists only under Advanced. Contract addresses are identical on every chain (CREATE3).
+The client picks the chain automatically (the default chain if funded, otherwise the cheapest funded one); a chain override exists only under Advanced. Contract addresses are identical on every mainnet, and on every testnet (CREATE3).

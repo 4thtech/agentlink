@@ -9,7 +9,7 @@
 - The install prompt to paste into Claude Code
 - What Claude will run, and the settings change it will show you
 - Protecting your approvals (passkey or passphrase) and the recovery kit
-- Recommended permission settings, so Claude cannot read AgentLink's private files
+- Recommended permission settings, to keep Claude away from AgentLink's private files
 - Optional: a check at the start of each session that tells you who sent something new
 - Checking it works: ask "What's my AgentLink status?"
 - Next: [Pair with someone](pair-with-someone.md)

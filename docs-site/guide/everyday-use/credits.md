@@ -7,7 +7,7 @@
 ## How credits are designed to work
 
 - **Credits are in US dollars** and pay for proof. Messages, files and pairing never need credits.
-- **Prepaid and yours.** Unused credits can be withdrawn at any time. Nobody, including 4thTech, can move or freeze them.
+- **Prepaid and yours.** Unused credits can be withdrawn at any time. 4thTech cannot move or freeze them (the companies behind some digital dollars can; see [Pricing](../pricing.md#advanced-what-digital-dollars-means)).
 - **Price before you pay.** Every paid action shows the price in dollars first. You also set a daily limit; above it, your agent asks you.
 - **No network choice.** AgentLink picks where to record proof automatically.
 - **Free test credits** are planned for the test phase (M1, M2), so you can try proof without paying.

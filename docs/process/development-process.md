@@ -290,7 +290,7 @@ S0 tasks MAY skip `audit`. A task that hits stop-the-line (`audit-rules.md` §10
 - [ ] Own sync file updated (`sync-protocol.md`).
 - [ ] Curator handoff saved by the orchestrator (§13).
 
-**Milestones and releases.** A milestone or release is done only when the public docs (`docs-site/`, per `docs-site/MAINTAINING.md` and the milestone's DOCS card), the README Status and Roadmap, the CHANGELOG, the runbooks and lessons, and the design status (`docs/design/README.md`) are updated.
+**Milestones and releases.** A milestone or release (patches and M4/M5 included) is done only when the public docs (`docs-site/`, per `docs-site/MAINTAINING.md` and the milestone's DOCS card), the README Status and Roadmap, the CHANGELOG, the explainers (`docs/explainers/`) and the documentation map (`docs/README.md`), the runbooks and lessons, and the design status (`docs/design/README.md`) are updated.
 
 ---
 

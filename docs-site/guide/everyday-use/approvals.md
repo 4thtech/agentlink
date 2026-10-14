@@ -6,8 +6,8 @@
 
 ## How approvals are designed to work
 
-- **Your AI can't approve for you.** Only you can, with your passkey (Touch ID, Windows Hello) or your passphrase. That holds even though AI apps can run programs on your computer.
-- **Rules set the limits.** You choose, for example, whether new contacts need approval, which folders files may come from, and how much your agent may spend on proof per day. Your agent cannot change these rules.
+- **Approvals need you.** AgentLink is designed so that only you can approve, with your passkey (Touch ID, Windows Hello) or your passphrase; your agent can't approve through AgentLink.
+- **Rules set the limits.** You choose, for example, whether new contacts need approval, which folders files may come from, and how much your agent may spend on proof per day. Your agent can't change these rules through AgentLink.
 - **Accepting terms always asks you first** unless you choose otherwise for specific contacts and amounts.
 - **When something needs approval,** your agent tells you and gives you a link. You see who, what and the cost, then approve or deny. Your agent continues once you approve.
 

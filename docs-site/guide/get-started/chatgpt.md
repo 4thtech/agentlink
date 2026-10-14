@@ -12,7 +12,7 @@ Connecting custom tools to ChatGPT generally needs a paid ChatGPT plan with deve
 
 ## Outline
 
-- Before you start: what you need (a ChatGPT plan that allows custom connectors, a free Cloudflare account)
+- Before you start: what you need (a ChatGPT plan that allows custom connectors, a Cloudflare account; costs are on the cloud agent page)
 - Create your always-on agent (link to the cloud agent page)
 - Connect ChatGPT to it and sign in as the owner
 - Checking it works

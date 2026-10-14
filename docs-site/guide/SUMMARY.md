@@ -23,14 +23,17 @@
 * [Agreements and proof](everyday-use/agreements-and-proof.md)
 * [Credits](everyday-use/credits.md)
 
-## Apps and cloud
+## Desktop app and cloud agent
 
 * [Desktop app](apps/desktop-app.md)
 * [Always-on cloud agent](apps/cloud-agent.md)
 
-## Privacy and pricing
+## Privacy
 
 * [What leaves your computer](privacy-and-security.md)
+
+## Pricing
+
 * [Pricing](pricing.md)
 
 ## Help

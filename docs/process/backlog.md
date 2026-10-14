@@ -26,7 +26,7 @@ Contents: §1 How to read a card · §2 M0 Foundations (incl. legacy OPS-L items
 
 | Field | Meaning |
 |---|---|
-| **ID** | `M<milestone>-<build-plan task><letter>`. A build-plan task split into PR-sized parts gets letter suffixes (`M1-1a`, `M1-1b`, …). Tasks not in the build plan take the next free number in their milestone and are marked **(new)**. Legacy security items are `OPS-L1`…`OPS-L9` (private 09 §4 L-1…L-9). Milestone gates are `M1-GATE`, `M2-GATE`, `M3-GATE`. Owner design drops are `DESIGN-D1`…`DESIGN-D3` (D-30). M4 and M5 are single epic cards (`M4-EPIC`, `M5-EPIC`), decomposed when they start. Public-docs passes are `DOCS-M1a`, `DOCS-M1b`, `DOCS-M2`, `DOCS-M3`, plus `DOCS-LINT` (§5, DOCS-PUB). |
+| **ID** | `M<milestone>-<build-plan task><letter>`. A build-plan task split into PR-sized parts gets letter suffixes (`M1-1a`, `M1-1b`, …). Tasks not in the build plan take the next free number in their milestone and are marked **(new)**. Legacy security items are `OPS-L1`…`OPS-L9` (private 09 §4 L-1…L-9). Milestone gates are `M1-GATE`, `M2-GATE`, `M3-GATE`. Owner design drops are `DESIGN-D1`…`DESIGN-D3` (D-30). M4 and M5 are single epic cards (`M4-EPIC`, `M5-EPIC`), decomposed when they start. Public docs: `DOCS-PUB` (structure), the passes `DOCS-M1a`, `DOCS-M1b`, `DOCS-M2`, `DOCS-M3`, and `DOCS-LINT` (§5). |
 | **Status** | See the legend below. |
 | **Size** | **S** ≤ 2 days · **M** 3–5 days · **L** 6–8 days of focused agent + human work. Anything larger is split. The changed-lines limits in `development-process.md` §7.4 also apply. |
 | **Tier** | Worker model routing (`development-process.md` §3): **Haiku** (mechanical, read-only, no design choices, never S1/S2) · **Sonnet** (clear-spec implementation, tests, CI, UI, docs, non-security review) · **Opus** (S2 work, architecture, protocol, contracts, signing, deploy scripts, audits). **Owner** marks a card that only the human owner can execute (accounts, settings, keys, legal, money); an agent may prepare material for it. |
@@ -70,7 +70,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 21 (incl. 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
-| Public docs (DOCS-PUB, all milestones) | 5 (DOCS-M1a, DOCS-M1b, DOCS-M2, DOCS-M3, DOCS-LINT) |
+| Public docs (DOCS-PUB, all milestones) | 6 (DOCS-PUB, DOCS-M1a, DOCS-M1b, DOCS-M2, DOCS-M3, DOCS-LINT) |
 
 ---
 
@@ -1865,7 +1865,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-25 · Agent-assisted install: install prompts per harness (D-39) (new)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
-- **Repo/path:** agentlink · docs/quickstart/, skills/agentlink/SKILL.md, apps/cli (`init`)
+- **Repo/path:** agentlink · docs-site/guide/get-started/, skills/agentlink/SKILL.md, apps/cli (`init`)
 - **Depends on:** M1-9a, M1-12a, M1-12b, M1-16
 - **Spec:** D-39, D-53; 06 §7, §7.1 (install prompts, install-and-accept prompt); 02 F-01, F-09, J1, J7; 04 §2.5; 11 §5
 - **Invariants:** I-1, I-4
@@ -1881,7 +1881,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-29 · J9 session habit: `status --brief` and optional SessionStart hooks per harness (D-53) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
-- **Repo/path:** agentlink · apps/cli (`status --brief`, optional `init` offer), docs/quickstart/ (hook snippets)
+- **Repo/path:** agentlink · apps/cli (`status --brief`, optional `init` offer), docs-site/guide/get-started/ and docs-site/technical/reference/harness-configuration.md (hook snippets)
 - **Depends on:** M1-9a, M1-9c, M1-12a
 - **Spec:** D-53; 06 §6.1, §7, §8; 02 J9; 11 §6.1 (J9 strings); 04 §2.5
 - **Invariants:** I-4, I-5, I-7
@@ -2717,10 +2717,23 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 
 ### Public documentation across milestones (DOCS-PUB) (new)
 
-The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook space each, published from `main` by Git Sync; the owner connects Git Sync in the GitBook interface (`docs-site/MAINTAINING.md` §2). Pages for unreleased features carry a **Planned** status hint and are filled in by the milestone's DOCS card below, in the delivery step "Docs and knowledge". Cards that still name `docs/quickstart/` (M1-25) write into `docs-site/guide/` instead. A milestone is done only when its DOCS card is done (`development-process.md` §6.3).
+The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook space each, published from `main` by Git Sync (D-57); the owner connects Git Sync in the GitBook interface (`docs-site/MAINTAINING.md` §2). `docs-site/**` is S1. Pages for unreleased features carry a **Planned** status hint and are filled in by the milestone's DOCS card below, in the delivery step "Docs and knowledge". A milestone is done only when its DOCS card is done (`development-process.md` §6.3).
+
+#### DOCS-PUB · Public documentation: structure and foundation (new)
+- **Status:** ready (in review: PR #8; live status on the sync board) · **Size:** L · **Tier:** Opus · **Security:** S1
+- **Repo/path:** agentlink · docs-site/ (structure, foundation pages, `MAINTAINING.md`); D-57 in `docs/foundation/00-README.md`; `docs/process/` alignment (release and deployment §4.9, §5.1, rollback; delivery process step 12 and done condition 8; audit rules §2.2; development process §6.3; this backlog)
+- **Depends on:** —
+- **Spec:** owner request (14 Oct 2026); D-29, D-57; 11 §5; 10 (milestones); `versioning.md` §3
+- **Invariants:** — (pages restate I-1 to I-10 from 04; nothing is relaxed)
+- **Scope:**
+  - Two GitBook Git Sync spaces (`guide/`, `technical/`) organised by Diátaxis; real content only where the specs make it true by design; every other page an outline with a Planned status line.
+  - `docs-site/MAINTAINING.md` (upkeep table M1a to M3, per-release docs pass, owner's one-time GitBook setup); the DOCS cards below; the Definition of done rule.
+- **Acceptance:**
+  - Every page has a status line; every relative link resolves; each `SUMMARY.md` lists every page exactly once; the guide passes the 11 §5 vocabulary check.
+  - Independent review recorded (`IR-DOCS-PUB-<n>`); the owner confirms D-57 at merge.
 
 #### DOCS-M1a · Public docs pass for v0.1.0 (pair and talk) (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1a
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · docs-site/
 - **Depends on:** M1-12b, M1-25, M1-9c, M1-16 (release); the owner's GitBook Git Sync setup
 - **Spec:** `docs-site/MAINTAINING.md` §3–§4; 06 §2, §3, §7, §8; 02 J1, J4, J8, J9; 11 §5; `versioning.md` §3
@@ -2729,13 +2742,14 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
   - Fill in the M1a column of the `MAINTAINING.md` table: setup pages for Claude Code, Codex, Gemini CLI and Claude Desktop (config), pairing, first message, contacts, messages, approvals (passphrase), negotiation, troubleshooting, FAQ, glossary; technical MCP tools (Talk), policies, CLI, harness configuration, SDK packages (Talk), crypto suites, test vectors.
   - Status hints of shipped features → "Available since v0.1.0" only once v0.1.0 is on npm `latest`; "What works today", Status and roadmap and Versioning updated.
   - Replace cross-space GitHub links with the published site URLs once the site address exists.
+  - Add the headless file KeyStore (containers, WSL, SSH) to Identities and keys → "Where seeds live" once D-54 is decided.
 - **Acceptance:**
   - Every page marked available maps to a `done` card and to software on npm `latest`; every unreleased feature still says Planned.
   - Guide passes the 11 §5 vocabulary check; every page is in its `SUMMARY.md`; no broken relative links (DOCS-LINT, or a manual check recorded in the PR until it lands).
   - Someone new to AgentLink installs and pairs from the guide alone (shared with the M1-12b acceptance).
 
 #### DOCS-M1b · Public docs pass for v0.2.0 (files, proof, credits) (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · docs-site/
 - **Depends on:** DOCS-M1a, M1-12d, M1-12c, M1-GATE (release v0.2.0)
 - **Spec:** `docs-site/MAINTAINING.md` §3–§4; 04 §4, §5; 05 §2–§3; 06 §2.3–§2.5; 07 §5, §8; 12; 11 §5
@@ -2747,7 +2761,7 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
   - As DOCS-M1a, for v0.2.0; testnet contract addresses on the Contracts page equal `@agentlink/occ-v2-abi`.
 
 #### DOCS-M2 · Public docs pass for v0.3.0 (console, desktop apps, cloud agent) (new)
-- **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S0
+- **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · docs-site/
 - **Depends on:** DOCS-M1b, M2-3e, M2-11b to M2-11d, M2-11g, M2-5a, M2-5b, M2-GATE (release v0.3.0)
 - **Spec:** `docs-site/MAINTAINING.md` §3–§4; 08 §2–§4, §7, §8; 04 §2.2, §2.7; 07 §5.5; 11 §5
@@ -2760,7 +2774,7 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
   - As DOCS-M1a, for v0.3.0; the desktop and cloud setup pages are followed end to end by an external tester (times recorded).
 
 #### DOCS-M3 · Public docs pass for v1.0.0 (mainnet beta) and versioned docs (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S0
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · docs-site/
 - **Depends on:** DOCS-M2, M3-6, M3-10, M3-14
 - **Spec:** `docs-site/MAINTAINING.md` §3–§5; 12 (live fee schedule); 05 §9; `versioning.md` §3, §7
@@ -2780,9 +2794,11 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
 - **Invariants:** —
 - **Scope:**
   - A zero-dependency Node script, run in CI on changes to `docs-site/`: every relative link and anchor resolves; every Markdown file in a space appears in its `SUMMARY.md` exactly once and every entry exists; every page starts with a status hint; the guide uses none of the 11 §5 "Never say" terms outside sections titled "Advanced".
-  - Optional: classify `docs-site/**/privacy-and-security.md` and `docs-site/technical/concepts/security-model.md`, `threat-model.md` as S1 in `review-gate`, since they restate security commitments.
+  - Mirror `docs-site/**` = S1 (`audit-rules.md` §2.2, D-57) in `review-gate.yml`; this `.github` part is the owner's, together with M0-25.
+  - Reuse the link checker from M0-24 where it exists; this card adds the `docs-site/` rules.
 - **Acceptance:**
   - Unit tests with a passing and a failing fixture for each rule; the check passes on `main` and fails on a planted broken link and a planted "wallet" in the guide.
+  - A fixture PR touching only `docs-site/` is derived as S1 by `review-gate`.
 
 ---
 

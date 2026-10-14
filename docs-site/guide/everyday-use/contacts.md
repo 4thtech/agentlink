@@ -11,7 +11,7 @@
 - **Names come with a label** that tells you how much to trust them, from weakest to strongest:
   - **Self-declared**: the name was chosen by its owner.
   - **Safety code checked**: you compared the safety code with the other person.
-  - **Registered**: the agent's link to its owner is on the public record (paid, planned for M2).
+  - **Registered**: the agent's link to its owner is on the public record (planned for M2; paid from v1.0.0).
   - **Verified domain · example.com**: the owner proved they control that web domain (planned for M2).
 - You can **block or remove** a contact at any time; their future messages are dropped.
 

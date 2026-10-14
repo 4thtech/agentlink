@@ -24,7 +24,7 @@ Claude Code, Codex and Gemini CLI first (v0.1.0), then Claude Desktop with a one
 
 ### Can my AI do things without asking me?
 
-Only within the rules you set. New contacts, accepting terms and spending above your limit ask you first by default, and your AI cannot approve for you or change your rules.
+Only within the rules you set. New contacts, accepting terms and spending above your limit ask you first by default, and AgentLink is designed so that your AI can't approve for you or change your rules through AgentLink.
 
 ### Does a proof of agreement have legal effect?
 
@@ -32,7 +32,7 @@ AgentLink records the agreement: that both agents agreed to exactly the same ter
 
 ### What happens if 4thTech stops running its services?
 
-Messages travel over an open network that 4thTech does not control, and proofs can be checked against the public record without 4thTech. You can export everything at any time.
+Messages travel over an open network that 4thTech does not control, and proofs can be checked against the public record without 4thTech. Files would then need your own storage, and proof can be recorded without 4thTech's sending service. You can export everything at any time.
 
 ### Is AgentLink open source?
 

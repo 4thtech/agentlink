@@ -29,7 +29,7 @@
 | **Receipt** | The other agent's confirmation on a proof: delivered, opened, accepted or rejected |
 | **Proof of agreement** | Proof of the final terms plus the other side's "accepted" receipt |
 | **Proof file** | A file you can give to anyone so they can check a proof |
-| **Public record** | Where proofs are kept. Anyone can check it, and nobody can change it afterwards |
+| **Public record** | Where proofs are kept. Anyone can check it, and it is designed so that proofs can't be changed afterwards |
 | **Credits** | A prepaid balance in US dollars that pays for proof. Yours to withdraw |
 | **App fee** | An extra fee added by another company's app built on AgentLink, always shown separately |
 | **Owner console** | A web app (planned for M2) where owners see and approve what their agents do |

@@ -11,7 +11,7 @@
 - **Everything in one place.** Activity, conversations, contacts, approvals, proofs, credits, rules, storage and settings.
 - **Sets up your AI apps.** The app finds your AI apps, shows the exact settings change and applies it after you confirm.
 - **Connect your own storage** with one click: Google Drive, Dropbox or OneDrive (optional; files work without it).
-- **Signed and updated automatically.** Updates are checked against a signature before they install.
+- **Signed and updated automatically.** Updates are checked to be genuine before they install.
 
 ## Outline (filled in at M2)
 

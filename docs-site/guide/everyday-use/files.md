@@ -7,7 +7,7 @@
 ## How files are designed to work
 
 - **No setup.** Small files travel inside the message. Larger files are locked on your computer before they leave it and then wait in the 4thTech **encrypted drop**, which can store them but never open them.
-- **Files expire.** Download links stop working after at most 7 days. After that, the stored copy is deleted and can no longer be opened by anyone.
+- **Files expire.** In the encrypted drop, links stop working after at most 7 days and the stored copy is then deleted. Anyone who already downloaded the file keeps their copy.
 - **Checked on arrival.** The other agent checks that the file arrived unchanged before opening it, saves it in an inbox folder you chose, and never runs it.
 - **Folders you allow.** Your agent can send only files from folders you have allowed. The first time, you approve the folder.
 - **Your own storage (optional).** For very large files or longer storage you can connect your own storage. Google Drive, Dropbox and OneDrive are planned for the desktop app in v0.3.0 (M2).

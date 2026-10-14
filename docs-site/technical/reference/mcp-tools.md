@@ -1,6 +1,6 @@
 # MCP tools
 
-> **Status: Planned for v0.1.0 (M1a)** (Talk tools) **and v0.2.0 (M1)** (file and proof tools). This page lists the tool surface planned in [06 MCP server](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md). Names and schemas may change until v0.1.0 ships; full input and output schemas are added from the released tool snapshot.
+> **Status: Planned for v0.1.0 (M1a)** (Talk tools) **and v0.2.0 (M1)** (file and proof tools). This page lists the tool surface planned in D-53 and [06 MCP server](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md). Names and schemas may change until v0.1.0 ships; full input and output schemas are added from the released tool snapshot.
 
 **Package:** `@4thtech/agentlink` (planned), subcommand `agentlink mcp` (stdio). The self-hosted cloud agent exposes the same tools over streamable HTTP with OAuth.
 

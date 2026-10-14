@@ -16,13 +16,17 @@ Both spaces follow [Diátaxis](https://diataxis.fr), with plain navigation label
 | Diátaxis | User guide | Technical docs |
 |---|---|---|
 | Tutorials | Get started | Guides → Your first integration |
-| How-to guides | Everyday use; Apps and cloud | Guides |
+| How-to guides | Everyday use; Desktop app and cloud agent | Guides |
 | Reference | Pricing; Help (troubleshooting, FAQ, glossary) | Reference |
-| Explanation | What is AgentLink?; What leaves your computer | Concepts |
+| Explanation | What is AgentLink?; Privacy (What leaves your computer) | Concepts |
 
 ## 2. Publishing
 
-The repository is the source of truth. Each space is connected to `main` with GitBook **Git Sync**, one space per folder. A merge to `main` that changes `docs-site/` updates the published docs.
+The repository is the source of truth (D-57, amends D-29). Each space is connected to `main` with GitBook **Git Sync**, one space per folder, GitHub → GitBook only. A merge to `main` that changes `docs-site/` updates the published docs.
+
+- **Review class.** `docs-site/**` is S1 (`audit-rules.md` §2.2): every change gets an independent review and the orchestrator's audit, then auto-merges when the checks are green. Until `review-gate` derives this itself (owner follow-up), the PR declares S1.
+- **Owner-only.** Any change to the publishing setup (Git Sync, domain, site structure, spaces) is made by the owner.
+- **Rollback.** Revert the PR on `main`; Git Sync republishes the previous pages.
 
 - **Never edit in GitBook.** Changes go through a pull request like any other change. `main` accepts changes only through pull requests, so a GitBook-side edit could not sync back without bypassing review. Never add the GitBook app as a ruleset bypass actor.
 - **Moving or renaming a page** needs a `redirects:` entry in that space's `.gitbook.yaml`, so published links keep working.
@@ -33,7 +37,7 @@ The repository is the source of truth. Each space is connected to `main` with Gi
 
 Only the owner does this, in the GitBook and GitHub interfaces. Agents never change GitBook settings.
 
-1. Decide where the docs live: a new GitBook site for AgentLink (recommended: own brand, D-42; custom domain after D-38), or new sections in the existing `wiki.4thtech.io` site (D-29). Either way, create two spaces: **User guide** and **Technical docs**.
+1. Decide where the docs live (`DECISION NEEDED (owner)`, D-57): a new GitBook site for AgentLink (recommended: own brand, D-42; custom domain after D-38), or new sections in the existing `wiki.4thtech.io` site. Either way, create two spaces: **User guide** and **Technical docs**.
 2. Install the GitBook GitHub app on the `4thtech` organisation with access to `4thtech/agentlink` only.
 3. In each space: **Git Sync → GitHub**, repository `4thtech/agentlink`, branch `main`, project directory `docs-site/guide` (or `docs-site/technical`), initial sync direction **GitHub → GitBook**. Use space-level Git Sync: site-wide content mapping makes GitBook commit a mapping file to the repository.
 4. In each space's settings, turn off live editing, and do not merge change requests in GitBook (see "Never edit in GitBook").
@@ -65,9 +69,9 @@ Milestones map to versions per [versioning.md](../docs/process/versioning.md): M
 
 ## 4. Who updates what, and when
 
-**Who.** A docs worker (Sonnet; S0 unless a page restates security rules) in the "Docs and knowledge" step of the delivery process, working from the milestone's DOCS card in [backlog.md](../docs/process/backlog.md). A feature PR that changes an interface also updates the matching technical reference page in the same PR (Definition of done).
+**Who.** A docs worker (Sonnet; S1, because `docs-site/**` is S1) in the "Docs and knowledge" step of the delivery process, working from the milestone's DOCS card in [backlog.md](../docs/process/backlog.md). A feature PR that changes an interface also updates the matching technical reference page in the same PR (Definition of done).
 
-**When.** A milestone or release is done only when the public docs, the README Status and Roadmap, the CHANGELOG, runbooks and lessons, and the design status are updated ([development-process.md](../docs/process/development-process.md) §6.3).
+**When.** A milestone or release (patches and M4/M5 included) is done only when the public docs, the README Status and Roadmap, the CHANGELOG, the explainers and the documentation map, runbooks and lessons, and the design status are updated (also an item in the release checklist, `release-and-deployment.md` §5.1) ([development-process.md](../docs/process/development-process.md) §6.3).
 
 | Page | M1a (v0.1.0) | M1b, M1 gate (v0.2.0) | M2 (v0.3.0) | M3 (v1.0.0) |
 |---|---|---|---|---|

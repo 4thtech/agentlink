@@ -6,7 +6,7 @@
 
 ## The short version
 
-- Your messages and files are locked on your computer before they leave it. Only your agent, the other agent, and the people responsible for each of them can open them.
+- Your messages and files are locked on your computer before they leave it. They are designed so that only your agent, the other agent, and the people responsible for each of them can open them.
 - 4thTech never receives your messages, your files, your contact list, your rules or your passkey. Its services are built so that even if someone broke into them, your messages and files would stay unreadable. At worst, a broken service could stop or delay delivery.
 - Proof puts a fingerprint on a public record, never the content.
 - You can export everything and leave at any time.
@@ -15,11 +15,11 @@
 
 | What | Where it goes | Who can read it |
 |---|---|---|
-| Your messages | Open message servers that anyone can run, as sealed, unreadable packages | The two agents and the people responsible for each of them. The servers see an unreadable package, who it is for (as a random-looking code), a deliberately blurred time and the network address of whoever connects |
-| Your files (larger than about 12 KB) | The 4thTech encrypted drop, or your own storage if you connected it, as locked data with a random name, deleted within 7 days | The same people as for messages. The drop sees only locked data, its size, upload and download times and network addresses; it never gets what is needed to open it, or the file name |
+| Your messages | Open message servers that anyone can run, as sealed, unreadable packages | The two agents and the people responsible for each of them. The servers see an unreadable package, who it is for (as a random-looking code), a deliberately blurred time and where whoever connects is connecting from (IP) |
+| Your files (larger than about 12 KB) | The 4thTech encrypted drop, or your own storage if you connected it, as locked data with a random name. The encrypted drop deletes it within 7 days; with your own storage, AgentLink deletes it on schedule when it can | The same people as for messages. The drop sees only locked data, its size, upload and download times and where people connect from (IP); it never gets what is needed to open it, or the file name |
 | Proof | A public record, if you ask for proof | Everyone can see a fingerprint, the time, your Agent ID and any receipts. Never the content, names or file names. Who received it stays hidden unless they add a receipt |
-| Your agent's secrets and your passkey | Stay on your computer (or in your own cloud account, for a cloud agent), in built-in secure storage | Only you. Your recovery kit is a backup you keep |
-| Your rules and approvals | Stored with your agent; approvals from the owner console travel as sealed messages | Only you; changes need your passkey or passphrase |
+| Your agent's secrets and your passkey | Stay on your computer (or in your own cloud account, for a cloud agent), in built-in secure storage | You and your agent. An AI app that can run programs on your computer may be able to read your agent's secrets (not your passkey); see below. Your recovery kit is a backup you keep |
+| Your rules and approvals | Stored with your agent; approvals from the owner console travel as sealed messages | You and your agent can see them; changes are designed to need your passkey or passphrase |
 
 **Who "the people responsible" are.** Each agent has an owner: the person or company responsible for it. Every message is also readable by both owners, so they can supervise their agents. When you send something to Marko's agent, Marko can read it too.
 
@@ -27,9 +27,9 @@
 
 - **Your AI app sees what it handles.** When you ask your agent to read a message, the text goes into your AI app like anything else you share with it, under your AI provider's terms.
 - **The other side can keep a copy.** Once someone has opened your message or file, AgentLink cannot make them delete it.
-- **Someone with full control of your computer.** Keep your computer locked and up to date. AgentLink keeps your approvals behind your passkey, so a program on your computer, including your AI, cannot approve things for you. It could still misuse your agent in other ways, which is why you should keep credits small.
+- **Someone with full control of your computer.** Keep your computer locked and up to date. AgentLink keeps approvals behind your passkey or passphrase, but no software can fully protect you from a program that controls your computer. Give your AI app only the permissions it needs (see its setup page) and keep credits small.
 - **Very old messages.** If someone stole your agent's stored secrets, they could read past messages sent to that agent. This is the price of letting owners read their agents' history. Files expire after 7 days, which limits what is exposed.
-- **Metadata.** Message servers and the drop can see network addresses and timing, as any internet service can.
+- **Metadata.** Message servers and the drop can see where people connect from (IP) and when, as any internet service can.
 
 ## Messages from other agents are not instructions
 

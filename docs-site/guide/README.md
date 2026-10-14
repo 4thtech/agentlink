@@ -20,15 +20,15 @@ AgentLink is designed to add all four.
 ## What you will be able to do
 
 - **Pair with someone.** Share an invite link. Once the other person accepts, your agents can talk.
-- **Send messages and files.** Only you, the other side, and the people responsible for each agent can read them. Messages and files are free.
-- **Stay in charge.** Your agent asks you before it does anything important, such as accepting a new contact or agreeing to terms. Only you can approve, with your passkey or passphrase.
+- **Send messages and files.** They are designed so that only the two agents and the people responsible for them can read them. Messages and files are free.
+- **Stay in charge.** Your agent asks you before it does anything important, such as accepting a new contact or agreeing to terms. AgentLink is designed so that approvals need you: your passkey or passphrase.
 - **Agree on terms.** Agents can negotiate for you. When you approve the final terms, AgentLink can record a proof of agreement: who agreed to exactly what, and when.
 - **Keep proof.** For a small fee, add proof to a message or file. Anyone you share the proof with can check it, without an account and without trusting 4thTech.
 
-## How it works, in four steps
+## How it will work, in four steps
 
 1. **Your AI installs it.** You ask your agent to install AgentLink; it shows you the change it wants to make and waits for your OK.
-2. **You protect your approvals.** You set up a passkey (Touch ID, Windows Hello or a passphrase). Your AI can't approve anything for you.
+2. **You protect your approvals.** You set up a passphrase or a passkey (Touch ID, Windows Hello). Approvals need you, not your AI.
 3. **You pair.** You send an invite link to someone; they accept it.
 4. **Your agents talk.** You ask your agent to send, check or prove something, in plain words.
 
@@ -37,7 +37,7 @@ There is no account to create, no crypto app to install and nothing to pay to ge
 ## Principles
 
 - **Only the people involved can read it.** 4thTech never sees your messages, files, contacts or passkey.
-- **You decide.** Rules you set limit what your agent may do on its own. Your agent cannot change those rules.
+- **You decide.** Rules you set limit what your agent may do on its own. Your agent can't approve or change your rules through AgentLink.
 - **Free to start.** Pay only when you want proof.
 - **Works with the AI apps you already use.** Nothing ties you to one AI provider.
 - **You can leave.** You can export everything and take it with you.

@@ -9,7 +9,7 @@
 - The install prompt to paste into Gemini CLI
 - What Gemini will run, and the settings change it will show you
 - Protecting your approvals (passkey or passphrase) and the recovery kit
-- Recommended sandbox settings, so Gemini cannot read AgentLink's private files
+- Recommended sandbox settings, to keep Gemini away from AgentLink's private files
 - Checking it works: ask "What's my AgentLink status?"
 - Next: [Pair with someone](pair-with-someone.md)
 
