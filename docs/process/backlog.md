@@ -63,7 +63,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 
 | Section | Cards |
 |---|---|
-| M0 Foundations | 33 (incl. 7 in the D-25 group; 9 `done (setup)`; 2 follow-ups from CI findings: M0-2h, M0-26) |
+| M0 Foundations | 34 (incl. 7 in the D-25 group; 9 `done (setup)`; 3 follow-ups from CI findings: M0-2h, M0-10d, M0-26) |
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
@@ -378,6 +378,18 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - The first `lintText` call pays the cold ESLint start (config and plugin load), which exceeded the 5 s default test timeout under CI load, so the first test flaked and a rerun passed. Do the cold start once in `beforeAll`, with its own generous hook timeout; the per-test timeout stays at the default for warm runs.
 - **Acceptance:**
   - No assertion changes; the suite passes repeatedly, also in parallel with the crypto tests.
+
+#### M0-10d · console-ban test: deterministic cold-start timeout (new)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 (`tools/**`; S1 only if the PR also edits `docs/process/**`, as M0-10c did)
+- **Repo/path:** agentlink · tools/console-ban.test.mjs
+- **Depends on:** M0-8, M0-10c
+- **Spec:** `audit-rules.md` §2 (`tools/**` is S0); `ci-cd.md`; same pattern as M0-10c
+- **Invariants:** I-7
+- **Scope:**
+  - Observed on push CI of 14 Oct 2026: the test "packages/chain/src/m08-probe.ts: globalThis.console is flagged" timed out at the 5 s default (cold ESLint start under CI load); a rerun passed. Do the cold start once in `beforeAll` with its own generous hook timeout, as M0-10c did for the eslint-rules test; the per-test timeout stays at the default.
+  - Card only so far; no fix has been made.
+- **Acceptance:**
+  - No assertion changes; the suite passes repeatedly, also in parallel with the crypto tests, and a deliberately slow first `lintText` no longer fails the first test.
 
 #### M0-11 · Curator project context (new)
 - **Status:** done (setup) · **Size:** S · **Tier:** Owner · **Security:** S0
@@ -1139,7 +1151,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Owner decisions of 14 Oct 2026:
     - G-4 batches (05 §3.3): an identical existing record or receipt is skipped and emits `RecordSkipped` or `ReceiptSkipped`; every other failure reverts the batch.
     - Pause blocks `acknowledge` and `acknowledgeBatch` (05 §5.1, D-61).
-  - Proposed (owner confirms at merge, D-62): pause and unpause still work after `freezeUpgrades`; a receipt batch item is skipped only after its deadline, signature and commitment checks pass (05 §3.3).
+  - Accepted (D-62, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34): pause and unpause still work after `freezeUpgrades`; a receipt batch item is skipped only after its deadline, signature and commitment checks pass (05 §3.3).
   - CI parity job: EIP-712 hashes equal the canonical public vectors at the pinned commit.
   - Open Low (IR-M1-3a-1 L-3): the Notary's freeze goes through a `_beforeUpgrade` hook, not an override of `_authorizeUpgrade` (see M1-3b), so the role check stays in the base.
   - Follow-up (IR-M1-3b-1 I-3): the Notary's direct-payment functions call `depositFromModule` with `payer = msg.sender`, never a signer or payer taken from calldata; a module charges only the payer's own credits.
@@ -3322,7 +3334,7 @@ Concurrency guideline: no more than five or six S1/S2 cards `in-review`/`audit` 
 Found while decomposing. None is resolved here; each needs a spec-change PR (or an owner decision) before the blocked cards become `ready`. Priority: **H** blocks security-critical design, **M** blocks a card's acceptance, **L** cosmetic or late.
 
 1. **G-1 (H) Local owner presence vs a same-user agent.** 04 §1 I-4, §2.5; 08 §1; 10 M1-8. The WebAuthn RP ID `localhost` is shared by every local origin, and 04 §2.5 already accepts that a shell-capable agent can tamper with the installation. Either way the next owner passkey or passphrase use on that machine can be captured and the wrapped owner seed on disk unwrapped: local presence proves presence, not intent. The same holds for creating the owner key on such a machine: a tampered installation or a same-user process that reads memory can capture or predetermine the owner seed during setup (04 §2.8, D-54). The residual-risk text lists only tampering and credit spending, and I-4's "no agent process can produce one" holds only while the installation is intact. *Proposed:* state this in 04 §2.5; scope the M1-8 test to an unmodified installation; recommend owner operations from the console on a separate device when the harness has unrestricted shell; harness deny rules for the installed package and npx cache; consider not storing the owner seed on agent machines by default. *Blocks:* M1-8c, M1-8d, M1-8e, M1-11a, M1-12b. *Status:* stays open until the D-36 desktop app ships (G-42).
-2. **G-2 (H) `KeyStore` location and methods.** Resolved by 4thtech/agentlink#34 (merged 2026-10-14; D-62 is proposed, the owner confirms), in 04 §3.1.1, with 03 §3, 04 §2.6, §3.5 and 07 §1, §4.1, §4.2 aligned. Reviews IR-M1-1g-1 (M-1, M-2, L-1, L-2, I-4, I-5) and IR-M1-1c-1 (F3, F5) are folded in.
+2. **G-2 (H) `KeyStore` location and methods.** Resolved by 4thtech/agentlink#34 (merged 2026-10-14; D-62 accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34), in 04 §3.1.1, with 03 §3, 04 §2.6, §3.5 and 07 §1, §4.1, §4.2 aligned. Reviews IR-M1-1g-1 (M-1, M-2, L-1, L-2, I-4, I-5) and IR-M1-1c-1 (F3, F5) are folded in.
    - **Signature.** `sig` = BIP-340 by `from` over `taggedHash("agentlink/envelope/v1", envelopeHash)`, where `envelopeHash = sha256(JCS(envelope without sig))` over the strictly parsed envelope, with the 32 raw hash bytes inside the tagged hash. A table of every BIP-340 use of a Nostr key (envelope, owner action, NIP-01 seal and AUTH) fixes one message per object. A new use needs its own tag, and nothing signs an untagged digest.
    - **Keys.** Agent-sent types are signed by the agent Nostr key at the current epoch. `approval`, `policy` (owner → agent) and `revoke` are signed by the owner Nostr key, only in an `OwnerSession` from `unlock(presence)`, in the same gesture as the carried `SignedOwnerAction`. The envelope signature authorises nothing. Receivers enforce the type ↔ key table.
    - **Interfaces.** The interfaces are types in `@agentlink/crypto`, and the seed holders are in `/keystore` and `@agentlink/node`. Test doubles are unreachable from production `src`. `EnvelopeKeys` (`signEnvelopeHash`, `signNostr`, `nip44Encrypt`/`nip44Decrypt`, `unwrapCek(wrapped, envelopeId, {epoch})`, which replaces `hpkeOpen(wrapped, info)`) is shared by `KeyStore` and `OwnerSession` (IR-M1-1g-1 M-1). An `OwnerSession` signs only Nostr kinds 13 and 22242. `{epoch}` is accepted only on decrypting methods and `getPublicBundle`.
@@ -3336,7 +3348,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
    - Batches are all-or-nothing. The exception is an item that is already on-chain in identical form: a Record with the same `recordStructHash`, or a receipt type already set by the committed recipient. Such an item is skipped, with no charge and no revert, and emits `RecordSkipped` or `ReceiptSkipped`. Any other failure reverts the whole batch. Single calls still revert.
    - **Submitter (M1-10a):** simulate per item and then as a batch, and leave out every failing item. If a sent batch reverts, resubmit once without the failing items; an item that fails twice is `failed`. A signer that caused a revert is submitted alone for a while. Per-item status is `recorded`, `skipped` or `failed`.
    - Same decision (D-61): the `notarize` gas target is ≤ 170k (05 §3.4). Pause also blocks receipts (05 §5.1). Every Record has a fresh random salt (04 §5).
-   - Proposed with it (owner confirms at merge, D-62): pause and unpause still work after freeze; a signed item that did not land is replaced only when the chain shows it never can (04 §5); a receipt item is skipped only after its own checks pass (05 §3.3).
+   - Accepted with it (D-62, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34): pause and unpause still work after freeze; a signed item that did not land is replaced only when the chain shows it never can (04 §5); a receipt item is skipped only after its own checks pass (05 §3.3).
 
    *Was:* 05 §3.2; 07 §7. Whether one failing item reverts `notarizeBatch`/`acknowledgeBatch` was unspecified. The submitter batches across signers, so one item (for example credits spent between simulation and inclusion) could grief the rest. *Blocks:* M1-3d, M1-10a.
 5. **G-5 (M) J1 key storage wording.** RESOLVED by 02 §5 J1 steps 2–3: `init` puts only the agent keys in the OS keychain (step 2); the owner key is created and wrapped in the setup step (step 3, 04 §2.2). *Was:* J1 step 2 stored "owner and agent keys" in the OS keychain, against 04 §2.2. *Blocked:* M1-9a, M1-12b.
@@ -3395,7 +3407,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 44. **G-44 (M) Drop delete on receipt vs owner access.** RESOLVED: the drop follows `files.deleteAfter` like any storage (default `expiry`, `receipt` as an owner option; D-48, 04 §4), so I-9 holds as written: owners keep access to file contents until expiry. *Was:* D-48 deleted drop objects on receipt, ending owner access before expiry. *Blocked:* M1-7f.
 45. **G-45 (M) Consumer providers without expiring public links.** 07 §5.5; D-18 (links expire after at most 7 days); D-49. Google Drive "anyone with the link" permissions cannot expire; Dropbox link expiry needs a paid plan; Microsoft Graph documents `Files.ReadWrite` (broader than the app folder) as the least-privileged permission for `createLink` on personal accounts. Sender-side revocation works only while the sender's device is online. *Proposed:* accept sender-side revocation, run by the desktop tray app at expiry and at start-up, as the expiry mechanism where a provider has no expiring link; ship OneDrive only if `createLink` works with the app-folder scope. Owner decides per provider. A scope broader than the app folder (e.g. OneDrive `Files.ReadWrite`) voids the 04 §7 "stolen token reaches only AgentLink ciphertext" mitigation on Windows and Linux, where same-user processes can read keychain tokens. *Blocks:* M2-15b, M2-15c, M2-15d.
 
-46. **G-46 (H) One plaintext for every recipient.** Recorded as a requirement by the owner (D-61, 14 Oct 2026), stated normatively in 04 §3.3; the construction is open. *Timing (proposed, build plan; owner confirms at merge, D-62):* the construction is fixed before M1-7b becomes `ready` and before the `aead-envelope` and `envelope-sig` vectors freeze. 04 §3.1, §3.1.1, §3.3; 07 §8. Found while resolving G-2. *Requirement:* the payload AEAD must be key-committing, or the recipients must be bound to one content key, so that every recipient, every owner (I-9) and a proof-pack verifier who opens an envelope gets the same plaintext under its signed, notarized `envelopeHash`. Options include a key-committing construction, or a commitment to the CEK in the signed header that is checked before decrypting. Either option changes the envelope header, hence the timing above. *Blocks:* freezing the `aead-envelope` and `envelope-sig` vectors (M1-1h), M1-7b, M1-7g (proof of agreement); each lists it under Depends on.
+46. **G-46 (H) One plaintext for every recipient.** Recorded as a requirement by the owner (D-61, 14 Oct 2026), stated normatively in 04 §3.3; the construction is open. *Timing (build plan; D-62, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34):* the construction is fixed before M1-7b becomes `ready` and before the `aead-envelope` and `envelope-sig` vectors freeze. 04 §3.1, §3.1.1, §3.3; 07 §8. Found while resolving G-2. *Requirement:* the payload AEAD must be key-committing, or the recipients must be bound to one content key, so that every recipient, every owner (I-9) and a proof-pack verifier who opens an envelope gets the same plaintext under its signed, notarized `envelopeHash`. Options include a key-committing construction, or a commitment to the CEK in the signed header that is checked before decrypting. Either option changes the envelope header, hence the timing above. *Blocks:* freezing the `aead-envelope` and `envelope-sig` vectors (M1-1h), M1-7b, M1-7g (proof of agreement); each lists it under Depends on.
 
 ---
 

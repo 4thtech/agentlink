@@ -22,7 +22,7 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 >   - the owner passphrase wrap, the pairing proof and the pairing safety code;
 >   - independent test vectors for these suites, and the shared policy, approval, proof pack and tool-result types in `@agentlink/types`, tested in Node, three browsers and workerd.
 > - **Also landed:**
->   - the specification for envelope signatures and key interfaces (gap G-2; decision D-62 is proposed until the owner confirms);
+>   - the specification for envelope signatures and key interfaces (gap G-2; decision D-62 accepted by the owner at merge);
 >   - the first design drop (D1: brand core, tokens, components, local approvals screens), with the second drop (D2: console, desktop apps, onboarding and more) partly in, tracked in [`docs/design/`](docs/design/README.md);
 >   - the notary contract (record and receipt logic) in the private contracts repo. Its test and static-analysis suites are in review; nothing is deployed.
 > - **In progress:** the rest of the crypto layer (file encryption), the remaining contract work and test vectors, then the core and the node runtime.
