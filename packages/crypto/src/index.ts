@@ -30,3 +30,29 @@ export {
 } from './jcs.js';
 export { randomBytes } from './random.js';
 export { wipe } from './wipe.js';
+// M1-1b: public keys, identities, BIP-340 verification and fingerprints. Everything that takes a
+// master seed or a secret key is in the restricted subpath @agentlink/crypto/keystore (keystore.ts).
+export { HKDF_SHA256_MAX_LENGTH, hkdfSha256 } from './hkdf.js';
+export {
+  KEY_LABELS,
+  MASTER_SEED_LENGTH,
+  MAX_KEY_EPOCH,
+  evmAddressChecksummed,
+  evmAddressFromPublicKey,
+  kidFromEncPublicKey,
+  type DerivedPublicKey,
+  type KeyLabel,
+  type PublicIdentity,
+} from './keys.js';
+export {
+  BIP340_PUBLIC_KEY_LENGTH,
+  BIP340_SIGNATURE_LENGTH,
+  bip340Verify,
+  isBip340PublicKey,
+} from './bip340.js';
+export {
+  agentFingerprint,
+  formatFingerprint,
+  ownerFingerprint,
+  type FingerprintForm,
+} from './fingerprint.js';

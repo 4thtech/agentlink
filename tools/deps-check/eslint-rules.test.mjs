@@ -167,3 +167,36 @@ describe('review IR-M0-10-1 regressions (ESLint side)', () => {
     expect(await lint('packages/node/src/a.ts', code)).toEqual([]);
   });
 });
+
+describe('IR-M1-1b-1 M-1: @agentlink/crypto/keystore is for KeyStore backends only', () => {
+  const keystore = `import { deriveSecretKey } from '@agentlink/crypto/keystore';\nvoid deriveSecretKey;\n`;
+
+  it.each([
+    'packages/core/src/a.ts',
+    'packages/tools/src/a.ts',
+    'packages/chain/src/a.ts',
+    'apps/cli/src/a.ts',
+    'apps/console/src/a.ts',
+    'packages/unknown/src/a.ts',
+  ])('rejects a static import in %s', async (filePath) => {
+    expect(rules(await lint(filePath, keystore))).toContain('no-restricted-imports');
+  });
+
+  it('rejects a dynamic import and require in packages/core', async () => {
+    for (const code of [
+      `const m = await import('@agentlink/crypto/keystore');`,
+      `const m = require('@agentlink/crypto/keystore');`,
+    ]) {
+      expect(rules(await lint('packages/core/src/a.ts', code))).toContain('boundaries/no-bypass');
+    }
+  });
+
+  it('does not apply the rule in packages/node, and keeps the main entry open in packages/core', async () => {
+    // packages/node may import @agentlink/crypto only once its layering entry allows it; this
+    // rule must not be what stops the KeyStore backends there.
+    const messages = await lint('packages/node/src/a.ts', keystore);
+    for (const { message } of messages) expect(message).not.toMatch(/may be imported only in/);
+    const main = `import { bip340Verify } from '@agentlink/crypto';\nvoid bip340Verify;\n`;
+    expect(await lint('packages/core/src/a.ts', main)).toEqual([]);
+  });
+});

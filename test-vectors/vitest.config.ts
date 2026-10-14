@@ -12,12 +12,15 @@ const SHARED = 'harness/vectors.test.ts';
 // Suites test the source of @agentlink/crypto, not a build of it: the vectors job does not build,
 // and a stale dist/ must never be what passes. Inline projects do not inherit a root `resolve`, so
 // every project repeats it.
+// The entries are exact (anchored) so the restricted subpath `@agentlink/crypto/keystore`
+// (IR-M1-1b-1 M-1) maps to its own source file instead of a path under index.ts.
+const cryptoSource = (file: string): string =>
+  decodeURIComponent(new URL(`../packages/crypto/src/${file}`, import.meta.url).pathname);
 const resolve = {
-  alias: {
-    '@agentlink/crypto': decodeURIComponent(
-      new URL('../packages/crypto/src/index.ts', import.meta.url).pathname,
-    ),
-  },
+  alias: [
+    { find: /^@agentlink\/crypto$/, replacement: cryptoSource('index.ts') },
+    { find: /^@agentlink\/crypto\/keystore$/, replacement: cryptoSource('keystore.ts') },
+  ],
 };
 
 export default defineConfig({
