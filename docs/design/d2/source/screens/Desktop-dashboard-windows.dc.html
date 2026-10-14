@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Desktop dashboard on Windows</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="width: 960px; height: 640px; background: var(--al-color-bg-canvas); font-family: var(--font-sans); color: var(--al-color-fg-default);">
+<x-import component-from-global-scope="AgentLink.AppShell" os="{{os}}" title="AgentLink" agent="Tali's Claude (laptop)" version="v0.3.0" nav="{{nav}}" connection="{{connection}}" status-items="{{statusItems}}" style="display: block; height: 100%;">
+<sc-if value="{{showNote}}" hint-placeholder-val="{{true}}">
+<x-import component-from-global-scope="AgentLink.Banner" tone="{{noteTone}}" compact="{{yes}}">{{note}}</x-import>
+</sc-if>
+<h1 class="al-text-title-1" style="margin: 0;">Home</h1>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
+<a href="#" style="display: flex; flex-direction: column; gap: 6px; padding: 16px; border: 1px solid var(--al-color-accent-fg); border-radius: 6px; background: var(--al-color-accent-subtle); color: var(--al-color-fg-default); text-decoration: none;"><span class="al-text-label" style="color: var(--al-color-accent-fg);">Approvals waiting</span><span class="al-text-title-1 al-text-code">2</span></a>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 16px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);"><span class="al-text-label" style="color: var(--al-color-fg-muted);">Proofs this week</span><span class="al-text-title-1 al-text-code">7</span></div>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 16px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);"><span class="al-text-label" style="color: var(--al-color-fg-muted);">Credits</span><span class="al-text-title-1 al-text-code">$4.80</span></div>
+</div>
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Recent</span>
+<div style="border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--al-color-border-subtle);"><span class="al-text-code" style="color: var(--al-color-fg-muted);">11:58</span><span class="al-text-body" style="flex-grow: 1;">Request received from Marko</span><x-import component-from-global-scope="AgentLink.StatusChip" status="received"></x-import></div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--al-color-border-subtle);"><span class="al-text-code" style="color: var(--al-color-fg-muted);">11:02</span><span class="al-text-body" style="flex-grow: 1;">Marko opened Invoice_September.pdf</span><x-import component-from-global-scope="AgentLink.StatusChip" status="opened"></x-import></div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px;"><span class="al-text-code" style="color: var(--al-color-fg-muted);">10:05</span><span class="al-text-body" style="flex-grow: 1;">proposal-draft.pdf delivered to Ana</span><x-import component-from-global-scope="AgentLink.StatusChip" status="delivered"></x-import></div>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark","light-contrast","dark-contrast"],"default":"light"},"os":{"editor":"enum","options":["windows","linux","macos"],"default":"windows"},"$preview":{"width":960,"height":640}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const os = this.props.os ?? 'windows';
+    const notes = {
+      windows: ['info', 'Closing this window keeps AgentLink running in the notification area. Quit from its menu.'],
+      linux: ['warning', 'No system tray found. AgentLink keeps working; closing this window asks whether to keep it running. Approvals here use your owner passphrase, which is weaker than a system prompt.'],
+      macos: ['info', 'Closing this window keeps AgentLink in the menu bar.']
+    };
+    return {
+      os: os, theme: this.props.theme ?? 'light', yes: true, showNote: true,
+      noteTone: notes[os][0], note: notes[os][1],
+      connection: 'connected',
+      statusItems: ['48 proofs left', 'Encrypted drop 212 MB / 1 GB'],
+      nav: [
+        { icon: 'activity', label: 'Home', active: true },
+        { icon: 'approval', label: 'Approvals', count: 2 },
+        { icon: 'inbox', label: 'Threads' },
+        { icon: 'proof-seal', label: 'Proofs' },
+        { icon: 'users', label: 'Contacts' },
+        { icon: 'folder', label: 'Files' },
+        { icon: 'hard-drive', label: 'Storage' },
+        { icon: 'sliders-horizontal', label: 'Rules' },
+        { icon: 'settings', label: 'Settings' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

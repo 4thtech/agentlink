@@ -14,6 +14,18 @@ export type CryptoInputErrorCode =
   | 'wipe_failed'
   /** A byte string that is not a valid curve point (M1-1b: evmAddressFromPublicKey). */
   | 'invalid_public_key'
+  /** A ciphertext payload with the wrong format, version or size (M1-1g: NIP-44). */
+  | 'invalid_payload'
+  /** Authentication failed, or the authenticated plaintext is malformed (M1-1g: NIP-44). */
+  | 'decrypt_failed'
+  /** An envelope that breaks the 04 §3.1 v1 structure or a §2.4.1 encoding (M1-1c). */
+  | 'invalid_envelope'
+  /**
+   * Decryption refused (M1-1c): a CEK unwrap or a payload that does not authenticate (wrong key,
+   * wrong envelope, tampered bytes) or whose X25519 shared secret is all zero. One code for every
+   * cause, so a caller cannot tell them apart.
+   */
+  | 'open_failed'
   | 'invalid_signature'
   | 'invalid_typed_data'
   | 'invalid_card'

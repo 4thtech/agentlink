@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Console credits</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
+</style>
+</helmet>
+<div data-theme="dark" style="height: 900px; background: var(--al-color-bg-canvas); font-family: var(--font-sans); color: var(--al-color-fg-default);">
+<x-import component-from-global-scope="AgentLink.AppShell" agent="All agents (2)" version="console" nav="{{nav}}" status-items="{{statusItems}}" style="display: block; height: 100%;">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px;">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px;"><span class="al-text-label" style="color: var(--al-color-fg-muted);">Dollars only · <a href="#">Pricing</a></span><h1 class="al-text-title-1" style="margin: 0;">Credits</h1></div>
+<x-import component-from-global-scope="AgentLink.Button" variant="primary" icon="plus">Add credits</x-import>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+<div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+<div style="overflow-x: auto; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<table style="width: 100%; min-width: 520px; border-collapse: collapse;">
+<thead><tr class="al-text-label" style="color: var(--al-color-fg-muted); text-align: left;"><th style="padding: 10px 16px; font-weight: 500; border-bottom: 1px solid var(--al-color-border-default);">Agent</th><th style="padding: 10px 16px; font-weight: 500; border-bottom: 1px solid var(--al-color-border-default); text-align: right;">Balance</th><th style="padding: 10px 16px; font-weight: 500; border-bottom: 1px solid var(--al-color-border-default); text-align: right;">Today</th><th style="padding: 10px 16px; font-weight: 500; border-bottom: 1px solid var(--al-color-border-default); text-align: right;">Daily budget</th></tr></thead>
+<tbody class="al-text-body">
+<tr><td style="padding: 12px 16px;">Tali's Claude (laptop)</td><td class="al-text-code" style="padding: 12px 16px; text-align: right;">$4.80</td><td class="al-text-code" style="padding: 12px 16px; text-align: right;">$0.30</td><td class="al-text-code" style="padding: 12px 16px; text-align: right;">$5.00</td></tr>
+<tr><td style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle);">Office bot (cloud)</td><td class="al-text-code" style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle); text-align: right; color: var(--al-color-status-warning-fg);">$0.00</td><td class="al-text-code" style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle); text-align: right;">$0.00</td><td class="al-text-code" style="padding: 12px 16px; border-top: 1px solid var(--al-color-border-subtle); text-align: right;">$5.00</td></tr>
+</tbody>
+</table>
+</div>
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">History</span>
+<div style="border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--al-color-border-subtle);"><span class="al-text-code" style="width: 110px; color: var(--al-color-fg-muted);">12 Oct 14:02</span><span class="al-text-body" style="flex-grow: 1;">Proof · agreement with Ana</span><span class="al-text-code">−$0.10</span></div>
+<div style="display: flex; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--al-color-border-subtle);"><span class="al-text-code" style="width: 110px; color: var(--al-color-fg-muted);">12 Oct 09:14</span><span class="al-text-body" style="flex-grow: 1;">Proof · Invoice_September.pdf to Marko</span><span class="al-text-code">−$0.10</span></div>
+<div style="display: flex; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--al-color-border-subtle);"><span class="al-text-code" style="width: 110px; color: var(--al-color-fg-muted);">8 Oct 17:30</span><span class="al-text-body" style="flex-grow: 1;">Credits added</span><span class="al-text-code" style="color: var(--al-color-status-success-fg);">+$5.00</span></div>
+<div style="display: flex; gap: 12px; padding: 10px 16px;"><span class="al-text-code" style="width: 110px; color: var(--al-color-fg-muted);">3 Oct 12:00</span><span class="al-text-body" style="flex-grow: 1;">Free test credits</span><span class="al-text-code" style="color: var(--al-color-status-success-fg);">+$0.50</span></div>
+</div>
+</div>
+<aside style="flex: 1 1 320px; display: flex; flex-direction: column; gap: 16px;">
+<x-import component-from-global-scope="AgentLink.CreditsMeter" balance="$4.80" proofs-left="{{n48}}" spent-today="{{spent}}" budget="{{n5}}"></x-import>
+<x-import component-from-global-scope="AgentLink.Banner" tone="warning" compact="{{yes}}">Office bot has no credits. Proofs from it will ask you to add credits; messages and files stay free.</x-import>
+<details style="padding: 14px 16px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<summary class="al-text-body-sm" style="cursor: pointer;">Advanced</summary>
+<div style="display: flex; flex-direction: column; gap: 8px; padding-top: 10px;">
+<span class="al-text-body-sm" style="color: var(--al-color-fg-muted);">Withdraw unused credits to an address you control. Needs your passkey.</span>
+<div><x-import component-from-global-scope="AgentLink.Button" size="sm">Withdraw credits</x-import></div>
+</div>
+</details>
+</aside>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      n48: 48, n5: 5, spent: 0.3, yes: true,
+      statusItems: ['2 agents online', '7 proofs this week'],
+      nav: [
+        { icon: 'activity', label: 'Home' },
+        { icon: 'approval', label: 'Approvals', count: 2 },
+        { icon: 'inbox', label: 'Threads' },
+        { icon: 'proof-seal', label: 'Proofs' },
+        { icon: 'users', label: 'Contacts' },
+        { icon: 'agent', label: 'Agents' },
+        { icon: 'sliders-horizontal', label: 'Rules' },
+        { icon: 'plus', label: 'Credits', active: true },
+        { icon: 'hard-drive', label: 'Storage' },
+        { icon: 'settings', label: 'Settings' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

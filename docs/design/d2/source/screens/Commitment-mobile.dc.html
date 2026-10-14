@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Accepting terms on mobile</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
+</style>
+</helmet>
+<div data-theme="dark" style="width: 390px; min-height: 1240px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--al-color-bg-canvas); color: var(--al-color-fg-default); font-family: var(--font-sans);">
+<header style="display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid var(--al-color-border-subtle);">
+<a href="Main.dc.html" aria-label="Back to approvals" style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin: -10px 0 -10px -10px; color: var(--al-color-fg-default);"><x-import component-from-global-scope="AgentLink.Icon" name="chevron-right" size="{{s20}}" style="transform: rotate(180deg);"></x-import></a>
+<div style="display: flex; flex-direction: column; flex-grow: 1;">
+<span class="al-text-title-3">Spec v2 negotiation</span>
+<span class="al-text-caption" style="color: var(--al-color-fg-muted);">Ana's agent · Gemini CLI</span>
+</div>
+<span class="al-text-label" style="color: var(--al-color-accent-fg);">2 of 2</span>
+</header>
+<main style="display: flex; flex-direction: column; gap: 16px; padding: 16px;">
+<div style="display: flex; align-items: center; gap: 8px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">v1</span>
+<span style="flex-grow: 1; height: 2px; background: var(--al-color-border-default);"></span>
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">v2</span>
+<span style="flex-grow: 1; height: 2px; background: var(--al-color-border-default);"></span>
+<span class="al-text-label" style="color: var(--al-color-accent-fg);">v3 · firm offer</span>
+</div>
+<x-import component-from-global-scope="AgentLink.CommitmentCard" headline="Accept Tali's terms, version 3" valid-until="20 Oct" who="Tali · Registered" proposer="Tali's agent" subject="Spec v2 – milestone 3" diff="{{diff}}" scope="Sends your acceptance to Tali's agent and adds your Accepted receipt to their record of these terms, until 20 Oct. Nothing else. If the terms change, it stops working." consequence="Accepting commits you to these terms. Tali's agent and anyone with the proof file can see you agreed, and when." cost="Free for you" auto-note="Auto-accept doesn't apply: price is in EUR" fingerprint="e3b0…c442" method="Touch ID"></x-import>
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Earlier in this thread</span>
+<x-import component-from-global-scope="AgentLink.UntrustedContent" from="Ana's agent" kind="note">€1,800 works only without the migration.</x-import>
+<span class="al-text-caption" style="color: var(--al-color-fg-muted);">Note (not part of the recorded terms)</span>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      s20: 20,
+      diff: {
+        oldLabel: 'v2', newLabel: 'v3',
+        rows: [
+          { field: 'Deliverables', old: 'd1 spec, d2 prototype, d3 data migration', new: 'd1 spec, d2 prototype', proposerWords: true },
+          { field: 'Price (Tali pays)', old: '€1,800', new: '€1,500' },
+          { field: 'Due', old: '30 Nov 2026', new: '30 Nov 2026' }
+        ]
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

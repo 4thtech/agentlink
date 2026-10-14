@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sign in as owner</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}
+</style>
+</helmet>
+<div data-theme="dark" style="width: 390px; min-height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--al-color-bg-canvas); color: var(--al-color-fg-default); font-family: var(--font-sans);">
+<header style="display: flex; align-items: center; gap: 10px; padding: 16px; border-bottom: 1px solid var(--al-color-border-subtle);">
+<x-import component-from-global-scope="AgentLink.Mark" size="{{s20}}"></x-import>
+<span class="al-text-body-sm" style="flex-grow: 1; color: var(--al-color-fg-muted);">Office bot (cloud)</span>
+<span class="al-text-code" style="font-size: 11px; color: var(--al-color-fg-muted);">workers.dev</span>
+</header>
+<main style="display: flex; flex-direction: column; gap: 18px; padding: 24px 16px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Sign in as owner</span>
+<h1 class="al-text-title-2" style="margin: 0;">An AI app wants to use your agent</h1>
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<dl style="margin: 0; display: grid; grid-template-columns: 96px 1fr; gap: 10px;">
+<dt class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 3px;">App</dt><dd class="al-text-body" style="margin: 0;">“ChatGPT” <span class="al-text-caption" style="color: var(--al-color-fg-muted);">name it chose</span></dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 3px;">Returns to</dt><dd style="margin: 0;"><span class="al-text-code" style="padding: 2px 6px; border: 1px solid var(--al-color-border-strong); border-radius: 2px;">chatgpt.com</span></dd>
+<dt class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 3px;">Agent</dt><dd class="al-text-body" style="margin: 0;">Office bot (cloud)</dd>
+</dl>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 4px; background: var(--al-color-status-success-bg); border: 1px solid var(--al-color-status-success-border);"><span class="al-text-label" style="color: var(--al-color-status-success-fg);">It can</span><span class="al-text-body-sm">Send and read messages</span><span class="al-text-body-sm">Ask you to approve</span></div>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 4px; background: var(--al-color-status-neutral-bg); border: 1px solid var(--al-color-status-neutral-border);"><span class="al-text-label" style="color: var(--al-color-status-neutral-fg);">It can't</span><span class="al-text-body-sm">Approve anything</span><span class="al-text-body-sm">Change your rules</span></div>
+</div>
+<x-import component-from-global-scope="AgentLink.Button" variant="primary" size="lg" icon="approval" block="{{yes}}">Approve in my console</x-import>
+<div role="status" style="display: flex; align-items: center; gap: 8px;"><x-import component-from-global-scope="AgentLink.Icon" name="clock" size="{{s14}}"></x-import><span class="al-text-body-sm" style="color: var(--al-color-fg-muted);">Waiting for you to approve in your console</span></div>
+<div style="display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--al-color-border-subtle);">
+<span class="al-text-body-sm" style="color: var(--al-color-fg-muted);">Console not at hand? Enter a one-time access code from it.</span>
+<x-import component-from-global-scope="AgentLink.TextField" label="Access code" mono="{{yes}}" inputmode="numeric" autocomplete="one-time-code"></x-import>
+<x-import component-from-global-scope="AgentLink.Button" size="lg" block="{{yes}}">Continue</x-import>
+</div>
+<x-import component-from-global-scope="AgentLink.Button" variant="ghost" block="{{yes}}">Deny</x-import>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() { return { s14: 14, s20: 20, yes: true }; }
+}
+</script>
+</body>
+</html>

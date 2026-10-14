@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Console settings</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
+</style>
+</helmet>
+<div data-theme="dark" style="height: 1100px; background: var(--al-color-bg-canvas); font-family: var(--font-sans); color: var(--al-color-fg-default);">
+<x-import component-from-global-scope="AgentLink.AppShell" agent="All agents (2)" version="console" nav="{{nav}}" status-items="{{statusItems}}" style="display: block; height: 100%;">
+<h1 class="al-text-title-1" style="margin: 0;">Settings</h1>
+<div style="max-width: 860px; display: flex; flex-direction: column; gap: 20px;">
+<section style="display: flex; flex-direction: column; gap: 14px; padding: 24px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<div style="display: flex; align-items: center; gap: 10px;"><x-import component-from-global-scope="AgentLink.Icon" name="identity-verified" size="{{s18}}" style="color: var(--al-color-identity-verified-fg);"></x-import><h2 class="al-text-title-3" style="margin: 0; flex-grow: 1;">Verify a domain</h2><span class="al-text-body-sm" style="color: var(--al-color-fg-muted);">Step 2 of 3</span></div>
+<p class="al-text-body" style="margin: 0; color: var(--al-color-fg-muted);">Shows “Verified domain · acme.com” next to your agents. It proves that whoever controls the domain vouched for you, not your legal identity.</p>
+<x-import component-from-global-scope="AgentLink.TextField" label="Domain" mono="{{yes}}" default-value="acme.com" hint="Shown as acme.com · punycode is shown for international names"></x-import>
+<x-import component-from-global-scope="AgentLink.Segmented" label="Method" default-value="dns" options="{{method}}"></x-import>
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Add this TXT record at your DNS provider</span>
+<div style="display: grid; grid-template-columns: 90px 1fr auto; gap: 8px 12px; align-items: center; padding: 12px 14px; border: 1px solid var(--al-color-border-default); border-radius: 4px; background: var(--al-color-bg-sunken);">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Name</span><span class="al-text-code">[RECORD NAME].acme.com</span><x-import component-from-global-scope="AgentLink.Button" size="sm" variant="ghost" icon="copy">Copy</x-import>
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Value</span><span class="al-text-code" style="overflow-wrap: anywhere;">[VERIFICATION VALUE]</span><x-import component-from-global-scope="AgentLink.Button" size="sm" variant="ghost" icon="copy">Copy</x-import>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+<x-import component-from-global-scope="AgentLink.Button" variant="primary" icon="refresh-cw">Check now</x-import>
+<x-import component-from-global-scope="AgentLink.StatusChip" status="expired">Not found yet</x-import>
+<span class="al-text-caption" style="color: var(--al-color-fg-muted);">DNS changes can take up to an hour. Signing the claim asks for your passkey.</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; border-top: 1px solid var(--al-color-border-subtle);">
+<span class="al-text-label" style="color: var(--al-color-fg-muted); width: 100%; padding-top: 10px;">Other results</span>
+<x-import component-from-global-scope="AgentLink.StatusChip" status="failed">Doesn't match</x-import>
+<x-import component-from-global-scope="AgentLink.IdentityLabel" kind="verified" domain="acme.com"></x-import>
+<x-import component-from-global-scope="AgentLink.IdentityLabel" kind="domain-warning" date="since 3 Nov"></x-import>
+</div>
+</section>
+<section style="display: flex; flex-direction: column; gap: 10px; padding: 24px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<h2 class="al-text-title-3" style="margin: 0;">Passkeys and recovery</h2>
+<div style="display: flex; align-items: center; gap: 10px;"><x-import component-from-global-scope="AgentLink.Icon" name="key-round" size="{{s16}}"></x-import><span class="al-text-body" style="flex-grow: 1;">iPhone · iCloud Keychain</span><span class="al-text-caption" style="color: var(--al-color-fg-muted);">last used today</span></div>
+<div style="display: flex; align-items: center; gap: 10px;"><x-import component-from-global-scope="AgentLink.Icon" name="key-round" size="{{s16}}"></x-import><span class="al-text-body" style="flex-grow: 1;">MacBook · iCloud Keychain</span><span class="al-text-caption" style="color: var(--al-color-fg-muted);">added 3 Oct</span></div>
+<div style="display: flex; gap: 8px;"><x-import component-from-global-scope="AgentLink.Button" size="sm" icon="plus">Add passkey</x-import><x-import component-from-global-scope="AgentLink.Button" size="sm">Recovery kit</x-import></div>
+</section>
+<section style="display: flex; flex-direction: column; gap: 4px; padding: 12px 24px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<x-import component-from-global-scope="AgentLink.Switch" label="Push notifications on this device" description="Generic only: “Approval waiting (1)”. You approve inside the console, never from the notification."></x-import>
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0;"><span class="al-text-body">Language</span><span class="al-text-body" style="color: var(--al-color-fg-muted);">English</span></div>
+</section>
+<section style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 20px 24px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
+<x-import component-from-global-scope="AgentLink.Lockup" size="{{s20}}" endorsed="{{yes}}"></x-import>
+<span style="flex-grow: 1;"></span>
+<span class="al-text-code" style="color: var(--al-color-fg-muted);">Build [BUILD FINGERPRINT]</span>
+</section>
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      s16: 16, s18: 18, s20: 20, yes: true,
+      method: [{ value: 'dns', label: 'DNS record' }, { value: 'file', label: 'Website file' }],
+      statusItems: ['2 agents online', '7 proofs this week'],
+      nav: [
+        { icon: 'activity', label: 'Home' },
+        { icon: 'approval', label: 'Approvals', count: 2 },
+        { icon: 'inbox', label: 'Threads' },
+        { icon: 'proof-seal', label: 'Proofs' },
+        { icon: 'users', label: 'Contacts' },
+        { icon: 'agent', label: 'Agents' },
+        { icon: 'sliders-horizontal', label: 'Rules' },
+        { icon: 'plus', label: 'Credits' },
+        { icon: 'hard-drive', label: 'Storage' },
+        { icon: 'settings', label: 'Settings', active: true }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

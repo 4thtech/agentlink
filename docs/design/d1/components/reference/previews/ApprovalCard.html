@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../../tokens/tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../../screens/lib/react.production.min.js"></script><script src="../../../screens/lib/react-dom.production.min.js"></script><script src="../bundle.js"></script><meta charset="utf-8"><title>ApprovalCard</title></head>
+<body>
+<div id="root" class="al-preview"></div>
+<script>
+  var A = window.AgentLink, h = React.createElement, F = React.Fragment;
+  ReactDOM.createRoot(document.getElementById('root')).render(h(F,null,
+ h(A.ApprovalCard,{type:'proof',agent:'Tali\u2019s Claude (laptop)',time:'14:01',expires:'Expires in 9 min',headline:'Send contract-signed.pdf to Marko with proof',
+   who:h(F,null,h('strong',null,'Marko'),h(A.IdentityLabel,{kind:'verified',domain:'novak-accounting.example'})),
+   what:h('code',{className:'al-text-code'},'contract-signed.pdf \u00B7 1.1 MB'), cost:h(A.CostChip,{amount:'$0.10',source:'from credits'}),
+   why:'Your rule: Proof \u2192 Ask me', consequence:'A public record shows this exact file was sent at this time. It doesn\u2019t prove its content is true.',
+   details:'Record ID 0x9f2c\u202641ab (after recording)', method:'Touch ID'}),
+ h(A.ApprovalCard,{type:'new-contact',agent:'Tali\u2019s Claude (laptop)',time:'10:12',expires:'Expires 19 Oct',headline:'Add a new contact',
+   who:h(F,null,h('span',null,'\u201CMarko Novak\u201D'),h(A.IdentityLabel,{kind:'selfdeclared'}),h(A.Fingerprint,{value:'7F3A\u00B719C2'})), method:'Touch ID'},
+   h(A.TextField,{label:'Name this contact',defaultValue:'Marko'}),
+   h(A.SafetyCode,{code:'4821 0937 5512',contactName:'Marko'}),
+   h('label',{className:'al-check al-text-body-sm'},h('input',{type:'checkbox'}),'Remember for this contact: allow proofs from Marko without asking')),
+ ['waiting','approved','denied','expired','decided-elsewhere'].map(function(s){return h(A.ApprovalCard,{key:s,type:'proof',agent:'Tali\u2019s Claude (laptop)',time:'14:01',headline:'Send a file to Marko with proof',cost:h(A.CostChip,{amount:'$0.10'}),state:s,method:'Touch ID'});})));
+</script>
+</body>
+</html>

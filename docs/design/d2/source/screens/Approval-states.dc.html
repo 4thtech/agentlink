@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Approval card types and states</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentlink/tokens.css">
+<link rel="stylesheet" href="ds/agentlink/components/bundle.css">
+<script src="ds/agentlink/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div data-theme="dark" style="width: 1280px; min-height: 1560px; box-sizing: border-box; padding: 40px; display: flex; flex-direction: column; gap: 24px; background: var(--al-color-bg-canvas); color: var(--al-color-fg-default); font-family: var(--font-sans);">
+<span class="al-text-label" style="color: var(--al-color-fg-muted);">Types</span>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; align-items: start;">
+<x-import component-from-global-scope="AgentLink.ApprovalCard" type="new-contact" agent="Tali's Claude (laptop)" time="10:12" expires="Expires 19 Oct" headline="Add a new contact" who="“Marko Novak” · Self-declared · 7F3A·19C2" why="Marko accepted your invite" consequence="Marko's agent can send you messages and files. You can block it any time." method="Touch ID">
+<x-import component-from-global-scope="AgentLink.TextField" label="Name this contact" default-value="Marko"></x-import>
+<x-import component-from-global-scope="AgentLink.SafetyCode" code="4821 0937 5512" contact-name="Marko"></x-import>
+</x-import>
+<x-import component-from-global-scope="AgentLink.ApprovalCard" type="file-over-limit" agent="Tali's Claude (laptop)" time="11:40" expires="Expires in 30 min" headline="Send a 140 MB file to Marko" who="Marko" what="design-assets.zip · 140 MB" cost="Free" why="Over your 100 MB file rule" consequence="It goes through the encrypted drop and counts toward this week's 1 GB." method="Touch ID">
+<label class="al-check al-text-body-sm"><input type="checkbox">Remember for this contact: allow files up to 200 MB from Marko</label>
+</x-import>
+<x-import component-from-global-scope="AgentLink.ApprovalCard" type="document-key" agent="Tali's Claude (laptop)" time="16:20" expires="Expires in 10 min" headline="Include the document key in this proof export" who="Anyone with the export" what="Invoice_September.pdf · proof of 12 Oct" cost="Free" why="Exports leave out the document key unless you approve" consequence="Anyone who has this export can open the document, not just check the proof." method="Touch ID"></x-import>
+</div>
+<span class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 16px;">States</span>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; align-items: start;">
+<x-import component-from-global-scope="AgentLink.ApprovalCard" type="proof" agent="Tali's Claude (laptop)" time="14:01" headline="Send a file to Marko with proof" cost="$0.10 from credits" state="waiting" method="Touch ID"></x-import>
+<x-import component-from-global-scope="AgentLink.ApprovalCard" type="proof" agent="Tali's Claude (laptop)" time="14:01" headline="Send a file to Marko with proof" cost="$0.10 from credits" state="approved" method="Touch ID"></x-import>
+<x-import component-from-global-scope="AgentLink.ApprovalCard" type="proof" agent="Tali's Claude (laptop)" time="14:01" headline="Send a file to Marko with proof" cost="$0.10 from credits" state="denied" method="Touch ID"></x-import>
+<x-import component-from-global-scope="AgentLink.ApprovalCard" type="proof" agent="Tali's Claude (laptop)" time="14:01" headline="Send a file to Marko with proof" cost="$0.10 from credits" state="expired" method="Touch ID"></x-import>
+<x-import component-from-global-scope="AgentLink.ApprovalCard" type="proof" agent="Tali's Claude (laptop)" time="14:01" headline="Send a file to Marko with proof" cost="$0.10 from credits" state="failed" method="Touch ID"></x-import>
+<x-import component-from-global-scope="AgentLink.ApprovalCard" type="proof" agent="Tali's Claude (laptop)" time="14:01" headline="Send a file to Marko with proof" cost="$0.10 from credits" state="decided-elsewhere" method="Touch ID"></x-import>
+</div>
+<span class="al-text-label" style="color: var(--al-color-fg-muted); padding-top: 16px;">Commitment edge cases</span>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; align-items: start;">
+<x-import component-from-global-scope="AgentLink.CommitmentCard" headline="Ana accepted version 3 after you sent version 4" who="Ana · Self-declared" warning="Review before you add your acceptance. Version 4 is your newest; Ana accepted the older version 3." scope="Adds your acceptance to Ana's recorded acceptance of version 3, making it a proof of agreement." cost="$0.10 from credits" method="Touch ID"></x-import>
+<x-import component-from-global-scope="AgentLink.CommitmentCard" headline="Accept Tali's terms, version 3" who="Tali · Registered" warning="Tali's agent sent version 4, so nothing was sent and your approval for version 3 no longer applies." cost="Free for you" state="expired" method="Touch ID"></x-import>
+<x-import component-from-global-scope="AgentLink.CommitmentCard" headline="Firm offer to Ana, version 3" who="Ana · Self-declared" scope="Sends version 3 with proof. If Ana accepts by 20 Oct, you are committed to it." consequence="Waiting for Ana to accept; valid until 20 Oct." cost="$0.10 from credits" state="approved" method="Touch ID"></x-import>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1560}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

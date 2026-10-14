@@ -1,0 +1,400 @@
+{
+  "color": {
+    "bg": {
+      "canvas": {
+        "$value": "#000000",
+        "$type": "color",
+        "$description": "Page/window background: the outermost layer of every surface."
+      },
+      "surface": {
+        "$value": "#060708",
+        "$type": "color",
+        "$description": "Panels, sidebars, list panes and cards that sit on the canvas."
+      },
+      "raised": {
+        "$value": "#0e1013",
+        "$type": "color",
+        "$description": "Popovers, menus, dialogs, approval cards and the selected list row."
+      },
+      "sunken": {
+        "$value": "#000000",
+        "$type": "color",
+        "$description": "Wells: code blocks, terminal output, inputs, the copy-prompt block."
+      },
+      "overlay": {
+        "$value": "rgba(0, 0, 0, 0.85)",
+        "$type": "color",
+        "$description": "Scrim behind modal dialogs and the native approval window's sheet."
+      }
+    },
+    "fg": {
+      "default": {
+        "$value": "#ffffff",
+        "$type": "color",
+        "$description": "Primary text and icons on canvas, surface, raised and sunken."
+      },
+      "muted": {
+        "$value": "#d3d8de",
+        "$type": "color",
+        "$description": "Secondary text, metadata, table headers on canvas, surface, raised and sunken."
+      },
+      "subtle": {
+        "$value": "#bcc3cb",
+        "$type": "color",
+        "$description": "Tertiary text: timestamps, placeholders, disabled-adjacent hints, on canvas, surface, raised and sunken (still 4.5:1)."
+      },
+      "on": {
+        "accent": {
+          "$value": "#000000",
+          "$type": "color",
+          "$description": "Text and icons on an accent fill (primary button label). Dark ink on orange; white only in Light · increased contrast, where the fill deepens to burnt orange."
+        }
+      },
+      "link": {
+        "$value": "#ffae80",
+        "$type": "color",
+        "$description": "Inline hyperlinks on canvas, surface and raised. Underlined, never colour alone."
+      }
+    },
+    "border": {
+      "subtle": {
+        "$value": "#5a626c",
+        "$type": "color",
+        "$description": "Dividers between rows and panes. Decorative only: never the only boundary of a control."
+      },
+      "default": {
+        "$value": "#8a939e",
+        "$type": "color",
+        "$description": "Card and panel outlines, table rules."
+      },
+      "strong": {
+        "$value": "#d3d8de",
+        "$type": "color",
+        "$description": "Control boundaries (inputs, switches, secondary buttons): 3:1 on canvas, surface and raised."
+      }
+    },
+    "focus": {
+      "ring": {
+        "$value": "#ffae80",
+        "$type": "color",
+        "$description": "Keyboard focus: a solid 2px ring, 2px offset. 3:1 on every surface in every theme."
+      }
+    },
+    "accent": {
+      "default": {
+        "$value": "#ff7a2e",
+        "$type": "color",
+        "$description": "Signal orange. Primary button fill, the selected nav marker, the caret, the seal in the mark. Once per view for actions."
+      },
+      "hover": {
+        "$value": "#ff9152",
+        "$type": "color",
+        "$description": "Primary button fill on hover."
+      },
+      "pressed": {
+        "$value": "#ff6a1a",
+        "$type": "color",
+        "$description": "Primary button fill while pressed."
+      },
+      "fg": {
+        "$value": "#ffae80",
+        "$type": "color",
+        "$description": "Orange as text or icon on canvas, surface, raised and accent-subtle."
+      }
+    },
+    "status": {
+      "success": {
+        "fg": {
+          "$value": "#7eecc7",
+          "$type": "color",
+          "$description": "Success: sent, delivered, accepted, connected. The status text, on its status-success-bg and the surfaces."
+        },
+        "border": {
+          "$value": "#4fd1a5",
+          "$type": "color",
+          "$description": "Success: sent, delivered, accepted, connected. The status outline."
+        },
+        "icon": {
+          "$value": "#7eecc7",
+          "$type": "color",
+          "$description": "Success: sent, delivered, accepted, connected. The status icon (with text, never alone)."
+        }
+      },
+      "warning": {
+        "fg": {
+          "$value": "#ffdf7a",
+          "$type": "color",
+          "$description": "Warning: near quota, expiring, weaker setup. The status text, on its status-warning-bg and the surfaces."
+        },
+        "border": {
+          "$value": "#f2c94c",
+          "$type": "color",
+          "$description": "Warning: near quota, expiring, weaker setup. The status outline."
+        },
+        "icon": {
+          "$value": "#ffdf7a",
+          "$type": "color",
+          "$description": "Warning: near quota, expiring, weaker setup. The status icon (with text, never alone)."
+        }
+      },
+      "danger": {
+        "fg": {
+          "$value": "#ffaaaa",
+          "$type": "color",
+          "$description": "Danger: destructive, irreversible or integrity failure only. The status text, on its status-danger-bg and the surfaces."
+        },
+        "border": {
+          "$value": "#ff7b7b",
+          "$type": "color",
+          "$description": "Danger: destructive, irreversible or integrity failure only. The status outline."
+        },
+        "icon": {
+          "$value": "#ff9a9a",
+          "$type": "color",
+          "$description": "Danger: destructive, irreversible or integrity failure only. The status icon (with text, never alone)."
+        }
+      },
+      "info": {
+        "fg": {
+          "$value": "#a8d2ff",
+          "$type": "color",
+          "$description": "Info: neutral news, checking, recording. The status text, on its status-info-bg and the surfaces."
+        },
+        "border": {
+          "$value": "#6cb6ff",
+          "$type": "color",
+          "$description": "Info: neutral news, checking, recording. The status outline."
+        },
+        "icon": {
+          "$value": "#a8d2ff",
+          "$type": "color",
+          "$description": "Info: neutral news, checking, recording. The status icon (with text, never alone)."
+        }
+      },
+      "neutral": {
+        "fg": {
+          "$value": "#d3d8de",
+          "$type": "color",
+          "$description": "Neutral: idle, paused, expired. The status text, on its status-neutral-bg and the surfaces."
+        },
+        "border": {
+          "$value": "#8a939e",
+          "$type": "color",
+          "$description": "Neutral: idle, paused, expired. The status outline."
+        },
+        "icon": {
+          "$value": "#d3d8de",
+          "$type": "color",
+          "$description": "Neutral: idle, paused, expired. The status icon (with text, never alone)."
+        }
+      }
+    },
+    "proof": {
+      "fg": {
+        "$value": "#d6cfff",
+        "$type": "color",
+        "$description": "Text and icons on proof-bg and on the surfaces."
+      },
+      "border": {
+        "$value": "#a495ff",
+        "$type": "color",
+        "$description": "Outline of proof badges and the stamp."
+      },
+      "seal": {
+        "$value": "#c4baff",
+        "$type": "color",
+        "$description": "The seal glyph of a recorded proof. Never used for success."
+      }
+    },
+    "untrusted": {
+      "bg": {
+        "$value": "#000000",
+        "$type": "color",
+        "$description": "Inset ground of the untrusted-content container (other parties' words)."
+      },
+      "fg": {
+        "$value": "#f0f2f5",
+        "$type": "color",
+        "$description": "Body text inside the untrusted container, on untrusted-bg."
+      },
+      "border": {
+        "$value": "#e0c27a",
+        "$type": "color",
+        "$description": "Dashed outline of the untrusted container."
+      },
+      "label": {
+        "fg": {
+          "$value": "#ffe099",
+          "$type": "color",
+          "$description": "Text of the label strip, on untrusted-label-bg."
+        }
+      }
+    },
+    "commitment": {
+      "fg": {
+        "$value": "#ffcaa8",
+        "$type": "color",
+        "$description": "Text on commitment-bg."
+      },
+      "border": {
+        "$value": "#ff8a4c",
+        "$type": "color",
+        "$description": "Outline of the commitment approval card."
+      }
+    },
+    "identity": {
+      "verified": {
+        "fg": {
+          "$value": "#a8d2ff",
+          "$type": "color",
+          "$description": "\"Verified domain · acme.com\" (strongest). The identity label text, on its identity-verified-bg and the surfaces."
+        },
+        "border": {
+          "$value": "#6cb6ff",
+          "$type": "color",
+          "$description": "\"Verified domain · acme.com\" (strongest). The identity label outline."
+        }
+      },
+      "registered": {
+        "fg": {
+          "$value": "#d6cfff",
+          "$type": "color",
+          "$description": "\"Registered\" (on the public record). The identity label text, on its identity-registered-bg and the surfaces."
+        },
+        "border": {
+          "$value": "#a495ff",
+          "$type": "color",
+          "$description": "\"Registered\" (on the public record). The identity label outline."
+        }
+      },
+      "selfdeclared": {
+        "bg": {
+          "$value": "#0e1013",
+          "$type": "color",
+          "$description": "\"Self-declared\" (weakest). The identity label ground."
+        },
+        "fg": {
+          "$value": "#d3d8de",
+          "$type": "color",
+          "$description": "\"Self-declared\" (weakest). The identity label text, on its identity-selfdeclared-bg and the surfaces."
+        },
+        "border": {
+          "$value": "#8a939e",
+          "$type": "color",
+          "$description": "\"Self-declared\" (weakest). The identity label outline."
+        }
+      },
+      "warning": {
+        "fg": {
+          "$value": "#ffdf7a",
+          "$type": "color",
+          "$description": "\"Domain no longer verified\". The identity label text, on its identity-warning-bg and the surfaces."
+        },
+        "border": {
+          "$value": "#f2c94c",
+          "$type": "color",
+          "$description": "\"Domain no longer verified\". The identity label outline."
+        }
+      }
+    },
+    "diff": {
+      "added": {
+        "fg": {
+          "$value": "#7eecc7",
+          "$type": "color",
+          "$description": "Added value (+). The diff text, on its diff-added-bg and the surfaces."
+        },
+        "border": {
+          "$value": "#4fd1a5",
+          "$type": "color",
+          "$description": "Added value (+). The diff outline."
+        }
+      },
+      "removed": {
+        "fg": {
+          "$value": "#ffaaaa",
+          "$type": "color",
+          "$description": "Removed value (−, struck through). The diff text, on its diff-removed-bg and the surfaces."
+        },
+        "border": {
+          "$value": "#ff7b7b",
+          "$type": "color",
+          "$description": "Removed value (−, struck through). The diff outline."
+        }
+      },
+      "changed": {
+        "fg": {
+          "$value": "#ffdf7a",
+          "$type": "color",
+          "$description": "Changed value (~). The diff text, on its diff-changed-bg and the surfaces."
+        },
+        "border": {
+          "$value": "#f2c94c",
+          "$type": "color",
+          "$description": "Changed value (~). The diff outline."
+        }
+      }
+    },
+    "brand": {
+      "mark": {
+        "$value": "#ffffff",
+        "$type": "color",
+        "$description": "The brackets of the mark."
+      },
+      "wordmark": {
+        "$value": "#ffffff",
+        "$type": "color",
+        "$description": "The AgentLink wordmark."
+      },
+      "endorsement": {
+        "$value": "#d3d8de",
+        "$type": "color",
+        "$description": "\"by 4thTech\" endorsement line, on canvas and surface."
+      }
+    },
+    "syntax": {
+      "keyword": {
+        "$value": "#ffae80",
+        "$type": "color",
+        "$description": "Code and terminal blocks: commands, keywords, on bg-sunken."
+      },
+      "string": {
+        "$value": "#7eecc7",
+        "$type": "color",
+        "$description": "Code and terminal blocks: strings and paths, on bg-sunken."
+      },
+      "comment": {
+        "$value": "#bcc3cb",
+        "$type": "color",
+        "$description": "Code and terminal blocks: comments, on bg-sunken."
+      },
+      "number": {
+        "$value": "#d6cfff",
+        "$type": "color",
+        "$description": "Code and terminal blocks: numbers and literals, on bg-sunken."
+      }
+    }
+  },
+  "shadow": {
+    "1": {
+      "$value": "none",
+      "$type": "shadow",
+      "$description": "Buttons, inputs."
+    },
+    "2": {
+      "$value": "none",
+      "$type": "shadow",
+      "$description": "Menus, popovers."
+    },
+    "3": {
+      "$value": "none",
+      "$type": "shadow",
+      "$description": "Dialogs, approval sheet."
+    },
+    "4": {
+      "$value": "none",
+      "$type": "shadow",
+      "$description": "Native approval window, toasts."
+    }
+  }
+}

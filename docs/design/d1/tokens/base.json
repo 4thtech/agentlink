@@ -1,0 +1,492 @@
+{
+  "space": {
+    "0": {
+      "$value": "0px",
+      "$type": "dimension",
+      "$description": "No gap."
+    },
+    "1": {
+      "$value": "2px",
+      "$type": "dimension",
+      "$description": "Hairline nudges; icon-to-badge gaps."
+    },
+    "2": {
+      "$value": "4px",
+      "$type": "dimension",
+      "$description": "Icon-to-label gap inside chips and buttons."
+    },
+    "3": {
+      "$value": "8px",
+      "$type": "dimension",
+      "$description": "Gap between related controls; chip padding."
+    },
+    "4": {
+      "$value": "12px",
+      "$type": "dimension",
+      "$description": "Compact row padding (IDE density); control horizontal padding."
+    },
+    "5": {
+      "$value": "16px",
+      "$type": "dimension",
+      "$description": "Card padding; mobile page gutter."
+    },
+    "6": {
+      "$value": "20px",
+      "$type": "dimension",
+      "$description": "Card padding at comfortable density."
+    },
+    "7": {
+      "$value": "24px",
+      "$type": "dimension",
+      "$description": "Gap between cards and sections; desktop gutter."
+    },
+    "8": {
+      "$value": "32px",
+      "$type": "dimension",
+      "$description": "Section spacing inside a page."
+    },
+    "9": {
+      "$value": "40px",
+      "$type": "dimension",
+      "$description": "Page header to content."
+    },
+    "10": {
+      "$value": "48px",
+      "$type": "dimension",
+      "$description": "Large section breaks."
+    },
+    "11": {
+      "$value": "64px",
+      "$type": "dimension",
+      "$description": "Marketing / onboarding vertical rhythm."
+    },
+    "12": {
+      "$value": "80px",
+      "$type": "dimension",
+      "$description": "Hero spacing (marketing only)."
+    }
+  },
+  "radius": {
+    "none": {
+      "$value": "0px",
+      "$type": "dimension",
+      "$description": "Terminal blocks, tables, the app shell, the mark."
+    },
+    "xs": {
+      "$value": "2px",
+      "$type": "dimension",
+      "$description": "Kbd keys, inline code, fingerprint chips."
+    },
+    "sm": {
+      "$value": "3px",
+      "$type": "dimension",
+      "$description": "Chips, badges, checkboxes."
+    },
+    "md": {
+      "$value": "4px",
+      "$type": "dimension",
+      "$description": "Buttons, inputs, menus. The default."
+    },
+    "lg": {
+      "$value": "6px",
+      "$type": "dimension",
+      "$description": "Cards, panels, approval card."
+    },
+    "xl": {
+      "$value": "10px",
+      "$type": "dimension",
+      "$description": "Dialogs and the native approval window sheet."
+    },
+    "full": {
+      "$value": "9999px",
+      "$type": "dimension",
+      "$description": "Status dots and monogram avatars only."
+    }
+  },
+  "size": {
+    "touch": {
+      "min": {
+        "$value": "44px",
+        "$type": "dimension",
+        "$description": "Minimum touch target on mobile and for approval buttons everywhere."
+      }
+    },
+    "icon": {
+      "sm": {
+        "$value": "14px",
+        "$type": "dimension",
+        "$description": "Icons inside chips and dense rows."
+      },
+      "md": {
+        "$value": "16px",
+        "$type": "dimension",
+        "$description": "Default UI icon size."
+      },
+      "lg": {
+        "$value": "20px",
+        "$type": "dimension",
+        "$description": "Icons in card headers and empty states."
+      }
+    },
+    "control": {
+      "sm": {
+        "$value": "28px",
+        "$type": "dimension",
+        "$description": "Dense toolbar controls (desktop only)."
+      },
+      "md": {
+        "$value": "32px",
+        "$type": "dimension",
+        "$description": "Default control height on desktop."
+      },
+      "lg": {
+        "$value": "44px",
+        "$type": "dimension",
+        "$description": "Approve / Deny, mobile controls, primary onboarding actions."
+      }
+    }
+  },
+  "border": {
+    "width": {
+      "thin": {
+        "$value": "1px",
+        "$type": "dimension",
+        "$description": "Every outline and divider."
+      },
+      "thick": {
+        "$value": "2px",
+        "$type": "dimension",
+        "$description": "Selected state, increased-contrast outlines, the untrusted container's dashed edge."
+      }
+    }
+  },
+  "focus": {
+    "ring": {
+      "width": {
+        "$value": "2px",
+        "$type": "dimension",
+        "$description": "Width of the focus-ring outline."
+      },
+      "offset": {
+        "$value": "2px",
+        "$type": "dimension",
+        "$description": "Gap between a control and its focus ring."
+      }
+    }
+  },
+  "opacity": {
+    "disabled": {
+      "$value": "0.4",
+      "$type": "number",
+      "$description": "Disabled controls (also remove pointer events; never the only cue)."
+    },
+    "scrim": {
+      "$value": "0.72",
+      "$type": "number",
+      "$description": "Reference opacity of bg-overlay."
+    }
+  },
+  "z": {
+    "base": {
+      "$value": "0",
+      "$type": "number",
+      "$description": "Page content."
+    },
+    "sticky": {
+      "$value": "100",
+      "$type": "number",
+      "$description": "Sticky headers, bottom tabs."
+    },
+    "dropdown": {
+      "$value": "200",
+      "$type": "number",
+      "$description": "Menus and popovers."
+    },
+    "overlay": {
+      "$value": "300",
+      "$type": "number",
+      "$description": "Scrims."
+    },
+    "modal": {
+      "$value": "400",
+      "$type": "number",
+      "$description": "Dialogs, approval sheet."
+    },
+    "toast": {
+      "$value": "500",
+      "$type": "number",
+      "$description": "Toasts (never cover focused controls)."
+    }
+  },
+  "duration": {
+    "instant": {
+      "$value": "0ms",
+      "$type": "duration",
+      "$description": "Reduced motion, state swaps."
+    },
+    "fast": {
+      "$value": "120ms",
+      "$type": "duration",
+      "$description": "Hover, press, focus."
+    },
+    "base": {
+      "$value": "200ms",
+      "$type": "duration",
+      "$description": "Menus, toasts, panels."
+    },
+    "slow": {
+      "$value": "320ms",
+      "$type": "duration",
+      "$description": "Signature moments: proof stamp settles, approval confirmed, pairing matched."
+    }
+  },
+  "easing": {
+    "standard": {
+      "$value": "cubic-bezier(0.2, 0, 0, 1)",
+      "$type": "cubicBezier",
+      "$description": "Most transitions."
+    },
+    "enter": {
+      "$value": "cubic-bezier(0, 0, 0, 1)",
+      "$type": "cubicBezier",
+      "$description": "Elements entering."
+    },
+    "exit": {
+      "$value": "cubic-bezier(0.3, 0, 1, 1)",
+      "$type": "cubicBezier",
+      "$description": "Elements leaving."
+    }
+  },
+  "layout": {
+    "gutter": {
+      "mobile": {
+        "$value": "16px",
+        "$type": "dimension",
+        "$description": "Side gutter under 600px."
+      },
+      "desktop": {
+        "$value": "24px",
+        "$type": "dimension",
+        "$description": "Side gutter from 600px."
+      }
+    },
+    "max": {
+      "content": {
+        "$value": "720px",
+        "$type": "dimension",
+        "$description": "Reading width: approval cards, verify result, onboarding."
+      },
+      "page": {
+        "$value": "1440px",
+        "$type": "dimension",
+        "$description": "Max page width (xl caps here)."
+      }
+    },
+    "sidebar": {
+      "width": {
+        "$value": "232px",
+        "$type": "dimension",
+        "$description": "Console / desktop dashboard sidebar."
+      }
+    }
+  },
+  "breakpoint": {
+    "sm": {
+      "$value": "600px",
+      "$type": "dimension",
+      "$description": "Below: phone layout, bottom tabs (design at 360)."
+    },
+    "md": {
+      "$value": "1024px",
+      "$type": "dimension",
+      "$description": "600–1023: tablet (design at 768)."
+    },
+    "lg": {
+      "$value": "1440px",
+      "$type": "dimension",
+      "$description": "1024–1439: sidebar + list + detail (design at 1280). From 1440: xl, capped width."
+    }
+  },
+  "font": {
+    "weight": {
+      "regular": {
+        "$value": "400",
+        "$type": "fontWeight",
+        "$description": "Body and code."
+      },
+      "medium": {
+        "$value": "500",
+        "$type": "fontWeight",
+        "$description": "Labels, buttons, table headers."
+      },
+      "semibold": {
+        "$value": "600",
+        "$type": "fontWeight",
+        "$description": "Titles and the wordmark."
+      },
+      "bold": {
+        "$value": "700",
+        "$type": "fontWeight",
+        "$description": "Rare emphasis in long-form text."
+      }
+    },
+    "family": {
+      "sans": {
+        "$value": "\"Geist\", ui-sans-serif, system-ui, -apple-system, \"Segoe UI\", \"Noto Sans\", sans-serif",
+        "$type": "fontFamily",
+        "$description": "UI text. Geist (SIL OFL), self-hosted."
+      },
+      "mono": {
+        "$value": "\"Geist Mono\", ui-monospace, \"SF Mono\", \"Cascadia Mono\", \"JetBrains Mono\", Menlo, Consolas, monospace",
+        "$type": "fontFamily",
+        "$description": "Codes, IDs, amounts, commands, labels. Geist Mono (SIL OFL)."
+      }
+    }
+  },
+  "text": {
+    "display": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "{font.family.sans}",
+        "fontSize": "40px",
+        "lineHeight": "44px",
+        "fontWeight": 600,
+        "letterSpacing": "-0.025em"
+      },
+      "$description": "One per screen at most: onboarding, verify result, proof stamp."
+    },
+    "title-1": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "{font.family.sans}",
+        "fontSize": "28px",
+        "lineHeight": "34px",
+        "fontWeight": 600,
+        "letterSpacing": "-0.02em"
+      },
+      "$description": "Page titles."
+    },
+    "title-2": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "{font.family.sans}",
+        "fontSize": "20px",
+        "lineHeight": "28px",
+        "fontWeight": 600,
+        "letterSpacing": "-0.015em"
+      },
+      "$description": "Card and dialog headlines (the approval headline)."
+    },
+    "title-3": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "{font.family.sans}",
+        "fontSize": "16px",
+        "lineHeight": "24px",
+        "fontWeight": 600,
+        "letterSpacing": "-0.01em"
+      },
+      "$description": "Section and panel headers."
+    },
+    "body-lg": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "{font.family.sans}",
+        "fontSize": "16px",
+        "lineHeight": "24px",
+        "fontWeight": 400,
+        "letterSpacing": "0em"
+      },
+      "$description": "Onboarding, verify, mobile body. Mobile inputs use this size (16px floor)."
+    },
+    "body": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "{font.family.sans}",
+        "fontSize": "14px",
+        "lineHeight": "20px",
+        "fontWeight": 400,
+        "letterSpacing": "0em"
+      },
+      "$description": "Default UI text on desktop."
+    },
+    "body-sm": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "{font.family.sans}",
+        "fontSize": "13px",
+        "lineHeight": "18px",
+        "fontWeight": 400,
+        "letterSpacing": "0em"
+      },
+      "$description": "Dense rows, secondary lines."
+    },
+    "caption": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "{font.family.sans}",
+        "fontSize": "12px",
+        "lineHeight": "16px",
+        "fontWeight": 400,
+        "letterSpacing": "0em"
+      },
+      "$description": "Footnotes, helper text, trust lines."
+    },
+    "label": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "{font.family.mono}",
+        "fontSize": "11px",
+        "lineHeight": "16px",
+        "fontWeight": 500,
+        "letterSpacing": "0.06em"
+      },
+      "$description": "Uppercase mono labels: section eyebrows, status chips, table headers. Always uppercase via CSS."
+    },
+    "code": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "{font.family.mono}",
+        "fontSize": "13px",
+        "lineHeight": "20px",
+        "fontWeight": 400,
+        "letterSpacing": "0em"
+      },
+      "$description": "Commands, IDs, fingerprints, amounts in tables (tabular by construction)."
+    },
+    "code-lg": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "{font.family.mono}",
+        "fontSize": "24px",
+        "lineHeight": "32px",
+        "fontWeight": 500,
+        "letterSpacing": "0.02em"
+      },
+      "$description": "Safety codes, pairing codes, recovery codes: grouped digits."
+    },
+    "wordmark": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "{font.family.mono}",
+        "fontSize": "20px",
+        "lineHeight": "24px",
+        "fontWeight": 600,
+        "letterSpacing": "-0.03em"
+      },
+      "$description": "Live-text wordmark fallback when the SVG cannot be used."
+    }
+  },
+  "palette": {
+    "signal-orange": {
+      "$value": "#ff6a1a",
+      "$type": "color",
+      "$description": "Brand signal orange. The seal in the mark; accent fill in dark."
+    },
+    "4thtech-green": {
+      "$value": "#2cd8a7",
+      "$type": "color",
+      "$description": "Endorsing brand only. Not part of the AgentLink UI palette."
+    }
+  }
+}
