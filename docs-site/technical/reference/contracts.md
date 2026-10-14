@@ -1,6 +1,6 @@
 # Contracts
 
-> **Status: Design.** Not deployed. Testnet deployment (Base Sepolia, Gnosis Chiado) is planned for v0.2.0 (M1); mainnet (Base, Gnosis) for v1.0.0 (M3). No addresses exist yet. Source: [05 OCC v2 contracts](https://github.com/4thtech/agentlink/blob/main/docs/foundation/05-contracts-occ-v2.md).
+> **Status: Design.** Not deployed. Testnet deployment is planned for v0.2.0 (M1), on Base Sepolia first and Gnosis Chiado later at the same addresses; mainnet (Base, Gnosis) for v1.0.0 (M3). No addresses exist yet. Source: [05 OCC v2 contracts](https://github.com/4thtech/agentlink/blob/main/docs/foundation/05-contracts-occ-v2.md).
 
 The contract source lives in a separate private repository during the beta. Verified source is planned to be published at mainnet (licence proposed: BUSL-1.1, to be confirmed). This repository consumes only the ABI package `@agentlink/occ-v2-abi` and shared test vectors.
 
@@ -34,7 +34,7 @@ function creditsOf(address payer, address token) external view returns (uint256)
 - No admin function can move, freeze or reduce a payer's credits; pausing blocks new charges, never withdrawals.
 - Fees are bounded by on-chain caps; raising a cap has a 7-day delay; every record carries the signer's maximum fee.
 - Governance by Safe multisigs through `AccessManager` with per-function delays; the Notary can be frozen against upgrades.
-- Identical addresses on every chain (CREATE3 via CreateX).
+- Identical addresses on every chain where the contracts are deployed (CREATE3 via CreateX). Proposed: one set for mainnets and a different set for testnets. Clients use only the addresses listed for each chain ID.
 
 ## Addresses
 
