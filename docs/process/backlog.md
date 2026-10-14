@@ -1840,7 +1840,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `restrictName` table tests: control, format, bidi and zero-width characters, `<`, `>`, `:`, `/`, `(`, `)`, `[`, `]`, `"`, newlines and a 200-character name are reduced to the allowed set and ≤ 32 code points; fullwidth and mathematical letters are folded (NFKC); a mixed-script name (`Тali`), `ǃ`/`ǀ` look-alikes and a look-alike label (`Marko Verified domain acme com`) fall back to "Contact" plus the fingerprint; an empty result falls back too; an agent-written invite `label` with the same content is shown restricted until the owner confirms it.
 
 #### M1-7c-b · core: `contact.check` verify and store (new, split from M1-7c)
-- **Status:** ready · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#80) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-2f, M1-7c
 - **Spec:** 04 §2.5.1, §3.6.1; 07 §3 (`contacts.safety_check`); G-28
