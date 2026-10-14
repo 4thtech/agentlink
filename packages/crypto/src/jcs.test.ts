@@ -231,3 +231,36 @@ describe('parseJson (strict RFC 8259 + I-JSON)', () => {
     expect(String(caught)).not.toContain('oops');
   });
 });
+
+describe('parseJson integersOnly (M1-1e, 04 §2.4.1)', () => {
+  const strict = { integersOnly: true } as const;
+
+  it('accepts protocol integers', () => {
+    expect(parseJson('{"a":0,"b":[1,9007199254740991]}', strict)).toEqual({
+      a: 0,
+      b: [1, 9007199254740991],
+    });
+  });
+
+  it.each([
+    '1.0',
+    '1e3',
+    '1E3',
+    '10e-1',
+    '-0',
+    '-1',
+    '0.5',
+    '9007199254740991.4',
+    '9007199254740992',
+    '9007199254740993',
+    '100000000000000000000',
+  ])('refuses the token %s, also nested', (token) => {
+    rejects(() => parseJson(token, strict), 'invalid_json');
+    rejects(() => parseJson(`{"a":[{"b":${token}}]}`, strict), 'invalid_json');
+  });
+
+  it('leaves the default parser unchanged', () => {
+    expect(parseJson('[1.0,1e3,-0,-1]')).toEqual([1, 1000, -0, -1]);
+    expect(parseJson('[1.0]', { integersOnly: false })).toEqual([1]);
+  });
+});

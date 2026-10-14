@@ -13,6 +13,10 @@ const SEED_OR_SECRET = [
   'derivePublicIdentity',
   'bip340Sign',
   'bip340PublicKey',
+  // M1-1e (IR-M1-1e-1 M-1): ECDSA signing with a secret key.
+  'signDigestEcdsa',
+  'signTypedData',
+  'signAgentCard',
 ];
 
 describe('@agentlink/crypto/keystore', () => {
@@ -39,6 +43,13 @@ describe('@agentlink/crypto/keystore', () => {
       'agentFingerprint',
       'formatFingerprint',
       'KEY_LABELS',
+      'recoverEvmAddress',
+      'decodeEcdsaSignature',
+      'hashTypedData',
+      'hashAgentCard',
+      'verifyAgentCard',
+      'verifyCardOwnerSig',
+      'verifyCardAgentSig',
     ]) {
       expect(Object.keys(main), name).toContain(name);
     }

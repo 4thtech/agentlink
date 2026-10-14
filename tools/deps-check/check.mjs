@@ -36,6 +36,7 @@ import {
   allowedWorkspaceNames,
   isSubtleExempt,
   layerMessage,
+  libraryAllowed,
   libraryMessage,
   matchesGroup,
   violationFor,
@@ -146,7 +147,8 @@ export function checkManifest(zone, manifest) {
         continue;
       }
       const lib = LIBRARIES.find((candidate) => matchesGroup(real, candidate.group));
-      if (lib && !lib.zones.includes(zone)) {
+      // A test-only library (LIBRARIES testZones) may be a devDependency, never a runtime one.
+      if (lib && !libraryAllowed(lib, zone, { test: field === 'devDependencies' })) {
         problems.push(`${where}${alias}: ${libraryMessage(lib)}`);
         continue;
       }
