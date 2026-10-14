@@ -16,6 +16,10 @@ const SEED_OR_SECRET = [
   // M1-1c: HPKE open of a CEK with the recipient's secret key, and envelope-hash signing.
   'unwrapCek',
   'signEnvelopeHash',
+  // M1-1e (IR-M1-1e-1 M-1): ECDSA signing with a secret key.
+  'signDigestEcdsa',
+  'signTypedData',
+  'signAgentCard',
 ];
 
 // M1-1c: the deterministic test seam (fixed HPKE ephemeral key or AES-GCM IV, raw RFC 9180 suite).
@@ -64,6 +68,13 @@ describe('@agentlink/crypto/keystore', () => {
       'generateCek',
       'encryptPayload',
       'decryptPayload',
+      'recoverEvmAddress',
+      'decodeEcdsaSignature',
+      'hashTypedData',
+      'hashAgentCard',
+      'verifyAgentCard',
+      'verifyCardOwnerSig',
+      'verifyCardAgentSig',
     ]) {
       expect(Object.keys(main), name).toContain(name);
     }

@@ -16,3 +16,8 @@ export { bip340PublicKey, bip340Sign } from './bip340.js';
 // BIP-340 signing of an envelopeHash (the KeyStore's envelope-hash signing, 04 §3.1).
 export { unwrapCek } from './hpke.js';
 export { signEnvelopeHash } from './envelope.js';
+// M1-1e (IR-M1-1e-1 M-1): ECDSA signing with a secret key. cardSig and cardAgentSig are signed
+// through the KeyStore; everyone else verifies with the main entry (verifyAgentCard and friends).
+export { signDigestEcdsa } from './ecdsa.js';
+export { signTypedData } from './eip712.js';
+export { signAgentCard } from './agent-card.js';

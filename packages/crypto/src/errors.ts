@@ -21,7 +21,10 @@ export type CryptoInputErrorCode =
    * wrong envelope, tampered bytes) or whose X25519 shared secret is all zero. One code for every
    * cause, so a caller cannot tell them apart.
    */
-  | 'open_failed';
+  | 'open_failed'
+  | 'invalid_signature'
+  | 'invalid_typed_data'
+  | 'invalid_card';
 
 /**
  * The one error type @agentlink/crypto throws for input it refuses.

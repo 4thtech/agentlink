@@ -80,18 +80,32 @@ AgentLink goes in **two directions** (D-37):
 | **Self-hosted cloud** | Streamable HTTP + OAuth | Worker secrets in **user's** Cloudflare account | Durable Object (SQLite-backed) | Always-on; polls relays with DO alarms; serves remote-only harnesses |
 | **Hosted remote (P2, M4)** | Streamable HTTP + OAuth | None server-side; signing via owner's browser passkey | Ciphertext only | Approval mode; every action proposed, owner signs in console |
 
-The MCP **tool surface is identical** across packagings (see 06). Differences live behind the `KeyStore`, `Store` and `ApprovalChannel` interfaces in core.
+The MCP **tool surface is identical** across packagings (see 06). Differences live behind the `KeyStore`, `Store` and `ApprovalChannel` interfaces. `Store` and `ApprovalChannel` are in core. The key interfaces are types in `@agentlink/crypto`, so `transport-nostr` and core share them without a dependency cycle (04 §3.1.1, G-2; proposed, owner confirms at merge).
 
 ```ts
-interface KeyStore {        // never exposes raw private keys outside crypto ops where possible
-  getPublicBundle(): Promise<PublicBundle>;
-  sign712(typedData): Promise<Hex>;
-  signNostr(event): Promise<SignedEvent>;
+// @agentlink/crypto (types only). No method returns a private key or a seed (04 §3.1.1).
+interface EnvelopeKeys {    // implemented by KeyStore (agent) and OwnerSession (owner)
+  signEnvelopeHash(envelopeHash: Uint8Array): Promise<Hex>;  // BIP-340 under "agentlink/envelope/v1"
+  signNostr(event): Promise<SignedEvent>;                     // OwnerSession: kinds 13 and 22242 only
   nip44Encrypt(peer: Hex, plaintext: string): Promise<string>;
-  nip44Decrypt(peer: Hex, ciphertext: string): Promise<string>;
-  hpkeOpen(wrapped: WrappedKey, info: Uint8Array): Promise<Uint8Array>;   // unwrap a CEK
+  nip44Decrypt(peer: Hex, ciphertext: string, o?: { epoch?: number }): Promise<string>;
+  unwrapCek(wrapped: WrappedKey, envelopeId: Uint8Array, o?: { epoch?: number }): Promise<Uint8Array>;
 }
-// Owner keys use a separate OwnerKeyStore that unlocks only with user presence (04 §2.5).
+interface KeyStore extends EnvelopeKeys {
+  getPublicBundle(o?: { epoch?: number }): Promise<PublicBundle>;
+  sign712(typedData): Promise<Hex>;
+}
+interface OwnerKeyStore {   // unlocks only with user presence (04 §2.5)
+  getPublicKeys(): Promise<OwnerPublicKeys>;
+  unlock(presence: OwnerPresence): Promise<OwnerSession>;
+  lock(): Promise<void>;
+}
+interface OwnerSession extends EnvelopeKeys {  // short-lived; never reachable from MCP or agent code
+  signOwnerAction(body): Promise<Hex>;
+  sign712(typedData): Promise<Hex>;
+  close(): Promise<void>;
+}
+// @agentlink/core
 interface Store { /* contacts, threads, envelopes, records, approvals, policies */ }
 interface ApprovalChannel { request(a: ApprovalRequest): Promise<ApprovalId>; status(id): Promise<ApprovalStatus>; }
 ```

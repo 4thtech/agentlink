@@ -1,6 +1,7 @@
 import type { SuiteModule } from '../suite';
 import { aeadEnvelope } from './aead-envelope';
 import { bip340 } from './bip340';
+import { eip712 } from './eip712';
 import { fingerprint } from './fingerprint';
 import { hkdfDerive } from './hkdf-derive';
 import { hpke } from './hpke';
@@ -16,6 +17,7 @@ import { taggedHashSuite } from './tagged-hash';
 export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['aead-envelope', aeadEnvelope],
   ['bip340', bip340],
+  ['eip712', eip712],
   ['fingerprint', fingerprint],
   ['hkdf-derive', hkdfDerive],
   ['hpke', hpke],

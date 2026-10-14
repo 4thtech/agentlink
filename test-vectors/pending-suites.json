@@ -1,10 +1,6 @@
 {
   "description": "Suites whose vectors are committed before the code under test (M1-1h). Each runs no cases until its card adds the suite module and removes the entry. Fail closed: see test-vectors/README.md, Pending suites. The list may only shrink against main (tools/vectors/check-pending.mjs), and a release fails while a suite of a gated phase is pending.",
   "suites": {
-    "eip712": {
-      "card": "M1-1e",
-      "phase": "M1a"
-    },
     "encodings": {
       "card": "M1-2a",
       "phase": "M1a"

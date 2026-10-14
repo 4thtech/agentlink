@@ -431,3 +431,48 @@ describe('M1-1c: the crypto test seam @agentlink/crypto/testing', () => {
     ).not.toMatch(RESTRICTED);
   });
 });
+
+describe('IR-M1-1e-1 L-1: viem is a test-only library in packages/crypto', () => {
+  const code = `import { keccak256 } from 'viem';\nvoid keccak256;\n`;
+
+  it('refuses viem in crypto runtime source, in every form', () => {
+    for (const form of [
+      code,
+      `export * from 'viem';\n`,
+      `const m = await import('viem/accounts');\n`,
+      `type T = import('viem').Hex;\n`,
+    ]) {
+      expect(src('packages/crypto', form, 'src/eip712.ts').join('\n')).toMatch(
+        /viem may be imported only in packages\/chain, apps\/pay \(and in test files of packages\/crypto\)/,
+      );
+    }
+    expect(violationFor('packages/crypto', 'viem', 'packages/crypto/src/eip712.ts')).not.toBeNull();
+  });
+
+  it('allows viem in crypto test files only', () => {
+    expect(src('packages/crypto', code, 'src/eip712.test.ts')).toEqual([]);
+    expect(violationFor('packages/crypto', 'viem/accounts', 'packages/crypto/src/a.test.ts')).toBe(
+      null,
+    );
+    // Other zones' tests get nothing from this.
+    expect(violationFor('packages/core', 'viem', 'packages/core/src/a.test.ts')).not.toBeNull();
+  });
+
+  it('allows viem as a crypto devDependency, never as a runtime dependency', () => {
+    expect(manifest('packages/crypto', { devDependencies: { viem: '2.57.1' } })).toEqual([]);
+    for (const field of ['dependencies', 'peerDependencies', 'optionalDependencies']) {
+      expect(manifest('packages/crypto', { [field]: { viem: '2.57.1' } }).join('\n')).toMatch(
+        /viem may be imported only in/,
+      );
+    }
+    expect(manifest('packages/core', { devDependencies: { viem: '2.57.1' } }).join('\n')).toMatch(
+      /viem may be imported only in/,
+    );
+  });
+
+  it('keeps the test-only zone off the runtime zone list', () => {
+    const viem = LIBRARIES.find((lib) => lib.group.includes('viem'));
+    expect(viem?.zones).not.toContain('packages/crypto');
+    expect(viem?.testZones).toEqual(['packages/crypto']);
+  });
+});

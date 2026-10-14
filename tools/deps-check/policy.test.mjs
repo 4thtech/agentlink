@@ -57,7 +57,9 @@ describe('policy data', () => {
     expect(zonesOf('@noble/curves')).toEqual(['packages/crypto']);
     expect(zonesOf('@hpke/core')).toEqual(['packages/crypto']);
     expect(zonesOf('nostr-tools')).toEqual(['packages/crypto', 'packages/transport-nostr']);
-    expect(zonesOf('viem')).toEqual(['packages/crypto', 'packages/chain', 'apps/pay']);
+    // viem in packages/crypto: test files only (IR-M1-1e-1 L-1).
+    expect(zonesOf('viem')).toEqual(['packages/chain', 'apps/pay']);
+    expect(violationFor('packages/crypto', 'viem', 'packages/crypto/src/x.test.ts')).toBeNull();
     expect(zonesOf('aws4fetch')).toEqual(['packages/storage']);
     expect(zonesOf('node:fs')).toEqual(NODE_ZONES);
     expect(zonesOf('node:crypto')).toEqual([]);

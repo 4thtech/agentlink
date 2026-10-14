@@ -206,7 +206,7 @@ Owner-only operations: approve/deny, change policies, add/remove allowed folders
 
   Any failure drops the object (fail closed). `expiresAt` = 0 is required for `agent.revoke` and allowed only there; that op skips the expiry and lifetime checks. Nonces are retained for at least the maximum lifetime plus skew. Skew, lifetimes and retention are fixed below (G-7).
 - **Lifetimes, skew and nonces (G-7; proposed, owner confirms at merge).** All times are unix seconds, as JSON integers (§2.4.1). "Now" is the verifying core's own system clock; no 4thTech time service is used.
-  - **Clock skew `S` = 300 s.** It applies only to `issuedAt`: the core refuses `issuedAt > now + S`. Expiry has no skew: the core refuses `now > expiresAt`. The schema requires `issuedAt < expiresAt` for every op except `agent.revoke`.
+  - **Clock skew `S` = 300 s.** It applies to `issuedAt` here and to an envelope's `createdAt` (§3.1.1, step 9): the core refuses `issuedAt > now + S`. Expiry has no skew: the core refuses `now > expiresAt`. The schema requires `issuedAt < expiresAt` for every op except `agent.revoke`.
   - **Maximum lifetime `L(op)`.** The core refuses `expiresAt − issuedAt > L(op)`. A signing surface sets `expiresAt` at most `issuedAt + L(op)` and may choose less. The local UI and the CLI apply an action within seconds. The long values exist for the console, whose `approval`, `policy` and `contact.check` objects reach a local agent over relays, possibly after the machine wakes up.
 
     | `op` | `L(op)` | Why |
@@ -237,6 +237,7 @@ Owner-only operations: approve/deny, change policies, add/remove allowed folders
 ### 2.6 Key rotation
 
 - A new `keyEpoch` derives new Nostr and encryption keys (EVM key unchanged) and issues a new agent card. Old epoch keys are re-derivable from the seed, so history stays readable.
+- Signing and encryption always use the current epoch. Decryption picks the epoch from the recipient `kid` or the gift wrap's `p` tag. A new envelope is accepted only from the sender's current key, except a `card-update` (§3.1.1, G-2; proposed, owner confirms at merge).
 - Contacts update the card when they see a higher epoch signed by the same owner (envelope type `card-update`).
 - Owner key rotation (re-signing all agent cards) is P2.
 
@@ -550,7 +551,116 @@ All binary values are base64url **without padding** in JSON unless §2.4.1 puts 
 
 - `envelopeHash = sha256(JCS(envelope without "sig"))` (RFC 8785). This is the value notarized on-chain.
 - AEAD additional data = `sha256(JCS({v, id, thread, from, createdAt, recipients}))`.
-- `sig` = BIP-340 Schnorr by `from` over `taggedHash("agentlink/envelope/v1", envelopeHash)` (BIP-340 tagged hash), so envelope signatures can never be confused with Nostr event signatures.
+- `sig` = BIP-340 Schnorr by `from` over `taggedHash("agentlink/envelope/v1", envelopeHash)` (BIP-340 tagged hash), so envelope signatures can never be confused with Nostr event signatures. Exact bytes, keys, verification and size limits: §3.1.1.
+
+#### 3.1.1 Envelope signatures, keys and limits (G-2; proposed, owner confirms at merge)
+
+**What is signed.** One construction for every envelope and every sender:
+1. `E` is the strictly parsed envelope (M1-1c) with every key except `sig`: `v`, `id`, `thread`, `from`, `createdAt`, `recipients` (in the order sent) and `aead` (`alg`, `iv`, `ct`). The hash is computed from the parsed copy, so what is hashed is what was checked.
+2. `envelopeHash = sha256(JCS(E))`, 32 bytes.
+3. `m = taggedHash("agentlink/envelope/v1", envelopeHash) = sha256(sha256(t) ‖ sha256(t) ‖ envelopeHash)`. `t` is the 21 UTF-8 bytes of the tag, and `envelopeHash` enters as its 32 raw bytes, never as hex.
+4. `sig = BIP-340 Sign(sk, m, auxRand)`, with 32 fresh CSPRNG bytes as `auxRand` (vectors fix them). `sk` is the secret key of `from` (table below). `sig` is the 64-byte signature as 128 lowercase hex (§2.4.1).
+
+The AAD (§3.1) covers the header only. The hash also covers `aead`, so the signature commits to the ciphertext. That alone does not make every recipient read the same plaintext; the requirement is in §3.3 (G-46).
+
+**Domain separation.** A Nostr key signs several kinds of object. Each has its own 32-byte message:
+
+| Object | Message that BIP-340 signs | Key |
+|---|---|---|
+| Envelope `sig` (this section) | `taggedHash("agentlink/envelope/v1", envelopeHash)` | agent or owner Nostr key |
+| `SignedOwnerAction` `sig` (§2.5.1) | `taggedHash("agentlink/owner-action/v1", sha256(JCS(OwnerAction)))` | owner Nostr key |
+| Nostr events: seal (kind 13), NIP-42 AUTH (kind 22242) | the NIP-01 event id: `sha256` of the JSON text `[0,"<pubkey>",…]` | agent or owner Nostr key |
+| Drop requests (§4, 07 §5.4) | as fixed there | drop key only |
+
+- The two tagged messages start with different 64-byte prefixes, and a NIP-01 id hashes a JSON text that starts with `[0,"`. A signature valid for one object is valid for another only through a SHA-256 collision. The owner-action tag and the envelope tag are never interchangeable, even over the same 32 bytes.
+- **Rule.** A new BIP-340 use of an agent or owner Nostr key gets its own tag `agentlink/<name>/v1` and a row in this table. No key signs a raw, untagged digest. A verifier checks a signature only under the tag of the object it verifies.
+- The EVM key (ECDSA, EIP-712) never signs an envelope, and the drop key signs only drop requests.
+
+**Which key signs.**
+
+| Envelope types | `from` and signing key | Signed through |
+|---|---|---|
+| Every type an agent sends: the 02 F-22 types, `handshake`, `handshake-ack`, `card-update`, `proof`, `ack`, `approval-request` and the `policy` echo | The agent's Nostr key at its current `keyEpoch` (§2.6) | `KeyStore.signEnvelopeHash` |
+| `approval`, `policy` (owner → agent) and `revoke` (§3.4.1) | The owner's Nostr key (epoch 0; owner-key rotation is P2, §2.6) | `OwnerSession.signEnvelopeHash`, in a session from `OwnerKeyStore.unlock(presence)` (§2.5) |
+
+- **Owner signing.** The owner key signs an envelope only for those three types, only in a session opened with presence, and in the same gesture as the `SignedOwnerAction` it carries. Its seal (kind 13) is signed by the same session, because §3.5 requires the seal key to equal `from`.
+- **The owner's envelope signature authorises nothing.** It lets the receiver attribute the envelope to the owner key. Authority comes only from the carried `SignedOwnerAction` (§2.5, §3.4.1).
+- **Receivers enforce the table.** `approval` and `policy` are accepted only from the agent's own owner key (§3.4.1). `revoke` follows §3.4.1: authority comes from the carried object, whatever the `from`. Any other type whose `from` is the agent's own owner key, or the `ownerNostr` of a contact's card, is dropped.
+- **Not yet carried.** Console `contact.check` objects (§2.5.1) have no envelope type in this table. M2-2e adds the carrier type and its row here before the console sends them.
+
+**Key interfaces (G-2).**
+- **Location.** `KeyStore`, `OwnerKeyStore`, `OwnerSession` and the shared `EnvelopeKeys` interface are types in `@agentlink/crypto`'s main entry, so `transport-nostr` and `core` both use them without a dependency cycle (03 §3, 07 §1). The implementations that hold a seed live in the restricted subpath `@agentlink/crypto/keystore` and in `@agentlink/node` (keychain and file backends). Test doubles (`MemoryKeyStore`, `MemoryOwnerKeyStore`) are in an entry point that deps-check allows only in tests, `test-vectors` and e2e, never in production `src` (IR-M1-1g-1 M-2). The self-host Worker gets its own backend (M2-3a), not the test double.
+- **`EnvelopeKeys`** is the set of methods that build and open envelopes. `KeyStore` (the agent's keys) and `OwnerSession` (the owner's keys) both implement it, so the transport and core paths are the same for both:
+  - `signEnvelopeHash(envelopeHash)`: takes the 32-byte `envelopeHash` and returns `sig`. It applies the tag itself, so no method signs an untagged digest. Hash-in gives the holder nothing new: the agent key signs every envelope anyway, and a session can sign any owner action. The caller computes the hash from the parsed envelope with M1-1c's `envelopeHash`.
+  - `signNostr(event)`: seals and NIP-42 AUTH. On an `OwnerSession`, only kinds 13 and 22242 are signed, and any other kind is refused. A session is a bearer handle (IR-M1-1g-1 I-5), and a general owner signer could replace the owner-backup event (§2.3). That event gets its own method when G-36 is resolved.
+  - `nip44Encrypt(peer, plaintext)` and `nip44Decrypt(peer, payload, {epoch?})`.
+  - `unwrapCek(wrapped, envelopeId, {epoch?})`: opens one recipient entry and returns the 32-byte CEK, which the caller wipes after the payload AEAD. It builds `info = "agentlink/v1/cek" ‖ id` itself from the 16-byte envelope id. This replaces `hpkeOpen(wrapped, info)`, so a KeyStore is never a general HPKE-open oracle for other contexts (IR-M1-1c-1 F5).
+- **`KeyStore`** adds `getPublicBundle({epoch?})` (public keys and `kid` at that epoch) and `sign712`. **`OwnerSession`** adds `signOwnerAction` and `sign712`.
+- **Epochs.** Signing and encryption always use the current epoch. `{epoch}` exists only on the decrypting methods and on the public-key lookup. An epoch above the current one is refused (`epoch_unavailable`). An `OwnerSession` has epoch 0 only.
+- **Owner sessions.** A production surface collects presence itself, from the owner's own input: an interactive terminal prompt, a WebAuthn ceremony or the native approval window. It never takes presence from an environment variable, a file, a command-line argument or a tool input (§2.5, §2.8, D-54). A session is never handed to MCP-reachable or agent-reachable code. Its expiry is enforced on a monotonic clock, and `lock()` also stops an `unlock` that is still in flight (IR-M1-1g-1 I-4, I-5, L-1, L-2).
+
+**Recipient entries (sender, core).**
+- The sender writes exactly the set of §3.2, or of §3.4.1 for the owner channel, with **one entry per distinct `enc` key**. When both agents have the same owner, that owner has a single entry. Gift wraps follow the same rule: one per distinct Nostr key (§3.5).
+- The order of the entries is the sender's choice. The hash and the AAD cover it, and receivers compare the entries as a set.
+
+**The owner reads its envelopes (I-9).** The owner is a recipient of its agents' envelopes (§3.2 entries 2 and 3) and of the owner channel (§3.4.1). It also reads back its own `approval`, `policy` and `revoke` on another device. Senders take `ownerEnc` (the CEK wrap) and `ownerNostr` (the gift wrap) from the cards. All steps run inside one `OwnerSession`:
+1. `nip44Decrypt` of the gift wrap (from its ephemeral key) under the owner Nostr key gives the seal. The seal's signature is verified, and `nip44Decrypt` of its content (from the seal key) gives the rumor.
+2. The envelope passes the verification steps below, 1–4.
+3. The core finds the one entry whose `kid` is the `kid` of `ownerEnc`.
+4. `unwrapCek(entry, id)` gives the CEK. The payload is decrypted with the AAD (§3.1), and the CEK is wiped.
+5. The payload passes step 6 (strict schema) before anything is rendered.
+6. The copy is placed by the attribution rules below. Nothing is shown on an agent's thread before they hold.
+
+**Where the owner shows a copy (I-9).** Anyone can address an envelope to `ownerNostr`, so a decrypted copy is not proof that the owner's agent sent or received it. A surface (the console, the desktop app) shows a copy on one of its agents' threads only when:
+- **Sent by the agent.** `from` is that agent's `agentNostr` at an epoch of a card the owner signed, and the agent is not revoked. Owner-authored types follow the key table above, and `approval-request` and the `policy` echo follow §3.4.1.
+- **Received by the agent.** The recipients include that agent's `enc` `kid`, and `from` is a contact key of that agent: the `agentNostr` of the contact's card as the owner's own copies establish it. That source is the same as for revoke delivery (§3.4.1). A pairing counts only once the owner holds both the `handshake` and the `handshake-ack` that names it (`handshakeHash`), and one of the two is from the owner's own agent. Later keys come only from a `card-update` that passes §3.4.1 against that card. Step 7 applies to the type, including the superseded-key rule.
+- **Fresh and unique.** Step 9 applies. When the owner holds two copies with the same `id` and different `envelopeHash`, neither is shown as the thread's message: both are shown as a conflict, and the contact is flagged. The owner cannot tell which one the agent accepted.
+- **Anything else** that passed steps 1–6 is shown outside the threads, as not from a known contact. It is never shown as something the agent sent, received or agreed to.
+
+- **Reading needs presence.** The gift wrap is addressed to `ownerNostr`, the key that signs owner actions, so no read-only owner key exists. A read session gets the same protections as a signing session. Receiving owner copies from DM relays also needs NIP-42 AUTH with the owner key (kind 22242) in the same session. How long the console keeps a read session open is decided in M2-2d, and it never outlives the console's own unlock. A separate owner inbox key would need a new card field and is not proposed.
+- A surface may keep the plaintext it read under its own at-rest rules (07 §3, 08). It never keeps the owner keys.
+- An agent's `KeyStore` never holds owner keys and never opens an owner entry.
+
+**Verification (fail closed).** Inbound envelopes are checked in this order. A failure at any step drops the envelope, with nothing processed in part. Errors never echo the input (I-7).
+1. **Size before parsing** (transport): the limits below.
+2. **Transport** (§3.5, M1-5a): the gift wrap and seal signatures verify, the rumor key equals the seal key, the seal key equals `from` (as bytes), and the `agentlink` tag is present.
+3. **Strict parse** (M1-1c): exact keys and encodings (§2.4.1); 1 to 8 recipients with distinct `kid`s; the `ct` limit.
+4. **Signature.** `from` lifts to a curve point (BIP-340 `lift_x`), and `sig` verifies under `from` over `m` above. Only the envelope tag is tried. An untagged `envelopeHash` and a NIP-01 check are never accepted.
+5. **Own entry.** The core looks for an entry whose `kid` matches one of its own `enc` keys, at any epoch (`getPublicBundle({epoch})`). With none, the envelope is not for this agent. With one, there is exactly one `unwrapCek`, at that entry's epoch, so an envelope never makes the core try more than one HPKE open per local key. If entries match own keys at more than one epoch, the core uses the highest epoch, still with exactly one `unwrapCek`. A failed open or AEAD is dropped (`open_failed`).
+6. **Payload.** The payload passes its strict schema (`@agentlink/types`, M1-2a; `terms` limits M1-21).
+7. **Sender role.** `from` must be the key that the type requires:
+   - a contact's agent key: the `agentNostr` of the contact's **current** card. A superseded epoch key is refused, except for `card-update` (§3.4.1), so a key replaced after a compromise cannot keep sending. The refused envelope is stored as refused and shown in the activity feed, never in `agentlink_inbox`. Owner copies stay readable.
+   - pairing types: as §3.6 and §3.4.1 state;
+   - owner types: as the table above;
+   - an unknown agent key goes to the requests queue (06), and only after steps 1–6, subject to the arrival-order rule below.
+
+   **Arrival order after a key rotation.** Relays do not order delivery, and NIP-59 randomises gift-wrap timestamps, so a contact's first envelopes under a new epoch key can arrive before its `card-update`. Fail closed:
+   - Within one sync pass, the core processes `card-update` envelopes before any other envelope.
+   - An envelope from an unknown agent key whose recipients include the `kid` of the `ownerEnc` of a stored contact's card (that owner's entry, §3.2) is **held**: it is neither processed nor shown as a request.
+   - Each time a `card-update` is applied, the core runs the held envelopes again from step 7. One whose `from` is now that contact's current key is processed as from the contact.
+   - A held envelope that no `card-update` claims within 48 h (the sync overlap, 07 §4.2) goes to the requests queue as from an unknown key. Before any request is shown, the core checks `from` again against its contacts' current cards, so a contact is never shown as a new contact request.
+   - A held envelope is never accepted as the contact's without a valid `card-update`. The cost is that a new agent of an existing contact's owner waits up to 48 h in the requests queue.
+   - Held envelopes count against the same limits as requests from unknown senders (the requests queue, 06; spam, §7), and at most 100 are held per owner `kid` (proposed; owner confirms at merge). Beyond that, the oldest held envelope is dropped. A stranger that copies a contact owner's `kid` into its recipients therefore delays only its own envelopes, within those limits.
+8. **Own owner (I-9).** The recipients must include the `kid` of the agent's own owner's `ownerEnc`. Without it, the envelope is stored as refused and shown in the activity feed, because the agent's owner could not read it. The check shows that an entry is present, not that it opens.
+9. **Freshness and uniqueness.** A `createdAt` more than 300 s in the future (`S`, §2.5.1) is refused. An `id` already stored with the same `envelopeHash` is a duplicate and is dropped silently (07 §4.2). An `id` already stored with a different `envelopeHash` is refused, and the contact is flagged in the activity feed. This check covers every envelope still in the store, with no retention cutoff; the 07 §4.2 seen-set only saves work during sync.
+
+Decrypting stored history with an older epoch key stays allowed (§2.6). Only accepting a new envelope from a superseded sender key is refused.
+
+**Size limits and where each one is enforced.** "24 KB" in §3.5 and 07 §4.2 means 24 576 bytes.
+
+| Limit | Value | Enforced in | Why |
+|---|---|---|---|
+| Inbound relay frame | ≤ 131 072 bytes (128 KiB), checked on the raw WebSocket message **before** `JSON.parse` | `transport-nostr` (M1-5b) | The largest valid gift wrap (NIP-44 payload at its maximum of 87 472 characters) is about 88 KB as an `EVENT` frame. The 128 KiB proposed in IR-M1-1c-1 F3 fits here, at the outermost layer |
+| NIP-44 payload | 132 to 87 472 characters, plaintext ≤ 65 535 bytes | `@agentlink/crypto` (M1-1g) | NIP-44 v2 |
+| Envelope (rumor `content`) | ≤ 24 576 bytes of UTF-8, checked on the string **before** `JSON.parse`. On send, the rumor `content` is exactly `JCS(envelope)`, checked before wrapping, so send and receive measure the same string | `transport-nostr` (M1-5a), on both send and receive | §3.5. At this size the worst-case seal is 38 663 bytes (under the NIP-44 limit) and the `EVENT` frame is 55 131 bytes (under the common 64 KiB relay cap) |
+| `recipients` | 1 to 8 entries, distinct `kid`s | `@agentlink/crypto` parser (M1-1c), so every caller gets it | §3.2 needs at most 5 (with the P2 arbitrator), and the owner channel needs 2. 8 leaves room for one more role without a new version. It also caps the publish fan-out (one gift wrap per key) and the parse work, at about 157 bytes per entry |
+| `aead.ct` | 16 to 17 152 bytes decoded, so the payload plaintext is ≤ 17 136 bytes. Checked on the base64url length (≤ 22 870 characters) **before** decoding | `@agentlink/crypto` parser (M1-1c) | The largest multiple of 64 that keeps the worst-case envelope (8 entries, `createdAt` = 2^53 − 1) at or under 24 576 bytes as JCS (24 509 bytes). So every envelope that passes the parser fits §3.5 |
+| Exact recipient set; one HPKE open | per type (§3.2, §3.4.1) | `core` (M1-7b) | I-9, and bounded work per envelope |
+| Payload fields | payload schema (M1-2a), `terms` limits (M1-21), inline files per G-27 | `core` and `@agentlink/types` | |
+
+- **The IR-M1-1c-1 F3 values were checked and not adopted for `ct`.** A `ct` of 64 KiB + 16 gives an envelope of about 89 KB, above the 65 535-byte NIP-44 plaintext limit of the seal, so it could never be sent. D-48 sends files through the encrypted drop or the owner's storage, not inline, so the inline payload can stay small. The 1–8 recipient cap and a raw cap before `JSON.parse` are adopted, the second at both layers above.
+- A 12 KB inline file (16 384 base64url characters) still fits, with about 750 bytes left for the rest of the payload. G-27 ("inline only if the final envelope ≤ 24 KB") decides.
+- Raising a limit means older receivers refuse the larger envelopes. It is a spec change with a compatibility note, never a silent default change.
 
 ### 3.2 Recipient set (always)
 
@@ -567,6 +677,7 @@ All binary values are base64url **without padding** in JSON unless §2.4.1 puts 
 - `info = utf8("agentlink/v1/cek") || id` (`id` as its raw 16 bytes).
 - Each recipient entry seals the CEK independently (empty AAD).
 - Sender authenticity comes from `sig` and the agent card binding `from` to the owner, not from HPKE Auth mode.
+- **Requirement: one plaintext for every recipient (G-46; owner decision, 14 Oct 2026, D-61).** Every recipient entry, every owner (I-9) and a proof-pack verifier obtain the same plaintext for a given `envelopeHash`, or fail to decrypt. The payload AEAD as specified above does not guarantee this on its own. The owner decided the requirement; the construction is open. *Timing (proposed, build plan; owner confirms at merge, D-62):* the construction is fixed before M1-7b becomes `ready` and before the `aead-envelope` and `envelope-sig` vectors freeze.
 
 ### 3.4 Payload (plaintext inside `aead.ct`)
 
@@ -700,7 +811,12 @@ A commitment (D-31) is approved once per agreement and per owner. The approval b
 - The owner approves with presence (§2.5) by signing `approval.decide` `{approvalId, actionDigest, decision: "approve"}` (§2.5.1). The core applies it once, for its own `agent`, with an unused nonce and within the request's `expiresAt`. From then on, the parts it authorises run until the scope's `expiresAt`.
 - Before each part runs, the core re-verifies the stored `approval.decide` and recomputes `actionDigest` from the stored action. It does not use the current call, because a deferred receipt has no call; a current call must match the stored action. It also checks that the void rules below do not apply.
 - At most one live scope exists per answered envelope (`agentId`, `answers.envelopeId`), and per firm offer (`agentId`, negotiation key, `version`). Creating a new scope voids an older one that is still pending. Once the `accept` part has run for an envelope, any later scope on it covers only the receipt.
-- The core claims a part atomically: in one store transaction (SQLite, or Durable Object storage) it checks that the part is unused, marks it used and stores the signed item, before it publishes anything (07 §2.1). Two concurrent retries therefore cannot both run a part. A used part is never authorised again. The record's single-use nonce and the on-chain one-time receipt flag (I-6, 05 §3.3) are the second line of defence.
+- **Part states.** Each part is `unclaimed`, `claimed`, `done` or `void`:
+  - `unclaimed` → `claimed`: the core claims a part atomically. In one store transaction (SQLite, or Durable Object storage) it checks that the part is `unclaimed`, sets it to `claimed` and stores the signed item, before it publishes anything (07 §2.1). Two concurrent retries therefore cannot both run a part.
+  - `claimed` → `done`: the envelope part when its stored envelope is published; a Record or receipt part when the chain shows its item (or the identical one, 05 §3.3). Until then the core only resubmits the stored item, never a new one, except under the replacement rule below.
+  - `unclaimed` or `claimed` → `void`: the scope expired or a void rule applies.
+  - Only an `unclaimed` part can be claimed. A `claimed`, `done` or `void` part is never authorised again. The record's single-use nonce and the on-chain one-time receipt flag (I-6, 05 §3.3) are the second line of defence.
+- **A signed item that did not land** (proposed; owner confirms at merge). A `claimed` Record or receipt part whose stored item can no longer land, for example because the Notary was paused (05 §5.1) or a submitter dropped it, gets one replacement item at a time under §5 ("Replacing a signed item"). The rule depends only on what the chain shows, never on the cause or a submitter's report. The part stays `claimed` and the replacement takes the stored item's place in the same store transaction. It is signed only while the scope's `expiresAt` has not passed and no void rule applies, after the re-verification above, and without asking the owner again. If the chain shows the earlier item, the part is `done` and nothing is signed or charged again.
 - A repeat with the same `clientRequestId` returns the original result. A repeat call with the same `approvalId` after every part has run or is waiting for its record returns `rejected` with `APPROVAL_USED` and the state of the original response (for example `waiting_for_record`). It never sends or signs a part twice.
 
 **Expiry (proposed; owner confirms at merge).** `expiresAt = min(terms.validUntil, createdAt + 7 days)`, where `createdAt` is when the core created the pending request or the grant. Both values are set then and are part of the signed digest. The pending request itself expires sooner: 24 h after it was created, or at the scope's `expiresAt` if that comes first (§3.4.1, G-7). An approval that arrives after that is refused. After `expiresAt`, unused parts are void. If the offerer records the offer after that, the accepter's `ACCEPTED` receipt is not signed. The accept message then stands without on-chain evidence. A new `accept` call on the same offer asks the owner again; because the accept was already sent, its scope covers only the receipt.
@@ -742,7 +858,7 @@ The terms fingerprint is under Advanced. Tool summaries name only the contact, t
 - The envelope JSON is the `content` of an unsigned **rumor** (kind 14, tag `["agentlink","1"]`), sealed (kind 13) with the sender's Nostr key, then **gift-wrapped** (kind 1059) with an ephemeral key to each recipient Nostr pubkey, per NIP-59 / NIP-17 with NIP-44 v2 encryption.
 - The receiver requires the seal's pubkey to equal `envelope.from`.
 - One gift wrap per recipient Nostr key (recipient agent, recipient owner, sender owner).
-- **Size limits:** serialized envelope ≤ **24 KB**; inline files ≤ **12 KB**. Nesting (seal + gift wrap, NIP-44 padding, base64) roughly doubles size, and NIP-44 caps plaintext at 65,535 bytes; many relays cap events at 64 KB. Before publishing, check the final gift-wrap size against each relay's NIP-11 `max_message_length`.
+- **Size limits:** serialized envelope ≤ **24 KB** (24 576 bytes; every limit and where it is enforced: §3.1.1); inline files ≤ **12 KB**. Nesting (seal + gift wrap, NIP-44 padding, base64) roughly doubles size, and NIP-44 caps plaintext at 65,535 bytes; many relays cap events at 64 KB. Before publishing, check the final gift-wrap size against each relay's NIP-11 `max_message_length`.
 - Gift-wrap timestamps are randomized up to 2 days in the past (NIP-59), so inbox sync must use a ≥ 48 h look-back window and deduplicate by envelope ID (see 07 §4.2).
 
 ### 3.6 Pairing protocol
@@ -909,8 +1025,15 @@ The §2.9 values go to other suites: the agent ID to `hkdf-derive`, `cardAgentSi
 ## 5. On-chain records
 
 - Record and Receipt structs are defined in `05-contracts-occ-v2.md`. EIP-712 domain `{name: "OCC", version: "2", chainId, verifyingContract}`. Structs include an explicit `signer` field, so EOAs and ERC-1271 smart accounts verify the same way.
-- **Recipient commitment:** `keccak256(abi.encode(recipientAgentEvm, salt))`; the 32-byte salt is delivered in the encrypted `proof` envelope. The public cannot link a record to its recipient unless a receipt is posted (receipts reveal the recipient's agent address; see 05 §3.3).
+- **Recipient commitment:** `keccak256(abi.encode(recipientAgentEvm, salt))`; the 32-byte salt is delivered in the encrypted `proof` envelope. **Every Record uses a fresh salt** of 32 CSPRNG bytes. A salt is never reused, never derived from a key, the envelope or the recipient, and never shared between Records, including a Record signed again for the same envelope (decided by the owner in chat, 14 Oct 2026, D-61; wording confirmed at merge). So two Records to the same recipient cannot be linked through their commitments. The public cannot link a record to its recipient unless a receipt is posted (receipts reveal the recipient's agent address; see 05 §3.3).
 - **Records:** random 256-bit nonce per signer, single use; `deadline` enforced. **Receipts:** one per type per record (flag), `deadline` enforced.
+- **Replacing a signed item** (proposed; owner confirms at merge). A client resubmits the same signed Record or Receipt; it signs a replacement only when the earlier one can never land. This holds for every Record and receipt, including a commitment part (§3.4.2) and after a pause (05 §5.1).
+  - **Condition.** The earlier item's `deadline` has passed, **and** `getRecord` read at the chain's `finalized` block (block tag `finalized`), whose timestamp must be after that deadline, shows no record for the earlier `recordId`. For a receipt, it shows that receipt type not set on the record. Once a block after the deadline is finalized, no reorg can include the earlier item, because the contract enforces the deadline. This is the 06 §3 budget release condition, read the same way.
+  - **Chains without a `finalized` tag.** The client reads at the block `confirmations` deep (07 §6.1) instead. A reorg deeper than that can still include the earlier item after its replacement was signed: two Records, two charges. This is an accepted residual risk on such chains only, and the cost is a replacement that waits minutes for finality where the tag exists.
+  - **Fail closed.** A read that fails, or a `finalized` block whose timestamp is not yet after the deadline, signs nothing; the client tries again later. Submitter responses are never used for this (§7).
+  - **Already on-chain.** If the chain shows the earlier Record, that Record stands: nothing is signed again and nothing is charged again. If it shows the receipt type, or the conflicting `ACCEPTED`/`REJECTED` type, no receipt is signed.
+  - **The replacement.** A Record gets a new nonce (so a new `recordId`), a fresh salt (above) and a new `deadline`, with every other field unchanged; its fee is still bounded by the same approval or policy. A receipt gets a new `deadline` for the same `recordId` and `receiptType`. In the same store transaction, the budget entry of the earlier Record is released and one is reserved for the replacement (06 §3), so the total never counts both.
+  - **Time limit.** A commitment part is replaced only before its scope's `expiresAt` (§3.4.2). A Record approved by the owner outside a commitment is replaced only before that approval's `expiresAt` (§3.4.1), and only if policy, evaluated again, does not now `deny` it. A Record allowed by policy alone is replaced only if `evaluate`, run again in the same transaction with the budget, still returns `allow`. Otherwise nothing is signed and the call returns `pending_approval`.
 - On-chain data is minimal: no content, file names or display names.
 
 ---
