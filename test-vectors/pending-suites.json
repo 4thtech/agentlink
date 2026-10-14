@@ -5,8 +5,16 @@
       "card": "M1-2a",
       "phase": "M1a"
     },
+    "invite-link": {
+      "card": "M1-7c",
+      "phase": "M1a"
+    },
     "owner-action": {
       "card": "M1-7d",
+      "phase": "M1a"
+    },
+    "pairing-bodies": {
+      "card": "M1-2d",
       "phase": "M1a"
     },
     "safety-code-recompute": {
