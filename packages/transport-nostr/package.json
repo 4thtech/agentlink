@@ -33,6 +33,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@agentlink/types": "workspace:*",
+    "@agentlink/log": "workspace:*",
     "@agentlink/crypto": "workspace:*"
   },
   "devDependencies": {
