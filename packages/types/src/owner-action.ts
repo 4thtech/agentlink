@@ -77,6 +77,18 @@ export const agentRevokeParamsSchema = z.strictObject({
   reason: z.enum(REVOKE_REASONS),
 });
 
+/**
+ * `contact.check` params (04 §2.5.1, §3.6.1; G-28): the owner compared the safety code. `contact` is
+ * the contact's agent ID (`0x` + 40 lowercase hex) and `pairingDigest` the transcript digest of its
+ * current pairing (bare hex, 64 lowercase), each in its one encoding (04 §2.4.1); any other spelling
+ * or key is rejected, never normalised. Matching both against a completed pairing, recomputed from
+ * the signed `handshake` and `handshake-ack` on every load, is the core's (M1-7c).
+ */
+export const contactCheckParamsSchema = z.strictObject({
+  contact: evmAddress,
+  pairingDigest: sha256Hex,
+});
+
 // --- OwnerAction ---------------------------------------------------------------------------------
 
 const head = {
@@ -135,6 +147,16 @@ export const policySetActionSchema = z
   })
   .refine(expiring, EXPIRING_MSG);
 
+/** "Safety code checked" for one contact and one pairing (04 §2.5.1). No envelope carries it yet (M2-2e). */
+export const contactCheckActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('contact.check'),
+    params: contactCheckParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG);
+
 /** `agent.revoke`: `expiresAt` is exactly 0 (permanent; the core skips expiry and lifetime checks). */
 export const agentRevokeActionSchema = z.strictObject({
   ...head,
@@ -153,6 +175,7 @@ export const ownerActionSchema = z.discriminatedUnion('op', [
   approvalDecideBatchActionSchema,
   approvalCancelActionSchema,
   policySetActionSchema,
+  contactCheckActionSchema,
   agentRevokeActionSchema,
 ]);
 
@@ -166,6 +189,8 @@ export const signedApprovalDecideBatchSchema = signedOf(approvalDecideBatchActio
 export const signedApprovalCancelSchema = signedOf(approvalCancelActionSchema);
 export const signedPolicySetSchema = signedOf(policySetActionSchema);
 export const signedAgentRevokeSchema = signedOf(agentRevokeActionSchema);
+/** What `contacts.safety_check` stores (07 §3), re-verified on every load (04 §2.5.1, §3.6.1). */
+export const signedContactCheckSchema = signedOf(contactCheckActionSchema);
 /**
  * What an `approval` envelope carries: `approval.decide`, `approval.decideBatch` or `approval.cancel`
  * (04 §3.4.1; D-55, D-68). Any other op is dropped.
@@ -183,11 +208,13 @@ export type ApprovalDecideBatchParams = z.infer<typeof approvalDecideBatchParams
 export type ApprovalCancelParams = z.infer<typeof approvalCancelParamsSchema>;
 export type PolicySetParams = z.infer<typeof policySetParamsSchema>;
 export type AgentRevokeParams = z.infer<typeof agentRevokeParamsSchema>;
+export type ContactCheckParams = z.infer<typeof contactCheckParamsSchema>;
 export type ApprovalDecideAction = z.infer<typeof approvalDecideActionSchema>;
 export type ApprovalDecideBatchAction = z.infer<typeof approvalDecideBatchActionSchema>;
 export type ApprovalCancelAction = z.infer<typeof approvalCancelActionSchema>;
 export type PolicySetAction = z.infer<typeof policySetActionSchema>;
 export type AgentRevokeAction = z.infer<typeof agentRevokeActionSchema>;
+export type ContactCheckAction = z.infer<typeof contactCheckActionSchema>;
 export type OwnerAction = z.infer<typeof ownerActionSchema>;
 export type SignedOwnerAction = z.infer<typeof signedOwnerActionSchema>;
 export type SignedApprovalDecide = z.infer<typeof signedApprovalDecideSchema>;
@@ -195,4 +222,5 @@ export type SignedApprovalDecideBatch = z.infer<typeof signedApprovalDecideBatch
 export type SignedApprovalCancel = z.infer<typeof signedApprovalCancelSchema>;
 export type SignedPolicySet = z.infer<typeof signedPolicySetSchema>;
 export type SignedAgentRevoke = z.infer<typeof signedAgentRevokeSchema>;
+export type SignedContactCheck = z.infer<typeof signedContactCheckSchema>;
 export type SignedApprovalOp = z.infer<typeof signedApprovalOpSchema>;

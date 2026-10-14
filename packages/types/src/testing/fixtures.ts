@@ -473,6 +473,21 @@ export const approvalDecideBatchAction = (n = 2) => ({
   expiresAt: 1760000600,
 });
 
+/** A `pairingDigest` (04 §3.6.1): the safety-code transcript digest, 64 lowercase hex. */
+export const PAIRING_DIGEST = hex(32, '6b');
+
+/** `contact.check` (04 §2.5.1, §3.6.1; G-28): the owner compared the safety code with `contact`. */
+export const contactCheckAction = () => ({
+  v: 1,
+  agent: AGENT_EVM,
+  owner: OWNER_NOSTR,
+  op: 'contact.check',
+  params: { contact: CONTACT_A, pairingDigest: PAIRING_DIGEST },
+  nonce: b64u(16, 'X'),
+  issuedAt: 1760000000,
+  expiresAt: 1760000600,
+});
+
 export const signed = <T>(body: T) => ({ body, sig: BIP340_SIG });
 
 export const fileEntryInline = () => ({
