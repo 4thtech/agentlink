@@ -195,6 +195,48 @@ def hkdf_sha256(ikm, salt, info, length):
     )
 
 
+def hkdf_sha256_written_out(ikm, salt, info, length):
+    """RFC 5869 Extract and Expand written out over hashlib HMAC, only to cross-check
+    `hkdf_sha256` (`cryptography`). An empty salt is HashLen zero bytes (RFC 5869 §2.2); HMAC pads
+    both to the same block, so they give the same PRK."""
+    prk = hmac_sha256(bytes(salt) if salt else bytes(32), bytes(ikm))
+    out, block, counter = b"", b"", 1
+    while len(out) < length:
+        block = hmac_sha256(prk, block + bytes(info) + bytes([counter]))
+        out += block
+        counter += 1
+    return out[:length]
+
+
+# 04 §3.3 (G-46, D-66): the only derivations that take the CEK as ikm.
+PAYLOAD_KEY_LABEL = "agentlink/v1/payload-key"
+PAYLOAD_COMMIT_LABEL = "agentlink/v1/payload-commit"
+CEK_EPH_LABEL = "agentlink/v1/cek-eph"
+CEK_DERIVATION_LABELS = (PAYLOAD_KEY_LABEL, PAYLOAD_COMMIT_LABEL, CEK_EPH_LABEL)
+
+
+def derive_from_cek(label, cek, envelope_id, recipient_public=None):
+    """04 §3.3 derivations from the CEK: HKDF-SHA256, ikm = CEK (32 bytes), empty salt, 32-byte
+    output; info = utf8(label) || id (16 raw bytes), and || pk_j (the raw 32-byte X25519 key) for
+    `agentlink/v1/cek-eph` only. Raises ValueError for any other label or length."""
+    if label not in CEK_DERIVATION_LABELS:
+        raise ValueError("not a CEK derivation label")
+    if len(cek) != 32 or len(envelope_id) != 16:
+        raise ValueError("wrong CEK or id length")
+    suffix = b""
+    if label == CEK_EPH_LABEL:
+        if recipient_public is None or len(recipient_public) != 32:
+            raise ValueError("cek-eph needs a 32-byte recipient key")
+        suffix = bytes(recipient_public)
+    elif recipient_public is not None:
+        raise ValueError("only cek-eph takes a recipient key")
+    info = label.encode("utf-8") + bytes(envelope_id) + suffix
+    out = hkdf_sha256(cek, b"", info, 32)
+    if out != hkdf_sha256_written_out(cek, b"", info, 32):
+        fail("cryptography's HKDF disagrees with RFC 5869 written out")
+    return out
+
+
 def tagged_hash(tag, message):
     """BIP-340 tagged hash: SHA256(SHA256(tag) || SHA256(tag) || msg)."""
     tag_hash = sha256(tag.encode("utf-8"))
@@ -393,6 +435,17 @@ def case_schema(suite, description, ops):
         },
         "oneOf": branches,
     }
+
+
+def optional_input(schema, op, field):
+    """Make one input field of `op` optional in a schema from case_schema (a case that tests the
+    field's absence)."""
+    for branch in schema["oneOf"]:
+        inputs = branch["properties"]["input"]
+        if inputs["properties"]["op"] == {"const": op}:
+            inputs["required"] = [name for name in inputs["required"] if name != field]
+            return schema
+    fail(f"{schema['title']}: no op {op}")
 
 
 # --- write / check -------------------------------------------------------------------------------
