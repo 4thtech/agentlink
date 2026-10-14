@@ -30,3 +30,35 @@ export {
 } from './jcs.js';
 export { randomBytes } from './random.js';
 export { wipe } from './wipe.js';
+// M1-1b: key derivation, BIP-340, public identities and fingerprints.
+export { HKDF_SHA256_MAX_LENGTH, hkdfSha256 } from './hkdf.js';
+export {
+  KEY_LABELS,
+  MASTER_SEED_LENGTH,
+  MAX_KEY_EPOCH,
+  deriveAgentId,
+  deriveKey,
+  derivePublicIdentity,
+  derivePublicKey,
+  deriveSecretKey,
+  evmAddressChecksummed,
+  kidFromEncPublicKey,
+  type DerivedPublicKey,
+  type KeyLabel,
+  type PublicIdentity,
+} from './keys.js';
+export {
+  BIP340_PUBLIC_KEY_LENGTH,
+  BIP340_SIGNATURE_LENGTH,
+  bip340PublicKey,
+  bip340Sign,
+  bip340Verify,
+  isBip340PublicKey,
+} from './bip340.js';
+export {
+  FINGERPRINT_TAGS,
+  agentFingerprint,
+  formatFingerprint,
+  ownerFingerprint,
+  type FingerprintForm,
+} from './fingerprint.js';
