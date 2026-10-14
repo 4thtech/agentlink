@@ -251,6 +251,8 @@ export const BYTE_LENGTHS = freeze({
   iv: 12,
   /** AES-GCM tag (§3.1). */
   tag: 16,
+  /** Payload key commitment `aead.kc`, derived from the CEK (§3.1, §3.3; G-46, D-66). */
+  keyCommitment: 32,
   /** BIP-340 Schnorr signature (§2.5.1, §3.1). */
   bip340Sig: 64,
   /** EIP-712 ECDSA signature r ‖ s ‖ v (§2.4). */

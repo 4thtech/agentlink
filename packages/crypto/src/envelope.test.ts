@@ -4,9 +4,11 @@
 // test-vectors/aead-envelope; these tests pin the API rules around them.
 import { describe, expect, it } from 'vitest';
 import {
+  AEAD_ALG,
   AEAD_CT_MAX_ENCODED_LENGTH,
   AEAD_CT_MAX_LENGTH,
   CryptoInputError,
+  KEY_COMMITMENT_LENGTH,
   MAX_RECIPIENTS,
   TAGS,
   canonicalize,
@@ -46,7 +48,10 @@ function sampleHeader(from = encodeHex(randomBytes(32))): Json {
 }
 
 function sampleUnsigned(from?: string): Json {
-  return { ...sampleHeader(from), aead: { alg: 'A256GCM', iv: b64(12), ct: b64(40) } };
+  return {
+    ...sampleHeader(from),
+    aead: { alg: 'A256GCM-KC', iv: b64(12), kc: b64(32), ct: b64(40) },
+  };
 }
 
 function sampleSigned(): Json {
@@ -135,6 +140,24 @@ describe('parseEnvelope: 04 §3.1 structure and §2.4.1 encodings', () => {
     ['sig missing', changed(base, ['sig'], undefined)],
     ['kid missing', changed(base, ['recipients', 1, 'kid'], undefined)],
     ['iv missing', changed(base, ['aead', 'iv'], undefined)],
+    // 04 §3.1 (G-46, D-66): exactly {alg, iv, kc, ct}, alg A256GCM-KC, kc of exactly 32 bytes.
+    ['kc missing', changed(base, ['aead', 'kc'], undefined)],
+    ['kc of 31 bytes', changed(base, ['aead', 'kc'], b64(31))],
+    ['kc of 33 bytes', changed(base, ['aead', 'kc'], b64(33))],
+    ['kc of 16 bytes', changed(base, ['aead', 'kc'], b64(16))],
+    ['kc empty', changed(base, ['aead', 'kc'], '')],
+    ['kc padded', changed(base, ['aead', 'kc'], `${b64(32)}=`)],
+    ['kc in standard base64', changed(base, ['aead', 'kc'], `+/${b64(32).slice(2)}`)],
+    ['kc as hex', changed(base, ['aead', 'kc'], encodeHex(randomBytes(32)))],
+    ['kc a number', changed(base, ['aead', 'kc'], 7)],
+    ['kc null', changed(base, ['aead', 'kc'], null)],
+    ['the old alg A256GCM with kc', changed(base, ['aead', 'alg'], 'A256GCM')],
+    [
+      'the old aead form {alg: A256GCM, iv, ct}',
+      changed(changed(base, ['aead', 'kc'], undefined), ['aead', 'alg'], 'A256GCM'),
+    ],
+    ['alg A256GCM-KC lower-case', changed(base, ['aead', 'alg'], 'a256gcm-kc')],
+    ['alg A256GCM-KC with a space', changed(base, ['aead', 'alg'], 'A256GCM-KC ')],
     ['id of 15 bytes', changed(base, ['id'], b64(15))],
     ['id of 17 bytes', changed(base, ['id'], b64(17))],
     ['id padded', changed(base, ['id'], `${base.id as string}==`)],
@@ -207,14 +230,21 @@ describe('parser limits: 1 to 8 recipients with distinct kids, ct ≤ 17 152 byt
     expect(b64(AEAD_CT_MAX_LENGTH)).toHaveLength(AEAD_CT_MAX_ENCODED_LENGTH);
   });
 
-  it('accepts the worst case: 8 recipients, a ct of 17 152 bytes, createdAt 2^53 - 1 (24 509 bytes as JCS)', () => {
+  it('fixes the aead form of 04 §3.1 (G-46, D-66): alg A256GCM-KC and a 32-byte kc', () => {
+    expect(AEAD_ALG).toBe('A256GCM-KC');
+    expect(KEY_COMMITMENT_LENGTH).toBe(32);
+    expect(Object.keys(parseEnvelope(base).aead)).toEqual(['alg', 'iv', 'kc', 'ct']);
+  });
+
+  it('accepts the worst case: 8 recipients, a ct of 17 152 bytes, createdAt 2^53 - 1 (24 563 bytes as JCS)', () => {
     let worst = changed(base, ['recipients'], entries(8));
     worst = changed(worst, ['aead', 'ct'], b64(17_152));
     worst = changed(worst, ['createdAt'], 2 ** 53 - 1);
     const parsed = parseEnvelope(worst);
     expect(parsed.recipients).toHaveLength(8);
     const jcs = canonicalizeToBytes(parsed);
-    expect(jcs.length).toBe(24_509);
+    // 04 §3.1.1 size table: 24 563 bytes with kc and alg A256GCM-KC, 13 bytes under the limit.
+    expect(jcs.length).toBe(24_563);
     expect(jcs.length).toBeLessThanOrEqual(24_576);
     expect(() => parseUnsignedEnvelope(withoutSig(worst))).not.toThrow();
     expect(() => envelopeHash(worst as unknown as Envelope)).not.toThrow();
