@@ -35,7 +35,9 @@ const client = await AgentLinkClient.create({
 
 await client.createInvite({ label, expiresInDays });
 await client.acceptInvite(url);
-await client.sendMessage({ to, text, type, body, replyTo, notarize });
+await client.sendMessage({ to, text, type, body, replyTo, notarize });   // type: text | note | request | delivery
+await client.proposeTerms({ to, terms, revises, note, notarize });       // offer; the core fills termsId, version, parties, hashes
+await client.respondToTerms(envelopeId, { decision, terms, note, notarize }); // accept | reject | counter (06 §2.2a)
 await client.sendFile({ to, file: { name, bytes | stream }, message, notarize, expiresInDays });
 await client.syncInbox();                    // pulls from transport, stores, returns new items
 await client.fetchFile(envelopeId, index);   // returns decrypted stream + metadata
@@ -47,6 +49,22 @@ await AgentLinkClient.verifyProofPack(pack, { chains });   // static; no identit
 ```
 
 Every mutating call runs: **policy check → (approval) → action → store → result**. Policy evaluation is a pure function `evaluate(policy, action, context) → allow | approval | deny` with unit tests for every rule.
+
+### 2.1 Commitment flow (D-55)
+
+`respondToTerms` and `proposeTerms` (for a firm offer) follow 04 §3.4.2:
+
+1. **Load.** The core reads the answered envelope from its store. It runs the 04 §3.4 checks: canonical form, newest version of its negotiation (key = `termsId` plus the two parties, chain computed from its own store, no forks), within `validUntil`, own agent in `parties`. It then builds the `CommitmentScope` from stored data only, with `createdAt` and `expiresAt` fixed now; the scope never changes afterwards. A new scope for the same answered envelope voids an older pending one (one live scope, 04 §3.4.2).
+2. **Evaluate.** `evaluate(policy, {kind: "commitment", scope}, context)` returns one of three results:
+   - `deny`: the call returns `rejected`.
+   - `allow`: the core stores a policy grant with the policy document's hash. The grant is a ledger row, not authority: before each part runs, the core evaluates the verified policy again and requires `allow` for this scope.
+   - `approval`: the core stores a pending approval with the scope and its digest, and the call returns `pending_approval`.
+   A proof approval needed by the same call joins the same request.
+3. **Run.** On the retry with `approvalId`, the core verifies the owner-signed approval against the stored scope's digest and checks the void rules. It then runs the parts that have not run yet: send the `accept`, then record it if `notarize` is set and the offer has no record, then sign the receipt if the offer's record is known. Each part is claimed atomically: in one store transaction (SQLite, or Durable Object storage) the core checks that the part is unused (compare-and-set), marks it used and stores the signed item (envelope, record or receipt), and only then publishes it. A concurrent retry finds the part claimed and runs nothing. After a crash it republishes the same signed item rather than making a new one, and receivers and the contract deduplicate it by envelope ID, record nonce or one-time receipt flag.
+4. **Deferred receipt.** When `syncInbox` processes a `proof` envelope (background loop or `agentlink_inbox`, never the read-only `agentlink_status`), it checks the record on-chain (M1-7g). It then looks up an open `accept` scope whose `answers.envelopeHash` equals the record's `envelopeHash`, where the record's kind is `OFFER`, its signer is the scope's `counterparty.agentId` and its recipient commitment opens to this agent. It rechecks void rules 2–6 (04 §3.4.2) and, for a grant, re-evaluates the policy. Only then does it claim the receipt part, sign `ACCEPTED` and submit it. Otherwise it signs nothing, and the activity feed says why.
+5. **Expire.** At `expiresAt`, open parts are marked void and nothing more runs for that scope.
+
+`evaluate` stays pure; the scope, grants and parts used live in the `approvals` table (§3).
 
 ---
 
@@ -61,7 +79,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | `files` | envelope_id, idx, name, size, sha256, locator, url, file_key (encrypted at rest with a keychain-held local key), expires_at, deleted_at |
 | `proofs` | envelope_id, chain_id, record_id, tx_hash, status, fee_token, fee_amount, salt, created_at |
 | `receipts` | record_id, type, signer, tx_hash, at |
-| `approvals` | approval_id, action_json, summary, status, created_at, decided_at, signed_decision (the owner's `SignedOwnerAction`; re-verified on every use, `status` is only a cache, 04 §2.5.1) |
+| `approvals` | approval_id, action_json, scope_json (commitments, D-55; immutable after creation, carried in `action.context.scope`, 04 §3.4.2), answers_envelope_id (at most one live scope per value), source (owner \| policy grant, with policy hash), signed_decision (the owner's `SignedOwnerAction`; re-verified on every use, `status` is only a cache, 04 §2.5.1), parts_used_json (accept envelope ID, record ID, receipt record ID; claimed by compare-and-set), summary, status (pending \| approved \| denied \| expired \| cancelled \| void), expires_at, created_at, decided_at |
 | `policies` | key, value_json, updated_at |
 | `sync_cursors` | relay_url, last_seen |
 
@@ -268,6 +286,8 @@ Cloudflare Worker; stateless except rate-limit counters (Durable Object). It nev
   "recipient": { "evm": "0x…", "salt": "0x…" },          // optional disclosure
   "receipts": [ { "type": "DELIVERED", "signer": "0x…", "txHash": "0x…", "at": "…" } ],
   "disclosure": { "contentKey": "base64url" } | null,  // only if owner approved
+  "ownerApproval": { "signed": { /* SignedOwnerAction, approval.decide */ }, "action": { /* commitment approval-request.action incl. context.scope */ } }
+                 | { "standingRule": true, "policyHash": "hex" } | null,  // proof of agreement: included by default, owner may leave it out (04 §3.4, D-55)
   "exportedAt": "…"
 }
 ```
