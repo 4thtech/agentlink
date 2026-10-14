@@ -23,7 +23,7 @@ agentlink/
 │  ├─ chain/                     # viem clients, OCC v2 bindings (ABIs from @agentlink/occ-v2-abi)
 │  ├─ transport-nostr/           # NIP-17/59 gift wraps, relay pool, sync
 │  ├─ storage/                   # inline, drop and S3 (aws4fetch) adapters; Drive/Dropbox/OneDrive connectors (M2)
-│  ├─ core/                      # AgentLinkClient, policies, approvals, KeyStore/Store interfaces
+│  ├─ core/                      # AgentLinkClient, policies, approvals, Store interface (KeyStore types: @agentlink/crypto, G-2)
 │  ├─ node/                      # keychain KeyStore, SQLite Store, local approval server
 │  └─ ui/                        # shared React components (design system)
 ├─ apps/

@@ -283,7 +283,7 @@ Reviewers apply every checklist the diff touches. Item IDs are stable; new items
 - CT-3 `SafeERC20`; credits equal the measured balance delta; fee-on-transfer tokens never allowlisted.
 - CT-4 `depositWithAuthorization` calls `receiveWithAuthorization` with payee = vault (never `transferWithAuthorization`); `value ≥ minDeposit`; EIP-3009 flag required.
 - CT-5 AccessManager: every restricted selector mapped to its intended role; nothing left reachable through the admin role by accident. OZ AccessManager execution delays attach to (role, account) grants, so **each delay tier is its own role** (05 §5.1, e.g. `CONFIG_ADMIN` 48 h vs `UPGRADER` 7 d; `pause` vs `unpause`). Grant delays, target-admin delays and guardians set as configured.
-- CT-6 No admin path can move, freeze or reduce a payer's credits; pause blocks charges, deposits, notarization and registration and **never** `withdraw`, `withdrawIntegrator`, `sweep` or Registry `revoke` (05 §5.1); clients approve exact amounts only (05 §2.4).
+- CT-6 No admin path can move, freeze or reduce a payer's credits; pause blocks charges, deposits, notarization, receipts (`acknowledge`, `acknowledgeBatch`; D-61) and registration and **never** `withdraw`, `withdrawIntegrator`, `sweep` or Registry `revoke` (05 §5.1); clients approve exact amounts only (05 §2.4).
 - CT-7 `freezeUpgrades` is one-way: afterwards `_authorizeUpgrade` always reverts regardless of roles.
 - CT-8 UUPS: implementations call `_disableInitializers()`; proxies initialised in the deploying transaction; initializers not re-runnable.
 - CT-9 ERC-7201 namespaced storage; a storage-layout diff against the last deployed version accompanies every upgrade (no reorder, removal or type change).
