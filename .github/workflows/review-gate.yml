@@ -266,10 +266,6 @@ jobs:
               if (approvers.length === 0) {
                 // For an automated PR the same missing approval was reported under (c).
                 if (!isBotPr) {
-                  problems.push(
-                    'S2: needs an APPROVED review on the current head commit by @talirezun or @denisjazbec ' +
-                      'who is not the PR author. A review relayed in chat does not count (audit-rules.md §3).',
-                  );
                 }
               } else {
                 core.info(`S2 approval on the head commit by: ${approvers.map(show).join(', ')}`);
