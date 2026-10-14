@@ -12,6 +12,7 @@ The orchestrator spawns it and handles the result. The reviewer is a **different
 ## Preconditions
 - The builder's work is committed and pushed to its task branch; CI has run on the head commit (`gh run list --branch <branch>`). There is no PR yet.
 - You know the class and the areas touched (to choose the `audit-rules.md` §5 checklists).
+- S2: you have the RED commit SHA, its test command and the stated failure reason from the builder's PR-body file (its **Tests-first evidence** section; the builder's brief requires it, RB-03). Take only those three items from it, never the rest of the file. They are facts to reproduce, not the builder's rationale.
 - Review number `<k>` is 1 for the first review of a task, then 2, 3 … for each delta review (for example `IR-M1-5a-1`, then `IR-M1-5a-2`).
 
 ## Steps
@@ -22,6 +23,7 @@ The orchestrator spawns it and handles the result. The reviewer is a **different
    gh run list --branch <branch> --limit 5 > <scratch>/rb-<TASK-ID>-ir<k>-ci.txt
    ```
 2. Spawn the reviewer with **only** the inputs of `audit-rules.md` §4.1: the spec sections (04 in full for S2), the invariants, the diff file, the CI output, read-only access to the head commit, and the §5 checklists. **Not** the brief, the builder's report, the PR body, commit messages, the threat note, Curator content or sync files.
+   For S2 also pass the RED commit SHA and the test command, and tell it: "check out the RED commit in a scratch worktree, confirm it is an ancestor of the head and holds only tests, run the command, and confirm it fails for the stated reason; record `tests-first reproduced: yes|no`" (`audit-rules.md` §3.4). A `no` is a High finding: the review is REJECTED until the red is reproduced.
 3. Tell it the procedure (§4.2: every checklist item gets `finding <ID>`, `no finding` or `n/a: <reason>`; S2 adds the invariant walkthrough with file:line) and the output format (§4.3), with the report ID `IR-<TASK-ID>-<k>` and "write the full report to `<scratch>/IR-<TASK-ID>-<k>.md`".
 4. For a delta review, add the prior finding list (IDs and titles only) and the new commit range. The reviewer verifies each prior fix and reviews the new commits.
 5. When the report arrives, forward it **verbatim** to the owner. Never edit, merge or drop findings (§4.4).

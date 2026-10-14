@@ -21,7 +21,7 @@ An Opus builder: `test-vectors/**` is S2 (`audit-rules.md` §2.2). Vectors chang
    python3 -I tools/vectors/generate_<suite>.py --write
    ```
 3. **Suite module.** Add `test-vectors/harness/suites/<suite>.ts` and register it in `harness/suites/index.ts`. It returns `{ field, actual }` for every field of the case's `expected`. It never returns expected values; `harness/compare.ts` reads them from the vector. It calls `@agentlink/crypto`, never a crypto library or `crypto.subtle` directly.
-4. **Tests first (S2).** Commit the vectors, schema and a stub suite that throws, with the prefix `RED (expected):`, and push so CI shows red. Then implement.
+4. **Tests first (S2).** Commit the vectors, schema and a stub suite that throws, with the prefix `RED (expected):`. Run it locally and record the SHA, command and output excerpt as in [RB-05](writing-tests.md) step 6; do not push it alone (LL-14). Then implement.
 5. **Run the checks:**
    ```bash
    node tools/vectors/check-generators.mjs   # every vectors.json equals its generator's output

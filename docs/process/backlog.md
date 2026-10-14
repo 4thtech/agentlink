@@ -281,7 +281,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - Canary test helper: injects known canary secrets through public APIs and fails if any captured log line (all levels) contains one. Every later package adds its canaries.
 - **Acceptance:**
   - Unit test per redaction rule, including nested objects, arrays, errors and URLs.
-  - A deliberately leaking fixture makes the canary job fail in CI (red run linked in PR).
+  - A deliberately leaking fixture makes the canary job fail when run locally (local demonstration, output in PR; not pushed).
 
 #### M0-8b · Logger hardening follow-ups (new)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
@@ -1544,7 +1544,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - D-53 and D-55 assertions: the snapshot holds exactly the 15 tools of 06 §2.0; `agentlink_send`'s `type` enum has no `offer`, `accept` or `reject`; every name starts with `agentlink_`; the four annotations are set explicitly on every tool and match the 06 §2.0 table; every tool that can return `pending_approval` accepts `approvalId`; after 0.1.0, a removed or renamed tool or a removed or newly required field fails CI unless the PR records a decision-log entry; no tool name, description or argument installs, changes or removes harness hooks or harness configuration.
   - Deny assertions: no tool name, description or argument that changes policy, exports keys, adds storage credentials, decides approvals or reads arbitrary files. Vocabulary lint over summaries and server instructions.
 - **Acceptance:**
-  - Adding a fixture tool `set_policy` or an argument `privateKey` fails CI (red run linked); so do a fixture tool without the `agentlink_` prefix and a fixture write tool marked `readOnlyHint: true` (red runs linked); Inspector validation passes for every tool.
+  - Adding a fixture tool `set_policy` or an argument `privateKey` fails the check when run locally (local demonstration, output in PR; not pushed); so do a fixture tool without the `agentlink_` prefix and a fixture write tool marked `readOnlyHint: true` (local demonstrations); Inspector validation passes for every tool.
 
 #### M1-9f · Claude Desktop one-click extension bundle
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
