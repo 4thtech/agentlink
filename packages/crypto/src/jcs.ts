@@ -28,6 +28,15 @@ export interface JsonObject {
  */
 export const MAX_JSON_DEPTH = 128;
 
+/** Options for parseJson. */
+export interface ParseJsonOptions {
+  /**
+   * Refuse every number token that is not a protocol integer: `0|[1-9][0-9]*` on the token text and
+   * at most 2^53 - 1 (04 §2.4.1). Default false (RFC 8259 numbers, as JCS needs).
+   */
+  readonly integersOnly?: boolean;
+}
+
 const invalidJson = (message: string): CryptoInputError =>
   new CryptoInputError('invalid_json', message);
 const unsupported = (message: string): CryptoInputError =>
@@ -221,13 +230,16 @@ class Parser {
  * duplicate property names (compared after unescaping), no lone surrogates, no number outside the
  * double range, nesting at most MAX_JSON_DEPTH. Objects come back with a null prototype.
  *
- * Integer-only fields (04 §2.4.1: `1.0` and `1e3` refused) need the number's source token, which
- * this parser does not expose; the schema layer (@agentlink/types) checks those tokens.
+ * With `integersOnly` (M1-1e), every number token must also be a protocol integer (04 §2.4.1): it
+ * matches `0|[1-9][0-9]*` on the token text, so `1.0`, `1e3`, `-0` and `9007199254740991.4` are
+ * refused whatever value they parse to, and its value is at most 2^53 - 1. Use it for JSON text
+ * whose numbers are all such integers, such as the card JSON form (04 §2.4).
  */
-export function parseJson(text: string): JsonValue {
+export function parseJson(text: string, options?: ParseJsonOptions): JsonValue {
   if (typeof text !== 'string') {
     throw new CryptoInputError('invalid_argument', 'parseJson: text must be a string');
   }
+  void options; // RED stub (M1-1e): the option is not applied yet
   return new Parser(text).parseDocument();
 }
 

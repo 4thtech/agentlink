@@ -11,7 +11,11 @@ export type CryptoInputErrorCode =
   | 'invalid_json'
   | 'jcs_unsupported_value'
   | 'no_secure_random'
-  | 'wipe_failed';
+  | 'wipe_failed'
+  | 'invalid_signature'
+  | 'invalid_secret_key'
+  | 'invalid_typed_data'
+  | 'invalid_card';
 
 /**
  * The one error type @agentlink/crypto throws for input it refuses.

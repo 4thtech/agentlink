@@ -1,4 +1,5 @@
 import type { SuiteModule } from '../suite';
+import { eip712 } from './eip712';
 import { jcs } from './jcs';
 import { placeholderSha256 } from './placeholder-sha256';
 import { taggedHashSuite } from './tagged-hash';
@@ -9,6 +10,7 @@ import { taggedHashSuite } from './tagged-hash';
  * also has a module fails too, so the card that adds the module removes the pending entry.
  */
 export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
+  ['eip712', eip712],
   ['jcs', jcs],
   ['placeholder-sha256', placeholderSha256],
   ['tagged-hash', taggedHashSuite],
