@@ -1803,6 +1803,26 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
     - Exactly one `unwrapCek` per pass, and at most 7 recomputed seals.
   - (IR-M1-7a-1 R2-M1) A blocked or removed contact that rotates keys: its `card-update` is dropped, so its new key stays unknown. An envelope from an unknown key whose recipients include the `ownerEnc` `kid` of a **blocked or removed** contact's owner is dropped (recorded in `seen` after step 4), never held and never queued as a request, also after 48 h. Only active contacts' owner kids hold. Test, replacing the `it.todo` in `packages/core/src/contacts.test.ts`.
 
+#### M1-7b-b · core: require the sender's own owner entry when the sender's card is held (new, G-51, D-71 (4); follow-up to M1-7b)
+- **Status:** ready (planning 2026-10-15: dependency M1-7b merged (#66); G-51 decided yes in D-71 (4); the matching 04 §3.1.1 step 8 and §3.2 text lands with the D-71 docs PR) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/core
+- **Depends on:** M1-7b
+- **Spec:** 04 §3.1.1 step 8, §3.2; D-71 (4)
+- **Invariants:** I-5, I-9
+- **Scope:**
+  - Step 8 (04 §3.1.1): when the core holds the sender's card (a contact's current card; for a `card-update` the card it carries once it has passed §3.4.1; for the pairing types the card in the body once it has passed §3.6), refuse an envelope whose recipients lack that card's `ownerEnc` `kid`: stored as refused, shown in the activity feed, and the contact flagged. When `from` is not a contact's key, the refusal is recorded under the requests-queue and spam limits and no contact is flagged.
+  - The presence check needs no extra `unwrapCek`. Held envelopes meet it when they run again from step 5 after their `card-update`.
+  - Same owner on both sides: the one owner entry meets both rules. Owner-authored types and senders whose card is not held are unchanged.
+- **Acceptance:**
+  - Tests first: a `RED (expected):` commit with the local red run per `audit-rules.md` §3.4 (LL-15).
+  - A contact's envelope without its owner's `kid` is refused, stored as refused and the contact flagged; with it, accepted.
+  - A held envelope without the sender's owner `kid` is refused when its `card-update` is applied.
+  - A `handshake` without the sender's owner `kid` is refused, recorded under the requests-queue limits, and no contact is flagged.
+  - An envelope from an unknown key (no card held) is not refused for this reason; two agents of one owner (3 entries) are accepted.
+  - Existing M1-7b tests stay green; no test is weakened. Independent review.
+
+#### M1-7c · core: pairing protocol (invite, accept, handshake)
+
 #### M1-7c · core: pairing protocol (invite, accept, handshake)
 - **Status:** done (4thtech/agentlink#78, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
