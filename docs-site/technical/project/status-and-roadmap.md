@@ -60,6 +60,7 @@ Code that is merged is not necessarily published: nothing is released or install
 | Node runtime (@agentlink/node) | Owner code at a prompt | Done | [#67](https://github.com/4thtech/agentlink/pull/67) |
 | Node runtime (@agentlink/node) | Relay connection | Done | [#81](https://github.com/4thtech/agentlink/pull/81), [#84](https://github.com/4thtech/agentlink/pull/84) |
 | Node runtime (@agentlink/node) | Policy version record in the keychain | Done | [#86](https://github.com/4thtech/agentlink/pull/86) |
+| Node runtime (@agentlink/node) | First agent card at owner setup | In progress | - |
 | Node runtime (@agentlink/node) | Passphrase-locked key file for headless machines | Planned | - |
 | MCP server, CLI and apps | MCP server and CLI | In progress | - |
 | MCP server, CLI and apps | Local approval page | Planned | - |

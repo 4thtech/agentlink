@@ -33,6 +33,13 @@ export type NodeKeyStoreErrorCode =
   | 'harness_detected'
   /** The owner operation's item list is empty, too long or malformed. */
   | 'owner_operation_invalid'
+  /**
+   * M1-8h: the object is not one an owner flow of 04 §2.5 signs (EIP-712 other than the agent card,
+   * an owner-action op 04 §2.5.1 does not define, or a second signature in one operation).
+   */
+  | 'owner_operation_refused'
+  /** M1-8h: `owner init` could not issue the first agent card; the new owner item was removed. */
+  | 'owner_card_failed'
   /** The stored policy-version mark is not a canonical version (M1-8g). Never read as 0. */
   | 'policy_mark_invalid'
   /** A policy version outside [0, 2^53 - 1] was given to the mark (M1-8g). */

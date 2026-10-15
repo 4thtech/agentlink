@@ -12,6 +12,7 @@ import { inviteHandler } from './commands/invite.js';
 import { requestsHandler } from './commands/requests.js';
 import { statusHandler } from './commands/status.js';
 import { createInitHandler, nodeInitDeps } from './commands/init.js';
+import { ownerCommandHandlers } from './commands/owner/index.js';
 import { createDispatcher } from './dispatch.js';
 import { createOutput } from './output.js';
 
@@ -35,6 +36,8 @@ const dispatch = createDispatcher({
   status: statusHandler,
   doctor: doctorHandler,
   requests: requestsHandler,
+  // M1-9b: the owner commands (owner init, approve, deny, cancel).
+  ...ownerCommandHandlers(),
 });
 
 process.exitCode = await dispatch(process.argv.slice(2), {
