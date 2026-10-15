@@ -43,6 +43,9 @@ export type CoreErrorCode =
   // Inbox sync and delivery acknowledgements (07 §2, §4.2; 02 F-23; M1-7h)
   | 'envelope_not_found'
   | 'sync_budget_invalid'
+  // Inbox page read (06 §2.2; M1-7h-c)
+  | 'inbox_query_invalid'
+  | 'inbox_busy'
   // Policy (06 §3; M1-7d)
   | 'policy_context_invalid'
   // Approvals and idempotency (04 §3.4.1, 06 §2.5, 07 §3.3; M1-7e)

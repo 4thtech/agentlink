@@ -61,6 +61,11 @@ export interface AgentLinkClientOptions {
    * "received" `ack` for each new message from a contact. Default false.
    */
   readonly deliveryAcks?: boolean;
+  /**
+   * The https origins of the encrypted drop (D-48), so an inbox page shows a received file stored
+   * there as `drop` and any other URL as `own` (06 §2.2 `FileInfo.delivery`). Default: none.
+   */
+  readonly dropOrigins?: readonly string[];
 }
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
@@ -99,6 +104,7 @@ export class AgentLinkClient {
     policyMark: PolicyVersionMark | undefined,
     transport: TransportFactory | undefined,
     deliveryAcks: boolean,
+    dropOrigins: readonly string[],
   ) {
     this.agentId = agentId;
     this.identity = new IdentityService(ctx);
@@ -134,7 +140,7 @@ export class AgentLinkClient {
       idempotency: this.idempotency,
       outbox: this.outbox,
     });
-    this.inbox = new InboxService(ctx, this.contacts, this.requests);
+    this.inbox = new InboxService(ctx, this.contacts, this.requests, { dropOrigins });
     this.acks = new DeliveryAcks(
       ctx,
       {
@@ -233,6 +239,7 @@ export class AgentLinkClient {
       options.policyMark,
       options.transport,
       options.deliveryAcks === true,
+      options.dropOrigins ?? [],
     );
   }
 }

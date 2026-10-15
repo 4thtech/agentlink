@@ -2095,6 +2095,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:** M1-7h applies a verified `revoke` (`revoked_agents`, contact status or `identity.revoked_at`, pending outbox rows stopped as `revoked`) and drops any other. Left here: in the same store transaction, void every pending approval and every open commitment part with the revoked agent as counterparty (void rule 3); the activity line for a revoke; `catchUp` counts that leave out `received` rows whose type is not a message once it is known (F04 a); acks staged for the outbox instead of published inside `syncInbox` (F04 b); a KeyStore failure while listing own keys degrades the fetch instead of failing the sync (F04 c).
 - **Acceptance:** after a contact's revoke, an approval pending for an action with that contact is `void` and its commitment parts are void, in the revoke's transaction; a peer's acks do not raise `catchUp` counts; `syncInbox` returns within its budget with 200 acks pending.
 
+#### M1-7h-c · core: inbox page read with read marking (new, for M1-9p)
+- **Status:** in-progress · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/core
+- **Depends on:** M1-7h, M1-7e-2, M1-7k
+- **Spec:** 06 §2.1 (accepted requests), §2.2 (`InboundMessage`, `OutboundMessage`, "Order and paging", "Read state"); 07 §3, §3.2; 04 §3.5; D-70, D-72, D-73
+- **Invariants:** I-5, I-7
+- **Scope:** `client.inbox.page(query)`, the core read behind the `agentlink_inbox` port (`inboxPage` in `apps/cli/src/tools/context.ts`, M1-9p): received messages from contacts that are not removed, accepted requests (D-72: `from: null` and the 04 §2.9 sender code, never a name) and, with `includeSent`, our own sent messages; per contact or across all; `limit` 1 to 100, `before`, `since`, `includeRead`, and the caller's byte bound (`sizeOf`, `maxBytes`). Order by (`createdAt`, envelopeId bytes); the newest matching items, listed oldest first. The returned unread inbound items are marked read in the transaction that commits the page; a page that changed since it was selected is read again, so concurrent reads never both return an item as unread. Sender-chosen values stay data for the CLI to wrap; no file URL, file key or inline bytes in any item; logs carry counts only. `dropOrigins` client option classifies file storage as `drop` or `own`.
+- **Acceptance:** tests first (RED commit): paging bounds and stable order across equal times; `before` and `since` at their edges; an unknown `before` reads and marks nothing; read marks only on returned items, none when the page fails; two concurrent reads never double-return; accepted requests without a sender name; sent items only on request; refused rows, queued requests, unprocessed rows and protocol types never appear.
+
 #### M1-7j · core: relay changes and the owner card-update (G-24) (new)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (D-73 (5): it serves the owner surfaces and `relays set`, M1-9n; neither J8 nor J9 needs it)
 - **Repo/path:** agentlink · packages/core
