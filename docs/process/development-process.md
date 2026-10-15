@@ -246,6 +246,7 @@ The orchestrator audits; it does not re-implement and does not re-read everythin
 | 8 | Independent audit (S1/S2) | Spawn the independent auditor worker per `audit-rules.md` §4 (specs + diff only; S2 adds the invariant walkthrough); S0 MAY use a Sonnet review | Report received and forwarded verbatim; findings tracked; verdict not FAIL; report ID in the PR (`review-gate`) |
 | 9 | Public/private boundary check (§12) | `--name-only` and a grep for the §12.1 items | Nothing from §12.1 in a public-repo diff |
 | 10 | Claim classification | — | Every statement to the owner labelled **verified** (re-run or observed) or **reported** (worker said). A reported claim MUST NOT be presented as verified |
+| 11 | Docs pass | Before every handoff and before reporting a milestone, release or merge as done: `node tools/docs-status/index.mjs --check`; compare `docs/status.yaml` with the merged PRs and backlog card statuses (`gh pr list --state merged`); confirm the PR's "Docs impact" section is true; check the CHANGELOG `[Unreleased]` line and, for public docs, `docs-site/` and `knowledge/` | The check passes; no merged work is missing from `docs/status.yaml`; each doc named in "Docs impact" was updated; a gap is fixed in a follow-up docs PR before the handoff is saved |
 
 For S1/S2, invariant and spec conformance come from step 8, not from the orchestrator reading the entire diff. If a step fails, the orchestrator returns the work to the worker or re-routes it (§3.3). Fixes go back to a worker. A trivial fix the orchestrator makes itself is disclosed in the PR and verified by the same protocol.
 
@@ -282,7 +283,8 @@ S0 tasks MAY skip `audit`. A task that hits stop-the-line (`audit-rules.md` §10
 - [ ] `ci-gate`, `security-gate`, `pr-hygiene` and `review-gate` green (contracts repo: `contracts-gate` green). A required job that skipped is not evidence for an acceptance criterion.
 - [ ] Acceptance evidence in the PR: each AC → test name, command output or screenshot.
 - [ ] Docs and spec updated in the same PR if an interface or behaviour changed (§8).
-- [ ] `README.md` Status section updated when a milestone, release or user-visible capability changes. The README never claims unimplemented features: we build in public, and the README is the project's public face.
+- [ ] Status kept true by one source: a PR that changes status (a card done or started, a component or milestone moved, a deploy, a release) edits `docs/status.yaml` and runs `node tools/docs-status/index.mjs` in the same PR. That regenerates the README Status and Roadmap, the `docs-site/` status page and, when present, `knowledge/07-status-and-roadmap.md`; `pnpm lint` runs `tools/docs-status --check` and fails on any drift. Never edit a generated block by hand. The README never claims unimplemented features: we build in public, and the README is the project's public face.
+- [ ] The PR body's "Docs impact" section names the docs updated (README, `docs-site/`, `knowledge/`, CHANGELOG, specs, runbooks) or says `none: <reason>`.
 - [ ] Review requirements for the class met and shown in the PR body (`audit-rules.md` §3): independent review report referenced for S1/S2; for S2, threat note and tests-first evidence; and, for S2 and sensitive paths, Tali's "merge" in chat recorded in the PR body (D-51, D-52).
 - [ ] All review findings and relayed feedback items dispositioned (§14); zero open Critical/High against the change.
 - [ ] Changeset added if a published package changed; CHANGELOG `[Unreleased]` entry for user-visible, spec or process changes (`versioning.md` §5).
@@ -444,7 +446,7 @@ DECISION NEEDED (owner): whether submitter gas-key addresses and the mainnet dep
 | **Start** | 1. Auto-load `AGENTS.md` / `CLAUDE.md`. 2. `get_project_context` for project `agentlink` (scope `orchestrator`; a single-task session uses its task ID). 3. Read the `sync` branch: `board.md` (claims, ownership) and every person file (status, feedback). 4. Verify handoff and sync claims against the repository before relying on them. |
 | **During** | Save Curator state per §13.2. Claim or release tasks on `board.md` as they start or finish. |
 | **At ~60% context** | Save the Curator handoff and the own sync file, then suggest a fresh session to the owner (§3.5). |
-| **End** | 1. Update own sync file (status, claims, feedback dispositions; `sync-protocol.md`), within its budget (§3.6). 2. `save_working_state` with the complete current state, within the handoff budget. |
+| **End** | 0. Docs pass (§5 step 11): `docs/status.yaml` matches what merged and the status check passes. 1. Update own sync file (status, claims, feedback dispositions; `sync-protocol.md`), within its budget (§3.6). 2. `save_working_state` with the complete current state, within the handoff budget. |
 
 ### 13.2 Curator rules
 
