@@ -267,7 +267,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        # Exact runner images, no `*-latest` (M1-8a-d): an image change must not silently change the
+        # keychain behaviour under test. These are the images `*-latest` resolved to when pinned
+        # (2026-10-15); a bump is its own reviewed change.
+        os: [macos-26, windows-2025-vs2026, ubuntu-24.04]
     env:
       AGENTLINK_REQUIRE_KEYCHAIN: "1"
     steps:
