@@ -9,16 +9,16 @@ AgentLink is pre-alpha, last updated 15 Oct 2026, version v0.0.1. M0 (foundation
 
 - **M0 Foundations.** Repository, process and CI. Merged: Monorepo skeleton; Delivery pipeline and runbooks; Public documentation; Redacting logger (@agentlink/log); Specifications and process. In progress: CI follow-ups.
 - **Crypto (@agentlink/crypto).** Code merged, none of it published. Merged: Encodings, hashing, JSON canonicalisation; Key derivation and public identities; EIP-712 typed data and the agent card; Owner passphrase wrap, pairing proof, safety code; Key interfaces, NIP-44 v2, gift wrap. In progress: Envelope encryption; Independent test vectors. Planned: File encryption (ALF1).
-- **Shared types (@agentlink/types).** Code merged, none of it published. Merged: Policy, approval, proof pack and tool-result types. In progress: Constants and the envelope, payload, card and invite schemas.
-- **Transport (@agentlink/transport-nostr).** Code merged, not published. Merged: Gift wrap and unwrap; Relay pool and delivery outbox; Sync. In progress: Outbox stays inside the sync look-back.
-- **Core (@agentlink/core).** Code merged, not published. Nothing in it is user-runnable yet. Merged: Skeleton: identity, contacts, store and approval interfaces; Envelopes; Invites and pairing; Safety code checked; Owner-signed actions and policies. In progress: Approval requests and the requests queue; Held cards need the sender's own owner entry; Send pipeline and outbox. Planned: Inbox sync, delivery acknowledgements, owner card update.
+- **Shared types (@agentlink/types).** Code merged, none of it published. Merged: Constants and the envelope, payload, card and invite schemas; Policy, approval, proof pack and tool-result types.
+- **Transport (@agentlink/transport-nostr).** Code merged, not published. Merged: Gift wrap and unwrap; Relay pool and delivery outbox; Sync; Outbox stays inside the sync look-back.
+- **Core (@agentlink/core).** Code merged, not published. Nothing in it is user-runnable yet. Merged: Skeleton: identity, contacts, store and approval interfaces; Envelopes; Invites and pairing; Safety code checked; Owner-signed actions and policies; Approval requests and the requests queue; Held cards need the sender's own owner entry. In progress: Send pipeline. Planned: Inbox sync, delivery acknowledgements, owner card update.
 - **Node runtime (@agentlink/node).** Code merged, not published. Nothing in it is user-runnable yet. Merged: Agent key store in the OS keychain; Local SQLite database; Owner code at a prompt; Relay connection; Policy version record in the keychain. Planned: Passphrase-locked key file for headless machines.
 - **MCP server, CLI and apps.** Nothing built yet. Planned: MCP server and CLI; Local approval page; Owner console, desktop apps, cloud agent.
 - **OCC v2 contracts (private repo).** Pre-audit. Nothing in AgentLink uses them yet. Merged: Notary and fee vault; Testnet deployment. Planned: Gnosis Chiado deployment, ABI package, pre-audit fixes.
 - **Design.** Tracked in `docs/design/`. Merged: Design drop D1. In progress: Design drop D2.
 - **Testnet:** OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit; AgentLink does not use them yet.
 - **Mainnet:** After the external audit (M3). Not deployed.
-- **In progress:** In review as pull requests: approval requests and the requests queue (M1-7e), the held-card owner entry (G-51), the encodings vectors and the outbox look-back. Next: inbox sync, file encryption, the MCP server and CLI, and the remaining contract work.
+- **In progress:** The send pipeline in core (M1-7k) and the terms schema (M1-21), and the decomposition of the MCP server and CLI into cards. Next: inbox sync, the MCP server and CLI, then file encryption and the remaining contract work.
 - **Does not exist yet:** a usable product. The packages are private and nothing is published; only the crypto, types, transport, core, node and logging foundations listed here contain code. **There is nothing to install or run yet.** The design is described throughout and marked "planned" where it is not built.
 <!-- status-summary:end -->
 

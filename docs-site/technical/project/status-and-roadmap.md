@@ -13,7 +13,7 @@
 
 **Testnet:** OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit; AgentLink does not use them yet. **Mainnet:** After the external audit (M3). Not deployed. **Services:** Submitter, faucet and encrypted drop are not built or deployed yet.
 
-**In progress:** In review as pull requests: approval requests and the requests queue (M1-7e), the held-card owner entry (G-51), the encodings vectors and the outbox look-back. Next: inbox sync, file encryption, the MCP server and CLI, and the remaining contract work.
+**In progress:** The send pipeline in core (M1-7k) and the terms schema (M1-21), and the decomposition of the MCP server and CLI into cards. Next: inbox sync, the MCP server and CLI, then file encryption and the remaining contract work.
 
 **Next:** The rest of the M1a crypto and core layers, then the walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets.
 
@@ -37,20 +37,20 @@ Code that is merged is not necessarily published: nothing is released or install
 | Crypto (@agentlink/crypto) | Key interfaces, NIP-44 v2, gift wrap | Done | [#41](https://github.com/4thtech/agentlink/pull/41), [#42](https://github.com/4thtech/agentlink/pull/42), [#55](https://github.com/4thtech/agentlink/pull/55) |
 | Crypto (@agentlink/crypto) | Independent test vectors | In progress | [#25](https://github.com/4thtech/agentlink/pull/25), [#35](https://github.com/4thtech/agentlink/pull/35), [#72](https://github.com/4thtech/agentlink/pull/72), [#75](https://github.com/4thtech/agentlink/pull/75) |
 | Crypto (@agentlink/crypto) | File encryption (ALF1) | Planned | - |
-| Shared types (@agentlink/types) | Constants and the envelope, payload, card and invite schemas | In progress | [#23](https://github.com/4thtech/agentlink/pull/23), [#93](https://github.com/4thtech/agentlink/pull/93) |
+| Shared types (@agentlink/types) | Constants and the envelope, payload, card and invite schemas | Done | [#23](https://github.com/4thtech/agentlink/pull/23), [#93](https://github.com/4thtech/agentlink/pull/93) |
 | Shared types (@agentlink/types) | Policy, approval, proof pack and tool-result types | Done | [#31](https://github.com/4thtech/agentlink/pull/31), [#36](https://github.com/4thtech/agentlink/pull/36), [#71](https://github.com/4thtech/agentlink/pull/71), [#72](https://github.com/4thtech/agentlink/pull/72), [#76](https://github.com/4thtech/agentlink/pull/76) |
 | Transport (@agentlink/transport-nostr) | Gift wrap and unwrap | Done | [#45](https://github.com/4thtech/agentlink/pull/45) |
 | Transport (@agentlink/transport-nostr) | Relay pool and delivery outbox | Done | [#59](https://github.com/4thtech/agentlink/pull/59) |
 | Transport (@agentlink/transport-nostr) | Sync | Done | [#63](https://github.com/4thtech/agentlink/pull/63) |
-| Transport (@agentlink/transport-nostr) | Outbox stays inside the sync look-back | In progress | [#87](https://github.com/4thtech/agentlink/pull/87) |
+| Transport (@agentlink/transport-nostr) | Outbox stays inside the sync look-back | Done | [#87](https://github.com/4thtech/agentlink/pull/87) |
 | Core (@agentlink/core) | Skeleton: identity, contacts, store and approval interfaces | Done | [#48](https://github.com/4thtech/agentlink/pull/48) |
 | Core (@agentlink/core) | Envelopes | Done | [#66](https://github.com/4thtech/agentlink/pull/66) |
 | Core (@agentlink/core) | Invites and pairing | Done | [#78](https://github.com/4thtech/agentlink/pull/78) |
 | Core (@agentlink/core) | Safety code checked | Done | [#80](https://github.com/4thtech/agentlink/pull/80), [#85](https://github.com/4thtech/agentlink/pull/85) |
 | Core (@agentlink/core) | Owner-signed actions and policies | Done | [#79](https://github.com/4thtech/agentlink/pull/79) |
-| Core (@agentlink/core) | Approval requests and the requests queue | In progress | [#95](https://github.com/4thtech/agentlink/pull/95) |
-| Core (@agentlink/core) | Held cards need the sender's own owner entry | In progress | [#90](https://github.com/4thtech/agentlink/pull/90) |
-| Core (@agentlink/core) | Send pipeline and outbox | In progress | [#99](https://github.com/4thtech/agentlink/pull/99) |
+| Core (@agentlink/core) | Approval requests and the requests queue | Done | [#95](https://github.com/4thtech/agentlink/pull/95) |
+| Core (@agentlink/core) | Held cards need the sender's own owner entry | Done | [#90](https://github.com/4thtech/agentlink/pull/90) |
+| Core (@agentlink/core) | Send pipeline | In progress | [#99](https://github.com/4thtech/agentlink/pull/99) |
 | Core (@agentlink/core) | Inbox sync, delivery acknowledgements, owner card update | Planned | - |
 | Node runtime (@agentlink/node) | Agent key store in the OS keychain | Done | [#54](https://github.com/4thtech/agentlink/pull/54), [#57](https://github.com/4thtech/agentlink/pull/57), [#83](https://github.com/4thtech/agentlink/pull/83) |
 | Node runtime (@agentlink/node) | Local SQLite database | Done | [#60](https://github.com/4thtech/agentlink/pull/60), [#68](https://github.com/4thtech/agentlink/pull/68) |
