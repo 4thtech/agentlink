@@ -1,9 +1,11 @@
-// Suite `terms` (M1-21, D-32, D-55): the strict `terms` schema and canonical form, `TermsInput` and
-// its mapping (@agentlink/types), termsHash = sha256(JCS(terms)) (@agentlink/crypto), and the pure
-// negotiation-chain helpers. For the chain ops this module replays the case's `log` the way a core
-// replays its own store: it groups offers by `negotiationKey`, checks every received envelope with
-// the helpers and applies their result (store, refuse, mark conflict, lock). The decisions are the
-// helpers'; this module only keeps the list. Nothing here supplies an expected value.
+// Suite `terms` (M1-21, D-32, D-55, D-74): the strict `terms` schema and canonical form, `TermsInput`
+// and its mapping (@agentlink/types), termsHash = sha256(JCS(terms)) (@agentlink/crypto), and the
+// pure negotiation-chain reducer. For the chain ops this module replays the case's `log` the way a
+// core replays its own store: it drops a duplicate (the same envelope, D-71 (3); here the JCS of the
+// abstract envelope stands in for its envelopeHash), checks the body and its termsHash, and passes
+// every envelope to the reducer of its negotiation key (`recordSentTerms`, `receiveTerms`). The
+// decisions are the reducer's; this module only keeps the per-key states. Nothing here supplies an
+// expected value.
 import {
   CryptoInputError,
   canonicalize,
@@ -12,19 +14,20 @@ import {
   verifyTermsHash,
 } from '@agentlink/crypto';
 import {
+  EMPTY_NEGOTIATION,
   acceptBodySchema,
   checkSendAccept,
-  evaluateIncomingAnswer,
-  evaluateIncomingOffer,
   negotiationKey,
   newestOpenOffer,
   nextTermsLink,
   offerBodySchema,
+  parseTermsInput,
+  receiveTerms,
+  recordSentTerms,
   rejectBodySchema,
   termsFromInput,
-  termsInputSchema,
   termsSchema,
-  type StoredTermsOffer,
+  type NegotiationState,
   type Terms,
 } from '@agentlink/types';
 import type { Comparison, SuiteModule } from '../suite';
@@ -35,13 +38,10 @@ interface Envelope {
   readonly id: string;
   readonly from: string;
   readonly to: string;
+  readonly createdAt: number;
   readonly type: string;
   readonly replyTo: string | null;
   readonly body: unknown;
-}
-interface LogEntry {
-  readonly dir: Dir;
-  readonly envelope: Envelope;
 }
 
 const BODY_SCHEMAS = {
@@ -56,6 +56,7 @@ const fail = (what: string): never => {
 const obj = (v: unknown, what: string): Obj =>
   typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Obj) : fail(what);
 const str = (v: unknown, what: string): string => (typeof v === 'string' ? v : fail(what));
+const num = (v: unknown, what: string): number => (typeof v === 'number' ? v : fail(what));
 
 /** A terms body that passes its strict schema and whose termsHash is the recomputed one. */
 function parseBody(type: string, body: unknown): { terms: Terms; termsHash: string } | null {
@@ -66,96 +67,65 @@ function parseBody(type: string, body: unknown): { terms: Terms; termsHash: stri
   return { terms: parsed.data.terms, termsHash: parsed.data.termsHash };
 }
 
-/** One negotiation key's state, as a core keeps it. */
-interface Chain {
-  offers: StoredTermsOffer[];
-  lockedVersions: number[];
-}
-
 class Store {
-  private readonly chains = new Map<string, Chain>();
+  private readonly chains = new Map<string, NegotiationState>();
+  private readonly seen = new Set<string>();
 
   constructor(private readonly self: string) {}
 
-  chain(key: string): Chain {
-    let c = this.chains.get(key);
-    if (c === undefined) {
-      c = { offers: [], lockedVersions: [] };
-      this.chains.set(key, c);
-    }
-    return c;
+  state(key: string): NegotiationState {
+    return this.chains.get(key) ?? EMPTY_NEGOTIATION;
   }
 
-  /** Finds a stored offer by envelope id in any negotiation. */
-  findOffer(id: string): { key: string; offer: StoredTermsOffer } | undefined {
-    for (const [key, c] of this.chains) {
-      const offer = c.offers.find((o) => o.envelopeId === id);
-      if (offer !== undefined) return { key, offer };
+  /** Finds the key of a stored offer by envelope id. */
+  keyOfOffer(id: string): string | undefined {
+    for (const [key, s] of this.chains) {
+      if (s.offers.some((o) => o.envelopeId === id)) return key;
     }
     return undefined;
   }
 
-  /** Applies one envelope; returns the outcome of a received one and its negotiation key. */
-  apply(dir: Dir, env: Envelope): { outcome: 'valid' | 'refused' | 'conflict'; key?: string } {
+  apply(
+    dir: Dir,
+    env: Envelope,
+  ): { outcome: 'valid' | 'refused' | 'conflict' | 'duplicate'; key?: string } {
+    const identity = canonicalize(env as unknown as Obj);
+    if (this.seen.has(identity)) return { outcome: 'duplicate', key: this.keyOf(env) };
+    this.seen.add(identity);
     const body = parseBody(env.type, env.body);
-    if (body === null) return { outcome: 'refused' };
-    const { terms, termsHash: hash } = body;
-    const key = negotiationKey(terms.termsId, terms.parties);
-    const c = this.chain(key);
-    const offer: StoredTermsOffer = {
+    if (body === null) return { outcome: 'refused', key: this.keyOf(env) };
+    const key = negotiationKey(body.terms.termsId, body.terms.parties);
+    const envelope = {
       envelopeId: env.id,
       sender: env.from,
-      version: terms.version,
-      termsHash: hash,
-      state: 'open',
-      validUntil: terms.validUntil,
+      recipient: env.to,
+      createdAt: env.createdAt,
+      type: env.type as 'offer' | 'accept' | 'reject',
+      replyTo: env.replyTo,
+      terms: body.terms,
+      termsHash: body.termsHash,
     };
     if (dir === 'sent') {
-      // The own core wrote it after its own checks.
-      if (env.type === 'offer') c.offers.push(offer);
-      if (env.type === 'accept') c.lockedVersions.push(terms.version);
+      this.chains.set(key, recordSentTerms(this.state(key), envelope));
       return { outcome: 'valid', key };
     }
-    if (env.type === 'offer') {
-      const r = evaluateIncomingOffer(
-        { envelopeId: env.id, sender: env.from, self: this.self, terms },
-        c,
-      );
-      if (r.result === 'accept') {
-        c.offers.push(offer);
-        return { outcome: 'valid', key };
-      }
-      if (r.result === 'conflict') {
-        c.offers = c.offers.map((o) =>
-          o.envelopeId === r.with ? { ...o, state: 'conflict' as const } : o,
-        );
-        c.offers.push({ ...offer, state: 'conflict' });
-        return { outcome: 'conflict', key };
-      }
-      return { outcome: 'refused', key };
-    }
-    const r = evaluateIncomingAnswer(
-      {
-        envelopeId: env.id,
-        type: env.type as 'accept' | 'reject',
-        sender: env.from,
-        self: this.self,
-        replyTo: env.replyTo,
-        terms,
-        termsHash: hash,
-      },
-      c,
-    );
-    if (r.result !== 'accept') return { outcome: 'refused', key };
-    if (env.type === 'accept') c.lockedVersions.push(terms.version);
-    return { outcome: 'valid', key };
+    const r = receiveTerms(this.state(key), envelope, this.self);
+    this.chains.set(key, r.state);
+    return { outcome: r.outcome, key };
+  }
+
+  /** The negotiation key of an envelope whose body may not parse (for the newest-version fields). */
+  private keyOf(env: Envelope): string | undefined {
+    const terms = (env.body as { terms?: { termsId?: unknown; parties?: unknown } } | null)?.terms;
+    const r = termsSchema.safeParse(terms);
+    return r.success ? negotiationKey(r.data.termsId, r.data.parties) : undefined;
   }
 }
 
 function replay(self: string, log: unknown): Store {
   const store = new Store(self);
   if (!Array.isArray(log)) fail('log');
-  for (const entry of log as LogEntry[]) {
+  for (const entry of log as unknown[]) {
     const e = obj(entry, 'log entry');
     if (e.dir !== 'sent' && e.dir !== 'received') fail('log dir');
     store.apply(e.dir as Dir, obj(e.envelope, 'envelope') as unknown as Envelope);
@@ -164,7 +134,7 @@ function replay(self: string, log: unknown): Store {
 }
 
 const newest = (store: Store, key: string | undefined): Comparison[] => {
-  const head = key === undefined ? undefined : newestOpenOffer(store.chain(key).offers);
+  const head = key === undefined ? undefined : newestOpenOffer(store.state(key).offers);
   return [
     { field: 'newestVersion', actual: String(head?.version ?? 0) },
     { field: 'newestTermsHash', actual: head?.termsHash ?? 'null' },
@@ -200,13 +170,10 @@ function evaluate(input: Obj): Comparison[] {
       const r = parseBody(str(input.type, 'type'), input.body);
       return parsed(r !== null, () => (r as { termsHash: string }).termsHash);
     }
-    case 'parseTermsInput':
-      return [
-        {
-          field: 'outcome',
-          actual: termsInputSchema.safeParse(input.termsInput).success ? 'accept' : 'reject',
-        },
-      ];
+    case 'parseTermsInput': {
+      const ok = parseTermsInput(input.termsInput, num(input.now, 'now')).success;
+      return [{ field: 'outcome', actual: ok ? 'accept' : 'reject' }];
+    }
     case 'mapTermsInput': {
       const ctx = obj(input.context, 'context');
       const r = termsFromInput(input.termsInput, {
@@ -228,6 +195,8 @@ function evaluate(input: Obj): Comparison[] {
         { field: 'termsJcs', actual: canonicalize(r.data) },
       ];
     }
+    case 'unicodeProbe':
+      return [{ field: 'nfc', actual: str(input.probe, 'probe').normalize('NFC') }];
     case 'chainReceive': {
       const self = str(input.self, 'self');
       const store = replay(self, input.log);
@@ -241,25 +210,26 @@ function evaluate(input: Obj): Comparison[] {
         self,
         str(input.contact, 'contact'),
       ]);
-      const link = nextTermsLink(store.chain(key).offers);
+      const link = nextTermsLink(store.state(key), self);
       return [
         { field: 'version', actual: String(link.version) },
         { field: 'previousTermsHash', actual: link.previousTermsHash ?? 'null' },
+        { field: 'replyTo', actual: link.replyTo ?? 'null' },
       ];
     }
     case 'sendAccept': {
       const self = str(input.self, 'self');
       const store = replay(self, input.log);
       const id = str(input.answers, 'answers');
-      const found = store.findOffer(id);
+      const key = store.keyOfOffer(id);
       const r =
-        found === undefined
-          ? { result: 'refuse' as const }
-          : checkSendAccept(store.chain(found.key), id, self, input.now as number);
+        key === undefined
+          ? ({ result: 'refuse' } as const)
+          : checkSendAccept(store.state(key), id, self, num(input.now, 'now'));
       return r.result === 'allowed'
         ? [
             { field: 'outcome', actual: 'allowed' },
-            { field: 'termsHash', actual: (found as { offer: StoredTermsOffer }).offer.termsHash },
+            { field: 'termsHash', actual: r.termsHash },
           ]
         : [{ field: 'outcome', actual: 'refused' }];
     }

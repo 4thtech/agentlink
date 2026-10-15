@@ -1,19 +1,20 @@
-// Terms (D-32, D-55): the `terms` object of `offer`, `accept` and `reject` (04 §3.4), its canonical
-// form, the agent-facing `TermsInput` (06 §2.2a) and the pure negotiation-chain rules.
+// Terms (D-32, D-55, D-74): the `terms` object of `offer`, `accept` and `reject` (04 §3.4), its
+// canonical form, the agent-facing `TermsInput` (06 §2.2a) and the pure negotiation-chain reducer.
 //
 // Rules:
-// - Received terms are untrusted content (I-5): every string, list and the whole object are bounded
-//   (TERMS_LIMITS) before anything else reads them, and they are only ever checked, never rendered
-//   or executed here.
+// - Received terms are untrusted content (I-5): every string and list is bounded (TERMS_LIMITS)
+//   before anything else reads it, and terms are only ever checked here, never rendered or executed.
 // - Non-canonical input is refused, never rewritten (04 §3.4): nothing here trims, normalises,
 //   re-cases or re-orders. A value that parses is returned unchanged, so what the owner sees is
 //   exactly what `termsHash` covers.
+// - Characters follow the pinned UCD 15.0.0 table (unicode.ts), never the runtime's categories.
 // - No hashing here: `termsHash = sha256(JCS(terms))` is `termsHash` in @agentlink/crypto (04 §8.1).
-// - The chain helpers are pure: the core (M1-32) reads its own store, passes the offers of one
-//   negotiation key and applies the result. They never trust the counterparty's pointer.
+// - The chain reducer is pure: the core (M1-32) replays its own store through it, keyed by
+//   `negotiationKey`, and persists the result. It never trusts the counterparty's pointer.
 import { z } from 'zod';
 import {
   BYTE_LENGTHS,
+  MAX_TERMS_NOTE_CODE_POINTS,
   TERMS_DEFAULT_VALIDITY_SECONDS,
   TERMS_LIMITS,
   TERMS_TOKEN_SYMBOLS,
@@ -26,29 +27,28 @@ import {
   hexToBytes,
   isUtcTimestamp,
   isWellFormedString,
-  jsonByteLength,
   sha256Hex,
   uint53,
   utcTimestampToUnixSeconds,
 } from './encoding.js';
+import { hasCategory15, isTermsRuntimeSupported, type RefusedCategory } from './unicode.js';
 
-// --- canonical form (04 §3.4, IR-D55-1 F07) -------------------------------------------------------
+// --- canonical form (04 §3.4, D-55, D-74) ---------------------------------------------------------
 
-// C0 and C1 controls and DEL (Cc); every format character (Cf), which includes the bidi controls
-// U+200E, U+200F, U+202A-U+202E, U+2066-U+2069 and the zero-width characters; private use (Co);
-// surrogates (Cs: only a lone one can occur in a JS string).
-const NOT_CANONICAL_CHAR = /[\p{Cc}\p{Cf}\p{Co}\p{Cs}]/u;
+const REFUSED: ReadonlySet<RefusedCategory> = new Set(['Cc', 'Cf', 'Zl', 'Zp', 'Co', 'Cs', 'Cn']);
 
 /**
- * True when `value` is canonical terms text (04 §3.4): a well-formed string in Unicode NFC with no C0
- * or C1 control, no bidi control, no other format character (zero-width characters included) and
- * no private-use code point. Never throws.
+ * True when `value` is canonical terms text (04 §3.4 "Characters", D-74): a well-formed string with
+ * no code point whose UCD 15.0.0 General_Category is Cc (DEL included), Cf, Zl, Zp, Co, Cs or Cn
+ * (unassigned, noncharacters included), equal to its own NFC form. Always false on a runtime older
+ * than Unicode 15.0 (`isTermsRuntimeSupported`). Never throws.
  */
 export function isCanonicalTermsText(value: unknown): value is string {
   return (
     typeof value === 'string' &&
+    isTermsRuntimeSupported() &&
     isWellFormedString(value) &&
-    !NOT_CANONICAL_CHAR.test(value) &&
+    !hasCategory15(value, REFUSED) &&
     value.normalize('NFC') === value
   );
 }
@@ -61,44 +61,50 @@ const termsText = (min: number, max: number) =>
     .max(max * 2, { abort: true })
     .refine(isCanonicalTermsText, {
       message:
-        'must be NFC text without control, bidi, zero-width or other format, or private-use characters',
+        'must be NFC text without control, format, separator, private-use or unassigned characters',
     })
     .refine((s) => {
       const n = codePointLength(s);
       return n >= min && n <= max;
     }, `must be ${min}..${max} characters`);
 
-const AMOUNT = /^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$/;
+/** `deliverables[].id` and `deadlines[].ref`: `^[A-Za-z0-9_-]{1,16}$` (D-74). */
+const deliverableId = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]{1,16}$/, 'must be 1 to 16 characters of A-Z, a-z, 0-9, _ or -');
+
+const AMOUNT = /^(0|[1-9][0-9]{0,17})(\.[0-9]{1,6})?$/;
 /**
- * `price.amount` (04 §3.4, §2.4.1 "Other decimal amounts"): `^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$`,
- * greater than zero, hashed as written (so `"1500.00"` and `"1500"` are different terms). A JSON
- * number is refused.
+ * `price.amount` (04 §3.4, D-74): `^(0|[1-9][0-9]{0,17})(\.[0-9]{1,6})?$`, greater than zero,
+ * hashed as written (so `"1500.00"` and `"1500"` are different terms). A JSON number is refused.
  */
 export const termsAmountSchema = z
   .string()
-  .max(TERMS_LIMITS.amountLength)
-  .regex(AMOUNT, 'must be a decimal amount with at most 6 decimals, no sign and no leading zero')
+  .max(25, { abort: true })
+  .regex(AMOUNT, 'must be a decimal amount: at most 18 digits, 6 decimals, no sign or leading zero')
   .refine((s) => /[1-9]/.test(s), 'must be greater than zero');
 
-const ISO_4217 = /^[A-Z]{3}$/;
+const CURRENCY_GRAMMAR = /^[A-Z]{3}$/;
 const TOKEN_SYMBOLS: ReadonlySet<string> = new Set(TERMS_TOKEN_SYMBOLS);
-/** `price.currency` (04 §3.4): `^[A-Z]{3}$` (ISO 4217) or exactly an allowlisted token symbol. */
+/** `price.currency` (04 §3.4, D-74): the grammar `^[A-Z]{3}$` or exactly USDC, USDT or XDAI. */
 export const termsCurrencySchema = z
   .string()
   .refine(
-    (s) => ISO_4217.test(s) || TOKEN_SYMBOLS.has(s),
-    'must be an ISO 4217 code (3 upper-case ASCII letters) or an allowlisted token symbol',
+    (s) => CURRENCY_GRAMMAR.test(s) || TOKEN_SYMBOLS.has(s),
+    'must be 3 upper-case ASCII letters or one of USDC, USDT, XDAI',
   );
 
-/** `deadlines[].due` (04 §3.4): strict RFC 3339 in UTC, `YYYY-MM-DDTHH:MM:SSZ`. */
+/** `deadlines[].due` (04 §3.4): strict RFC 3339 in UTC, `YYYY-MM-DDTHH:MM:SSZ`, a real date. */
 export const termsDueSchema = z
   .string()
   .refine(isUtcTimestamp, 'must be an RFC 3339 UTC timestamp: YYYY-MM-DDTHH:MM:SSZ');
 
-const deliverableId = termsText(1, TERMS_LIMITS.deliverableIdCodePoints);
 const description = termsText(1, TERMS_LIMITS.descriptionCodePoints);
 const subject = termsText(1, TERMS_LIMITS.subjectCodePoints);
-const positiveInt = uint53.refine((n) => n >= 1, 'must be a positive integer');
+const positiveInt = uint53.refine((n) => n >= 1, 'must be an integer from 1 to 2^53 - 1');
+
+/** `note` of an offer or reject body: `null` or 1 to 500 code points of canonical text (D-74). */
+export const termsNoteSchema = termsText(1, MAX_TERMS_NOTE_CODE_POINTS).nullable();
 
 const deadlineSchema = z.strictObject({ ref: deliverableId, due: termsDueSchema });
 
@@ -141,13 +147,13 @@ function checkIdsAndRefs(
 }
 
 /**
- * The `terms` object (04 §3.4, D-32): the body of `offer`, `accept` and `reject`, checked on send
- * and on receipt. Every field is required except `price` (absent, never null, when there is none);
- * `deadlines` is `[]` when there are none. Encodings per 04 §2.4.1: `termsId` base64url (16 bytes),
- * agent IDs `0x` + 40 lower-case hex, hashes bare 64 lower-case hex. Cross-field rules: two distinct
- * parties (written in either order and hashed as written); `payer` and every `by` one of them;
- * unique deliverable ids; deadlines name a deliverable, once each; version 1 exactly when there is
- * no `previousTermsHash`; the whole object at most TERMS_LIMITS.maxBytes.
+ * The `terms` object (04 §3.4, D-32, D-74): the body of `offer`, `accept` and `reject`, checked on
+ * send and on receipt. Every key is always present; `null` only for `price` (no price),
+ * `plaintextSha256` (no file) and `previousTermsHash` (version 1). Encodings per 04 §2.4.1:
+ * `termsId` base64url (16 bytes), agent IDs `0x` + 40 lower-case hex, hashes bare 64 lower-case hex.
+ * Cross-field rules: two distinct parties in ascending byte order; `payer` and every `by` one of
+ * them; unique deliverable ids; deadlines name a deliverable, once each; version 1 exactly when
+ * `previousTermsHash` is null.
  */
 export const termsSchema = z
   .strictObject({
@@ -156,19 +162,20 @@ export const termsSchema = z
     parties: z.tuple([evmAddress, evmAddress]),
     subject,
     deliverables: z.array(termsDeliverableSchema).min(1).max(TERMS_LIMITS.deliverables),
-    price: termsPriceSchema.exactOptional(),
+    price: termsPriceSchema.nullable(),
     deadlines: z.array(deadlineSchema).max(TERMS_LIMITS.deadlines),
-    // A JSON integer in [0, 2^53 - 1] (04 §3.4 "validUntil is an integer", 04 §3.4 shape rules);
-    // whether it has passed is a check at use (TERMS_EXPIRED), not a shape rule.
-    validUntil: uint53,
+    validUntil: positiveInt,
     previousTermsHash: sha256Hex.nullable(),
   })
   .superRefine((t, ctx) => {
     const issue: IssueFn = (message, path) => ctx.addIssue({ code: 'custom', message, path });
     const [a, b] = Array.isArray(t.parties) ? t.parties : [];
-    if (a === b) issue('the two parties must differ', ['parties']);
+    // Canonical lower-case addresses of one length: string order is byte order.
+    if (!(typeof a === 'string' && typeof b === 'string' && a < b)) {
+      issue('parties must be two distinct agent IDs in ascending order', ['parties']);
+    }
     const isParty = (x: unknown) => x === a || x === b;
-    if (t.price !== undefined && !isParty(t.price?.payer)) {
+    if (t.price !== null && t.price !== undefined && !isParty(t.price.payer)) {
       issue('payer must be one of the parties', ['price', 'payer']);
     }
     (t.deliverables ?? []).forEach((d, i) => {
@@ -180,24 +187,23 @@ export const termsSchema = z
         'previousTermsHash',
       ]);
     }
-    if (jsonByteLength(t) > TERMS_LIMITS.maxBytes) {
-      issue(`terms exceed ${TERMS_LIMITS.maxBytes} bytes`, []);
-    }
   });
 
 export type Terms = z.infer<typeof termsSchema>;
 export type TermsDeliverable = z.infer<typeof termsDeliverableSchema>;
 export type TermsPrice = z.infer<typeof termsPriceSchema>;
 
-// --- TermsInput (06 §2.2a, D-55) ------------------------------------------------------------------
+// --- TermsInput (06 §2.2a, D-55, D-74) ------------------------------------------------------------
 
 const side = z.enum(['me', 'them']);
 
 /**
- * `TermsInput` (06 §2.2a, D-55): the only fields an agent may supply to the terms tools. Strict at
- * every level, so `termsId`, `version`, `parties`, `previousTermsHash` and `termsHash` (core-filled)
- * and any unknown key are refused. The same canonical-form rules and TERMS_LIMITS as `terms`.
- * `validUntil` is the strict UTC form `YYYY-MM-DDTHH:MM:SSZ`; `by` and `payer` are `me` or `them`.
+ * `TermsInput` (06 §2.2a, D-55, D-74): the only fields an agent may supply to the terms tools. Strict
+ * at every level, so `termsId`, `version`, `parties`, `previousTermsHash` and `termsHash`
+ * (core-filled) and any unknown key are refused, and so is an explicit `null` anywhere; ids are given
+ * on every deliverable or on none. The same
+ * canonical-form rules and TERMS_LIMITS as `terms`. `validUntil` is only the strict UTC form
+ * `YYYY-MM-DDTHH:MM:SSZ`; that it is after now is checked by `parseTermsInput`.
  */
 export const termsInputSchema = z
   .strictObject({
@@ -222,6 +228,15 @@ export const termsInputSchema = z
   .superRefine((t, ctx) => {
     // The id rules of `terms`, on the ids the mapping will give (defaults d1, d2, … by position),
     // so a duplicate or an unknown deadline ref is refused at the tool input, never renamed.
+    // D-74: ids on every deliverable or on none, so a default can never collide with a given id.
+    const given = (t.deliverables ?? []).filter((d) => d?.id !== undefined).length;
+    if (given !== 0 && given !== (t.deliverables ?? []).length) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'give an id on every deliverable or on none',
+        path: ['deliverables'],
+      });
+    }
     const ids = (t.deliverables ?? []).map((d, n) => ({ id: d?.id ?? `d${n + 1}` }));
     checkIdsAndRefs(ids, t.deadlines, (message, path) =>
       ctx.addIssue({ code: 'custom', message, path }),
@@ -229,6 +244,39 @@ export const termsInputSchema = z
   });
 
 export type TermsInput = z.infer<typeof termsInputSchema>;
+
+/** A validation result that never throws: the value, or the validation error. */
+export type TermsResult<T> =
+  | { readonly success: true; readonly data: T; readonly error?: undefined }
+  | { readonly success: false; readonly data?: undefined; readonly error: z.ZodError };
+export type TermsFromInputResult = TermsResult<Terms>;
+
+const failure = <T>(message: string, path: (string | number)[]): TermsResult<T> => ({
+  success: false,
+  error: new z.ZodError([{ code: 'custom', message, path, input: undefined }]),
+});
+
+/**
+ * Parses a `TermsInput` at unix time `now` (06 §2.2a, D-74): the strict schema, and a given
+ * `validUntil` must be after `now`. Never throws.
+ */
+export function parseTermsInput(input: unknown, now: number): TermsResult<TermsInput> {
+  try {
+    if (!uint53.safeParse(now).success) return failure('invalid now', []);
+    const parsed = termsInputSchema.safeParse(input);
+    if (!parsed.success) return { success: false, error: parsed.error };
+    const until = parsed.data.validUntil;
+    if (until !== undefined) {
+      const seconds = utcTimestampToUnixSeconds(until);
+      if (seconds === null || seconds <= now) {
+        return failure('validUntil must be after now', ['validUntil']);
+      }
+    }
+    return { success: true, data: parsed.data };
+  } catch {
+    return failure('invalid terms input', []);
+  }
+}
 
 function deepFreeze<T>(value: T): T {
   if (value !== null && typeof value === 'object') {
@@ -241,7 +289,7 @@ function deepFreeze<T>(value: T): T {
 /**
  * The JSON Schema of `TermsInput` for the MCP tool list (06 §2.2a). It describes the shape, with
  * every object closed (`additionalProperties: false`); the canonical-form and length rules are
- * enforced by `termsInputSchema` when the tool runs. Plain, deeply frozen JSON.
+ * enforced by `parseTermsInput` when the tool runs. Plain, deeply frozen JSON.
  */
 export const termsInputJsonSchema: Readonly<Record<string, unknown>> = deepFreeze(
   JSON.parse(
@@ -273,45 +321,31 @@ const termsContextSchema = z.strictObject({
   now: uint53,
 });
 
-/** The result of `termsFromInput`: the terms, or the validation error (never a throw). */
-export type TermsFromInputResult =
-  | { readonly success: true; readonly data: Terms; readonly error?: undefined }
-  | { readonly success: false; readonly data?: undefined; readonly error: z.ZodError };
-
-const failure = (message: string, path: (string | number)[]): TermsFromInputResult => ({
-  success: false,
-  error: new z.ZodError([{ code: 'custom', message, path, input: undefined }]),
-});
-
 /**
- * Maps a `TermsInput` to `terms` (06 §2.2a): fills `termsId`, `version`, `parties` (`[self,
- * counterparty]`) and `previousTermsHash` from `context`; maps `me` and `them` in `by` and `payer`
- * to the two agent IDs; gives deliverables without an id `d1`, `d2`, … by position; sets
- * `plaintextSha256` to null when absent, `deadlines` to `[]` when absent and `validUntil` to unix
- * seconds (default now + 7 days). The result must parse as `terms`, and `validUntil` must be after
- * `now`. Anything else is a validation failure: a default id that collides with a given one is
- * refused, never renamed. Never throws.
+ * Maps a `TermsInput` to `terms` (06 §2.2a, D-74): fills `termsId`, `version` and
+ * `previousTermsHash` from `context` and `parties` as the two agent IDs in ascending order; maps `me`
+ * and `them` in `by` and `payer`; gives deliverables without an id `d1`, `d2`, … by position; sets
+ * `plaintextSha256` and `price` to null and `deadlines` to `[]` when absent, and `validUntil` to unix
+ * seconds (default now + 604 800). The input must pass `parseTermsInput` and the result `termsSchema`;
+ * anything else is a validation failure, never a rewrite. Never throws.
  */
 export function termsFromInput(input: unknown, context: TermsContext): TermsFromInputResult {
   try {
-    const parsed = termsInputSchema.safeParse(input);
-    if (!parsed.success) return { success: false, error: parsed.error };
     const ctx = termsContextSchema.safeParse(context);
     if (!ctx.success) return failure('invalid terms context', []);
     const { termsId, version, previousTermsHash, self, counterparty, now } = ctx.data;
+    const parsed = parseTermsInput(input, now);
+    if (!parsed.success) return { success: false, error: parsed.error };
     const i = parsed.data;
     const party = (s: 'me' | 'them') => (s === 'me' ? self : counterparty);
     const validUntil =
       i.validUntil === undefined
         ? now + TERMS_DEFAULT_VALIDITY_SECONDS
-        : utcTimestampToUnixSeconds(i.validUntil);
-    if (validUntil === null || validUntil <= now) {
-      return failure('validUntil must be after now', ['validUntil']);
-    }
-    const terms: Record<string, unknown> = {
+        : (utcTimestampToUnixSeconds(i.validUntil) as number);
+    const terms = {
       termsId,
       version,
-      parties: [self, counterparty],
+      parties: [self, counterparty].sort(),
       subject: i.subject,
       deliverables: i.deliverables.map((d, n) => ({
         id: d.id ?? `d${n + 1}`,
@@ -319,17 +353,14 @@ export function termsFromInput(input: unknown, context: TermsContext): TermsFrom
         by: party(d.by),
         plaintextSha256: d.plaintextSha256 ?? null,
       })),
+      price:
+        i.price === undefined
+          ? null
+          : { amount: i.price.amount, currency: i.price.currency, payer: party(i.price.payer) },
+      deadlines: (i.deadlines ?? []).map((d) => ({ ref: d.ref, due: d.due })),
+      validUntil,
+      previousTermsHash,
     };
-    if (i.price !== undefined) {
-      terms.price = {
-        amount: i.price.amount,
-        currency: i.price.currency,
-        payer: party(i.price.payer),
-      };
-    }
-    terms.deadlines = (i.deadlines ?? []).map((d) => ({ ref: d.ref, due: d.due }));
-    terms.validUntil = validUntil;
-    terms.previousTermsHash = previousTermsHash;
     const result = termsSchema.safeParse(terms);
     return result.success
       ? { success: true, data: result.data }
@@ -339,7 +370,7 @@ export function termsFromInput(input: unknown, context: TermsContext): TermsFrom
   }
 }
 
-// --- negotiation chain (04 §3.4, IR-D55-1 F04, IR-D55-2) ------------------------------------------
+// --- negotiation chain (04 §3.4, D-55, D-74) -------------------------------------------------------
 
 /**
  * The negotiation key (04 §3.4): `termsId` plus the unordered pair of parties, so a `termsId` from
@@ -356,244 +387,375 @@ export function sameTermsHash(a: unknown, b: unknown): boolean {
   return bytesEqual(hexToBytes(a), hexToBytes(b));
 }
 
-/**
- * One stored `offer` of a negotiation, from the core's own store (sent or received). Refused
- * envelopes never enter the chain and are not passed. `conflict`: marked not acceptable by a
- * concurrent counter (no-fork rule 3); it no longer counts as the newest version.
- */
-export interface StoredTermsOffer {
+/** A `terms` envelope as the chain sees it: verified sender and recipient, parsed body. */
+export interface TermsEnvelope {
   readonly envelopeId: string;
-  /** Agent ID of the party that sent it. */
+  /** Agent ID of the verified sender. */
   readonly sender: string;
-  readonly version: number;
-  readonly termsHash: string;
-  readonly state: 'open' | 'conflict';
-  /** The offer's `terms.validUntil` (unix seconds); `checkSendAccept` needs it. */
-  readonly validUntil?: number;
-}
-
-/** The newest open offer of a negotiation (highest version; conflicted offers are skipped). */
-export function newestOpenOffer(offers: readonly StoredTermsOffer[]): StoredTermsOffer | undefined {
-  let head: StoredTermsOffer | undefined;
-  for (const o of offers) {
-    if (o.state === 'open' && (head === undefined || o.version > head.version)) head = o;
-  }
-  return head;
-}
-
-/** The chain link a sending core writes (04 §3.4): newest version + 1 and its `termsHash`. */
-export function nextTermsLink(offers: readonly StoredTermsOffer[]): {
-  version: number;
-  previousTermsHash: string | null;
-} {
-  const head = newestOpenOffer(offers);
-  return head === undefined
-    ? { version: 1, previousTermsHash: null }
-    : { version: head.version + 1, previousTermsHash: head.termsHash };
-}
-
-export type OfferRefusal =
-  | 'invalid'
-  | 'not_a_party'
-  | 'locked'
-  | 'same_sender'
-  | 'version_gap'
-  | 'stale_version'
-  | 'previous_mismatch';
-
-export type OfferEvaluation =
-  | { readonly result: 'accept' }
-  /** The same envelope is already stored: nothing to do. */
-  | { readonly result: 'duplicate' }
-  /** Store the envelope as refused and show it in the activity feed (04 §3.4). */
-  | { readonly result: 'refuse'; readonly reason: OfferRefusal }
-  /**
-   * Concurrent counters (no-fork rule 3): mark both this envelope and `with` (this side's own
-   * offer for the same version) not acceptable and void pending scopes on them, except one whose
-   * `accept` part has run (rule 4). The previous version stays the newest.
-   */
-  | { readonly result: 'conflict'; readonly with: string };
-
-export interface IncomingOffer {
-  readonly envelopeId: string;
-  /** The verified sender's agent ID. */
-  readonly sender: string;
-  /** This agent's ID (the receiver). */
-  readonly self: string;
-  readonly terms: Terms;
-}
-
-export interface NegotiationState {
-  /** The stored offers of this negotiation key (`negotiationKey`), both directions. */
-  readonly offers: readonly StoredTermsOffer[];
-  /** Versions for which an `accept` was sent or received (no-fork rule 2). */
-  readonly lockedVersions: readonly number[];
-}
-
-const storedOfferSchema = z.strictObject({
-  envelopeId: base64url(BYTE_LENGTHS.id),
-  sender: evmAddress,
-  version: positiveInt,
-  termsHash: sha256Hex,
-  state: z.enum(['open', 'conflict']),
-  validUntil: uint53.exactOptional(),
-});
-const incomingSchema = z.strictObject({
-  envelopeId: base64url(BYTE_LENGTHS.id),
-  sender: evmAddress,
-  self: evmAddress,
-  terms: termsSchema,
-});
-const stateSchema = z.strictObject({
-  offers: z.array(storedOfferSchema),
-  lockedVersions: z.array(positiveInt),
-});
-
-/** Why `terms` does not link to `head`, or null when it is exactly the next version on it. */
-function linkRefusal(terms: Terms, head: StoredTermsOffer | undefined): OfferRefusal | null {
-  const expected = nextTermsLink(head === undefined ? [] : [head]);
-  if (terms.version > expected.version) return 'version_gap';
-  if (terms.version < expected.version) return 'stale_version';
-  if (expected.previousTermsHash === null)
-    return terms.previousTermsHash === null ? null : 'previous_mismatch';
-  return sameTermsHash(terms.previousTermsHash, expected.previousTermsHash)
-    ? null
-    : 'previous_mismatch';
-}
-
-/**
- * The receiving core's chain check for an incoming `offer` (04 §3.4, D-55), computed from its own
- * store only. In order:
- * 1. `parties` must be exactly the sender and this agent (`not_a_party`).
- * 2. An envelope already stored is a `duplicate`.
- * 3. A version with a sent or received `accept` is `locked` (no-fork rule 2).
- * 4. A second open offer for the same version from the same sender is refused (`same_sender`,
- *    rule 1; the first one seen wins). Conflicted offers do not count, so after a conflict either
- *    side may send that version again (rule 3).
- * 5. If the newest open offer is this side's own offer for the same version, and the incoming one
- *    links to the same base, it is a `conflict` (rule 3, no tie-break). Otherwise it is refused
- *    with its link error.
- * 6. Else the offer must be the newest version + 1 with `previousTermsHash` equal to the newest
- *    `termsHash` (`version_gap`, `stale_version`, `previous_mismatch`).
- * Invalid input is refused (`invalid`); never throws.
- */
-export function evaluateIncomingOffer(
-  incoming: IncomingOffer,
-  state: NegotiationState,
-): OfferEvaluation {
-  try {
-    const inc = incomingSchema.safeParse(incoming);
-    const st = stateSchema.safeParse(state);
-    if (!inc.success || !st.success) return { result: 'refuse', reason: 'invalid' };
-    const { envelopeId, sender, self, terms } = inc.data;
-    const { offers, lockedVersions } = st.data;
-    const [a, b] = terms.parties;
-    if (sender === self || !((a === sender && b === self) || (a === self && b === sender))) {
-      return { result: 'refuse', reason: 'not_a_party' };
-    }
-    if (offers.some((o) => o.envelopeId === envelopeId)) return { result: 'duplicate' };
-    if (lockedVersions.includes(terms.version)) return { result: 'refuse', reason: 'locked' };
-    const open = offers.filter((o) => o.state === 'open');
-    if (open.some((o) => o.version === terms.version && o.sender === sender)) {
-      return { result: 'refuse', reason: 'same_sender' };
-    }
-    const head = newestOpenOffer(open);
-    if (head !== undefined && head.version === terms.version && head.sender !== sender) {
-      const base = newestOpenOffer(open.filter((o) => o.version < terms.version));
-      const refusal = linkRefusal(terms, base);
-      return refusal === null
-        ? { result: 'conflict', with: head.envelopeId }
-        : { result: 'refuse', reason: refusal };
-    }
-    const refusal = linkRefusal(terms, head);
-    return refusal === null ? { result: 'accept' } : { result: 'refuse', reason: refusal };
-  } catch {
-    return { result: 'refuse', reason: 'invalid' };
-  }
-}
-
-// --- answers: accept and reject (04 §3.4, 06 §2.2a) -----------------------------------------------
-
-export type AnswerRefusal =
-  | 'invalid'
-  | 'not_a_party'
-  | 'unknown_offer'
-  | 'not_own_offer'
-  | 'conflicted'
-  | 'hash_mismatch'
-  | 'locked';
-
-export interface IncomingAnswer {
-  readonly envelopeId: string;
-  readonly type: 'accept' | 'reject';
-  /** The verified sender's agent ID. */
-  readonly sender: string;
-  /** This agent's ID (the receiver). */
-  readonly self: string;
-  /** The envelope's `replyTo`: the offer it answers (PROPOSED reading of 04 §3.4). */
+  /** Agent ID of the recipient. */
+  readonly recipient: string;
+  /** The signed envelope `createdAt` (unix seconds). */
+  readonly createdAt: number;
+  readonly type: 'offer' | 'accept' | 'reject';
+  /** The payload `replyTo`: the answered offer, or on a resend the other side's conflicting envelope. */
   readonly replyTo: string | null;
   readonly terms: Terms;
   /** The body's `termsHash`, already recomputed and checked by the core with @agentlink/crypto. */
   readonly termsHash: string;
 }
 
-const incomingAnswerSchema = z.strictObject({
-  envelopeId: base64url(BYTE_LENGTHS.id),
-  type: z.enum(['accept', 'reject']),
+/** One stored `offer` (sent or received and taken). Refused envelopes never enter the chain. */
+export interface StoredTermsOffer {
+  readonly envelopeId: string;
+  readonly sender: string;
+  readonly version: number;
+  readonly termsHash: string;
+  readonly validUntil: number;
+  /** `conflict`: not acceptable since a concurrent counter (rule 3); never the newest version. */
+  readonly state: 'open' | 'conflict';
+}
+
+/** A conflict on a version: the envelopes in it, one per side (item 1 records only this side's). */
+export interface TermsConflict {
+  readonly version: number;
+  readonly envelopes: readonly { readonly sender: string; readonly envelopeId: string }[];
+}
+
+/** The chain state of one negotiation key, as the core keeps it. */
+export interface NegotiationState {
+  readonly offers: readonly StoredTermsOffer[];
+  /** In order; the last one per version is the latest conflict on it. */
+  readonly conflicts: readonly TermsConflict[];
+  /** Versions for which an `accept` was sent or received (rule 2). */
+  readonly lockedVersions: readonly number[];
+}
+
+export const EMPTY_NEGOTIATION: NegotiationState = deepFreeze({
+  offers: [],
+  conflicts: [],
+  lockedVersions: [],
+});
+
+const envelopeIdSchema = base64url(BYTE_LENGTHS.id);
+const termsEnvelopeSchema = z.strictObject({
+  envelopeId: envelopeIdSchema,
   sender: evmAddress,
-  self: evmAddress,
-  replyTo: base64url(BYTE_LENGTHS.id).nullable(),
+  recipient: evmAddress,
+  createdAt: uint53,
+  type: z.enum(['offer', 'accept', 'reject']),
+  replyTo: envelopeIdSchema.nullable(),
   terms: termsSchema,
   termsHash: sha256Hex,
 });
+const stateSchema = z.strictObject({
+  offers: z.array(
+    z.strictObject({
+      envelopeId: envelopeIdSchema,
+      sender: evmAddress,
+      version: positiveInt,
+      termsHash: sha256Hex,
+      validUntil: positiveInt,
+      state: z.enum(['open', 'conflict']),
+    }),
+  ),
+  conflicts: z.array(
+    z.strictObject({
+      version: positiveInt,
+      envelopes: z
+        .array(z.strictObject({ sender: evmAddress, envelopeId: envelopeIdSchema }))
+        .min(1)
+        .max(2),
+    }),
+  ),
+  lockedVersions: z.array(positiveInt),
+});
+
+/** The newest open offer of a negotiation (highest version; conflicted offers are skipped). */
+export function newestOpenOffer(offers: readonly StoredTermsOffer[]): StoredTermsOffer | undefined {
+  let head: StoredTermsOffer | undefined;
+  for (const o of Array.isArray(offers) ? offers : []) {
+    if (o?.state === 'open' && (head === undefined || o.version > head.version)) head = o;
+  }
+  return head;
+}
+
+const latestConflict = (state: NegotiationState, version: number): TermsConflict | undefined =>
+  [...state.conflicts].reverse().find((c) => c.version === version);
 
 /**
- * The receiving core's check for an incoming `accept` or `reject` (04 §3.4): it must answer, by
- * `replyTo`, an open offer this agent sent in this negotiation and quote exactly that offer's
- * `termsHash`, so an accept whose hash does not match the offer it answers is refused. A second
- * accept for a locked version is refused (no-fork rule 2). An answer to an offer this side has
- * since superseded is still valid; the owner's approval card says so (06 §2.2a path (b)). After a
- * valid `accept` the core adds the version to `lockedVersions`. Never throws.
+ * The chain link a sending core writes (04 §3.4, D-74): `version` = newest open version + 1 and
+ * `previousTermsHash` = its `termsHash` (1 and null for a new negotiation). After a conflict on that
+ * version, the offer is this side's resend: `replyTo` names the other side's envelope in the latest
+ * conflict; otherwise `replyTo` is null. Invalid input gives the new-negotiation link.
  */
-export function evaluateIncomingAnswer(
-  incoming: IncomingAnswer,
+export function nextTermsLink(
   state: NegotiationState,
-): { readonly result: 'accept' } | { readonly result: 'refuse'; readonly reason: AnswerRefusal } {
+  self: string,
+): { version: number; previousTermsHash: string | null; replyTo: string | null } {
+  const fresh = { version: 1, previousTermsHash: null, replyTo: null };
   try {
-    const inc = incomingAnswerSchema.safeParse(incoming);
     const st = stateSchema.safeParse(state);
-    if (!inc.success || !st.success) return { result: 'refuse', reason: 'invalid' };
-    const { type, sender, self, replyTo, terms, termsHash } = inc.data;
-    const { offers, lockedVersions } = st.data;
-    const [a, b] = terms.parties;
-    if (sender === self || !((a === sender && b === self) || (a === self && b === sender))) {
-      return { result: 'refuse', reason: 'not_a_party' };
-    }
-    const answered = offers.find((o) => o.envelopeId === replyTo);
-    if (answered === undefined) return { result: 'refuse', reason: 'unknown_offer' };
-    if (answered.sender !== self) return { result: 'refuse', reason: 'not_own_offer' };
-    if (answered.state !== 'open') return { result: 'refuse', reason: 'conflicted' };
-    if (!sameTermsHash(answered.termsHash, termsHash) || answered.version !== terms.version) {
-      return { result: 'refuse', reason: 'hash_mismatch' };
-    }
-    if (type === 'accept' && lockedVersions.includes(terms.version)) {
-      return { result: 'refuse', reason: 'locked' };
-    }
-    return { result: 'accept' };
+    if (!st.success) return fresh;
+    const head = newestOpenOffer(st.data.offers);
+    const version = head === undefined ? 1 : head.version + 1;
+    const conflict = latestConflict(st.data, version);
+    const other = conflict?.envelopes.find((e) => e.sender !== self);
+    return {
+      version,
+      previousTermsHash: head === undefined ? null : head.termsHash,
+      replyTo: other === undefined ? null : other.envelopeId,
+    };
   } catch {
-    return { result: 'refuse', reason: 'invalid' };
+    return fresh;
   }
+}
+
+/**
+ * Records an envelope this side sent (the core checked it before sending): an `offer` is stored
+ * open, an `accept` locks its version (rule 2), a `reject` changes nothing. Invalid input leaves the
+ * state unchanged. Never throws.
+ */
+export function recordSentTerms(
+  state: NegotiationState,
+  envelope: TermsEnvelope,
+): NegotiationState {
+  try {
+    const st = stateSchema.safeParse(state);
+    const env = termsEnvelopeSchema.safeParse(envelope);
+    if (!st.success || !env.success) return state;
+    const e = env.data;
+    if (e.type === 'offer') {
+      return { ...st.data, offers: [...st.data.offers, storedOffer(e, 'open')] };
+    }
+    if (e.type === 'accept' && !st.data.lockedVersions.includes(e.terms.version)) {
+      return { ...st.data, lockedVersions: [...st.data.lockedVersions, e.terms.version] };
+    }
+    return st.data;
+  } catch {
+    return state;
+  }
+}
+
+const storedOffer = (
+  e: z.infer<typeof termsEnvelopeSchema>,
+  state: 'open' | 'conflict',
+): StoredTermsOffer => ({
+  envelopeId: e.envelopeId,
+  sender: e.sender,
+  version: e.terms.version,
+  termsHash: e.termsHash,
+  validUntil: e.terms.validUntil,
+  state,
+});
+
+export type TermsRefusal =
+  | 'invalid'
+  | 'not_a_party'
+  | 'locked'
+  | 'same_sender'
+  | 'version_gap'
+  | 'stale_version'
+  | 'previous_mismatch'
+  | 'resend_link'
+  | 'unknown_offer'
+  | 'not_own_offer'
+  | 'conflicted'
+  | 'hash_mismatch'
+  | 'expired';
+
+export interface TermsReceipt {
+  /**
+   * `valid`: stored and taken. `conflict`: concurrent counters (rule 3): both envelopes are not
+   * acceptable and pending scopes on this side's are void, except one whose `accept` part has run
+   * (rule 4). `refused`: stored as refused and shown in the activity feed; the state is unchanged.
+   */
+  readonly outcome: 'valid' | 'conflict' | 'refused';
+  readonly reason?: TermsRefusal;
+  readonly state: NegotiationState;
+}
+
+/** Why `terms` does not link to `head`, or null when it is exactly the next version on it. */
+function linkRefusal(terms: Terms, head: StoredTermsOffer | undefined): TermsRefusal | null {
+  const expectedVersion = head === undefined ? 1 : head.version + 1;
+  if (terms.version > expectedVersion) return 'version_gap';
+  if (terms.version < expectedVersion) return 'stale_version';
+  if (head === undefined) return terms.previousTermsHash === null ? null : 'previous_mismatch';
+  return sameTermsHash(terms.previousTermsHash, head.termsHash) ? null : 'previous_mismatch';
+}
+
+/**
+ * The receiving core's chain step for one `terms` envelope (04 §3.4, D-55, D-74), computed from its
+ * own state only. Duplicates (the same envelopeHash) are dropped before this, on the receive path.
+ *
+ * Offers, in order: `parties` are exactly the sender and this agent; rule 2 (a locked version)
+ * first; then, for a `replyTo` (a resend after a conflict, D-74 Q17): item 1 (it names this side's
+ * open envelope for the version, which reveals the conflict) and item 2 (it is the sender's first
+ * resend naming this side's envelope in the latest conflict), anything else refused (item 3); two
+ * resends are a new conflict (item 4). Without `replyTo`: refused after a conflict on the version;
+ * rule 1 (one open envelope per version and sender); rule 3 (this side's own offer for the version
+ * is the newest: a conflict); else newest + 1 on the newest `termsHash`.
+ *
+ * Answers: `replyTo` names an open offer this agent sent, the version is not locked, `termsHash`
+ * and version equal that offer's, and the envelope `createdAt` is at most its `validUntil`. A valid
+ * `accept` locks the version. An accept of this side's superseded offer is valid (06 §2.2a (b)).
+ * Never throws.
+ */
+export function receiveTerms(
+  state: NegotiationState,
+  envelope: TermsEnvelope,
+  self: string,
+): TermsReceipt {
+  try {
+    const st = stateSchema.safeParse(state);
+    const env = termsEnvelopeSchema.safeParse(envelope);
+    if (!st.success || !env.success || !evmAddress.safeParse(self).success) {
+      return { outcome: 'refused', reason: 'invalid', state };
+    }
+    const s = st.data;
+    const e = env.data;
+    const refuse = (reason: TermsRefusal): TermsReceipt => ({ outcome: 'refused', reason, state });
+    const [a, b] = e.terms.parties;
+    if (
+      e.recipient !== self ||
+      e.sender === self ||
+      !((a === e.sender && b === self) || (a === self && b === e.sender))
+    ) {
+      return refuse('not_a_party');
+    }
+    return e.type === 'offer'
+      ? receiveOffer(s, e, self, refuse)
+      : receiveAnswer(s, e, self, refuse);
+  } catch {
+    return { outcome: 'refused', reason: 'invalid', state };
+  }
+}
+
+type Env = z.infer<typeof termsEnvelopeSchema>;
+type State = z.infer<typeof stateSchema>;
+
+function receiveOffer(
+  s: State,
+  e: Env,
+  self: string,
+  refuse: (reason: TermsRefusal) => TermsReceipt,
+): TermsReceipt {
+  const n = e.terms.version;
+  if (s.lockedVersions.includes(n)) return refuse('locked');
+  const open = s.offers.filter((o) => o.state === 'open');
+  const ownAtN = open.filter((o) => o.version === n && o.sender === self);
+  const senderAtN = open.filter((o) => o.version === n && o.sender === e.sender);
+  const base = newestOpenOffer(open.filter((o) => o.version < n));
+  const latest = latestConflict(s, n);
+  const valid = (offers: StoredTermsOffer[], conflicts = s.conflicts): TermsReceipt => ({
+    outcome: 'valid',
+    state: { ...s, offers, conflicts },
+  });
+  const conflict = (mine: readonly StoredTermsOffer[]): TermsReceipt => {
+    const ids = new Set(mine.map((o) => o.envelopeId));
+    const offers = s.offers.map((o) =>
+      ids.has(o.envelopeId) ? { ...o, state: 'conflict' as const } : o,
+    );
+    return {
+      outcome: 'conflict',
+      state: {
+        ...s,
+        offers: [...offers, storedOffer(e, 'conflict')],
+        conflicts: [
+          ...s.conflicts,
+          {
+            version: n,
+            envelopes: [
+              ...mine.map((o) => ({ sender: o.sender, envelopeId: o.envelopeId })),
+              { sender: e.sender, envelopeId: e.envelopeId },
+            ],
+          },
+        ],
+      },
+    };
+  };
+
+  if (e.replyTo !== null) {
+    const target = s.offers.find((o) => o.envelopeId === e.replyTo);
+    // Item 1: it names this side's open envelope for n, so a conflict exists that this side has
+    // not seen. This side's envelope becomes not acceptable; the resend is the sender's live one.
+    if (
+      target !== undefined &&
+      target.version === n &&
+      target.sender === self &&
+      target.state === 'open'
+    ) {
+      if (senderAtN.length > 0) return refuse('same_sender');
+      const link = linkRefusal(e.terms, base);
+      if (link !== null) return refuse(link);
+      const offers = s.offers.map((o) =>
+        o.envelopeId === target.envelopeId ? { ...o, state: 'conflict' as const } : o,
+      );
+      return valid(
+        [...offers, storedOffer(e, 'open')],
+        [
+          ...s.conflicts,
+          { version: n, envelopes: [{ sender: self, envelopeId: target.envelopeId }] },
+        ],
+      );
+    }
+    // Item 2: the sender's first resend after the latest conflict, naming this side's envelope in it.
+    const mine = latest?.envelopes.find((x) => x.sender === self);
+    if (mine === undefined || mine.envelopeId !== e.replyTo) return refuse('resend_link');
+    if (senderAtN.length > 0) return refuse('same_sender');
+    const link = linkRefusal(e.terms, base);
+    if (link !== null) return refuse(link);
+    // Item 4: this side's own resend is live too: a new conflict.
+    if (ownAtN.length > 0) return conflict(ownAtN);
+    return valid([...s.offers, storedOffer(e, 'open')]);
+  }
+
+  // After a conflict on n, an envelope for n needs the resend link (item 2).
+  if (latest !== undefined) return refuse('resend_link');
+  if (senderAtN.length > 0) return refuse('same_sender');
+  const head = newestOpenOffer(open);
+  if (head !== undefined && head.version === n && head.sender === self) {
+    const link = linkRefusal(e.terms, base);
+    if (link !== null) return refuse(link);
+    return conflict(ownAtN);
+  }
+  const link = linkRefusal(e.terms, head);
+  if (link !== null) return refuse(link);
+  return valid([...s.offers, storedOffer(e, 'open')]);
+}
+
+function receiveAnswer(
+  s: State,
+  e: Env,
+  self: string,
+  refuse: (reason: TermsRefusal) => TermsReceipt,
+): TermsReceipt {
+  if (e.replyTo === null) return refuse('unknown_offer');
+  const answered = s.offers.find((o) => o.envelopeId === e.replyTo);
+  if (answered === undefined) return refuse('unknown_offer');
+  if (answered.sender !== self) return refuse('not_own_offer');
+  // Rule 2 takes precedence: a locked version takes no other envelope (D-74, IR-D-74-1 F04).
+  if (s.lockedVersions.includes(answered.version) || s.lockedVersions.includes(e.terms.version)) {
+    return refuse('locked');
+  }
+  if (answered.state !== 'open') return refuse('conflicted');
+  if (answered.version !== e.terms.version || !sameTermsHash(answered.termsHash, e.termsHash)) {
+    return refuse('hash_mismatch');
+  }
+  // Judged by the signed createdAt, never the receiver's clock (D-74 Q14, IR-D-74-1 F03).
+  if (e.createdAt > answered.validUntil) return refuse('expired');
+  const lockedVersions =
+    e.type === 'accept' ? [...s.lockedVersions, e.terms.version] : s.lockedVersions;
+  return { outcome: 'valid', state: { ...s, lockedVersions } };
 }
 
 export type SendAcceptRefusal =
   'invalid' | 'unknown_offer' | 'own_offer' | 'conflicted' | 'superseded' | 'locked' | 'expired';
 
 /**
- * The sending core's check before an `accept` (04 §3.4): the offer is stored and was received from
- * the contact, is not conflicted, is the newest open version of its negotiation (`superseded`,
- * TERMS_SUPERSEDED), its version is not locked by an earlier accept, and `now` is not after its
- * `validUntil` (`expired`, TERMS_EXPIRED; PROPOSED: `now == validUntil` is still within). The
- * caller passes the offers of the offer's negotiation key. Never throws.
+ * The sending core's check before an `accept` (04 §3.4): the offer is stored, was received from the
+ * contact, is not conflicted, is the newest open version of its negotiation (`superseded`,
+ * TERMS_SUPERSEDED), its version is not locked, and `now` (this core's clock) is at most its
+ * `validUntil` (`expired`, TERMS_EXPIRED; D-74 Q14). Returns the `termsHash` to quote. Never throws.
  */
 export function checkSendAccept(
   state: NegotiationState,
@@ -601,7 +763,7 @@ export function checkSendAccept(
   self: string,
   now: number,
 ):
-  | { readonly result: 'allowed' }
+  | { readonly result: 'allowed'; readonly termsHash: string }
   | { readonly result: 'refuse'; readonly reason: SendAcceptRefusal } {
   try {
     const st = stateSchema.safeParse(state);
@@ -613,14 +775,12 @@ export function checkSendAccept(
     if (offer === undefined) return { result: 'refuse', reason: 'unknown_offer' };
     if (offer.sender === self) return { result: 'refuse', reason: 'own_offer' };
     if (offer.state !== 'open') return { result: 'refuse', reason: 'conflicted' };
+    if (lockedVersions.includes(offer.version)) return { result: 'refuse', reason: 'locked' };
     if (newestOpenOffer(offers)?.envelopeId !== offer.envelopeId) {
       return { result: 'refuse', reason: 'superseded' };
     }
-    if (lockedVersions.includes(offer.version)) return { result: 'refuse', reason: 'locked' };
-    if (offer.validUntil === undefined || now > offer.validUntil) {
-      return { result: 'refuse', reason: 'expired' };
-    }
-    return { result: 'allowed' };
+    if (now > offer.validUntil) return { result: 'refuse', reason: 'expired' };
+    return { result: 'allowed', termsHash: offer.termsHash };
   } catch {
     return { result: 'refuse', reason: 'invalid' };
   }

@@ -16,7 +16,6 @@ import {
   MAX_INLINE_CIPHERTEXT_BYTES,
   MAX_INLINE_FILE_BYTES,
   MAX_MIME_LENGTH,
-  MAX_TERMS_NOTE_CODE_POINTS,
   MAX_URL_LENGTH,
   type PayloadType,
 } from './constants.js';
@@ -47,7 +46,7 @@ import {
   signedApprovalOpSchema,
   signedPolicySetSchema,
 } from './owner-action.js';
-import { termsSchema } from './terms.js';
+import { termsNoteSchema, termsSchema } from './terms.js';
 
 const envelopeId = base64url(BYTE_LENGTHS.id);
 
@@ -148,7 +147,8 @@ const termsBody = <N extends z.ZodType>(note: N) =>
     termsHash: sha256Hex,
     note,
   });
-const termsNote = ijsonString({ max: MAX_TERMS_NOTE_CODE_POINTS }).nullable();
+// D-74: `null` or 1 to 500 code points of canonical terms text (04 §3.4 "Characters").
+const termsNote = termsNoteSchema;
 export const offerBodySchema = termsBody(termsNote);
 /** An accept never carries a note (04 §3.4, §3.4.2, D-55). */
 export const acceptBodySchema = termsBody(z.null());

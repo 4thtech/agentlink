@@ -8,6 +8,7 @@
 // - Validators never throw on hostile input (cycles, deep nesting, throwing getters); they report.
 import { z } from 'zod';
 import { APPROVAL_ID_PREFIX, BYTE_LENGTHS, MAX_JSON_DEPTH, MAX_JSON_NODES } from './constants.js';
+import { hasCategory15, type RefusedCategory } from './unicode.js';
 
 // --- Strings -------------------------------------------------------------------------------------
 
@@ -48,15 +49,16 @@ export function utf8ByteLength(s: string): number {
   return n;
 }
 
-// Control (Cc), format (Cf: bidi, zero-width…) and line or paragraph separator characters.
-const CONTROL_OR_FORMAT = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+// Control (Cc), format (Cf: bidi, zero-width…) and line or paragraph separator characters, by the
+// pinned UCD 15.0.0 table, not the runtime's (D-74: the table also serves approval-request.summary).
+const CONTROL_OR_FORMAT: ReadonlySet<RefusedCategory> = new Set(['Cc', 'Cf', 'Zl', 'Zp']);
 
 /**
  * True when the string has a control, format (bidi, zero-width) or line/paragraph separator
- * character: text we generate (summaries, `nextStep`) must have none, so it can never fake
- * structure (I-5).
+ * character (UCD 15.0.0): text we generate (summaries, `nextStep`) must have none, so it can never
+ * fake structure (I-5).
  */
-export const hasControlOrFormat = (s: string): boolean => CONTROL_OR_FORMAT.test(s);
+export const hasControlOrFormat = (s: string): boolean => hasCategory15(s, CONTROL_OR_FORMAT);
 
 /**
  * True when every item is a string and the list is in strictly ascending code-unit order (hence

@@ -328,28 +328,28 @@ export const MAX_DISPLAY_NAME_CODE_POINTS = 256;
 export const MAX_FILE_NAME_CODE_POINTS = 255;
 export const MAX_MIME_LENGTH = 255;
 export const MAX_URL_LENGTH = 2048;
-/** `note` on offer / accept / reject (04 §3.4). */
-export const MAX_TERMS_NOTE_CODE_POINTS = 1024;
+/** `note` on offer / accept / reject: `null` or 1 to 500 code points (04 §3.4, D-74). */
+export const MAX_TERMS_NOTE_CODE_POINTS = 500;
 /**
- * `terms` size limits (04 §3.4 "size limits follow M1-21"; PROPOSED, owner confirms at merge). One
- * set serves both `terms` and `TermsInput` (D-55). Lengths are Unicode code points; `amountLength`
- * is characters of the ASCII amount; `maxBytes` is the UTF-8 size of the compact JSON form of the
- * whole `terms` object, which leaves room for a note and the rest of a 24 KiB envelope.
+ * `terms` size limits (04 §3.4 "Size limits", D-74). One set serves both `terms` and `TermsInput`
+ * (D-55). Lengths are Unicode code points, except the ASCII deliverable id (`^[A-Za-z0-9_-]{1,16}$`)
+ * and the amount's digits. The largest body these allow is 12 083 bytes as JCS.
  */
 export const TERMS_LIMITS = freeze({
-  subjectCodePoints: 256,
-  deliverables: 32,
-  deliverableIdCodePoints: 32,
-  descriptionCodePoints: 2048,
-  deadlines: 32,
-  amountLength: 40,
-  maxBytes: 12 * 1024,
+  subjectCodePoints: 200,
+  deliverables: 10,
+  deliverableIdLength: 16,
+  descriptionCodePoints: 160,
+  deadlines: 10,
+  amountIntegerDigits: 18,
+  amountFractionDigits: 6,
+  noteCodePoints: MAX_TERMS_NOTE_CODE_POINTS,
 } as const);
 /**
- * Token symbols allowed as `price.currency` besides ISO 4217 codes (04 §3.4 "allowlisted token
- * symbols"; PROPOSED, owner confirms at merge): the USD stablecoins of D-46. Matched exactly.
+ * Token symbols allowed as `price.currency` besides the grammar `^[A-Z]{3}$` (04 §3.4 "Currency",
+ * D-74): exactly the D-46 / 12 §3.1 fee tokens. Adding one is a spec change.
  */
-export const TERMS_TOKEN_SYMBOLS = freeze(['USDC', 'USDT'] as const);
+export const TERMS_TOKEN_SYMBOLS = freeze(['USDC', 'USDT', 'XDAI'] as const);
 /** `TermsInput.validUntil` default: 7 days from now (06 §2.2a). */
 export const TERMS_DEFAULT_VALIDITY_SECONDS = 7 * 24 * 60 * 60;
 /** Free-form JSON (message bodies, placeholders): nesting depth and total node count. */
