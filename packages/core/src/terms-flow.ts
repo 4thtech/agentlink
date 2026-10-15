@@ -328,9 +328,11 @@ function newestOwnAbove(n: Negotiation | undefined, self: string, version: numbe
 }
 
 /**
- * Void rule 1 (04 §3.4.2) for the offer `envelopeId` at `version`: it is not open, it is not the
- * newest open offer, an offer with a higher version is stored in any state, or a conflict on its
- * version was seen (IR-M1-32-1 F01).
+ * Void rule 1 (04 §3.4.2) for the offer `envelopeId` at `version`: it is not open (a conflicted
+ * envelope of its version), it is not the newest open offer, or an offer with a higher version is
+ * stored in any state (IR-M1-32-1 F01: a conflict on n + 1 never revives a scope on n). A conflict
+ * on its own version supersedes only the conflicted envelopes: the anchored resend that follows
+ * it (D-74 item 2) is open and stays acceptable (IR-M1-32-1 D1-F01).
  */
 function supersededInStore(
   n: Negotiation | undefined,
@@ -341,8 +343,7 @@ function supersededInStore(
   return (
     offerState(n, envelopeId) !== 'open' ||
     newestOpenOffer(offers)?.envelopeId !== envelopeId ||
-    offers.some((o) => o.version > version) ||
-    (n?.state.conflicts ?? []).some((c) => c.version === version)
+    offers.some((o) => o.version > version)
   );
 }
 
