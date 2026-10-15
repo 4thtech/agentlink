@@ -2895,7 +2895,6 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - **Claude Code examples (D-67, confirmed by the owner in D-68 (3); starting point, verify against the current Claude Code permissions and sandboxing docs at build time).** In `~/.claude/settings.json`, `permissions.deny`: `Read(~/.agentlink/**)`, `Edit(~/.agentlink/**)`; `Bash(security *)` (macOS), `Bash(secret-tool *)` (Linux), `Bash(cmdkey *)`, `Bash(vaultcmd *)` (Windows); `Edit(~/.npm/_npx/**)` (macOS, Linux; on Windows the npx cache under `~/AppData/Local/npm-cache/_npx/**`); `Edit(//<npm root -g>/@4thtech/agentlink/**)` for a global install (absolute paths start with `//`); `Edit(~/.claude/settings.json)`, so the edit tool cannot remove the rules; and, so the agent cannot redirect what the owner's own terminal runs as `agentlink` or `npx` (04 §2.5, D-67), `Edit(~/.zshrc)`, `Edit(~/.zprofile)`, `Edit(~/.bashrc)`, `Edit(~/.bash_profile)`, `Edit(~/.profile)`, `Edit(~/.config/fish/**)`, `Edit(~/.npmrc)`, `Edit(~/.local/bin/**)` and the npm global prefix's `bin` directory (on Windows the PowerShell profile under `~/Documents/PowerShell/**`); the sandbox `denyWrite` covers the same paths for Bash. The copy states that these are guards only. Because Read and Edit rules do not cover every way a shell command or script can open a file, and a Bash rule matches only the command text, also show the sandbox (macOS, Linux, WSL2): `sandbox.enabled` with `sandbox.filesystem.denyRead` for `~/.agentlink` and `denyWrite` for the npx cache and the package directory. Check at build time that the rules do not break the AgentLink MCP server (started by the harness, not through Bash) or an agent-run `init`, and state the order (install first, then add the rules) if they do.
   - Containers, devcontainers, WSL and SSH (D-54, 07 §9; documentation only, there is no headless dogfood for M1a, D-73 (4)): opting in to the file KeyStore; mounting the unlock code as a run-time secret and pointing `AGENTLINK_KEYSTORE_PASSPHRASE_FILE` at it (never in the image, a committed `devcontainer.json` or a committed MCP config); why the environment variable is weaker; disabling core dumps; deny rules for `~/.agentlink/keystore` and the secret file; doing `owner init` personally and never letting the agent see the owner code; owner approvals over SSH or `docker exec -it`.
   - Run owner († ) commands in a terminal the agent does not control; `doctor` for troubleshooting. Local UI, storage and credits sections are M1-12d (M1b).
-  - Sync rule: `e2e/llm/claude-settings.linux.json` (M1-13a) must be kept in sync with the published Claude Code snippet in docs-site (the docs are the superset).
   - Notes (IR-M1-12b-1): the containers, devcontainer, WSL and SSH section above is deferred with the file KeyStore (D-73 (4)); the page says containers are not supported in v0.1.0. Live per-harness transcripts of the deny rules (acceptance 2) are pending the owner's decision. Follow-up: `agentlink init --confirm <code>` is parsed but missing from the `--help` usage lines (apps/cli dispatch.ts; for the M1-9a owner or a tiny CLI card).
 - **Acceptance:**
   - Tali and Denis install from the docs alone for the J9 dogfood (M1-23), times recorded.
@@ -2913,7 +2912,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Two people new to AgentLink complete J1 from the docs alone (observed, times recorded; install → first message under 5 minutes).
 
 #### M1-13a · e2e: two agents on two harnesses
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#155; IR-M1-13a-1 PASS with changes; LLM variant runs by manual dispatch only, no schedule until the owner sizes the credit; pending first dispatch on main) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · e2e/, .github/workflows/e2e.yml
 - **Depends on:** M1-9c, M1-9o, M1-9p, M1-12a, M1-1g-c (boundary guards scan e2e/); the e2e runner and credentials are decided in D-73 (9)
 - **Spec:** 10 M1-13; 06 §9; 02 J1, J9
@@ -2924,6 +2923,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Deterministic variant green on PRs within 15 minutes; LLM variant pass rate reported per run.
   - Canary scan of all e2e logs and artifacts finds no plaintext or keys.
+  - Sync rule: `e2e/llm/claude-settings.linux.json` must stay in sync with the published Claude Code snippet in docs-site (harness-configuration.md); the docs are the superset (M1-12b).
 
 #### M1-13c · e2e: files, proof and proof of agreement (new, split from M1-13a)
 - **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b

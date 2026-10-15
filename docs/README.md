@@ -127,6 +127,7 @@ When code, process or any other document disagrees with a spec, the spec wins. S
 | [`onboarding.md`](process/onboarding.md) | Onboarding for collaborators and the agents working for them |
 | [`backlog.md`](process/backlog.md) | Task cards (the IDs you see in branches and PR titles) |
 | [`repo-reference.md`](process/repo-reference.md) | Stack, repository layout, commands and testing |
+| [`test-reports/`](process/test-reports/README.md) | Reports of end-to-end and acceptance test runs (setup, how to rerun, measured results) |
 
 ### `explainers/`: plain-language guides
 
