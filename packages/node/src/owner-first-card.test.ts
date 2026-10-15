@@ -249,6 +249,7 @@ describe('owner init signs the first agent card (M1-8h; 04 §2.5, §2.4)', () =>
     expect(alice.keychain.items.has(OWNER_ACCOUNT)).toBe(true);
   });
 
+  // Two owner inits (four Argon2id runs) and SQLite: its own limit on loaded CI runners (M0-10e).
   it('end to end: two agents set up with init + owner init pair through invite and accept', async () => {
     const alice = await initAgent('alice');
     const bob = await initAgent('bob');
@@ -267,7 +268,7 @@ describe('owner init signs the first agent card (M1-8h; 04 §2.5, §2.4)', () =>
     const atBob = await bob.client.contacts.list();
     expect(atAlice.map((c) => c.id)).toEqual([bob.agentId]);
     expect(atBob.map((c) => c.id)).toEqual([alice.agentId]);
-  });
+  }, 60_000);
 
   it('never replaces a card: an agent that has one refuses before a code is shown', async () => {
     const alice = await initAgent('alice');
