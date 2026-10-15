@@ -11,7 +11,12 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MISMATCH_EXIT, describeGeneratorRun, generatorCheck } from './generators.mjs';
+import {
+  MISMATCH_EXIT,
+  describeGeneratorRun,
+  generatorCheck,
+  suitesTableProblems,
+} from './generators.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const vectorsDir = join(root, 'test-vectors');
@@ -75,6 +80,16 @@ const CONTROL = 'test-vectors/tagged-hash/vectors.json';
     rmSync(dir, { recursive: true, force: true });
   }
 }
+
+// The Suites table of test-vectors/README.md agrees with the committed suites and the pending list
+// (M1-1h-d, IR-M1-2a-1 F01).
+problems.push(
+  ...suitesTableProblems(
+    readFileSync(join(vectorsDir, 'README.md'), 'utf8'),
+    Object.keys(JSON.parse(readFileSync(join(vectorsDir, 'pending-suites.json'), 'utf8')).suites),
+    files.map((path) => path.split('/')[1]),
+  ),
+);
 
 if (problems.length > 0) {
   console.error('\nvector provenance check FAILED');
