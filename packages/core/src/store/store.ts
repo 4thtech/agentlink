@@ -86,6 +86,12 @@ export interface SealContext {
 export interface StoreCipher {
   seal(context: SealContext, plaintext: string): Promise<Sealed>;
   open(context: SealContext, sealed: Sealed): Promise<string>;
+  /**
+   * HMAC-SHA256 of `data` under the store's index key, as 64 lowercase hex (07 §3.1 keyed digests;
+   * `idempotency.request_digest`, §3.3). Optional in the interface: without it, idempotency fails
+   * closed (M1-7e). The Node cipher (M1-8b) provides it.
+   */
+  indexDigest?(data: Uint8Array): Promise<string>;
 }
 
 /** The canonical row key for a SealContext: the primary-key values in key order, as JSON. */

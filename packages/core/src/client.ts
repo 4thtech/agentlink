@@ -14,7 +14,10 @@ import type { CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import { IdentityService, finishPendingRotation } from './identity.js';
 import { OwnerActions, type PolicyVersionMark } from './owner-actions.js';
+import { ApprovalService } from './approvals.js';
+import { IdempotencyService } from './idempotency.js';
 import { PairingService } from './pairing.js';
+import { RequestsQueue } from './requests.js';
 import type { Store, StoreCipher } from './store/store.js';
 
 export interface AgentLinkClientOptions {
@@ -49,6 +52,12 @@ export class AgentLinkClient {
   readonly approvals: ApprovalChannel;
   /** Owner-signed actions and the signed policy (M1-7d; 04 §2.5.1). Authority is the signature. */
   readonly ownerActions: OwnerActions;
+  /** Approval requests and their one use (M1-7e; 04 §3.4.1, 06 §2.5). Decides nothing. */
+  readonly approvalService: ApprovalService;
+  /** The requests queue for unknown senders: count, list and ignore (M1-7e; 07 §3.2). */
+  readonly requests: RequestsQueue;
+  /** `clientRequestId` idempotency (M1-7e; 06 §1 rule 6, 07 §3.3). */
+  readonly idempotency: IdempotencyService;
 
   private constructor(
     agentId: string,
@@ -63,6 +72,15 @@ export class AgentLinkClient {
     this.envelopes = new EnvelopeService(ctx, this.identity, this.contacts, this.pairing);
     this.approvals = approvals;
     this.ownerActions = new OwnerActions(ctx, this.identity, this.contacts, policyMark);
+    this.idempotency = new IdempotencyService(ctx);
+    this.approvalService = new ApprovalService(
+      ctx,
+      this.identity,
+      this.ownerActions,
+      approvals,
+      this.idempotency,
+    );
+    this.requests = new RequestsQueue(ctx);
   }
 
   /**
