@@ -339,12 +339,20 @@ async function serveAlice(
   return { client, running };
 }
 
-/** Fires the first lease step and waits until alice's server holds the lease. */
+/**
+ * Waits for a completion signal: a timer the loop schedules only once a step or pass has ended.
+ * Generous bound for slow CI runners (crypto-heavy passes); the assertions that follow are plain.
+ */
+const until = (signal: () => boolean): Promise<void> =>
+  vi.waitFor(() => expect(signal()).toBe(true), { timeout: 15_000, interval: 5 });
+
+/** Fires the first lease step and waits until it has ended with alice's server holding the lease. */
 async function takeLease(timers: ManualTimers): Promise<void> {
-  await vi.waitFor(() => expect(timers.has(0)).toBe(true));
+  await until(() => timers.has(0));
   timers.fire(0);
-  await vi.waitFor(async () => expect(await leaseRows(alice.store)).toHaveLength(1));
-  await vi.waitFor(() => expect(timers.has(0)).toBe(true)); // the start-up pass is due
+  await until(() => timers.has(20_000)); // the next lease step is scheduled once this one ended
+  expect(await leaseRows(alice.store)).toHaveLength(1);
+  expect(timers.has(0)).toBe(true); // the start-up pass is due
 }
 
 describe('background loop: pairing with no tool call (M1-9r)', () => {
@@ -356,9 +364,9 @@ describe('background loop: pairing with no tool call (M1-9r)', () => {
     await inviteAccepted(alice.client, bob);
     expect(await paired(alice.client, bob.client)).toBe(false);
     timers.fire(0); // the start-up pass; no tool is called
-    await vi.waitFor(async () => expect(await paired(alice.client, bob.client)).toBe(true));
+    await until(() => timers.has(30_000)); // the next pass is scheduled once this one ended
+    expect(await paired(alice.client, bob.client)).toBe(true);
     // The same pass delivered alice's handshake-ack: bob completes on his next sync.
-    await vi.waitFor(() => expect(timers.has(30_000)).toBe(true));
     await bob.client.syncInbox();
     expect(await paired(bob.client, alice.client)).toBe(true);
 
@@ -387,8 +395,10 @@ describe('background loop: pairing with no tool call (M1-9r)', () => {
     await takeLease(timers);
     await inviteAccepted(alice.client, bob);
     timers.fire(0);
-    await vi.waitFor(() => expect(updates).toContain(INBOX_RESOURCE_URI));
+    await until(() => timers.has(30_000));
     expect(await paired(alice.client, bob.client)).toBe(true);
+    await client.ping(); // the notification went out before the pass ended; let it arrive
+    expect(updates).toEqual([INBOX_RESOURCE_URI]);
     await client.close();
     await expect(running).resolves.toBe(0);
   });
