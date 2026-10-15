@@ -10,7 +10,7 @@ const opened: string[] = [];
 const connector: RelayConnector = {
   open(target, handlers) {
     opened.push(target.url);
-    queueMicrotask(() => handlers.onClose());
+    void Promise.resolve().then(() => handlers.onClose());
     return { send: () => {}, close: () => {} };
   },
 };

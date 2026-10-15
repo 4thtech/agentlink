@@ -375,6 +375,21 @@ export class EnvelopeService {
    * set; the caller never supplies keys. Publishing (gift wraps, outbox) is the send flow's.
    */
   async build(input: BuildEnvelopeInput): Promise<BuiltEnvelope> {
+    const { built, row } = await this.prepare(input);
+    await this.#ctx.store.transaction((tx) => {
+      tx.insert('envelopes', row);
+    });
+    return built;
+  }
+
+  /**
+   * Builds and signs an outbound envelope like `build`, without storing it: the caller inserts
+   * `row` in its own store transaction (07 §3.2: the send pipeline stores the envelope together
+   * with all of its outbox rows, M1-7k).
+   */
+  async prepare(
+    input: BuildEnvelopeInput,
+  ): Promise<{ readonly built: BuiltEnvelope; readonly row: Row<'envelopes'> }> {
     const ctx = this.#ctx;
     await this.#identity.assertCanSend();
     const parsed = payloadSchema.safeParse(input.payload);
@@ -422,14 +437,14 @@ export class EnvelopeService {
     const thread = await this.#threadFor(input, payload, contactId);
     const sealed = await sealOutbound(ctx, { parties, payload, thread });
     const row = await outboundRow(ctx, sealed, contactId ?? null);
-    await ctx.store.transaction((tx) => {
-      tx.insert('envelopes', row);
-    });
     return {
-      envelope: sealed.envelope,
-      envelopeHash: sealed.envelopeHash,
-      thread,
-      recipientNostrKeys: sealed.recipientNostrKeys,
+      built: {
+        envelope: sealed.envelope,
+        envelopeHash: sealed.envelopeHash,
+        thread,
+        recipientNostrKeys: sealed.recipientNostrKeys,
+      },
+      row,
     };
   }
 

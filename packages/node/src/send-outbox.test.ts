@@ -14,7 +14,12 @@ import {
   type ApprovalChannel,
   type TransportFactory,
 } from '@agentlink/core';
-import { encodeUtf8, type KeyStore, type NostrEvent, type OwnerPublicKeys } from '@agentlink/crypto';
+import {
+  encodeUtf8,
+  type KeyStore,
+  type NostrEvent,
+  type OwnerPublicKeys,
+} from '@agentlink/crypto';
 import { wrapEnvelope, type PublishOutcome } from '@agentlink/transport-nostr';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';
@@ -170,9 +175,7 @@ describe('outbox over one SQLite store shared by two clients (M1-7k, 06 §6)', (
 
     t += OUTBOX_CLAIM_SECONDS;
     expect((await two.outbox.processDue()).sent).toBe(4);
-    expect(spy2.published.map((e) => e.id).sort()).toEqual(
-      spy1.published.map((e) => e.id).sort(),
-    );
+    expect(spy2.published.map((e) => e.id).sort()).toEqual(spy1.published.map((e) => e.id).sort());
 
     // Restart: a fresh client finds nothing left to publish and wraps nothing again.
     const spy3 = new RelaySpy();

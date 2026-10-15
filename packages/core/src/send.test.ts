@@ -11,11 +11,7 @@ import {
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
 import { createLogger } from '@agentlink/log';
 import { defaultPolicy } from '@agentlink/types';
-import {
-  unwrapGiftWrap,
-  wrapEnvelope,
-  type PublishOutcome,
-} from '@agentlink/transport-nostr';
+import { unwrapGiftWrap, wrapEnvelope, type PublishOutcome } from '@agentlink/transport-nostr';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import { CoreError } from './errors.js';
@@ -30,6 +26,7 @@ import {
   seed,
 } from './testing/fixtures.js';
 import { pairWith, type TestAgent, type TestOwner } from './testing/envelopes.js';
+import { sleep } from './testing/platform.js';
 import { MemoryPolicyMark, newNonce, ownerHex, signWith } from './testing/owner.js';
 import type { TransportFactory } from './transport.js';
 
@@ -155,7 +152,10 @@ async function pair(a: Agent, b: Agent): Promise<void> {
 
 const rows = (store: MemoryStore) =>
   store.transaction((tx) => ({
-    out: tx.select('envelopes', { direction: 'out' }),
+    // Without the pairing evidence rows that pairWith stores (testing/pairing.ts).
+    out: tx
+      .select('envelopes', { direction: 'out' })
+      .filter((r) => r.type !== 'handshake' && r.type !== 'handshake-ack'),
     outbox: tx.select('outbox'),
     idempotency: tx.select('idempotency'),
   }));
@@ -163,7 +163,7 @@ const rows = (store: MemoryStore) =>
 /** Waits until `check` holds (a hanging publish leaves work in flight). */
 async function until(check: () => boolean): Promise<void> {
   for (let i = 0; i < 200 && !check(); i += 1) {
-    await new Promise((resolve) => setImmediate(resolve));
+    await sleep(0);
   }
   expect(check()).toBe(true);
 }
@@ -408,7 +408,10 @@ class OutboxFailingStore extends MemoryStore {
                 return (target.insert as (t: string, r: unknown) => void)(table, row);
               };
             }
-            return Reflect.get(target, prop, receiver) as unknown;
+            const value = Reflect.get(target, prop, receiver) as unknown;
+            return typeof value === 'function'
+              ? (value as (...args: unknown[]) => unknown).bind(target)
+              : value;
           },
         }),
       ),
@@ -560,7 +563,10 @@ describe('outbox: staged pairing messages (04 §3.6; M1-7c)', () => {
     expect(spy.published).toHaveLength(4); // once: nothing is wrapped or published again
     stored = await rows(b.store);
     expect(stored.outbox).toHaveLength(4);
-    expect(stored.out.find((r) => r.envelope_id === accepted.pairingId)?.delivery).toBe('sent');
+    const handshake = await b.store.transaction((tx) =>
+      tx.get('envelopes', { envelope_id: accepted.pairingId }),
+    );
+    expect(handshake?.delivery).toBe('sent');
 
     // The inviter answers through the same path: its handshake-ack goes to the invitee's list.
     const forA = b.spy.published.find((p) => pTag(p.event) === aAgent);
