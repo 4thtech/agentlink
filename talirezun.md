@@ -1,31 +1,30 @@
 # @talirezun — sync
-**Headline:** M1a core: pairing, key commitment, owner code with batch approval, transport and store merged; owner-actions (M1-7d) awaits an owner decision
-_Updated 2026-10-15 01:45 · claude-code / claude-opus-5-5 · orchestrator_
+**Headline:** M1-7d owner actions, contact.check routing, policy mark and public knowledge base merged; M1a: encodings, requests and CLI/MCP next
+_Updated 2026-10-15 07:30 · claude-code / claude-opus-5-5 · orchestrator_
 
 ## Now
-- agentlink merged overnight 2026-10-14/15:
-  - #67 M1-8c owner code and batch approval;
-  - #70 D-69 invite links use raw DEFLATE;
-  - #71 M1-2d pairing body schemas;
-  - #72 M1-2e batch approval schema;
-  - #73 docs follow-ups and lesson LL-15;
-  - #75 and #77 test vectors;
-  - #76 M1-2f contact.check schema;
-  - #78 M1-7c pairing;
-  - #80 M1-7c-b contact.check verify-and-store;
-  - #81 M1-5b-b Node relay connector.
-- Contracts: invariant-test flake fixed and CI repaired.
+- merged 2026-10-15:
+  - #79 M1-7d (D-70 paired contacts Talk without approval);
+  - #85 contact.check routing;
+  - #86 M1-8g policy mark;
+  - #88 public knowledge base (knowledge/ + llms.txt);
+  - #89 D-71 decisions;
+  - #83 and #84 CI.
 
 ## In flight
 | Task | Branch / PR | Status | Next step |
 |---|---|---|---|
-| M1-7d owner actions | #79 | waiting on owner decision (G-6 reading) | Owner decision |
-| audit-rules one-liner | #74 | waiting on owner approval | Owner approval |
-| M1-5b-b Docker relay CI job | — | needs owner (`.github`) | Owner |
+| M1-5f outbox window | #87 | PR open | Review, then merge |
+| M1-7b-b sender-owner entry | #90 | PR open | Review, then merge |
+| docs status source | #91 | PR open | Review, then merge |
+| Docs-impact section | #92 | PR open | Review, then merge |
+| M1-2a encodings | #93 | PR open | Review, then merge |
+| M1-7e requests | #94 | PR open | Review, then merge |
+| 4thTech wiki redesign | — | plan done | Build |
 
 ## Next
-1. M1-7e requests, M1-8g, M1-9 CLI + MCP (after M1-7d).
-2. M1-13 e2e, J9 dogfood → M1a gate (v0.1.0).
+1. M1-9 CLI + MCP, M1-12 docs.
+2. M1-13 e2e, J9 dogfood → v0.1.0.
 
 ## Decisions made (still relevant)
 - D-61: G-4 batches all-or-nothing, identical duplicates skipped; notarize gas ≤ 170k; pause blocks receipts; fresh salt per record; G-46 one-plaintext requirement.
@@ -34,6 +33,8 @@ _Updated 2026-10-15 01:45 · claude-code / claude-opus-5-5 · orchestrator_
 - D-67: same-user agent risk (G-1) accepted for M1 testnets, re-decided at the M2 gate.
 - D-68: batch owner approval, one code entry per reviewed batch, no unlock session; commitments never batched.
 - D-69: invite links use raw DEFLATE (RFC 1951).
+- D-70: paired contacts Talk without approval by default.
+- D-71: deployer keys (testnets: repo secret, process-only safeguards; mainnet: separate hardware key).
 
 ## Asks
 - [ ] @denisjazbec: start with `docs/README.md` and `docs/process/onboarding.md`. (2026-10-12)
@@ -48,4 +49,4 @@ _Updated 2026-10-15 01:45 · claude-code / claude-opus-5-5 · orchestrator_
 _(none yet)_
 
 ## Blocked on
-- M1-7d owner actions (#79): owner decision (G-6 reading).
+- None.

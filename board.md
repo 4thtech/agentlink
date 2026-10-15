@@ -1,5 +1,5 @@
 # AgentLink — sync board
-_Updated 2026-10-15 01:45 by @talirezun_
+_Updated 2026-10-15 07:30 by @talirezun_
 
 ## Area ownership
 | Area | Repo / paths | Lead | Review |
@@ -25,7 +25,13 @@ _Updated 2026-10-15 01:45 by @talirezun_
 | M1-7c pairing | @talirezun (agents) | done | #78 | 2026-10-15 |
 | M1-7c-b contact.check verify-and-store | @talirezun (agents) | done | #80 | 2026-10-15 |
 | M1-5b-b Node relay connector | @talirezun (agents) | in-progress | #81 merged; Docker CI job pending | 2026-10-15 |
-| M1-7d owner actions | @talirezun (agents) | blocked | #79; owner decision | 2026-10-15 |
+| M1-7d owner actions | @talirezun (agents) | done | #79 | 2026-10-15 |
+| M1-8g policy-version mark | @talirezun (agents) | done | #86 | 2026-10-15 |
+| M1-7c-b contact.check routing | @talirezun (agents) | done | #85 | 2026-10-15 |
+| M1-5f outbox window | @talirezun (agents) | in-progress | #87 | 2026-10-15 |
+| M1-7b-b sender-owner entry | @talirezun (agents) | in-progress | #90 | 2026-10-15 |
+| M1-2a encodings | @talirezun (agents) | in-progress | #93 | 2026-10-15 |
+| M1-7e requests | @talirezun (agents) | in-progress | #94 | 2026-10-15 |
 
 ## Waiting on a decision
 | # | Question | Decider | Raised by / when |
@@ -37,4 +43,4 @@ _Updated 2026-10-15 01:45 by @talirezun_
 ## Blockers
 | Task | Blocked on | Since |
 |---|---|---|
-| M1-7d owner actions | Owner decision (G-6 reading), #79 | 2026-10-15 |
+| — | — | — |
