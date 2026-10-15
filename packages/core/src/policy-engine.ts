@@ -54,7 +54,10 @@ export type PolicyAction =
     }
   /** An outbound envelope to a paired contact. */
   | { readonly kind: 'envelope.send'; readonly contact: string; readonly sizeBytes: number }
-  /** A commitment: its scope and stored terms, or a receipt without terms (04 §3.4.2, M1-20). */
+  /**
+   * A commitment: its scope and stored terms, or a receipt without terms (04 §3.4.2, M1-20). The
+   * decision only: execution uses evaluateCommitment and recheckCommitmentGrant (IR-M1-20-1 F02).
+   */
   | { readonly kind: 'commitment'; readonly facts: CommitmentFacts }
   /** A paid proof action (the budget and contact rules are M1-7i). */
   | { readonly kind: 'proof' }
@@ -196,9 +199,13 @@ export function evaluate(
       if (policy === undefined) return failClosedContact();
       return isAllowedContact(policy, action.contact) ? 'allow' : 'deny';
 
-    case 'commitment':
-      // The rule and its grant are evaluateCommitment (commitments.ts); this is its decision.
-      return evaluateCommitment(effective, action.facts).decision;
+    case 'commitment': {
+      // Only the decision. Running a commitment must use evaluateCommitment, which returns the grant
+      // to record, and recheckCommitmentGrant before each part (M1-32; IR-M1-20-1 F02). A void
+      // (APPROVAL_VOID) reads as deny here: nothing is sent or signed.
+      const d = evaluateCommitment(effective, action.facts).decision;
+      return d === 'void' ? 'deny' : d;
+    }
 
     case 'proof':
       // A global deny always wins (06 §3 step 1); the allow paths are M1-7i.

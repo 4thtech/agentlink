@@ -136,6 +136,7 @@ export {
   type AutoAcceptMiss,
   type CommitmentBinding,
   type CommitmentBindingRefusal,
+  type CommitmentVoidReason,
   type CommitmentEvaluation,
   type CommitmentFacts,
   type CommitmentGrant,

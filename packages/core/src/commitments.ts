@@ -18,7 +18,9 @@
 //   `autoAcceptMinUSD`, which is set, and we deliver everything). Anything else asks the owner.
 // - Only the stored terms the scope binds are evaluated (I-5, D-55): both are re-validated with the
 //   strict schemas and the scope's `termsHash` must be the terms' own. A scope or terms that do not
-//   check out never allow, even under `allow` (fail closed); `deny` still wins.
+//   check out are `void` (APPROVAL_VOID) under every policy: never allowed, never an owner request.
+// - A late accept of one of our own superseded versions always asks, even under `allow`, so the
+//   owner sees the warning (04 §3.4.2 "Counter-offers and late accepts"; IR-M1-20-1 F01).
 // - A grant is a ledger row, never authority: before each part the core re-runs the rule on the
 //   verified policy and requires the same policy hash (recheckCommitmentGrant).
 import { verifyTermsHash } from '@agentlink/crypto';
@@ -54,6 +56,12 @@ export type CommitmentFacts =
       readonly self: string;
       readonly scope: unknown;
       readonly terms: unknown;
+      /**
+       * From the core's store (M1-32): the answered version is one of this agent's own offers and a
+       * newer own version exists (04 §3.4.2 "Counter-offers and late accepts"). Then the owner must
+       * see the late-accept warning, so the commitment always asks (IR-M1-20-1 F01).
+       */
+      readonly supersededByOwnNewer: boolean;
     }
   /** `agentlink_acknowledge` `accepted` / `rejected` on a record without terms (06 §2.4). */
   | { readonly kind: 'acknowledge'; readonly receipt: 'ACCEPTED' | 'REJECTED' };
@@ -68,8 +76,8 @@ export type AutoAcceptMiss =
   | 'reject'
   /** A firm offer: never covered by the limits. */
   | 'firm_offer'
-  /** The scope or the terms do not check out, or do not bind each other. */
-  | 'unevaluable'
+  /** A newer own version exists: the owner sees the late-accept warning (IR-M1-20-1 F01). */
+  | 'superseded'
   | 'contact_not_listed'
   | 'no_price'
   /** Not USD or a USD stablecoin. */
@@ -91,8 +99,21 @@ export interface CommitmentGrant {
   readonly policyHash: string;
 }
 
+/** Why facts are refused outright: a binding refusal, or facts that are not a commitment at all. */
+export type CommitmentVoidReason = CommitmentBindingRefusal | 'facts_invalid';
+
 export type CommitmentEvaluation =
   | { readonly decision: 'deny' }
+  /**
+   * The scope and its terms do not check out or do not bind each other (04 §3.4.2 void rule 2):
+   * refused with `APPROVAL_VOID` under every policy. Nothing is sent or signed and no owner request
+   * is created (IR-M1-20-1 F03, OQ3).
+   */
+  | {
+      readonly decision: 'void';
+      readonly code: 'APPROVAL_VOID';
+      readonly reason: CommitmentVoidReason;
+    }
   | { readonly decision: 'allow'; readonly grant: CommitmentGrant }
   | { readonly decision: 'approval'; readonly autoAccept: AutoAcceptMiss };
 
@@ -180,37 +201,48 @@ function autoAccept(policy: PolicyDocument, { scope, terms }: Bound): AutoAccept
   return compareDecimalWithUsd(price.amount, c.autoAcceptMinUSD) >= 0 ? undefined : 'under_minimum';
 }
 
+const voided = (reason: CommitmentVoidReason): CommitmentEvaluation => ({
+  decision: 'void',
+  code: 'APPROVAL_VOID',
+  reason,
+});
+
 const ask = (autoAccept: AutoAcceptMiss): CommitmentEvaluation => ({
   decision: 'approval',
   autoAccept,
 });
 
 /**
- * The `commitments` rule for one commitment scope (06 §3, 04 §3.4.2): deny, allow (with the grant
- * to record) or approval (with why auto-accept did not apply). Pure and deterministic; never
- * throws, and anything it cannot read asks the owner.
+ * The `commitments` rule for one commitment scope (06 §3, 04 §3.4.2): void (`APPROVAL_VOID`, the
+ * facts do not bind; checked first, under every policy), deny, allow (with the grant to record) or
+ * approval (with why auto-accept did not apply). Pure and deterministic; never throws.
  */
 export function evaluateCommitment(
   effective: EffectivePolicy,
   facts: CommitmentFacts,
 ): CommitmentEvaluation {
+  // Integrity first, under every policy: facts that do not bind are void, never a request.
+  const f = facts as Partial<Record<string, unknown>> | null | undefined;
+  let bound: Bound | undefined;
+  let superseded = false;
+  if (typeof f === 'object' && f !== null && f.kind === 'acknowledge') {
+    if (f.receipt !== 'ACCEPTED' && f.receipt !== 'REJECTED') return voided('facts_invalid');
+  } else if (typeof f === 'object' && f !== null && f.kind === 'terms') {
+    if (typeof f.supersededByOwnNewer !== 'boolean') return voided('facts_invalid');
+    const r = bind(f.self, f.scope, f.terms);
+    if (!r.ok) return voided(r.reason);
+    bound = r.bound;
+    superseded = f.supersededByOwnNewer;
+  } else {
+    return voided('facts_invalid');
+  }
+
   if (effective.mode === 'fail_closed') return ask('policy_invalid');
   const policy = effective.policy;
   const rule = policy.commitments.accept;
   if (rule === 'deny') return { decision: 'deny' };
-
-  const f = facts as Partial<Record<string, unknown>> | null | undefined;
-  let bound: Bound | undefined;
-  if (typeof f === 'object' && f !== null && f.kind === 'acknowledge') {
-    if (f.receipt !== 'ACCEPTED' && f.receipt !== 'REJECTED') return ask('unevaluable');
-  } else if (typeof f === 'object' && f !== null && f.kind === 'terms') {
-    const r = bind(f.self, f.scope, f.terms);
-    if (!r.ok) return ask('unevaluable');
-    bound = r.bound;
-  } else {
-    return ask('unevaluable');
-  }
-
+  // A late accept of a version we already replaced: the owner sees the warning, even under allow.
+  if (superseded) return ask('superseded');
   if (rule === 'allow') {
     return { decision: 'allow', grant: { basis: 'rule', policyHash: policyDocumentHash(policy) } };
   }
@@ -234,7 +266,9 @@ export type GrantRecheck =
       readonly reason: 'policy_invalid' | 'policy_changed' | 'not_allowed' | 'grant_invalid';
     }
   /** `commitments.accept` is now deny: nothing is sent or signed (04 §3.4.2 rule 4). */
-  | { readonly status: 'deny' };
+  | { readonly status: 'deny' }
+  /** The stored terms no longer bind the scope: `APPROVAL_VOID`, nothing is sent or signed. */
+  | { readonly status: 'void'; readonly code: 'APPROVAL_VOID' };
 
 /**
  * Before each part of a granted scope runs (04 §3.4.2, D-55): the grant row is only a ledger, so the
@@ -248,6 +282,7 @@ export function recheckCommitmentGrant(
   grant: CommitmentGrant,
 ): GrantRecheck {
   const e = evaluateCommitment(effective, facts);
+  if (e.decision === 'void') return { status: 'void', code: 'APPROVAL_VOID' };
   if (e.decision === 'deny') return { status: 'deny' };
   if (effective.mode === 'fail_closed') return { status: 'ask_owner', reason: 'policy_invalid' };
   const g = grant as Partial<CommitmentGrant> | null | undefined;
