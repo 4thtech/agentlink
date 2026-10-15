@@ -36,6 +36,7 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 >   - Relay pool and delivery outbox ([#59](https://github.com/4thtech/agentlink/pull/59)): Publishes a wrap to its relays, counts it sent at 2 acknowledgements and retries for 24 h.
 >   - Sync ([#63](https://github.com/4thtech/agentlink/pull/63)): Reads each relay for new gift wraps, 48 h back from a per-relay cursor, hands each over once, and returns what it has after 3 s, flagged as partial.
 >   - Outbox stays inside the sync look-back ([#87](https://github.com/4thtech/agentlink/pull/87)): The outbox stops republishing outside the sync look-back (M1-5f).
+>   - Default relay set ([#119](https://github.com/4thtech/agentlink/pull/119)): One shared list of three public relays (relay.damus.io, nos.lol, relay.primal.net) and an opt-in script and checklist to vet them; the relays are not yet signed off.
 > - **Core (@agentlink/core):** Code merged, not published. Nothing in it is user-runnable yet.
 >   - Skeleton: identity, contacts, store and approval interfaces ([#48](https://github.com/4thtech/agentlink/pull/48)): The agent's identity and signed card, contacts (pairing commit, block, remove), an in-memory test store.
 >   - Envelopes ([#66](https://github.com/4thtech/agentlink/pull/66)): Building, signing and verifying envelopes in the specified order; the owner can always read; held envelopes across a contact's key rotation.
