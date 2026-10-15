@@ -572,6 +572,103 @@ describe('agentlink_accept_invite under the default policy', () => {
   });
 });
 
+describe('agentlink_accept_invite called again without approvalId (M1-13a follow-up)', () => {
+  const approvalRows = async (agent: Agent) => (await rows(agent)).approvals;
+
+  it('the two-step flow is spelled out in the pending result: same inviteUrl and approvalId', async () => {
+    const url = await invite(w.alice);
+    const asked = await call(w.bob, 'agentlink_accept_invite', { inviteUrl: url });
+    const id = pendingId(asked);
+    const next = String(asked.structured.nextStep);
+    expect(next).toContain(`agentlink approve ${id}`);
+    expect(next).toContain('agentlink_accept_invite');
+    expect(next).toContain('same inviteUrl');
+    expect(next).toContain(`approvalId ${id}`);
+    expect(next).not.toContain(url);
+  });
+
+  it('while the request is pending, returns the same approvalId and makes no new request', async () => {
+    const url = await invite(w.alice);
+    const id = pendingId(await call(w.bob, 'agentlink_accept_invite', { inviteUrl: url }));
+    const again = await call(w.bob, 'agentlink_accept_invite', { inviteUrl: url });
+    expect(pendingId(again)).toBe(id);
+    expect(String(again.structured.nextStep)).toContain(`approvalId ${id}`);
+    const third = await call(w.bob, 'agentlink_accept_invite', { inviteUrl: url });
+    expect(pendingId(third)).toBe(id);
+    expect((await approvalRows(w.bob)).map((a) => a.status)).toEqual(['pending']);
+    expect((await rows(w.bob)).pairings).toHaveLength(0);
+    expect(w.net.eventCount()).toBe(0);
+  });
+
+  it('matches the invite, not the spelling: the bare link code finds the same request', async () => {
+    const url = await invite(w.alice);
+    const bare = url.slice(INVITE_LINK_PREFIX.length);
+    const id = pendingId(await call(w.bob, 'agentlink_accept_invite', { inviteUrl: url }));
+    expect(pendingId(await call(w.bob, 'agentlink_accept_invite', { inviteUrl: bare }))).toBe(id);
+    expect(await approvalRows(w.bob)).toHaveLength(1);
+    // And the owner's approval serves either spelling.
+    await decide(w.bob, id, 'approve');
+    const ok = await call(w.bob, 'agentlink_accept_invite', { inviteUrl: bare, approvalId: id });
+    expect(ok.structured.status).toBe('ok');
+    expect((await rows(w.bob)).pairings).toHaveLength(1);
+  });
+
+  it('after the owner approved, does not accept without approvalId; says to call again with it', async () => {
+    const url = await invite(w.alice);
+    const id = pendingId(await call(w.bob, 'agentlink_accept_invite', { inviteUrl: url }));
+    await decide(w.bob, id, 'approve');
+
+    const bare = await call(w.bob, 'agentlink_accept_invite', { inviteUrl: url });
+    expect(bare.structured.status).toBe('rejected');
+    expect(bare.structured['code']).toBe('APPROVAL_ID_MISSING');
+    expect(bare.structured.approvalId).toBeUndefined();
+    expect(String(bare.structured.nextStep)).toContain('agentlink_accept_invite');
+    expect(String(bare.structured.nextStep)).toContain('same inviteUrl');
+    expect(String(bare.structured.nextStep)).toContain(`approvalId ${id}`);
+    expect(everything(bare)).not.toContain(url);
+    // Nothing ran and the approval is not used: no pairing, no new request.
+    const state = await rows(w.bob);
+    expect(state.pairings).toHaveLength(0);
+    expect(state.contacts).toHaveLength(0);
+    expect(state.approvals.map((a) => a.status)).toEqual(['approved']);
+    expect(w.net.eventCount()).toBe(0);
+
+    const ok = await call(w.bob, 'agentlink_accept_invite', { inviteUrl: url, approvalId: id });
+    expect(ok.structured.status).toBe('ok');
+    expect((await rows(w.bob)).pairings).toHaveLength(1);
+  });
+
+  it('after a denial, a call without approvalId asks the owner again (a new request)', async () => {
+    const url = await invite(w.alice);
+    const id = pendingId(await call(w.bob, 'agentlink_accept_invite', { inviteUrl: url }));
+    await decide(w.bob, id, 'deny');
+    const next = pendingId(await call(w.bob, 'agentlink_accept_invite', { inviteUrl: url }));
+    expect(next).not.toBe(id);
+    expect((await approvalRows(w.bob)).map((a) => a.status).sort()).toEqual(['denied', 'pending']);
+    expect((await rows(w.bob)).pairings).toHaveLength(0);
+  });
+
+  it('after the request lapsed, a call without approvalId asks the owner again', async () => {
+    const url = await invite(w.alice);
+    const id = pendingId(await call(w.bob, 'agentlink_accept_invite', { inviteUrl: url }));
+    await w.bob.store.transaction((tx) =>
+      tx.update('approvals', { approval_id: id }, { expires_at: NOW - 1 }),
+    );
+    const next = pendingId(await call(w.bob, 'agentlink_accept_invite', { inviteUrl: url }));
+    expect(next).not.toBe(id);
+    expect(await approvalRows(w.bob)).toHaveLength(2);
+  });
+
+  it('a different invite gets its own request', async () => {
+    const first = await invite(w.alice);
+    const second = await invite(w.alice);
+    const a = pendingId(await call(w.bob, 'agentlink_accept_invite', { inviteUrl: first }));
+    const b = pendingId(await call(w.bob, 'agentlink_accept_invite', { inviteUrl: second }));
+    expect(b).not.toBe(a);
+    expect(await approvalRows(w.bob)).toHaveLength(2);
+  });
+});
+
 describe('agentlink_accept_invite under `auto`', () => {
   it('pairs at once and publishes the handshake', async () => {
     await allowAutoAccept(w.bob);

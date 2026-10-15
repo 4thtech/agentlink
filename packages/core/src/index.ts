@@ -154,6 +154,7 @@ export {
   type ApprovalUse,
   type CollectOutcome,
   type FeeQuote,
+  type OpenApproval,
   type PendingApproval,
 } from './approvals.js';
 export {

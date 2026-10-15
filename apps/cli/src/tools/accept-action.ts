@@ -4,10 +4,12 @@
 // surface's retry refuse (fail closed, but a needless second ask).
 //
 // Shape: `{tool, args: {inviteUrl}, context: {triggers, inviteId, counterparty}}`. `args` is the tool
-// input after defaults, without `approvalId` and `clientRequestId`. `inviteId` and `counterparty`
+// input after defaults, without `approvalId` and `clientRequestId`; `inviteUrl` is put in its full
+// link form (the prefix added to a bare link code), so both spellings of one invite build one action
+// and one approval serves either (M1-13a follow-up). `inviteId` and `counterparty`
 // come from the decoded link, so an approval for one invite can never be used for another (I-4).
 // Runtime-agnostic: core only.
-import { decodeInviteLink } from '@agentlink/core';
+import { INVITE_LINK_PREFIX, decodeInviteLink } from '@agentlink/core';
 
 export interface AcceptInviteAction {
   readonly tool: 'agentlink_accept_invite';
@@ -27,7 +29,11 @@ export async function acceptInviteAction(inviteUrl: string): Promise<AcceptInvit
   const invite = await decodeInviteLink(inviteUrl);
   return {
     tool: 'agentlink_accept_invite',
-    args: { inviteUrl },
+    args: {
+      inviteUrl: inviteUrl.startsWith(INVITE_LINK_PREFIX)
+        ? inviteUrl
+        : `${INVITE_LINK_PREFIX}${inviteUrl}`,
+    },
     context: {
       triggers: ['contacts.acceptInvites'],
       inviteId: invite.inviteId,

@@ -240,7 +240,7 @@
   {
     "name": "agentlink_accept_invite",
     "title": "AgentLink: accept an invite",
-    "description": "Accept an AgentLink invite link the user gave you, to connect with that person's AI agent. If the result is pending_approval, tell the user what it says and call again with the approvalId once they approve.",
+    "description": "Accept an AgentLink invite link the user gave you, to connect with that person's AI agent. When the owner must approve, it takes two calls: the first returns pending_approval with an approvalId (tell the user what it says); after they approve, call this tool again with the same inviteUrl and that approvalId. Calling again without approvalId does not accept the invite.",
     "inputSchema": {
       "type": "object",
       "properties": {
