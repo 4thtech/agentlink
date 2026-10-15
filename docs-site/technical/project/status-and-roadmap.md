@@ -54,6 +54,7 @@ Code that is merged is not necessarily published: nothing is released or install
 | Core (@agentlink/core) | Held cards need the sender's own owner entry | Done | [#90](https://github.com/4thtech/agentlink/pull/90) |
 | Core (@agentlink/core) | Send pipeline | In progress | [#99](https://github.com/4thtech/agentlink/pull/99) |
 | Core (@agentlink/core) | Inbox sync, delivery acknowledgements, owner card update | In progress | [#106](https://github.com/4thtech/agentlink/pull/106) |
+| Core (@agentlink/core) | Terms and one approval per agreement | In progress | [#126](https://github.com/4thtech/agentlink/pull/126) |
 | Node runtime (@agentlink/node) | Agent key store in the OS keychain | Done | [#54](https://github.com/4thtech/agentlink/pull/54), [#57](https://github.com/4thtech/agentlink/pull/57), [#83](https://github.com/4thtech/agentlink/pull/83) |
 | Node runtime (@agentlink/node) | Local SQLite database | Done | [#60](https://github.com/4thtech/agentlink/pull/60), [#68](https://github.com/4thtech/agentlink/pull/68) |
 | Node runtime (@agentlink/node) | Owner code at a prompt | Done | [#67](https://github.com/4thtech/agentlink/pull/67) |

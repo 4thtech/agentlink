@@ -3055,7 +3055,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Specs name one origin for the local UI; a test registers and uses a PRF passkey on that origin, and requests with any other `Host` value are rejected.
 
 #### M1-32 · core: terms flow and one approval per agreement (new, D-55)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (the deferred receipt with M1-7g in M1b)
+- **Status:** in review (4thtech/agentlink#126) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (the deferred receipt with M1-7g in M1b)
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7b, M1-7e, M1-20, M1-21 (not M1-7h, so it runs beside M1-7c → M1-7h and stays off the critical path)
 - **Spec:** D-55, D-31, D-32; 04 §3.4, §3.4.2; 07 §2, §2.1, §3 (`approvals`); 06 §2.2a, §2.5, §3

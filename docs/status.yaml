@@ -161,6 +161,10 @@ areas:
         state: in-progress
         prs: [106]
         summary: "Inbox sync with a per-contact rate limit, opt-in delivery acknowledgements and a fetch-only catch-up for read-only status (M1-7h); in progress. Owner-signed revocations of contacts and of the agent itself are applied; the owner card update (M1-7j, M1b) follows."
+      - name: "Terms and one approval per agreement"
+        state: in-progress
+        prs: [126]
+        summary: "Offers, counters, rejects and accepts with the chain fields filled from the agent's own store; the negotiation rules (no forks, lock after an accept, conflicts and anchored resends) applied on receive; an accept asks the owner once per agreement, or runs within the owner-signed auto-accept limits, and is sent at most once (M1-32, D-55); in review. Receipts and recorded offers follow in M1b."
   - id: node
     title: "Node runtime (@agentlink/node)"
     intro: "Code merged, not published. Nothing in it is user-runnable yet."
