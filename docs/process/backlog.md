@@ -2587,7 +2587,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** tests first (RED commit): a processed `proof` or protocol-type row from a contact is not counted unread, and the count clears after the default page; end to end over the MCP protocol client between two real agents, A sends, B's `agentlink_inbox` returns the message inside the untrusted block, marks it read, and a second call does not return it as unread; `agentlink_status` counts it until then and not after.
 
 #### M1-9q · MCP tools: propose and respond to terms (new, split from M1-9c)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (PR pending; declared S2 under audit-rules §2.4: drives commitment approvals and renders the owner's approval card) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`src/tools/{propose-terms,respond-to-terms}.ts` and their two registry entries)
 - **Depends on:** M1-9c, M1-21, M1-20, M1-32; M1-9b for the end-to-end approval
 - **Spec:** 06 §2.2a, §2.5, §3; 04 §3.4, §3.4.2; 11 §6.1, §6.10; D-31, D-32, D-55
