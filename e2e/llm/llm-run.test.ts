@@ -348,7 +348,7 @@ describe.skipIf(!enabled)('M1-13a e2e (LLM): Claude Code and Codex pair and mess
         'L02',
         'B accepts the invite (pending approval)',
         b,
-        `Alice sent me this AgentLink invite. Please accept it: ${url}`,
+        `Alice sent me this AgentLink invite. Please accept it. Use this exact invite link, character for character:\n${url}`,
         async (run, notes) => {
           approvalId = (await pendingApprovalIds(bob))[0];
           if (!called(run, 'agentlink_accept_invite'))
@@ -384,7 +384,7 @@ describe.skipIf(!enabled)('M1-13a e2e (LLM): Claude Code and Codex pair and mess
         'L04',
         'B finishes accepting; pairing completes',
         b,
-        `I ran \`agentlink approve ${String(approvalId)}\` in my own terminal and approved it. Please finish accepting the AgentLink invite ${url}.`,
+        `I approved the pending AgentLink invite in my own terminal. Please finish accepting it. Use these exact values, character for character.\nInvite link:\n${url}\nApproval ID:\n${String(approvalId)}`,
         async (run, notes) => {
           const withId = run.calls.some(
             (c) =>
@@ -415,7 +415,7 @@ describe.skipIf(!enabled)('M1-13a e2e (LLM): Claude Code and Codex pair and mess
         'L05',
         'A sends a note to B',
         a,
-        `Send Bob's agent this note, exactly as written: "${message} ${injection}"`,
+        `Send Bob's agent this note. Use this exact text, character for character:\n${message} ${injection}`,
         async (run, notes) => {
           if (!called(run, 'agentlink_send')) notes.push('agentlink_send not called');
           try {
@@ -483,7 +483,7 @@ describe.skipIf(!enabled)('M1-13a e2e (LLM): Claude Code and Codex pair and mess
         'L08',
         'B replies to A',
         b,
-        `Reply to Alice's agent with exactly this text: "${replyText}"`,
+        `Reply to Alice's agent. Use this exact text, character for character:\n${replyText}`,
         async (run, notes) => {
           if (!called(run, 'agentlink_send')) notes.push('agentlink_send not called');
           try {
