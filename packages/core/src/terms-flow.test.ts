@@ -383,7 +383,7 @@ describe('proposeTerms: the core fills the chain fields (06 §2.2a, 04 §3.4)', 
 });
 
 describe('the chain on receive, from the own store (04 §3.4; D-74)', () => {
-  it('a version gap is stored as refused and never enters the chain', async () => {
+  it('a version gap never enters the chain: it waits for the missing version, and is stored as refused once the wait lapses (M1-32-b)', async () => {
     const { a, b, offer } = await offered();
     const v2 = ok(
       await a.client.proposeTerms({ to: b.id, terms: input(), revises: offer.envelopeId }),
@@ -395,7 +395,15 @@ describe('the chain on receive, from the own store (04 §3.4; D-74)', () => {
         revises: v2.envelopeId,
       }),
     );
-    const reports = await deliver(a, b, [v3.envelopeId]);
+    const waiting = await deliver(a, b, [v3.envelopeId]);
+    expect(waiting).toEqual([
+      expect.objectContaining({ outcome: 'deferred', reason: 'terms_waiting' }),
+    ]);
+    expect(await inRow(b, v3.envelopeId)).toMatchObject({ state: 'received' });
+    expect((await b.client.terms.negotiations(a.id))[0]).toMatchObject({ newestVersion: 1 });
+    // v2 never arrives: after the wait (48 h from its signed createdAt) v3 is refused.
+    clock.t += 172_800 + 1;
+    const reports = await b.client.envelopes.processReceived();
     expect(reports).toEqual([
       expect.objectContaining({ outcome: 'refused', reason: 'terms_refused', flagged: false }),
     ]);
@@ -1454,5 +1462,450 @@ describe('IR-M1-32-1 delta 1 regressions', () => {
       }),
     ).toEqual({ status: 'rejected', code: 'TERMS_SUPERSEDED' });
     expect(await outRows(b, 'accept')).toHaveLength(1);
+  });
+});
+
+// --- M1-32-b: order-independent receive (IR-M1-9q-1 F-3) and clientRequestId (F-2) ---------------
+
+/** A seeded PRNG (no dependency): the same seed gives the same interleavings. */
+function prng(seed: number) {
+  let x = seed >>> 0;
+  return (n: number): number => {
+    x = (x + 0x6d2b79f5) >>> 0;
+    let t = x;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) % n;
+  };
+}
+
+/** Hands exactly `ids` (in this order) to `to`'s receive path, then runs one processing pass. */
+async function deliverInOrder(from: Agent, to: Agent, ids: readonly string[]) {
+  for (const id of ids) {
+    const row = await from.store.transaction((tx) => tx.get('envelopes', { envelope_id: id }));
+    await to.client.envelopes.receive({ envelope: parseJson(row?.envelope_json ?? '') });
+  }
+  return to.client.envelopes.processReceived();
+}
+
+/** The chain as `agent` sees it for one termsId: its newest envelope and every item's state. */
+async function chainOf(agent: Agent, contact: string, termsId: string) {
+  const n = (await agent.client.terms.negotiations(contact)).find((x) => x.termsId === termsId);
+  return n === undefined
+    ? undefined
+    : {
+        newestVersion: n.newestVersion,
+        newestEnvelopeId: n.newestEnvelopeId,
+        items: n.items.map((i) => `${i.envelopeId}:${i.type}:${i.version}:${i.state}`).sort(),
+      };
+}
+
+describe('M1-32-b: the chain on receive never depends on arrival order or createdAt (IR-M1-9q-1 F-3; D-74, 04 §3.4)', () => {
+  it('reviewer repro: v1 and v2 sent in the same second and received in one sync: v2 is applied and v1 is superseded', async () => {
+    const a = await openAgent(1, ownerA, 'alice');
+    const b = await openAgent(2, ownerB, 'bob');
+    await pair(a, b);
+    // The same second for every envelope. Propose until one chain sorts v2 before v1 by envelope
+    // ID, the order a pass takes rows with an equal createdAt in.
+    const chains: { v1: string; v2: string; termsId: string }[] = [];
+    for (let i = 0; i < 40 && !chains.some((c) => c.v2 < c.v1); i += 1) {
+      const v1 = ok(await a.client.proposeTerms({ to: b.id, terms: input() }));
+      const v2 = ok(
+        await a.client.proposeTerms({
+          to: b.id,
+          terms: input({ subject: 'v2' }),
+          revises: v1.envelopeId,
+        }),
+      );
+      chains.push({ v1: v1.envelopeId, v2: v2.envelopeId, termsId: v1.termsId });
+    }
+    expect(chains.some((c) => c.v2 < c.v1)).toBe(true);
+    const reports = await deliver(a, b);
+    expect(reports.map((r) => r.outcome)).toEqual(reports.map(() => 'ok'));
+    for (const c of chains) {
+      expect(await chainOf(b, a.id, c.termsId)).toMatchObject({
+        newestVersion: 2,
+        newestEnvelopeId: c.v2,
+      });
+      expect(await b.client.respondToTerms({ envelopeId: c.v1, decision: 'accept' })).toEqual({
+        status: 'rejected',
+        code: 'TERMS_SUPERSEDED',
+      });
+    }
+    const last = chains[chains.length - 1]!;
+    pending(await b.client.respondToTerms({ envelopeId: last.v2, decision: 'accept' }));
+  });
+
+  it('v3 received one sync before v2: v3 waits, then both are taken and v3 is the newest', async () => {
+    const { a, b, offer } = await offered();
+    const v2 = ok(
+      await a.client.proposeTerms({ to: b.id, terms: input(), revises: offer.envelopeId }),
+    );
+    const v3 = ok(
+      await a.client.proposeTerms({
+        to: b.id,
+        terms: input({ subject: 'v3' }),
+        revises: v2.envelopeId,
+      }),
+    );
+    expect(await deliverInOrder(a, b, [v3.envelopeId])).toEqual([
+      expect.objectContaining({ outcome: 'deferred', reason: 'terms_waiting' }),
+    ]);
+    // While it waits, v3 is not in the chain and cannot be answered.
+    expect(
+      await b.client.respondToTerms({ envelopeId: v3.envelopeId, decision: 'accept' }),
+    ).toEqual({ status: 'rejected', code: 'INVALID_ARGUMENT' });
+    const reports = await deliverInOrder(a, b, [v2.envelopeId]);
+    expect(reports.map((r) => r.outcome)).toEqual(['ok', 'ok']);
+    expect(await chainOf(b, a.id, offer.termsId)).toMatchObject({
+      newestVersion: 3,
+      newestEnvelopeId: v3.envelopeId,
+    });
+    expect(
+      await b.client.respondToTerms({ envelopeId: v2.envelopeId, decision: 'accept' }),
+    ).toEqual({ status: 'rejected', code: 'TERMS_SUPERSEDED' });
+    pending(await b.client.respondToTerms({ envelopeId: v3.envelopeId, decision: 'accept' }));
+  });
+
+  it('a later signed createdAt on v1 than on v2 changes nothing: the links decide', async () => {
+    const a = await openAgent(1, ownerA, 'alice');
+    const b = await openAgent(2, ownerB, 'bob');
+    await pair(a, b);
+    const t = clock.t;
+    clock.t = t + 5;
+    const v1 = ok(await a.client.proposeTerms({ to: b.id, terms: input() }));
+    clock.t = t + 1;
+    const v2 = ok(
+      await a.client.proposeTerms({
+        to: b.id,
+        terms: input({ subject: 'v2' }),
+        revises: v1.envelopeId,
+      }),
+    );
+    clock.t = t + 10;
+    // One sync: the pass takes v2 first (the earlier createdAt).
+    const reports = await deliverInOrder(a, b, [v1.envelopeId, v2.envelopeId]);
+    expect(reports.map((r) => r.outcome)).toEqual(['ok', 'ok']);
+    expect(await chainOf(b, a.id, v1.termsId)).toMatchObject({
+      newestVersion: 2,
+      newestEnvelopeId: v2.envelopeId,
+    });
+  });
+
+  it('a waiting offer stays waiting across passes and is taken when its missing version arrives within the wait', async () => {
+    const { a, b, offer } = await offered();
+    const v2 = ok(
+      await a.client.proposeTerms({ to: b.id, terms: input(), revises: offer.envelopeId }),
+    );
+    const v3 = ok(
+      await a.client.proposeTerms({
+        to: b.id,
+        terms: input({ subject: 'v3' }),
+        revises: v2.envelopeId,
+      }),
+    );
+    await deliverInOrder(a, b, [v3.envelopeId]);
+    clock.t += 3_600;
+    expect(await b.client.envelopes.processReceived()).toEqual([
+      expect.objectContaining({ outcome: 'deferred', reason: 'terms_waiting' }),
+    ]);
+    clock.t += 3_600;
+    const reports = await deliverInOrder(a, b, [v2.envelopeId]);
+    expect(reports.map((r) => r.outcome)).toEqual(['ok', 'ok']);
+    expect(await inRow(b, v3.envelopeId)).toMatchObject({ state: 'ok' });
+  });
+
+  it('IR-M1-32-b-1 F01: a waiting offer is not counted unread; it counts once the chain takes it', async () => {
+    const { a, b, offer } = await offered();
+    const unread = async () =>
+      (await b.client.inbox.counts()).inbox.find((e) => e.contactId === a.id)?.unread ?? 0;
+    // B reads v1, so nothing is unread.
+    await b.client.inbox.page({
+      limit: 100,
+      includeRead: false,
+      includeSent: false,
+      sizeOf: () => 1,
+      maxBytes: 1_000_000,
+    });
+    expect(await unread()).toBe(0);
+    const v2 = ok(
+      await a.client.proposeTerms({ to: b.id, terms: input(), revises: offer.envelopeId }),
+    );
+    const v3 = ok(
+      await a.client.proposeTerms({
+        to: b.id,
+        terms: input({ subject: 'v3' }),
+        revises: v2.envelopeId,
+      }),
+    );
+    await deliverInOrder(a, b, [v3.envelopeId]);
+    // v3 waits: the inbox page can never return it, so it is not unread.
+    expect(await unread()).toBe(0);
+    clock.t += 60;
+    await b.client.envelopes.processReceived();
+    expect(await unread()).toBe(0);
+    await deliverInOrder(a, b, [v2.envelopeId]);
+    expect(await unread()).toBe(2);
+  });
+
+  it('property: a chain arriving in any order and any sync split (same second included) always ends in the same state', async () => {
+    const a = await openAgent(1, ownerA, 'alice');
+    const b = await openAgent(2, ownerB, 'bob');
+    await pair(a, b);
+    const rnd = prng(0x3132_6262);
+    let reordered = 0;
+    let rounds = 0;
+    for (let round = 0; round < 24; round += 1) {
+      clock.t += 7_200;
+      const base = clock.t;
+      // A random chain: A's versions, sometimes with B's counter in between (B must hold A's
+      // newest first, which itself arrives in a random order).
+      const v1 = ok(
+        await a.client.proposeTerms({ to: b.id, terms: input({ subject: `r${round}` }) }),
+      );
+      const termsId = v1.termsId;
+      let head = v1.envelopeId;
+      let headIsOwn = true;
+      const toB: string[] = [v1.envelopeId];
+      const sentByA: string[] = [v1.envelopeId];
+      const phases = 1 + rnd(3);
+      for (let phase = 0; phase < phases; phase += 1) {
+        const versions = 1 + rnd(4);
+        for (let k = 0; k < versions; k += 1) {
+          // The same second, later or earlier: the signed createdAt never decides.
+          clock.t = base + rnd(3);
+          const subject = `r${round} p${phase} k${k}`;
+          const r = headIsOwn
+            ? ok(
+                await a.client.proposeTerms({
+                  to: b.id,
+                  terms: input({ subject }),
+                  revises: head,
+                }),
+              )
+            : ok(
+                await a.client.respondToTerms({
+                  envelopeId: head,
+                  decision: 'counter',
+                  terms: input({ subject }),
+                }),
+              );
+          head = r.envelopeId!;
+          headIsOwn = true;
+          toB.push(head);
+          sentByA.push(head);
+        }
+        // What B has not seen, in a random permutation and random sync batches.
+        const order = [...toB];
+        for (let i = order.length - 1; i > 0; i -= 1) {
+          const j = rnd(i + 1);
+          [order[i], order[j]] = [order[j]!, order[i]!];
+        }
+        if (order.join() !== toB.join()) reordered += 1;
+        clock.t = base + 10;
+        while (order.length > 0) {
+          await deliverInOrder(a, b, order.splice(0, 1 + rnd(order.length)));
+        }
+        toB.length = 0;
+        // Converged: everything A sent is taken and open, and A's last envelope is B's newest.
+        const chain = await chainOf(b, a.id, termsId);
+        expect(chain?.newestEnvelopeId).toBe(head);
+        for (const id of sentByA) {
+          expect(await inRow(b, id)).toMatchObject({ state: 'ok' });
+        }
+        expect(chain!.items.every((i) => i.endsWith(':open'))).toBe(true);
+        if (phase < phases - 1 && rnd(2) === 0) {
+          // B counters the newest; A receives it and answers with its next version.
+          const c = ok(
+            await b.client.respondToTerms({
+              envelopeId: head,
+              decision: 'counter',
+              terms: input({ subject: `r${round} b${phase}` }),
+            }),
+          );
+          await deliver(b, a);
+          head = c.envelopeId!;
+          headIsOwn = false;
+        }
+      }
+      // Every older version from A is superseded on B; the newest one is acceptable.
+      for (const id of sentByA.slice(0, -1)) {
+        expect(await b.client.respondToTerms({ envelopeId: id, decision: 'accept' })).toEqual({
+          status: 'rejected',
+          code: 'TERMS_SUPERSEDED',
+        });
+      }
+      pending(await b.client.respondToTerms({ envelopeId: head, decision: 'accept' }));
+      rounds += 1;
+    }
+    expect(rounds).toBe(24);
+    // Not vacuous: many phases arrived out of order.
+    expect(reordered).toBeGreaterThan(5);
+  }, 180_000);
+});
+
+describe('M1-32-b: proposeTerms and respondToTerms honour clientRequestId (IR-M1-9q-1 F-2; 06 §1 rule 6, 07 §3.3)', () => {
+  it('a repeated propose under one clientRequestId returns the identical result and sends exactly once', async () => {
+    const a = await openAgent(1, ownerA, 'alice');
+    const b = await openAgent(2, ownerB, 'bob');
+    await pair(a, b);
+    const before = a.spy.published.length;
+    const call = { to: b.id, terms: input(), clientRequestId: 'k1' };
+    const first = ok(await a.client.proposeTerms(call));
+    const wraps = a.spy.published.length - before;
+    expect(wraps).toBeGreaterThan(0);
+    clock.t += 30;
+    expect(await a.client.proposeTerms({ ...call })).toEqual(first);
+    expect(await outRows(a, 'offer')).toHaveLength(1);
+    expect(a.spy.published.length - before).toBe(wraps);
+    await deliver(a, b);
+    expect(await b.client.terms.negotiations(a.id)).toHaveLength(1);
+  });
+
+  it('a different request under the same clientRequestId is IDEMPOTENCY_KEY_REUSED and sends nothing', async () => {
+    const a = await openAgent(1, ownerA, 'alice');
+    const b = await openAgent(2, ownerB, 'bob');
+    await pair(a, b);
+    ok(await a.client.proposeTerms({ to: b.id, terms: input(), clientRequestId: 'k1' }));
+    const published = a.spy.published.length;
+    expect(
+      await a.client.proposeTerms({
+        to: b.id,
+        terms: input({ subject: 'Other' }),
+        clientRequestId: 'k1',
+      }),
+    ).toEqual({ status: 'rejected', code: 'IDEMPOTENCY_KEY_REUSED' });
+    expect(await outRows(a, 'offer')).toHaveLength(1);
+    expect(a.spy.published.length).toBe(published);
+    // Another key is another call.
+    ok(await a.client.proposeTerms({ to: b.id, terms: input(), clientRequestId: 'k2' }));
+    expect(await outRows(a, 'offer')).toHaveLength(2);
+  });
+
+  it('concurrent proposes under one clientRequestId send at most one offer', async () => {
+    const a = await openAgent(1, ownerA, 'alice');
+    const b = await openAgent(2, ownerB, 'bob');
+    await pair(a, b);
+    const call = { to: b.id, terms: input(), clientRequestId: 'k-concurrent' };
+    const results = await Promise.all([
+      a.client.proposeTerms(call),
+      a.client.proposeTerms(call),
+      a.client.proposeTerms(call),
+    ]);
+    expect(await outRows(a, 'offer')).toHaveLength(1);
+    const oks = results.filter((r) => r.status === 'ok');
+    expect(oks.length).toBeGreaterThanOrEqual(1);
+    for (const r of results) expect(['ok', 'in_progress']).toContain(r.status);
+    for (const r of oks) expect(r).toEqual(oks[0]);
+    expect(await a.client.proposeTerms(call)).toEqual(oks[0]);
+  });
+
+  it('a repeated counter and a repeated reject under one clientRequestId send exactly once', async () => {
+    const { a, b, offer } = await offered();
+    const counterCall = {
+      envelopeId: offer.envelopeId,
+      decision: 'counter' as const,
+      terms: input({ subject: 'B v2' }),
+      clientRequestId: 'c1',
+    };
+    const c1 = ok(await b.client.respondToTerms(counterCall));
+    const published = b.spy.published.length;
+    expect(await b.client.respondToTerms({ ...counterCall })).toEqual(c1);
+    expect(await outRows(b, 'offer')).toHaveLength(1);
+    expect(b.spy.published.length).toBe(published);
+    expect(
+      await b.client.respondToTerms({ ...counterCall, terms: input({ subject: 'B other' }) }),
+    ).toEqual({ status: 'rejected', code: 'IDEMPOTENCY_KEY_REUSED' });
+
+    await deliver(b, a);
+    const rejectCall = {
+      envelopeId: c1.envelopeId!,
+      decision: 'reject' as const,
+      note: 'No thanks',
+      clientRequestId: 'r1',
+    };
+    const r1 = ok(await a.client.respondToTerms(rejectCall));
+    clock.t += 5;
+    expect(await a.client.respondToTerms({ ...rejectCall })).toEqual(r1);
+    expect(await outRows(a, 'reject')).toHaveLength(1);
+  });
+
+  it('a repeated accept under one clientRequestId gives the same approval request; the run with the approval sends one accept and replays its result', async () => {
+    const { b, offer } = await offered();
+    const call = {
+      envelopeId: offer.envelopeId,
+      decision: 'accept' as const,
+      clientRequestId: 'a1',
+    };
+    const p1 = pending(await b.client.respondToTerms(call));
+    expect(pending(await b.client.respondToTerms({ ...call }))).toEqual(p1);
+    // The repeat did not void the first request: one live request.
+    const rows = await b.store.transaction((tx) => tx.select('approvals', {}));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ approval_id: p1.approvalId, status: 'pending' });
+
+    await approve(b, p1.approvalId);
+    const runCall = { ...call, approvalId: p1.approvalId, clientRequestId: 'a2' };
+    const done = ok(await b.client.respondToTerms(runCall));
+    expect(done.envelopeId).toBeDefined();
+    const published = b.spy.published.length;
+    // The original result, not APPROVAL_USED, and nothing sent.
+    expect(await b.client.respondToTerms({ ...runCall })).toEqual(done);
+    expect(await outRows(b, 'accept')).toHaveLength(1);
+    expect(b.spy.published.length).toBe(published);
+  });
+
+  it('a kept pending_approval whose approval was decided is not replayed: the repeat reports the approval state', async () => {
+    const { b, offer } = await offered();
+    const call = {
+      envelopeId: offer.envelopeId,
+      decision: 'accept' as const,
+      clientRequestId: 'a1',
+    };
+    const p1 = pending(await b.client.respondToTerms(call));
+    await approve(b, p1.approvalId);
+    expect(await b.client.respondToTerms({ ...call })).toMatchObject({
+      status: 'approval_state',
+      approvalId: p1.approvalId,
+      approval: { status: 'approved' },
+    });
+    expect(await outRows(b, 'accept')).toHaveLength(0);
+  });
+
+  it('one clientRequestId on the two terms tools of one agent are two calls', async () => {
+    const { a, b, offer } = await offered();
+    const c = ok(
+      await b.client.respondToTerms({
+        envelopeId: offer.envelopeId,
+        decision: 'counter',
+        terms: input(),
+      }),
+    );
+    await deliver(b, a);
+    ok(await a.client.proposeTerms({ to: b.id, terms: input(), clientRequestId: 'same' }));
+    ok(
+      await a.client.respondToTerms({
+        envelopeId: c.envelopeId!,
+        decision: 'reject',
+        clientRequestId: 'same',
+      }),
+    );
+    expect(await outRows(a, 'reject')).toHaveLength(1);
+  });
+
+  it('input refused before anything runs stores no idempotency row', async () => {
+    const a = await openAgent(1, ownerA, 'alice');
+    const b = await openAgent(2, ownerB, 'bob');
+    await pair(a, b);
+    expect(
+      await a.client.proposeTerms({
+        to: b.id,
+        terms: input(),
+        notarize: true,
+        note: 'x',
+        clientRequestId: 'bad',
+      }),
+    ).toEqual({ status: 'rejected', code: 'INVALID_ARGUMENT' });
+    expect(await a.store.transaction((tx) => tx.select('idempotency', {}))).toHaveLength(0);
   });
 });

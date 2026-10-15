@@ -154,6 +154,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Specification (D-53): the MCP tool surface is frozen before 0.1.0 at 13 `agentlink_`-prefixed tools with MCP annotations and `approvalId` on every tool that can need approval; one invite link installs AgentLink and pairs; agents check AgentLink at session start (counts only) and offer a handoff at session end.
 - Specification (D-55): agents negotiate with two dedicated tools, `agentlink_propose_terms` and `agentlink_respond_to_terms` (accept, reject, counter), instead of typed offers through `agentlink_send`, bringing the frozen tool surface to 15; one owner approval, bound to the exact terms, contact, conversation and expiry, now covers both the acceptance and its Accepted receipt, and is void if the terms change; terms now state who pays and who delivers, and auto-accept applies only in the direction the owner chose.
 
+### Fixed
+
+- Core terms flow (M1-32-b, S2; review IR-M1-9q-1 F-2, F-3): `proposeTerms` and `respondToTerms` now honour `clientRequestId` as `sendMessage` does, so a retry after a timeout returns the original result and never sends a second offer, counter, reject or accept, and another request under the same key returns `IDEMPOTENCY_KEY_REUSED`; a concurrent repeat returns `in_progress`, and a repeat of an accept whose approval request was meanwhile decided reports that approval's state. Revisions of an offer no longer get lost when they arrive out of order: an offer whose earlier version has not arrived yet waits (inbound reason `terms_waiting`) and is taken as soon as the missing version arrives, in the same sync or a later one, so v2 sent in the same second as v1 is applied and v1 is superseded. An offer whose missing version never arrives is refused after 48 hours, as before with reason `terms_refused`. A waiting offer is not counted as unread. Specification (proposed, owner confirms at merge): 04 §3.4 and 07 §3.2 describe the wait.
+
 ## [0.0.1] - 2026-10-12
 
 M0 Foundations: specifications (spec pack v0.3), development and audit process, CI/security workflows, versioning framework, agent instructions; no product code yet.

@@ -5,6 +5,10 @@
 // step 1). Those rows are only the envelopes the chain took: the receive path runs the chain rules
 // before an envelope is stored (`TermsInbound`, wired into the envelope pipeline), and an envelope
 // the chain refuses is stored as `refused` without its payload (07 §3.2), so it never re-enters.
+// An envelope refused only because a version it links to has not arrived yet (`waitsForChain`)
+// waits instead: the receive path decides it again once other envelopes of the chain are taken,
+// and stores it as refused only when the wait lapses (envelopes.ts, M1-32-b). So any arrival
+// order of one chain converges on the same stored set, and the replay below on the same state.
 //
 // Rebuilding is a replay through the pure reducer of @agentlink/types (`recordSentTerms`,
 // `receiveTerms`) in a fixed order that never depends on store order or on a sender-chosen time:
@@ -329,12 +333,31 @@ export interface TermsInboundInput {
 /** Fixed reason codes of a chain refusal on receive (never inbound text). */
 export type TermsInboundRefusal = TermsRefusal;
 
+/**
+ * Refusals that can lift once this agent holds more of the chain (M1-32-b; D-74: the chain is
+ * decided by the version and `previousTermsHash` links, never by arrival order or createdAt):
+ * - `version_gap`: a version above newest + 1, so a version in between has not arrived yet;
+ * - `previous_mismatch`: the right version on a pointer to an envelope not held yet, for example a
+ *   version that links the sender's resend while the conflict it follows has not arrived.
+ * Every other refusal is final whatever arrives later (rule 1, rule 2, a stale version, a bad
+ * answer, an expired answer, an unanchored resend).
+ */
+export function waitsForChain(reason: TermsRefusal): boolean {
+  return reason === 'version_gap' || reason === 'previous_mismatch';
+}
+
 export type TermsAdmission =
   | {
       readonly refused: true;
       readonly reason: TermsInboundRefusal;
       /** Rule 1: a second envelope from the same sender for a version flags the contact. */
       readonly flagged: boolean;
+      /**
+       * The refusal depends on envelopes this agent may not hold yet (`waitsForChain`): the
+       * receive path keeps the envelope and decides it again once other envelopes of the chain
+       * are taken, and stores it as refused only when the wait lapses (M1-32-b).
+       */
+      readonly wait: boolean;
     }
   | {
       readonly refused: false;
@@ -390,7 +413,7 @@ export class TermsInbound implements TermsInboundHook {
     const p = input.payload as { type: unknown; body: unknown; replyTo: unknown };
     const body = termsBodyOf(p.type, p.body);
     if (self === undefined || body === undefined || !isTermsType(p.type)) {
-      return { refused: true, reason: 'invalid', flagged: false };
+      return { refused: true, reason: 'invalid', flagged: false, wait: false };
     }
     const record: TermsRecord = {
       envelopeId: input.envelopeId,
@@ -410,7 +433,12 @@ export class TermsInbound implements TermsInboundHook {
     const receipt = admitInbound(self, snapshot.negotiations, record);
     if (receipt.outcome === 'refused') {
       const reason = receipt.reason ?? 'invalid';
-      return { refused: true, reason, flagged: reason === 'same_sender' };
+      return {
+        refused: true,
+        reason,
+        flagged: reason === 'same_sender',
+        wait: waitsForChain(reason),
+      };
     }
     // Rule 3 (a conflict found here, or revealed by a resend, D-74 item 1): the envelopes of the
     // conflict, and the version both counters replaced.

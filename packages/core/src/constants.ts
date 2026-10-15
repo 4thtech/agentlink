@@ -44,6 +44,12 @@ export const MAX_RECEIVED_ENVELOPES = 1_000;
 export const HELD_RELEASE_SECONDS = 172_800;
 /** held_envelopes: at most 100 rows per owner_kid, in their own pool (decided at #44; amends D-62). */
 export const MAX_HELD_PER_OWNER_KID = 100;
+/**
+ * A terms envelope that waits for a version it links to (M1-32-b): kept `received` and decided
+ * again in each pass once other envelopes of its chain are taken; stored as refused once its
+ * signed createdAt is this much older than now (the relay look-back, as for held rows).
+ */
+export const TERMS_WAIT_SECONDS = 172_800;
 
 /** Requests queue: at most 5 pending requests per unknown sender key (decided at #44). */
 export const MAX_REQUESTS_PER_SENDER = 5;

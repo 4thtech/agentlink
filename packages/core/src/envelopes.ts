@@ -64,6 +64,7 @@ import {
   HELD_RELEASE_SECONDS,
   MAX_HELD_PER_OWNER_KID,
   MAX_RECEIVED_ENVELOPES,
+  TERMS_WAIT_SECONDS,
 } from './constants.js';
 import {
   screenInboundTx,
@@ -76,7 +77,12 @@ import { checkRecipientWrap, kidOf } from './envelope-wraps.js';
 import { CoreError } from './errors.js';
 import type { IdentityService } from './identity.js';
 import { REQUESTS_FULL, isBlockedTx, pruneRefusedTx, requestsFullTx } from './requests.js';
-import { isTermsType, type TermsAdmission, type TermsInboundHook } from './terms-store.js';
+import {
+  isTermsType,
+  termsBodyOf,
+  type TermsAdmission,
+  type TermsInboundHook,
+} from './terms-store.js';
 import type { Row } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 
@@ -182,7 +188,13 @@ export type InboundReason =
    * locked version, resend link, answer rules; M1-32). Stored as refused and shown in the activity
    * feed; a second envelope for a version from the same sender also flags the contact (rule 1).
    */
-  | 'terms_refused';
+  | 'terms_refused'
+  /**
+   * With outcome `deferred`: an `offer` the chain cannot decide yet because a version it links to
+   * has not arrived (M1-32-b). It stays `received` and is decided again in later passes; once the
+   * wait lapses (TERMS_WAIT_SECONDS from its signed createdAt) it is refused with `terms_refused`.
+   */
+  | 'terms_waiting';
 
 export interface InboundReport {
   /** The validated envelope `id` (base64url, 16 bytes); absent when the envelope did not parse. */
@@ -344,6 +356,24 @@ interface Item {
   readonly envelopeJson: string;
   readonly source: 'received' | 'held';
   readonly releaseAt?: number;
+}
+
+/** A terms envelope waiting for a version it links to (M1-32-b): no plaintext, no key. */
+interface Waiting {
+  readonly item: Item;
+  readonly contactId: string;
+  readonly type: PayloadType;
+  /** The signed createdAt: the wait lapses TERMS_WAIT_SECONDS after it. */
+  readonly createdAt: number;
+  /** The terms version, so the pass decides a chain's waiting envelopes in link order. */
+  readonly version: number;
+}
+
+/** What one processing pass tracks for the waiting terms envelopes (M1-32-b). */
+interface Pass {
+  waiting: Waiting[];
+  /** Terms envelopes the chain took since the waiting list was last decided again. */
+  taken: number;
 }
 
 /** An envelope that passed steps 5 and 6. Owns `cek` until step 8 (or the first failure). */
@@ -663,8 +693,10 @@ export class EnvelopeService {
   /**
    * One processing pass (07 §3.2): held rows that can move first, then every `received` row, with
    * `card-update` envelopes before any other (04 §3.1.1 step 7). Each applied `card-update` runs
-   * the held rows of that contact's owner `kid` again from step 5. Returns one report per envelope
-   * whose state changed or that a later card handles (`deferred`).
+   * the held rows of that contact's owner `kid` again from step 5. Terms envelopes that wait for a
+   * version they link to are decided again at the end of the pass (#runWaiting, M1-32-b). Returns
+   * one report per envelope whose state changed, that a later card handles, or that waits
+   * (`deferred`).
    */
   async processReceived(): Promise<InboundReport[]> {
     const ctx = this.#ctx;
@@ -678,7 +710,8 @@ export class EnvelopeService {
     // fail-closed hard caps (policyLimits), never no limit.
     this.#rateLimit = await this.#hooks.rateLimit?.limit();
     const reports: InboundReport[] = [];
-    reports.push(...(await this.#runHeld(own, book)));
+    const pass: Pass = { waiting: [], taken: 0 };
+    reports.push(...(await this.#runHeld(own, book, pass)));
 
     const rows = await ctx.store.transaction((tx) =>
       tx.select(
@@ -721,12 +754,12 @@ export class EnvelopeService {
           ...opened.filter((o) => o.payload.type !== 'card-update'),
         ];
         for (const o of ordered) {
-          const { report: done, applied } = await this.#decide(o, own, book);
+          const { report: done, applied } = await this.#decide(o, own, book, pass);
           if (done !== undefined) reports.push(done);
           if (applied !== undefined) {
             book = await this.#book();
             reports.push(
-              ...(await this.#runHeld(own, book, {
+              ...(await this.#runHeld(own, book, pass, {
                 ownerKid: kidOf(bytesOf(applied.ownerEnc)),
                 fromKey: applied.agentNostr.slice(2),
               })),
@@ -735,6 +768,73 @@ export class EnvelopeService {
         }
       } finally {
         for (const o of opened) wipeCek(o);
+      }
+    }
+    reports.push(...(await this.#runWaiting(own, book, pass)));
+    return reports;
+  }
+
+  /**
+   * The terms envelopes that wait for a version they link to (M1-32-b; D-74, 04 §3.4: the chain is
+   * decided by its links, never by arrival order or createdAt). While the pass took any terms
+   * envelope since they were last decided, each is opened and decided again (one `unwrapCek`
+   * each), in link order (contact, version, createdAt, ID), until a round takes nothing. Then each
+   * one still waiting is refused if its wait lapsed, or stays `received` for a later pass. So one
+   * chain ends in the same stored set whatever order and whatever syncs its envelopes arrive in.
+   * One report per envelope: its final outcome in this pass.
+   */
+  async #runWaiting(own: OwnKeys, book: Book, pass: Pass): Promise<InboundReport[]> {
+    const reports: InboundReport[] = [];
+    let list = pass.waiting;
+    pass.waiting = [];
+    while (list.length > 0 && pass.taken > 0) {
+      pass.taken = 0;
+      list.sort(
+        (x, y) =>
+          (x.contactId < y.contactId ? -1 : x.contactId > y.contactId ? 1 : 0) ||
+          x.version - y.version ||
+          x.createdAt - y.createdAt ||
+          (x.item.envelopeId < y.item.envelopeId
+            ? -1
+            : x.item.envelopeId > y.item.envelopeId
+              ? 1
+              : 0),
+      );
+      for (const w of list) {
+        const result = await this.#open(w.item, own, book);
+        if ('kind' in result) {
+          const done = await this.#settle(w.item, result);
+          if (done !== undefined) reports.push(done);
+          continue;
+        }
+        try {
+          const { report: done } = await this.#decide(result, own, book, pass);
+          if (done !== undefined) reports.push(done);
+        } finally {
+          wipeCek(result);
+        }
+      }
+      list = pass.waiting;
+      pass.waiting = [];
+    }
+    const now = nowOf(this.#ctx);
+    for (const w of list) {
+      if (now > w.createdAt + TERMS_WAIT_SECONDS) {
+        const final: Final = {
+          kind: 'refuse',
+          reason: 'terms_refused',
+          contactId: w.contactId,
+          flagged: false,
+        };
+        const done = await this.#settle(w.item, final, undefined, w.type);
+        if (done !== undefined) reports.push(done);
+      } else {
+        reports.push(
+          report(w.item.envelopeId, 'deferred', {
+            reason: 'terms_waiting',
+            contactId: w.contactId,
+          }),
+        );
       }
     }
     return reports;
@@ -750,6 +850,7 @@ export class EnvelopeService {
   async #runHeld(
     own: OwnKeys,
     book: Book,
+    pass: Pass,
     after?: { readonly ownerKid: string; readonly fromKey: string },
   ): Promise<InboundReport[]> {
     const now = nowOf(this.#ctx);
@@ -793,7 +894,7 @@ export class EnvelopeService {
         continue;
       }
       try {
-        const { report: done } = await this.#decide(result, own, book);
+        const { report: done } = await this.#decide(result, own, book, pass);
         if (done !== undefined) reports.push(done);
       } finally {
         wipeCek(result);
@@ -945,6 +1046,7 @@ export class EnvelopeService {
     o: Opened,
     own: OwnKeys,
     book: Book,
+    pass: Pass,
   ): Promise<{ readonly report?: InboundReport | undefined; readonly applied?: AgentCard }> {
     const disposition = await this.#senderRole(o, own, book);
     // D-72, IR-D-72-1 F01 and F10: an envelope from a blocked key that skipped the step 5 drop is
@@ -1029,6 +1131,31 @@ export class EnvelopeService {
         thread: o.envelope.thread,
         payload: o.payload,
       });
+      if (admission.refused && admission.wait) {
+        // A version it links to has not arrived yet (M1-32-b): nothing is written; the row stays
+        // where it is and #runWaiting decides it again in this pass, or a later one.
+        const version = termsBodyOf(o.payload.type, o.payload.body)?.terms.version ?? 0;
+        // Marked as waiting, so it is not an unread item: the inbox page can never return it
+        // until the chain takes it (IR-M1-32-b-1 F01). Taking or refusing it rewrites the row.
+        if (o.item.source === 'received') {
+          const { envelopeId, envelopeHash } = o.item;
+          await this.#ctx.store.transaction((tx) =>
+            tx.update(
+              'envelopes',
+              { envelope_id: envelopeId, envelope_hash: envelopeHash, state: 'received' },
+              { refused_reason: 'terms_waiting' },
+            ),
+          );
+        }
+        pass.waiting.push({
+          item: o.item,
+          contactId: disposition.contactId,
+          type: o.payload.type,
+          createdAt: o.envelope.createdAt,
+          version,
+        });
+        return {};
+      }
       if (admission.refused) {
         const final: Final = {
           kind: 'refuse',
@@ -1038,7 +1165,9 @@ export class EnvelopeService {
         };
         return { report: await this.#settle(o.item, final, o.envelope, o.payload.type) };
       }
-      return this.#accept(o, { ...disposition, terms: admission });
+      const accepted = await this.#accept(o, { ...disposition, terms: admission });
+      if (accepted.report?.outcome === 'ok') pass.taken += 1;
+      return accepted;
     }
     return this.#accept(o, disposition);
   }
