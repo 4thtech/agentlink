@@ -186,11 +186,11 @@ areas:
         summary: "M1-8f."
   - id: apps
     title: "MCP server, CLI and apps"
-    intro: "The CLI runtime is in review; nothing is usable yet."
+    intro: "The CLI runtime is merged and the MCP server skeleton is in review; nothing is usable yet."
     components:
       - name: "MCP server and CLI"
         state: in-progress
-        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising) is in review; the commands and the MCP server follow."
+        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising) is merged; the MCP server skeleton (stdio, the frozen M1a tool list, the untrusted-content wrapper and the read-only status and contacts tools) is in review; sending, the inbox, invites, terms and the CLI commands follow."
       - name: "Local approval page"
         state: planned
         summary: "A small page on 127.0.0.1 for owner approvals and settings (M1b)."
