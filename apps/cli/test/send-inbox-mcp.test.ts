@@ -60,9 +60,18 @@ class TestCipher implements StoreCipher {
     const body = JSON.stringify([context.table, context.column, context.rowKey, plaintext]);
     return Promise.resolve(`${PREFIX}${encodeBase64url(encodeUtf8(body))}` as Sealed);
   }
-  open(context: { table: string; column: string; rowKey: string }, sealed: Sealed): Promise<string> {
-    const parsed = JSON.parse(decodeUtf8(decodeBase64url(sealed.slice(PREFIX.length)))) as unknown[];
-    if (parsed[0] !== context.table || parsed[1] !== context.column || parsed[2] !== context.rowKey) {
+  open(
+    context: { table: string; column: string; rowKey: string },
+    sealed: Sealed,
+  ): Promise<string> {
+    const parsed = JSON.parse(
+      decodeUtf8(decodeBase64url(sealed.slice(PREFIX.length))),
+    ) as unknown[];
+    if (
+      parsed[0] !== context.table ||
+      parsed[1] !== context.column ||
+      parsed[2] !== context.rowKey
+    ) {
       return Promise.reject(new Error('test cipher: wrong context'));
     }
     return Promise.resolve(parsed[3] as string);
@@ -125,7 +134,10 @@ class RelayNetwork implements RelayConnector {
 function matches(filter: Filter, event: NostrEvent): boolean {
   if (filter.kinds !== undefined && !filter.kinds.includes(event.kind)) return false;
   const wanted = filter['#p'];
-  if (wanted !== undefined && !event.tags.some((t) => t[0] === 'p' && wanted.includes(t[1] ?? ''))) {
+  if (
+    wanted !== undefined &&
+    !event.tags.some((t) => t[0] === 'p' && wanted.includes(t[1] ?? ''))
+  ) {
     return false;
   }
   if (filter.since !== undefined && event.created_at < filter.since) return false;
@@ -224,7 +236,10 @@ async function pair(inviter: Agent, invitee: Agent): Promise<void> {
   );
   expect(applied.status).toBe('applied');
   const invite = await inviter.client.pairing.createInvite();
-  const started = await invitee.client.pairing.acceptInvite({ link: invite.inviteUrl, allowed: true });
+  const started = await invitee.client.pairing.acceptInvite({
+    link: invite.inviteUrl,
+    allowed: true,
+  });
   expect(started.status).toBe('pending');
   await invitee.client.outbox.processDue();
   await inviter.client.syncInbox();
@@ -287,7 +302,10 @@ async function call(client: Client, name: string, args: Record<string, unknown>)
   const result = await client.callTool({ name, arguments: args });
   expect(result.isError).toBeFalsy();
   const [content] = result.content as { type: string; text: string }[];
-  return { structured: result.structuredContent as Record<string, unknown>, text: content?.text ?? '' };
+  return {
+    structured: result.structuredContent as Record<string, unknown>,
+    text: content?.text ?? '',
+  };
 }
 
 // --- tests ------------------------------------------------------------------------------------------
@@ -302,8 +320,20 @@ let aliceMcp: Client;
 
 beforeEach(async () => {
   net = new RelayNetwork();
-  alice = await makeAgent(1, 'alice', 'Alice', ['wss://one.relay-alpha.net', 'wss://two.relay-alpha.net'], net);
-  bob = await makeAgent(2, 'bob', 'Bob', ['wss://one.relay-beta.net', 'wss://two.relay-beta.net'], net);
+  alice = await makeAgent(
+    1,
+    'alice',
+    'Alice',
+    ['wss://one.relay-alpha.net', 'wss://two.relay-alpha.net'],
+    net,
+  );
+  bob = await makeAgent(
+    2,
+    'bob',
+    'Bob',
+    ['wss://one.relay-beta.net', 'wss://two.relay-beta.net'],
+    net,
+  );
   await pair(alice, bob);
   aliceMcp = await connect(agentToolContext(alice.opened, silent));
 });
@@ -320,7 +350,10 @@ describe('send and receive through the MCP protocol (M1-9p)', () => {
       expect(JSON.stringify(sent.structured)).not.toContain(part);
     }
 
-    const bobMcp = await connect({ ...agentToolContext(bob.opened, silent), client: withTestInboxPage(bob) });
+    const bobMcp = await connect({
+      ...agentToolContext(bob.opened, silent),
+      client: withTestInboxPage(bob),
+    });
     const read = await call(bobMcp, 'agentlink_inbox', {});
     const messages = read.structured['messages'] as Record<string, unknown>[];
     expect(messages).toHaveLength(1);
@@ -344,29 +377,46 @@ describe('send and receive through the MCP protocol (M1-9p)', () => {
   });
 
   it('a repeat with the same clientRequestId sends nothing and returns the original result', async () => {
-    const first = await call(aliceMcp, 'agentlink_send', { to: 'Bob', text: 'hello', clientRequestId: 'req-rt-1' });
+    const first = await call(aliceMcp, 'agentlink_send', {
+      to: 'Bob',
+      text: 'hello',
+      clientRequestId: 'req-rt-1',
+    });
     expect(first.structured['status']).toBe('ok');
     const published = net.published;
     const events = net.eventCount();
 
-    const repeat = await call(aliceMcp, 'agentlink_send', { to: 'Bob', text: 'hello', clientRequestId: 'req-rt-1' });
+    const repeat = await call(aliceMcp, 'agentlink_send', {
+      to: 'Bob',
+      text: 'hello',
+      clientRequestId: 'req-rt-1',
+    });
     expect(repeat.structured).toEqual(first.structured);
     expect(net.published).toBe(published);
     expect(net.eventCount()).toBe(events);
 
-    const reused = await call(aliceMcp, 'agentlink_send', { to: 'Bob', text: 'different', clientRequestId: 'req-rt-1' });
+    const reused = await call(aliceMcp, 'agentlink_send', {
+      to: 'Bob',
+      text: 'different',
+      clientRequestId: 'req-rt-1',
+    });
     expect(reused.structured).toMatchObject({ status: 'rejected', code: 'IDEMPOTENCY_KEY_REUSED' });
     expect(net.published).toBe(published);
   });
 
   it('a body with terms is USE_TERMS_TOOLS; offer is refused by the schema; nothing is stored or sent', async () => {
     const published = net.published;
-    const terms = await call(aliceMcp, 'agentlink_send', { to: 'Bob', body: { terms: { subject: HOSTILE } } });
+    const terms = await call(aliceMcp, 'agentlink_send', {
+      to: 'Bob',
+      body: { terms: { subject: HOSTILE } },
+    });
     expect(terms.structured).toMatchObject({ status: 'error', code: 'USE_TERMS_TOOLS' });
     const offer = await call(aliceMcp, 'agentlink_send', { to: 'Bob', text: 'x', type: 'offer' });
     expect(offer.structured).toMatchObject({ status: 'error', code: 'INVALID_ARGUMENT' });
     expect(net.published).toBe(published);
-    const outbound = await alice.store.transaction((tx) => tx.select('envelopes', { direction: 'out', type: 'text' }));
+    const outbound = await alice.store.transaction((tx) =>
+      tx.select('envelopes', { direction: 'out', type: 'text' }),
+    );
     expect(outbound).toHaveLength(0);
   });
 

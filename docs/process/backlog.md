@@ -2471,7 +2471,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** per-status tests; an approval retry pairs exactly once (relay spy, with a core test signer; end to end with M1-9b); an agent-written label is shown restricted; no safety code in any result.
 
 #### M1-9p · MCP tools: send and inbox (new, split from M1-9c)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (send done; `agentlink_inbox` built against the `ToolClient.inboxPage` port and "not available yet" in production until the core page read lands, proposed card M1-7h-c) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`src/tools/{send,inbox}.ts`)
 - **Depends on:** M1-9c, M1-9j, M1-7k, M1-7h
 - **Spec:** 06 §2.2, §4, §6; 07 §3.3; IR-D48-1 F15f

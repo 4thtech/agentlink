@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 import type { ToolClient, ToolContext } from './context.js';
 import { callTool } from './index.js';
 import type { FinishedResult } from './result.js';
+import { INBOX_TEXT } from './inbox.js';
 import { SEND_TEXT } from './send.js';
 
 const A = `0x${'a'.repeat(40)}`;
@@ -32,7 +33,11 @@ const CANARY =
 const CANARY_PARTS = ['CANARY-9P', 'Human:', 'SYSTEM', '~/.ssh', '\u001b', '\u0007'];
 
 const display = (name: string): ContactDisplayName =>
-  ({ name: name as RestrictedName, label: 'self-declared', nameSource: 'counterparty' }) as ContactDisplayName;
+  ({
+    name: name as RestrictedName,
+    label: 'self-declared',
+    nameSource: 'counterparty',
+  }) as ContactDisplayName;
 
 function contact(
   id: string,
@@ -200,7 +205,9 @@ describe('agentlink_send: refusals before anything is sent', () => {
   });
 
   it('the core refusal USE_TERMS_TOOLS maps to the same result', async () => {
-    const client = fake({ send: () => Promise.resolve({ status: 'rejected', code: USE_TERMS_TOOLS }) });
+    const client = fake({
+      send: () => Promise.resolve({ status: 'rejected', code: USE_TERMS_TOOLS }),
+    });
     const result = await send({ to: B, text: 'hi' }, client);
     expect(result.structured.code).toBe('USE_TERMS_TOOLS');
     expect(result.structured.status).toBe('error');
@@ -310,5 +317,57 @@ describe('agentlink_send: core errors become fixed text (I-5, I-7)', () => {
     const result = await send({ to: B, text: CANARY }, client, logger);
     expect(result.structured.code).toBe('INTERNAL');
     expectNoCanary(result, lines);
+  });
+});
+
+describe('fixed text of the send and inbox tools (11 §5.1; I-5)', () => {
+  const texts = [
+    ...Object.values(SEND_TEXT),
+    INBOX_TEXT.someMessages(1),
+    INBOX_TEXT.someMessages(3),
+    INBOX_TEXT.noMatching,
+    INBOX_TEXT.headerFrom('“Marko” (self-declared)', '7F3A·19C2'),
+    INBOX_TEXT.headerSent('“Marko” (self-declared)'),
+    INBOX_TEXT.beforeNotFound,
+    INBOX_TEXT.beforeNotFoundNextStep,
+  ];
+
+  it('passes the vocabulary lint (the same list as the M1-9c handlers)', () => {
+    const banned = [
+      /\bwallets?\b/i,
+      /\bgas\b/i,
+      /\bseed phrases?\b/i,
+      /\bprivate keys?\b/i,
+      /\btransactions?\b/i,
+      /\bchains?\b/i,
+      /\bon-chain\b/i,
+      /\bblockchains?\b/i,
+      /\bcontracts?\b/i,
+      /\bhash(es)?\b/i,
+      /\b(nostr|relays?)\b/i,
+      /\b(envelope|harness|policy|policies)\b/i,
+      /\bmcp\b/i,
+      /\bsignature\b/i,
+      /\bkeystore\b/i,
+      /\bpasswords?\b/i,
+      /\bverified\b/i,
+      /\bcommitment\b/i,
+      /\bdecrypt/i,
+      /\bencryption keys?\b/i,
+      /\bagent card\b/i,
+      /\bnative token\b/i,
+      /\bsign(s|ed|ing)?\b/i,
+      /!/,
+    ];
+    for (const text of texts)
+      for (const pattern of banned) expect(text, `${text} ~ ${pattern}`).not.toMatch(pattern);
+  });
+
+  it('is valid tool text: 1 to 500 code points, no control or format character', () => {
+    for (const text of texts) {
+      expect(Array.from(text).length).toBeGreaterThan(0);
+      expect(Array.from(text).length).toBeLessThanOrEqual(500);
+      expect(text).not.toMatch(/[\p{Cc}\p{Cf}]/u);
+    }
   });
 });
