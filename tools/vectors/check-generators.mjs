@@ -60,7 +60,12 @@ const CONTROL = 'test-vectors/tagged-hash/vectors.json';
   try {
     const copy = join(dir, 'vectors.json');
     writeFileSync(copy, `${JSON.stringify(control, null, 2)}\n`);
-    const check = generatorCheck(CONTROL, control, (script) => existsSync(join(root, script)), python);
+    const check = generatorCheck(
+      CONTROL,
+      control,
+      (script) => existsSync(join(root, script)),
+      python,
+    );
     if (check.argv === null) {
       problems.push(`negative control: ${check.problems.join('; ')}`);
     } else {
