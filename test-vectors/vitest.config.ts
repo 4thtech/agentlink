@@ -46,6 +46,13 @@ const resolve = {
     // resolved to source here.
     { find: /^@agentlink\/core$/, replacement: packageSource('core', 'index.ts') },
     { find: /^@agentlink\/log$/, replacement: packageSource('log', 'index.ts') },
+    // M1-7k: core's index now also loads its send pipeline, which imports @agentlink/transport-nostr
+    // (wrap, relay pool, outbox worker). Its source imports only crypto, types and log, all resolved
+    // to source above, so it runs in every runtime; the vectors job does not build it.
+    {
+      find: /^@agentlink\/transport-nostr$/,
+      replacement: packageSource('transport-nostr', 'index.ts'),
+    },
   ],
 };
 

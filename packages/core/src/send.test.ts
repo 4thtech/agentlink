@@ -161,10 +161,9 @@ const rows = (store: MemoryStore) =>
   }));
 
 /** Waits until `check` holds (a hanging publish leaves work in flight). */
-async function until(check: () => boolean): Promise<void> {
-  for (let i = 0; i < 200 && !check(); i += 1) {
-    await sleep(0);
-  }
+async function until(check: () => boolean, timeoutMs = 15_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!check() && Date.now() < deadline) await sleep(5);
   expect(check()).toBe(true);
 }
 
@@ -509,8 +508,12 @@ describe('outbox: one publisher per pending row (07 §3.2; M1-9 plan finding 4)'
     const one = await open(spy1);
     const two = await open(spy2);
 
-    void one.outbox.processDue();
-    await until(() => spy1.published.length === 4);
+    let stalledError: unknown;
+    void one.outbox.processDue().catch((error: unknown) => {
+      stalledError = error ?? new Error('rejected');
+    });
+    await until(() => spy1.published.length === 4 || stalledError !== undefined);
+    expect(stalledError).toBeUndefined();
     expect((await two.outbox.processDue()).sent).toBe(0);
     expect(spy2.published).toHaveLength(0);
 

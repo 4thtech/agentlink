@@ -131,9 +131,14 @@ async function initIdentity(p: Party, client: AgentLinkClient, relays: string[])
   }
 }
 
-async function until(check: () => boolean): Promise<void> {
-  for (let i = 0; i < 500 && !check(); i += 1) {
-    await new Promise((resolve) => setImmediate(resolve));
+/**
+ * Waits until `check` holds, by wall-clock time: the first pass waits on SQLite's lock timers and on
+ * real crypto, so a count of event-loop turns is too short on a slow runner (CI, PR #99).
+ */
+async function until(check: () => boolean, timeoutMs = 15_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!check() && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
   }
   expect(check()).toBe(true);
 }
@@ -168,8 +173,13 @@ describe('outbox over one SQLite store shared by two clients (M1-7k, 06 §6)', (
     const two = await openClient(b, spy2);
 
     spy1.mode = 'hang'; // the first process stalls (or dies) mid-publish
-    void one.outbox.processDue();
-    await until(() => spy1.published.length === 4);
+    // The stalled pass never settles; a rejection before it stalls must fail the test, not leak.
+    let stalledError: unknown;
+    void one.outbox.processDue().catch((error: unknown) => {
+      stalledError = error ?? new Error('rejected');
+    });
+    await until(() => spy1.published.length === 4 || stalledError !== undefined);
+    expect(stalledError).toBeUndefined();
     expect((await two.outbox.processDue()).sent).toBe(0);
     expect(spy2.published).toHaveLength(0);
 
