@@ -32,7 +32,13 @@ export type NodeKeyStoreErrorCode =
   /** An AI app's environment marker is set; the owner step is refused (04 §2.8, UX guard). */
   | 'harness_detected'
   /** The owner operation's item list is empty, too long or malformed. */
-  | 'owner_operation_invalid';
+  | 'owner_operation_invalid'
+  /** The stored policy-version mark is not a canonical version (M1-8g). Never read as 0. */
+  | 'policy_mark_invalid'
+  /** A policy version outside [0, 2^53 - 1] was given to the mark (M1-8g). */
+  | 'policy_version_invalid'
+  /** The mark did not read back as raised after the write (M1-8g). */
+  | 'policy_mark_not_raised';
 
 export class NodeKeyStoreError extends Error {
   readonly code: NodeKeyStoreErrorCode;
