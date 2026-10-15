@@ -2053,7 +2053,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Fresh salts (04 §5, D-61): two Records for the same recipient, and a replacement Record for the same envelope, have different CSPRNG salts; no salt-derivation API exists.
 
 #### M1-7h · core: inbox sync, card updates, revocation, delivery acks
-- **Status:** in-progress · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** in-progress (4thtech/agentlink#111) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7c, M1-5c
 - **Spec:** 07 §2 (`syncInbox`), §4.2; 04 §2.6, §3.4, §7 (spam); 06 §2.2, §6; 02 F-21, F-23, F-65
