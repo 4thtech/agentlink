@@ -2421,7 +2421,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Storage credentials never printed or logged (canary).
 
 #### M1-9c · MCP server: skeleton, frozen M1a surface, wrapper, read-only tools
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#113) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (tool handlers in a runtime-agnostic module, G-15, D-73 (1): `src/mcp/**`, `src/tools/{registry,result,untrusted}.ts`, `src/tools/strings/**`, `src/tools/{status,list-contacts,get-approval}.ts`)
 - **Depends on:** M1-9k, M1-9j; the M1-7h catch-up for live counts (store-only counts until then)
 - **Spec:** 06 §1, §2.0, §2.1, §2.5, §4, §5, §6.1; 11 §5, §6.1; D-53, D-73 (1)
