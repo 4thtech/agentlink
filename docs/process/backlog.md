@@ -2484,7 +2484,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Depends on:** M1-9c, M1-21, M1-20, M1-32; M1-9b for the end-to-end approval
 - **Spec:** 06 §2.2a, §2.5, §3; 04 §3.4, §3.4.2; 11 §6.1, §6.10; D-31, D-32, D-55
 - **Invariants:** I-4, I-5
-- **Scope:** `agentlink_propose_terms` and `agentlink_respond_to_terms` (D-55, 06 §2.2a: `TermsInput` from M1-21; `accept`, `reject`, `counter`; a binding `accept` goes through the `commitments` policy, M1-20, under one commitment scope, M1-32); receipts and `notarize` stay M1-9d; summaries name the contact, the action, the version and our dates only; the commitment card for `agentlink approve` (11 §6.10) is rendered here.
+- **Scope:** `agentlink_propose_terms` and `agentlink_respond_to_terms` (D-55, 06 §2.2a: `TermsInput` from M1-21; `accept`, `reject`, `counter`; a binding `accept` goes through the `commitments` policy, M1-20, under one commitment scope, M1-32); receipts and `notarize` stay M1-9d; summaries name the contact, the action, the version and our dates only; the commitment card for `agentlink approve` (11 §6.10) is rendered here, from the card data M1-32 builds with the M1-20 helpers (deferred from M1-20, IR-M1-20-1 F05), including the late-accept warning ("They accepted version 3 after you sent version 4") and the auto-accept note.
 - **Acceptance:**
   - `agentlink_respond_to_terms` with `accept` under the default policy → `pending_approval`; the retry with the `approvalId` sends exactly one `accept` (relay spy) and a second retry sends nothing (`APPROVAL_USED`); `terms` passed with `accept` → `INVALID_ARGUMENT`; `agentlink_send` with `type: "accept"` fails schema validation.
   - A canary in an offer's subject, deliverables, note or price never appears in a summary, `nextStep`, error or approval summary.
@@ -2916,7 +2916,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Walking skeleton, negotiation and UX (D-31…D-41) (new)
 
 #### M1-20 · Commitments policy: owner approval for binding accepts and receipts (D-31) (new)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#114) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types (policy schema), packages/core (policy engine)
 - **Depends on:** M1-7d, M1-21
 - **Spec:** D-31, D-32, D-55; 06 §3 (`commitments` policy and its "Commitments (D-31, D-55)" paragraph; open there and in 11 §14 Q1: whether a notarized `offer` is also a commitment), §2.2a (`agentlink_respond_to_terms`), §2.4 (`agentlink_acknowledge` on records without `terms`); 04 §2.5 (Commitments), §3.4 (`terms` checks), §3.4.2 (one approval per agreement); 02 F-61, F-62, J8
@@ -3064,6 +3064,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `CommitmentScope` v1 and its digest, immutable from creation, with `expiresAt = min(validUntil, createdAt + 7 days)`; pending approval or policy grant (M1-20, re-evaluated before each part); one live scope per answered envelope; atomic claim of each part (compare-and-set in the transaction that stores the signed item); void rules 1–6 incl. owner cancel (04 §3.4.2); one request per call when a proof approval is also needed (M1b).
   - `note` refused with `accept` and with `notarize`; incoming accepts of own superseded, unexpired versions stored and surfaced, never dropped.
   - The lookup for the deferred `ACCEPTED` receipt (07 §2.1 step 4) as a function that M1-7g calls from `syncInbox` processing in M1b; never run from `agentlink_status`.
+  - From M1-20 (IR-M1-20-1): run commitments through `evaluateCommitment` (never the bare `evaluate` decision) and record its grant; `recheckCommitmentGrant` before each part; fill `supersededByOwnNewer` from the store (a late accept of an own superseded version always asks, F01); an `APPROVAL_VOID` result (facts that do not bind) is refused with no request created; build the commitment approval request's card data (counterparty under the 06 §2.1 name rule with its label, the stored terms and the changes from the previous version, what the single approval does via `commitmentParts`, the auto-accept note from `AutoAcceptMiss`, the terms fingerprint under Advanced; 11 §8); combine the `notarize` part's proof rule (M1-7i) into one request.
 - **Acceptance:**
   - Tests first; a table-driven test per decision and record state (offer recorded before, after or never) asserts exactly which parts run: one `accept` envelope and at most one `ACCEPTED` receipt per approval.
   - Replay and reuse: a second call with the same `approvalId` → `APPROVAL_USED` and nothing sent (relay spy); an approval for one agent presented to another agent of the same owner → refused; an approval for version 3 after version 4 is stored → `TERMS_SUPERSEDED`; a stored offer altered in the database → `APPROVAL_VOID`; the contact's owner key changed → the receipt part is void; after `expiresAt` → void.

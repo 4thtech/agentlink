@@ -27,6 +27,7 @@ import {
   type OwnerActionOp,
   type SignedOwnerAction,
 } from '@agentlink/types';
+import { isCommitmentAction } from './commitments.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import type { ContactBook } from './contacts.js';
 import type { IdentityService } from './identity.js';
@@ -291,10 +292,11 @@ export class OwnerActions {
           [row.approval_id],
           row.action_json,
         );
-        const action = parseJson(text) as { context?: { scope?: unknown } } | null;
+        const action = parseJson(text);
         actionDigest = computeActionDigest(action);
-        scoped =
-          typeof action === 'object' && action !== null && action.context?.scope !== undefined;
+        // A scope, or `commitments.accept` among the triggers (an accepted/rejected acknowledgement
+        // has no scope but is a commitment, D-31): never a batch item (D-68, M1-20).
+        scoped = isCommitmentAction(action);
       } catch {
         // An unreadable stored action can never match a signed digest (fail closed).
         actionDigest = '';
