@@ -40,7 +40,8 @@
     "@agentlink/core": "workspace:*",
     "@agentlink/types": "workspace:*",
     "@agentlink/crypto": "workspace:*",
-    "@agentlink/log": "workspace:*"
+    "@agentlink/log": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.32.1"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
