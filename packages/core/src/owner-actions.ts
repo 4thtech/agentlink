@@ -78,7 +78,7 @@ export type OwnerActionOutcome =
 
 /** What a stored approval allows when its `approvalId` is presented with a call (04 §2.5.1). */
 export type ApprovalCheck =
-  | { readonly status: 'approved' | 'denied' | 'pending' | 'expired' | 'cancelled' }
+  | { readonly status: 'approved' | 'denied' | 'pending' | 'expired' | 'cancelled' | 'void' }
   | {
       readonly status: 'refused';
       readonly reason:
@@ -587,6 +587,9 @@ export class OwnerActions {
       // A cancel of a request that was never decided denied it (04 §2.5.1).
       return row.signed_decision === null ? { status: 'denied' } : { status: 'cancelled' };
     }
+    // A status only ever takes authority away, never grants it (04 §2.5.1): a used approval
+    // (`void`, M1-7e) or a lapsed one stays so, whatever its signed decision says.
+    if (row.status === 'void' || row.status === 'expired') return { status: row.status };
     if (row.signed_decision === null) {
       return now > row.expires_at ? { status: 'expired' } : { status: 'pending' };
     }

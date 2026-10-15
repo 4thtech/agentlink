@@ -75,6 +75,7 @@ import { nowOf, seal, type CoreContext } from './context.js';
 import { checkRecipientWrap, kidOf } from './envelope-wraps.js';
 import { CoreError } from './errors.js';
 import type { IdentityService } from './identity.js';
+import { REQUESTS_FULL, requestsFullTx } from './requests.js';
 import type { Row } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 
@@ -162,7 +163,9 @@ export type InboundReason =
   /** An owner-authored type (`approval`, `revoke`) signed by the agent's own key. */
   | 'agent_key_type'
   /** `receive` was given a gift-wrap id that is not 64 lowercase hex (a caller bug). */
-  | 'wrap_id_invalid';
+  | 'wrap_id_invalid'
+  /** The requests queue is at a limit for this unknown key or in total (07 §3.2; M1-7e). */
+  | 'requests_full';
 
 export interface InboundReport {
   /** The validated envelope `id` (base64url, 16 bytes); absent when the envelope did not parse. */
@@ -1107,12 +1110,21 @@ export class EnvelopeService {
     };
     try {
       const done = await ctx.store.transaction((tx) => {
-        if (!claim(tx, item)) return false;
+        if (!claim(tx, item)) return 'lost' as const;
+        // The requests-queue limits: the count and the insert in this one transaction (07 §3.2).
+        // Over a limit nothing is stored and nothing is sent; the seen rows stay.
+        if (d.state === 'request' && requestsFullTx(tx, envelope.from)) {
+          deleteRow(tx, item);
+          return 'full' as const;
+        }
         d.cardUpdate?.apply(tx);
         writeRow(tx, item, row);
-        return true;
+        return 'stored' as const;
       });
-      if (!done) return {};
+      if (done === 'lost') return {};
+      if (done === 'full') {
+        return { report: report(item.envelopeId, 'dropped', { reason: REQUESTS_FULL }) };
+      }
     } catch (error) {
       if (d.cardUpdate !== undefined && error instanceof CoreError) {
         // The card-update broke a §3.4.1 rule at apply time: dropped, nothing applied.
@@ -1218,6 +1230,17 @@ export class EnvelopeService {
             flagged: true,
           };
         }
+      }
+      // A refusal from an unknown key counts toward the requests-queue limits (07 §3.2); over a
+      // limit it is not stored. Pairing refusals keep their own rules (04 §3.6).
+      if (
+        effective.kind === 'refuse' &&
+        effective.contactId === undefined &&
+        envelope !== undefined &&
+        !(type !== undefined && PAIRING_TYPES.has(type)) &&
+        requestsFullTx(tx, envelope.from)
+      ) {
+        effective = { kind: 'drop', reason: REQUESTS_FULL };
       }
       if (effective.kind === 'drop' || envelope === undefined) {
         deleteRow(tx, item);

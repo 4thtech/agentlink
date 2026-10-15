@@ -124,6 +124,25 @@ export {
   type PolicyLimits,
   type PolicyProblem,
 } from './policy-engine.js';
+export {
+  ApprovalService,
+  feeContextFromQuote,
+  type ApprovalAuthorization,
+  type ApprovalRefusal,
+  type ApprovalRequestInput,
+  type ApprovalUse,
+  type CollectOutcome,
+  type FeeQuote,
+  type PendingApproval,
+} from './approvals.js';
+export {
+  IdempotencyService,
+  type IdempotencyKey,
+  type IdempotencyRun,
+  type IdempotencyStart,
+  type PreparedEffect,
+} from './idempotency.js';
+export { REQUESTS_FULL, RequestsQueue, queueRefusals, type RequestEntry } from './requests.js';
 export { CoreError, StoreConstraintError, StoreUsageError, type CoreErrorCode } from './errors.js';
 export * from './constants.js';
 export {

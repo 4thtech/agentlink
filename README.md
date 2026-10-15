@@ -41,7 +41,7 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 >   - Invites and pairing ([#78](https://github.com/4thtech/agentlink/pull/78)): Single-use invite links, the handshake and ack with the commit-then-reveal safety code.
 >   - Safety code checked ([#80](https://github.com/4thtech/agentlink/pull/80), [#85](https://github.com/4thtech/agentlink/pull/85)): The owner's signed check, applied only when it matches the recomputed pairing and re-verified on every read; it goes through the owner-action path.
 >   - Owner-signed actions and policies ([#79](https://github.com/4thtech/agentlink/pull/79)): Approvals, batch approvals, cancellations and policy changes apply only with a valid owner signature, once each; a stored policy that no longer verifies makes the agent ask the owner.
->   - Approval requests and the requests queue (in progress; [#94](https://github.com/4thtech/agentlink/pull/94)): Approval requests with use-once, requests-queue limits and idempotency (M1-7e); in review.
+>   - Approval requests and the requests queue (in progress; [#95](https://github.com/4thtech/agentlink/pull/95)): Approval requests with use-once, requests-queue limits and idempotency (M1-7e); in review.
 >   - Held cards need the sender's own owner entry (in progress; [#90](https://github.com/4thtech/agentlink/pull/90)): A held card is accepted only with the sender's own owner entry (G-51); in review.
 >   - Inbox sync, delivery acknowledgements, owner card update (planned): Inbox sync and delivery acknowledgements (M1-7h), owner card update (M1-7j).
 > - **Node runtime (@agentlink/node):** Code merged, not published. Nothing in it is user-runnable yet.
