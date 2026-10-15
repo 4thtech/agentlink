@@ -96,7 +96,7 @@ areas:
       - name: "Terms, TermsInput and termsHash"
         state: in-progress
         prs: [98, 101]
-        summary: "In review (#101): the strict `terms` schema and canonical form, `TermsInput` with its JSON Schema and mapping, `termsHash` (in crypto) and the pure negotiation-chain checks, with the `terms` vector suite; 3 vector cases wait on open spec questions."
+        summary: "In review (#101): the strict `terms` schema with the D-74 canonical form (pinned UCD 15.0.0 characters), `TermsInput` with its JSON Schema and mapping, `termsHash` (in crypto) and the pure negotiation-chain reducer; all 381 `terms` vectors pass in Node, three browsers and workerd."
   - id: transport
     title: "Transport (@agentlink/transport-nostr)"
     intro: "Code merged, not published."

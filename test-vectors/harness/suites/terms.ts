@@ -88,7 +88,7 @@ class Store {
   apply(
     dir: Dir,
     env: Envelope,
-  ): { outcome: 'valid' | 'refused' | 'conflict' | 'duplicate'; key?: string } {
+  ): { outcome: 'valid' | 'refused' | 'conflict' | 'duplicate'; key: string | undefined } {
     const identity = canonicalize(env as unknown as Obj);
     if (this.seen.has(identity)) return { outcome: 'duplicate', key: this.keyOf(env) };
     this.seen.add(identity);
