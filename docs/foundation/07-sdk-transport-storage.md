@@ -441,7 +441,8 @@ The console and the desktop app keep the owner's own store, never an agent's. Th
 
 ```ts
 interface Transport {
-  publish(envelope: Envelope, recipients: NostrRecipient[], keys: EnvelopeKeys): Promise<PublishResult>; // one gift wrap per distinct recipient key
+  wrap(envelope: Envelope, recipients: NostrRecipient[], keys: EnvelopeKeys): Promise<WrappedEnvelope>; // one gift wrap per distinct recipient key; publishes nothing
+  publish(storedWrap: SignedWrap, relays: RelayUrl[]): Promise<PublishResult>; // exactly the row's relays (§3.2, §4.3), never any other
   subscribe(keys: EnvelopeKeys, onEnvelope: (e: Envelope, meta) => void): Unsubscribe;
   sync(keys: EnvelopeKeys, since: number): Promise<Envelope[]>;
 }
@@ -453,7 +454,9 @@ interface Transport {
 // ephemeral key created inside @agentlink/crypto. Size checks before JSON.parse: 04 §3.1.1.
 ```
 
-An XMTP adapter (P2) implements the same interface; envelopes are unchanged.
+**Two steps, store first (proposed, owner confirms at merge; IR-M1-7k-1 Q1).** Wrapping and publishing are separate calls so that the core can meet §3.2: it calls `wrap`, stores the outbound envelope with one outbox row per returned wrap in one store transaction, and only then calls `publish` for each stored wrap, with that row's relay list. A retry republishes the same stored wrap; nothing is wrapped or signed again. `wrap` publishes nothing; `publish` sends to exactly the relays it is given.
+
+An XMTP adapter (P2) implements the same interface, in the same two steps; envelopes are unchanged.
 
 ### 4.2 Nostr implementation
 

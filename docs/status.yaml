@@ -147,7 +147,8 @@ areas:
         summary: "A held card is accepted only with the sender's own owner entry (G-51)."
       - name: "Send pipeline"
         state: in-progress
-        summary: "Sending messages and publishing staged pairing messages through the relays, with one active publisher per agent (M1-7k); in progress."
+        prs: [99]
+        summary: "Sending a message to a paired contact, stored with its delivery rows before anything is published, retried from the outbox, with one publisher per row when several processes share the agent (M1-7k); in review."
       - name: "Inbox sync, delivery acknowledgements, owner card update"
         state: planned
         summary: "Inbox sync and delivery acknowledgements (M1-7h); the owner card update (M1-7j) follows in M1b."
