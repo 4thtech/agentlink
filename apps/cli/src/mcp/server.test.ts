@@ -212,8 +212,17 @@ describe('agentlink mcp command', () => {
 
   it('serves an opened agent and closes it once the client closes the pipe', async () => {
     const close = vi.fn(() => Promise.resolve());
+    // M1-9r: the server competes for the publisher lease and releases it on close.
+    const release = vi.fn(() => Promise.resolve(false));
     const coreClient = {
       identity: { get: () => Promise.resolve(undefined) },
+      publisherLease: () => ({
+        held: false,
+        take: () => Promise.resolve(false),
+        renew: () => Promise.resolve(false),
+        release,
+      }),
+      inbox: { counts: () => Promise.resolve({ inbox: [], requests: 0 }) },
     } as unknown as AgentLinkClient;
     const agent = { name: 'work', agentId: A, client: coreClient, close } as unknown as OpenedAgent;
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
@@ -237,6 +246,10 @@ describe('agentlink mcp command', () => {
     await client.close();
     await expect(running).resolves.toBe(0);
     expect(close).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(release.mock.invocationCallOrder[0]).toBeLessThan(
+      close.mock.invocationCallOrder[0] ?? 0,
+    );
     expect(io.output.print).not.toHaveBeenCalled();
   });
 

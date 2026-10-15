@@ -3,3 +3,12 @@
 export { SERVER_INSTRUCTIONS } from './instructions.js';
 export { SERVER_NAME, createMcpServer, toMcpTool } from './server.js';
 export { agentToolContext, createMcpCommand, mcpCommand, type McpCommandDeps } from './command.js';
+export {
+  BackgroundLoop,
+  INBOX_RESOURCE_URI,
+  attachInboxResource,
+  type BackgroundLoopOptions,
+  type LoopClient,
+  type LoopLease,
+  type LoopTimers,
+} from './loop.js';
