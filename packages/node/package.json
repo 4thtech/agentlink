@@ -36,7 +36,7 @@
     "@agentlink/core": "workspace:*",
     "@agentlink/crypto": "workspace:*",
     "@agentlink/transport-nostr": "workspace:*",
-    "@napi-rs/keyring": "2.1.0",
+    "@napi-rs/keyring": "2.1.1",
     "better-sqlite3": "13.0.3",
     "ws": "8.22.0"
   },
