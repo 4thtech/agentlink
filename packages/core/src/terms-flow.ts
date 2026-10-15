@@ -70,6 +70,7 @@ import { nowOf, open, seal, type CoreContext } from './context.js';
 import type { EnvelopeService } from './envelopes.js';
 import { CoreError } from './errors.js';
 import type { IdentityService } from './identity.js';
+import { agentNostrKey } from './card.js';
 import { renderContactName } from './names.js';
 import type { OutboxService } from './outbox.js';
 import { computeActionDigest, verifyStoredOwnerAction } from './owner-action.js';
@@ -324,6 +325,25 @@ function newestOwnAbove(n: Negotiation | undefined, self: string, version: numbe
     }
   }
   return newest;
+}
+
+/**
+ * Void rule 1 (04 §3.4.2) for the offer `envelopeId` at `version`: it is not open, it is not the
+ * newest open offer, an offer with a higher version is stored in any state, or a conflict on its
+ * version was seen (IR-M1-32-1 F01).
+ */
+function supersededInStore(
+  n: Negotiation | undefined,
+  envelopeId: string,
+  version: number,
+): boolean {
+  const offers = n?.state.offers ?? [];
+  return (
+    offerState(n, envelopeId) !== 'open' ||
+    newestOpenOffer(offers)?.envelopeId !== envelopeId ||
+    offers.some((o) => o.version > version) ||
+    (n?.state.conflicts ?? []).some((c) => c.version === version)
+  );
 }
 
 /** A stored commitment: the approval row, its parsed action, scope and terms. */
@@ -730,6 +750,9 @@ export class TermsService {
             return rejected('INVALID_ARGUMENT');
         }
       }
+      if (supersededInStore(n, rec.envelopeId, rec.terms.version)) {
+        return rejected('TERMS_SUPERSEDED');
+      }
     } else if (now > rec.terms.validUntil) {
       return rejected('TERMS_EXPIRED');
     }
@@ -1022,6 +1045,18 @@ export class TermsService {
     ) {
       return voided;
     }
+    // The card itself (IR-M1-32-1 F03): a card-update raises keyEpoch and so changes the agent key
+    // (04 §3.4.1). The answered envelope's signing key is the card the scope was built on; any
+    // later card, whatever its `issuedAt`, signs with another key.
+    const answeredRow =
+      scope.answers === null
+        ? undefined
+        : await this.#ctx.store.transaction((tx) =>
+            tx.get('envelopes', { envelope_id: scope.answers!.envelopeId }),
+          );
+    if (answeredRow === undefined || answeredRow.from_key !== agentNostrKey(contact.card)) {
+      return voided;
+    }
     // Rule 2: the stored answered envelope still binds the scope.
     let snapshot: TermsSnapshot;
     try {
@@ -1042,17 +1077,14 @@ export class TermsService {
     ) {
       return voided;
     }
-    // Rule 1: before the envelope is sent, a newer version or a conflict on this one.
-    if (envelopeUnrun) {
-      const n = snapshot.negotiations.get(entry.key);
-      const head = newestOpenOffer(n?.state.offers ?? []);
-      if (
-        offerState(n, answers.envelopeId) !== 'open' ||
-        head === undefined ||
-        head.envelopeId !== answers.envelopeId
-      ) {
-        return { code: 'TERMS_SUPERSEDED', reason: 'superseded' };
-      }
+    // Rule 1: before the envelope is sent, a newer version (in any state, from either side) or a
+    // conflict on this one is in the store (IR-M1-32-1 F01: a conflict on n + 1 makes this version
+    // the newest open one again, but never revives a scope on it).
+    if (
+      envelopeUnrun &&
+      supersededInStore(snapshot.negotiations.get(entry.key), answers.envelopeId, scope.version)
+    ) {
+      return { code: 'TERMS_SUPERSEDED', reason: 'superseded' };
     }
     return undefined;
   }
@@ -1200,7 +1232,35 @@ export class TermsService {
       await this.#voidParts(approvalId, voidRule.reason);
       return rejected(voidRule.code);
     }
-    if (envelopePart === undefined) return ok();
+    if (envelopePart === undefined) {
+      // A receipt-only scope: nothing is sent. The first call with the approval reports the
+      // receipt state; a repeat call is APPROVAL_USED with that state (04 §3.4.2; IR-M1-32-1 F06).
+      // The first call is recorded by moving the receipt part's updated_at past the row's
+      // created_at (parts are created at created_at); any claim or void changes its state instead.
+      const createdAt = stored.row.created_at;
+      if (receiptPart?.state === 'unclaimed' && receiptPart.updated_at > createdAt) {
+        const rc = receipt();
+        return rejected('APPROVAL_USED', rc === undefined ? {} : { receipt: rc });
+      }
+      const first = await this.#ctx.store.transaction(
+        (tx) =>
+          tx.update(
+            'commitment_parts',
+            {
+              approval_id: approvalId,
+              part: 'receipt',
+              state: 'unclaimed',
+              updated_at: { lte: createdAt },
+            },
+            { updated_at: Math.max(nowOf(this.#ctx), createdAt + 1) },
+          ) === 1,
+      );
+      if (!first) {
+        const rc = receipt();
+        return rejected('APPROVAL_USED', rc === undefined ? {} : { receipt: rc });
+      }
+      return ok();
+    }
     if (envelopePart.state === 'void') {
       return rejected(envelopePart.void_reason === 'expired' ? 'TERMS_EXPIRED' : 'APPROVAL_VOID');
     }
@@ -1293,9 +1353,12 @@ export class TermsService {
     const n = plan.snapshot.negotiations.get(
       plan.snapshot.byEnvelope.get(plan.answered.envelopeId)?.key ?? '',
     );
+    // The newest lower version held, its open (live) offer first, never a conflicted original
+    // when a resend replaced it (IR-M1-32-1 F05).
+    const open = (r: TermsRecord) => (offerState(n, r.envelopeId) === 'open' ? 0 : 1);
     const previous = (n?.records ?? [])
       .filter((r) => r.type === 'offer' && r.terms.version < plan.terms.version)
-      .sort((a, b) => b.terms.version - a.terms.version)[0];
+      .sort((a, b) => b.terms.version - a.terms.version || open(a) - open(b))[0];
     const self = scope.agentId;
     const newerOwn =
       plan.decision === 'confirm' ? newestOwnAbove(n, self, plan.terms.version) : null;
@@ -1443,6 +1506,18 @@ export class TermsService {
       const stored = await this.#stored(row.approval_id);
       if (stored === undefined) continue;
       const { scope } = stored;
+      // Only after the accept was sent: its envelope part claimed or done, or a receipt-only
+      // scope whose accept ran under an earlier one (IR-M1-32-1 F02).
+      const envelopePart = await this.#ctx.store.transaction((tx) =>
+        tx.get('commitment_parts', { approval_id: row.approval_id, part: 'envelope' }),
+      );
+      if (
+        envelopePart !== undefined &&
+        envelopePart.state !== 'claimed' &&
+        envelopePart.state !== 'done'
+      ) {
+        continue;
+      }
       if (
         scope.decision !== 'accept' ||
         scope.agentId !== self.agentId ||
@@ -1491,6 +1566,18 @@ export class TermsService {
   ): boolean {
     const row = tx.get('approvals', { approval_id: approvalId });
     if (row === undefined || row.scope_key === null) return false;
+    // Re-checked inside the claim transaction (IR-M1-32-1 F04): a cancel, a denial or a void that
+    // landed since the lookup, and the scope's expiry.
+    if (row.status !== 'approved' || row.signed_cancel !== null || row.scope_json === null) {
+      return false;
+    }
+    let expiresAt: unknown;
+    try {
+      expiresAt = (parseJson(row.scope_json) as { expiresAt?: unknown }).expiresAt;
+    } catch {
+      return false;
+    }
+    if (typeof expiresAt !== 'number' || now > expiresAt) return false;
     for (const other of tx.select('approvals', { scope_key: row.scope_key })) {
       if (other.approval_id === approvalId) continue;
       if (
