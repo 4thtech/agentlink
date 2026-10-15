@@ -1109,7 +1109,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - deps-check and ESLint stay green: no primitive outside `packages/crypto`.
 
 #### M1-1-sc · crypto: senderCode helper (`agentlink/sender-code/v1`) and fingerprint-suite vector (new, IR-M1-7e-2-1 F05)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#110) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/crypto, test-vectors, tools/vectors
 - **Depends on:** M1-1b (fingerprints)
 - **Spec:** 04 §2.9 (Sender code, D-72; IR-D-72-1 F07, F12), §2.9 short form; 11 §5.2
