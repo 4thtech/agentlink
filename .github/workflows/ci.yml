@@ -284,7 +284,9 @@ jobs:
 
       - name: Choose the test report path
         shell: bash
-        run: echo "KEYCHAIN_REPORT=$RUNNER_TEMP/keychain-vitest.json" >> "$GITHUB_ENV"
+        run: |
+          echo "KEYCHAIN_REPORT=$RUNNER_TEMP/keychain-vitest.json" >> "$GITHUB_ENV"
+          echo "CLI_KEYCHAIN_REPORT=$RUNNER_TEMP/cli-keychain-vitest.json" >> "$GITHUB_ENV"
 
       # Secret Service for @napi-rs/keyring (libsecret): gnome-keyring and a session bus. The
       # keyring itself is started and unlocked in the test step, inside the D-Bus session.
@@ -295,15 +297,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 dbus
 
-      # The workspace dependencies of @agentlink/node (core, crypto) are consumed from dist/.
-      - name: Build the workspace dependencies of @agentlink/node
+      # The workspace dependencies of @agentlink/node (core, crypto) are consumed from dist/. The
+      # CLI package and its dependencies are built too: the child processes of the CLI two-process
+      # test run apps/cli's dist/.
+      - name: Build the workspace dependencies of @agentlink/node and the CLI
         shell: bash
-        run: pnpm exec turbo run build --filter='@agentlink/node^...'
+        run: pnpm exec turbo run build --filter='@4thtech/agentlink...'
 
       - name: Run the @agentlink/node tests against the real keychain (macOS, Windows)
         if: runner.os != 'Linux'
         shell: bash
-        run: pnpm --filter @agentlink/node exec vitest run --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
+        run: |
+          set -euo pipefail
+          pnpm --filter @agentlink/node exec vitest run --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
+          pnpm --filter @4thtech/agentlink exec vitest run test/two-process.keychain.test.ts --reporter=default --reporter=json --outputFile.json="$CLI_KEYCHAIN_REPORT"
 
       # A fresh D-Bus session, then gnome-keyring started with --unlock, which creates and unlocks
       # the default ("login") collection from a throwaway password read on stdin (random per run,
@@ -318,6 +325,7 @@ jobs:
             eval "$keyring_env"
             export GNOME_KEYRING_CONTROL
             pnpm --filter @agentlink/node exec vitest run --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
+            pnpm --filter @4thtech/agentlink exec vitest run test/two-process.keychain.test.ts --reporter=default --reporter=json --outputFile.json="$CLI_KEYCHAIN_REPORT"
           '
 
       # "Runs with no skipped test" (M1-8a-b acceptance): the keychain suite must have run and
@@ -337,11 +345,27 @@ jobs:
             if (tests.length < 3 || bad.length > 0) { console.error("::error::keychain-native.test.ts must run at least 3 tests, all passed (none skipped)"); process.exit(1); }
           '
 
+      # The CLI two-process keychain test (apps/cli/test/two-process.keychain.test.ts) is opt-in on
+      # AGENTLINK_REQUIRE_KEYCHAIN=1, which this job sets: it must have run, 1 test, passed, none
+      # skipped. A missing file fails the vitest step above (no test files found) and this check.
+      - name: Check that two-process.keychain.test.ts ran with 1 test passed and none skipped
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e '
+            const report = JSON.parse(require("node:fs").readFileSync(process.env.CLI_KEYCHAIN_REPORT, "utf8"));
+            const files = report.testResults.filter((f) => /two-process\.keychain\.test\.ts$/.test(f.name.replace(/\\/g, "/")));
+            if (files.length !== 1) { console.error("::error::two-process.keychain.test.ts did not run"); process.exit(1); }
+            const tests = files[0].assertionResults;
+            const bad = tests.filter((t) => t.status !== "passed");
+            console.log(`two-process.keychain.test.ts: ${tests.length} tests, ${bad.length} not passed`);
+            if (tests.length !== 1 || bad.length > 0) { console.error("::error::two-process.keychain.test.ts must run exactly 1 test, passed (none skipped)"); process.exit(1); }
+          '
+
   # M1-5b-b: the Node relay connector's Docker suite (packages/node/src/relay-docker.test.ts): the
   # pool and the outbox against real relays, strfry and rnostr, pinned by digest in the test file.
   # AGENTLINK_REQUIRE_DOCKER=1 turns a missing Docker daemon into a failed test instead of a skip.
-  # Not part of `ci-gate` yet on purpose: it joins `ci-gate`'s `needs` in a follow-up PR once it has
-  # run green here.
+  # Part of `ci-gate`'s `needs` (it had run green on main before it joined).
   relays-docker:
     name: relays-docker
     needs: detect
@@ -428,7 +452,7 @@ jobs:
     # merge with `main`. Only the latter may satisfy the required check `ci-gate`, so a feature
     # branch push publishes `ci-gate (push)` instead.
     name: ${{ (github.event_name == 'push' && github.ref != 'refs/heads/main') && 'ci-gate (push)' || 'ci-gate' }}
-    needs: [detect, checks, vectors, context-budget]
+    needs: [detect, checks, vectors, context-budget, relays-docker]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
