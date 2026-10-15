@@ -1,0 +1,21 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "rootDir": "..",
+    "types": ["node"],
+    // DOM for Node's global WebSocket in the scenario's own scripts.
+    "lib": ["ES2022", "DOM"],
+    // The scenario's Node scripts (src/*.mjs) are imported by the tests; they are not type-checked.
+    "allowJs": true,
+    "checkJs": false,
+    // The crypto test seam is never built and has no package export: type-check it from source, as
+    // vitest.config.ts resolves it (04 §3.1.1: allowed in e2e).
+    "paths": {
+      "@agentlink/crypto/testing": ["../packages/crypto/src/testing.ts"]
+    }
+  },
+  "include": ["test", "llm", "vitest.config.ts"]
+}
