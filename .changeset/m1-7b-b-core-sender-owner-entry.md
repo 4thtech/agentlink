@@ -1,0 +1,5 @@
+---
+'@agentlink/core': minor
+---
+
+Require the sender's own owner entry on receive (M1-7b-b, G-51, D-71 (4); 04 §3.1.1 step 8, §3.2). When the core holds the sender's card (a contact's current card, the card a `card-update` carries once it passes §3.4.1, or the body card of a pairing message), an envelope whose recipients lack that card's `ownerEnc` `kid` is refused with the new fixed reason `sender_owner_entry_missing`: stored as refused without its ciphertext or payload, and the contact flagged; a pairing message from a key that is not a contact's is refused without flagging anyone. The check is a presence check on the `kid` (no extra content-key opening) and runs after the own-owner rule, which still reports first. When both agents have the same owner the one owner entry meets both rules; senders whose card is not held and owner-authored types are unchanged. After a `card-update` is applied, the held envelopes from that card's agent key now also run again at once, including any held under another contact owner's `kid`.
