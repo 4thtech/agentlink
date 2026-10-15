@@ -448,7 +448,7 @@ A stdio server runs only while the harness runs, so nothing tells the user that 
 
 | Harness | Configuration |
 |---|---|
-| **Claude Code** | `claude mcp add agentlink -- npx -y @4thtech/agentlink mcp` |
+| **Claude Code** | `~/.claude.json` user scope → `mcpServers.agentlink` = `{"type": "stdio", "command": "npx", "args": ["-y", "@4thtech/agentlink", "mcp"], "env": {}}`, written by `init` after the diff is confirmed; equivalent to `claude mcp add --scope user agentlink -- npx -y @4thtech/agentlink mcp` (proposed, owner confirms at merge; IR-M1-9a-1 F05). Not written when `CLAUDE_CONFIG_DIR` is set |
 | **Claude Desktop** | `claude_desktop_config.json` → `{"mcpServers": {"agentlink": {"command": "npx", "args": ["-y", "@4thtech/agentlink", "mcp"]}}}`; also ship a one-click Claude Desktop extension bundle (verify current bundle format at build time) |
 | **Codex (CLI, IDE, ChatGPT desktop Codex)** | `codex mcp add agentlink -- npx -y @4thtech/agentlink mcp` (writes `[mcp_servers.agentlink]` in `~/.codex/config.toml`) |
 | **Gemini CLI** | `~/.gemini/settings.json` → `"mcpServers": {"agentlink": {"command": "npx", "args": ["-y", "@4thtech/agentlink", "mcp"]}}` |

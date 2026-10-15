@@ -99,7 +99,7 @@ describe('readConfigFile', () => {
     expect(await code(readConfigFile(home, ['.claude.json']))).toBe('unsafe_path');
     await rm(join(home, '.claude.json'), { recursive: true });
     await writeFile(join(home, '.claude.json'), Buffer.alloc(MAX_CONFIG_BYTES + 1, 0x20));
-    expect(await code(readConfigFile(home, ['.claude.json']))).toBe('malformed');
+    expect(await code(readConfigFile(home, ['.claude.json']))).toBe('too_large');
   });
 
   it('refuses bytes that are not UTF-8', async () => {

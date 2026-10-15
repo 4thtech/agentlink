@@ -75,15 +75,38 @@ class Scanner {
       this.pos += 1;
       if (ch === quote) return out;
       if (quote === '"' && ch === '\\') {
-        const escaped = this.peek();
-        if (this.done() || escaped === '\n') this.fail();
-        this.pos += 1;
-        out += escaped === '"' || escaped === '\\' ? escaped : `\\${escaped}`;
+        out += this.escape();
       } else {
         out += ch;
       }
     }
     return this.fail();
+  }
+
+  /** One escape of a basic string, decoded, so a key written with \\u006c escapes equals its plain form. */
+  private escape(): string {
+    const ch = this.peek();
+    this.pos += 1;
+    const simple: Record<string, string> = {
+      b: '\b',
+      t: '\t',
+      n: '\n',
+      f: '\f',
+      r: '\r',
+      e: '\u001b',
+      '"': '"',
+      '\\': '\\',
+    };
+    const plain = simple[ch];
+    if (plain !== undefined) return plain;
+    const width = ch === 'x' ? 2 : ch === 'u' ? 4 : ch === 'U' ? 8 : 0;
+    const hex = this.src.slice(this.pos, this.pos + width);
+    if (width === 0 || !new RegExp(`^[0-9A-Fa-f]{${width}}$`).test(hex)) return this.fail();
+    const point = Number.parseInt(hex, 16);
+    // Surrogates and values above U+10FFFF are not scalar values.
+    if ((point >= 0xd800 && point <= 0xdfff) || point > 0x10ffff) return this.fail();
+    this.pos += width;
+    return String.fromCodePoint(point);
   }
 
   private keyPart(): string {

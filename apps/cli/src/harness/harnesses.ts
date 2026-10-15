@@ -148,6 +148,11 @@ export type HarnessPlan =
 
 /** Reads the harness's config and works out the exact change, without writing anything. */
 export async function planHarness(def: HarnessDef, context: HarnessContext): Promise<HarnessPlan> {
+  // CLAUDE_CONFIG_DIR moves Claude Code's files; a write to ~/.claude.json would report success on a
+  // file it does not read. It is not followed (an environment value must not move a write): refused.
+  if (def.id === 'claude-code' && (context.env['CLAUDE_CONFIG_DIR'] ?? '') !== '') {
+    return { status: 'blocked', def, reason: 'unsupported_format' };
+  }
   try {
     const before = await readConfigFile(context.home, def.parts, context);
     const edit = def.edit(before.text, mcpArgs(context.agent));

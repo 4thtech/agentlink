@@ -113,7 +113,7 @@ function checkFile(info: Stats, uid: number | undefined): void {
   // nlink 1: a rename over the file would break another name for it.
   if (info.isSymbolicLink() || !info.isFile() || info.nlink !== 1) throw unsafe();
   if (POSIX && uid !== undefined && info.uid !== uid) throw unsafe();
-  if (info.size > MAX_CONFIG_BYTES) throw new HarnessError('malformed');
+  if (info.size > MAX_CONFIG_BYTES) throw new HarnessError('too_large');
 }
 
 /** Reads `<home>/<parts…>`; a missing file (or folder) reads as `bytes: undefined`. */
@@ -148,13 +148,15 @@ export async function readConfigFile(
     // The file opened is the one checked (not swapped in between).
     if (!info.isFile() || info.ino !== before.ino || info.dev !== before.dev) throw unsafe();
     const bytes = await handle.readFile();
-    if (bytes.length > MAX_CONFIG_BYTES) throw new HarnessError('malformed');
+    if (bytes.length > MAX_CONFIG_BYTES) throw new HarnessError('too_large');
     let text: string;
     try {
-      text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
     } catch {
       throw new HarnessError('malformed');
     }
+    // A byte order mark would be dropped by a rewrite, unseen in the diff: refused instead.
+    if (text.startsWith('\ufeff')) throw new HarnessError('unsupported_format');
     return { bytes, text, mode: info.mode & 0o777 };
   } finally {
     await handle.close();

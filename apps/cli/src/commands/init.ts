@@ -244,6 +244,7 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
       const yes: ChangePlan[] = [];
       for (const change of changes) {
         output.print('');
+        output.print(copy('cli.init.changesFor', { appName: change.def.appName }));
         output.print(copy('cli.init.apply'));
         const answer = await deps.readLine();
         if (/^\s*y(es)?\s*$/i.test(answer)) yes.push(change);

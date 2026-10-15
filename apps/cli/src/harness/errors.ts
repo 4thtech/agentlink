@@ -7,6 +7,8 @@ export type HarnessErrorCode =
   | 'unsafe_path'
   /** The existing file is not valid JSON or TOML, or is too large: nothing is written. */
   | 'malformed'
+  /** Larger than AgentLink will read; never "invalid", and never to be moved aside. */
+  | 'too_large'
   /** Valid, but not in a form that can be changed with an exact, additive diff: nothing is written. */
   | 'unsupported_format'
   /** The file is not the one that was shown (it changed, or a second name appeared). */
@@ -19,6 +21,8 @@ export const HARNESS_MESSAGES: Readonly<Record<HarnessErrorCode, string>> = Obje
     "{appName}'s settings are in a place AgentLink won't write to: it must be a plain file in your own folder, with no links. Nothing was changed. Add AgentLink to {appName} by hand instead.",
   malformed:
     "{appName}'s settings file isn't valid, so AgentLink left it alone. Nothing was changed. Fix or move the file, then run `agentlink init` again.",
+  too_large:
+    "{appName}'s settings file is larger than AgentLink will edit, so it was left alone. Nothing was changed. Add AgentLink to {appName} by hand instead; don't move the file.",
   unsupported_format:
     "AgentLink can't change {appName}'s settings file without rewriting parts you wrote. Nothing was changed. Add AgentLink to {appName} by hand instead.",
   changed:
