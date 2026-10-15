@@ -53,6 +53,64 @@ export interface ApprovalRequestInput {
   readonly summary: string;
   /** For a commitment: the counterparty envelope it answers (07 §3 `answers_envelope_id`). */
   readonly answersEnvelopeId?: string;
+  /**
+   * For a commitment (M1-32; 07 §3.5): its scope key (one live scope per value) and the parts its
+   * decision authorises. The row is written with one `unclaimed` row per part, and an older pending
+   * scope with the same key is voided in the same store transaction (04 §3.4.2).
+   */
+  readonly commitment?: {
+    readonly scopeKey: string;
+    readonly parts: readonly CommitmentPartRow[];
+  };
+}
+
+/** A `commitment_parts.part` value (07 §3.5). */
+export type CommitmentPartRow = 'envelope' | 'record' | 'receipt';
+
+/**
+ * Voids every pending scope with `scopeKey` and its parts (04 §3.4.2: a new scope for the same
+ * answered envelope voids an older one that is still pending). Approved scopes are not touched: only
+ * an owner signature ends what an owner approved (07 §3.5).
+ */
+export function voidPendingScopeTx(tx: StoreTx, scopeKey: string, now: number): number {
+  let n = 0;
+  for (const row of tx.select('approvals', { scope_key: scopeKey, status: 'pending' })) {
+    n += tx.update(
+      'approvals',
+      { approval_id: row.approval_id, status: 'pending' },
+      { status: 'void', decided_at: now },
+    );
+    tx.update(
+      'commitment_parts',
+      { approval_id: row.approval_id, state: { in: ['unclaimed', 'claimed'] } },
+      { state: 'void', void_reason: 'void', updated_at: now },
+    );
+  }
+  return n;
+}
+
+/** The `unclaimed` part rows of a new commitment scope (07 §3.5 "Keys"). */
+export function insertCommitmentPartsTx(
+  tx: StoreTx,
+  approvalId: string,
+  parts: readonly CommitmentPartRow[],
+  now: number,
+): void {
+  for (const part of parts) {
+    tx.insert('commitment_parts', {
+      approval_id: approvalId,
+      part,
+      state: 'unclaimed',
+      item_ref: null,
+      item_json: null,
+      ledger_entry_id: null,
+      void_reason: null,
+      replacements: 0,
+      claimed_at: null,
+      done_at: null,
+      updated_at: now,
+    });
+  }
 }
 
 /** The `pending_approval` result a tool returns (06 §2.5); `nextStep` is the MCP layer's. */
@@ -250,9 +308,13 @@ export class ApprovalService {
         ? new CoreError('approval_summary_invalid', 'The approval summary is not valid.')
         : new CoreError('approval_action_invalid', 'The approval request is not valid.');
     }
-    if (input.answersEnvelopeId !== undefined && scope === undefined) {
+    if (
+      (input.answersEnvelopeId !== undefined || input.commitment !== undefined) &&
+      scope === undefined
+    ) {
       throw new CoreError('approval_action_invalid', 'The approval request is not valid.');
     }
+    const commitment = input.commitment;
 
     const key = [approvalId];
     const actionText = canonicalize(input.action);
@@ -264,13 +326,14 @@ export class ApprovalService {
 
     const written = await this.#ctx.store.transaction((tx) => {
       if (run !== undefined && !this.#idempotency.effectTx(tx, run, prepared!)) return false;
+      if (commitment !== undefined) voidPendingScopeTx(tx, commitment.scopeKey, now);
       tx.insert('approvals', {
         approval_id: approvalId,
         action_json: sealedAction,
-        // Immutable after creation; parts and the scope key are M1-32.
+        // Immutable after creation (04 §3.4.2); the parts and the scope key are M1-32's.
         scope_json: scope === undefined ? null : canonicalize(scope),
         answers_envelope_id: input.answersEnvelopeId ?? null,
-        scope_key: null,
+        scope_key: commitment?.scopeKey ?? null,
         source: 'owner',
         policy_hash: null,
         signed_decision: null,
@@ -281,6 +344,9 @@ export class ApprovalService {
         created_at: now,
         decided_at: null,
       });
+      if (commitment !== undefined) {
+        insertCommitmentPartsTx(tx, approvalId, commitment.parts, now);
+      }
       return true;
     });
     if (!written) {

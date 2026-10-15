@@ -227,6 +227,44 @@ export {
   type SyncInboxResult,
 } from './sync.js';
 export { REQUESTS_FULL, RequestsQueue, queueRefusals, type RequestEntry } from './requests.js';
+// M1-32: terms and one approval per agreement (D-55; 06 §2.2a, 04 §3.4, §3.4.2).
+export {
+  COMMITMENT_SCOPE_SECONDS,
+  PROPOSE_TERMS_TOOL,
+  RESPOND_TO_TERMS_TOOL,
+  TermsService,
+  termsChanges,
+  type CommitmentCard,
+  type DeferredReceipt,
+  type KnownRecord,
+  type NegotiationSummary,
+  type ProposeTermsInput,
+  type ProposeTermsResult,
+  type ReceiptState,
+  type RecordLookup,
+  type RespondDecision,
+  type RespondToTermsInput,
+  type RespondToTermsResult,
+  type TermsChange,
+  type TermsCode,
+  type TermsPending,
+  type TermsRejected,
+  type TermsSent,
+} from './terms-flow.js';
+export {
+  TERMS_PAYLOAD_TYPES,
+  TermsInbound,
+  admitInbound,
+  rebuildNegotiations,
+  replayOrder,
+  type Negotiation,
+  type TermsAdmission,
+  type TermsInboundHook,
+  type TermsInboundInput,
+  type TermsRecord,
+  type TermsSnapshot,
+} from './terms-store.js';
+export { type CommitmentPartRow } from './approvals.js';
 export { CoreError, StoreConstraintError, StoreUsageError, type CoreErrorCode } from './errors.js';
 export * from './constants.js';
 export {
