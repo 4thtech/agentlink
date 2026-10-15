@@ -125,6 +125,25 @@ export {
   type PolicyProblem,
 } from './policy-engine.js';
 export {
+  AUTO_ACCEPT_USD_CURRENCIES,
+  checkCommitmentBinding,
+  commitmentParts,
+  commitmentVoidedByPolicy,
+  evaluateCommitment,
+  isCommitmentAction,
+  policyDocumentHash,
+  recheckCommitmentGrant,
+  type AutoAcceptMiss,
+  type CommitmentBinding,
+  type CommitmentBindingRefusal,
+  type CommitmentVoidReason,
+  type CommitmentEvaluation,
+  type CommitmentFacts,
+  type CommitmentGrant,
+  type CommitmentPart,
+  type GrantRecheck,
+} from './commitments.js';
+export {
   ApprovalService,
   feeContextFromQuote,
   type ApprovalAuthorization,
