@@ -5,6 +5,7 @@
 import { readFileSync } from 'node:fs';
 import process from 'node:process';
 import { isatty } from 'node:tty';
+import { createInitHandler, nodeInitDeps } from './commands/init.js';
 import { createDispatcher } from './dispatch.js';
 import { mcpCommand } from './mcp/index.js';
 import { createOutput } from './output.js';
@@ -22,7 +23,10 @@ function packageVersion(): string {
 }
 
 const version = packageVersion();
-const dispatch = createDispatcher({ mcp: mcpCommand(version) });
+const dispatch = createDispatcher({
+  init: createInitHandler(nodeInitDeps()),
+  mcp: mcpCommand(version),
+});
 
 process.exitCode = await dispatch(process.argv.slice(2), {
   output: createOutput(),
