@@ -13,8 +13,9 @@
 // digest recomputed from that pairing's signed `handshake` and `handshake-ack`, never a stored
 // digest. The store checks the nonce again, and records it, inside the apply transaction (07 §3.4).
 //
-// This is the contact.check part of the SignedOwnerAction verifier; the general one (every op, the
-// nonce table, refusal reports) is M1-7d.
+// This is the contact.check part of the SignedOwnerAction verifier: its op rule needs the async
+// pairing recomputation, so the pure verifier of every other op (owner-action.ts) leaves it to this
+// one, and OwnerActions.apply routes a `contact.check` to ContactBook.applyContactCheck (M1-7d).
 //
 // I-5: the input is untrusted. Refusals are fixed codes; nothing from the input is interpolated.
 import {
@@ -38,10 +39,9 @@ import {
 } from '@agentlink/types';
 
 /**
- * Why a `contact.check` was refused. Fixed codes; never input text (I-5, I-7). Every code except the
- * two `contact.check` rule codes (`contact_unknown`, `pairing_unavailable`) has the same name and
- * stage as M1-7d's OwnerActionRefusal; those two join it when `contact.check` is routed through the
- * owner-action module (IR-M1-7c-b-1 F02 hand-off on the M1-7d card).
+ * Why a `contact.check` was refused. Fixed codes; never input text (I-5, I-7). Every code is also an
+ * OwnerActionRefusal with the same name and stage: OwnerActions.apply routes a `contact.check` to
+ * ContactBook.applyContactCheck and reports its code unchanged (M1-7d, IR-M1-7c-b-1 F02).
  */
 export type ContactCheckRefusal =
   // the object (04 §2.5.1, in this order): dropped, nothing written
@@ -59,7 +59,8 @@ export type ContactCheckRefusal =
   | 'digest_mismatch'
   // the store side (contacts.applyContactCheck)
   | 'store_changed'
-  | 'identity_missing';
+  | 'identity_missing'
+  | 'identity_revoked';
 
 /** The receiving agent, as the checks need it. */
 export interface ContactCheckContext {

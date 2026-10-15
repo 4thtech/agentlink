@@ -874,20 +874,27 @@ describe('using a stored approval (04 §2.5.1 "Stored objects are re-verified")'
 });
 
 describe('ops applied elsewhere', () => {
-  it('agent.revoke and contact.check are not applied here (M1-7h, M1-7c-b) and write nothing', async () => {
+  it('agent.revoke is not applied here (M1-7h) and writes nothing', async () => {
     const t = await setup();
     const revoke = await t.signed('agent.revoke', { reason: 'retired' });
     expect(await t.client.ownerActions.apply(revoke)).toMatchObject({
       status: 'refused',
       reason: 'unsupported_op',
     });
+    expect(await t.nonces()).toHaveLength(0);
+  });
+
+  it('contact.check is routed to the contact book (M1-7c-b): an unknown contact is refused by its rule', async () => {
+    const t = await setup();
     const check = await t.signed('contact.check', {
       contact: `0x${'5a'.repeat(20)}`,
       pairingDigest: 'ab'.repeat(32),
     });
-    expect(await t.client.ownerActions.apply(check)).toMatchObject({
+    expect(await t.client.ownerActions.apply(check)).toEqual({
       status: 'refused',
-      reason: 'unsupported_op',
+      op: 'contact.check',
+      reason: 'contact_unknown',
+      nonceBurnt: false,
     });
     expect(await t.nonces()).toHaveLength(0);
   });

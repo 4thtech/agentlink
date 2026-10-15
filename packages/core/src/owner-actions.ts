@@ -6,7 +6,9 @@
 //   before it (sealed values, recomputed digests); inside it, the rows read before are compared with
 //   what is there now, and a change refuses the object. A batch is applied whole or not at all; a
 //   batch that is authentic and fresh but does not match burns its nonce in the same transaction,
-//   so it can never apply later (04 §2.5.2). A refused single op writes nothing (07 §3.4).
+//   so it can never apply later (04 §2.5.2). A refused single op writes nothing (07 §3.4). A
+//   `contact.check` is routed to ContactBook.applyContactCheck (M1-7c-b), which recomputes the
+//   pairing digest from the stored pair; `agent.revoke` is applied by M1-7h.
 // - loadPolicy(): the G-6 loader. The stored `policy.set` is re-verified on every load and its
 //   version must equal the KeyStore high-water mark; the defaults are used only while the mark is 0
 //   and no row exists. Anything else fails closed (policy-engine.ts).
@@ -26,6 +28,7 @@ import {
   type SignedOwnerAction,
 } from '@agentlink/types';
 import { nowOf, open, seal, type CoreContext } from './context.js';
+import type { ContactBook } from './contacts.js';
 import type { IdentityService } from './identity.js';
 import {
   computeActionDigest,
@@ -152,11 +155,18 @@ function freshLedgerIfBroken(tx: StoreTx, now: number): void {
 export class OwnerActions {
   readonly #ctx: CoreContext;
   readonly #identity: IdentityService;
+  readonly #contacts: ContactBook;
   readonly #mark: PolicyVersionMark | undefined;
 
-  constructor(ctx: CoreContext, identity: IdentityService, mark?: PolicyVersionMark) {
+  constructor(
+    ctx: CoreContext,
+    identity: IdentityService,
+    contacts: ContactBook,
+    mark?: PolicyVersionMark,
+  ) {
     this.#ctx = ctx;
     this.#identity = identity;
+    this.#contacts = contacts;
     this.#mark = mark;
   }
 
@@ -209,15 +219,30 @@ export class OwnerActions {
         return this.#applyCancel(text, value, base);
       case 'policy.set':
         return this.#applyPolicy(text, value, base);
-      case 'agent.revoke':
-      case 'contact.check': {
-        // Verified for the report, applied elsewhere: revocation delivery is M1-7h, the safety-code
-        // check M1-7c-b. Nothing is written here.
+      case 'contact.check':
+        return this.#applyContactCheck(value);
+      case 'agent.revoke': {
+        // Verified for the report, applied elsewhere: revocation delivery is M1-7h. Nothing is
+        // written here.
         const verdict = verifyOwnerAction(value, base);
         if (!verdict.ok && verdict.stage === 'object') return this.#report(fromVerdict(verdict));
         return this.#report(refused(op, 'unsupported_op'));
       }
     }
+  }
+
+  /**
+   * `contact.check` (04 §2.5.1, §3.6.1; G-28): M1-7c-b's verify-and-store path, after the identity
+   * checks above (`identity_revoked` included). It runs the same object checks in the same order, then
+   * the nonce, then the op's rule (`pairingDigest` against the digest recomputed from the stored
+   * signed `handshake` and `handshake-ack`), and checks and records the nonce and writes
+   * `contacts.safety_check` in one store transaction. A refusal writes nothing. Its codes are
+   * OwnerActionRefusal codes, reported unchanged; the contact book has already logged the code.
+   */
+  async #applyContactCheck(value: unknown): Promise<OwnerActionOutcome> {
+    const outcome = await this.#contacts.applyContactCheck(value);
+    if (outcome.status === 'refused') return refused('contact.check', outcome.reason);
+    return { status: 'applied', op: 'contact.check' };
   }
 
   async #nonceUsed(nonce: string): Promise<boolean> {
