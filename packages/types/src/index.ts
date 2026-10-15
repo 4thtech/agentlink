@@ -6,6 +6,8 @@ export * from './usd.js';
 export * from './policy.js';
 export * from './owner-action.js';
 export * from './card.js';
+export * from './unicode.js';
+export * from './terms.js';
 export * from './approval.js';
 export * from './payload.js';
 export * from './envelope.js';

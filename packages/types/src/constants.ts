@@ -255,6 +255,8 @@ export const BYTE_LENGTHS = freeze({
   inviteId: 16,
   /** Random part of `approvalId` (§3.4.1). */
   approvalId: 16,
+  /** `terms.termsId` (§3.4). */
+  termsId: 16,
   /** Symmetric keys: CEK and `fileKey` (§3.3, §3.4). */
   key: 32,
   /** Invite `secret` (§3.6). */
@@ -326,8 +328,30 @@ export const MAX_DISPLAY_NAME_CODE_POINTS = 256;
 export const MAX_FILE_NAME_CODE_POINTS = 255;
 export const MAX_MIME_LENGTH = 255;
 export const MAX_URL_LENGTH = 2048;
-/** `note` on offer / accept / reject (04 §3.4). */
-export const MAX_TERMS_NOTE_CODE_POINTS = 1024;
+/** `note` on offer / accept / reject: `null` or 1 to 500 code points (04 §3.4, D-74). */
+export const MAX_TERMS_NOTE_CODE_POINTS = 500;
+/**
+ * `terms` size limits (04 §3.4 "Size limits", D-74). One set serves both `terms` and `TermsInput`
+ * (D-55). Lengths are Unicode code points, except the ASCII deliverable id (`^[A-Za-z0-9_-]{1,16}$`)
+ * and the amount's digits. The largest body these allow is 12 083 bytes as JCS.
+ */
+export const TERMS_LIMITS = freeze({
+  subjectCodePoints: 200,
+  deliverables: 10,
+  deliverableIdLength: 16,
+  descriptionCodePoints: 160,
+  deadlines: 10,
+  amountIntegerDigits: 18,
+  amountFractionDigits: 6,
+  noteCodePoints: MAX_TERMS_NOTE_CODE_POINTS,
+} as const);
+/**
+ * Token symbols allowed as `price.currency` besides the grammar `^[A-Z]{3}$` (04 §3.4 "Currency",
+ * D-74): exactly the D-46 / 12 §3.1 fee tokens. Adding one is a spec change.
+ */
+export const TERMS_TOKEN_SYMBOLS = freeze(['USDC', 'USDT', 'XDAI'] as const);
+/** `TermsInput.validUntil` default: 7 days from now (06 §2.2a). */
+export const TERMS_DEFAULT_VALIDITY_SECONDS = 7 * 24 * 60 * 60;
 /** Free-form JSON (message bodies, placeholders): nesting depth and total node count. */
 export const MAX_JSON_DEPTH = 32;
 export const MAX_JSON_NODES = 4096;

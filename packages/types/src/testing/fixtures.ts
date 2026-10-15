@@ -216,8 +216,46 @@ export const firmOfferScope = () => ({
   answers: null,
 });
 
-/** Stored canonical terms in `context.terms` (free JSON until M1-21 lands the strict schema). */
-const storedTerms = () => ({ termsId: b64u(16, 'T'), version: 3, subject: 'Milestone 3' });
+/**
+ * Canonical terms (04 §3.4, M1-21): this agent (AGENT_EVM) pays, the contact (CONTACT_A) delivers.
+ * Version 3 of negotiation `b64u(16, 'T')`, matching `commitmentScope()`.
+ */
+export const terms = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+  termsId: b64u(16, 'T'),
+  version: 3,
+  parties: [AGENT_EVM, CONTACT_A],
+  subject: 'Spec v2 – milestone 3',
+  deliverables: [
+    {
+      id: 'd1',
+      description: 'Revised spec, chapters 1–4 (日本語 ✓)',
+      by: CONTACT_A,
+      plaintextSha256: null,
+    },
+  ],
+  price: { amount: '1500.00', currency: 'EUR', payer: AGENT_EVM },
+  deadlines: [{ ref: 'd1', due: '2026-11-30T17:00:00Z' }],
+  validUntil: 1760600000,
+  previousTermsHash: hex(32, '5c'),
+  ...over,
+});
+
+/** The first version of a negotiation: no previous hash. */
+export const firstTerms = (over: Record<string, unknown> = {}): Record<string, unknown> =>
+  terms({ version: 1, previousTermsHash: null, ...over });
+
+/** A `TermsInput` (06 §2.2a, D-55): only the fields an agent may supply. */
+export const termsInput = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+  subject: 'Spec v2 – milestone 3',
+  deliverables: [{ description: 'Revised spec, chapters 1–4 (日本語 ✓)', by: 'them' }],
+  price: { amount: '1500.00', currency: 'EUR', payer: 'me' },
+  deadlines: [{ ref: 'd1', due: '2026-11-30T17:00:00Z' }],
+  validUntil: '2025-10-16T07:33:20Z',
+  ...over,
+});
+
+/** Stored canonical terms in `context.terms`: the terms the scope is bound to. */
+const storedTerms = () => terms();
 
 /** One valid `approval-request.action` per approval tool (06 §2.0 "Approval" column). */
 export const approvalActions = () => ({
@@ -249,7 +287,7 @@ export const approvalActions = () => ({
   },
   agentlink_propose_terms: {
     tool: 'agentlink_propose_terms',
-    args: { to: CONTACT_A, terms: { subject: 'Milestone 3' }, notarize: true },
+    args: { to: CONTACT_A, terms: termsInput(), notarize: true },
     context: {
       triggers: ['commitments.accept', 'proofs.perActionMaxUSD'],
       scope: firmOfferScope(),
@@ -525,9 +563,9 @@ const payloadOf = (type: string, body: unknown, files: unknown[] = []) => ({
 export const payloads = (): Record<string, Record<string, unknown>> => ({
   text: payloadOf('text', 'Hello from Tali’s agent ✓ — 你好', [fileEntryInline()]),
   request: payloadOf('request', { kind: 'refresh-link', envelopeId: ID16, ciphertextSha256: SHA }),
-  offer: payloadOf('offer', { terms: { termsId: ID16, version: 1 }, termsHash: SHA, note: null }),
-  accept: payloadOf('accept', { terms: { termsId: ID16, version: 1 }, termsHash: SHA, note: null }),
-  reject: payloadOf('reject', { terms: { termsId: ID16 }, termsHash: SHA, note: 'too expensive' }),
+  offer: payloadOf('offer', { terms: firstTerms(), termsHash: SHA, note: null }),
+  accept: payloadOf('accept', { terms: firstTerms(), termsHash: SHA, note: null }),
+  reject: payloadOf('reject', { terms: firstTerms(), termsHash: SHA, note: 'too expensive' }),
   delivery: payloadOf('delivery', { milestone: 'd1', items: [1, 2, 3] }, [fileEntryUrl()]),
   note: payloadOf('note', 'a note to myself'),
   file: payloadOf('file', 'here is the file', [fileEntryUrl()]),

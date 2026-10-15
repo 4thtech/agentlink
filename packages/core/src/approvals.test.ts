@@ -227,13 +227,32 @@ describe('creating a request (04 §3.4.1, 06 §2.5)', () => {
       createdAt: now,
       expiresAt: now + 3_600,
     };
+    // Strict terms and TermsInput since M1-21 (04 §3.4, 06 §2.2a).
+    const terms = {
+      termsId: scope.termsId,
+      version: 1,
+      // D-74: parties in ascending byte order, every key present (`price: null`).
+      parties: [scope.agentId, scope.counterparty.agentId].sort(),
+      subject: 'Milestone 3',
+      deliverables: [
+        { id: 'd1', description: 'Spec', by: scope.counterparty.agentId, plaintextSha256: null },
+      ],
+      price: null,
+      deadlines: [],
+      validUntil: now + 3_600,
+      previousTermsHash: null,
+    };
     const action = {
       tool: 'agentlink_propose_terms',
-      args: { to: scope.counterparty.agentId, terms: { price: 1 }, notarize: true },
+      args: {
+        to: scope.counterparty.agentId,
+        terms: { subject: 'Milestone 3', deliverables: [{ description: 'Spec', by: 'them' }] },
+        notarize: true,
+      },
       context: {
         triggers: ['commitments.accept'],
         scope,
-        terms: { price: 1 },
+        terms,
         fee: { token: FEE_TOKEN, amount: '100000', usd: '0.1' },
       },
     };
