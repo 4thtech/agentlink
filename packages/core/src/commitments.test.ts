@@ -226,7 +226,12 @@ const ROWS: readonly Row[] = [
     facts: facts(),
     expected: 'contact_not_listed',
   },
-  { name: 'confirm (ACCEPTED on their ACCEPT)', policy: autoBuy(), facts: facts(buyTerms(), { decision: 'confirm' }), expected: 'allow' },
+  {
+    name: 'confirm (ACCEPTED on their ACCEPT)',
+    policy: autoBuy(),
+    facts: facts(buyTerms(), { decision: 'confirm' }),
+    expected: 'allow',
+  },
   // never covered by the limits
   {
     name: 'REJECTED for an allowlisted contact under the limit',
@@ -243,7 +248,12 @@ const ROWS: readonly Row[] = [
   // price and currency (04 §3.4 USD set)
   { name: 'price is null', policy: autoBuy(), facts: facts(withPrice(null)), expected: 'no_price' },
   { name: 'EUR', policy: autoBuy(), facts: facts(priced('10', 'EUR')), expected: 'currency' },
-  { name: 'DAI (passes the grammar)', policy: autoBuy(), facts: facts(priced('10', 'DAI')), expected: 'currency' },
+  {
+    name: 'DAI (passes the grammar)',
+    policy: autoBuy(),
+    facts: facts(priced('10', 'DAI')),
+    expected: 'currency',
+  },
   { name: 'ETH', policy: autoBuy(), facts: facts(priced('10', 'ETH')), expected: 'currency' },
   { name: 'USDC', policy: autoBuy(), facts: facts(priced('10', 'USDC')), expected: 'allow' },
   { name: 'USDT', policy: autoBuy(), facts: facts(priced('10', 'USDT')), expected: 'allow' },
@@ -274,11 +284,36 @@ const ROWS: readonly Row[] = [
     facts: facts(sellTerms()),
     expected: 'direction',
   },
-  { name: 'sell with autoAcceptMinUSD unset (default)', policy: autoSell(null), facts: facts(sellTerms()), expected: 'sell_off' },
-  { name: 'sell, at the minimum', policy: autoSell('10'), facts: facts(sellTerms('10')), expected: 'allow' },
-  { name: 'sell, above the minimum', policy: autoSell('5'), facts: facts(sellTerms('10')), expected: 'allow' },
-  { name: 'sell, under the minimum', policy: autoSell('5'), facts: facts(sellTerms('4.99')), expected: 'under_minimum' },
-  { name: 'sell, but this agent pays', policy: autoSell('5'), facts: facts(buyTerms()), expected: 'direction' },
+  {
+    name: 'sell with autoAcceptMinUSD unset (default)',
+    policy: autoSell(null),
+    facts: facts(sellTerms()),
+    expected: 'sell_off',
+  },
+  {
+    name: 'sell, at the minimum',
+    policy: autoSell('10'),
+    facts: facts(sellTerms('10')),
+    expected: 'allow',
+  },
+  {
+    name: 'sell, above the minimum',
+    policy: autoSell('5'),
+    facts: facts(sellTerms('10')),
+    expected: 'allow',
+  },
+  {
+    name: 'sell, under the minimum',
+    policy: autoSell('5'),
+    facts: facts(sellTerms('4.99')),
+    expected: 'under_minimum',
+  },
+  {
+    name: 'sell, but this agent pays',
+    policy: autoSell('5'),
+    facts: facts(buyTerms()),
+    expected: 'direction',
+  },
   {
     name: 'sell, but the contact delivers an item',
     policy: autoSell('5'),
@@ -293,7 +328,12 @@ const ROWS: readonly Row[] = [
     ),
     expected: 'direction',
   },
-  { name: 'sell, price null', policy: autoSell('5'), facts: facts(withPrice(null)), expected: 'no_price' },
+  {
+    name: 'sell, price null',
+    policy: autoSell('5'),
+    facts: facts(withPrice(null)),
+    expected: 'no_price',
+  },
   // terms the limits cannot evaluate (fail closed)
   {
     name: 'acknowledge on a record without terms',
@@ -374,7 +414,10 @@ describe('only the exact stored terms are evaluated (I-5, D-55)', () => {
   });
 
   it('terms whose parties are not exactly this agent and the counterparty ask', () => {
-    const t = buyTerms({ parties: [SELF, D], deliverables: [{ id: 'd1', description: 'x', by: D, plaintextSha256: null }] });
+    const t = buyTerms({
+      parties: [SELF, D],
+      deliverables: [{ id: 'd1', description: 'x', by: D, plaintextSha256: null }],
+    });
     expect(asks(evaluateCommitment(autoBuy(), facts(t)))).toBe('unevaluable');
   });
 
@@ -403,7 +446,16 @@ describe('only the exact stored terms are evaluated (I-5, D-55)', () => {
   });
 
   it('never throws on garbage facts, and never allows them', () => {
-    const garbage: unknown[] = [null, undefined, 1, 'x', [], {}, { kind: 'terms' }, { kind: 'other' }];
+    const garbage: unknown[] = [
+      null,
+      undefined,
+      1,
+      'x',
+      [],
+      {},
+      { kind: 'terms' },
+      { kind: 'other' },
+    ];
     for (const g of garbage) {
       for (const p of [autoBuy(), signed((x) => (x.commitments.accept = 'allow'))]) {
         const e = evaluateCommitment(p, g as CommitmentFacts);
@@ -536,7 +588,12 @@ describe('a policy grant is a ledger row, re-checked before each part (D-55)', (
     const p = autoBuy();
     const grant = grantOf(evaluateCommitment(p, facts()));
     const t = buyTerms();
-    const other: CommitmentFacts = { kind: 'terms', self: SELF, scope: scopeFor(t), terms: priced('9') };
+    const other: CommitmentFacts = {
+      kind: 'terms',
+      self: SELF,
+      scope: scopeFor(t),
+      terms: priced('9'),
+    };
     expect(recheckCommitmentGrant(p, other, grant).status).toBe('ask_owner');
   });
 
@@ -599,7 +656,7 @@ describe('commitments are never batch items (D-68; 04 §2.5.2)', () => {
 describe('evaluateCommitment is deterministic (property)', () => {
   it('never allows outside the conditions, over random policies and terms', () => {
     let s = 20261015;
-    const rand = () => ((s = (s * 1103515245 + 12345) >>> 0) / 2 ** 32);
+    const rand = () => (s = (s * 1103515245 + 12345) >>> 0) / 2 ** 32;
     const pick = <T>(xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)]!;
     for (let i = 0; i < 1_500; i += 1) {
       const policy = signed((p) => {
@@ -612,10 +669,19 @@ describe('evaluateCommitment is deterministic (property)', () => {
       const payer = pick([SELF, C]);
       const by = pick([[C], [SELF], [C, SELF]]);
       const terms = buyTerms({
-        deliverables: by.map((b, n) => ({ id: `d${n}`, description: 'x', by: b, plaintextSha256: null })),
+        deliverables: by.map((b, n) => ({
+          id: `d${n}`,
+          description: 'x',
+          by: b,
+          plaintextSha256: null,
+        })),
         price: pick([
           null,
-          { amount: pick(['1', '5', '10', '10.5', '1000']), currency: pick(['USD', 'EUR', 'USDC']), payer },
+          {
+            amount: pick(['1', '5', '10', '10.5', '1000']),
+            currency: pick(['USD', 'EUR', 'USDC']),
+            payer,
+          },
         ]),
       });
       const decision = pick(['accept', 'reject', 'confirm', 'offer'] as const);

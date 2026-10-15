@@ -1,9 +1,9 @@
 // The policy engine (07 §2; 06 §3; G-6). `evaluate(policy, action, context)` is pure: no clock, no
 // store, no I/O, and it never changes its inputs, so every rule has a table test.
 //
-// Minimal for M1a (D-33): the contacts and envelopes rules, the plain `commitments.accept` rule, the
-// key-disclosure rule and the automatic receipts. Until their cards land, the remaining rules fail
-// toward the owner: auto-accept limits (M1-20) never apply, and a proof or a file send that the
+// Minimal for M1a (D-33): the contacts and envelopes rules, the `commitments` rule with its
+// auto-accept limits (M1-20, commitments.ts), the key-disclosure rule and the automatic receipts.
+// Until their cards land, the remaining rules fail toward the owner: a proof or a file send that the
 // policy does not deny needs approval (M1-7i), never `allow`.
 //
 // G-6 (06 §3): the loaded policy is one of three modes. `defaults` only while no version was ever
@@ -14,6 +14,7 @@
 // applies (an unreadable deny becomes approval, never allow), and limits that grant nothing stay at
 // the built-in hard caps of FAIL_CLOSED_LIMITS.
 import { POLICY_DEFAULTS, type Policy } from '@agentlink/types';
+import { evaluateCommitment, type CommitmentFacts } from './commitments.js';
 import { CoreError } from './errors.js';
 
 /** A policy document as the engine reads it (06 §3 JSON form). */
@@ -53,8 +54,8 @@ export type PolicyAction =
     }
   /** An outbound envelope to a paired contact. */
   | { readonly kind: 'envelope.send'; readonly contact: string; readonly sizeBytes: number }
-  /** A commitment scope (04 §3.4.2; the auto-accept limits are M1-20). */
-  | { readonly kind: 'commitment' }
+  /** A commitment: its scope and stored terms, or a receipt without terms (04 §3.4.2, M1-20). */
+  | { readonly kind: 'commitment'; readonly facts: CommitmentFacts }
   /** A paid proof action (the budget and contact rules are M1-7i). */
   | { readonly kind: 'proof' }
   /** Sending a local file (folders and storage are M1-7i, M1-7f). */
@@ -196,8 +197,8 @@ export function evaluate(
       return isAllowedContact(policy, action.contact) ? 'allow' : 'deny';
 
     case 'commitment':
-      if (policy === undefined) return 'approval';
-      return policy.commitments.accept;
+      // The rule and its grant are evaluateCommitment (commitments.ts); this is its decision.
+      return evaluateCommitment(effective, action.facts).decision;
 
     case 'proof':
       // A global deny always wins (06 §3 step 1); the allow paths are M1-7i.

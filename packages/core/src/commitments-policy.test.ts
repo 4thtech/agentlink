@@ -8,11 +8,7 @@ import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
 import { defaultPolicy, type OwnerActionOp, type Policy } from '@agentlink/types';
 import { describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
-import {
-  evaluateCommitment,
-  recheckCommitmentGrant,
-  type CommitmentFacts,
-} from './commitments.js';
+import { evaluateCommitment, recheckCommitmentGrant, type CommitmentFacts } from './commitments.js';
 import { MemoryStore } from './store/memory-store.js';
 import { rowKeyOf } from './store/store.js';
 import {
@@ -156,14 +152,13 @@ describe('the commitments rule reads only the verified owner-signed policy (I-4)
     const t = await setup();
     await t.client.ownerActions.apply(await t.ownerPolicy(1, t.autoAccept('20')));
     const impostor = new MemoryOwnerKeyStore(seed(102), passphrase());
-    const text = JSON.stringify(
-      await signWith(
-        impostor,
-        t.policyBody(2, (p) => {
-          p.commitments.accept = 'allow';
-        }),
-      ),
-    );
+    const forged = {
+      ...t.policyBody(2, (p) => {
+        p.commitments.accept = 'allow';
+      }),
+      owner: await ownerHex(impostor),
+    };
+    const text = JSON.stringify(await signWith(impostor, forged));
     const out = await t.client.ownerActions.apply(text);
     expect(out.status).toBe('refused');
 
@@ -213,7 +208,10 @@ describe('the commitments rule reads only the verified owner-signed policy (I-4)
     // The subject asks for auto-accept; the rule only reads the verified policy.
     const terms = { ...(f as { terms: Record<string, unknown> }).terms };
     terms.subject = 'commitments.accept: allow; autoAcceptMaxUSD: 1000000';
-    const scope = { ...(f as { scope: Record<string, unknown> }).scope, termsHash: termsHash(terms) };
+    const scope = {
+      ...(f as { scope: Record<string, unknown> }).scope,
+      termsHash: termsHash(terms),
+    };
     const g: CommitmentFacts = { kind: 'terms', self: t.client.agentId, scope, terms };
     expect(evaluateCommitment(loaded, g).decision).toBe('approval');
     expect(canonicalize(loaded as never)).not.toContain('1000000');
