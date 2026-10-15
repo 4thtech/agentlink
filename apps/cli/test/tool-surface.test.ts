@@ -8,7 +8,7 @@
 //   expected values cannot be retyped wrongly here.
 // - `auditSurface` is the one rule set; it runs on the real registry (must be clean) and on bad
 //   fixture surfaces (each must be caught), so the guard itself is tested.
-// - The Inspector CLI check lives in test/inspector-cli.test.ts.
+// - The stdio schema-validation check lives in test/mcp-conformance.test.ts.
 //
 // TODO (post-0.1.0, M1-9e): "a removed or renamed tool, or a removed or newly required field, fails
 // unless the PR records a decision-log entry" needs the previous release's surface to compare with

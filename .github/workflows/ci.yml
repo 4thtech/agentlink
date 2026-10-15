@@ -177,11 +177,11 @@ jobs:
         run: pnpm test
 
       # Named so the MCP conformance gate (06 §9, M1-9e) is visible in the CI log: the tool-surface
-      # snapshot and rules, and the pinned MCP Inspector CLI validating every tool. Both also run
+      # snapshot and rules, and an MCP SDK client validating every tool over real stdio. Both also run
       # inside `pnpm test` above; this step repeats them on purpose (about a second).
-      - name: MCP tool surface and Inspector CLI
+      - name: MCP tool surface and conformance
         if: needs.detect.outputs.has_test == 'true'
-        run: pnpm --filter @4thtech/agentlink exec vitest run test/tool-surface.test.ts test/inspector-cli.test.ts
+        run: pnpm --filter @4thtech/agentlink exec vitest run test/tool-surface.test.ts test/mcp-conformance.test.ts
 
   vectors:
     name: vectors
