@@ -74,6 +74,13 @@ describe('drift check', () => {
     expect(lint('--table', target).status).not.toBe(0);
   });
 
+  it('fails on a table with CRLF line ends', () => {
+    const edited = read(TABLE).replace(/\n/g, '\r\n');
+    const run = generate('--table', copy('crlf.ts', edited));
+    expect(run.status).toBe(1);
+    expect(run.stderr).toMatch(/differs from the generator output/);
+  });
+
   it('fails on a dropped table range', () => {
     const table = read(TABLE);
     const edited = table.replace(' 0x61c, 0x61c, 1,', '');

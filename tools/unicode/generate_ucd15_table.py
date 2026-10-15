@@ -110,10 +110,11 @@ def main(argv):
         print(f"generate_ucd15_table: {error}", file=sys.stderr)
         return ERROR_EXIT
     if args.write:
-        args.table.write_text(text, encoding="utf-8")
+        args.table.write_bytes(text.encode("utf-8"))
         return 0
     try:
-        committed = args.table.read_text(encoding="utf-8")
+        # Bytes, not text mode: a CRLF checkout must fail the check, never be normalised.
+        committed = args.table.read_bytes().decode("utf-8")
     except OSError as error:
         print(f"generate_ucd15_table: {error}", file=sys.stderr)
         return ERROR_EXIT
