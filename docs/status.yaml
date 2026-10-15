@@ -140,7 +140,11 @@ areas:
       - name: "Approval requests and the requests queue"
         state: done
         prs: [95]
-        summary: "Approval requests with use-once, requests-queue limits and idempotency (M1-7e). A follow-up for requests from unknown senders (accept, ignore, block) is in review."
+        summary: "Approval requests with use-once, requests-queue limits and idempotency (M1-7e)."
+      - name: "Requests from unknown senders: accept, ignore, block"
+        state: in-progress
+        prs: [105]
+        summary: "Accept, ignore, ignore all, block and unblock for requests from unknown senders, a blocked sender dropped before any decryption, refusals that expire after 7 days (M1-7e-2, D-72); in review."
       - name: "Held cards need the sender's own owner entry"
         state: done
         prs: [90]
