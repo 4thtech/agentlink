@@ -1097,7 +1097,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - deps-check and ESLint stay green: no primitive outside `packages/crypto`.
 
 #### M1-2a · types: constants and envelope, payload, card, invite schemas
-- **Status:** in-progress (code merged in 4thtech/agentlink#23; the `encodings` vector suite is still pending under M1-2a) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** in-progress (code merged in 4thtech/agentlink#23; the `encodings` vector suite in branch `feat/M1-2a-encodings`) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types
 - **Depends on:** M0-2d; gap G-29 resolved for owner-operation bodies
 - **Spec:** 04 §2.4, §2.5.1, §3.1, §3.4, §3.4.1, §3.6; 05 §2.1, §3.1; 07 §1
@@ -1110,6 +1110,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - G-23/G-28 (04 §2.9, §3.6, §3.6.1, §3.4.1): `agentId` (`0x` + 40 lowercase hex). Invite: `cardAgentSig` and `codeCommit`. `handshake`: `cardAgentSig`, `codeNonce`, `codeCommit` and `inviterCardHash` (bare hex 64). `handshake-ack`: `handshakeHash` (`0x` + 64 hex, an `envelopeHash`), `codeReveal`, `card` and `cardSig`. `contact.check` params: `{contact, pairingDigest}`, where `pairingDigest` is 64 lowercase hex with no prefix. The 32-byte fields are base64url of exactly 32 bytes, and `inviteId` is exactly 16 bytes. Every field is required, and non-canonical forms are rejected.
   - Security S2 because envelope/payload schema changes are S2 (`audit-rules.md` §2.2).
 - **Split (orchestrator):** the G-23/G-28 pairing-body fields above (invite, `handshake`, `handshake-ack`) are done under M1-2d together with the G-24 `relays` change, so the pairing bodies land complete before M1-7c. The other parts stay here.
+- **Remaining (orchestrator, 2026-10-15):** only the `encodings` suite. `@agentlink/types` gets the per-path decoder of 04 §2.4.1 (one decoder for each schema path of the table, built on the schema leaf where a schema has the path) and the byte comparison of two encoded values; the suite's integer-token cases run through the strict `parseJson` of `@agentlink/crypto` (`integersOnly`, M1-1e). The G-23/G-28 parts are done in M1-2d and M1-2f; the browser and workerd runs of the package's own tests are M1-2c.
 - **Acceptance:**
   - Vector suite `encodings`: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - Round-trip tests for every schema; property-based fuzzing never throws anything but a validation error.
