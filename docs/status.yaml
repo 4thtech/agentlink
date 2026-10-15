@@ -144,7 +144,11 @@ areas:
       - name: "Approval requests and the requests queue"
         state: done
         prs: [95]
-        summary: "Approval requests with use-once, requests-queue limits and idempotency (M1-7e). A follow-up for requests from unknown senders (accept, ignore, block) is in review."
+        summary: "Approval requests with use-once, requests-queue limits and idempotency (M1-7e)."
+      - name: "Requests from unknown senders: accept, ignore, block"
+        state: in-progress
+        prs: [105]
+        summary: "Accept, ignore, ignore all, block and unblock for requests from unknown senders, a blocked sender dropped before any decryption, refusals that expire after 7 days (M1-7e-2, D-72); in review."
       - name: "Held cards need the sender's own owner entry"
         state: done
         prs: [90]
@@ -154,8 +158,9 @@ areas:
         prs: [99]
         summary: "Sending a message to a paired contact, stored with its delivery rows before anything is published, retried from the outbox, with one publisher per row when several processes share the agent (M1-7k); in review."
       - name: "Inbox sync, delivery acknowledgements, owner card update"
-        state: planned
-        summary: "Inbox sync and delivery acknowledgements (M1-7h); the owner card update (M1-7j) follows in M1b."
+        state: in-progress
+        prs: [106]
+        summary: "Inbox sync with a per-contact rate limit, opt-in delivery acknowledgements and a fetch-only catch-up for read-only status (M1-7h); in progress. Owner-signed revocations of contacts and of the agent itself are applied; the owner card update (M1-7j, M1b) follows."
   - id: node
     title: "Node runtime (@agentlink/node)"
     intro: "Code merged, not published. Nothing in it is user-runnable yet."
@@ -185,11 +190,11 @@ areas:
         summary: "M1-8f."
   - id: apps
     title: "MCP server, CLI and apps"
-    intro: "Nothing built yet."
+    intro: "The CLI runtime is in review; nothing is usable yet."
     components:
       - name: "MCP server and CLI"
-        state: planned
-        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a)."
+        state: in-progress
+        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising) is in review; the commands and the MCP server follow."
       - name: "Local approval page"
         state: planned
         summary: "A small page on 127.0.0.1 for owner approvals and settings (M1b)."

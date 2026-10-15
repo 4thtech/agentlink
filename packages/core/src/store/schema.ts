@@ -154,7 +154,8 @@ export const TABLES = {
     },
     primaryKey: ['invite_id'],
   },
-  // 07 §3, §3.2.
+  // 07 §3, §3.2. refused_at and request_accepted_at (D-72, schema version 2): the local time a row
+  // was stored as `refused` (its retention), and the owner's Accept of one `request` row.
   envelopes: {
     columns: {
       envelope_id: id,
@@ -171,6 +172,8 @@ export const TABLES = {
       payload_json: opt('enc'),
       read_at: opt('int'),
       delivery: optOneOf('queued', 'sent', 'not_delivered'),
+      refused_at: opt('int'),
+      request_accepted_at: opt('int'),
     },
     primaryKey: ['envelope_id'],
   },
@@ -297,6 +300,13 @@ export const TABLES = {
       release_at: int,
     },
     primaryKey: ['envelope_id'],
+  },
+  // 07 §3.2 (D-72, schema version 2). Written only by the owner's Block and Unblock, and deleted by a
+  // card-update that makes the key a contact's current key. via_envelope_id is information only
+  // (IR-D-72-1 F03): Unblock goes by from_key.
+  blocked_keys: {
+    columns: { from_key: id, blocked_at: int, via_envelope_id: id },
+    primaryKey: ['from_key'],
   },
   // 07 §3.2.
   rate_counters: {

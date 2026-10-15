@@ -626,6 +626,8 @@ export class PairingService implements PairingHandler {
       ),
       read_at: null,
       delivery: null,
+      refused_at: null,
+      request_accepted_at: null,
     };
     const ackRow = ack === undefined ? undefined : await outboundRow(ctx, ack, id);
     let result: 'claimed_elsewhere' | 'invite_used' | 'done';

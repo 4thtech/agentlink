@@ -197,7 +197,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 **What the owner does with a request (D-72; IR-M1-7e-1 F01; proposed, owner confirms at merge).** Only on owner surfaces (the local UI, the desktop app and the owner's own terminal, 06 §8; the console from M2), never through an MCP tool (I-4). None of these creates a contact: a contact comes only from a completed pairing (04 §2.9). Each runs in one store transaction.
 - **Accept** sets `request_accepted_at` on that one `request` row; nothing else changes. `agentlink_inbox` then returns it, always inside the untrusted block with the unknown-sender label, and with a fixed `nextStep` that offers the user an invite to share with the sender (06 §2.1, §4). It stays a `request` row: it keeps counting toward the limits above until the owner ignores it, and the agent cannot reply to it (04 §3.2). The flag covers that row only; a later envelope from the key is a new request.
 - **Ignore** deletes every `request` and `refused` row whose `from_key` is that key and whose `contact_id` is null. **Ignore all** deletes every such row for every key, so the owner can always empty the queue at once, whatever the number of sender keys.
-- **Block** inserts the key into `blocked_keys` and deletes its `request`, `refused` (with `contact_id` null) and `held_envelopes` rows. From then on its envelopes are dropped at 04 §3.1.1 step 5, before any HPKE open, and use no queue space. **Unblock** deletes the `blocked_keys` row; nothing removed comes back, and a dropped envelope is not fetched again (its seen row stays).
+- **Block** inserts the key into `blocked_keys` and deletes its `request`, `refused` (with `contact_id` null) and `held_envelopes` rows. From then on its envelopes are dropped at 04 §3.1.1 step 5, before any HPKE open, and use no queue space. **Unblock** deletes the `blocked_keys` row; nothing removed comes back, and a dropped envelope is not fetched again (its seen row stays). A request whose key has meanwhile become a contact's current key is not blocked: Block changes nothing and the surface offers Ignore, because the contact's status governs that key (IR-M1-7e-2-1 F03; proposed, owner confirms at merge).
 - The seen rows of deleted rows stay, so a relay that serves the same item again does not bring it back (seen-set retention above).
 
 **Refused-row retention (D-72; IR-M1-7e-1 F01; proposed, owner confirms at merge).** A `refused` row with `contact_id` null (a refusal from an unknown key) expires 604 800 s (7 days) after `refused_at`, the local time it was stored. It is measured on the local clock, never from the sender-chosen `createdAt`, which step 9 has not yet checked when step 8 refuses. An expired row no longer counts toward the limits, the count ignores it in the same transaction as the insert, so expiry never waits for pruning, and pruning deletes it at the start of each processing pass. *Why 7 days:* it is the seen-set's minimum retention (above). While the refused row exists, step 9 deduplicates a re-served envelope against it; after that, the seen row does so for as long as a sync can still request the item. A re-count after both are gone gives a sender nothing that a fresh key does not, and a refusal from an unknown key flags no contact (IR-D-72-1 F04). And a refused row holds no ciphertext and no payload, so after a week it serves only the count. A flood of refusals from fresh keys can therefore fill the queue for at most 7 days, and the owner can empty it at once with Ignore all. Refused rows of a contact (`contact_id` set) are not affected: they stay as the contact's record, as before.
@@ -449,7 +449,13 @@ interface Transport {
   wrap(envelope: Envelope, recipients: NostrRecipient[], keys: EnvelopeKeys): Promise<WrappedEnvelope>; // one gift wrap per distinct recipient key; publishes nothing
   publish(storedWrap: SignedWrap, relays: RelayUrl[]): Promise<PublishResult>; // exactly the row's relays (§3.2, §4.3), never any other
   subscribe(keys: EnvelopeKeys, onEnvelope: (e: Envelope, meta) => void): Unsubscribe;
-  sync(keys: EnvelopeKeys, since: number): Promise<Envelope[]>;
+  sync(options: {
+    relays: RelayUrl[];                          // the own list only (§4.3); AUTH only there
+    identities: { pubkey: string; epoch?: number }[]; // own Nostr keys at every epoch: the REQ's #p
+    persistence: { getCursor; setCursor; isSeen }; // the core's sync_cursors and seen (§3.2)
+    onEnvelope(item: { envelope; giftWrapId; relay; recipient }): 'processed' | 'verified' | 'retry';
+    budgetMs?: number;                           // 3 000 by default (06 §6)
+  }): Promise<{ partial: boolean }>;
 }
 
 // EnvelopeKeys (03 §3, 04 §3.1.1) exposes the secret-key operations the transport needs:
@@ -460,6 +466,8 @@ interface Transport {
 ```
 
 **Two steps, store first (proposed, owner confirms at merge; IR-M1-7k-1 Q1).** Wrapping and publishing are separate calls so that the core can meet §3.2: it calls `wrap`, stores the outbound envelope with one outbox row per returned wrap in one store transaction, and only then calls `publish` for each stored wrap, with that row's relay list. A retry republishes the same stored wrap; nothing is wrapped or signed again. `wrap` publishes nothing; `publish` sends to exactly the relays it is given.
+
+**Sync owned by the core (proposed, owner confirms at merge; M1-7h, IR-M1-7h-1 F05).** `sync` reads the relays it is given with the 48 h look-back of §4.2 and hands each newly opened wrap's strictly parsed, not yet verified envelope to `onEnvelope`. The core owns the cursors and the seen-set: the transport deduplicates by gift-wrap ID only (never by the sender-chosen envelope ID), and the handler's answer decides whether the wrap counts as handled and whether the relay's cursor may move (`retry` keeps both). The core skips a copy whose `envelopeHash` is already in `seen` before its signature check, by design: that row is written only after a signature over the same hash passed, so the envelope is verified once. `subscribe` follows the same handler shape.
 
 An XMTP adapter (P2) implements the same interface, in the same two steps; envelopes are unchanged.
 

@@ -119,6 +119,9 @@ describe('M1-1g-b: no build can include the crypto test seam (IR-M1-1c-G2-1 L-1)
   const seam = RESTRICTED_ENTRY_POINTS.find((entry) =>
     entry.group.includes('@agentlink/crypto/testing'),
   );
+  // The packages of the seam's testDirs (IR-M1-9k-1 F01): `apps/cli/test` -> `apps/cli`.
+  const testDirPackages = (seam?.testDirs ?? []).map((dir) => dir.split('/').slice(0, 2).join('/'));
+  const seamPackages = [...(seam?.testZones ?? []), ...testDirPackages];
 
   it('finds the workspace packages', () => {
     expect(packageDirs.length).toBeGreaterThan(10);
@@ -139,7 +142,7 @@ describe('M1-1g-b: no build can include the crypto test seam (IR-M1-1c-G2-1 L-1)
       const test = readJsonc(path);
       const paths = test.compilerOptions?.paths ?? {};
       if (Object.keys(paths).some((key) => key.startsWith('@agentlink/crypto/testing'))) {
-        expect(seam?.testZones).toContain(dir);
+        expect(seamPackages).toContain(dir);
         expect(test.compilerOptions.noEmit).toBe(true);
       }
     },
@@ -169,7 +172,7 @@ describe('M1-1g-b: no build can include the crypto test seam (IR-M1-1c-G2-1 L-1)
   it.each(packageDirs)('%s: only a test zone Vite or Vitest config aliases the seam', (dir) => {
     for (const name of readdirSync(join(REPO, dir)).filter((n) => VITE_CONFIG.test(n))) {
       if (!aliasesSeam(readFileSync(join(REPO, dir, name), 'utf8'))) continue;
-      expect(seam?.testZones, `${dir}/${name}`).toContain(dir);
+      expect(seamPackages, `${dir}/${name}`).toContain(dir);
       expect(name, `${dir}/${name}`).toMatch(/^vitest\./);
     }
   });
@@ -180,6 +183,20 @@ describe('M1-1g-b: no build can include the crypto test seam (IR-M1-1c-G2-1 L-1)
     expect(readJsonc(join(REPO, 'packages/crypto/tsconfig.json')).exclude).toContain(
       'src/testing.ts',
     );
+  });
+
+  it('every testDirs package of the seam has the alias and the noEmit path it needs (IR-M1-9k-1 F01)', () => {
+    expect(seam?.testDirs).toEqual(['apps/cli/test']);
+    for (const pkg of testDirPackages) {
+      expect(readFileSync(join(REPO, pkg, 'vitest.config.ts'), 'utf8'), pkg).toMatch(
+        /find: \/\^@agentlink\\\/crypto\\\/testing\$\//,
+      );
+      const test = readJsonc(join(REPO, pkg, 'tsconfig.test.json'));
+      expect(test.compilerOptions.noEmit, pkg).toBe(true);
+      expect(test.compilerOptions.paths['@agentlink/crypto/testing'], pkg).toEqual([
+        '../../packages/crypto/src/testing.ts',
+      ]);
+    }
   });
 
   it('every test zone of the seam has the alias and the noEmit path it needs', () => {

@@ -92,6 +92,8 @@ async function fill(a: TestAgent, n: number, state: 'request' | 'refused', fromK
         payload_json: null,
         read_at: null,
         delivery: null,
+        refused_at: state === 'refused' ? clock.t : null,
+        request_accepted_at: null,
       });
     }
   });
@@ -262,8 +264,8 @@ describe('the owner view: count, list and ignore (02 F-65, 11 §5.2)', () => {
     expect(await a.client.requests.count()).toBe(2);
     const list = await a.client.requests.list();
     expect(list).toEqual([
-      { envelopeId: e1.id, fromKey: key, type: 'text', createdAt: e1.createdAt },
-      { envelopeId: e2.id, fromKey: key, type: 'text', createdAt: e2.createdAt },
+      { envelopeId: e1.id, fromKey: key, type: 'text', createdAt: e1.createdAt, acceptedAt: null },
+      { envelopeId: e2.id, fromKey: key, type: 'text', createdAt: e2.createdAt, acceptedAt: null },
     ]);
     expect(JSON.stringify(list)).not.toContain(SECRET);
   });

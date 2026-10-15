@@ -157,6 +157,7 @@ export {
   type Transport,
   type TransportDeps,
   type TransportFactory,
+  type TransportSyncOptions,
 } from './transport.js';
 export {
   OUTBOX_CLAIM_SECONDS,
@@ -164,6 +165,30 @@ export {
   type OutboxPeer,
   type OutboxRoute,
 } from './outbox.js';
+export {
+  ACK_KIND_RECEIVED,
+  DeliveryAcks,
+  MAX_ACKS_PER_PASS,
+  ackPayload,
+  type DeliveryAckStatus,
+} from './acks.js';
+export {
+  INBOX_TYPES,
+  InboxService,
+  type InboxCounts,
+  type InboxItem,
+  type InboxSender,
+} from './inbox.js';
+export {
+  DEFAULT_SYNC_BUDGET_MS,
+  MAX_SYNC_BUDGET_MS,
+  StoreSyncPersistence,
+  SyncService,
+  type CatchUpResult,
+  type FetchSummary,
+  type SyncInboxOptions,
+  type SyncInboxResult,
+} from './sync.js';
 export { REQUESTS_FULL, RequestsQueue, queueRefusals, type RequestEntry } from './requests.js';
 export { CoreError, StoreConstraintError, StoreUsageError, type CoreErrorCode } from './errors.js';
 export * from './constants.js';

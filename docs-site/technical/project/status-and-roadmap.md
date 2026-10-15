@@ -50,16 +50,17 @@ Code that is merged is not necessarily published: nothing is released or install
 | Core (@agentlink/core) | Safety code checked | Done | [#80](https://github.com/4thtech/agentlink/pull/80), [#85](https://github.com/4thtech/agentlink/pull/85) |
 | Core (@agentlink/core) | Owner-signed actions and policies | Done | [#79](https://github.com/4thtech/agentlink/pull/79) |
 | Core (@agentlink/core) | Approval requests and the requests queue | Done | [#95](https://github.com/4thtech/agentlink/pull/95) |
+| Core (@agentlink/core) | Requests from unknown senders: accept, ignore, block | In progress | [#105](https://github.com/4thtech/agentlink/pull/105) |
 | Core (@agentlink/core) | Held cards need the sender's own owner entry | Done | [#90](https://github.com/4thtech/agentlink/pull/90) |
 | Core (@agentlink/core) | Send pipeline | In progress | [#99](https://github.com/4thtech/agentlink/pull/99) |
-| Core (@agentlink/core) | Inbox sync, delivery acknowledgements, owner card update | Planned | - |
+| Core (@agentlink/core) | Inbox sync, delivery acknowledgements, owner card update | In progress | [#106](https://github.com/4thtech/agentlink/pull/106) |
 | Node runtime (@agentlink/node) | Agent key store in the OS keychain | Done | [#54](https://github.com/4thtech/agentlink/pull/54), [#57](https://github.com/4thtech/agentlink/pull/57), [#83](https://github.com/4thtech/agentlink/pull/83) |
 | Node runtime (@agentlink/node) | Local SQLite database | Done | [#60](https://github.com/4thtech/agentlink/pull/60), [#68](https://github.com/4thtech/agentlink/pull/68) |
 | Node runtime (@agentlink/node) | Owner code at a prompt | Done | [#67](https://github.com/4thtech/agentlink/pull/67) |
 | Node runtime (@agentlink/node) | Relay connection | Done | [#81](https://github.com/4thtech/agentlink/pull/81), [#84](https://github.com/4thtech/agentlink/pull/84) |
 | Node runtime (@agentlink/node) | Policy version record in the keychain | Done | [#86](https://github.com/4thtech/agentlink/pull/86) |
 | Node runtime (@agentlink/node) | Passphrase-locked key file for headless machines | Planned | - |
-| MCP server, CLI and apps | MCP server and CLI | Planned | - |
+| MCP server, CLI and apps | MCP server and CLI | In progress | - |
 | MCP server, CLI and apps | Local approval page | Planned | - |
 | MCP server, CLI and apps | Owner console, desktop apps, cloud agent | Planned | - |
 | OCC v2 contracts (private repo) | Notary and fee vault | Done | contracts#4 |

@@ -18,7 +18,12 @@ import {
 } from '@agentlink/core';
 import { encodeHex, encodeUtf8, sha256 } from '@agentlink/crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { MIGRATIONS, createSchemaStatements, type StoreMigration } from './sqlite-schema.js';
+import {
+  MIGRATIONS,
+  STORE_APPLICATION_ID,
+  createSchemaStatements,
+  type StoreMigration,
+} from './sqlite-schema.js';
 import { SqliteStore } from './sqlite-store.js';
 import { NodeStoreError } from './store-errors.js';
 import { sealed } from './store-rows.fixture.js';
@@ -431,27 +436,76 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     raw.close();
   });
 
-  it('pins the version 1 schema: a TABLES change needs a new migration, never an edit of v1', () => {
-    // If this fails, the logical schema changed. Freeze the version 1 statements as they were and
+  it('pins every schema version: a TABLES change needs a new migration, never an edit of one', () => {
+    // If this fails, the logical schema changed. Freeze the earlier statements as they were and
     // add a migration with the next version instead (07 §3.7: forward migrations only).
-    const digest = encodeHex(sha256(encodeUtf8(MIGRATIONS[0]?.statements.join(';\n') ?? '')));
-    expect(STORE_SCHEMA_VERSION).toBe(1);
-    expect(MIGRATIONS.map((m) => m.version)).toEqual([1]);
-    expect(digest).toMatchInlineSnapshot(
+    const digestOf = (i: number) =>
+      encodeHex(sha256(encodeUtf8(MIGRATIONS[i]?.statements.join(';\n') ?? '')));
+    expect(STORE_SCHEMA_VERSION).toBe(2);
+    expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2]);
+    // Version 1 (G-9) is unchanged by D-72.
+    expect(digestOf(0)).toMatchInlineSnapshot(
       `"6a2a36755c97cca746bdfe0b166c409cf1a067b1fd526011470446c0bb7dfd1b"`,
     );
+    // Version 2 (D-72, M1-7e-2): envelopes.refused_at, envelopes.request_accepted_at, blocked_keys.
+    expect(MIGRATIONS[1]?.statements).toMatchInlineSnapshot(`
+      [
+        "ALTER TABLE "envelopes" ADD COLUMN "refused_at" INTEGER CHECK ("refused_at" IS NULL OR (typeof("refused_at") = 'integer' AND "refused_at" BETWEEN 0 AND 9007199254740991))",
+        "ALTER TABLE "envelopes" ADD COLUMN "request_accepted_at" INTEGER CHECK ("request_accepted_at" IS NULL OR (typeof("request_accepted_at") = 'integer' AND "request_accepted_at" BETWEEN 0 AND 9007199254740991))",
+        "CREATE TABLE "blocked_keys" (
+        "from_key" TEXT NOT NULL CHECK (typeof("from_key") = 'text' AND length("from_key") > 0),
+        "blocked_at" INTEGER NOT NULL CHECK (typeof("blocked_at") = 'integer' AND "blocked_at" BETWEEN 0 AND 9007199254740991),
+        "via_envelope_id" TEXT NOT NULL CHECK (typeof("via_envelope_id") = 'text' AND length("via_envelope_id") > 0),
+        PRIMARY KEY ("from_key")
+      ) STRICT",
+      ]
+    `);
+  });
+
+  it('migrates a version 1 file to version 2 (D-72): rows kept, new columns null, blocked_keys added', async () => {
+    // A file as the version 1 code left it: the frozen v1 statements and user_version 1.
+    const raw = new Database(path());
+    for (const statement of MIGRATIONS[0]?.statements ?? []) raw.prepare(statement).run();
+    raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
+    raw.pragma('user_version = 1');
+    raw
+      .prepare(
+        `INSERT INTO "envelopes" ("envelope_id", "envelope_hash", "thread_id", "direction", ` +
+          `"contact_id", "from_key", "type", "state", "refused_reason", "created_at", ` +
+          `"envelope_json", "payload_json", "read_at", "delivery") VALUES ` +
+          `('e1', 'h1', 't1', 'in', NULL, 'k1', 'text', 'refused', 'owner_entry_missing', 5, ` +
+          `NULL, NULL, NULL, NULL)`,
+      )
+      .run();
+    raw.close();
+    const v2 = await SqliteStore.open(path());
+    expect(v2.schemaVersion).toBe(2);
+    expect(await v2.transaction((tx) => tx.get('envelopes', { envelope_id: 'e1' }))).toMatchObject({
+      state: 'refused',
+      refused_at: null,
+      request_accepted_at: null,
+    });
+    await v2.transaction((tx) =>
+      tx.insert('blocked_keys', { from_key: 'k1', blocked_at: 7, via_envelope_id: 'e1' }),
+    );
+    expect(await v2.transaction((tx) => tx.count('blocked_keys'))).toBe(1);
+    await v2.close();
+    // A fresh file through both migrations is the same schema as the migrated one.
+    const fresh = await SqliteStore.open(join(dir, 'fresh.db'));
+    expect(fresh.schemaVersion).toBe(2);
+    await fresh.close();
   });
 
   it('migrates forward from the previous schema version', async () => {
     const v1 = await SqliteStore.open(path());
     await v1.transaction((tx) => tx.insert('seen', seen('kept')));
     await v1.close();
-    const v2: StoreMigration = {
-      version: 2,
+    const v3: StoreMigration = {
+      version: 3,
       statements: ['CREATE INDEX "seen__by_time" ON "seen" ("first_seen_at")'],
     };
-    const migrated = await SqliteStore.open(path(), { migrations: [...MIGRATIONS, v2] });
-    expect(migrated.schemaVersion).toBe(2);
+    const migrated = await SqliteStore.open(path(), { migrations: [...MIGRATIONS, v3] });
+    expect(migrated.schemaVersion).toBe(3);
     expect(await migrated.transaction((tx) => tx.count('seen'))).toBe(1);
     const check = new Database(path(), { readonly: true });
     expect(
@@ -462,11 +516,12 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     ).toBe(1);
     check.close();
     await migrated.close();
-    // The code at version 1 refuses the newer file, and leaves it as it is (no downgrade).
+    // The code at the current version refuses the newer file, and leaves it as it is (no
+    // downgrade).
     const error = await rejects(SqliteStore.open(path()));
     expect((error as NodeStoreError).code).toBe('store_too_new');
     const raw = new Database(path(), { readonly: true });
-    expect(raw.pragma('user_version', { simple: true })).toBe(2);
+    expect(raw.pragma('user_version', { simple: true })).toBe(3);
     raw.close();
   });
 
@@ -485,7 +540,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     ).toBe(0);
     raw.close();
     const fine = await SqliteStore.open(path());
-    expect(fine.schemaVersion).toBe(1);
+    expect(fine.schemaVersion).toBe(STORE_SCHEMA_VERSION);
     await fine.close();
   });
 

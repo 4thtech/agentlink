@@ -42,10 +42,11 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 >   - Invites and pairing ([#78](https://github.com/4thtech/agentlink/pull/78)): Single-use invite links, the handshake and ack with the commit-then-reveal safety code.
 >   - Safety code checked ([#80](https://github.com/4thtech/agentlink/pull/80), [#85](https://github.com/4thtech/agentlink/pull/85)): The owner's signed check, applied only when it matches the recomputed pairing and re-verified on every read; it goes through the owner-action path.
 >   - Owner-signed actions and policies ([#79](https://github.com/4thtech/agentlink/pull/79)): Approvals, batch approvals, cancellations and policy changes apply only with a valid owner signature, once each; a stored policy that no longer verifies makes the agent ask the owner.
->   - Approval requests and the requests queue ([#95](https://github.com/4thtech/agentlink/pull/95)): Approval requests with use-once, requests-queue limits and idempotency (M1-7e). A follow-up for requests from unknown senders (accept, ignore, block) is in review.
+>   - Approval requests and the requests queue ([#95](https://github.com/4thtech/agentlink/pull/95)): Approval requests with use-once, requests-queue limits and idempotency (M1-7e).
+>   - Requests from unknown senders: accept, ignore, block (in progress; [#105](https://github.com/4thtech/agentlink/pull/105)): Accept, ignore, ignore all, block and unblock for requests from unknown senders, a blocked sender dropped before any decryption, refusals that expire after 7 days (M1-7e-2, D-72); in review.
 >   - Held cards need the sender's own owner entry ([#90](https://github.com/4thtech/agentlink/pull/90)): A held card is accepted only with the sender's own owner entry (G-51).
 >   - Send pipeline (in progress; [#99](https://github.com/4thtech/agentlink/pull/99)): Sending a message to a paired contact, stored with its delivery rows before anything is published, retried from the outbox, with one publisher per row when several processes share the agent (M1-7k); in review.
->   - Inbox sync, delivery acknowledgements, owner card update (planned): Inbox sync and delivery acknowledgements (M1-7h); the owner card update (M1-7j) follows in M1b.
+>   - Inbox sync, delivery acknowledgements, owner card update (in progress; [#106](https://github.com/4thtech/agentlink/pull/106)): Inbox sync with a per-contact rate limit, opt-in delivery acknowledgements and a fetch-only catch-up for read-only status (M1-7h); in progress. Owner-signed revocations of contacts and of the agent itself are applied; the owner card update (M1-7j, M1b) follows.
 > - **Node runtime (@agentlink/node):** Code merged, not published. Nothing in it is user-runnable yet.
 >   - Agent key store in the OS keychain ([#54](https://github.com/4thtech/agentlink/pull/54), [#57](https://github.com/4thtech/agentlink/pull/57), [#83](https://github.com/4thtech/agentlink/pull/83)): macOS Keychain, Windows Credential Manager, Linux Secret Service, with the "needs setup" answer on machines without one; CI runs on all three.
 >   - Local SQLite database ([#60](https://github.com/4thtech/agentlink/pull/60), [#68](https://github.com/4thtech/agentlink/pull/68)): Sensitive columns encrypted under a key from the keychain, shared safely by several processes.
@@ -53,8 +54,8 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 >   - Relay connection ([#81](https://github.com/4thtech/agentlink/pull/81), [#84](https://github.com/4thtech/agentlink/pull/84)): Connects only to an address that passed the relay address check, refuses redirects and proxies, caps incoming messages; a Docker relay suite runs in CI.
 >   - Policy version record in the keychain ([#86](https://github.com/4thtech/agentlink/pull/86)): Stops an older owner-signed policy from being put back.
 >   - Passphrase-locked key file for headless machines (planned): M1-8f.
-> - **MCP server, CLI and apps:** Nothing built yet.
->   - MCP server and CLI (planned): `npx` package with the MCP server over stdio and the `agentlink` CLI (M1a).
+> - **MCP server, CLI and apps:** The CLI runtime is in review; nothing is usable yet.
+>   - MCP server and CLI (in progress): `npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising) is in review; the commands and the MCP server follow.
 >   - Local approval page (planned): A small page on 127.0.0.1 for owner approvals and settings (M1b).
 >   - Owner console, desktop apps, cloud agent (planned): M2.
 > - **OCC v2 contracts (private repo):** Pre-audit. Nothing in AgentLink uses them yet.
