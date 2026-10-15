@@ -23,6 +23,7 @@ import {
   type KeyStore,
   type OwnerKeyStore,
 } from '@agentlink/crypto';
+import type { Logger } from '@agentlink/log';
 import { AgentLinkClient } from '../client.js';
 import { MemoryStore } from '../store/memory-store.js';
 import {
@@ -54,6 +55,7 @@ export async function makeAgent(
   keyStore: KeyStore,
   owner: TestOwner,
   name: string,
+  logger?: Logger,
 ): Promise<TestAgent> {
   const store = new MemoryStore();
   const cipher = new TestStoreCipher();
@@ -63,6 +65,7 @@ export async function makeAgent(
     cipher,
     approvals: new RecordingApprovalChannel(),
     clock: clock.now,
+    ...(logger === undefined ? {} : { logger }),
   });
   await client.identity.init({
     owner: await owner.unlock(passphrase()),

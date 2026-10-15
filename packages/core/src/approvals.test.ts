@@ -1,0 +1,638 @@
+// M1-7e: approval requests, use-once, expiry, cancel and batch use (04 §2.5.1, §2.5.2, §3.4.1;
+// 06 §2.5; 07 §3 `approvals`). Verifying and applying the owner's signed objects is M1-7d
+// (owner-actions.test.ts); here: what a tool call can do with a request and an approved ID.
+// I-4: nothing here decides, widens or creates an approved approval without the owner's signature.
+// I-5: errors and log lines carry fixed text only.
+import {
+  canonicalize,
+  encodeBase64url,
+  encodeHex,
+  randomBytes,
+  type JsonObject,
+} from '@agentlink/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
+import { createLogger } from '@agentlink/log';
+import { APPROVAL_TTL_SECONDS, type OwnerActionOp } from '@agentlink/types';
+import { describe, expect, it } from 'vitest';
+import { feeContextFromQuote } from './approvals.js';
+import { AgentLinkClient } from './client.js';
+import { CoreError } from './errors.js';
+import { computeActionDigest } from './owner-action.js';
+import { MemoryStore } from './store/memory-store.js';
+import { rowKeyOf } from './store/store.js';
+import {
+  FakeClock,
+  RELAYS,
+  RecordingApprovalChannel,
+  TestStoreCipher,
+  passphrase,
+  seed,
+} from './testing/fixtures.js';
+import { MemoryPolicyMark, newNonce, ownerHex, signWith } from './testing/owner.js';
+
+/** A random 16-byte id, base64url (derived at runtime: no literal ids in tests). */
+const b64id = (): string => encodeBase64url(randomBytes(16));
+const SECRET = 'SECRET-ARG-TEXT-7e';
+const hex64 = () => encodeHex(randomBytes(32));
+const hex0x = () => `0x${hex64()}`;
+const FEE_TOKEN = `0x${'ab'.repeat(20)}`;
+
+/** A valid `agentlink_export_proof_pack` action (06 §2.0; types approval.ts). */
+const exportAction = (note = 'x'): JsonObject => ({
+  tool: 'agentlink_export_proof_pack',
+  args: { recordId: '0x01', includeKey: true, note },
+  context: {
+    triggers: ['proofs.allowKeyDisclosure'],
+    recordId: `0x${'ab'.repeat(32)}`,
+    envelopeHash: `0x${'cd'.repeat(32)}`,
+  },
+});
+
+async function setup() {
+  const keyStore = new MemoryKeyStore(seed(1));
+  const owner = new MemoryOwnerKeyStore(seed(101), passphrase());
+  const store = new MemoryStore();
+  const cipher = new TestStoreCipher();
+  const clock = new FakeClock();
+  const channel = new RecordingApprovalChannel();
+  const lines: string[] = [];
+  const client = await AgentLinkClient.create({
+    keyStore,
+    store,
+    cipher,
+    approvals: channel,
+    clock: clock.now,
+    policyMark: new MemoryPolicyMark(),
+    logger: createLogger({ name: 'core', level: 'debug', sink: (_l, line) => lines.push(line) }),
+  });
+  const session = await owner.unlock(passphrase());
+  await client.identity.init({
+    owner: session,
+    ownerKeys: await owner.getPublicKeys(),
+    name: 'Agent',
+    relays: RELAYS,
+  });
+  await session.close();
+  const OWNER = await ownerHex(owner);
+
+  const signed = async (op: OwnerActionOp, params: JsonObject, over: JsonObject = {}) =>
+    JSON.stringify(
+      await signWith(owner, {
+        v: 1,
+        agent: client.agentId,
+        owner: OWNER,
+        op,
+        params,
+        nonce: newNonce(),
+        issuedAt: clock.t,
+        expiresAt: clock.t + 600,
+        ...over,
+      }),
+    );
+
+  /** A pending request made through the service, as a tool call would. */
+  const request = async (action: JsonObject = exportAction()) => {
+    const pending = await client.approvalService.request({
+      action,
+      summary: 'Include the document key in an export',
+    });
+    return { ...pending, action };
+  };
+  type Req = Awaited<ReturnType<typeof request>>;
+  const decide = (r: Req, decision = 'approve'): JsonObject => ({
+    approvalId: r.approvalId,
+    actionDigest: computeActionDigest(r.action),
+    decision,
+  });
+  const approve = async (r: Req, decision = 'approve') => {
+    const over = r.expiresAt < clock.t + 600 ? { expiresAt: r.expiresAt } : {};
+    return client.ownerActions.apply(await signed('approval.decide', decide(r, decision), over));
+  };
+  const row = (approvalId: string) =>
+    store.transaction((tx) => tx.get('approvals', { approval_id: approvalId }));
+
+  return { client, store, cipher, clock, channel, lines, signed, request, decide, approve, row };
+}
+
+describe('creating a request (04 §3.4.1, 06 §2.5)', () => {
+  it('stores a pending row bound to the action digest, sealed, with the 24 h TTL', async () => {
+    const t = await setup();
+    const action = exportAction(SECRET);
+    const pending = await t.client.approvalService.request({
+      action,
+      summary: 'Include the document key in an export',
+    });
+    expect(pending).toMatchObject({
+      status: 'pending_approval',
+      summary: 'Include the document key in an export',
+      actionDigest: computeActionDigest(action),
+      expiresAt: t.clock.t + APPROVAL_TTL_SECONDS,
+    });
+    expect(pending.approvalId).toMatch(/^apr_[A-Za-z0-9_-]{22}$/);
+    const row = await t.row(pending.approvalId);
+    expect(row).toMatchObject({
+      status: 'pending',
+      source: 'owner',
+      signed_decision: null,
+      signed_cancel: null,
+      scope_json: null,
+      expires_at: t.clock.t + APPROVAL_TTL_SECONDS,
+      created_at: t.clock.t,
+      decided_at: null,
+    });
+    // `args` can hold message text: sealed at rest, bound to its row (07 §3).
+    expect(row?.action_json).not.toContain(SECRET);
+    const opened = await t.cipher.open(
+      {
+        table: 'approvals',
+        column: 'action_json',
+        rowKey: rowKeyOf([pending.approvalId]),
+      },
+      row!.action_json,
+    );
+    expect(opened).toBe(canonicalize(action));
+    // Delivered to the owner's channel after the commit, with fixed text only.
+    expect(t.channel.requests).toEqual([
+      {
+        approvalId: pending.approvalId,
+        actionDigest: computeActionDigest(action),
+        summary: 'Include the document key in an export',
+        expiresAt: t.clock.t + APPROVAL_TTL_SECONDS,
+      },
+    ]);
+  });
+
+  it('gives every request a fresh ID', async () => {
+    const t = await setup();
+    const a = await t.request();
+    const b = await t.request();
+    expect(a.approvalId).not.toBe(b.approvalId);
+  });
+
+  it('refuses an action the strict schema does not accept, with a fixed message (I-5)', async () => {
+    const t = await setup();
+    const bad = { ...exportAction(SECRET), context: { triggers: ['policy.set'] } };
+    const error = await t.client.approvalService
+      .request({ action: bad, summary: 'Export' })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(CoreError);
+    expect((error as CoreError).code).toBe('approval_action_invalid');
+    expect((error as CoreError).message).not.toContain(SECRET);
+    expect(await t.store.transaction((tx) => tx.count('approvals'))).toBe(0);
+    expect(t.lines.join('\n')).not.toContain(SECRET);
+  });
+
+  it.each([
+    ['empty', ''],
+    ['a newline', 'Send\nApproved'],
+    ['a bidi control', 'Send ‮to Bob'],
+    ['a line separator', 'Send x'],
+    ['over 200 characters', 'a'.repeat(201)],
+  ])('refuses a summary with %s (I-5, 04 §3.4.1)', async (_n, summary) => {
+    const t = await setup();
+    const error = await t.client.approvalService
+      .request({ action: exportAction(), summary })
+      .catch((e: unknown) => e);
+    expect((error as CoreError).code).toBe('approval_summary_invalid');
+    expect(await t.store.transaction((tx) => tx.count('approvals'))).toBe(0);
+  });
+
+  it('keeps the request when the channel fails, and logs a fixed code only', async () => {
+    const t = await setup();
+    t.channel.request = () => Promise.reject(new Error(`channel down ${SECRET}`));
+    const pending = await t.request(exportAction(SECRET));
+    expect(pending.status).toBe('pending_approval');
+    expect((await t.row(pending.approvalId))?.status).toBe('pending');
+    expect(t.lines.join('\n')).not.toContain(SECRET);
+  });
+
+  it('a commitment request whose scope expires sooner expires with the scope (G-7)', async () => {
+    const t = await setup();
+    const now = t.clock.t;
+    const scope = {
+      v: 1,
+      kind: 'agentlink/commitment',
+      agentId: t.client.agentId,
+      decision: 'offer',
+      counterparty: { agentId: `0x${'11'.repeat(20)}`, ownerKey: hex64() },
+      thread: b64id(),
+      termsId: b64id(),
+      version: 1,
+      termsHash: hex64(),
+      answers: null,
+      notarize: true,
+      maxFeeUsd: '1',
+      createdAt: now,
+      expiresAt: now + 3_600,
+    };
+    const action = {
+      tool: 'agentlink_propose_terms',
+      args: { to: scope.counterparty.agentId, terms: { price: 1 }, notarize: true },
+      context: {
+        triggers: ['commitments.accept'],
+        scope,
+        terms: { price: 1 },
+        fee: { token: FEE_TOKEN, amount: '100000', usd: '0.1' },
+      },
+    };
+    const pending = await t.client.approvalService.request({
+      action,
+      summary: 'Make a firm offer',
+    });
+    expect(pending.expiresAt).toBe(now + 3_600);
+    const row = await t.row(pending.approvalId);
+    expect(row?.expires_at).toBe(now + 3_600);
+    expect(row?.scope_json).toBe(canonicalize(scope));
+    // Commitment parts are M1-32: until then an approved commitment is never used as a whole.
+    expect(await t.client.approvalService.use(pending.approvalId, action, 'approval')).toEqual({
+      status: 'refused',
+      reason: 'commitment_scope',
+    });
+  });
+
+  it('refuses a request when the agent has no identity', async () => {
+    const client = await AgentLinkClient.create({
+      keyStore: new MemoryKeyStore(seed(3)),
+      store: new MemoryStore(),
+      cipher: new TestStoreCipher(),
+      approvals: new RecordingApprovalChannel(),
+    });
+    const error = await client.approvalService
+      .request({ action: exportAction(), summary: 'Export' })
+      .catch((e: unknown) => e);
+    expect((error as CoreError).code).toBe('identity_missing');
+  });
+});
+
+describe('use once (04 §3.4.1, 06 §2.5)', () => {
+  it('an approved ID lets the identical action proceed once; then it is void', async () => {
+    const t = await setup();
+    const r = await t.request();
+    expect(await t.approve(r)).toMatchObject({ status: 'applied' });
+    expect(await t.client.ownerActions.checkApproval(r.approvalId, r.action)).toEqual({
+      status: 'approved',
+    });
+    expect(await t.client.approvalService.use(r.approvalId, r.action, 'approval')).toEqual({
+      status: 'used',
+    });
+    expect((await t.row(r.approvalId))?.status).toBe('void');
+    expect(await t.client.approvalService.use(r.approvalId, r.action, 'approval')).toEqual({
+      status: 'void',
+    });
+    expect(await t.client.ownerActions.checkApproval(r.approvalId, r.action)).toEqual({
+      status: 'void',
+    });
+  });
+
+  it('an approved ID is refused for a different action, and stays usable for its own', async () => {
+    const t = await setup();
+    const r = await t.request(exportAction('one'));
+    await t.approve(r);
+    expect(
+      await t.client.approvalService.use(r.approvalId, exportAction('two'), 'approval'),
+    ).toEqual({ status: 'refused', reason: 'digest_mismatch' });
+    expect((await t.row(r.approvalId))?.status).toBe('approved');
+    expect(await t.client.approvalService.use(r.approvalId, r.action, 'approval')).toEqual({
+      status: 'used',
+    });
+  });
+
+  it('a pending, a denied or an unknown ID authorises nothing', async () => {
+    const t = await setup();
+    const pending = await t.request();
+    expect(
+      await t.client.approvalService.use(pending.approvalId, pending.action, 'approval'),
+    ).toEqual({ status: 'pending' });
+    const denied = await t.request();
+    await t.approve(denied, 'deny');
+    expect(
+      await t.client.approvalService.use(denied.approvalId, denied.action, 'approval'),
+    ).toEqual({ status: 'denied' });
+    expect(
+      await t.client.approvalService.use(`apr_${'A'.repeat(22)}`, exportAction(), 'approval'),
+    ).toEqual({ status: 'refused', reason: 'approval_unknown' });
+    expect(await t.client.approvalService.use('not-an-id', exportAction(), 'approval')).toEqual({
+      status: 'refused',
+      reason: 'approval_unknown',
+    });
+  });
+
+  it('a rule changed to deny after approval refuses the approved call and keeps it unused', async () => {
+    const t = await setup();
+    const r = await t.request();
+    await t.approve(r);
+    expect(await t.client.approvalService.use(r.approvalId, r.action, 'deny')).toEqual({
+      status: 'refused',
+      reason: 'policy_deny',
+    });
+    expect((await t.row(r.approvalId))?.status).toBe('approved');
+  });
+
+  it('two concurrent uses of one approved ID: exactly one proceeds', async () => {
+    const t = await setup();
+    const r = await t.request();
+    await t.approve(r);
+    const results = await Promise.all([
+      t.client.approvalService.use(r.approvalId, r.action, 'approval'),
+      t.client.approvalService.use(r.approvalId, r.action, 'approval'),
+      t.client.approvalService.use(r.approvalId, r.action, 'approval'),
+    ]);
+    expect(results.filter((x) => x.status === 'used')).toHaveLength(1);
+    expect(results.filter((x) => x.status !== 'used').every((x) => x.status === 'void')).toBe(true);
+  });
+
+  it('authorize hands out a claim for the effect transaction; a refused claim writes nothing', async () => {
+    const t = await setup();
+    const r = await t.request();
+    await t.approve(r);
+    const first = await t.client.approvalService.authorize(r.approvalId, r.action, 'approval');
+    const second = await t.client.approvalService.authorize(r.approvalId, r.action, 'approval');
+    expect(first.status).toBe('authorized');
+    expect(second.status).toBe('authorized');
+    if (first.status !== 'authorized' || second.status !== 'authorized') return;
+    expect(await t.store.transaction((tx) => first.claim(tx))).toBe(true);
+    // The second claim finds the row already used: the caller's effect transaction must abort.
+    expect(await t.store.transaction((tx) => second.claim(tx))).toBe(false);
+  });
+
+  it('a status edited in the store never grants: approved without a signed decision is pending', async () => {
+    const t = await setup();
+    const r = await t.request();
+    await t.store.transaction((tx) =>
+      tx.update('approvals', { approval_id: r.approvalId }, { status: 'approved' }),
+    );
+    expect(await t.client.approvalService.use(r.approvalId, r.action, 'approval')).toEqual({
+      status: 'pending',
+    });
+    expect((await t.row(r.approvalId))?.status).toBe('approved');
+  });
+
+  it('a decision copied from another request does not verify for this one', async () => {
+    const t = await setup();
+    const a = await t.request();
+    const b = await t.request();
+    await t.approve(a);
+    const decided = await t.row(a.approvalId);
+    await t.store.transaction((tx) =>
+      tx.update(
+        'approvals',
+        { approval_id: b.approvalId },
+        { status: 'approved', signed_decision: decided!.signed_decision },
+      ),
+    );
+    expect(await t.client.approvalService.use(b.approvalId, b.action, 'approval')).toEqual({
+      status: 'refused',
+      reason: 'decision_invalid',
+    });
+  });
+});
+
+describe('expiry (G-7, 04 §3.4.1)', () => {
+  it('expiresAt = requestedAt + 86 400; a decision at expiresAt applies, at expiresAt + 1 it does not', async () => {
+    const t = await setup();
+    const r = await t.request();
+    const late = await t.request();
+    expect(r.expiresAt).toBe(t.clock.t + 86_400);
+    t.clock.t = r.expiresAt;
+    expect(await t.approve(r)).toMatchObject({ status: 'applied' });
+    t.clock.t = late.expiresAt + 1;
+    const text = await t.signed('approval.decide', t.decide(late), {
+      issuedAt: t.clock.t,
+      expiresAt: late.expiresAt,
+    });
+    expect(await t.client.ownerActions.apply(text)).toMatchObject({ status: 'refused' });
+    expect((await t.row(late.approvalId))?.status).toBe('pending');
+  });
+
+  it('an approved, unused approval runs at expiresAt and is expired at expiresAt + 1', async () => {
+    const t = await setup();
+    const a = await t.request();
+    const b = await t.request();
+    await t.approve(a);
+    await t.approve(b);
+    t.clock.t = a.expiresAt;
+    expect(await t.client.approvalService.use(a.approvalId, a.action, 'approval')).toEqual({
+      status: 'used',
+    });
+    t.clock.t = b.expiresAt + 1;
+    expect(await t.client.approvalService.use(b.approvalId, b.action, 'approval')).toEqual({
+      status: 'expired',
+    });
+    expect((await t.row(b.approvalId))?.status).toBe('approved');
+    // The next call asks again: a new pending request with a new ID.
+    const again = await t.request(b.action);
+    expect(again.approvalId).not.toBe(b.approvalId);
+    expect(again.expiresAt).toBe(t.clock.t + 86_400);
+  });
+
+  it('expireDue marks lapsed pending and approved rows expired, and leaves the rest', async () => {
+    const t = await setup();
+    const pending = await t.request();
+    const approved = await t.request();
+    await t.approve(approved);
+    const fresh = await t.request();
+    const used = await t.request();
+    await t.approve(used);
+    await t.client.approvalService.use(used.approvalId, used.action, 'approval');
+    t.clock.t = pending.expiresAt + 1;
+    const later = await t.request();
+    expect(await t.client.approvalService.expireDue()).toBe(3);
+    expect((await t.row(pending.approvalId))?.status).toBe('expired');
+    expect((await t.row(approved.approvalId))?.status).toBe('expired');
+    expect((await t.row(fresh.approvalId))?.status).toBe('expired');
+    expect((await t.row(used.approvalId))?.status).toBe('void');
+    expect((await t.row(later.approvalId))?.status).toBe('pending');
+    // A status that only takes authority away is honoured.
+    expect(await t.client.ownerActions.checkApproval(approved.approvalId, approved.action)).toEqual(
+      { status: 'expired' },
+    );
+  });
+});
+
+describe('approval.cancel (04 §2.5.1)', () => {
+  it('voids an approved, unused approval; the retry needs a new request', async () => {
+    const t = await setup();
+    const r = await t.request();
+    await t.approve(r);
+    const cancel = await t.signed('approval.cancel', { approvalId: r.approvalId });
+    expect(await t.client.ownerActions.apply(cancel)).toMatchObject({ status: 'applied' });
+    expect(await t.client.approvalService.use(r.approvalId, r.action, 'approval')).toEqual({
+      status: 'cancelled',
+    });
+  });
+
+  it('on a used approval changes nothing', async () => {
+    const t = await setup();
+    const r = await t.request();
+    await t.approve(r);
+    await t.client.approvalService.use(r.approvalId, r.action, 'approval');
+    const cancel = await t.signed('approval.cancel', { approvalId: r.approvalId });
+    expect(await t.client.ownerActions.apply(cancel)).toMatchObject({
+      status: 'refused',
+      reason: 'not_approved',
+    });
+    expect(await t.row(r.approvalId)).toMatchObject({ status: 'void', signed_cancel: null });
+  });
+});
+
+describe('batch use (D-68, 04 §2.5.2)', () => {
+  const batchOf = (
+    t: Awaited<ReturnType<typeof setup>>,
+    rs: Awaited<ReturnType<typeof t.request>>[],
+  ) =>
+    t.signed('approval.decideBatch', {
+      items: [...rs].sort((a, b) => (a.approvalId < b.approvalId ? -1 : 1)).map((r) => t.decide(r)),
+    });
+
+  it('a batch of 3 approves exactly those 3, and each proceeds once', async () => {
+    const t = await setup();
+    const rs = [await t.request(), await t.request(), await t.request()];
+    const other = await t.request();
+    expect(await t.client.ownerActions.apply(await batchOf(t, rs))).toMatchObject({
+      status: 'applied',
+    });
+    for (const r of rs) {
+      expect(await t.client.approvalService.use(r.approvalId, r.action, 'approval')).toEqual({
+        status: 'used',
+      });
+      expect(await t.client.approvalService.use(r.approvalId, r.action, 'approval')).toEqual({
+        status: 'void',
+      });
+    }
+    expect(await t.client.approvalService.use(other.approvalId, other.action, 'approval')).toEqual({
+      status: 'pending',
+    });
+  });
+
+  it('approval.cancel on one item voids only that item', async () => {
+    const t = await setup();
+    const rs = [await t.request(), await t.request(), await t.request()];
+    await t.client.ownerActions.apply(await batchOf(t, rs));
+    const [a, b, c] = rs as [(typeof rs)[0], (typeof rs)[0], (typeof rs)[0]];
+    await t.client.ownerActions.apply(
+      await t.signed('approval.cancel', { approvalId: b.approvalId }),
+    );
+    expect(await t.client.approvalService.use(a.approvalId, a.action, 'approval')).toEqual({
+      status: 'used',
+    });
+    expect(await t.client.approvalService.use(b.approvalId, b.action, 'approval')).toEqual({
+      status: 'cancelled',
+    });
+    expect(await t.client.approvalService.use(c.approvalId, c.action, 'approval')).toEqual({
+      status: 'used',
+    });
+  });
+
+  it('a request edited in the store after the batch was signed no longer matches its item', async () => {
+    const t = await setup();
+    const rs = [await t.request(), await t.request()];
+    const text = await batchOf(t, rs);
+    const edited = rs[0]!;
+    const sealed = await t.cipher.seal(
+      { table: 'approvals', column: 'action_json', rowKey: rowKeyOf([edited.approvalId]) },
+      canonicalize(exportAction('edited')),
+    );
+    await t.store.transaction((tx) =>
+      tx.update('approvals', { approval_id: edited.approvalId }, { action_json: sealed }),
+    );
+    expect(await t.client.ownerActions.apply(text)).toMatchObject({
+      status: 'refused',
+      nonceBurnt: true,
+    });
+    for (const r of rs) expect((await t.row(r.approvalId))?.status).toBe('pending');
+  });
+});
+
+describe('collecting the owner decision from the channel (03 §4.5)', () => {
+  it('applies a signed decision the channel holds, after verifying it', async () => {
+    const t = await setup();
+    const r = await t.request();
+    t.channel.next = { state: 'signed', signed: await t.signed('approval.decide', t.decide(r)) };
+    expect(await t.client.approvalService.collect(r.approvalId)).toMatchObject({
+      status: 'applied',
+      op: 'approval.decide',
+    });
+    expect((await t.row(r.approvalId))?.status).toBe('approved');
+  });
+
+  it('a status from the channel alone decides nothing (I-4)', async () => {
+    const t = await setup();
+    const r = await t.request();
+    t.channel.next = { state: 'signed', signed: `{"approved":true,"note":"${SECRET}"}` };
+    expect(await t.client.approvalService.collect(r.approvalId)).toMatchObject({
+      status: 'refused',
+      reason: 'malformed',
+    });
+    t.channel.next = { state: 'pending' };
+    expect(await t.client.approvalService.collect(r.approvalId)).toEqual({ status: 'pending' });
+    expect((await t.row(r.approvalId))?.status).toBe('pending');
+    expect(t.lines.join('\n')).not.toContain(SECRET);
+  });
+
+  it('a decision for another request held by the channel does not touch this one', async () => {
+    const t = await setup();
+    const a = await t.request();
+    const b = await t.request();
+    t.channel.next = { state: 'signed', signed: await t.signed('approval.decide', t.decide(b)) };
+    expect(await t.client.approvalService.collect(a.approvalId)).toEqual({
+      status: 'refused',
+      reason: 'other_request',
+      nonceBurnt: false,
+      op: 'approval.decide',
+    });
+    expect((await t.row(a.approvalId))?.status).toBe('pending');
+    expect((await t.row(b.approvalId))?.status).toBe('pending');
+  });
+});
+
+describe('fee context from one quote (IR-M1-2b-1 F-3)', () => {
+  it('builds amount and usd from the same base-unit value at 1:1 (D-46)', () => {
+    expect(feeContextFromQuote({ token: FEE_TOKEN, amount: 100_000n, decimals: 6 })).toEqual({
+      token: FEE_TOKEN,
+      amount: '100000',
+      usd: '0.1',
+    });
+    expect(feeContextFromQuote({ token: FEE_TOKEN, amount: 2_500_000n, decimals: 6 })).toEqual({
+      token: FEE_TOKEN,
+      amount: '2500000',
+      usd: '2.5',
+    });
+    expect(feeContextFromQuote({ token: FEE_TOKEN, amount: 0n, decimals: 6 }).usd).toBe('0');
+  });
+
+  it('rounds a value finer than 6 decimals up, never down', () => {
+    // 18-decimal token: 1 wei is above zero, so the fee shown is the smallest step, $0.000001.
+    expect(feeContextFromQuote({ token: FEE_TOKEN, amount: 1n, decimals: 18 }).usd).toBe(
+      '0.000001',
+    );
+    expect(
+      feeContextFromQuote({ token: FEE_TOKEN, amount: 1_000_000_000_000_000_001n, decimals: 18 })
+        .usd,
+    ).toBe('1.000001');
+  });
+
+  it.each([
+    ['a negative amount', { token: FEE_TOKEN, amount: -1n, decimals: 6 }],
+    [
+      'an upper-case token',
+      { token: FEE_TOKEN.toUpperCase().replace('0X', '0x'), amount: 1n, decimals: 6 },
+    ],
+    ['fractional decimals', { token: FEE_TOKEN, amount: 1n, decimals: 6.5 }],
+    ['too many decimals', { token: FEE_TOKEN, amount: 1n, decimals: 78 }],
+    ['an amount above the USD range', { token: FEE_TOKEN, amount: 10n ** 30n, decimals: 6 }],
+  ])('refuses %s', (_n, quote) => {
+    expect(() => feeContextFromQuote(quote)).toThrow(CoreError);
+  });
+
+  it('the fee it builds is accepted in a request action', async () => {
+    const t = await setup();
+    const fee = feeContextFromQuote({ token: FEE_TOKEN, amount: 100_000n, decimals: 6 });
+    const action = {
+      tool: 'agentlink_notarize',
+      args: { envelopeId: b64id() },
+      context: { triggers: ['proofs.notarize'], counterparty: null, envelopeHash: hex0x(), fee },
+    };
+    const pending = await t.client.approvalService.request({ action, summary: 'Record a proof' });
+    expect(pending.status).toBe('pending_approval');
+  });
+});
