@@ -142,14 +142,14 @@ function fake(
     self?: boolean;
     items?: PageItem[];
     requests?: number;
-    page?: 'absent' | 'before_not_found';
+    page?: 'before_not_found';
     syncFails?: boolean;
   } = {},
 ): Fake {
   const calls: string[] = [];
   const queries: InboxPageQuery[] = [];
   const reject = () => Promise.reject(new Error('not used'));
-  const client: Fake = {
+  return {
     calls,
     queries,
     self: () => {
@@ -174,9 +174,7 @@ function fake(
         ? Promise.reject(new Error(`relay said ${HOSTILE}`))
         : Promise.resolve();
     },
-  };
-  if (options.page !== 'absent') {
-    client.inboxPage = (query): Promise<InboxPage> => {
+    inboxPage: (query): Promise<InboxPage> => {
       calls.push('inboxPage');
       queries.push(query);
       if (options.page === 'before_not_found')
@@ -195,9 +193,8 @@ function fake(
         items: kept.reverse(),
         requests: options.requests ?? 0,
       });
-    };
-  }
-  return client;
+    },
+  };
 }
 
 function capture(): { logger: Logger; lines: string[] } {
@@ -340,13 +337,6 @@ describe('agentlink_inbox: sync and query (06 §2.2, §6)', () => {
     expect(result.structured.status).toBe('ok');
     expect(client.calls).toContain('inboxPage');
     for (const part of CANARY_PARTS) expect(lines.join('\n')).not.toContain(part);
-  });
-
-  it('without the core page read it is "not available yet" and syncs nothing (production until M1-7h-c)', async () => {
-    const client = fake({ page: 'absent' });
-    const result = await inbox({}, client);
-    expect(result.structured.code).toBe('NOT_AVAILABLE');
-    expect(client.calls).toEqual(['self']);
   });
 
   it('needs_setup when the agent has no identity', async () => {

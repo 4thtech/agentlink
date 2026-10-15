@@ -140,6 +140,8 @@ describe('openAgent (M1-9k)', () => {
     expect(options.approvals).toBe(result.agent.approvals);
     expect(options.policyMark).toBeDefined();
     expect(options.transport).toBeDefined();
+    // No drop origin is configured yet (M1-9p-b): received file URLs show as `own`.
+    expect(options.dropOrigins).toEqual([]);
     expect(Object.keys(result.agent.approvals).sort()).toEqual(['request', 'status']);
   });
 

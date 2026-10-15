@@ -112,6 +112,10 @@ function fakeClient(options: FakeOptions = {}): ToolClient & { calls: string[] }
       calls.push('syncInbox');
       return Promise.resolve();
     },
+    inboxPage: () => {
+      calls.push('inboxPage');
+      return Promise.resolve({ status: 'ok', items: [], requests: 0 });
+    },
   };
   if (options.pendingApprovals !== undefined) {
     const n = options.pendingApprovals;
