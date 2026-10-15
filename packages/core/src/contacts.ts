@@ -62,6 +62,7 @@ import {
 } from './contact-check.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
+import { openOwnCard, readIdentity } from './identity.js';
 import { restrictName } from './names.js';
 import { verifyPairingTranscript, type PairingTranscript } from './safety-code.js';
 import type { Row } from './store/schema.js';
@@ -307,25 +308,19 @@ export class ContactBook {
 
   /**
    * Who may sign an owner action for this agent (04 §2.5.1): the agent's own ID from its KeyStore and
-   * `ownerNostr` from its own stored card, re-verified (cardSig by ownerEvm). Undefined before init.
+   * `ownerNostr` from its own stored card, re-verified as IdentityService reads it (openOwnCard,
+   * IR-M1-7c-b-1 F03), and whether the own agent is revoked. Undefined before init.
    */
-  async #ownAuthority(): Promise<Omit<ContactCheckContext, 'now'> | undefined> {
+  async #ownAuthority(): Promise<
+    (Omit<ContactCheckContext, 'now'> & { readonly revoked: boolean }) | undefined
+  > {
     const ctx = this.#ctx;
     const { agentId } = await ctx.keyStore.getPublicBundle();
-    const row = await ctx.store.transaction((tx) => tx.select('identity')[0]);
-    if (row?.agent_id !== agentId) return undefined;
-    const stored = parseStoredCard(
-      await open(ctx, 'identity', 'agent_card_json', [row.agent_id], row.agent_card_json),
-    );
-    // As IdentityService reads it: both signatures (cardAgentSig by the agent key) and the epoch.
-    if (
-      stored.cardAgentSig === null ||
-      stored.card.agentEvm !== agentId ||
-      stored.card.keyEpoch !== row.key_epoch
-    ) {
-      return undefined;
-    }
-    return { agent: agentId, ownerNostr: stored.card.ownerNostr };
+    const got = await readIdentity(ctx);
+    if (got?.row.agent_id !== agentId) return undefined;
+    const stored = await openOwnCard(ctx, got.row);
+    if (stored === undefined) return undefined;
+    return { agent: agentId, ownerNostr: stored.card.ownerNostr, revoked: got.revoked };
   }
 
   /** 04 §3.6.1: the stored `contact.check` against a fresh recomputation; never a flag or digest. */
@@ -342,7 +337,8 @@ export class ContactBook {
     const pair = await recomputeStoredPairing(this.#ctx, row.contact_id, card);
     if (pair.status !== 'ok') return false;
     return storedContactCheckHolds(stored, {
-      ...own,
+      agent: own.agent,
+      ownerNostr: own.ownerNostr,
       contact: row.contact_id,
       pairingDigest: pair.pairingDigest,
     });
@@ -420,8 +416,8 @@ export class ContactBook {
    * same pair, checks the nonce again and records it (07 §3.4) and stores the signed object in
    * `safety_check`. A later check with a fresh nonce replaces it (idempotent).
    *
-   * Out of scope here: refusing when the own agent is revoked (M1-7h, and M1-7d's `identity_revoked`
-   * once `contact.check` is routed through the owner-action module, hand-off on the M1-7d card).
+   * Refused with `identity_revoked` once the own agent is revoked, like every owner action (M1-7d).
+   * OwnerActions.apply routes a `contact.check` here; its refusal codes are OwnerActionRefusal codes.
    */
   async applyContactCheck(signed: unknown): Promise<ContactCheckOutcome> {
     const ctx = this.#ctx;
@@ -433,6 +429,7 @@ export class ContactBook {
     };
     const own = await this.#ownAuthority();
     if (own === undefined) return refused('identity_missing');
+    if (own.revoked) return refused('identity_revoked');
     let pair: StoredPairingCode | undefined;
     const lookup = async (contact: string): Promise<PairingDigestLookup> => {
       const row = await ctx.store.transaction((tx) => {
@@ -448,7 +445,11 @@ export class ContactBook {
     };
     const nonceUsed = (nonce: string): Promise<boolean> =>
       ctx.store.transaction((tx) => tx.get('owner_action_nonces', { nonce }) !== undefined);
-    const verdict = await verifyContactCheck(signed, { ...own, now, nonceUsed }, lookup);
+    const verdict = await verifyContactCheck(
+      signed,
+      { agent: own.agent, ownerNostr: own.ownerNostr, now, nonceUsed },
+      lookup,
+    );
     if (!verdict.ok) return refused(verdict.reason);
     const checked = pair;
     if (checked?.status !== 'ok') return refused('pairing_unavailable');

@@ -17,10 +17,11 @@ export const KEYCHAIN_SERVICE = 'agentlink';
 export const KEYCHAIN_LINUX_STORE = 'secret-service';
 
 /**
- * The agent's keychain items (04 §2.8: the names are the `ALKS` entry names). Storage credentials
- * (`s3:<id>`, 07 §5.2) join when the storage card needs them.
+ * The agent's keychain items (04 §2.8: the names are the `ALKS` entry names): the seed, the store key
+ * and the policy-version mark (M1-8g, 04 §2.5.1). Storage credentials (`s3:<id>`, 07 §5.2) join when
+ * the storage card needs them.
  */
-export type KeychainItem = 'seed' | 'store-key';
+export type KeychainItem = 'seed' | 'store-key' | 'policy-version';
 
 /** A narrow view of the OS keychain under one service. Values are bytes; callers wipe what they get. */
 export interface KeychainBackend {
