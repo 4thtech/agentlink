@@ -291,11 +291,19 @@ const FAIL_CLOSED: readonly Row[] = [
     expected: 'approval',
   },
   {
-    name: 'contact envelope: no allowed rule applies',
+    // G-6 owner decision (Tali, 2026-10-15): a paired contact may Talk without approval.
+    name: 'contact envelope: a paired contact counts as allowed',
     policy: failClosed,
     action: fromContact(),
     context: hour(0),
-    expected: 'approval',
+    expected: 'allow',
+  },
+  {
+    name: 'contact envelope at the default rate cap still passes (119 before)',
+    policy: failClosed,
+    action: fromContact(),
+    context: hour(119),
+    expected: 'allow',
   },
   {
     name: 'contact envelope over the default rate cap',
@@ -311,7 +319,7 @@ const FAIL_CLOSED: readonly Row[] = [
     context: hour(0),
     expected: 'deny',
   },
-  { name: 'send', policy: failClosed, action: send(), expected: 'approval' },
+  { name: 'send to a paired contact', policy: failClosed, action: send(), expected: 'allow' },
   {
     name: 'send over the default size cap',
     policy: failClosed,
@@ -357,15 +365,16 @@ describe('evaluate: G-6 fail closed (06 §3)', () => {
     expect(evaluate(policy, action, context)).toBe(expected);
   });
 
-  it('reads paired-contact Talk strictly under fail closed until the owner decides (IR-M1-7d-1 F-1)', () => {
-    // G-6 reading, owner decision pending: switching FAIL_CLOSED_CONTACTS to 'paired' changes the
-    // two contact rows above to 'allow' and this line; nothing else.
-    expect(FAIL_CLOSED_CONTACTS).toBe('strict');
+  it('reads a paired contact as allowed for Talk under fail closed (G-6 owner decision, IR-M1-7d-1 F-1)', () => {
+    expect(FAIL_CLOSED_CONTACTS).toBe('paired');
   });
 
-  it('never gives allow, whatever the action', () => {
+  it('gives allow only for paired-contact Talk, whatever the action', () => {
+    const talk = (a: PolicyAction) =>
+      a.kind === 'envelope.send' || (a.kind === 'envelope.receive' && a.sender.kind === 'contact');
     for (const row of [...RULES, ...FAIL_CLOSED]) {
-      expect(evaluate(failClosed, row.action, row.context ?? hour(0))).not.toBe('allow');
+      const decision = evaluate(failClosed, row.action, row.context ?? hour(0));
+      if (!talk(row.action)) expect(decision, row.name).not.toBe('allow');
     }
   });
 
@@ -477,7 +486,10 @@ describe('evaluate is deterministic and side-effect free (property)', () => {
       expect(second).toBe(first);
       expect(['allow', 'approval', 'deny']).toContain(first);
       expect(JSON.stringify([policy, action, context])).toBe(before);
-      if (policy.mode === 'fail_closed') expect(first).not.toBe('allow');
+      const talk =
+        action.kind === 'envelope.send' ||
+        (action.kind === 'envelope.receive' && action.sender.kind === 'contact');
+      if (policy.mode === 'fail_closed' && !talk) expect(first).not.toBe('allow');
     }
   });
 });

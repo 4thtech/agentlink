@@ -633,6 +633,23 @@ describe('loading the signed policy (G-6, 06 §3)', () => {
     // Never the defaults: their `notarize: allow` and `autoDelivered: true` would loosen it, and
     // the stored deny becomes approval, never allow.
     expect(evaluate(loaded, { kind: 'proof' })).toBe('approval');
+    // G-6 owner decision (Tali, 2026-10-15): paired contacts Talk without approval; commitments
+    // (D-31) and paid proofs still need the owner.
+    expect(evaluate(loaded, { kind: 'commitment' })).toBe('approval');
+    expect(
+      evaluate(
+        loaded,
+        {
+          kind: 'envelope.receive',
+          sender: { kind: 'contact', contact: `0x${'0a'.repeat(20)}` },
+          sizeBytes: 1,
+        },
+        { contactEnvelopesLastHour: 0 },
+      ),
+    ).toBe('allow');
+    expect(
+      evaluate(loaded, { kind: 'envelope.send', contact: `0x${'0a'.repeat(20)}`, sizeBytes: 1 }),
+    ).toBe('allow');
     expect(evaluate(loaded, { kind: 'receipt.auto', receipt: 'delivered' })).toBe('deny');
     expect(
       evaluate(loaded, { kind: 'envelope.receive', sender: { kind: 'unknown' }, sizeBytes: 1 }),
