@@ -33,15 +33,19 @@ areas:
       - name: "Delivery pipeline and runbooks"
         state: done
         summary: "The automated delivery pipeline (D-52) and the runbooks."
-      - name: "Public documentation structure"
+      - name: "Public documentation"
         state: done
-        summary: "`docs-site/` (D-57), published through GitBook Git Sync."
+        prs: [88]
+        summary: "`docs-site/` (D-57), published through GitBook Git Sync, and the public knowledge base (`knowledge/` and `llms.txt`)."
+      - name: "Redacting logger (@agentlink/log)"
+        state: done
+        summary: "Structured logging for Node, browsers and Workers that redacts secrets by field name and value shape (M0-8)."
       - name: "Specifications and process"
         state: done
-        summary: "The specifications (`docs/foundation`), including decisions D-53, D-54, D-56, D-58 and D-59 (D-55 is not decided yet), the development and audit process and a security policy."
-      - name: "Terms tools decision and CI follow-ups"
+        summary: "The specifications (`docs/foundation`), including decisions D-53 to D-59 (D-55: dedicated terms tools, one approval per agreement, decided 14 Oct 2026), the development and audit process and a security policy."
+      - name: "CI follow-ups"
         state: in-progress
-        summary: "The terms tools decision (D-55) and a few CI follow-ups are still open."
+        summary: "A few CI follow-ups are still open."
   - id: crypto
     title: "Crypto (@agentlink/crypto)"
     intro: "Code merged, none of it published."
@@ -83,8 +87,8 @@ areas:
     components:
       - name: "Constants and the envelope, payload, card and invite schemas"
         state: in-progress
-        prs: [23]
-        summary: "Merged; the `encodings` vector suite is still pending."
+        prs: [23, 93]
+        summary: "Merged; per-path canonical decoders and the `encodings` vector suite are in review (#93)."
       - name: "Policy, approval, proof pack and tool-result types"
         state: done
         prs: [31, 36, 71, 72, 76]
@@ -105,6 +109,10 @@ areas:
         state: done
         prs: [63]
         summary: "Reads each relay for new gift wraps, 48 h back from a per-relay cursor, hands each over once, and returns what it has after 3 s, flagged as partial."
+      - name: "Outbox stays inside the sync look-back"
+        state: in-progress
+        prs: [87]
+        summary: "The outbox stops republishing outside the sync look-back (M1-5f); in review."
   - id: core
     title: "Core (@agentlink/core)"
     intro: "Code merged, not published. Nothing in it is user-runnable yet."
@@ -129,9 +137,17 @@ areas:
         state: done
         prs: [79]
         summary: "Approvals, batch approvals, cancellations and policy changes apply only with a valid owner signature, once each; a stored policy that no longer verifies makes the agent ask the owner."
-      - name: "Approvals queue, inbox sync, relay changes"
+      - name: "Approval requests and the requests queue"
+        state: in-progress
+        prs: [94]
+        summary: "Approval requests with use-once, requests-queue limits and idempotency (M1-7e); in review."
+      - name: "Held cards need the sender's own owner entry"
+        state: in-progress
+        prs: [90]
+        summary: "A held card is accepted only with the sender's own owner entry (G-51); in review."
+      - name: "Inbox sync, delivery acknowledgements, owner card update"
         state: planned
-        summary: "Requests queue (M1-7e), inbox sync and delivery acknowledgements (M1-7h), owner card update (M1-7j)."
+        summary: "Inbox sync and delivery acknowledgements (M1-7h), owner card update (M1-7j)."
   - id: node
     title: "Node runtime (@agentlink/node)"
     intro: "Code merged, not published. Nothing in it is user-runnable yet."
@@ -214,8 +230,8 @@ deploy:
     note: "Submitter, faucet and encrypted drop are not built or deployed yet."
 
 # Prose for the README Status block and the docs-site page.
-inProgress: "The rest of the crypto layer (file encryption) and the remaining contract work, the approvals queue and inbox sync in the core, the MCP server and CLI."
-notYet: "a usable product. The packages are private and nothing is published; only the crypto, types, transport, core and node foundations listed here contain code. **There is nothing to install or run yet.** The design is described throughout and marked \"planned\" where it is not built."
+inProgress: "In review as pull requests: approval requests and the requests queue (M1-7e), the held-card owner entry (G-51), the encodings vectors and the outbox look-back. Next: inbox sync, file encryption, the MCP server and CLI, and the remaining contract work."
+notYet: "a usable product. The packages are private and nothing is published; only the crypto, types, transport, core, node and logging foundations listed here contain code. **There is nothing to install or run yet.** The design is described throughout and marked \"planned\" where it is not built."
 next: "The rest of the M1a crypto and core layers, then the walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets."
 
 # Milestones. state: done | in-progress | planned. `gate` is the README wording, `outcome` the
@@ -229,7 +245,7 @@ roadmap:
     duration: "~1 week"
     outcome: "Repository, CI and rules in place"
     gate: "Specs, repositories, CI and open decisions in place."
-    progress: "Done so far: monorepo skeleton, Foundry skeleton in the private contracts repo, boundary guards, test-vector harness, redacting logger, delivery pipeline, runbooks, public docs structure and specs D-53, D-54, D-56, D-58 and D-59. Still open: the terms tools decision (D-55) and a few CI follow-ups."
+    progress: "Done so far: monorepo skeleton, Foundry skeleton in the private contracts repo, boundary guards, test-vector harness, redacting logger, delivery pipeline, runbooks, public docs structure and specs D-53 to D-59. Still open: a few CI follow-ups."
   - id: "M1a"
     name: "Walking skeleton: pair and talk"
     state: in-progress

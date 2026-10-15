@@ -33,8 +33,9 @@ describe('the real status file', () => {
   });
 
   it('is in sync with README.md and the docs-site page in this repository', () => {
-    const { problems } = run({ root: repo, check: true });
+    const { problems, skipped } = run({ root: repo, check: true });
     expect(problems).toEqual([]);
+    expect(skipped).toEqual([]); // the knowledge base carries the markers, so nothing is skipped
   });
 });
 
@@ -199,7 +200,7 @@ describe('run', () => {
     const KB = 'knowledge/07-status-and-roadmap.md';
     const withMarkers = [
       '# Status and roadmap',
-      '<!-- status-hint:start -->\nstale\n<!-- status-hint:end -->',
+      '<!-- status-intro:start -->\nstale\n<!-- status-intro:end -->',
       '<!-- status-summary:start -->\nstale\n<!-- status-summary:end -->',
       '<!-- status-milestones:start -->\nstale\n<!-- status-milestones:end -->',
       '',
@@ -210,7 +211,7 @@ describe('run', () => {
       write(KB, '# Status and roadmap\n\nhand-written\n');
       const result = run({ root, check: true });
       expect(result.problems).toEqual([]);
-      expect(result.skipped.join('\n')).toContain(`${KB} has no status-hint markers`);
+      expect(result.skipped.join('\n')).toContain(`${KB} has no status-intro markers`);
     });
 
     it('is enforced once it has markers', () => {

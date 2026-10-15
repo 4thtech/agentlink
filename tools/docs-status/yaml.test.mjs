@@ -39,6 +39,12 @@ describe('parseYaml', () => {
     expect(parseYaml('k: ["a, b", c]')).toEqual({ k: ['a, b', 'c'] });
   });
 
+  it('reads a long run of spaces before a comment quickly', () => {
+    const start = Date.now();
+    expect(parseYaml(`k: v${' '.repeat(50_000)}# c`)).toEqual({ k: 'v' });
+    expect(Date.now() - start).toBeLessThan(1000);
+  });
+
   it('returns an empty object for an empty document', () => {
     expect(parseYaml('# only a comment\n\n')).toEqual({});
   });
@@ -54,6 +60,8 @@ describe('parseYaml', () => {
     ['a block scalar', 'k: |\n  text'],
     ['a flow map', 'k: {a: 1}'],
     ['an unclosed flow list', 'k: [a, b'],
+    ['a __proto__ key', '__proto__: 1'],
+    ['a nested constructor key', 'a:\n  constructor: 1'],
     ['a line that is not "key: value"', 'k: 1\njust text'],
     ['a stray indent', 'k: 1\n    j: 2'],
     ['an empty list item', 'k:\n  -\nj: 1'],

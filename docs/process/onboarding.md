@@ -29,7 +29,7 @@
   - **Through Tali.** He relays it, and his agent logs every item in `talirezun.md` → *Feedback log* with a disposition (accepted → task/PR, declined → reason, or needs discussion). Check that log to see what happened to your feedback.
   - **In your sync file** under *Asks*. Tali's agents surface it to Tali at the start of each session.
 - **Your approval is not required (D-51).** Tali leads and works independently; his agents work under his GitHub account. S0/S1 PRs auto-merge when all checks are green. S2 PRs (crypto, keys, owner presence, the policy engine, the envelope/pairing protocol, contracts, signing, the submitter, the encrypted drop, deploy scripts) and sensitive-path PRs (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files) merge only after CI, the independent AI review and Tali's explicit "merge". You stay a code owner, so GitHub notifies you; your feedback and review comments are welcome, and each item is logged with a disposition (§A4).
-- **Mainnet contract deployment:** a second person witnesses and independently verifies it when Tali deploys with the mainnet deployer key (hardware-backed by default; under D-64 the campaign deployer key unless switched); by agreement, that is you (`release-and-deployment.md`).
+- **Mainnet contract deployment:** a second person witnesses and independently verifies it when Tali deploys with the mainnet deployer key (a separate key on his Trezor hardware wallet, D-71 (1)); by agreement, that is you (`release-and-deployment.md`).
 - **Taking over a part:** agree it with Tali. The board's *Area ownership* row is updated, and from then on you work the same process (§A6).
 
 ### A3. Seeing the current state

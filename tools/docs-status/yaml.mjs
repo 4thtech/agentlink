@@ -39,7 +39,9 @@ function scalar(text, lineNo) {
   const t = text.trim();
   if (t.startsWith('"')) return unquote(t, lineNo);
   if (/^['&*!|>{]/.test(t)) fail(lineNo, `unsupported YAML syntax starting with ${t[0]}`);
-  return t.replace(/\s+#.*$/, '');
+  // A trailing ` #` comment: found with indexOf, not a regex (a regex backtracks on long runs).
+  const hash = t.indexOf(' #');
+  return hash === -1 ? t : t.slice(0, hash).trimEnd();
 }
 
 function flowList(text, lineNo) {
@@ -110,6 +112,9 @@ export function parseYaml(source) {
       pending = undefined;
       const entry = splitEntry(line.text);
       if (!entry) fail(line.lineNo, `expected "key: value", got "${line.text}"`);
+      if (['__proto__', 'constructor', 'prototype'].includes(entry.key)) {
+        fail(line.lineNo, `the key "${entry.key}" is not allowed`);
+      }
       if (Object.hasOwn(out, entry.key)) fail(line.lineNo, `duplicate key "${entry.key}"`);
       if (entry.rest === '' || entry.rest.startsWith('#')) {
         const next = lines[pos];

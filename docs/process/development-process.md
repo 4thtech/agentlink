@@ -426,7 +426,7 @@ DECISION NEEDED (owner): confirm the licence allowlist. Proposed: MIT, ISC, BSD-
 | Deploy records | `4thtech/agentlink-ops` (`release-and-deployment.md` §5.2) |
 | Commercial model and pricing internals | Private |
 
-DECISION NEEDED (owner): whether submitter gas-key addresses and the mainnet deployer address are private before launch. They become public on-chain once used; publishing them early mainly invites targeted phishing and griefing. Proposed default: private until first use. Settled for the deployer address by D-64: the campaign deployer key is used on testnets first, so its address is public from its first testnet transaction (05 §9.1, control 3).
+DECISION NEEDED (owner): whether submitter gas-key addresses and the mainnet deployer address are private before launch. They become public on-chain once used; publishing them early mainly invites targeted phishing and griefing. Proposed default: private until first use. For the deployer addresses: the testnet deployer key's address is public from its first testnet transaction (05 §9.1, control 3); since D-71 (1) the mainnet deployer key is a separate key on the owner's Trezor hardware wallet, so the default (private until first use) applies to its address.
 
 ### 12.2 Enforcement
 

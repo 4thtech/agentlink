@@ -14,9 +14,10 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 > - **M0 Foundations:** Repository, process and CI.
 >   - Monorepo skeleton: pnpm workspace with Turborepo, strict CI, the Foundry skeleton in the private contracts repo, architecture boundary guards and the cross-runtime test-vector harness (M0-9).
 >   - Delivery pipeline and runbooks: The automated delivery pipeline (D-52) and the runbooks.
->   - Public documentation structure: `docs-site/` (D-57), published through GitBook Git Sync.
->   - Specifications and process: The specifications (`docs/foundation`), including decisions D-53, D-54, D-56, D-58 and D-59 (D-55 is not decided yet), the development and audit process and a security policy.
->   - Terms tools decision and CI follow-ups (in progress): The terms tools decision (D-55) and a few CI follow-ups are still open.
+>   - Public documentation ([#88](https://github.com/4thtech/agentlink/pull/88)): `docs-site/` (D-57), published through GitBook Git Sync, and the public knowledge base (`knowledge/` and `llms.txt`).
+>   - Redacting logger (@agentlink/log): Structured logging for Node, browsers and Workers that redacts secrets by field name and value shape (M0-8).
+>   - Specifications and process: The specifications (`docs/foundation`), including decisions D-53 to D-59 (D-55: dedicated terms tools, one approval per agreement, decided 14 Oct 2026), the development and audit process and a security policy.
+>   - CI follow-ups (in progress): A few CI follow-ups are still open.
 > - **Crypto (@agentlink/crypto):** Code merged, none of it published.
 >   - Encodings, hashing, JSON canonicalisation ([#27](https://github.com/4thtech/agentlink/pull/27)): Strict canonical encodings, SHA-256 and keccak-256, tagged hashes, RFC 8785 canonicalisation.
 >   - Key derivation and public identities ([#29](https://github.com/4thtech/agentlink/pull/29)): Agent keys derived from one seed; public identity bundles.
@@ -27,19 +28,22 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 >   - Independent test vectors (in progress; [#25](https://github.com/4thtech/agentlink/pull/25), [#35](https://github.com/4thtech/agentlink/pull/35), [#72](https://github.com/4thtech/agentlink/pull/72), [#75](https://github.com/4thtech/agentlink/pull/75)): Vector suites from independent generators for the merged crypto suites; more follow with each suite.
 >   - File encryption (ALF1) (planned): STREAM file encryption, with M1b.
 > - **Shared types (@agentlink/types):** Code merged, none of it published.
->   - Constants and the envelope, payload, card and invite schemas (in progress; [#23](https://github.com/4thtech/agentlink/pull/23)): Merged; the `encodings` vector suite is still pending.
+>   - Constants and the envelope, payload, card and invite schemas (in progress; [#23](https://github.com/4thtech/agentlink/pull/23), [#93](https://github.com/4thtech/agentlink/pull/93)): Merged; per-path canonical decoders and the `encodings` vector suite are in review (#93).
 >   - Policy, approval, proof pack and tool-result types ([#31](https://github.com/4thtech/agentlink/pull/31), [#36](https://github.com/4thtech/agentlink/pull/36), [#71](https://github.com/4thtech/agentlink/pull/71), [#72](https://github.com/4thtech/agentlink/pull/72), [#76](https://github.com/4thtech/agentlink/pull/76)): The policy document, approvals including batch approval, pairing bodies, relay lists, `contact.check` params; tested in Node, three browsers and workerd.
 > - **Transport (@agentlink/transport-nostr):** Code merged, not published.
 >   - Gift wrap and unwrap ([#45](https://github.com/4thtech/agentlink/pull/45)): Each envelope is sealed with the sender's key and wrapped once per recipient key; tested for interop with the `nostr-tools` reference.
 >   - Relay pool and delivery outbox ([#59](https://github.com/4thtech/agentlink/pull/59)): Publishes a wrap to its relays, counts it sent at 2 acknowledgements and retries for 24 h.
 >   - Sync ([#63](https://github.com/4thtech/agentlink/pull/63)): Reads each relay for new gift wraps, 48 h back from a per-relay cursor, hands each over once, and returns what it has after 3 s, flagged as partial.
+>   - Outbox stays inside the sync look-back (in progress; [#87](https://github.com/4thtech/agentlink/pull/87)): The outbox stops republishing outside the sync look-back (M1-5f); in review.
 > - **Core (@agentlink/core):** Code merged, not published. Nothing in it is user-runnable yet.
 >   - Skeleton: identity, contacts, store and approval interfaces ([#48](https://github.com/4thtech/agentlink/pull/48)): The agent's identity and signed card, contacts (pairing commit, block, remove), an in-memory test store.
 >   - Envelopes ([#66](https://github.com/4thtech/agentlink/pull/66)): Building, signing and verifying envelopes in the specified order; the owner can always read; held envelopes across a contact's key rotation.
 >   - Invites and pairing ([#78](https://github.com/4thtech/agentlink/pull/78)): Single-use invite links, the handshake and ack with the commit-then-reveal safety code.
 >   - Safety code checked ([#80](https://github.com/4thtech/agentlink/pull/80), [#85](https://github.com/4thtech/agentlink/pull/85)): The owner's signed check, applied only when it matches the recomputed pairing and re-verified on every read; it goes through the owner-action path.
 >   - Owner-signed actions and policies ([#79](https://github.com/4thtech/agentlink/pull/79)): Approvals, batch approvals, cancellations and policy changes apply only with a valid owner signature, once each; a stored policy that no longer verifies makes the agent ask the owner.
->   - Approvals queue, inbox sync, relay changes (planned): Requests queue (M1-7e), inbox sync and delivery acknowledgements (M1-7h), owner card update (M1-7j).
+>   - Approval requests and the requests queue (in progress; [#94](https://github.com/4thtech/agentlink/pull/94)): Approval requests with use-once, requests-queue limits and idempotency (M1-7e); in review.
+>   - Held cards need the sender's own owner entry (in progress; [#90](https://github.com/4thtech/agentlink/pull/90)): A held card is accepted only with the sender's own owner entry (G-51); in review.
+>   - Inbox sync, delivery acknowledgements, owner card update (planned): Inbox sync and delivery acknowledgements (M1-7h), owner card update (M1-7j).
 > - **Node runtime (@agentlink/node):** Code merged, not published. Nothing in it is user-runnable yet.
 >   - Agent key store in the OS keychain ([#54](https://github.com/4thtech/agentlink/pull/54), [#57](https://github.com/4thtech/agentlink/pull/57), [#83](https://github.com/4thtech/agentlink/pull/83)): macOS Keychain, Windows Credential Manager, Linux Secret Service, with the "needs setup" answer on machines without one; CI runs on all three.
 >   - Local SQLite database ([#60](https://github.com/4thtech/agentlink/pull/60), [#68](https://github.com/4thtech/agentlink/pull/68)): Sensitive columns encrypted under a key from the keychain, shared safely by several processes.
@@ -60,8 +64,8 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 >   - Design drop D2 (in progress; [#82](https://github.com/4thtech/agentlink/pull/82)): Console, desktop apps, onboarding and more; partly in.
 > - **Testnet:** OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit; AgentLink does not use them yet.
 > - **Mainnet:** After the external audit (M3). Not deployed.
-> - **In progress:** The rest of the crypto layer (file encryption) and the remaining contract work, the approvals queue and inbox sync in the core, the MCP server and CLI.
-> - **Does not exist yet:** a usable product. The packages are private and nothing is published; only the crypto, types, transport, core and node foundations listed here contain code. **There is nothing to install or run yet.** The design is described throughout and marked "planned" where it is not built.
+> - **In progress:** In review as pull requests: approval requests and the requests queue (M1-7e), the held-card owner entry (G-51), the encodings vectors and the outbox look-back. Next: inbox sync, file encryption, the MCP server and CLI, and the remaining contract work.
+> - **Does not exist yet:** a usable product. The packages are private and nothing is published; only the crypto, types, transport, core, node and logging foundations listed here contain code. **There is nothing to install or run yet.** The design is described throughout and marked "planned" where it is not built.
 > - **Next:** The rest of the M1a crypto and core layers, then the walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets.
 >
 > We build in public. This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI, so it is as current as that file, which every status-changing pull request updates.
@@ -148,7 +152,7 @@ Milestones are sequential gates ([build plan](docs/foundation/10-build-plan.md))
 <!-- roadmap:start -->
 | Milestone | Gate |
 |---|---|
-| **M0 Foundations** (nearly complete) | Specs, repositories, CI and open decisions in place. Done so far: monorepo skeleton, Foundry skeleton in the private contracts repo, boundary guards, test-vector harness, redacting logger, delivery pipeline, runbooks, public docs structure and specs D-53, D-54, D-56, D-58 and D-59. Still open: the terms tools decision (D-55) and a few CI follow-ups. |
+| **M0 Foundations** (nearly complete) | Specs, repositories, CI and open decisions in place. Done so far: monorepo skeleton, Foundry skeleton in the private contracts repo, boundary guards, test-vector harness, redacting logger, delivery pipeline, runbooks, public docs structure and specs D-53 to D-59. Still open: a few CI follow-ups. |
 | **M1a Walking skeleton: pair and talk** (in progress) | Two developers' agents (Claude Code and Codex) pair and keep a shared project in sync over AgentLink, and negotiate terms with owner approval. Crypto foundations, the transport (gift wrap, relays, sync), most of the core (envelopes, pairing, owner-signed actions and policies) and the node keychain, database and relay connection are merged; the approvals queue, inbox sync, MCP server and CLI come next. |
 | **M1b Files, proof, credits** | 10 internal testers on at least 3 harness combinations complete setup, first message, a file handover with proof, an owner approval, a third-party verification and a proof of agreement (completes M1, testnets). |
 | **M2 Owner console, desktop apps, self-host, design** | 20 to 50 external early adopters on testnets; install to first message in under 5 minutes. |
@@ -163,6 +167,7 @@ Milestones are sequential gates ([build plan](docs/foundation/10-build-plan.md))
 
 - [`docs/README.md`](docs/README.md): the documentation map, with reading paths.
 - [`docs/explainers/`](docs/explainers/): plain-language guides.
+- [`knowledge/`](knowledge/README.md) and [`llms.txt`](llms.txt): the compressed public knowledge base for AI assistants and quick reading, updated with every milestone or release.
 - [`docs-site/`](docs-site/README.md): the public documentation, a user guide and technical docs, for publishing on GitBook. Pages for features not built yet are marked planned.
 - [`CHANGELOG.md`](CHANGELOG.md): what changed in each release.
 - [`docs/process/versioning.md`](docs/process/versioning.md): how versions and releases work.

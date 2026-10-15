@@ -5,7 +5,7 @@
 // the source renders (so drift between the source and README, the docs site or the knowledge base
 // fails CI, instead of relying on someone remembering).
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseYaml } from './yaml.mjs';
 
@@ -197,6 +197,55 @@ export function renderSiteMilestones(data) {
   ].join('\n');
 }
 
+/** Knowledge base: the opening paragraph (plain language, short: the base has a size budget). */
+export function renderKnowledgeIntro(data) {
+  const open = data.roadmap.filter((m) => m.state !== 'planned');
+  const names = open.map(
+    (m) => `${m.id} (${m.name.toLowerCase()}) is ${m.stateNote ?? 'in progress'}`,
+  );
+  return `AgentLink is pre-alpha, last updated ${longDate(data.updated)}, version ${data.version}. ${names.join(' and ')}. There is nothing to install or run yet, and no package is published. This page mirrors the Status section of the project README, which is generated from the same source file (\`docs/status.yaml\`).`;
+}
+
+/** Knowledge base: where things stand, one line per area (done, in progress, planned). */
+export function renderKnowledgeSummary(data) {
+  const out = ['## Where things stand', ''];
+  for (const area of data.areas) {
+    const by = (state) => area.components.filter((c) => c.state === state).map((c) => c.name);
+    const parts = [
+      ['Merged', by('done')],
+      ['In progress', by('in-progress')],
+      ['Planned', by('planned')],
+    ]
+      .filter(([, names]) => names.length > 0)
+      .map(([label, names]) => `${label}: ${names.join('; ')}.`);
+    out.push(`- **${area.title}.** ${area.intro} ${parts.join(' ')}`);
+  }
+  out.push(
+    `- **Testnet:** ${data.deploy.testnet.note}`,
+    `- **Mainnet:** ${data.deploy.mainnet.note}`,
+    `- **In progress:** ${data.inProgress}`,
+    `- **Does not exist yet:** ${data.notYet}`,
+  );
+  return out.join('\n');
+}
+
+/** Knowledge base: the milestones table. */
+export function renderKnowledgeMilestones(data) {
+  const status = (m) => {
+    if (m.state === 'planned') return 'Planned';
+    const word = m.stateNote ?? stateWord(m.state);
+    return `${word[0].toUpperCase()}${word.slice(1)}`;
+  };
+  const rows = data.roadmap.map(
+    (m) => `| ${m.id} ${m.name} | ${m.version} | ${m.outcome} | ${status(m)} |`,
+  );
+  return [
+    '| Milestone | Planned version | What it delivers | Status |',
+    '|---|---|---|---|',
+    ...rows,
+  ].join('\n');
+}
+
 // --- Targets: which file gets which block ----------------------------------------------------------
 
 /**
@@ -220,9 +269,9 @@ export const TARGETS = [
     file: 'knowledge/07-status-and-roadmap.md',
     optional: true,
     blocks: {
-      'status-hint': renderSiteHint,
-      'status-summary': renderSiteSummary,
-      'status-milestones': renderSiteMilestones,
+      'status-intro': renderKnowledgeIntro,
+      'status-summary': renderKnowledgeSummary,
+      'status-milestones': renderKnowledgeMilestones,
     },
   },
 ];
@@ -256,6 +305,16 @@ function checkBadge(data, readme) {
     : `README.md: the milestone badge says "${m[1]}" but docs/status.yaml says "${data.milestone}"`;
 }
 
+/** The file's text, or null when it does not exist (no separate existence check: no race). */
+function readIfPresent(path) {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
 /**
  * Renders every target. In check mode nothing is written. Returns { problems, changed, skipped }:
  * `problems` are failures (drift, missing markers in required files, invalid source), `changed`
@@ -266,11 +325,11 @@ export function run({ root, check = false }) {
   const changed = [];
   const skipped = [];
 
-  const sourcePath = join(root, STATUS_FILE);
-  if (!existsSync(sourcePath)) return { problems: [`${STATUS_FILE} is missing`], changed, skipped };
+  const sourceText = readIfPresent(join(root, STATUS_FILE));
+  if (sourceText === null) return { problems: [`${STATUS_FILE} is missing`], changed, skipped };
   let data;
   try {
-    data = parseYaml(readFileSync(sourcePath, 'utf8'));
+    data = parseYaml(sourceText);
   } catch (error) {
     return { problems: [error.message], changed, skipped };
   }
@@ -280,12 +339,12 @@ export function run({ root, check = false }) {
 
   for (const target of TARGETS) {
     const path = join(root, target.file);
-    if (!existsSync(path)) {
+    const original = readIfPresent(path);
+    if (original === null) {
       if (target.optional) skipped.push(`${target.file} is absent; skipped`);
       else problems.push(`${target.file} is missing`);
       continue;
     }
-    const original = readFileSync(path, 'utf8');
     let text = original;
     let applied = 0;
     for (const [name, render] of Object.entries(target.blocks)) {
