@@ -26,10 +26,11 @@
 # `renovate[bot]` or `github-actions[bot]`. Commit author names, e-mail addresses and the
 # `verified` flag are NOT consulted: they can be forged by anyone who can push to the branch.
 # For an automated PR, (c) is satisfied only by an APPROVED review by @talirezun or @denisjazbec
-# on the current head commit (a new commit invalidates it); there is no report ID to cite, the
-# bot writes no PR body. (b) does not require a ticked class for it. (d) applies unchanged for
-# S2, including the "Threat note" and "Tests-first evidence" sections (a human fills them in);
-# the bot is the author, so any code owner's approval counts. There is no other exemption.
+# on the current head commit (a new commit invalidates it); there is no report ID to cite.
+# (b) does not require a ticked class for it. (d) applies unchanged for S2, including the
+# "Threat note" and "Tests-first evidence" sections: bot-supplied (renovate.json prBodyNotes),
+# approver confirms (owner decision 2026-10-15, audit-rules.md §3, §3.4).
+# The bot is the author, so any code owner's approval counts. There is no other exemption.
 # Owner action (ci-cd.md checklist): restrict who may push to `renovate/**` and
 # `changeset-release/**` branches, so that nobody else can add commits to a bot-authored PR.
 #

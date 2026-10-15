@@ -4,42 +4,130 @@
     "config:recommended",
     "helpers:pinGitHubActionDigestsToSemver"
   ],
-  "description": ["Renovate for the AgentLink monorepo. Supply-chain posture: cooldown before adopting new releases, no automerge, major updates and security-critical libraries reviewed by hand, GitHub Actions pinned to commit SHAs. PR titles start with DEPS (pr-hygiene rule)."],
+  "description": [
+    "Renovate for the AgentLink monorepo. Supply-chain posture: cooldown before adopting new releases, no automerge, major updates and security-critical libraries reviewed by hand, GitHub Actions pinned to commit SHAs. PR titles start with DEPS (pr-hygiene rule)."
+  ],
   "timezone": "UTC",
   "semanticCommits": "disabled",
   "commitMessagePrefix": "DEPS:",
-  "labels": ["dependencies"],
+  "labels": [
+    "dependencies"
+  ],
   "dependencyDashboard": true,
   "automerge": false,
   "minimumReleaseAge": "3 days",
   "internalChecksFilter": "strict",
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["before 5am on monday"]
+    "schedule": [
+      "before 5am on monday"
+    ]
   },
   "vulnerabilityAlerts": {
-    "labels": ["dependencies", "security"]
+    "labels": [
+      "dependencies",
+      "security"
+    ]
   },
   "packageRules": [
     {
-      "description": ["Pin devDependencies to exact versions"],
-      "matchDepTypes": ["devDependencies"],
+      "description": [
+        "Pin devDependencies to exact versions"
+      ],
+      "matchDepTypes": [
+        "devDependencies"
+      ],
       "rangeStrategy": "pin"
     },
     {
-      "description": ["Major updates wait for approval on the Dependency Dashboard"],
-      "matchUpdateTypes": ["major"],
+      "description": [
+        "Major updates wait for approval on the Dependency Dashboard"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "dependencyDashboardApproval": true
     },
     {
-      "description": ["Security-critical crypto and transport dependencies (allowlisted in 04 section 8): longer cooldown, one reviewed group, labelled security-sensitive"],
-      "matchPackageNames": ["@noble/*", "@hpke/*", "nostr-tools", "viem", "aws4fetch"],
+      "description": [
+        "Security-critical crypto and transport dependencies (allowlisted in 04 section 8): longer cooldown, one reviewed group, labelled security-sensitive"
+      ],
+      "matchPackageNames": [
+        "@noble/*",
+        "@hpke/*",
+        "nostr-tools",
+        "viem",
+        "aws4fetch"
+      ],
       "groupName": "security-critical crypto and transport",
       "minimumReleaseAge": "7 days",
-      "addLabels": ["security-sensitive"],
+      "addLabels": [
+        "security-sensitive"
+      ],
       "prBodyNotes": [
-        "**Security-sensitive dependency.** Read the changelog and the diff of every package in this group, check that no install scripts were added, and re-run `pnpm vectors:check`. Security class S1 or higher: human review plus an independent review session (docs/foundation/10-build-plan.md, working rule 7).",
-        "**`@hpke/*` updates (04 section 3.3, D-66, IR-G-46-1 F-1).** The CEK wraps hand a derived ephemeral key to `@hpke/core` through its `ekm` parameter. Before any `@hpke/*` update merges, the `hpke` and `aead-envelope` vector suites must pass in every runtime (`pnpm vectors:check`: Node, Chromium, Firefox, WebKit, workerd). There is no fallback: an update that breaks them stays unmerged until a replacement is reviewed."
+        "**Security-sensitive dependency.** Read the changelog and the diff of every package in this group, check that no install scripts were added, and re-run `pnpm vectors:check`. Security class S1 or higher: an automated PR meets the review requirement only by a code owner APPROVED review on the head commit (audit-rules.md section 3).",
+        "**`@hpke/*` updates (04 section 3.3, D-66, IR-G-46-1 F-1).** The CEK wraps hand a derived ephemeral key to `@hpke/core` through its `ekm` parameter. Before any `@hpke/*` update merges, the `hpke` and `aead-envelope` vector suites must pass in every runtime (`pnpm vectors:check`: Node, Chromium, Firefox, WebKit, workerd). There is no fallback: an update that breaks them stays unmerged until a replacement is reviewed.",
+        "## Threat note\n\nSecurity-critical crypto and transport dependency (S2 when the update touches packages/crypto, packages/core or packages/node; S1 otherwise). The packages in this group perform or feed the cryptography, signing and relay transport used by `@agentlink/crypto`, `@agentlink/core` and `@agentlink/node` (allowlisted in 04 section 8). Assets at risk: private keys, derived keys and plaintext handled in process. A compromised or buggy release could weaken key derivation, encryption or signature checks (invariants I-1 to I-4) or exfiltrate secrets (zero access rule). Supply-chain risk: a malicious release gets in-process access to all of those. Behaviour changes in any primitive must be caught by `pnpm vectors:check`.\n\nReviewer checklist: read the upstream changelog and release notes for the version range; confirm the lockfile diff only touches this package and its expected transitive dependencies (integrity hashes present, no unexpected new packages or registry URLs); confirm no `postinstall`, `preinstall` or `install` script was added (a PR that adds one is refused); for packages that ship native binaries or prebuilds, confirm they come from the package's own published platform packages and match the provenance and release the maintainers announce.\n\nResidual risk: a malicious or compromised release that passes review and tests could still read keys or plaintext in process; cooldowns, lockfile integrity and the review checklist reduce, not remove, that risk. Threat model: docs/foundation/04-security-and-crypto.md section 7.",
+        "## Tests-first evidence\n\nThis is a pure dependency bump, so there is no RED commit and none is claimed (audit-rules.md section 3.4). The evidence is the full required suite on this head commit; the approver confirms it is green. A code owner (talirezun or denisjazbec) confirms this section and the Threat note by an APPROVED review on the head commit, which is how an automated PR meets the independent-review requirement (audit-rules.md section 3.3). A new approval is needed after every new commit."
+      ]
+    },
+    {
+      "description": [
+        "S2 dependency: OS keychain binding used by the Node KeyStore (packages/node). review-gate classifies any PR touching packages/node as S2 and needs non-empty Threat note and Tests-first evidence sections, which Renovate regenerates with the PR body"
+      ],
+      "matchPackageNames": [
+        "@napi-rs/keyring"
+      ],
+      "addLabels": [
+        "security-sensitive"
+      ],
+      "prBodyNotes": [
+        "## Threat note\n\n`@napi-rs/keyring` (S2: `packages/node`). It is the native binding through which the Node `KeyStore` reads and writes the owner's key material in the operating system keychain (macOS Keychain, Windows Credential Manager, Secret Service on Linux). Assets at risk: the encrypted key blobs and any secret handed to the keychain. Trust boundary: native code running as the same OS user, outside the JavaScript sandbox, with access to every keychain entry that user can read. Abuse cases: a malicious release reads or exfiltrates keychain entries, writes entries under attacker control, or logs secrets; an API or error-semantics change makes `KeyStore` fail open (for example returns an empty value as \"not found\" and creates a new key). Supply-chain risk is highest here because the package ships prebuilt native binaries per platform.\n\nReviewer checklist: read the upstream changelog and release notes for the version range; confirm the lockfile diff only touches this package and its expected transitive dependencies (integrity hashes present, no unexpected new packages or registry URLs); confirm no `postinstall`, `preinstall` or `install` script was added (a PR that adds one is refused); for packages that ship native binaries or prebuilds, confirm they come from the package's own published platform packages and match the provenance and release the maintainers announce.\n\nResidual risk: a malicious or compromised release that passes review and tests could still read keys or plaintext in process; cooldowns, lockfile integrity and the review checklist reduce, not remove, that risk. Threat model: docs/foundation/04-security-and-crypto.md section 7.",
+        "## Tests-first evidence\n\nThis is a pure dependency bump, so there is no RED commit and none is claimed (audit-rules.md section 3.4). The evidence is the full required suite on this head commit; the approver confirms it is green. A code owner (talirezun or denisjazbec) confirms this section and the Threat note by an APPROVED review on the head commit, which is how an automated PR meets the independent-review requirement (audit-rules.md section 3.3). A new approval is needed after every new commit."
+      ]
+    },
+    {
+      "description": [
+        "S2 dependency: local SQLite store used by packages/node"
+      ],
+      "matchPackageNames": [
+        "better-sqlite3"
+      ],
+      "addLabels": [
+        "security-sensitive"
+      ],
+      "prBodyNotes": [
+        "## Threat note\n\n`better-sqlite3` (S2: `packages/node`). It is the native SQLite binding behind the local `Store` (messages, approvals, publisher lease, outbox). Assets at risk: stored ciphertext metadata, approval decisions and their integrity. Abuse cases: a malicious release reads or exfiltrates the database or its contents; a behaviour change in transactions, compare-and-set or schema handling breaks approval or lease guarantees. The package compiles or downloads a native addon at install time: check how the binary is obtained and that no new install script or download host appears.\n\nReviewer checklist: read the upstream changelog and release notes for the version range; confirm the lockfile diff only touches this package and its expected transitive dependencies (integrity hashes present, no unexpected new packages or registry URLs); confirm no `postinstall`, `preinstall` or `install` script was added (a PR that adds one is refused); for packages that ship native binaries or prebuilds, confirm they come from the package's own published platform packages and match the provenance and release the maintainers announce.\n\nResidual risk: a malicious or compromised release that passes review and tests could still read keys or plaintext in process; cooldowns, lockfile integrity and the review checklist reduce, not remove, that risk. Threat model: docs/foundation/04-security-and-crypto.md section 7.",
+        "## Tests-first evidence\n\nThis is a pure dependency bump, so there is no RED commit and none is claimed (audit-rules.md section 3.4). The evidence is the full required suite on this head commit; the approver confirms it is green. A code owner (talirezun or denisjazbec) confirms this section and the Threat note by an APPROVED review on the head commit, which is how an automated PR meets the independent-review requirement (audit-rules.md section 3.3). A new approval is needed after every new commit."
+      ]
+    },
+    {
+      "description": [
+        "S2 dependency: WebSocket client used by packages/node"
+      ],
+      "matchPackageNames": [
+        "ws"
+      ],
+      "addLabels": [
+        "security-sensitive"
+      ],
+      "prBodyNotes": [
+        "## Threat note\n\n`ws` (S2: `packages/node`). It carries the relay and local approval-server WebSocket traffic of the Node package. Assets at risk: traffic metadata and ciphertext in transit (content stays end-to-end encrypted). Abuse cases: a malicious release redirects, logs or modifies traffic, or weakens TLS or origin checks (SSRF and realpath rules in 04 section 4 still apply); a parser or framing regression lets an untrusted peer crash or confuse the process (inbound content is untrusted, I-5).\n\nReviewer checklist: read the upstream changelog and release notes for the version range; confirm the lockfile diff only touches this package and its expected transitive dependencies (integrity hashes present, no unexpected new packages or registry URLs); confirm no `postinstall`, `preinstall` or `install` script was added (a PR that adds one is refused); for packages that ship native binaries or prebuilds, confirm they come from the package's own published platform packages and match the provenance and release the maintainers announce.\n\nResidual risk: a malicious or compromised release that passes review and tests could still read keys or plaintext in process; cooldowns, lockfile integrity and the review checklist reduce, not remove, that risk. Threat model: docs/foundation/04-security-and-crypto.md section 7.",
+        "## Tests-first evidence\n\nThis is a pure dependency bump, so there is no RED commit and none is claimed (audit-rules.md section 3.4). The evidence is the full required suite on this head commit; the approver confirms it is green. A code owner (talirezun or denisjazbec) confirms this section and the Threat note by an APPROVED review on the head commit, which is how an automated PR meets the independent-review requirement (audit-rules.md section 3.3). A new approval is needed after every new commit."
+      ]
+    },
+    {
+      "description": [
+        "Type definitions for S2 packages/node: same S2 body notes so review-gate (d) passes"
+      ],
+      "matchPackageNames": [
+        "@types/node",
+        "@types/ws",
+        "@types/better-sqlite3"
+      ],
+      "prBodyNotes": [
+        "## Threat note\n\nType definitions used by `packages/node` (S2 by path). They ship no runtime code, but a changed type can hide a behavioural mismatch with the real library. Reviewer checks: the changelog; the lockfile diff (integrity hashes, no unexpected packages or registry URLs); no install script added; typecheck and the full suite green on the head commit.\n\nResidual risk: a malicious or compromised release that passes review and tests could still read keys or plaintext in process; cooldowns, lockfile integrity and the review checklist reduce, not remove, that risk. Threat model: docs/foundation/04-security-and-crypto.md section 7.",
+        "## Tests-first evidence\n\nThis is a pure dependency bump, so there is no RED commit and none is claimed (audit-rules.md section 3.4). The evidence is the full required suite on this head commit; the approver confirms it is green. A code owner (talirezun or denisjazbec) confirms this section and the Threat note by an APPROVED review on the head commit, which is how an automated PR meets the independent-review requirement (audit-rules.md section 3.3). A new approval is needed after every new commit."
       ]
     }
   ]
