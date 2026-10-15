@@ -16,9 +16,14 @@ import {
   type InboxSender,
   type PendingContact,
   type PolicyDecision,
+  type ProposeTermsInput,
+  type ProposeTermsResult,
+  type RespondToTermsInput,
+  type RespondToTermsResult,
   type SendMessageInput,
   type SendMessageResult,
 } from '@agentlink/core';
+import type { ContactDisplayName } from '@agentlink/types';
 import {
   agentFingerprint,
   decodeHex0x,
@@ -165,6 +170,26 @@ export interface InviteTools {
   publish(): Promise<boolean>;
 }
 
+/**
+ * The terms calls of `agentlink_propose_terms` and `agentlink_respond_to_terms` (M1-9q; 06 §2.2a,
+ * D-55). The core (M1-32) fills the version, parties and links, checks the negotiation chain, builds
+ * the commitment scope and decides it (policy grant or one owner request); nothing here sets or
+ * widens an approval (I-4).
+ */
+export interface TermsTools {
+  /** Core `proposeTerms`: `to` is the resolved contact's agent ID. */
+  propose(input: ProposeTermsInput): Promise<ProposeTermsResult>;
+  /** Core `respondToTerms`. */
+  respond(input: RespondToTermsInput): Promise<RespondToTermsResult>;
+  /**
+   * The contact who sent the received `offer` or `accept` named by `envelopeId`, as the 06 §2.1
+   * name rule shows it, or undefined when it is not one. For summaries only: the core decides.
+   */
+  senderOf(
+    envelopeId: string,
+  ): Promise<{ readonly id: string; readonly display: ContactDisplayName } | undefined>;
+}
+
 /** The core surface the handlers use. */
 export interface ToolClient {
   /** The agent's identity, or undefined when it has none yet (needs `agentlink init`). */
@@ -196,6 +221,8 @@ export interface ToolClient {
   inboxPage(query: InboxPageQuery): Promise<InboxPage>;
   /** Invites and pairing (M1-9o). Absent in a double that does not need them: the tools then answer "not available". */
   readonly invites?: InviteTools;
+  /** Terms (M1-9q). Absent in a double that does not need them: the tools then answer "not available". */
+  readonly terms?: TermsTools;
 }
 
 export interface ToolContext {
@@ -264,11 +291,28 @@ export function coreToolClient(client: AgentLinkClient): ToolClient {
     },
     inboxPage: (query) => client.inbox.page(query),
     invites: coreInviteTools(client),
+    terms: coreTermsTools(client),
     async storageMode() {
       const effective = await client.ownerActions.loadPolicy();
       return effective.mode !== 'fail_closed' && effective.policy.files.storage === 'own'
         ? 'own'
         : 'drop';
+    },
+  });
+}
+
+/** The received envelope types a terms answer can name (06 §2.2a (a) and (b)). */
+const ANSWERABLE: ReadonlySet<string> = new Set(['offer', 'accept']);
+
+function coreTermsTools(client: AgentLinkClient): TermsTools {
+  return Object.freeze<TermsTools>({
+    propose: (input) => client.proposeTerms(input),
+    respond: (input) => client.respondToTerms(input),
+    async senderOf(envelopeId) {
+      // The core's own inbox read: a processed inbound row from a contact, opened in memory only.
+      const [item] = await client.inbox.items([envelopeId]);
+      if (item === undefined || !ANSWERABLE.has(item.type)) return undefined;
+      return { id: item.from.contactId, display: item.from.display };
     },
   });
 }
