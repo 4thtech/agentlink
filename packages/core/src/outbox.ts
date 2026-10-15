@@ -15,16 +15,23 @@
 //   now + OUTBOX_CLAIM_SECONDS with a compare-and-set, inside the store transaction that reads it.
 //   Another process does not see the row as due until the claim lapses, so a process that stalls or
 //   dies mid-publish hands the row over within one retry interval (the first backoff is 30 s,
-//   07 §4.2). Every status write is a compare-and-set on `pending` (and the attempt write also on
-//   this process's claim), so a row is never moved by a process that lost it.
+//   07 §4.2). The attempt write is a compare-and-set on `pending` and this process's claim, and
+//   `isPending` re-checks the claim right before publishing, so a process that lost the claim
+//   neither publishes nor reschedules the row. `sent` and `not_delivered` are a compare-and-set on
+//   `pending` only (IR-M1-7k-1 F03): `sent` records a fact any process may have observed (2 OKs for
+//   the same signed event), and `not_delivered` is reached before any publish, right after the
+//   claim, so neither can undo another process's progress.
 // - envelopes.delivery follows the `contact` rows of the latest attempt per key (07 §3.2 "States");
 //   an envelope without a contact row (the owner channel) follows all of its rows.
-// - Staged envelopes: an outbound `envelopes` row that is `queued` and has no outbox row (a pairing
-//   `handshake` or `handshake-ack` from M1-7c, or any envelope `envelopes.build` stored) is wrapped
-//   and given its rows here, in a transaction that checks again that it still has none. So it is
-//   wrapped once and its rows survive a restart.
+// - Staged envelopes (IR-M1-7k-1 F01): only the pairing messages that M1-7c stages (a `handshake`
+//   with its pairing row, a `handshake-ack` recorded on its contact) are wrapped and given rows
+//   here, in a transaction that checks again that they still have none, so each is wrapped once and
+//   its rows survive a restart. Nothing else that is `queued` (for example `envelopes.build`
+//   output) is ever published: Talk messages get their rows only from `sendMessage`.
 //
-// Logs carry counts only: never wrap_json, relay URLs, keys or envelope IDs (I-7).
+// Logs: the core's own lines carry counts only, never wrap_json, relay URLs, keys or envelope IDs
+// (I-7). The RelayPool behind `nostrTransport` logs into the same logger and may name a skipped
+// relay's host, never its address (07 §4.2; transport-nostr relay-pool.ts; IR-M1-7k-1 F05).
 import {
   canonicalize,
   encodeHex,
@@ -65,6 +72,8 @@ export const OUTBOX_CLAIM_SECONDS = 30;
 const DUE_BATCH = 8;
 /** Listings per processDue pass (at most 512 rows). */
 const MAX_BATCHES = 64;
+/** The only types a core flow stages for the outbox (pairing, M1-7c; IR-M1-7k-1 F01). */
+const STAGED_TYPES: readonly string[] = Object.freeze(['handshake', 'handshake-ack']);
 /** Staged envelopes wrapped per pass. */
 const STAGED_BATCH = 50;
 /** A list received with a card holds at most 16 relays (07 §4.3). */
@@ -451,10 +460,15 @@ export class OutboxService {
   }
 
   /**
-   * Gives every staged outbound envelope (`queued`, no outbox row yet) its wraps and rows. An
-   * envelope that cannot be routed or wrapped (no counterparty any more, an unreadable list, a
-   * contact that is no longer active) is marked `not_delivered` and never published. Returns the
-   * number of envelopes enqueued.
+   * Gives every staged pairing message its wraps and rows (IR-M1-7k-1 F01). Only envelopes that a
+   * vetted core flow staged are publishable here: a `handshake` whose pairing row (pairing ID =
+   * envelope ID, role `invitee`) still exists, and a `handshake-ack` that is its contact's recorded
+   * `handshake_ack_envelope_id` (M1-7c). `envelopes.build` refuses both types, so its output (and
+   * any other `queued` row) never becomes publishable: Talk messages get their rows only through
+   * `sendMessage`, store-first, after the policy check. A staged message whose pairing or contact
+   * is gone, or whose stored envelope is unreadable, is marked `not_delivered` (permanent); a
+   * transient fault (an unreadable own list, a KeyStore or store error) leaves it `queued` for the
+   * next pass (IR-M1-7k-1 F02). Returns the number of envelopes enqueued.
    */
   async enqueueStaged(): Promise<number> {
     // A revoked agent, or one whose rotation is unfinished, signs nothing (04 §2.6, 07 §3.4).
@@ -463,7 +477,7 @@ export class OutboxService {
       tx
         .select(
           'envelopes',
-          { direction: 'out', delivery: 'queued' },
+          { direction: 'out', delivery: 'queued', type: { in: [...STAGED_TYPES] } },
           {
             orderBy: [
               ['created_at', 'asc'],
@@ -476,11 +490,16 @@ export class OutboxService {
     );
     let enqueued = 0;
     let dropped = 0;
+    let failed = 0;
     for (const row of staged) {
-      let rows: Row<'outbox'>[];
+      let rows: Row<'outbox'>[] | 'drop';
       try {
         rows = await this.#stagedRows(row);
       } catch {
+        failed += 1; // transient: stays queued, the next pass tries again
+        continue;
+      }
+      if (rows === 'drop') {
         dropped += await this.#ctx.store.transaction((tx) => {
           if (tx.count('outbox', { envelope_id: row.envelope_id }) !== 0) return 0;
           return tx.update(
@@ -491,43 +510,65 @@ export class OutboxService {
         });
         continue;
       }
+      const ready = rows;
       enqueued += await this.#ctx.store.transaction((tx) => {
         const current = tx.get('envelopes', { envelope_id: row.envelope_id });
         if (
           current?.direction !== 'out' ||
           current.delivery !== 'queued' ||
           current.envelope_hash !== row.envelope_hash ||
+          current.type !== row.type ||
           tx.count('outbox', { envelope_id: row.envelope_id }) !== 0
         ) {
           return 0; // another process enqueued it first, or it changed: wrapped once only
         }
-        for (const r of rows) tx.insert('outbox', r);
+        for (const r of ready) tx.insert('outbox', r);
         return 1;
       });
     }
-    if (enqueued + dropped > 0) this.#ctx.log.info('outbox staged', { enqueued, dropped });
+    if (enqueued + dropped + failed > 0) {
+      this.#ctx.log.info('outbox staged', { enqueued, dropped, failed });
+    }
     return enqueued;
   }
 
-  /** The rows of one staged envelope: its counterparty from the pairing row or the contact row. */
-  async #stagedRows(row: Row<'envelopes'>): Promise<Row<'outbox'>[]> {
-    if (row.envelope_json === null) throw new CoreError('store_unreadable', 'Unreadable.');
-    const envelope = parseEnvelope(parseJson(row.envelope_json, { integersOnly: true }));
-    if (envelope.id !== row.envelope_id) throw new CoreError('store_unreadable', 'Unreadable.');
-    let peer: OutboxPeer | undefined;
-    const pairing = await this.#ctx.store.transaction((tx) =>
-      tx.get('pairings', { pairing_id: row.envelope_id }),
-    );
-    if (pairing !== undefined) {
+  /**
+   * The rows of one staged pairing message, `drop` when it can never be routed (permanent), or a
+   * throw for a transient fault. The counterparty comes from the pairing row (`handshake`) or the
+   * contact row whose recorded ack this is (`handshake-ack`).
+   */
+  async #stagedRows(row: Row<'envelopes'>): Promise<Row<'outbox'>[] | 'drop'> {
+    let envelope: Envelope;
+    try {
+      if (row.envelope_json === null) return 'drop';
+      envelope = parseEnvelope(parseJson(row.envelope_json, { integersOnly: true }));
+    } catch {
+      return 'drop';
+    }
+    if (envelope.id !== row.envelope_id) return 'drop';
+    const contactId = row.contact_id;
+    const found = await this.#ctx.store.transaction((tx) => ({
+      pairing: tx.get('pairings', { pairing_id: row.envelope_id }),
+      contact: contactId === null ? undefined : tx.get('contacts', { contact_id: contactId }),
+    }));
+    let peer: OutboxPeer;
+    if (row.type === 'handshake') {
+      if (contactId !== null || found.pairing?.role !== 'invitee') return 'drop';
       const staged = await this.#contacts.readStaged(row.envelope_id);
-      if (staged === undefined) throw new CoreError('pairing_not_found', 'Not found.');
+      if (staged === undefined) return 'drop';
       peer = { card: staged.card, relays: staged.relays };
-    } else if (row.contact_id !== null) {
-      const view = await this.#contacts.get(row.contact_id);
-      if (view.status !== 'active') {
-        throw new CoreError('contact_not_active', 'That contact cannot receive messages now.');
+    } else if (row.type === 'handshake-ack') {
+      const contact = found.contact;
+      if (
+        contact === undefined ||
+        contact.handshake_ack_envelope_id !== row.envelope_id ||
+        contact.status !== 'active'
+      ) {
+        return 'drop';
       }
-      peer = await this.contactPeer(row.contact_id);
+      peer = await this.contactPeer(contact.contact_id);
+    } else {
+      return 'drop';
     }
     return this.prepareRows(envelope, await this.routes(peer));
   }

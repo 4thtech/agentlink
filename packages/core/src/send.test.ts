@@ -623,6 +623,50 @@ describe('outbox: only vetted core flows stage envelopes (IR-M1-7k-1 F01)', () =
   });
 });
 
+describe('outbox: transient faults keep a staged message (IR-M1-7k-1 F02)', () => {
+  it('leaves a staged handshake queued while the own list cannot be read, and publishes it later', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    const invite = await a.client.pairing.createInvite();
+    const accepted = await b.client.pairing.acceptInvite({ link: invite.inviteUrl, allowed: true });
+    if (accepted.status !== 'pending') throw new Error('expected a staged pairing');
+    const realOpen = b.cipher.open.bind(b.cipher);
+    b.cipher.open = (context, sealed) =>
+      context.table === 'identity' && context.column === 'relays'
+        ? Promise.reject(new Error('locked'))
+        : realOpen(context, sealed);
+    await b.client.outbox.processDue();
+    expect(b.spy.published).toHaveLength(0);
+    const handshake = () =>
+      b.store.transaction((tx) => tx.get('envelopes', { envelope_id: accepted.pairingId }));
+    expect((await handshake())?.delivery).toBe('queued');
+    b.cipher.open = realOpen;
+    await b.client.outbox.processDue();
+    expect(b.spy.published).toHaveLength(4);
+    expect((await handshake())?.delivery).toBe('sent');
+  });
+});
+
+describe('sendMessage: concurrent repeats (IR-M1-7k-1 F04)', () => {
+  it('makes one envelope and one set of wraps for concurrent calls with one clientRequestId', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    const input = { to: b.id, text: 'once', clientRequestId: 'req-race' };
+    const results = await Promise.all([
+      a.client.sendMessage(input),
+      a.client.sendMessage(input),
+      a.client.sendMessage(input),
+    ]);
+    const ok = results.filter((r) => r.status === 'ok');
+    expect(ok.length).toBeGreaterThanOrEqual(1);
+    for (const r of results) expect(['ok', 'in_progress']).toContain(r.status);
+    for (const r of ok) expect(r).toEqual(ok[0]);
+    expect((await rows(a.store)).out).toHaveLength(1);
+    expect(a.spy.published).toHaveLength(4);
+  });
+});
+
 describe('logs (I-7)', () => {
   it('carry counts only: no relay URL, message text, key or envelope id', async () => {
     const lines: string[] = [];
