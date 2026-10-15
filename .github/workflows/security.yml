@@ -1,4 +1,4 @@
-# Security checks: dependency review, secret scan (full history), CodeQL, zizmor.
+# Security checks: dependency review, secret scan, CodeQL, zizmor.
 #
 # `security-gate` is the single required status check for this workflow.
 #
@@ -41,7 +41,7 @@ jobs:
   dependency-review:
     name: dependency-review
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -86,14 +86,19 @@ jobs:
           #   the generators' independent Keccak-256.
           allow-dependencies-licenses: pkg:pypi/pycryptodome@3.23.0
 
-  # Full-history gitleaks scan; the implementation is the reusable workflow secret-scan.yml
-  # (official release binary, checksum-verified; see that file).
+  # gitleaks scan; the implementation is the reusable workflow secret-scan.yml (official release
+  # binary, checksum-verified; see that file). Pull requests and pushes to main scan the full
+  # history of the ref under test only, so a secret on another branch cannot turn them red; the
+  # weekly run scans every branch and tag (an alert), and every branch is also scanned on its own
+  # push by secret-scan-branches.yml.
   secret-scan:
     name: secret-scan
     if: github.event_name != 'merge_group'
     permissions:
       contents: read
     uses: ./.github/workflows/secret-scan.yml
+    with:
+      scope: ${{ github.event_name == 'schedule' && 'all' || 'ref' }}
 
   # Weekly backstop for the orphan coordination branch `sync`, scanned with the reviewed definition from the
   # default branch. Pushes to `sync` are scanned by a stub workflow that lives on that branch
@@ -110,7 +115,7 @@ jobs:
   codeql:
     name: codeql (${{ matrix.language }})
     if: github.event_name != 'merge_group'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -161,7 +166,7 @@ jobs:
   zizmor:
     name: zizmor
     if: github.event_name != 'merge_group'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -187,7 +192,7 @@ jobs:
     name: security-gate
     needs: [dependency-review, secret-scan, secret-scan-sync, codeql, zizmor]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
     steps:
