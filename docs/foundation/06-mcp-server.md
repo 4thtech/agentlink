@@ -112,14 +112,22 @@ Older names that remain in other documents (for example `create_invite` and `fet
 Agents negotiate with typed offers (02 J8, 04 §3.4). `agentlink_propose_terms` starts or revises an offer, and `agentlink_respond_to_terms` answers one. The agent supplies only the fields below. The core fills `termsId`, `version`, `parties` (its own agent and the contact), `previousTermsHash` and `termsHash` from its own store, maps `me` and `them` in `by` and `payer` to the two agent IDs, and checks every rule in 04 §3.4 (canonical form, negotiation chain) before anything is sent. Input that is not canonical is refused with `INVALID_ARGUMENT`, never silently rewritten.
 
 ```ts
-type TermsInput = {                       // strict: no other properties (M1-21 sets the size limits)
+type TermsInput = {                       // strict: no other properties; size limits and character rules: 04 §3.4 (D-74)
   subject: string;
   deliverables: { id?: string; description: string; by: "me" | "them"; plaintextSha256?: string }[];  // at least one; ids default to d1, d2, …
   price?: { amount: string; currency: string; payer: "me" | "them" };  // amount: positive decimal, e.g. "1500.00"; currency: ISO 4217 code or an allowlisted token symbol
   deadlines?: { ref: string; due: string }[];     // ref = a deliverable id; due = RFC 3339 UTC, e.g. "2026-11-30T17:00:00Z"
-  validUntil?: string;                            // ISO 8601; default 7 days from now
+  validUntil?: string;                            // strict RFC 3339 UTC, as `due`; default 7 days from now (D-74)
 };
 ```
+
+**TermsInput rules (D-74).** The limits and the character rule of 04 §3.4 apply to `TermsInput` and to `note` as they do to `terms`, so one set of limits serves both, and a `TermsInput` that passes always maps to `terms` that pass. The mapping is exact:
+- **Absent fields** (changes the hash; proposed, owner confirms at merge; PR #98 Q3). No `price` maps to `price: null`, no `deadlines` to `deadlines: []`, and no `plaintextSha256` to `null`. An explicit `null` in `TermsInput` is refused with `INVALID_ARGUMENT`: a field is either given or left out.
+- **`parties`** (changes the hash; proposed, owner confirms at merge; PR #98 Q4). The core writes its own agent ID and the contact's in ascending byte order (04 §3.4), not "own first". `me` and `them` map to the matching IDs whatever their place.
+- **Deliverable ids** (proposed, owner confirms at merge; PR #98 Q1). Either every deliverable has an `id` or none does. With none, the core assigns `d1`, `d2`, … in input order. A mix is refused with `INVALID_ARGUMENT`, so a default can never collide with a given id.
+- **`deliverables`** has at least one entry (04 §3.4; PR #98 Q10).
+- **`validUntil`** (proposed, owner confirms at merge; PR #98 Q12). Only the strict form `YYYY-MM-DDTHH:MM:SSZ` is accepted, a real date as for `due` (04 §3.4): no offset, no fraction, no other ISO 8601 form. It maps to unix seconds exactly. It must be after the core's current time, otherwise `INVALID_ARGUMENT`. The default is the core's current time in whole unix seconds (rounded down) plus exactly 604 800 (7 × 86 400).
+- **`note`** (proposed, owner confirms at merge; PR #98 Q18) follows the character rule and is 1 to 500 code points; an omitted `note` maps to `null`.
 
 | Tool | Input | Output | Notes |
 |---|---|---|---|
