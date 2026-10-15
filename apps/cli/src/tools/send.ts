@@ -16,7 +16,7 @@
 import { CoreError, type CoreErrorCode, type SendMessageInput } from '@agentlink/core';
 import { contactRef, renderRef, resolveContact } from './contacts.js';
 import type { ToolContext } from './context.js';
-import { fail, invalidArgument, ok, type HandlerOutput } from './result.js';
+import { fail, internalError, invalidArgument, ok, type HandlerOutput } from './result.js';
 import { copy } from './strings/index.js';
 import { TOOL_TEXT } from './text.js';
 
@@ -155,6 +155,11 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
             SEND_TEXT.policyDeniedNextStep,
             'POLICY_DENIED',
           );
+        default:
+          // A refusal code this version does not know: fixed text, never undefined (IR-M1-9p-1 F03).
+          return internalError();
       }
+    default:
+      return internalError();
   }
 }

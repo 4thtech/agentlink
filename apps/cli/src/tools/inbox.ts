@@ -62,7 +62,9 @@ const RFC3339 =
   /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|[+-](\d{2}):(\d{2})))?$/;
 
 /** An RFC 3339 date or date-time as unix seconds, or undefined when it is not one. */
-export function parseSince(value: string): number | undefined {
+export function parseSince(input: string): number | undefined {
+  // RFC 3339 allows a lower-case `t` and `z` (IR-M1-9p-1 F05).
+  const value = input.toUpperCase();
   const m = RFC3339.exec(value);
   if (m === null) return undefined;
   const [year, month, day, hour, minute, second] = [1, 2, 3, 4, 5, 6].map((i) => Number(m[i] ?? 0));
@@ -82,9 +84,27 @@ export function parseSince(value: string): number | undefined {
   return Number.isFinite(ms) ? Math.floor(ms / 1000) : undefined;
 }
 
-/** Unix seconds as RFC 3339 UTC, whole seconds: our format, never the sender's text. */
-const iso = (seconds: number): string =>
-  new Date(seconds * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+/** The last second with a four-digit RFC 3339 year: 9999-12-31T23:59:59Z. */
+const MAX_RFC3339_SECONDS = 253_402_300_799;
+
+/**
+ * Unix seconds as RFC 3339 UTC, whole seconds: our format, never the sender's text. Total
+ * (IR-M1-9p-1 F01): sender-chosen times are uint53 and unbounded on receipt, so anything that is not
+ * a whole number of seconds from 1970 to 9999 gives undefined instead of throwing. The caller then
+ * leaves the value out (or null); the sender's own value stays only inside the untrusted block.
+ */
+function isoOrUndefined(seconds: number): string | undefined {
+  if (!Number.isSafeInteger(seconds) || seconds < 0 || seconds > MAX_RFC3339_SECONDS) {
+    return undefined;
+  }
+  return new Date(seconds * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+/** `sentAt` is required: an out-of-range `createdAt` (core checks it on receipt) is clamped. */
+const isoClamped = (seconds: number): string =>
+  isoOrUndefined(
+    Number.isFinite(seconds) ? Math.min(Math.max(Math.trunc(seconds), 0), MAX_RFC3339_SECONDS) : 0,
+  ) ?? '1970-01-01T00:00:00Z';
 
 // ---- Items ---------------------------------------------------------------------------------------
 
@@ -112,7 +132,7 @@ function fileInfo(file: PageFile): Record<string, unknown> {
     size: file.size,
     plaintextSha256: file.plaintextSha256,
     delivery: file.delivery,
-    expiresAt: file.expiresAt === null ? null : iso(file.expiresAt),
+    expiresAt: file.expiresAt === null ? null : (isoOrUndefined(file.expiresAt) ?? null),
   };
 }
 
@@ -147,6 +167,24 @@ function untrustedOf(item: PageItem): { untrusted: Record<string, unknown>; cont
   return { untrusted, content };
 }
 
+/**
+ * `termsRef` (ours) only when its `validUntil` formats; otherwise it is left out and the sender's
+ * value stays inside the block, under `untrusted.terms` (IR-M1-9p-1 F01).
+ */
+function termsRefOf(item: PageItem): Record<string, unknown> {
+  if (item.termsRef === undefined) return {};
+  const validUntil = isoOrUndefined(item.termsRef.validUntil);
+  if (validUntil === undefined) return {};
+  return {
+    termsRef: {
+      termsId: item.termsRef.termsId,
+      version: item.termsRef.version,
+      termsHash: item.termsRef.termsHash,
+      validUntil,
+    },
+  };
+}
+
 function render(item: PageItem): Rendered {
   const { untrusted, content } = untrustedOf(item);
   const base: Record<string, unknown> = {
@@ -154,19 +192,10 @@ function render(item: PageItem): Rendered {
     envelopeId: item.envelopeId,
     thread: item.thread,
     type: item.type,
-    sentAt: iso(item.createdAt),
+    sentAt: isoClamped(item.createdAt),
     replyTo: item.replyTo,
     files: item.files.map(fileInfo),
-    ...(item.termsRef === undefined
-      ? {}
-      : {
-          termsRef: {
-            termsId: item.termsRef.termsId,
-            version: item.termsRef.version,
-            termsHash: item.termsRef.termsHash,
-            validUntil: iso(item.termsRef.validUntil),
-          },
-        }),
+    ...termsRefOf(item),
   };
   let header: string;
   let from: string;

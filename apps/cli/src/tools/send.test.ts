@@ -275,6 +275,8 @@ describe('agentlink_send: idempotency and policy results (06 §1 rule 6, 07 §3.
       [{ status: 'rejected', code: IDEMPOTENCY_KEY_REUSED }, 'rejected', 'IDEMPOTENCY_KEY_REUSED'],
       [{ status: 'in_progress' }, 'error', 'IN_PROGRESS'],
       [{ status: 'rejected', code: POLICY_DENIED }, 'rejected', 'POLICY_DENIED'],
+      [{ status: 'rejected', code: 'SOMETHING_NEW' } as never, 'error', 'INTERNAL'],
+      [{ status: 'unknown' } as never, 'error', 'INTERNAL'],
     ];
     for (const [answer, status, code] of cases) {
       const client = fake({ send: () => Promise.resolve(answer) });

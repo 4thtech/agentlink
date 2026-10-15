@@ -284,6 +284,7 @@ describe('agentlink_inbox: sync and query (06 §2.2, §6)', () => {
       ['2026-10-15T10:00:00Z', Date.UTC(2026, 9, 15, 10) / 1000],
       ['2026-10-15T12:00:00+02:00', Date.UTC(2026, 9, 15, 10) / 1000],
       ['2026-10-15T10:00:00.5Z', Date.UTC(2026, 9, 15, 10) / 1000],
+      ['2026-10-15t10:00:00z', Date.UTC(2026, 9, 15, 10) / 1000],
     ] as const) {
       const client = fake();
       await inbox({ since }, client);
