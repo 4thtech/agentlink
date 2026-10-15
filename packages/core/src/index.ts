@@ -192,11 +192,20 @@ export {
   type DeliveryAckStatus,
 } from './acks.js';
 export {
+  INBOX_PAGE_MAX_LIMIT,
   INBOX_TYPES,
   InboxService,
+  PAGE_TYPES,
+  type InboundPageItem,
   type InboxCounts,
   type InboxItem,
+  type InboxPage,
+  type InboxPageFile,
+  type InboxPageItem,
+  type InboxPageQuery,
   type InboxSender,
+  type InboxTermsRef,
+  type OutboundPageItem,
 } from './inbox.js';
 export {
   DEFAULT_SYNC_BUDGET_MS,

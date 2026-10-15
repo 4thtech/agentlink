@@ -29,6 +29,7 @@ import {
   passphrase,
   seed,
 } from './testing/fixtures.js';
+import { sleep } from './testing/platform.js';
 
 const DROP_ORIGIN = 'https://drop.agentlink.example';
 
@@ -357,11 +358,13 @@ describe('inbox page: read marks in the page transaction (06 §2.2 "Read state",
       return realOpen(context, sealed);
     };
     const slow = page();
-    await new Promise((r) => setTimeout(r, 0));
+    await sleep(0);
     const fast = await page();
     release();
     expect(ids(fast)).toEqual(all);
     expect(await slow).toEqual([]);
+    // The slow read's commit found the marks changed, wrote nothing and read again.
+    expect(lines.join('\n')).toContain('inbox page changed while read');
   });
 
   it('marks nothing when building the page fails', async () => {
@@ -479,7 +482,13 @@ describe('inbox page: what is returned (06 §2.2 "What is returned"; D-72)', () 
     await put({ contact: null, createdAt: T0 + 5, type: 'ack', acceptedAt: clock.t });
     for (const type of ['ack', 'proof', 'card-update', 'handshake', 'approval', 'revoke']) {
       await put({ contact: b.id, createdAt: T0 + 6, type, payload: text('x', type) });
-      await put({ direction: 'out', contact: b.id, createdAt: T0 + 6, type, payload: text('x', type) });
+      await put({
+        direction: 'out',
+        contact: b.id,
+        createdAt: T0 + 6,
+        type,
+        payload: text('x', type),
+      });
     }
     expect(ids(await page({ includeRead: true, includeSent: true, limit: 100 }))).toEqual([shown]);
   });
@@ -526,9 +535,33 @@ describe('inbox page: what is returned (06 §2.2 "What is returned"; D-72)', () 
     const [item] = await page();
     expect(item?.envelopeId).toBe(id);
     expect(item?.files).toEqual([
-      { index: 0, size: 10, plaintextSha256: sha, delivery: 'inline', expiresAt: null, name: 'report.pdf', mime: 'application/pdf' },
-      { index: 1, size: 10, plaintextSha256: sha, delivery: 'drop', expiresAt: T0 + 86_400, name: 'report.pdf', mime: 'application/pdf' },
-      { index: 2, size: 10, plaintextSha256: sha, delivery: 'own', expiresAt: T0 + 86_400, name: 'x.bin', mime: 'application/pdf' },
+      {
+        index: 0,
+        size: 10,
+        plaintextSha256: sha,
+        delivery: 'inline',
+        expiresAt: null,
+        name: 'report.pdf',
+        mime: 'application/pdf',
+      },
+      {
+        index: 1,
+        size: 10,
+        plaintextSha256: sha,
+        delivery: 'drop',
+        expiresAt: T0 + 86_400,
+        name: 'report.pdf',
+        mime: 'application/pdf',
+      },
+      {
+        index: 2,
+        size: 10,
+        plaintextSha256: sha,
+        delivery: 'own',
+        expiresAt: T0 + 86_400,
+        name: 'x.bin',
+        mime: 'application/pdf',
+      },
     ]);
     const json = JSON.stringify(item);
     expect(json).not.toContain('CANARY');

@@ -16,7 +16,20 @@ import { parseJson } from '@agentlink/crypto';
 import { payloadSchema, type ContactDisplayName, type Payload } from '@agentlink/types';
 import type { ContactBook, ContactView } from './contacts.js';
 import { open, type CoreContext } from './context.js';
+import { dropOriginsOf, readInboxPage, type InboxPage, type InboxPageQuery } from './inbox-page.js';
 import type { RequestsQueue } from './requests.js';
+
+export {
+  INBOX_PAGE_MAX_LIMIT,
+  PAGE_TYPES,
+  type InboundPageItem,
+  type InboxPage,
+  type InboxPageFile,
+  type InboxPageItem,
+  type InboxPageQuery,
+  type InboxTermsRef,
+  type OutboundPageItem,
+} from './inbox-page.js';
 
 /** Types shown in the inbox: the user message types (02 F-22, D-55) and the follow-ups to them. */
 export const INBOX_TYPES: readonly string[] = Object.freeze([
@@ -84,11 +97,31 @@ export class InboxService {
   readonly #ctx: CoreContext;
   readonly #contacts: ContactBook;
   readonly #requests: RequestsQueue;
+  readonly #dropOrigins: ReadonlySet<string>;
 
-  constructor(ctx: CoreContext, contacts: ContactBook, requests: RequestsQueue) {
+  constructor(
+    ctx: CoreContext,
+    contacts: ContactBook,
+    requests: RequestsQueue,
+    options: { readonly dropOrigins?: readonly string[] } = {},
+  ) {
     this.#ctx = ctx;
     this.#contacts = contacts;
     this.#requests = requests;
+    this.#dropOrigins = dropOriginsOf(options.dropOrigins);
+  }
+
+  /**
+   * One `agentlink_inbox` page with its read marks (M1-7h-c; 06 §2.2): received messages, accepted
+   * requests (D-72) and, with `includeSent`, our own sent messages, newest `limit` first and listed
+   * oldest first. The returned unread inbound items are marked read in the store transaction that
+   * commits the page (inbox-page.ts). Throws `inbox_query_invalid` for a malformed query.
+   */
+  page(query: InboxPageQuery): Promise<InboxPage> {
+    return readInboxPage(
+      { ctx: this.#ctx, contacts: this.#contacts, dropOrigins: this.#dropOrigins },
+      query,
+    );
   }
 
   /**
