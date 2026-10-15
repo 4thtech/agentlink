@@ -2,11 +2,11 @@
   "name": "@agentlink/tools",
   "version": "0.0.0",
   "private": true,
-  "description": "Repository check scripts (manifest policy, knowledge-base size budget and links, architecture boundaries, generated status docs). Not published.",
+  "description": "Repository check scripts (manifest policy, knowledge-base size budget and links, architecture boundaries, generated status docs, the UCD 15.0.0 table drift check). Not published.",
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "check": "node check-manifests.mjs && node check-knowledge-size.mjs && node check-knowledge-links.mjs && node deps-check/index.mjs && node docs-status/index.mjs --check",
+    "check": "node check-manifests.mjs && node check-knowledge-size.mjs && node check-knowledge-links.mjs && node deps-check/index.mjs && node docs-status/index.mjs --check && node unicode/check-ucd15.mjs",
     "status": "node docs-status/index.mjs",
     "status:check": "node docs-status/index.mjs --check",
     "lint": "eslint .",
