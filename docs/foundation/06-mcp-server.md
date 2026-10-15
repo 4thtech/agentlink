@@ -495,9 +495,10 @@ agentlink owner init                   † # create the owner key with a generat
 agentlink keystore passphrase            # file KeyStore only: change its passphrase or unlock code (terminal only)
 agentlink ui                             # open local approval/settings UI
 agentlink status [--brief]               # same data as agentlink_status; --brief prints only unread counts and contact names under the §2.1 rule (§6.1)
-agentlink invite | accept <url>
+agentlink invite
+agentlink accept <url> [--approval <approvalId>]   # (proposed, owner confirms at merge; IR-M1-9l-1) without `--approval` it follows `contacts.acceptInvites` and, when approval is needed, creates the request and prints the approve command; after the owner approves, run it again with `--approval <approvalId>` to pair exactly once
 agentlink contacts                       # list contacts under the §2.1 name rule
-agentlink requests [accept | ignore | block <requestId>]   # interactive terminal only, no harness marker: lists requests and shows each inside the untrusted container; also `ignore --all`, `blocked`, `unblock <requestId>`; never creates a contact (07 §3.2, D-72)
+agentlink requests [accept | ignore | block <requestId>]   # interactive terminal only, no harness marker: lists requests and shows each inside the untrusted container; also `ignore --all`, `blocked`, `unblock <senderKey>` (proposed, owner confirms at merge; IR-M1-9l-1: block purges the key's request rows, so no request ID exists to unblock by, and an ID chosen by the sender is never used, IR-D-72-1 F03); never creates a contact (07 §3.2, D-72)
 agentlink contacts --verify <id>       † # interactive terminal only, no harness marker: shows the safety code; "They match" signs contact.check (04 §3.6.1)
 agentlink storage connect              † # optional: guided S3-compatible setup (creds → keychain); not needed for files within the drop limits
 agentlink policy show | set <key> <value>   †
