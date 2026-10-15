@@ -1,2 +1,4 @@
 # Published vector copies are hashed byte for byte (tools/vectors/vectorlib.py): never convert line ends.
 tools/vectors/sources/** -text
+# The vendored UCD file is pinned by SHA-256 (tools/unicode/ucd-15.0.0/SHA256SUMS): never convert line ends.
+tools/unicode/ucd-15.0.0/** -text
