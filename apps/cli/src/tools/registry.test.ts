@@ -23,7 +23,7 @@ describe('tool surface (06 §2.0, D-53)', () => {
     expect(TOOLS).toMatchSnapshot();
   });
 
-  it('registers exactly the M1a tools, with the terms tools pending (M1-9q)', () => {
+  it('registers exactly the nine M1a tools', () => {
     const registered = TOOLS.map((t) => t.name);
     expect([...registered, ...Object.keys(PENDING_M1A_TOOLS)].sort()).toEqual(
       Object.keys(M1A_TABLE).sort(),
@@ -95,9 +95,19 @@ describe('tool surface (06 §2.0, D-53)', () => {
     for (const tool of TOOLS) {
       expect(tool.name).not.toMatch(dangerous);
       const input = Object.keys(tool.inputSchema['properties'] as object).join(' ');
-      expect(input).not.toMatch(/policy|path|file|key|credential|decision|hook/i);
+      expect(input).not.toMatch(/policy|path|file|key|credential|signed|hook/i);
     }
     expect(TOOLS.filter((t) => t.annotations.destructiveHint)).toEqual([]);
+  });
+
+  it('the terms tools take TermsInput and never a free body (D-55)', () => {
+    for (const name of ['agentlink_propose_terms', 'agentlink_respond_to_terms']) {
+      const tool = TOOLS.find((t) => t.name === name)!;
+      const props = tool.inputSchema['properties'] as Record<string, Record<string, unknown>>;
+      expect(props['terms']?.['additionalProperties'], name).toBe(false);
+      expect(props).not.toHaveProperty('body');
+      expect(props).not.toHaveProperty('text');
+    }
   });
 
   it('agentlink_send cannot carry offer, accept or reject (D-55)', () => {

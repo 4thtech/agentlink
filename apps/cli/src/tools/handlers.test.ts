@@ -449,6 +449,8 @@ describe('tools whose card has not landed answer "not available yet"', () => {
     'agentlink_create_invite',
     'agentlink_accept_invite',
     'agentlink_send',
+    'agentlink_propose_terms',
+    'agentlink_respond_to_terms',
     'agentlink_inbox',
   ]) {
     it(name, async () => {

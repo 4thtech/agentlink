@@ -3,8 +3,10 @@
 // a rename, a new tool or any schema or annotation change shows up there and is reviewed with
 // M1-9e's tool-surface snapshot (06 §9).
 //
-// - Seven tools now. The two terms tools (agentlink_propose_terms, agentlink_respond_to_terms) join
-//   when M1-21's strict `TermsInput` schema exists (M1-9q adds them; 06 §2.2a).
+// - All nine M1a tools, in 06 §2.0 order. The two terms tools take `TermsInput` (M1-21, 06 §2.2a)
+//   as the JSON Schema below; the core's strict zod schema stays the authority (registry.test.ts
+//   checks the two agree on samples). Their handlers are M1-9q's; `path` and `notarize` arrive with
+//   M1-9d as optional fields.
 // - Annotations exactly per the 06 §2.0 table, all four set explicitly.
 // - Every tool with an Approval entry in 06 §2.0 takes `approvalId?`.
 // - Descriptions are our fixed text. No inbound content, contact name or value ever reaches a
@@ -19,8 +21,11 @@ import {
   MAX_DISPLAY_NAME_CODE_POINTS,
   MAX_TOOL_TEXT_CHARS,
   MAX_URL_LENGTH,
+  MAX_TERMS_NOTE_CODE_POINTS,
   MCP_STATUSES,
   NAME_SOURCES,
+  TERMS_LIMITS,
+  TERMS_TOKEN_SYMBOLS,
   type McpToolName,
 } from '@agentlink/types';
 
@@ -82,6 +87,54 @@ const agentId = str({ pattern: AGENT_ID_PATTERN });
 const fingerprint = str({ pattern: FINGERPRINT_PATTERN });
 const timestamp = str({ maxLength: 64 });
 const pairing = oneOf(['pending', 'complete', 'mismatch']);
+
+/** 06 §2.2a `TermsInput` (M1-21, D-74): strict at every level; the core re-checks with its schema. */
+const termsId = str({ pattern: '^[A-Za-z0-9_-]{1,16}$' });
+const utc = str({ pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' });
+const side = oneOf(['me', 'them']);
+const termsInput = obj(
+  {
+    subject: str({ minLength: 1, maxLength: TERMS_LIMITS.subjectCodePoints }),
+    deliverables: {
+      type: 'array',
+      minItems: 1,
+      maxItems: TERMS_LIMITS.deliverables,
+      items: obj(
+        {
+          id: termsId,
+          description: str({ minLength: 1, maxLength: TERMS_LIMITS.descriptionCodePoints }),
+          by: side,
+          plaintextSha256: str({ pattern: '^[0-9a-f]{64}$' }),
+        },
+        ['description', 'by'],
+      ),
+    },
+    price: obj(
+      {
+        amount: str({ pattern: '^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,6})?$' }),
+        currency: str({ pattern: `^([A-Z]{3}|${TERMS_TOKEN_SYMBOLS.join('|')})$` }),
+        payer: side,
+      },
+      ['amount', 'currency', 'payer'],
+    ),
+    deadlines: {
+      type: 'array',
+      maxItems: TERMS_LIMITS.deadlines,
+      items: obj({ ref: termsId, due: utc }, ['ref', 'due']),
+    },
+    validUntil: utc,
+  },
+  ['subject', 'deliverables'],
+);
+const termsNote = str({ minLength: 1, maxLength: MAX_TERMS_NOTE_CODE_POINTS });
+const clientRequestId = str({ minLength: 1, maxLength: 256 });
+const termsOutput = {
+  thread: envelopeId,
+  termsId: str({ maxLength: 64 }),
+  version: int(1),
+  termsHash: str({ pattern: '^[0-9a-f]{64}$' }),
+  validUntil: timestamp,
+};
 
 /** 06 §2.2 `ContactRef`: the contact-name rule form (06 §2.1). */
 const contactRef = obj(
@@ -306,11 +359,54 @@ const DEFINITIONS: readonly ToolDefinition[] = [
         body: { type: 'object' },
         replyTo: envelopeId,
         approvalId,
-        clientRequestId: str({ minLength: 1, maxLength: 256 }),
+        clientRequestId,
       },
       ['to'],
     ),
     outputSchema: output({ envelopeId, thread: envelopeId, sentAt: timestamp, candidates }, true),
+    annotations: WRITE(true),
+    approval: true,
+  },
+  {
+    name: 'agentlink_propose_terms',
+    title: 'AgentLink: propose terms',
+    description:
+      "Send a contact's AI agent an offer with typed terms (what, who delivers, price, deadlines), or revise your own newest unanswered offer with revises. Free, and not a commitment. To answer their offer, use agentlink_respond_to_terms.",
+    inputSchema: obj(
+      {
+        to: str({ minLength: 1, maxLength: MAX_CONTACT_ARG }),
+        terms: termsInput,
+        revises: envelopeId,
+        note: termsNote,
+        approvalId,
+        clientRequestId,
+      },
+      ['to', 'terms'],
+    ),
+    outputSchema: output({ envelopeId, ...termsOutput, candidates }, true),
+    annotations: WRITE(true),
+    approval: true,
+  },
+  {
+    name: 'agentlink_respond_to_terms',
+    title: 'AgentLink: respond to terms',
+    description:
+      "Answer a contact's offer, named by its envelopeId: accept, reject, or counter with new terms. Accepting commits the user: only accept when the user asks; the owner approves it once, then call again with the approvalId.",
+    inputSchema: obj(
+      {
+        envelopeId,
+        decision: oneOf(['accept', 'reject', 'counter']),
+        terms: termsInput,
+        note: termsNote,
+        approvalId,
+        clientRequestId,
+      },
+      ['envelopeId', 'decision'],
+    ),
+    outputSchema: output(
+      { decision: oneOf(['accept', 'reject', 'counter']), envelopeId, ...termsOutput },
+      true,
+    ),
     annotations: WRITE(true),
     approval: true,
   },
@@ -360,11 +456,8 @@ export const TOOLS: readonly ToolDefinition[] = deepFreeze(
   DEFINITIONS.map((tool) => ({ ...tool })),
 );
 
-/** The M1a tools still to be registered, and the card that adds them. */
-export const PENDING_M1A_TOOLS: Readonly<Partial<Record<McpToolName, string>>> = Object.freeze({
-  agentlink_propose_terms: 'M1-9q',
-  agentlink_respond_to_terms: 'M1-9q',
-});
+/** The M1a tools still to be registered, and the card that adds them. None: all nine are here. */
+export const PENDING_M1A_TOOLS: Readonly<Partial<Record<McpToolName, string>>> = Object.freeze({});
 
 export function findTool(name: string): ToolDefinition | undefined {
   return TOOLS.find((tool) => tool.name === name);

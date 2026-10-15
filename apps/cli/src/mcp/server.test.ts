@@ -5,9 +5,10 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
 import type { AgentLinkClient, ContactView } from '@agentlink/core';
 import { createLogger } from '@agentlink/log';
-import type { ContactDisplayName, RestrictedName } from '@agentlink/types';
+import { termsInputSchema, type ContactDisplayName, type RestrictedName } from '@agentlink/types';
 import { describe, expect, it, vi } from 'vitest';
 import type { OpenAgentResult, OpenedAgent } from '../runtime/index.js';
 import { TOOLS, type ToolClient, type ToolContext } from '../tools/index.js';
@@ -250,6 +251,56 @@ describe('agentlink mcp command', () => {
     );
     expect(context.urlOrigins).toEqual([]);
     expect(context.agentName).toBe('work');
+  });
+});
+
+describe('the TermsInput JSON Schema agrees with the core schema (M1-21, 06 §2.2a)', () => {
+  const tool = TOOLS.find((t) => t.name === 'agentlink_propose_terms')!;
+  const terms = (tool.inputSchema['properties'] as Record<string, object>)['terms']!;
+  const validate = new AjvJsonSchemaValidator().getValidator(terms as never);
+  const base = {
+    subject: 'Logo design',
+    deliverables: [{ description: 'Three logo drafts', by: 'them' }],
+  };
+  const price = (amount: unknown, currency = 'EUR') => ({
+    ...base,
+    price: { amount, currency, payer: 'me' },
+  });
+  // [name, sample, accepted by the core schema]
+  const samples: [string, unknown, boolean][] = [
+    ['minimal', base, true],
+    [
+      'full',
+      {
+        ...base,
+        deliverables: [
+          { id: 'd1', description: 'Drafts', by: 'them', plaintextSha256: 'a'.repeat(64) },
+        ],
+        price: { amount: '1500.00', currency: 'EUR', payer: 'me' },
+        deadlines: [{ ref: 'd1', due: '2026-11-30T17:00:00Z' }],
+        validUntil: '2026-11-01T00:00:00Z',
+      },
+      true,
+    ],
+    ['token currency', price('10', 'USDC'), true],
+    ['unknown key', { ...base, termsHash: 'x' }, false],
+    ['core-filled version', { ...base, version: 2 }, false],
+    ['explicit null price', { ...base, price: null }, false],
+    ['no deliverables', { subject: 'x', deliverables: [] }, false],
+    ['number amount', price(1500), false],
+    ['negative amount', price('-1'), false],
+    ['lower-case currency', price('1', 'eur'), false],
+    ['offset time', { ...base, validUntil: '2026-11-01T00:00:00+01:00' }, false],
+    ['bad id', { ...base, deliverables: [{ id: 'a b', description: 'x', by: 'me' }] }, false],
+    ['long subject', { ...base, subject: 'x'.repeat(201) }, false],
+  ];
+
+  it.each(samples)('%s', (_name, sample, accepted) => {
+    expect(termsInputSchema.safeParse(sample).success).toBe(accepted);
+    // The JSON Schema accepts what the core accepts and refuses these shape errors too; the core
+    // may refuse more (canonical text, id and ref rules, amount above zero), and the M1-9q handler
+    // always runs the core schema.
+    expect(validate(sample).valid).toBe(accepted);
   });
 });
 

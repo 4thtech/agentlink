@@ -32,6 +32,8 @@ export const HANDLERS: Readonly<Partial<Record<McpToolName, ToolHandler>>> = Obj
   agentlink_accept_invite: stub, // M1-9o
   agentlink_list_contacts: listContactsHandler,
   agentlink_send: stub, // M1-9p
+  agentlink_propose_terms: stub, // M1-9q
+  agentlink_respond_to_terms: stub, // M1-9q
   agentlink_inbox: stub, // M1-9p
   agentlink_get_approval: getApprovalHandler,
 });
