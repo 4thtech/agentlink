@@ -441,8 +441,8 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     // add a migration with the next version instead (07 §3.7: forward migrations only).
     const digestOf = (i: number) =>
       encodeHex(sha256(encodeUtf8(MIGRATIONS[i]?.statements.join(';\n') ?? '')));
-    expect(STORE_SCHEMA_VERSION).toBe(2);
-    expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2]);
+    expect(STORE_SCHEMA_VERSION).toBe(3);
+    expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2, 3]);
     // Version 1 (G-9) is unchanged by D-72.
     expect(digestOf(0)).toMatchInlineSnapshot(
       `"6a2a36755c97cca746bdfe0b166c409cf1a067b1fd526011470446c0bb7dfd1b"`,
@@ -460,6 +460,59 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
       ) STRICT",
       ]
     `);
+    // Version 2 is unchanged by version 3.
+    expect(digestOf(1)).toMatchInlineSnapshot();
+    // Version 3 (M1-7k-b): publisher_lease (07 §3.2, 06 §6) and outbox_staged (IR-M1-7k-1 F08).
+    expect(MIGRATIONS[2]?.statements).toMatchInlineSnapshot();
+  });
+
+  it('migrates a version 2 file to version 3 (M1-7k-b): rows kept, publisher_lease and outbox_staged added', async () => {
+    // A file as the version 2 code left it: the frozen v1 and v2 statements and user_version 2.
+    const raw = new Database(path());
+    for (const m of MIGRATIONS.slice(0, 2)) {
+      for (const statement of m.statements) raw.prepare(statement).run();
+    }
+    raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
+    raw.pragma('user_version = 2');
+    raw
+      .prepare(
+        `INSERT INTO "envelopes" ("envelope_id", "envelope_hash", "thread_id", "direction", ` +
+          `"contact_id", "from_key", "type", "state", "refused_reason", "created_at", ` +
+          `"envelope_json", "payload_json", "read_at", "delivery", "refused_at", ` +
+          `"request_accepted_at") VALUES ` +
+          `('e1', 'h1', 't1', 'out', NULL, 'k1', 'handshake', 'ok', NULL, 5, ` +
+          `NULL, NULL, NULL, 'queued', NULL, NULL)`,
+      )
+      .run();
+    raw
+      .prepare(
+        `INSERT INTO "blocked_keys" ("from_key", "blocked_at", "via_envelope_id") VALUES (?, ?, ?)`,
+      )
+      .run('k2', 6, 'e0');
+    raw.close();
+    const v3 = await SqliteStore.open(path());
+    expect(v3.schemaVersion).toBe(3);
+    expect(await v3.transaction((tx) => tx.get('envelopes', { envelope_id: 'e1' }))).toMatchObject({
+      type: 'handshake',
+      delivery: 'queued',
+    });
+    expect(await v3.transaction((tx) => tx.count('blocked_keys'))).toBe(1);
+    await v3.transaction((tx) => {
+      tx.insert('publisher_lease', { name: 'subscriptions', holder: 'h', lease_until: 60 });
+      tx.insert('outbox_staged', { envelope_id: 'e1', failures: 1, retry_at: 65 });
+    });
+    // One lease row per name: a second holder cannot insert beside it.
+    expect(
+      await rejects(
+        v3.transaction((tx) =>
+          tx.insert('publisher_lease', { name: 'subscriptions', holder: 'g', lease_until: 70 }),
+        ),
+      ),
+    ).toBeInstanceOf(StoreConstraintError);
+    await v3.close();
+    const fresh = await SqliteStore.open(join(dir, 'fresh.db'));
+    expect(fresh.schemaVersion).toBe(3);
+    await fresh.close();
   });
 
   it('migrates a version 1 file to version 2 (D-72): rows kept, new columns null, blocked_keys added', async () => {
@@ -500,12 +553,12 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     const v1 = await SqliteStore.open(path());
     await v1.transaction((tx) => tx.insert('seen', seen('kept')));
     await v1.close();
-    const v3: StoreMigration = {
-      version: 3,
+    const v4: StoreMigration = {
+      version: 4,
       statements: ['CREATE INDEX "seen__by_time" ON "seen" ("first_seen_at")'],
     };
-    const migrated = await SqliteStore.open(path(), { migrations: [...MIGRATIONS, v3] });
-    expect(migrated.schemaVersion).toBe(3);
+    const migrated = await SqliteStore.open(path(), { migrations: [...MIGRATIONS, v4] });
+    expect(migrated.schemaVersion).toBe(4);
     expect(await migrated.transaction((tx) => tx.count('seen'))).toBe(1);
     const check = new Database(path(), { readonly: true });
     expect(
@@ -521,7 +574,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     const error = await rejects(SqliteStore.open(path()));
     expect((error as NodeStoreError).code).toBe('store_too_new');
     const raw = new Database(path(), { readonly: true });
-    expect(raw.pragma('user_version', { simple: true })).toBe(3);
+    expect(raw.pragma('user_version', { simple: true })).toBe(4);
     raw.close();
   });
 

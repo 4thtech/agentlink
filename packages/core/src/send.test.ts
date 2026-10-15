@@ -15,7 +15,8 @@ import { unwrapGiftWrap, wrapEnvelope, type PublishOutcome } from '@agentlink/tr
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import { CoreError } from './errors.js';
-import { OUTBOX_CLAIM_SECONDS } from './outbox.js';
+import { STAGED_MAX_AGE_SECONDS } from './constants.js';
+import { OUTBOX_CLAIM_SECONDS, OUTBOX_STAGED_BATCH } from './outbox.js';
 import { MemoryStore } from './store/memory-store.js';
 import type { StoreTx } from './store/store.js';
 import {
@@ -647,6 +648,115 @@ describe('outbox: transient faults keep a staged message (IR-M1-7k-1 F02)', () =
     await b.client.outbox.processDue();
     expect(b.spy.published).toHaveLength(4);
     expect((await handshake())?.delivery).toBe('sent');
+  });
+});
+
+describe('outbox: stale staged messages are bounded (IR-M1-7k-1 F08)', () => {
+  /** b accepts a fresh invite from a: one staged handshake (M1-7c), returned by its pairing ID. */
+  async function stage(a: Agent, b: Agent): Promise<string> {
+    const invite = await a.client.pairing.createInvite();
+    const accepted = await b.client.pairing.acceptInvite({ link: invite.inviteUrl, allowed: true });
+    if (accepted.status !== 'pending') throw new Error('expected a staged pairing');
+    return accepted.pairingId;
+  }
+
+  /** Makes the staged card of each listed pairing unreadable: a per-row fault that never clears. */
+  function breakPairings(b: Agent, failing: ReadonlySet<string>): () => void {
+    const realOpen = b.cipher.open.bind(b.cipher);
+    b.cipher.open = (context, sealed) =>
+      context.table === 'pairings' && failing.has(JSON.parse(context.rowKey)[0] as string)
+        ? Promise.reject(new Error('unreadable'))
+        : realOpen(context, sealed);
+    return () => {
+      b.cipher.open = realOpen;
+    };
+  }
+
+  const delivery = async (b: Agent, envelopeId: string) =>
+    (await b.store.transaction((tx) => tx.get('envelopes', { envelope_id: envelopeId })))?.delivery;
+
+  it('marks a staged message not_delivered once it is older than the bound, publishes it never, and leaves a fresh one untouched', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    const failing = new Set<string>();
+    const restore = breakPairings(b, failing);
+    const old = await stage(a, b);
+    failing.add(old);
+    const t0 = clock.t;
+    await b.client.outbox.processDue();
+    expect(b.spy.published).toHaveLength(0);
+    expect(await delivery(b, old)).toBe('queued');
+
+    clock.t = t0 + STAGED_MAX_AGE_SECONDS - 3_600;
+    const fresh = await stage(a, b);
+    failing.add(fresh);
+    await b.client.outbox.processDue();
+    expect(await delivery(b, old)).toBe('queued');
+
+    clock.t = t0 + STAGED_MAX_AGE_SECONDS;
+    await b.client.outbox.processDue();
+    expect(await delivery(b, old)).toBe('not_delivered');
+    expect(await delivery(b, fresh)).toBe('queued');
+    expect(b.spy.published).toHaveLength(0);
+
+    // The fault clears: the fresh one is published once, the expired one never.
+    restore();
+    clock.t += 3_600; // past the fresh one's retry time
+    await b.client.outbox.processDue();
+    expect(await delivery(b, fresh)).toBe('sent');
+    expect(await delivery(b, old)).toBe('not_delivered');
+    expect(b.spy.published).toHaveLength(4);
+    const rowsOf = (id: string) =>
+      b.store.transaction((tx) => tx.select('outbox', { envelope_id: id }));
+    expect(await rowsOf(old)).toHaveLength(0);
+    expect(await rowsOf(fresh)).toHaveLength(4);
+    clock.t += 3_600;
+    await b.client.outbox.processDue();
+    expect(b.spy.published).toHaveLength(4);
+    // No retry bookkeeping is left behind for either message.
+    expect(await b.store.transaction((tx) => tx.count('outbox_staged'))).toBe(0);
+  });
+
+  it('expires a stale staged message even while the agent cannot send', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    const old = await stage(a, b);
+    const realOpen = b.cipher.open.bind(b.cipher);
+    b.cipher.open = (context, sealed) =>
+      context.table === 'identity'
+        ? Promise.reject(new Error('locked'))
+        : realOpen(context, sealed);
+    clock.t += STAGED_MAX_AGE_SECONDS;
+    await b.client.outbox.enqueueStaged().catch(() => 0);
+    expect(await delivery(b, old)).toBe('not_delivered');
+    b.cipher.open = realOpen;
+    await b.client.outbox.processDue();
+    expect(b.spy.published).toHaveLength(0);
+  });
+
+  it('does not let a full batch of failing older messages block a newer one', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    const failing = new Set<string>();
+    breakPairings(b, failing);
+    for (let i = 0; i < OUTBOX_STAGED_BATCH; i += 1) {
+      failing.add(await stage(a, b));
+      clock.t += 1;
+    }
+    const good = await stage(a, b);
+    await b.client.outbox.processDue();
+    expect(await delivery(b, good)).toBe('sent');
+    expect(b.spy.published).toHaveLength(4);
+    for (const id of failing) expect(await delivery(b, id)).toBe('queued');
+
+    // The failing ones step aside until their retry time; a second newer one is wrapped at once.
+    const retries = await b.store.transaction((tx) => tx.select('outbox_staged'));
+    expect(retries).toHaveLength(OUTBOX_STAGED_BATCH);
+    for (const r of retries) expect(r.retry_at).toBeGreaterThan(clock.t);
+    const second = await stage(a, b);
+    await b.client.outbox.processDue();
+    expect(await delivery(b, second)).toBe('sent');
+    expect(b.spy.published).toHaveLength(8);
   });
 });
 
