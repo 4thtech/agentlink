@@ -316,6 +316,7 @@ async function craftHandshake(
   inviter: SignedCard,
   change: (body: Record<string, JsonValue>) => void = () => undefined,
   signer?: KeyStore,
+  entries = entriesTo(invitee.signed, inviter),
 ) {
   const invite = await decodeInviteLink(link);
   const inviteId = decodeBase64url(invite.inviteId, { length: 16 });
@@ -335,7 +336,7 @@ async function craftHandshake(
   change(body);
   return craft({
     signer: await agentSigner(signer ?? invitee.keyStore),
-    entries: entriesTo(invitee.signed, inviter),
+    entries,
     payload: { type: 'handshake', body, replyTo: null, files: [] },
     createdAt: clock.t,
   });
@@ -433,6 +434,51 @@ describe('refusals (04 §3.6 Accept and Complete, §2.9)', () => {
     expect(await count(a, 'pairings')).toBe(0);
     // Nothing from these was stored: drops leave no row (IR-M1-7b-1 M-1).
     expect(await a.store.transaction((tx) => tx.count('envelopes', { direction: 'in' }))).toBe(0);
+  });
+
+  it("G-51: a handshake without the sender's owner kid is refused, no contact flagged, the invite unused", async () => {
+    const invite = await a.client.pairing.createInvite();
+    const aCard = await a.client.identity.signedCard();
+    const me = { keyStore: b.keyStore, signed: await b.client.identity.signedCard() };
+    const senderOwnerKid = encodeBase64url(
+      kidFromEncPublicKey(decodeHex0x(me.signed.card.ownerEnc, { length: 32 })),
+    );
+    const missing = await craftHandshake(
+      invite.inviteUrl,
+      me,
+      aCard,
+      undefined,
+      undefined,
+      entriesTo(me.signed, aCard).filter(
+        (e) => encodeBase64url(kidFromEncPublicKey(e.pk)) !== senderOwnerKid,
+      ),
+    );
+    expect(missing.recipients.map((r) => r.kid)).not.toContain(senderOwnerKid);
+    expect(await deliver(a, missing)).toEqual([
+      {
+        envelopeId: missing.id,
+        outcome: 'refused',
+        reason: 'sender_owner_entry_missing',
+        flagged: false,
+      },
+    ]);
+    // Recorded like a request (no contact), without the ciphertext or the payload (I-5).
+    expect(
+      await a.store.transaction((tx) => tx.get('envelopes', { envelope_id: missing.id })),
+    ).toMatchObject({
+      state: 'refused',
+      refused_reason: 'sender_owner_entry_missing',
+      contact_id: null,
+      from_key: missing.from,
+      envelope_json: null,
+      payload_json: null,
+    });
+    expect(await a.client.contacts.list()).toEqual([]);
+    expect(await count(a, 'pairings')).toBe(0);
+    // The refusal used nothing up: the honest handshake for the same invite pairs.
+    const honest = await craftHandshake(invite.inviteUrl, me, aCard);
+    await deliver(a, honest);
+    expect((await a.client.contacts.list()).map((c) => c.id)).toEqual([b.id]);
   });
 
   it('A drops a handshake that replays a third party real card and signatures from another key', async () => {

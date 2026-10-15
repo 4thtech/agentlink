@@ -40,6 +40,15 @@ export type CoreErrorCode =
   | 'envelope_too_large'
   // Policy (06 §3; M1-7d)
   | 'policy_context_invalid'
+  // Approvals and idempotency (04 §3.4.1, 06 §2.5, 07 §3.3; M1-7e)
+  | 'approval_action_invalid'
+  | 'approval_summary_invalid'
+  | 'approval_scope_expired'
+  | 'fee_quote_invalid'
+  | 'idempotency_unavailable'
+  | 'idempotency_args_invalid'
+  | 'idempotency_result_invalid'
+  | 'idempotency_lost'
   // Pairing (04 §3.6, §3.6.1; M1-7c)
   | 'invite_invalid'
   | 'invite_too_large'

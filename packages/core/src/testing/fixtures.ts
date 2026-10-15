@@ -7,7 +7,9 @@ import {
   decodeBase64url,
   decodeUtf8,
   encodeBase64url,
+  encodeHex,
   encodeUtf8,
+  hmacSha256,
   type OwnerPresence,
 } from '@agentlink/crypto';
 import type { Sealed } from '../store/schema.js';
@@ -47,7 +49,15 @@ export class TestStoreCipher implements StoreCipher {
       return parsed[3];
     });
   }
+
+  /** A keyed digest under a fixed test index key (07 §3.1); the real one is HKDF of the store key. */
+  indexDigest(data: Uint8Array): Promise<string> {
+    return Promise.resolve(encodeHex(hmacSha256(TEST_INDEX_KEY, data)));
+  }
 }
+
+/** The fixed index key of TestStoreCipher (test only). */
+export const TEST_INDEX_KEY = new Uint8Array(32).fill(0x1d);
 
 /** An ApprovalChannel that records requests and reports a scripted status. */
 export class RecordingApprovalChannel implements ApprovalChannel {

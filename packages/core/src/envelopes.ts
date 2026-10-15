@@ -75,6 +75,7 @@ import { nowOf, seal, type CoreContext } from './context.js';
 import { checkRecipientWrap, kidOf } from './envelope-wraps.js';
 import { CoreError } from './errors.js';
 import type { IdentityService } from './identity.js';
+import { REQUESTS_FULL, requestsFullTx } from './requests.js';
 import type { Row } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 
@@ -136,6 +137,8 @@ export type InboundReason =
   | 'held_owner_inactive'
   | 'superseded_key'
   | 'owner_entry_missing'
+  /** The sender's card is held and the recipients lack its `ownerEnc` `kid` (G-51, D-71 (4)). */
+  | 'sender_owner_entry_missing'
   | 'wrap_mismatch'
   | 'future_created_at'
   | 'duplicate_id'
@@ -160,7 +163,9 @@ export type InboundReason =
   /** An owner-authored type (`approval`, `revoke`) signed by the agent's own key. */
   | 'agent_key_type'
   /** `receive` was given a gift-wrap id that is not 64 lowercase hex (a caller bug). */
-  | 'wrap_id_invalid';
+  | 'wrap_id_invalid'
+  /** The requests queue is at a limit for this unknown key or in total (07 §3.2; M1-7e). */
+  | 'requests_full';
 
 export interface InboundReport {
   /** The validated envelope `id` (base64url, 16 bytes); absent when the envelope did not parse. */
@@ -629,7 +634,12 @@ export class EnvelopeService {
           if (done !== undefined) reports.push(done);
           if (applied !== undefined) {
             book = await this.#book();
-            reports.push(...(await this.#runHeld(own, book, kidOf(bytesOf(applied.ownerEnc)))));
+            reports.push(
+              ...(await this.#runHeld(own, book, {
+                ownerKid: kidOf(bytesOf(applied.ownerEnc)),
+                fromKey: applied.agentNostr.slice(2),
+              })),
+            );
           }
         }
       } finally {
@@ -643,19 +653,37 @@ export class EnvelopeService {
    * Held rows (04 §3.1.1 step 7, 07 §3.2): each one whose `from` is now a blocked, removed or
    * revoked key is dropped; one whose `from` is now a contact's current key, or that is due
    * (release_at), runs again from step 5 with exactly one `unwrapCek`. The rest stay held.
+   * After a card-update, `after` limits the pass to the rows held under that card's owner `kid`
+   * and the rows from that card's agent key (held under another owner `kid`, G-51).
    */
-  async #runHeld(own: OwnKeys, book: Book, ownerKid?: string): Promise<InboundReport[]> {
+  async #runHeld(
+    own: OwnKeys,
+    book: Book,
+    after?: { readonly ownerKid: string; readonly fromKey: string },
+  ): Promise<InboundReport[]> {
     const now = nowOf(this.#ctx);
-    const candidates = await this.#ctx.store.transaction((tx) =>
-      tx
-        .select('held_envelopes', ownerKid === undefined ? {} : { owner_kid: ownerKid }, {
-          orderBy: [
-            ['received_at', 'asc'],
-            ['envelope_id', 'asc'],
-          ],
-        })
-        .map((row) => ({ row, screen: screenInboundTx(tx, row.from_key) })),
-    );
+    const order = {
+      orderBy: [
+        ['received_at', 'asc'],
+        ['envelope_id', 'asc'],
+      ],
+    } as const;
+    const candidates = await this.#ctx.store.transaction((tx) => {
+      const rows =
+        after === undefined
+          ? tx.select('held_envelopes', {}, order)
+          : [
+              ...tx.select('held_envelopes', { owner_kid: after.ownerKid }, order),
+              ...tx
+                .select('held_envelopes', { from_key: after.fromKey }, order)
+                .filter((r) => r.owner_kid !== after.ownerKid),
+            ].sort(
+              (x, y) =>
+                x.received_at - y.received_at ||
+                (x.envelope_id < y.envelope_id ? -1 : x.envelope_id > y.envelope_id ? 1 : 0),
+            );
+      return rows.map((row) => ({ row, screen: screenInboundTx(tx, row.from_key) }));
+    });
     const reports: InboundReport[] = [];
     for (const { row, screen } of candidates) {
       const item: Item = {
@@ -816,7 +844,11 @@ export class EnvelopeService {
         kind: 'refuse',
         reason: step8,
         ...(disposition.contactId === undefined ? {} : { contactId: disposition.contactId }),
-        flagged: step8 === 'wrap_mismatch' && disposition.contactId !== undefined,
+        // A contact is flagged for wraps that differ (G-46) and for leaving out its own owner
+        // (G-51); never for leaving out this agent's owner.
+        flagged:
+          (step8 === 'wrap_mismatch' || step8 === 'sender_owner_entry_missing') &&
+          disposition.contactId !== undefined,
       };
       return { report: await this.#settle(o.item, final, o.envelope, o.payload.type) };
     }
@@ -1012,8 +1044,9 @@ export class EnvelopeService {
   }
 
   /**
-   * Step 8: the own owner's entry must be present, and it, plus the sender's agent and owner
-   * entries when the sender's card is held, must be the wrap of this CEK byte for byte (§3.3).
+   * Step 8: the own owner's entry must be present and, when the sender's card is held, the entry
+   * of that card's owner too (G-51, D-71 (4); one entry meets both when the owners are the same).
+   * These, plus the sender's agent entry, must be the wrap of this CEK byte for byte (§3.3).
    * Entries for keys the core does not hold are not checked. At most MAX_WRAP_CHECKS seals.
    */
   async #wrapCheck(
@@ -1030,6 +1063,11 @@ export class EnvelopeService {
     ];
     const checked = new Set([own.ownerKid]);
     if (senderCard !== undefined) {
+      // The sender's own owner (§3.2 entry 3): a presence check on the kid, no extra unwrap.
+      const senderOwnerKid = kidOf(bytesOf(senderCard.ownerEnc));
+      if (!o.envelope.recipients.some((r) => r.kid === senderOwnerKid)) {
+        return 'sender_owner_entry_missing';
+      }
       for (const pk of [bytesOf(senderCard.agentEnc), bytesOf(senderCard.ownerEnc)]) {
         const kid = kidOf(pk);
         if (checked.has(kid)) continue;
@@ -1072,12 +1110,21 @@ export class EnvelopeService {
     };
     try {
       const done = await ctx.store.transaction((tx) => {
-        if (!claim(tx, item)) return false;
+        if (!claim(tx, item)) return 'lost' as const;
+        // The requests-queue limits: the count and the insert in this one transaction (07 §3.2).
+        // Over a limit nothing is stored and nothing is sent; the seen rows stay.
+        if (d.state === 'request' && requestsFullTx(tx, envelope.from)) {
+          deleteRow(tx, item);
+          return 'full' as const;
+        }
         d.cardUpdate?.apply(tx);
         writeRow(tx, item, row);
-        return true;
+        return 'stored' as const;
       });
-      if (!done) return {};
+      if (done === 'lost') return {};
+      if (done === 'full') {
+        return { report: report(item.envelopeId, 'dropped', { reason: REQUESTS_FULL }) };
+      }
     } catch (error) {
       if (d.cardUpdate !== undefined && error instanceof CoreError) {
         // The card-update broke a §3.4.1 rule at apply time: dropped, nothing applied.
@@ -1183,6 +1230,17 @@ export class EnvelopeService {
             flagged: true,
           };
         }
+      }
+      // A refusal from an unknown key counts toward the requests-queue limits (07 §3.2); over a
+      // limit it is not stored. Pairing refusals keep their own rules (04 §3.6).
+      if (
+        effective.kind === 'refuse' &&
+        effective.contactId === undefined &&
+        envelope !== undefined &&
+        !(type !== undefined && PAIRING_TYPES.has(type)) &&
+        requestsFullTx(tx, envelope.from)
+      ) {
+        effective = { kind: 'drop', reason: REQUESTS_FULL };
       }
       if (effective.kind === 'drop' || envelope === undefined) {
         deleteRow(tx, item);

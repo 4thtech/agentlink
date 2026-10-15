@@ -1822,10 +1822,10 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (IR-M1-7a-1 R2-M1) A blocked or removed contact that rotates keys: its `card-update` is dropped, so its new key stays unknown. An envelope from an unknown key whose recipients include the `ownerEnc` `kid` of a **blocked or removed** contact's owner is dropped (recorded in `seen` after step 4), never held and never queued as a request, also after 48 h. Only active contacts' owner kids hold. Test, replacing the `it.todo` in `packages/core/src/contacts.test.ts`.
 
 #### M1-7b-b · core: require the sender's own owner entry when the sender's card is held (new, G-51, D-71 (4); follow-up to M1-7b)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** ready (planning 2026-10-15: dependency M1-7b merged (#66); G-51 decided yes in D-71 (4); the matching 04 §3.1.1 step 8 and §3.2 text lands with the D-71 docs PR) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7b
-- **Spec:** 04 §3.1.1 step 8, §3.2; D-71 (4) (the refusal is decided; the pairing-type, same-owner, owner-authored and held-envelope details are derived and proposed)
+- **Spec:** 04 §3.1.1 step 8, §3.2; D-71 (4)
 - **Invariants:** I-5, I-9
 - **Scope:**
   - Step 8 (04 §3.1.1): when the core holds the sender's card (a contact's current card; for a `card-update` the card it carries once it has passed §3.4.1; for the pairing types the card in the body once it has passed §3.6), refuse an envelope whose recipients lack that card's `ownerEnc` `kid`: stored as refused, shown in the activity feed, and the contact flagged. When `from` is not a contact's key, the refusal is recorded under the requests-queue and spam limits and no contact is flagged.
@@ -1929,7 +1929,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Property test: `evaluate` stays deterministic and side-effect free.
 
 #### M1-7e · core: approvals, requests queue, idempotency
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** ready · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7d, M1-8g (a Node client applies no policy before it)
 - **Spec:** 06 §1 rule 6, §2.5; 03 §3, §4.5; 04 §2.5.2 (batch approval, D-68); 07 §3 (`approvals.signed_decision`); 02 F-62, F-65, J4
@@ -1949,6 +1949,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `approval.cancel` on an approved, unused non-commitment approval voids it (the retry gets a new `pending_approval`); on a used one it changes nothing; a rule changed to `deny` after approval refuses the approved call.
   - Batch (D-68): a batch of 3 approves exactly those 3 and each proceeds once; a batch with one already-decided, expired, mismatched or commitment item applies none of its items, and the same signed object resubmitted later is refused by its nonce; `approval.cancel` on one item voids only that item; a request edited in the store after the batch was signed no longer matches its item.
   - (with M1-7f) A file changed between approval and retry is not sent; the retry returns a new `pending_approval`.
+- **Planning notes (2026-10-15):**
+  - M1-8g (#86, merged) is a Node change: the core takes the `PolicyVersionMark` as an option (M1-7d), so nothing here depended on it.
+  - In this card: creating pending requests (action validated by the strict `approvalActionSchema`, digest, `apr_` ID, TTL and the commitment scope's earlier expiry, `summary` checked like `approval-request.summary`, sealed columns, delivery to the `ApprovalChannel` after commit); the fee context from one quote; use-once (`checkApproval` then a compare-and-set `approved` → `void` inside the effect transaction, with policy evaluated again at use); collecting an owner-signed decision from the channel through `OwnerActions.apply`; the requests-queue limits and the owner's list and ignore; `clientRequestId` idempotency (07 §3.3).
+  - `void` for a used non-commitment approval (07 §3 `approvals.status`; proposed, owner confirms at merge): the row can authorise nothing more, `checkApproval` reports `void` and `approval.cancel` changes nothing. A status column only ever takes authority away; it never grants it (04 §2.5.1).
+  - Deferred, with their owners: the file realpath and re-hash (M1-7f); commitment parts and scope keys (M1-32); the console path (an `approval` envelope from the own owner, M1-7h with the owner channel); the MCP mapping of statuses for `agentlink_get_approval` (M1-9).
+  - Open question (for the owner): "accept" of a request from an unknown sender. A request carries no card, and a contact is created only by a completed pairing (04 §2.9), so accepting cannot create a contact. This card gives the owner the list and ignore; what "accept" does (show the request in the inbox, or answer with an invite) needs a spec line first. No path here turns a request into a contact.
+- **Threat note (draft):** assets: the owner's authority over approvals (I-4), the agent's store and attention (requests queue), and the at-most-once effect of a tool call. Entry points: tool calls with their args and `approvalId` / `clientRequestId` (untrusted agent input); inbound envelopes from unknown keys (untrusted, I-5); the `approvals` and `idempotency` rows (writable by a same-user process); what an `ApprovalChannel` returns (unverified until `OwnerActions.apply`). Abuse cases: (a) an approved ID reused for another action, or a second time, or after expiry, cancel or a rule changed to `deny`; (b) a pending request created or widened by a tool, or an action the strict schema does not accept; (c) a channel or a store edit that makes a request look approved; (d) a flood of requests from one key or many fresh keys filling the store, or a refusal that tells the sender the agent is live; (e) inbound text in an error, a log line or a summary; (f) two executions of one `clientRequestId` both making an effect, a reused key with other args returning the original result, or a stale `pending_approval` replayed so the agent loops. Stopped by: the digest recomputed from the call's action on every use and the stored decision re-verified (M1-7d); the compare-and-set `approved` → `void` in the effect transaction; `pending` rows only, no tool decides; the 5 / 200 limits counted with the insert in one transaction, refusals not stored and not sent; fixed reason codes; the idempotency lease and a compare-and-set on every effect, `IDEMPOTENCY_KEY_REUSED`, the keyed request digest. Residual: a same-user process that rewrites `void` back to `approved`, or deletes idempotency rows, can make an approved action run again within the G-1 residual (04 §2.5, D-67).
 
 #### M1-7f · core: files (send, fetch, refresh link, crypto-shredding)
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b

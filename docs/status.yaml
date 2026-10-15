@@ -139,7 +139,7 @@ areas:
         summary: "Approvals, batch approvals, cancellations and policy changes apply only with a valid owner signature, once each; a stored policy that no longer verifies makes the agent ask the owner."
       - name: "Approval requests and the requests queue"
         state: in-progress
-        prs: [94]
+        prs: [95]
         summary: "Approval requests with use-once, requests-queue limits and idempotency (M1-7e); in review."
       - name: "Held cards need the sender's own owner entry"
         state: in-progress
