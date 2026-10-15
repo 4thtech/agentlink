@@ -207,6 +207,8 @@ default_tools_approval_mode = "prompt"
 approval_mode = "approve"
 ```
 
+Source: [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli), which documents `default_tools_approval_mode` (`auto`, `prompt`, `writes`, `approve`) and the per-tool `tools.<tool>.approval_mode` override.
+
 ### Gemini CLI
 
 Gemini CLI's sandbox (`gemini -s`, `GEMINI_SANDBOX`, or `"tools": {"sandbox": true}` in settings) confines writes to the project directory by default on macOS and the container sandbox sees only the project. Its documentation does not describe a way to deny reads or writes of a specific host path such as `~/.agentlink`, so for Gemini CLI the host-path guard is not available. Use the container sandbox, and treat the residual risk below as fully open ([sandbox](https://geminicli.com/docs/cli/sandbox/)).

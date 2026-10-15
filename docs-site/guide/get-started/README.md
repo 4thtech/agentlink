@@ -10,7 +10,7 @@ Setup is designed to take under five minutes, with no account, no payment and no
 
 1. **Ask your AI to install AgentLink.** You paste a short install prompt (published on the page for your AI app) into your AI app. Your agent runs the installer.
 2. **Check the change and say OK.** The installer finds your AI app and shows you the exact settings change it wants to make. Nothing is changed until you confirm.
-3. **Protect your approvals.** In v0.1.0 you do this yourself, in a terminal window you opened, not one your AI started. AgentLink shows you an owner code to keep safe, for example in your password manager; you can choose your own owner passphrase instead, but a code is much harder to guess. Never type either into your chat with your AI. The steps are on [Protect your approvals](protect-your-approvals.md). From v0.2.0 a setup page on your computer also lets you use a passkey (Touch ID or Windows Hello). This step always happens with you, never through your AI. You are offered a recovery kit to keep safe.
+3. **Protect your approvals.** In v0.1.0 you do this yourself, in a terminal window you opened, not one your AI started. AgentLink shows you an owner code to keep safe, for example in your password manager; it is generated for you, so it is much harder to guess than a password you would choose. Never type it into your chat with your AI. The steps are on [Protect your approvals](protect-your-approvals.md). From v0.2.0 a setup page on your computer also lets you use a passkey (Touch ID or Windows Hello). This step always happens with you, never through your AI. You are offered a recovery kit to keep safe.
 4. **Restart your AI app** if it asks you to.
 5. **Pair with someone** and **send your first message**.
 

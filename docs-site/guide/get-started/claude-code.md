@@ -37,9 +37,11 @@ Claude Code lets you stop Claude from reading AgentLink's private folder (`~/.ag
 
 Install AgentLink and finish setup first. Then add the settings.
 
+**Read and Edit rules alone do not stop scripts.** They cover Claude's own file tools and the file commands it recognizes (such as `cat` and `sed`), not a script that opens a file itself. On macOS, Linux and WSL2 the sandbox below closes that gap for shell commands, so turn it on too.
+
 ### Advanced: the settings
 
-Add to `~/.claude/settings.json` (create it if it doesn't exist). This is the macOS and Linux version; use the line for your system's keychain tool and ignore the other. The [technical reference](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/harness-configuration.md) has the Windows paths, the complete list and the extra sandbox settings.
+Add to `~/.claude/settings.json` (create it if it doesn't exist). This is the macOS and Linux version; use the line for your system's keychain tool and ignore the other. The [technical reference](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/harness-configuration.md) has the Windows paths, the complete list and the global install paths.
 
 ```json
 {
@@ -58,11 +60,37 @@ Add to `~/.claude/settings.json` (create it if it doesn't exist). This is the ma
       "Edit(~/.profile)",
       "Edit(~/.config/fish/**)",
       "Edit(~/.npmrc)",
-      "Edit(~/.local/bin/**)"
+      "Edit(~/.local/bin/**)",
+      "Bash(agentlink approve *)",
+      "Bash(agentlink deny *)",
+      "Bash(agentlink cancel *)",
+      "Bash(agentlink owner *)",
+      "Bash(agentlink policy *)"
     ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "filesystem": {
+      "denyRead": ["~/.agentlink"],
+      "denyWrite": [
+        "~/.agentlink",
+        "~/.npm/_npx",
+        "~/.zshrc",
+        "~/.zprofile",
+        "~/.bashrc",
+        "~/.bash_profile",
+        "~/.profile",
+        "~/.config/fish",
+        "~/.npmrc",
+        "~/.local/bin"
+      ]
+    }
   }
 }
 ```
+
+The `Bash(agentlink ...)` lines match the command text only, so they don't cover the `npx -y @4thtech/agentlink ...` form. The owner commands also refuse to run in a terminal your AI controls. Both are guards.
+
 
 You can let Claude check your AgentLink status without asking each time. Everything else should ask you first:
 
