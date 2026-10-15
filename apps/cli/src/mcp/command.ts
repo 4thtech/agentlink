@@ -14,6 +14,7 @@
 //   close the loop stops and releases the lease before the agent closes. `agentlink://inbox`
 //   notifications are optional (06 §6).
 import process from 'node:process';
+import type { Readable, Writable } from 'node:stream';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { createLogger, type Logger } from '@agentlink/log';
@@ -103,20 +104,33 @@ export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
   };
 }
 
+/** Where the stdio transport reads, writes and hears shutdown signals. Tests pass their own. */
+export interface StdioSource {
+  readonly stdin: Readable;
+  readonly stdout: Writable;
+  /** Emits `SIGTERM` and `SIGINT` (the process in production). */
+  readonly signals: Pick<NodeJS.EventEmitter, 'once'>;
+}
+
 /**
  * The stdio transport. The SDK's transport does not watch for the end of stdin, so the server is
- * closed here when the client closes the pipe (06 §6: clean shutdown on stdin close).
+ * closed here when the client closes the pipe (06 §6: clean shutdown on stdin close). A harness
+ * that stops the server with SIGTERM or SIGINT gets the same clean shutdown: the loop stops and the
+ * lease is released before the agent closes.
  */
-function stdioTransport(): Transport {
-  const transport = new StdioServerTransport();
+export function stdioTransport(io?: StdioSource): Transport {
+  // Without `io`: the SDK's own process stdin and stdout (the only writer of stdout, see above).
+  const transport =
+    io === undefined ? new StdioServerTransport() : new StdioServerTransport(io.stdin, io.stdout);
+  const stdin = io?.stdin ?? process.stdin;
+  const signals = io?.signals ?? process;
   const close = (): void => {
     transport.close().catch(() => undefined);
   };
-  process.stdin.once('end', close);
-  process.stdin.once('close', close);
-  // A harness that stops the server with a signal gets the same clean shutdown (lease released).
-  process.once('SIGTERM', close);
-  process.once('SIGINT', close);
+  stdin.once('end', close);
+  stdin.once('close', close);
+  signals.once('SIGTERM', close);
+  signals.once('SIGINT', close);
   return transport;
 }
 
@@ -124,6 +138,6 @@ function stdioTransport(): Transport {
 export const mcpCommand = (version: string): CommandHandler =>
   createMcpCommand({
     openAgent: (options) => openAgent(options),
-    transport: stdioTransport,
+    transport: () => stdioTransport(),
     version,
   });

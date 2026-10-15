@@ -2,7 +2,9 @@
 // SDK's in-memory transport. The SDK client validates every `structuredContent` against the tool's
 // `outputSchema` (with Ajv), so each call below is also an output-schema check, in place of an MCP
 // Inspector run.
+import { EventEmitter } from 'node:events';
 import { readFileSync, readdirSync } from 'node:fs';
+import { PassThrough } from 'node:stream';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
@@ -12,7 +14,7 @@ import { termsInputSchema, type ContactDisplayName, type RestrictedName } from '
 import { describe, expect, it, vi } from 'vitest';
 import type { OpenAgentResult, OpenedAgent } from '../runtime/index.js';
 import { TOOLS, type ToolClient, type ToolContext } from '../tools/index.js';
-import { agentToolContext, createMcpCommand } from './command.js';
+import { agentToolContext, createMcpCommand, stdioTransport } from './command.js';
 import { SERVER_INSTRUCTIONS } from './instructions.js';
 import { createMcpServer, SERVER_NAME } from './server.js';
 
@@ -252,6 +254,60 @@ describe('agentlink mcp command', () => {
     );
     expect(io.output.print).not.toHaveBeenCalled();
   });
+
+  it.each(['SIGTERM', 'SIGINT'])(
+    'on %s the loop stops and the lease is released before the agent closes (M1-9r)',
+    async (signal) => {
+      const order: string[] = [];
+      let held = false;
+      const lease = {
+        get held() {
+          return held;
+        },
+        take: () => {
+          held = true;
+          order.push('take');
+          return Promise.resolve(true);
+        },
+        renew: () => Promise.resolve(held),
+        release: () => {
+          held = false;
+          order.push('release');
+          return Promise.resolve(true);
+        },
+      };
+      const coreClient = {
+        identity: { get: () => Promise.resolve(undefined) },
+        publisherLease: () => lease,
+        syncInbox: () => Promise.resolve({ partial: false, stored: 0, reports: [] }),
+        outbox: { processDue: () => Promise.resolve({}) },
+        inbox: { counts: () => Promise.resolve({ inbox: [], requests: 0 }) },
+      } as unknown as AgentLinkClient;
+      const agent = {
+        name: 'work',
+        agentId: A,
+        client: coreClient,
+        close: () => {
+          order.push('close');
+          return Promise.resolve();
+        },
+      } as unknown as OpenedAgent;
+      const signals = new EventEmitter();
+      const stdin = new PassThrough();
+      const command = createMcpCommand({
+        openAgent: () => Promise.resolve({ status: 'ok', agent }),
+        transport: () => stdioTransport({ stdin, stdout: new PassThrough(), signals }),
+        version: '0',
+        logger: silent,
+      });
+      const running = command({ command: 'mcp', parsed, ...io });
+      await vi.waitFor(() => expect(order).toEqual(['take']));
+      signals.emit(signal);
+      await expect(running).resolves.toBe(0);
+      expect(order).toEqual(['take', 'release', 'close']);
+      expect(stdin.listenerCount('data')).toBe(0);
+    },
+  );
 
   it('still starts when the agent is not set up, and every tool says what to run', async () => {
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();

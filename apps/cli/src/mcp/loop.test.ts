@@ -217,6 +217,46 @@ describe('background loop (M1-9r)', () => {
     await loop.stop();
   });
 
+  it('consecutive partial passes back off exponentially up to the sync interval; a full pass resets', async () => {
+    const s = stubClient();
+    let partial = true;
+    s.sync.mockImplementation(() => Promise.resolve({ partial, stored: 0, reports: [] }));
+    const timers = new ManualTimers();
+    const loop = new BackgroundLoop({ client: s.client, logger, timers });
+    loop.start();
+    timers.fire(0);
+    await flush();
+    let due = 0; // the start-up pass
+    const seen: number[] = [];
+    for (let i = 0; i < 8; i += 1) {
+      timers.fire(due);
+      await flush();
+      due = timers.delays().find((ms) => ms !== LEASE_INTERVAL_MS) ?? -1;
+      seen.push(due);
+    }
+    // Offline or every relay down: 1 s, 2 s, 4 s ... capped at the 30 s interval.
+    expect(seen).toEqual([
+      1_000,
+      2_000,
+      4_000,
+      8_000,
+      16_000,
+      SYNC_INTERVAL_MS,
+      SYNC_INTERVAL_MS,
+      SYNC_INTERVAL_MS,
+    ]);
+    partial = false;
+    timers.fire(due);
+    await flush();
+    partial = true;
+    timers.fire(SYNC_INTERVAL_MS);
+    await flush();
+    // The full pass reset the backoff: the next partial one starts again at 1 s.
+    expect(timers.delays()).toContain(PARTIAL_RETRY_MS);
+    expect(s.sync).toHaveBeenCalledTimes(10);
+    await loop.stop();
+  });
+
   it('stop waits for a pass in flight, then releases; nothing runs afterwards', async () => {
     const s = stubClient();
     const timers = new ManualTimers();

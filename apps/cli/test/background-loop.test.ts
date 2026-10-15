@@ -418,13 +418,16 @@ describe('background loop: two servers on one agent (M1-9r, D-73)', () => {
     expect(await leaseRows(alice.store)).toHaveLength(1);
 
     await inviteAccepted(alice.client, bob);
-    // Both servers run their pass, and the idle one also serves an agentlink_inbox catch-up at the
-    // same moment (its tools still work): the handshake is processed once, each wrap goes out once.
-    await Promise.all([
+    // The holder runs its pass; the idle server's pass is a no-op without the lease (asserted below),
+    // while it serves an agentlink_inbox-style sync and outbox run at the same moment (its tools still
+    // work). The handshake is processed once and each wrap reaches each relay once.
+    const [, idlePassed] = await Promise.all([
       holder.pass(),
       idle.pass(),
       alice2.syncInbox().then(() => alice2.outbox.processDue()),
     ]);
+    expect(idlePassed).toBe(false);
+    expect(idle.holding).toBe(false);
     expect(await paired(alice.client, bob.client)).toBe(true);
     await bob.client.syncInbox();
     expect(await paired(bob.client, alice.client)).toBe(true);

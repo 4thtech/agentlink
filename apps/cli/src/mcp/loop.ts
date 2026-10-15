@@ -16,7 +16,9 @@
 //   then process the stored envelopes: handshake completion and `handshake-ack`, card updates, held
 //   rows, acks), then `outbox.processDue` (staged pairing messages get their rows; due rows are
 //   published, each under its per-row claim, M1-7k). Then the next pass after `syncIntervalMs`, or
-//   at once-ish (`PARTIAL_RETRY_MS`) when the fetch ran out of budget.
+//   sooner when the fetch did not finish (budget, a relay down): 1 s after the first partial pass,
+//   doubling with each consecutive partial one up to `syncIntervalMs`, reset by a full pass. So an
+//   offline machine or a dead relay set costs at most one pass per `syncIntervalMs` once backed off.
 // - Relay "subscriptions". The core's Transport has no live `subscribe` yet (packages/core
 //   transport.ts: "`subscribe` joins later"; S2), so the holder reads its relays with a repeated
 //   catch-up pass. Swapping in a live subscription changes only `#pass`.
@@ -49,7 +51,10 @@ export const LEASE_INTERVAL_MS = PUBLISHER_LEASE_RENEW_SECONDS * 1000;
 export const SYNC_INTERVAL_MS = 30_000;
 /** Fetch budget of one loop pass (the tools' catch-up uses 3 s; the loop may take longer). */
 export const PASS_BUDGET_MS = 10_000;
-/** A pass whose fetch did not finish (budget, a relay) is followed by another this soon. */
+/**
+ * The first pass after a partial one (budget, a relay down) follows this soon; the delay doubles
+ * with each further consecutive partial pass, capped at the sync interval.
+ */
 export const PARTIAL_RETRY_MS = 1_000;
 
 /** The publisher lease as the loop uses it (core `PublisherLease`). */
@@ -128,6 +133,8 @@ export class BackgroundLoop {
   #passTimer: unknown;
   #leaseStep: Promise<void> | undefined;
   #passRun: Promise<void> | undefined;
+  /** Consecutive partial passes, for the retry backoff. */
+  #partials = 0;
 
   constructor(options: BackgroundLoopOptions) {
     this.#client = options.client;
@@ -282,9 +289,17 @@ export class BackgroundLoop {
     this.#passTimer = this.#timers.set(() => {
       this.#passTimer = undefined;
       void this.pass().then((partial) => {
-        this.#schedulePass(partial ? PARTIAL_RETRY_MS : this.#syncMs);
+        this.#partials = partial ? this.#partials + 1 : 0;
+        this.#schedulePass(this.#nextDelay());
       });
     }, ms);
+  }
+
+  /** The delay before the next pass: the sync interval, or the partial-pass backoff. */
+  #nextDelay(): number {
+    if (this.#partials === 0) return this.#syncMs;
+    const exponent = Math.min(this.#partials - 1, 30);
+    return Math.min(PARTIAL_RETRY_MS * 2 ** exponent, this.#syncMs);
   }
 
   #clearPassTimer(): void {
