@@ -865,7 +865,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Done before M1-7d unpends the `owner-action` suite. Regeneration reproduces the files byte for byte, and the vector check passes in every declared runtime.
 
 #### M1-1h-d · Vectors: `check-generators` reports three suites that do not match their generators; encodings follow-ups (new, IR-M1-2a-1 F01, pre-existing)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`test-vectors/**` path, audit-rules §2.2, §2.4: a changed vector is S2; RED commit applies) · **Phase:** M1a (before M1-23)
+- **Status:** in review (4thtech/agentlink#104) · **Size:** S · **Tier:** Opus · **Security:** S2 (`test-vectors/**` path, audit-rules §2.2, §2.4: a changed vector is S2; RED commit applies) · **Phase:** M1a (before M1-23)
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/
 - **Depends on:** M1-1h
 - **Spec:** 04 §3.6, §3.6.1; `test-vectors/README.md`; `docs/process/audit-rules.md` §3.4
@@ -2053,7 +2053,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Fresh salts (04 §5, D-61): two Records for the same recipient, and a replacement Record for the same envelope, have different CSPRNG salts; no salt-derivation API exists.
 
 #### M1-7h · core: inbox sync, card updates, revocation, delivery acks
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** in-progress · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7c, M1-5c
 - **Spec:** 07 §2 (`syncInbox`), §4.2; 04 §2.6, §3.4, §7 (spam); 06 §2.2, §6; 02 F-21, F-23, F-65
@@ -2069,6 +2069,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - 500 envelopes from one contact are rate-limited without delaying another contact's envelopes.
   - In one sync pass, a `card-update` is processed before the same contact's envelopes from the new key, whatever their arrival order or `created_at` (04 §3.1.1, step 7).
   - (Catch-up) The M1-9c read-only test passes against this API: a handshake pending in the relay stays unprocessed, and no ack, contact, read mark or receipt results.
+
+#### M1-7h-b · core: revocation follow-ups (new, IR-M1-7h-1 F01, F04; blocks the M1 gate)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/core
+- **Depends on:** M1-7h, M1-7e, M1-32
+- **Spec:** 07 §3.4 (`revoked_agents` "Transaction"), §3.2; 04 §3.4.1, §3.4.2 (void rule 3); 06 §2.1, §6
+- **Invariants:** I-4, I-5
+- **Scope:** M1-7h applies a verified `revoke` (`revoked_agents`, contact status or `identity.revoked_at`, pending outbox rows stopped as `revoked`) and drops any other. Left here: in the same store transaction, void every pending approval and every open commitment part with the revoked agent as counterparty (void rule 3); the activity line for a revoke; `catchUp` counts that leave out `received` rows whose type is not a message once it is known (F04 a); acks staged for the outbox instead of published inside `syncInbox` (F04 b); a KeyStore failure while listing own keys degrades the fetch instead of failing the sync (F04 c).
+- **Acceptance:** after a contact's revoke, an approval pending for an action with that contact is `void` and its commitment parts are void, in the revoke's transaction; a peer's acks do not raise `catchUp` counts; `syncInbox` returns within its budget with 200 acks pending.
 
 #### M1-7j · core: relay changes and the owner card-update (G-24) (new)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (D-73 (5): it serves the owner surfaces and `relays set`, M1-9n; neither J8 nor J9 needs it)
@@ -2296,7 +2305,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### CLI and MCP server (`@4thtech/agentlink`, `apps/cli`)
 
 #### M1-9j · spec: InboundMessage shape, M1a approval channel, handler module (new, D-73)
-- **Status:** ready · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
+- **Status:** in-progress (spec in 4thtech/agentlink#103) · **Size:** S · **Tier:** Opus · **Security:** S2 (approvals, audit-rules §2.4; IR-M1-9j-1 F01) · **Phase:** M1a
 - **Repo/path:** agentlink · docs/foundation/06-mcp-server.md, 03-architecture.md, 07-sdk-transport-storage.md, docs/process/backlog.md
 - **Depends on:** D-73 (1) and (3) (decided)
 - **Spec:** 06 §2.2, §2.5, §4, §6; 03 §3, §4.5; IR-D48-1 F15f; G-15
@@ -2374,6 +2383,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - **Display ↔ signature binding (IR-M1-8c-1 F-4).** The review lines the owner sees are derived by node from the same stored actions it hashes into the signed items, never from text the core or the agent passes in; EIP-712 signing accepts only an allowlist of typed-data domains; a flow that signs a pair ("Remember for this contact" with its `policy.set`, 04 §2.5) binds both to the one confirmation screen. Tests: a changed summary for an unchanged action, a typed-data request outside the allowlist and a second signature outside the confirmed pair are each refused.
   - (IR-M1-8c-1 F-9) The `approval.decideBatch` signed by node (M1-8c) verifies against the M1-2e `owner-action` vectors.
   - `owner init` on a keychain machine creates the owner key once and refuses to overwrite it.
+  - (IR-M1-9j-1 F03, 06 §8 terminal output rule) A pending request whose stored action carries an ANSI/OSC canary (cursor movement, screen clear, an OSC 8 link, C1 controls, bidi and zero-width characters) in its message text, file name and contact name, plus a CR overwrite (`approve\rdeny`), an ESC sequence split exactly at the 2 000-code-point cut, NEL U+0085 and C1 CSI U+009B, a 10 000-character single line, a 500-line value and a base letter with 50 combining marks, prints, in `approve <id>` and in `approve` with no ID, with every such sequence removed (no ESC, CR or C1 left), inside the marked untrusted region, cut after sanitizing to the 06 §8 limits (2 000 code points, 40 lines, 200-code-point lines wrapped, 60 lines per region, 2 combining marks per base character), and with the who, cost and consequence lines unchanged and after it; the signed digest is the one recomputed from the displayed action (IR-M1-9j-1 F06).
 
 #### M1-9m · CLI: policy and safety-code check (†) (new, split from M1-9a and M1-9b)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the gate path: J8 and J9 run on the defaults)
@@ -2914,10 +2924,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Negotiation chain (04 §3.4, IR-D55-1 F04): key = `termsId` plus the unordered parties; `version` = newest + 1 and `previousTermsHash` = newest hash, computed from the local store; no forks (04 §3.4): a second envelope for a version from the same sender is refused, a version is locked once an accept for it was sent or received, and concurrent counters from both sides are a conflict on both sides, with no tie-break.
   - `termsHash` helper exactly per 04 §3.4; inbound `terms` are untrusted data (sizes, string lengths and list lengths bounded).
   - Vectors (canonical inputs, hashes, rejected inputs) generated by a session that does not implement the schema, under the M1-1h rules.
+  - **Spec clarifications (D-74; proposed, owner confirms at merge).** The open questions Q1–Q18 of the vector PR 4thtech/agentlink#98 are answered in 04 §3.4 ("Canonical-form and chain clarifications") and 06 §2.2a ("TermsInput rules"): the size limits, the pinned Unicode 15.0.0 character rule, key presence, `parties` order and the rest. The vectors in #98 and the implementation must follow these rules. Any vector built on a different assumption is regenerated before #98 merges, in particular those for Q2 (`XDAI` accepted, `EURC` refused), Q3 (`price` is `null`, never absent), Q4 (`parties` sorted, any other order refused, mapping not own-first), Q6 (U+2028/U+2029 refused), Q7 (unassigned code points refused), Q11 (version/pointer mismatch refused at parse) and Q17 (anchored resends, IR-D-74-1 F01); and the new rules get vectors (the size limits, duplicate deadline refs, mixed `TermsInput` ids, empty strings, `note` characters, token symbols).
 - **Acceptance:**
   - Round-trip and strictness tests; property fuzzing raises only validation errors; vectors pass in Node, browsers and Workers.
   - The hash is canonical (key order and whitespace do not change it; any covered field does); an `accept` whose `termsHash` does not match the offer it answers is rejected.
   - `TermsInput` rejects `termsId`, `version`, `parties`, `previousTermsHash`, `termsHash` and unknown keys.
+  - D-74 (IR-D-74-1 F02): the Unicode 15.0.0 table is generated by a generator under `tools/` from UCD 15.0.0 `extracted/DerivedGeneralCategory.txt` with its SHA-256 pinned (and recorded in 04 §3.4); the source file is vendored under `tools/` next to its pinned SHA-256, so the drift check needs no network (IR-D-74-1 D1-I01); the table is committed in `@agentlink/types`, and checked by a drift check in `pnpm lint`; the same table serves the `approval-request.summary` rule (replacing the runtime `\p{…}` classes); the core runs the Unicode 15.0 probe at load and, if it fails, refuses every `terms` body with `UNSUPPORTED_RUNTIME`. Vectors cover the table hash, code points new in 15.0 (accepted) and unassigned in 15.0 (refused), and the probe string.
+  - D-74 chain and answer vectors: a resend that arrives before the original, from both sides (IR-D-74-1 F01); a received answer with `createdAt` = `validUntil` delivered later (timely) and `validUntil` + 1 (refused) (F03); a path-(b) `reject` whose `replyTo` is the sender's own offer (F04); `XDAI` accepted and `EURC` refused as a currency, and auto-accept only for the USD set (F05).
   - Vectors include rejected inputs for every canonical-form rule (an RLO in `subject`, a zero-width space in a deliverable, Cyrillic `ЕUR`, `1500.0000001`, `0`, a due date with an offset instead of `Z`, upper-case hex) and chain cases (a version gap, a pointer to an older version, the same `termsId` from another pair, two envelopes for one version from the same sender, a fork after an accept, concurrent counters from both sides).
 
 #### M1-22 · e2e: J8 negotiate and agree over Talk (new)
@@ -4125,7 +4138,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 12. **G-12 (M) JCS and invite compression.** RESOLVED. *JCS:* by M1-1a (4thtech/agentlink#27): in-repo RFC 8785 code checked against the RFC vectors (`packages/crypto/src/jcs.ts`), the alternative proposed here, so no dependency was added. *Compression:* by 4thtech/agentlink#70 (D-69; the encoding decided by Tali in chat, 2026-10-14; the decoder rules proposed, owner confirms at merge), in 04 §3.6: raw DEFLATE (RFC 1951) with no zlib header or checksum, through the platform `CompressionStream("deflate-raw")` and `DecompressionStream("deflate-raw")`. Proposed with it (revised after review IR-D-69-1): the whole input bounded before URL parsing (the canonical prefix plus at most 21 846 characters of strict base64url, or the bare payload); inflation in bounded slices with a running count, capped at 16 384 bytes before any parse, with an orderly shutdown; the stream must end exactly at the end of the input (malformed, truncated and trailing-byte streams refused in every runtime, the codec detecting trailing input itself where the platform does not); fatal UTF-8 with the BOM kept, I-JSON and the strict schema before use; the encoder checks both limits; compressed bytes never hashed or signed; one codec in `@agentlink/core` (M1-7c). The proof-pack link is not covered (G-52). *Was:* 04 §3.1, §3.6; `AGENTS.md` dependency allowlist. No JCS implementation was allowlisted although `envelopeHash` depends on it; "deflate" did not say raw DEFLATE or zlib. *Proposed:* approve a vetted RFC 8785 implementation (or in-repo code with RFC vectors); specify `deflate-raw` via `CompressionStream`. *Blocked:* M1-1a (done), M1-7c.
 13. **G-13 (L) Record kind ↔ payload type.** 05 §3.1 kinds vs 04 §3.4 payload types; no mapping. *Blocks:* M1-7g.
 14. **G-14 (M) `agentlink_fetch_file` and SSRF in Workers.** 06 §2.3 (`savedTo`, inbox folder) vs 08 §3 (no filesystem); 04 §4 DNS checks are not possible in Workers. *Proposed:* cloud `agentlink_fetch_file` stores the decrypted file in the user's R2 and returns a short-lived link; Workers SSRF = https + IP-literal and hostname checks, documented reliance on Workers egress. *Blocks:* M1-15, M2-3b.
-15. **G-15 (L) Shared tool handlers.** 06 §1 rule 1; no shared package between `apps/cli` and `apps/cloud-agent` in the layout. *Proposed:* `packages/mcp-tools`. *Blocks:* M1-9c (structure), M2-3b.
+15. **G-15 (L) Shared tool handlers.** **RESOLVED (D-73 (1), Tali, in chat, 15 Oct 2026; spec in 06 §1, 03 §3, 07 §1 by M1-9j):** for M1a the handlers live in `apps/cli`. *Derived (D-73; proposed, owner confirms at merge):* the module is `apps/cli/src/tools/`, runtime-agnostic (no Node built-in, Node global or `@agentlink/node` import, fenced by ESLint rules and a neutral-platform bundle check in CI), moved into a shared package at M2-3b; no new package or audit-rules path row before then. *Was:* 06 §1 rule 1; no shared package between `apps/cli` and `apps/cloud-agent` in the layout. *Proposed:* `packages/mcp-tools`. *Blocks:* M1-9c (structure), M2-3b.
 16. **G-16 (M) Owner link and cloud commands.** 08 §2.1 (QR direction, code derivation and channel unspecified); `agentlink owner link`, `cloud deploy`, `cloud login` (08 §2.1, §3.2, §3.3) are missing from the 06 §8 command list. *Proposed:* specify the owner-link protocol (short code from a transcript hash) and add the commands with † where owner presence applies. *Blocks:* M2-2c, M2-3c, M2-3d.
 17. **G-17 (L) EIP-3009 flag location.** 05 §2.2 has no on-chain flag; 05 §2.5 says "flagged in the chain config". *Proposed:* off-chain flag (client + submitter), contract relies on the token call reverting. *Blocks:* M1-3c.
 18. **G-18 (L) GA undefined.** 05 §5 freezes the Notary "at GA"; 10 has no GA milestone. *Blocks:* M4-EPIC.

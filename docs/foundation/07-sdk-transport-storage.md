@@ -16,7 +16,7 @@ All packages live in the public `agentlink` monorepo (see 09). Every package mus
 | `@agentlink/storage` | types, crypto | `StorageAdapter` interface; `inline`, `drop` (default, D-48) and `s3` adapters (P0); `gdrive`, `dropbox`, `onedrive` connectors (P1, M2, D-49); `ipfs-pinning` (P2); storage selection (§5.6) |
 | `@agentlink/core` | all above | `AgentLinkClient`: identity, contacts, envelopes, threads, files, proofs, policies, approvals; `Store`, `ApprovalChannel` interfaces (the key interfaces are in crypto, G-2) |
 | `@agentlink/node` | core | Node implementations: keychain `KeyStore` and the opt-in passphrase-locked file `KeyStore` for headless machines (§9, D-54), SQLite `Store`, local approval server (Node only) |
-| `@4thtech/agentlink` | node, core | CLI + MCP server (stdio) (Node only) |
+| `@4thtech/agentlink` | node, core | CLI + MCP server (stdio) (Node only). Its tool handlers (`src/tools/`) import no Node built-in, Node global or `@agentlink/node` module and nothing outside `src/tools/` (06 §1), and are moved into a shared package for the cloud agent at M2-3b (06 §1, G-15, D-73 (1)) |
 
 Integrators use `@agentlink/core` directly (with their own `KeyStore`/`Store`) and pass their `appId` to earn integrator fees.
 
@@ -84,7 +84,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | `approvals` | approval_id, action_json (`enc`: `args` can hold message text), scope_json (commitments, D-55; immutable after creation, carried in `action.context.scope`, 04 §3.4.2), answers_envelope_id, scope_key (at most one live scope per value, §3.5), source (owner \| policy grant, with the policy hash `enc`), signed_decision (the owner's `SignedOwnerAction`: an `approval.decide`, or the `approval.decideBatch` that covers this row, copied per row and re-verified for this row's `approvalId`, 04 §2.5.2, D-68; re-verified on every use, `status` is only a cache, 04 §2.5.1), signed_cancel (the owner's `approval.cancel`, if any; re-verified on use), parts in `commitment_parts` (§3.5; this replaces the earlier parts_used_json), summary (`enc`: it names the contact), status (pending \| approved \| denied \| expired \| cancelled \| void; an approval other than a commitment becomes `void` in the transaction of its one use, and a status only ever takes authority away, never grants it: proposed, owner confirms at merge, M1-7e), expires_at, created_at, decided_at |
 | `policies` | The current signed policy, one row (§3.4); this replaces the earlier key, value_json, updated_at |
 | `sync_cursors` | relay_url, last_seen |
-| `outbox`, `seen`, `held_envelopes`, `blocked_keys`, `rate_counters` | Delivery (§3.2) |
+| `outbox`, `seen`, `held_envelopes`, `blocked_keys`, `rate_counters`, `publisher_lease` | Delivery (§3.2) |
 | `idempotency` | Tool results by `clientRequestId` (§3.3) |
 | `owner_action_nonces`, `revoked_agents` | Owner authority (§3.4) |
 | `budget_ledger`, `budget_state`, `commitment_parts` | Money and commitments (§3.5) |
@@ -146,6 +146,11 @@ Every mutating call runs: **policy check → (approval) → action → store →
 - **Keys.** wrap_id is the primary key; (envelope_id, recipient_key, attempt) is unique. At most one row per (envelope_id, recipient_key) is `pending`.
 - **Transaction.** The core stores the outbound envelope and all of its outbox rows in one store transaction before the first publish. For a commitment part this is the claim transaction (§2.1, §3.5). A retry after a crash republishes the same stored event: no envelope or seal is signed again. A relay that asks for NIP-42 AUTH still gets a login signed through the KeyStore (§4.2).
 - **States.** A row is `sent` once 2 relays have returned `OK` (§4.2), and `not_delivered` if that has not happened by give_up_at. `envelopes.delivery` follows the `contact` rows only: `sent` when every one is `sent`, `not_delivered` as soon as one is. The activity feed then says that the message did not reach that contact's agent. A failed `owner` row is reported separately, as an owner copy that did not arrive. Sending again is a new row with the next attempt, wrapping the same stored envelope.
+- **Per-row claim (M1-7k, #99; 06 §6).** Several processes share one store, so each `pending` row has at most one publisher at a time, with no extra column:
+  - **Claim.** In the store transaction that lists due rows (state `pending`, next_attempt_at ≤ now, oldest next_attempt_at first, at most 8 per listing), the process moves each listed row's next_attempt_at to now + 30 s (`OUTBOX_CLAIM_SECONDS`) with a compare-and-set on (wrap_id, state `pending`, the next_attempt_at it read). Only the rows whose compare-and-set changed one row are its own. It remembers the value it wrote as its claim. Another process does not see the row as due until the claim lapses, so a process that stalls or stops hands the row over within 30 s (the first retry interval, §4.2; longer than one publish).
+  - **Re-check before publishing.** Right before publishing, the process reads the row again and goes on only if it is still `pending` and next_attempt_at still equals its claim.
+  - **Recording the attempt.** acks, attempts and the next next_attempt_at are written with a compare-and-set on (state `pending`, next_attempt_at = its claim). A process that lost the claim neither publishes nor reschedules the row.
+  - **Leaving `pending`.** `sent` and `not_delivered` are a compare-and-set on state `pending` only: `sent` records a fact any process may have seen (2 `OK` for the same signed event), and `not_delivered` is set right after the claim, before any publish, so neither undoes another process's progress.
 - **Retention.** wrap_json is deleted when the row leaves `pending`. The row itself is deleted 7 days later.
 - **At rest.** relays and acks are `enc` (URLs). wrap_json stays in clear: it is the ciphertext that relays already hold.
 - **Revocation (proposed; owner confirms at merge).** The revoke transaction (§3.4) sets every `pending` row whose recipient_key is a known key of the revoked agent, at any epoch, to `not_delivered` with reason `revoked`. For the own agent it does so for every `pending` row. The activity feed reports it.
@@ -227,6 +232,22 @@ Every mutating call runs: **policy check → (approval) → action → store →
 - **Retention.** Buckets with bucket ≤ now − 3 600 are deleted.
 - **At rest.** In clear (IDs and counts).
 - **On failure.** A counter that cannot be read counts as being at the limit for that contact. Other contacts are not affected.
+
+**`publisher_lease`**: which process of an agent keeps the relay subscriptions and runs the background loop (06 §6; D-73, derived; proposed, owner confirms at merge; M1-9r).
+
+| Column | Type and meaning |
+|---|---|
+| name | text: the lease, `subscriptions` (the only value in M1) |
+| holder | `id`: 16 random bytes, base64url, chosen by each server process at start |
+| lease_until | `int`: unix seconds |
+
+- **Keys.** name is the primary key; the store holds one agent, so there is one row.
+- **Take.** In one store transaction a process inserts the row with its holder and lease_until = now + 60, or replaces a row whose lease_until ≤ now with a compare-and-set on the old holder. A process whose take changes no row is not the holder and tries again 20 s later.
+- **Renew.** The holder sets lease_until = now + 60 every 20 s, with a compare-and-set on holder = its own. If that changes no row, it has lost the lease: it closes its subscriptions and stops the loop before doing anything else.
+- **Release.** On clean shutdown the holder deletes the row with a compare-and-set on holder = its own.
+- **At rest.** In clear (a random ID and a time).
+- **On failure.** A lease that cannot be read or written counts as not held: the process keeps no subscriptions, and its tools still work (06 §6).
+- **Not authority.** The lease decides only who keeps relay connections. Every effect is still idempotent and claimed per row (outbox claim, M1-7k; idempotency lease, §3.3), so two holders at once cost connections, never a second effect.
 
 ### 3.3 Idempotency results (06 §1 rule 6)
 
@@ -428,7 +449,13 @@ interface Transport {
   wrap(envelope: Envelope, recipients: NostrRecipient[], keys: EnvelopeKeys): Promise<WrappedEnvelope>; // one gift wrap per distinct recipient key; publishes nothing
   publish(storedWrap: SignedWrap, relays: RelayUrl[]): Promise<PublishResult>; // exactly the row's relays (§3.2, §4.3), never any other
   subscribe(keys: EnvelopeKeys, onEnvelope: (e: Envelope, meta) => void): Unsubscribe;
-  sync(keys: EnvelopeKeys, since: number): Promise<Envelope[]>;
+  sync(options: {
+    relays: RelayUrl[];                          // the own list only (§4.3); AUTH only there
+    identities: { pubkey: string; epoch?: number }[]; // own Nostr keys at every epoch: the REQ's #p
+    persistence: { getCursor; setCursor; isSeen }; // the core's sync_cursors and seen (§3.2)
+    onEnvelope(item: { envelope; giftWrapId; relay; recipient }): 'processed' | 'verified' | 'retry';
+    budgetMs?: number;                           // 3 000 by default (06 §6)
+  }): Promise<{ partial: boolean }>;
 }
 
 // EnvelopeKeys (03 §3, 04 §3.1.1) exposes the secret-key operations the transport needs:
@@ -439,6 +466,8 @@ interface Transport {
 ```
 
 **Two steps, store first (proposed, owner confirms at merge; IR-M1-7k-1 Q1).** Wrapping and publishing are separate calls so that the core can meet §3.2: it calls `wrap`, stores the outbound envelope with one outbox row per returned wrap in one store transaction, and only then calls `publish` for each stored wrap, with that row's relay list. A retry republishes the same stored wrap; nothing is wrapped or signed again. `wrap` publishes nothing; `publish` sends to exactly the relays it is given.
+
+**Sync owned by the core (proposed, owner confirms at merge; M1-7h, IR-M1-7h-1 F05).** `sync` reads the relays it is given with the 48 h look-back of §4.2 and hands each newly opened wrap's strictly parsed, not yet verified envelope to `onEnvelope`. The core owns the cursors and the seen-set: the transport deduplicates by gift-wrap ID only (never by the sender-chosen envelope ID), and the handler's answer decides whether the wrap counts as handled and whether the relay's cursor may move (`retry` keeps both). The core skips a copy whose `envelopeHash` is already in `seen` before its signature check, by design: that row is written only after a signature over the same hash passed, so the envelope is verified once. `subscribe` follows the same handler shape.
 
 An XMTP adapter (P2) implements the same interface, in the same two steps; envelopes are unchanged.
 
