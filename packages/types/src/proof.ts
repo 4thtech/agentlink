@@ -15,6 +15,7 @@ import {
   bytes32Hex,
   evmAddress,
   isCanonicalEcdsaSignature,
+  isUtcTimestamp,
   sha256Hex,
   uint256Decimal,
   uint53,
@@ -25,46 +26,6 @@ import { chainKeySchema } from './policy.js';
 import { isUsdAmount, parseUsd, usdAmountSchema } from './usd.js';
 
 const freeze = <T>(value: T): Readonly<T> => Object.freeze(value);
-
-// --- timestamps ----------------------------------------------------------------------------------
-
-const UTC_TIMESTAMP = /^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})Z$/;
-
-const daysIn = (year: number, month: number): number =>
-  month === 2
-    ? (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
-      ? 29
-      : 28
-    : [4, 6, 9, 11].includes(month)
-      ? 30
-      : 31;
-
-/**
- * True for a strict RFC 3339 UTC timestamp with whole seconds, `YYYY-MM-DDTHH:MM:SSZ`: no offset,
- * no fraction, no leap second, a real calendar date. One spelling per instant.
- */
-export function isUtcTimestamp(value: unknown): value is string {
-  if (typeof value !== 'string') return false;
-  const m = UTC_TIMESTAMP.exec(value);
-  if (m === null) return false;
-  const [year, month, day, hour, minute, second] = m.slice(1).map(Number) as [
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-  ];
-  return (
-    month >= 1 &&
-    month <= 12 &&
-    day >= 1 &&
-    day <= daysIn(year, month) &&
-    hour <= 23 &&
-    minute <= 59 &&
-    second <= 59
-  );
-}
 
 /** PROPOSED form of the pack's and ProofStatus' `at` and `exportedAt` (the spec writes "…"). */
 export const utcTimestampSchema = z

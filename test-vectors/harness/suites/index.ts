@@ -18,6 +18,7 @@ import { placeholderSha256 } from './placeholder-sha256';
 import { safetyCode } from './safety-code';
 import { safetyCodeRecompute } from './safety-code-recompute';
 import { taggedHashSuite } from './tagged-hash';
+import { terms } from './terms';
 
 /**
  * Suite name (= directory under test-vectors/) to suite module. A vector file without one fails,
@@ -44,4 +45,5 @@ export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['safety-code', safetyCode],
   ['safety-code-recompute', safetyCodeRecompute],
   ['tagged-hash', taggedHashSuite],
+  ['terms', terms],
 ]);

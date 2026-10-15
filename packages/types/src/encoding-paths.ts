@@ -6,7 +6,7 @@
 // - A value decodes only in its path's one canonical form. Anything else is rejected (null), never
 //   normalised: no trimming, lower-casing or prefix fixing.
 // - Where a schema in this package has the path, its own leaf validates the value, so the table and
-//   the object schemas cannot disagree. Paths whose objects are built elsewhere (terms, EIP-3009,
+//   the object schemas cannot disagree (terms since M1-21). Paths whose objects are built elsewhere (EIP-3009,
 //   submitter bodies, drop bodies, tool outputs) use the primitive of their table row.
 // - Comparisons decode both values, each by its own path, and compare the bytes.
 // Validators never throw on hostile input; they report null.
@@ -59,6 +59,7 @@ import {
   recordSchema,
   recordSignatureSchema,
 } from './proof.js';
+import { termsDeliverableSchema, termsPriceSchema, termsSchema } from './terms.js';
 
 interface Decoder {
   /** The strict schema of the path: the value must pass it unchanged. */
@@ -105,6 +106,8 @@ const scope = commitmentScopeSchema.shape;
 const pack = proofPackSchema.shape;
 const record = recordSchema.shape;
 const receipt = receiptStructSchema.shape;
+const terms = termsSchema.shape;
+const termsDeliverable = termsDeliverableSchema.shape;
 
 // The table of 04 §2.4.1, one decoder per schema path. A literal object with a null prototype, so a
 // lookup never reaches Object.prototype (`toString`, `__proto__`).
@@ -118,8 +121,8 @@ const DECODERS = Object.freeze(
     'approval-request.agent': hex0x(approvalRequest.agent),
     'approval-request.action.context.fee.token': hex0x(approvalFeeSchema.shape.token),
     'terms.parties[]': hex0x(evmAddress),
-    'terms.deliverables[].by': hex0x(evmAddress),
-    'terms.price.payer': hex0x(evmAddress),
+    'terms.deliverables[].by': hex0x(termsDeliverable.by),
+    'terms.price.payer': hex0x(termsPriceSchema.shape.payer),
     'CommitmentScope.agentId': hex0x(scope.agentId),
     'CommitmentScope.counterparty.agentId': hex0x(counterpartySchema.shape.agentId),
     'policy.contacts.allowed[]': hex0x(evmAddress),
@@ -205,10 +208,10 @@ const DECODERS = Object.freeze(
     'approval-request.actionDigest': bare(approvalRequest.actionDigest),
     'approval.decide.params.actionDigest': bare(approvalDecideParamsSchema.shape.actionDigest),
     'terms-body.termsHash': bare(offerBodySchema.shape.termsHash),
-    'terms.previousTermsHash': bare(sha256Hex),
+    'terms.previousTermsHash': bare(terms.previousTermsHash),
     'CommitmentScope.termsHash': bare(scope.termsHash),
     'payload.files[].plaintextSha256': bare(file.plaintextSha256),
-    'terms.deliverables[].plaintextSha256': bare(sha256Hex),
+    'terms.deliverables[].plaintextSha256': bare(termsDeliverable.plaintextSha256),
     'payload.files[].ciphertextSha256': bare(file.ciphertextSha256),
     'drop-commit.ciphertextSha256': bare(sha256Hex),
     'ProofPack.ownerApproval.policyHash': bare(sha256Hex),
@@ -233,7 +236,7 @@ const DECODERS = Object.freeze(
     'CommitmentScope.answers.envelopeId': b64(commitmentAnswersSchema.shape.envelopeId),
     'CommitmentScope.thread': b64(scope.thread),
     'CommitmentScope.termsId': b64(scope.termsId),
-    'terms.termsId': b64(base64url(16)),
+    'terms.termsId': b64(terms.termsId),
     'invite.inviteId': b64(invite.inviteId),
     'invite.secret': b64(invite.secret),
     'invite.codeCommit': b64(invite.codeCommit),

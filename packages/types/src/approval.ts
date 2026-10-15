@@ -28,6 +28,7 @@ import {
   uint256Decimal,
   uint53,
 } from './encoding.js';
+import { termsInputSchema, termsSchema } from './terms.js';
 import { compareUsd, isUsdAmount, usdAmountSchema } from './usd.js';
 
 const freeze = <T>(value: T): Readonly<T> => Object.freeze(value);
@@ -187,8 +188,8 @@ const exportProofPackContext = z.strictObject({
 });
 
 /**
- * The terms tools: the commitment scope, the stored canonical terms it is bound to (strict schema
- * from M1-21) and the fee. Fee rules: a fee exists exactly when the scope caps one, it is within
+ * The terms tools: the commitment scope, the stored canonical terms it is bound to (`termsSchema`,
+ * M1-21) and the fee. Fee rules: a fee exists exactly when the scope caps one, it is within
  * that cap, and a proof trigger always comes with a fee.
  */
 const commitmentContext = (decisions: readonly CommitmentDecision[]) =>
@@ -199,12 +200,38 @@ const commitmentContext = (decisions: readonly CommitmentDecision[]) =>
         (s) => decisions.includes(s.decision),
         `scope.decision must be one of: ${decisions.join(', ')}`,
       ),
-      terms: jsonObjectSchema,
+      terms: termsSchema,
       fee: approvalFeeSchema.nullable(),
     })
     .superRefine((c, ctx) => {
       const issue = (message: string, path: string[]) =>
         ctx.addIssue({ code: 'custom', message, path });
+      // The stored terms are the ones the scope binds (04 §3.4.2): same negotiation and version,
+      // exactly this agent and the counterparty as parties, and the scope never outlives them.
+      // (`termsHash` itself is recomputed by the core with @agentlink/crypto.)
+      const s = c.scope;
+      const t = c.terms;
+      if (s !== undefined && t !== undefined) {
+        if (t.termsId !== s.termsId)
+          issue('terms.termsId must be the scope termsId', ['terms', 'termsId']);
+        if (t.version !== s.version)
+          issue('terms.version must be the scope version', ['terms', 'version']);
+        const parties = Array.isArray(t.parties) ? t.parties : [];
+        const self = s.agentId;
+        const other = s.counterparty?.agentId;
+        const exact =
+          (parties[0] === self && parties[1] === other) ||
+          (parties[0] === other && parties[1] === self);
+        if (!exact)
+          issue('terms.parties must be this agent and the counterparty', ['terms', 'parties']);
+        if (
+          typeof s.expiresAt === 'number' &&
+          typeof t.validUntil === 'number' &&
+          s.expiresAt > t.validUntil
+        ) {
+          issue('scope.expiresAt must not be after terms.validUntil', ['scope', 'expiresAt']);
+        }
+      }
       const cap = c.scope?.maxFeeUsd;
       if ((c.fee === null) !== (cap === null)) {
         issue('fee is present exactly when scope.maxFeeUsd is set', ['fee']);
@@ -231,7 +258,7 @@ const actionOf = <T extends ApprovalToolName, C extends z.ZodType>(tool: T, cont
 /** `agentlink_propose_terms` args of a firm offer (the only propose call that needs an approval). */
 const proposeTermsArgs = z.strictObject({
   to: evmAddress,
-  terms: jsonObjectSchema, // TermsInput: strict schema from M1-21
+  terms: termsInputSchema,
   revises: base64url(BYTE_LENGTHS.id).exactOptional(),
   notarize: z.literal(true),
 });
@@ -240,7 +267,7 @@ const proposeTermsArgs = z.strictObject({
 const respondToTermsArgs = z.strictObject({
   envelopeId: base64url(BYTE_LENGTHS.id),
   decision: z.enum(['accept', 'reject', 'counter']),
-  terms: jsonObjectSchema.exactOptional(),
+  terms: termsInputSchema.exactOptional(),
   notarize: z.boolean(),
 });
 
