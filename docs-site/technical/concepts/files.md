@@ -10,7 +10,7 @@ Files are encrypted on the device in chunks (default 1 MiB) with AES-256-GCM in 
 
 | Size or policy | Backend |
 |---|---|
-| ≤ 12 KB | Inline, inside the envelope |
+| ≤ 12 255 bytes (12 KB of `ALF1` ciphertext) | Inline, inside the envelope |
 | Larger, default | The 4thTech **encrypted drop** (Cloudflare Worker + R2): no setup |
 | Own storage configured, above the drop limits, or policy `files.storage: own` | S3-compatible storage (M1); Google Drive, Dropbox, OneDrive connectors in the desktop apps (M2) |
 
