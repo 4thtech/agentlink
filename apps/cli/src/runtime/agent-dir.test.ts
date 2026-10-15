@@ -2,6 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import {
   chmod,
+  link,
   mkdir,
   mkdtemp,
   readFile,
@@ -261,6 +262,22 @@ describe.skipIf(!posix)('agent folder permissions, owner and file types (IR-M1-9
         await expect(readAgentConfig(home, 'default')).rejects.toThrow(PATH_INVALID);
         await rm(target);
       }
+    } finally {
+      await rm(elsewhere, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses a config or store file with another hard link (IR-M1-9k-1 F08)', async () => {
+    const elsewhere = await realpath(await mkdtemp(join(tmpdir(), 'agentlink-target-')));
+    try {
+      const paths = await initDefault();
+      await link(paths.config, join(elsewhere, 'config-copy'));
+      await expect(readAgentConfig(home, 'default')).rejects.toThrow(PATH_INVALID);
+      await rm(join(elsewhere, 'config-copy'));
+      expect(await readAgentConfig(home, 'default')).toBeDefined();
+      await writeFile(paths.store, '', { mode: 0o600 });
+      await link(paths.store, join(elsewhere, 'store-copy'));
+      await expect(readAgentConfig(home, 'default')).rejects.toThrow(PATH_INVALID);
     } finally {
       await rm(elsewhere, { recursive: true, force: true });
     }
