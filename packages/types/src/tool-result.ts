@@ -1,8 +1,9 @@
 // The common tool-result shape (06 §1 rule 3, §2.5): `{status, summary, nextStep?, url?,
 // approvalId?}`, plus each tool's own fields (`toolResult(shape)`).
 //
-// - Every non-`ok` result has `nextStep`; `pending_approval` has the `approvalId` and the approval
-//   `url`, and no other status carries an `approvalId`.
+// - Every non-`ok` result has `nextStep`; `pending_approval` has the `approvalId`, and no other
+//   status carries an `approvalId`. Its `url` is optional: in M1a the owner approves in the CLI and
+//   there is no link (06 §2.5, D-73 (3)); the local UI or console link arrives in M1b.
 // - `summary` and `nextStep` are our template text (I-5): inbound content never appears there, and
 //   they hold no control, format or separator character, so they cannot fake structure.
 // - `code` (PROPOSED: the spec uses it, e.g. `AMBIGUOUS_CONTACT`, `USE_TERMS_TOOLS`) names a
@@ -70,7 +71,6 @@ export function checkToolResult(r: CommonFields, ctx: z.core.$RefinementCtx): vo
   if (!pending && r.approvalId !== undefined) {
     issue('only pending_approval carries an approvalId', ['approvalId']);
   }
-  if (pending && r.url === undefined) issue('pending_approval has the approval url', ['url']);
   if (r.status === 'ok' && r.code !== undefined) issue('an ok result has no error code', ['code']);
 }
 
@@ -96,13 +96,15 @@ export const proofStatusResultSchema = toolResult(proofStatusShape, checkProofSt
 
 /**
  * `agentlink_get_approval` (06 §2.5). The approval's state is `approval`, not `status`, so it never
- * collides with the common tool `status` (06 §2.5: `{status: "ok", approval, decidedAt?}`). An
- * `ok` result has `approval`; `decidedAt` (UTC) only once the owner decided, so never while pending.
+ * collides with the common tool `status` (06 §2.5: `{status: "ok", approval, decidedAt?, used?}`).
+ * An `ok` result has `approval`; `decidedAt` (UTC) only once the owner decided, so never while
+ * pending; `used: true` only on `expired`, for an approval already used once (06 §2.5 M1a mapping).
  */
 export const getApprovalResultSchema = toolResult(
   {
     approval: z.enum(APPROVAL_STATUSES).exactOptional(),
     decidedAt: utcTimestampSchema.exactOptional(),
+    used: z.literal(true).exactOptional(),
   },
   (r, ctx) => {
     if ((r.status === 'ok') !== (r.approval !== undefined)) {
@@ -117,6 +119,13 @@ export const getApprovalResultSchema = toolResult(
         code: 'custom',
         message: 'decidedAt only once the owner decided',
         path: ['decidedAt'],
+      });
+    }
+    if (r.used !== undefined && r.approval !== 'expired') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'used only on an expired approval (already used once)',
+        path: ['used'],
       });
     }
   },

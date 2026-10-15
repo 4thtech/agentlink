@@ -107,6 +107,7 @@ export {
 export {
   OwnerActions,
   type ApprovalCheck,
+  type ApprovalReading,
   type OwnerActionOutcome,
   type PolicyVersionMark,
 } from './owner-actions.js';
@@ -149,6 +150,7 @@ export {
   type ApprovalAuthorization,
   type ApprovalRefusal,
   type ApprovalRequestInput,
+  type ApprovalState,
   type ApprovalUse,
   type CollectOutcome,
   type FeeQuote,

@@ -657,3 +657,242 @@ describe('fee context from one quote (IR-M1-2b-1 F-3)', () => {
     expect(pending.status).toBe('pending_approval');
   });
 });
+
+describe('reading one approval by ID (06 §2.5 agentlink_get_approval; M1-7e-3)', () => {
+  /** The only keys a read may carry: no signature, decision payload, summary or action. */
+  const READ_KEYS = new Set(['status', 'reason', 'actionDigest', 'expiresAt', 'decidedAt']);
+  const keysOk = (value: object) => Object.keys(value).every((k) => READ_KEYS.has(k));
+
+  it('a pending request reads pending, bound to its stored action digest', async () => {
+    const t = await setup();
+    const r = await t.request();
+    expect(await t.client.approvalService.read(r.approvalId)).toEqual({
+      status: 'pending',
+      actionDigest: computeActionDigest(r.action),
+      expiresAt: r.expiresAt,
+    });
+  });
+
+  it('an approved request reads approved with decidedAt; reading changes nothing', async () => {
+    const t = await setup();
+    const r = await t.request();
+    await t.approve(r);
+    const before = await t.row(r.approvalId);
+    const read = await t.client.approvalService.read(r.approvalId);
+    expect(read).toEqual({
+      status: 'approved',
+      actionDigest: computeActionDigest(r.action),
+      expiresAt: r.expiresAt,
+      decidedAt: t.clock.t,
+    });
+    // Read-only: it never claims the approval, and it can still be used once.
+    expect(await t.row(r.approvalId)).toEqual(before);
+    expect(await t.client.approvalService.use(r.approvalId, r.action, 'approval')).toEqual({
+      status: 'used',
+    });
+  });
+
+  it('a used approval reads used, never approved', async () => {
+    const t = await setup();
+    const r = await t.request();
+    await t.approve(r);
+    await t.client.approvalService.use(r.approvalId, r.action, 'approval');
+    expect(await t.client.approvalService.read(r.approvalId)).toMatchObject({ status: 'used' });
+  });
+
+  it('an expired request reads expired, whether it was pending or approved and unused', async () => {
+    const t = await setup();
+    const pending = await t.request();
+    const approved = await t.request();
+    await t.approve(approved);
+    t.clock.t = approved.expiresAt;
+    expect(await t.client.approvalService.read(approved.approvalId)).toMatchObject({
+      status: 'approved',
+    });
+    t.clock.t = pending.expiresAt + 1;
+    expect(await t.client.approvalService.read(pending.approvalId)).toMatchObject({
+      status: 'expired',
+    });
+    expect(await t.client.approvalService.read(approved.approvalId)).toMatchObject({
+      status: 'expired',
+    });
+    // The expiry cache gives the same answer.
+    await t.client.approvalService.expireDue();
+    expect(await t.client.approvalService.read(pending.approvalId)).toMatchObject({
+      status: 'expired',
+    });
+    expect(await t.client.approvalService.read(approved.approvalId)).toMatchObject({
+      status: 'expired',
+    });
+  });
+
+  it('a denial reads denied; a cancel reads cancelled, or denied when never decided', async () => {
+    const t = await setup();
+    const denied = await t.request();
+    const cancelled = await t.request();
+    const withdrawn = await t.request();
+    await t.approve(denied, 'deny');
+    await t.approve(cancelled);
+    for (const r of [cancelled, withdrawn]) {
+      const cancel = await t.signed('approval.cancel', { approvalId: r.approvalId });
+      expect(await t.client.ownerActions.apply(cancel)).toMatchObject({ status: 'applied' });
+    }
+    expect(await t.client.approvalService.read(denied.approvalId)).toMatchObject({
+      status: 'denied',
+    });
+    expect(await t.client.approvalService.read(cancelled.approvalId)).toMatchObject({
+      status: 'cancelled',
+    });
+    expect(await t.client.approvalService.read(withdrawn.approvalId)).toMatchObject({
+      status: 'denied',
+    });
+  });
+
+  it('a request voided before any decision reads void, not used', async () => {
+    const t = await setup();
+    const r = await t.request();
+    await t.store.transaction((tx) =>
+      tx.update('approvals', { approval_id: r.approvalId }, { status: 'void' }),
+    );
+    expect(await t.client.approvalService.read(r.approvalId)).toMatchObject({ status: 'void' });
+  });
+
+  it('an unknown or malformed ID reads unknown (not_found)', async () => {
+    const t = await setup();
+    for (const id of [`apr_${b64id()}`, 'apr_short', 'nope', '']) {
+      expect(await t.client.approvalService.read(id)).toEqual({
+        status: 'unknown',
+        reason: 'not_found',
+      });
+    }
+  });
+
+  it('a status edited to approved without a signed decision reads pending (I-4)', async () => {
+    const t = await setup();
+    const r = await t.request();
+    await t.store.transaction((tx) =>
+      tx.update('approvals', { approval_id: r.approvalId }, { status: 'approved' }),
+    );
+    expect(await t.client.approvalService.read(r.approvalId)).toMatchObject({ status: 'pending' });
+  });
+
+  it('a tampered row reads unknown (invalid): an edited row authorises nothing', async () => {
+    const t = await setup();
+    const a = await t.request(exportAction('a'));
+    const b = await t.request(exportAction('b'));
+    const c = await t.request(exportAction('c'));
+    const d = await t.request(exportAction('d'));
+    await t.approve(a);
+    await t.approve(c);
+    await t.approve(d);
+    const rowA = (await t.row(a.approvalId))!;
+    const rowD = (await t.row(d.approvalId))!;
+    await t.store.transaction((tx) => {
+      // A decision copied from another request.
+      tx.update(
+        'approvals',
+        { approval_id: b.approvalId },
+        { status: 'approved', signed_decision: rowA.signed_decision },
+      );
+      // A sealed action moved from another row (its AAD binds it to that row).
+      tx.update('approvals', { approval_id: c.approvalId }, { action_json: rowA.action_json });
+      // A signed decision whose bytes were edited.
+      tx.update(
+        'approvals',
+        { approval_id: d.approvalId },
+        { signed_decision: rowD.signed_decision!.replace('"approve"', '"deny"') },
+      );
+    });
+    for (const r of [b, c, d]) {
+      expect(await t.client.approvalService.read(r.approvalId)).toEqual({
+        status: 'unknown',
+        reason: 'invalid',
+      });
+    }
+    // And an edited row still authorises nothing on use.
+    expect(await t.client.approvalService.use(b.approvalId, b.action, 'approval')).toMatchObject({
+      status: 'refused',
+    });
+  });
+
+  it('a used approval whose decision was swapped reads unknown (invalid), never used', async () => {
+    const t = await setup();
+    const a = await t.request(exportAction('a'));
+    const b = await t.request(exportAction('b'));
+    await t.approve(a);
+    await t.approve(b);
+    await t.client.approvalService.use(b.approvalId, b.action, 'approval');
+    const rowA = (await t.row(a.approvalId))!;
+    await t.store.transaction((tx) =>
+      tx.update(
+        'approvals',
+        { approval_id: b.approvalId },
+        { signed_decision: rowA.signed_decision },
+      ),
+    );
+    expect(await t.client.approvalService.read(b.approvalId)).toEqual({
+      status: 'unknown',
+      reason: 'invalid',
+    });
+  });
+
+  it('never returns the owner signature, the decision payload, the summary or the action', async () => {
+    const t = await setup();
+    const pending = await t.request(exportAction(SECRET));
+    const approved = await t.request(exportAction(SECRET));
+    await t.approve(approved);
+    const used = await t.request(exportAction(SECRET));
+    await t.approve(used);
+    await t.client.approvalService.use(used.approvalId, used.action, 'approval');
+    const denied = await t.request(exportAction(SECRET));
+    await t.approve(denied, 'deny');
+    for (const r of [pending, approved, used, denied]) {
+      const read = await t.client.approvalService.read(r.approvalId);
+      expect(keysOk(read)).toBe(true);
+      const text = JSON.stringify(read);
+      expect(text).not.toContain(SECRET);
+      expect(text).not.toContain('Include the document key');
+      expect(text).not.toContain('nonce');
+      const row = (await t.row(r.approvalId))!;
+      if (row.signed_decision !== null) {
+        const signed = JSON.parse(row.signed_decision) as Record<string, unknown>;
+        for (const [k, v] of Object.entries(signed)) {
+          if (k !== 'body') expect(text).not.toContain(JSON.stringify(v));
+        }
+      }
+    }
+    expect(t.lines.join('\n')).not.toContain(SECRET);
+  });
+});
+
+describe('counting pending approvals (06 §2.1 agentlink_status pendingApprovals; M1-7e-3)', () => {
+  it('counts only undecided, unexpired requests: not void, used, approved, denied or lapsed', async () => {
+    const t = await setup();
+    expect(await t.client.approvalService.countPending()).toBe(0);
+    const p1 = await t.request();
+    await t.request();
+    const approved = await t.request();
+    const used = await t.request();
+    const denied = await t.request();
+    const voided = await t.request();
+    const cancelled = await t.request();
+    expect(await t.client.approvalService.countPending()).toBe(7);
+    await t.approve(approved);
+    await t.approve(used);
+    await t.client.approvalService.use(used.approvalId, used.action, 'approval');
+    await t.approve(denied, 'deny');
+    await t.store.transaction((tx) =>
+      tx.update('approvals', { approval_id: voided.approvalId }, { status: 'void' }),
+    );
+    await t.client.ownerActions.apply(
+      await t.signed('approval.cancel', { approvalId: cancelled.approvalId }),
+    );
+    expect(await t.client.approvalService.countPending()).toBe(2);
+    // A lapsed request no longer counts, before and after the expiry cache runs.
+    t.clock.t = p1.expiresAt + 1;
+    await t.request();
+    expect(await t.client.approvalService.countPending()).toBe(1);
+    await t.client.approvalService.expireDue();
+    expect(await t.client.approvalService.countPending()).toBe(1);
+  });
+});
