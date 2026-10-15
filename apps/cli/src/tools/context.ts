@@ -5,7 +5,17 @@
 // `ToolClient` is the narrow read surface the handlers use, built from an `AgentLinkClient` by
 // `coreToolClient` (pure: core and crypto only). Tests pass doubles. The M1-9k pieces the handlers
 // may not import (src/approval/next-step.ts, 06 §1) arrive here as plain functions.
-import type { AgentLinkClient, ApprovalCheck, ContactView } from '@agentlink/core';
+import {
+  CoreError,
+  evaluate,
+  type AgentLinkClient,
+  type ApprovalCheck,
+  type ApprovalUse,
+  type ContactView,
+  type CreatedInvite,
+  type PendingContact,
+  type PolicyDecision,
+} from '@agentlink/core';
 import {
   agentFingerprint,
   decodeHex0x,
@@ -36,6 +46,28 @@ export interface StoredApprovalState {
   readonly decidedAt: number | null;
 }
 
+/**
+ * The invite and pairing calls of `agentlink_create_invite` and `agentlink_accept_invite` (M1-9o).
+ * Nothing here sets `allowed`: `start` is called only after the handler has the policy `allow` or a
+ * used owner approval (I-4).
+ */
+export interface InviteTools {
+  /** A single-use invite (04 §3.6); the link carries the secret and is never logged. */
+  create(input: { label?: string; expiresInDays?: number }): Promise<CreatedInvite>;
+  /** Step 1 of accept: decodes and checks the link, stores nothing (06 §2.1 name rule applies). */
+  check(link: string): Promise<PendingContact>;
+  /** The policy decision for `contacts.acceptInvites`. */
+  decision(): Promise<PolicyDecision>;
+  /** Creates the pending approval for `action`; returns its `apr_` ID. */
+  requestApproval(action: unknown, summary: string): Promise<string>;
+  /** Re-verifies the owner's signature against `action`'s digest and claims the approval once. */
+  useApproval(approvalId: string, action: unknown, decision: PolicyDecision): Promise<ApprovalUse>;
+  /** Stages the pairing and its handshake (only after `allow` or a used approval). */
+  start(link: string): Promise<PendingContact>;
+  /** Publishes the staged handshake; false when the network is unreachable (kept for later). */
+  publish(): Promise<boolean>;
+}
+
 /** The read surface the M1-9c handlers use. */
 export interface ToolClient {
   /** The agent's identity, or undefined when it has none yet (needs `agentlink init`). */
@@ -59,6 +91,8 @@ export interface ToolClient {
    * until then `agentlink_get_approval` answers with the fixed "not available yet" error.
    */
   approvalState?(approvalId: string): Promise<StoredApprovalState | undefined>;
+  /** Invites and pairing (M1-9o). Absent in a double that does not need them: the tools then answer "not available". */
+  readonly invites?: InviteTools;
 }
 
 export interface ToolContext {
@@ -121,11 +155,53 @@ export function coreToolClient(client: AgentLinkClient): ToolClient {
       return { inbox, requests };
     },
     contacts: () => client.contacts.list(),
+    invites: coreInviteTools(client),
     async storageMode() {
       const effective = await client.ownerActions.loadPolicy();
       return effective.mode !== 'fail_closed' && effective.policy.files.storage === 'own'
         ? 'own'
         : 'drop';
+    },
+  });
+}
+
+/** Core errors that only mean "the outbox could not publish right now". */
+const OFFLINE_CODES: ReadonlySet<string> = new Set(['transport_unavailable']);
+
+function coreInviteTools(client: AgentLinkClient): InviteTools {
+  return Object.freeze<InviteTools>({
+    create: (input) => client.pairing.createInvite(input),
+    async check(link) {
+      return (await client.pairing.acceptInvite({ link })).contact;
+    },
+    async decision() {
+      return evaluate(await client.ownerActions.loadPolicy(), { kind: 'invite.accept' });
+    },
+    async requestApproval(action, summary) {
+      const pending = await client.approvalService.request({
+        action,
+        summary,
+      });
+      return pending.approvalId;
+    },
+    useApproval: (approvalId, action, decision) =>
+      client.approvalService.use(approvalId, action, decision),
+    async start(link) {
+      const started = await client.pairing.acceptInvite({ link, allowed: true });
+      // `allowed` was set, so this does not happen; fail closed if it ever does.
+      if (started.status !== 'pending') {
+        throw new CoreError('approval_action_invalid', 'The pairing could not be started.');
+      }
+      return started.contact;
+    },
+    async publish() {
+      try {
+        const summary = await client.outbox.processDue();
+        return summary.sent > 0 && summary.failed === 0 && summary.notDelivered === 0;
+      } catch (error) {
+        if (error instanceof CoreError && !OFFLINE_CODES.has(error.code)) throw error;
+        return false;
+      }
     },
   });
 }

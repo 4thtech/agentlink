@@ -12,13 +12,7 @@
 //
 // The link is untrusted input (I-5): core decodes and checks it; nothing the link carries is
 // printed except through the contact-name rule (restricted name plus label).
-import {
-  CoreError,
-  decodeInviteLink,
-  evaluate,
-  renderContactName,
-  type CoreErrorCode,
-} from '@agentlink/core';
+import { CoreError, evaluate, renderContactName, type CoreErrorCode } from '@agentlink/core';
 import { approvalNextStep, isApprovalId } from '../approval/next-step.js';
 import {
   DISPATCH_TEXT,
@@ -28,6 +22,7 @@ import {
   type CommandContext,
   type CommandHandler,
 } from '../dispatch.js';
+import { acceptInviteAction, acceptInviteApprovalSummary } from '../tools/accept-action.js';
 import { RUNTIME_MESSAGES } from '../runtime/errors.js';
 import type { OpenedAgent } from '../runtime/open-agent.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
@@ -65,20 +60,8 @@ export function createAcceptHandler(deps: CommandDeps = createDeps()): CommandHa
       // Step 1 always runs and stores nothing: decode, strict schema, expiry, both card signatures,
       // name and relays (04 §3.6 Accept). A bad link ends here with core's fixed sentence.
       const checked = await client.pairing.acceptInvite({ link });
-      const invite = await decodeInviteLink(link);
       const contactName = terminalOneLine(renderContactName(checked.contact.display));
-      const action = {
-        tool: 'agentlink_accept_invite',
-        args: { inviteUrl: link },
-        context: {
-          triggers: ['contacts.acceptInvites'],
-          inviteId: invite.inviteId,
-          counterparty: {
-            agentId: invite.card.agentEvm,
-            ownerKey: invite.card.ownerNostr.slice(2),
-          },
-        },
-      };
+      const action = await acceptInviteAction(link);
       const decision = evaluate(await client.ownerActions.loadPolicy(), { kind: 'invite.accept' });
       if (decision === 'deny') {
         context.output.printError(TEXT.acceptNotAllowed);
@@ -89,7 +72,7 @@ export function createAcceptHandler(deps: CommandDeps = createDeps()): CommandHa
         if (approvalId === undefined) {
           const pending = await client.approvalService.request({
             action,
-            summary: `Accept an invite from ${contactName}`,
+            summary: acceptInviteApprovalSummary(contactName),
           });
           printAll(context, [
             approvalNextStep(pending.approvalId, agent.name),

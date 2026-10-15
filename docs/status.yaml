@@ -149,6 +149,10 @@ areas:
         state: done
         prs: [95]
         summary: "Approval requests with use-once, requests-queue limits and idempotency (M1-7e)."
+      - name: "Reading an approval and counting pending ones"
+        state: in-progress
+        prs: [116]
+        summary: "Read one approval's state, re-verified against its stored action, and count approvals waiting for the owner (M1-7e-3); in review."
       - name: "Requests from unknown senders: accept, ignore, block"
         state: in-progress
         prs: [105]
