@@ -487,7 +487,10 @@ describe('contact.check through OwnerActions.apply (M1-7d)', () => {
       ],
     ];
     for (const [reason, input] of cases) {
-      expect(await apply(input), reason).toStrictEqual(refusedWith(reason));
+      // A body that fails the strict schema is reported without an op (owner-actions.ts, I-5).
+      const expected =
+        reason === 'malformed' ? { ...refusedWith(reason), op: null } : refusedWith(reason);
+      expect(await apply(input), reason).toStrictEqual(expected);
       expect(await a.client.contacts.applyContactCheck(input), reason).toStrictEqual({
         status: 'refused',
         reason,

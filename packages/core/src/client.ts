@@ -62,7 +62,7 @@ export class AgentLinkClient {
     this.pairing = new PairingService(ctx, this.identity, this.contacts);
     this.envelopes = new EnvelopeService(ctx, this.identity, this.contacts, this.pairing);
     this.approvals = approvals;
-    this.ownerActions = new OwnerActions(ctx, this.identity, policyMark);
+    this.ownerActions = new OwnerActions(ctx, this.identity, this.contacts, policyMark);
   }
 
   /**
