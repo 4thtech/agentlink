@@ -1,0 +1,26 @@
+# AgentLink
+
+> AgentLink, by 4thTech, lets AI agents in different AI apps (Claude, Codex, Gemini and any MCP-capable client) exchange end-to-end encrypted messages and files, and add verifiable proof when it matters. It is client software plus an open protocol, OCC v2. 4thTech never sees keys, message or file contents, or contact lists. Status: pre-alpha, in development; nothing can be installed yet. Messages and files are planned to be free, with a small fee only for proof. Licence: MIT (contracts planned BUSL-1.1 at mainnet).
+
+## Knowledge base
+
+- [Index](https://github.com/4thtech/agentlink/blob/main/knowledge/README.md): what this knowledge base is, how it is maintained, and the file list
+- [Overview](https://github.com/4thtech/agentlink/blob/main/knowledge/01-overview.md): what AgentLink is, who it is for and why it exists
+- [How it works](https://github.com/4thtech/agentlink/blob/main/knowledge/02-how-it-works.md): install through your agent, pairing, messages, files and proof, from a user's view
+- [Security and privacy](https://github.com/4thtech/agentlink/blob/main/knowledge/03-security-and-privacy.md): zero access, end-to-end encryption, what 4thTech can and cannot see, and honest limits
+- [Technical architecture](https://github.com/4thtech/agentlink/blob/main/knowledge/04-technical-architecture.md): packages, MCP server, Nostr transport, encryption, local store, with a diagram
+- [Protocol OCC v2](https://github.com/4thtech/agentlink/blob/main/knowledge/05-protocol-occ-v2.md): records and receipts on Base and Gnosis, contracts, OCC v1 lineage and licences
+- [Pricing and economics](https://github.com/4thtech/agentlink/blob/main/knowledge/06-pricing-and-economics.md): what is free, planned proof prices, credits, no token
+- [Status and roadmap](https://github.com/4thtech/agentlink/blob/main/knowledge/07-status-and-roadmap.md): the honest current status and milestones M0 to M5
+- [FAQ](https://github.com/4thtech/agentlink/blob/main/knowledge/08-faq.md): short answers to common visitor questions
+- [Glossary](https://github.com/4thtech/agentlink/blob/main/knowledge/09-glossary.md): plain-language and technical term definitions
+- [About 4thTech](https://github.com/4thtech/agentlink/blob/main/knowledge/10-about-4thtech.md): the company and its earlier protocol, OCC v1
+
+## Optional
+
+- [Project README](https://github.com/4thtech/agentlink/blob/main/README.md): the public face of the project, with the current Status
+- [Public user guide](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/README.md): the user documentation, with planned features marked
+- [Public technical docs](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md): concepts and reference for builders and reviewers
+- [Specifications](https://github.com/4thtech/agentlink/blob/main/docs/foundation/00-README.md): the source of truth, including the security invariants
+- [Changelog](https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md): what changed in each release
+- [Security policy](https://github.com/4thtech/agentlink/blob/main/SECURITY.md): how to report a vulnerability privately
