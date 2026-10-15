@@ -1821,10 +1821,10 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (IR-M1-7a-1 R2-M1) A blocked or removed contact that rotates keys: its `card-update` is dropped, so its new key stays unknown. An envelope from an unknown key whose recipients include the `ownerEnc` `kid` of a **blocked or removed** contact's owner is dropped (recorded in `seen` after step 4), never held and never queued as a request, also after 48 h. Only active contacts' owner kids hold. Test, replacing the `it.todo` in `packages/core/src/contacts.test.ts`.
 
 #### M1-7b-b · core: require the sender's own owner entry when the sender's card is held (new, G-51, D-71 (4); follow-up to M1-7b)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** ready (planning 2026-10-15: dependency M1-7b merged (#66); G-51 decided yes in D-71 (4); the matching 04 §3.1.1 step 8 and §3.2 text lands with the D-71 docs PR) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7b
-- **Spec:** 04 §3.1.1 step 8, §3.2; D-71 (4) (the refusal is decided; the pairing-type, same-owner, owner-authored and held-envelope details are derived and proposed)
+- **Spec:** 04 §3.1.1 step 8, §3.2; D-71 (4)
 - **Invariants:** I-5, I-9
 - **Scope:**
   - Step 8 (04 §3.1.1): when the core holds the sender's card (a contact's current card; for a `card-update` the card it carries once it has passed §3.4.1; for the pairing types the card in the body once it has passed §3.6), refuse an envelope whose recipients lack that card's `ownerEnc` `kid`: stored as refused, shown in the activity feed, and the contact flagged. When `from` is not a contact's key, the refusal is recorded under the requests-queue and spam limits and no contact is flagged.
