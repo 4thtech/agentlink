@@ -1,5 +1,5 @@
 # AgentLink — sync board
-_Updated 2026-10-14 21:05 by @talirezun_
+_Updated 2026-10-15 01:45 by @talirezun_
 
 ## Area ownership
 | Area | Repo / paths | Lead | Review |
@@ -18,9 +18,14 @@ _Updated 2026-10-14 21:05 by @talirezun_
 | M1-7b envelope verification | @talirezun (agents) | done | #66 | 2026-10-14 |
 | M1-8b SQLite store | @talirezun (agents) | done | #60 | 2026-10-14 |
 | M1-8a-b keychain CI matrix | @talirezun (agents) | done | #57 | 2026-10-14 |
-| M1-8c owner code and batch approval | @talirezun (agents) | in-progress | fix round | 2026-10-14 |
-| M1-2e batch approval vectors | @talirezun (agents) | in-progress | — | 2026-10-14 |
-| M1-7c pairing | @talirezun (agents) | in-progress | — | 2026-10-14 |
+| M1-8c owner code and batch approval | @talirezun (agents) | done | #67 | 2026-10-15 |
+| M1-2d pairing body schemas | @talirezun (agents) | done | #71 | 2026-10-15 |
+| M1-2e batch approval vectors | @talirezun (agents) | done | #72 | 2026-10-15 |
+| M1-2f contact.check schema | @talirezun (agents) | done | #76 | 2026-10-15 |
+| M1-7c pairing | @talirezun (agents) | done | #78 | 2026-10-15 |
+| M1-7c-b contact.check verify-and-store | @talirezun (agents) | done | #80 | 2026-10-15 |
+| M1-5b-b Node relay connector | @talirezun (agents) | in-progress | #81 merged; Docker CI job pending | 2026-10-15 |
+| M1-7d owner actions | @talirezun (agents) | blocked | #79; owner decision | 2026-10-15 |
 
 ## Waiting on a decision
 | # | Question | Decider | Raised by / when |
@@ -32,3 +37,4 @@ _Updated 2026-10-14 21:05 by @talirezun_
 ## Blockers
 | Task | Blocked on | Since |
 |---|---|---|
+| M1-7d owner actions | Owner decision (G-6 reading), #79 | 2026-10-15 |

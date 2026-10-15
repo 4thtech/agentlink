@@ -1,21 +1,30 @@
 # @talirezun — sync
-**Headline:** OCC v2 contracts live on Base Sepolia (smoke test passed); M1a transport, store, key commitment and envelope verification merged
-_Updated 2026-10-14 21:05 · claude-code / claude-opus-5-5 · orchestrator_
+**Headline:** M1a core: pairing, key commitment, owner code with batch approval, transport and store merged; owner-actions (M1-7d) awaits an owner decision
+_Updated 2026-10-15 01:45 · claude-code / claude-opus-5-5 · orchestrator_
 
 ## Now
-- agentlink merged 2026-10-14 evening: #57 M1-8a-b keychain CI matrix, #58 backlog cards, #59 M1-5b relay pool, #60 M1-8b SQLite store, #61 M1-1l key commitment, #62 D-67 (G-1 accepted as an M1 residual), #63 M1-5c transport sync, #64 D-68 batch owner approval, #65 README testnet status, #66 M1-7b envelope verification.
-- Contracts #7–#9 merged; OCC v2 deployed to Base Sepolia through CI and smoke-tested.
+- agentlink merged overnight 2026-10-14/15:
+  - #67 M1-8c owner code and batch approval;
+  - #70 D-69 invite links use raw DEFLATE;
+  - #71 M1-2d pairing body schemas;
+  - #72 M1-2e batch approval schema;
+  - #73 docs follow-ups and lesson LL-15;
+  - #75 and #77 test vectors;
+  - #76 M1-2f contact.check schema;
+  - #78 M1-7c pairing;
+  - #80 M1-7c-b contact.check verify-and-store;
+  - #81 M1-5b-b Node relay connector.
+- Contracts: invariant-test flake fixed and CI repaired.
 
 ## In flight
 | Task | Branch / PR | Status | Next step |
 |---|---|---|---|
-| M1-8c owner code and batch approval | — | fix round | PR |
-| M1-2e batch approval vectors | — | building | — |
-| M1-7c pairing | — | building | — |
-| M1-8b concurrency test flake | #68 | final fix | — |
+| M1-7d owner actions | #79 | waiting on owner decision (G-6 reading) | Owner decision |
+| audit-rules one-liner | #74 | waiting on owner approval | Owner approval |
+| M1-5b-b Docker relay CI job | — | needs owner (`.github`) | Owner |
 
 ## Next
-1. M1-7d/7e (owner actions, requests), M1-9 CLI + MCP.
+1. M1-7e requests, M1-8g, M1-9 CLI + MCP (after M1-7d).
 2. M1-13 e2e, J9 dogfood → M1a gate (v0.1.0).
 
 ## Decisions made (still relevant)
@@ -24,6 +33,7 @@ _Updated 2026-10-14 21:05 · claude-code / claude-opus-5-5 · orchestrator_
 - D-52/D-57: build → independent review → CI → merge; services auto-deploy; npm `latest` keeps Tali's click.
 - D-67: same-user agent risk (G-1) accepted for M1 testnets, re-decided at the M2 gate.
 - D-68: batch owner approval, one code entry per reviewed batch, no unlock session; commitments never batched.
+- D-69: invite links use raw DEFLATE (RFC 1951).
 
 ## Asks
 - [ ] @denisjazbec: start with `docs/README.md` and `docs/process/onboarding.md`. (2026-10-12)
@@ -38,4 +48,4 @@ _Updated 2026-10-14 21:05 · claude-code / claude-opus-5-5 · orchestrator_
 _(none yet)_
 
 ## Blocked on
-- Nothing.
+- M1-7d owner actions (#79): owner decision (G-6 reading).
