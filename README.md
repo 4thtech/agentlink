@@ -128,6 +128,7 @@ Milestones are sequential gates ([build plan](docs/foundation/10-build-plan.md))
 
 - [`docs/README.md`](docs/README.md): the documentation map, with reading paths.
 - [`docs/explainers/`](docs/explainers/): plain-language guides.
+- [`knowledge/`](knowledge/README.md) and [`llms.txt`](llms.txt): the compressed public knowledge base for AI assistants and quick reading, updated with every milestone or release.
 - [`docs-site/`](docs-site/README.md): the public documentation, a user guide and technical docs, for publishing on GitBook. Pages for features not built yet are marked planned.
 - [`CHANGELOG.md`](CHANGELOG.md): what changed in each release.
 - [`docs/process/versioning.md`](docs/process/versioning.md): how versions and releases work.
