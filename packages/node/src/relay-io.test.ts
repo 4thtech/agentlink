@@ -610,7 +610,7 @@ describe('the host resolver (07 §4.2 step 1)', () => {
       (err: unknown) => err,
     );
     expect(error).toBeInstanceOf(Error);
-    expect((error as Error).message).not.toMatch(/relay\.example\.com/);
+    expect((error as Error).message.includes('relay.example.com')).toBe(false);
   });
 
   it('uses the system resolver by default, with all answers', async () => {
