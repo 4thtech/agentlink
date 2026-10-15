@@ -19,6 +19,7 @@ import { IdempotencyService } from './idempotency.js';
 import { PairingService } from './pairing.js';
 import { RequestsQueue } from './requests.js';
 import { OutboxService } from './outbox.js';
+import { PublisherLease } from './publisher-lease.js';
 import { SendService, type SendMessageInput, type SendMessageResult } from './send.js';
 import type { TransportFactory } from './transport.js';
 import { DeliveryAcks } from './acks.js';
@@ -115,6 +116,7 @@ export class AgentLinkClient {
   readonly terms: TermsService;
   readonly #send: SendService;
   readonly #sync: SyncService;
+  readonly #ctx: CoreContext;
 
   private constructor(
     agentId: string,
@@ -127,6 +129,7 @@ export class AgentLinkClient {
     dropOrigins: readonly string[],
   ) {
     this.agentId = agentId;
+    this.#ctx = ctx;
     this.identity = new IdentityService(ctx);
     this.contacts = new ContactBook(ctx);
     this.pairing = new PairingService(ctx, this.identity, this.contacts);
@@ -217,6 +220,15 @@ export class AgentLinkClient {
    */
   sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
     return this.#send.send(input);
+  }
+
+  /**
+   * A new handle on the agent's publisher lease (07 §3.2; 06 §6; M1-7k-b), with its own random
+   * holder ID. Only a long-running server process (`agentlink mcp`, M1-9r) creates one, once at
+   * start, and calls `take` every 20 s; CLI commands never do. Creating it writes nothing.
+   */
+  publisherLease(): PublisherLease {
+    return new PublisherLease({ store: this.#ctx.store, now: this.#ctx.now });
   }
 
   /**

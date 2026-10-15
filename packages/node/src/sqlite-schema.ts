@@ -164,10 +164,12 @@ export function createSchemaStatements(
 /** Tables added after version 1, and envelope columns added after version 1 (D-72, version 2). */
 const V2_TABLES: readonly TableName[] = ['blocked_keys'];
 const V2_ENVELOPE_COLUMNS: readonly string[] = ['refused_at', 'request_accepted_at'];
+/** Tables added by version 3 (M1-7k-b): the publisher lease (07 §3.2) and staged retries (F08). */
+const V3_TABLES: readonly TableName[] = ['publisher_lease', 'outbox_staged'];
 
 /**
- * The version 1 (G-9) schema: today's TABLES without what version 2 added. Its statements are
- * pinned by digest in sqlite-store.test.ts, so this snapshot cannot drift.
+ * The version 1 (G-9) schema: today's TABLES without what versions 2 and 3 added. Its statements
+ * are pinned by digest in sqlite-store.test.ts, so this snapshot cannot drift.
  */
 function v1Spec(table: TableName): TableSpec {
   const spec = tableSpec(table);
@@ -203,19 +205,22 @@ function v2Statements(): readonly string[] {
 
 /**
  * The forward migrations, oldest first; the last one's version is STORE_SCHEMA_VERSION. Version 1
- * is the G-9 schema, version 2 adds D-72's columns and table. A later schema version appends a
- * migration (ALTER TABLE, new tables) and never edits an earlier one; sqlite-store.test.ts pins the
- * digest of every version, so a TABLES change without a new migration fails the build.
+ * is the G-9 schema, version 2 adds D-72's columns and table, version 3 adds the `publisher_lease`
+ * and `outbox_staged` tables (M1-7k-b; new tables only, so existing rows are untouched). A later
+ * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
+ * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
+ * fails the build.
  */
 export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({
     version: 1,
     statements: createSchemaStatements(
-      TABLE_NAMES.filter((t) => !V2_TABLES.includes(t)),
+      TABLE_NAMES.filter((t) => !V2_TABLES.includes(t) && !V3_TABLES.includes(t)),
       v1Spec,
     ),
   }),
   Object.freeze({ version: 2, statements: Object.freeze(v2Statements()) }),
+  Object.freeze({ version: 3, statements: createSchemaStatements(V3_TABLES) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

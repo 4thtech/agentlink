@@ -28,6 +28,11 @@
 //   here, in a transaction that checks again that they still have none, so each is wrapped once and
 //   its rows survive a restart. Nothing else that is `queued` (for example `envelopes.build`
 //   output) is ever published: Talk messages get their rows only from `sendMessage`.
+// - Stale staged envelopes (IR-M1-7k-1 F08; M1-7k-b): one still without rows 24 h after its
+//   created_at is marked `not_delivered`; one whose wrap fails transiently records the failure in
+//   `outbox_staged` and goes behind the never-tried and less recently failed ones, so it never
+//   blocks a newer one. The relay subscriptions have their own leader, the publisher lease
+//   (publisher-lease.ts); the outbox needs none, the per-row claim holds.
 //
 // Logs: the core's own lines carry counts only, never wrap_json, relay URLs, keys or envelope IDs
 // (I-7). The RelayPool behind `nostrTransport` logs into the same logger and may name a skipped
@@ -54,7 +59,7 @@ import {
   type OutboxSummary,
 } from '@agentlink/transport-nostr';
 import { agentNostrKey } from './card.js';
-import { OUTBOX_GIVE_UP_SECONDS } from './constants.js';
+import { OUTBOX_GIVE_UP_SECONDS, STAGED_MAX_AGE_SECONDS } from './constants.js';
 import type { ContactBook } from './contacts.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
@@ -74,8 +79,10 @@ const DUE_BATCH = 8;
 const MAX_BATCHES = 64;
 /** The only types a core flow stages for the outbox (pairing, M1-7c; IR-M1-7k-1 F01). */
 const STAGED_TYPES: readonly string[] = Object.freeze(['handshake', 'handshake-ack']);
-/** Staged envelopes wrapped per pass. */
-const STAGED_BATCH = 50;
+/** Staged envelopes given rows (or dropped) per pass (IR-M1-7k-1 F08: failures do not count). */
+export const OUTBOX_STAGED_BATCH = 50;
+/** Staged envelopes tried per pass, failures included, so one pass stays bounded. */
+const STAGED_MAX_TRIES = 200;
 /** A list received with a card holds at most 16 relays (07 §4.3). */
 const MAX_LIST_RELAYS = 16;
 
@@ -467,14 +474,27 @@ export class OutboxService {
    * any other `queued` row) never becomes publishable: Talk messages get their rows only through
    * `sendMessage`, store-first, after the policy check. A staged message whose pairing or contact
    * is gone, or whose stored envelope is unreadable, is marked `not_delivered` (permanent); a
-   * transient fault (an unreadable own list, a KeyStore or store error) leaves it `queued` for the
-   * next pass (IR-M1-7k-1 F02). Returns the number of envelopes enqueued.
+   * transient fault (an unreadable own list, a KeyStore or store error) leaves it `queued` for a
+   * later pass (IR-M1-7k-1 F02).
+   *
+   * Bounded (IR-M1-7k-1 F08): a staged message still without rows STAGED_MAX_AGE_SECONDS after its
+   * created_at is marked `not_delivered`, so none stays staged for good. A transient fault records
+   * the failure time in `outbox_staged` and the message steps aside: each pass tries the never-tried
+   * messages first (oldest first), then the failed ones, least recently failed first, and a failure
+   * does not use up the batch. So failing older messages never block a newer one, and failing ones
+   * take turns. Returns the number of envelopes enqueued.
    */
   async enqueueStaged(): Promise<number> {
+    // Expiry first: it signs nothing, so it also ends the staged messages of an agent that cannot send.
+    const expired = await this.#expireStaged();
     // A revoked agent, or one whose rotation is unfinished, signs nothing (04 §2.6, 07 §3.4).
-    if ((await this.#identity.sendState()) !== 'ready') return 0;
-    const staged = await this.#ctx.store.transaction((tx) =>
-      tx
+    if ((await this.#identity.sendState()) !== 'ready') {
+      if (expired > 0) this.#ctx.log.info('outbox staged', { expired });
+      return 0;
+    }
+    const staged = await this.#ctx.store.transaction((tx) => {
+      const retries = new Map(tx.select('outbox_staged').map((r) => [r.envelope_id, r]));
+      const open = tx
         .select(
           'envelopes',
           { direction: 'out', delivery: 'queued', type: { in: [...STAGED_TYPES] } },
@@ -485,28 +505,38 @@ export class OutboxService {
             ],
           },
         )
-        .filter((row) => tx.count('outbox', { envelope_id: row.envelope_id }) === 0)
-        .slice(0, STAGED_BATCH),
-    );
+        .filter((row) => tx.count('outbox', { envelope_id: row.envelope_id }) === 0);
+      const fresh = open.filter((row) => !retries.has(row.envelope_id));
+      const failedAt = (row: Row<'envelopes'>): number =>
+        retries.get(row.envelope_id)?.failed_at ?? 0;
+      const failed = open
+        .filter((row) => retries.has(row.envelope_id))
+        .sort((x, y) => failedAt(x) - failedAt(y)); // stable: equal times keep created_at order
+      return [...fresh, ...failed].slice(0, STAGED_MAX_TRIES);
+    });
     let enqueued = 0;
     let dropped = 0;
     let failed = 0;
     for (const row of staged) {
+      if (enqueued + dropped >= OUTBOX_STAGED_BATCH) break;
       let rows: Row<'outbox'>[] | 'drop';
       try {
         rows = await this.#stagedRows(row);
       } catch {
-        failed += 1; // transient: stays queued, the next pass tries again
+        failed += 1; // transient: stays queued and goes to the back of the line
+        await this.#recordStagedFailure(row.envelope_id).catch(() => undefined);
         continue;
       }
       if (rows === 'drop') {
         dropped += await this.#ctx.store.transaction((tx) => {
           if (tx.count('outbox', { envelope_id: row.envelope_id }) !== 0) return 0;
-          return tx.update(
+          const n = tx.update(
             'envelopes',
             { envelope_id: row.envelope_id, direction: 'out', delivery: 'queued' },
             { delivery: 'not_delivered' },
           );
+          if (n === 1) tx.delete('outbox_staged', { envelope_id: row.envelope_id });
+          return n;
         });
         continue;
       }
@@ -520,16 +550,83 @@ export class OutboxService {
           current.type !== row.type ||
           tx.count('outbox', { envelope_id: row.envelope_id }) !== 0
         ) {
-          return 0; // another process enqueued it first, or it changed: wrapped once only
+          return 0; // another process enqueued it first, it expired, or it changed: wrapped once only
         }
         for (const r of ready) tx.insert('outbox', r);
+        tx.delete('outbox_staged', { envelope_id: row.envelope_id });
         return 1;
       });
     }
-    if (enqueued + dropped + failed > 0) {
-      this.#ctx.log.info('outbox staged', { enqueued, dropped, failed });
+    if (enqueued + dropped + failed + expired > 0) {
+      this.#ctx.log.info('outbox staged', { enqueued, dropped, failed, expired });
     }
     return enqueued;
+  }
+
+  /**
+   * Marks `not_delivered` every staged message still without rows STAGED_MAX_AGE_SECONDS after its
+   * created_at (IR-M1-7k-1 F08), and deletes the retry rows of messages that are no longer staged.
+   * One transaction, with the same checks as the enqueue: a message that got its rows is never
+   * expired, and an expired one is never enqueued (it is no longer `queued`), so none is published
+   * after expiry, whichever process runs first. Returns the number expired.
+   */
+  async #expireStaged(): Promise<number> {
+    const now = nowOf(this.#ctx);
+    return this.#ctx.store.transaction((tx) => {
+      let expired = 0;
+      if (now >= STAGED_MAX_AGE_SECONDS) {
+        const stale = tx.select('envelopes', {
+          direction: 'out',
+          delivery: 'queued',
+          type: { in: [...STAGED_TYPES] },
+          created_at: { lte: now - STAGED_MAX_AGE_SECONDS },
+        });
+        for (const row of stale) {
+          if (tx.count('outbox', { envelope_id: row.envelope_id }) !== 0) continue;
+          expired += tx.update(
+            'envelopes',
+            { envelope_id: row.envelope_id, direction: 'out', delivery: 'queued' },
+            { delivery: 'not_delivered' },
+          );
+        }
+      }
+      for (const retry of tx.select('outbox_staged')) {
+        const row = tx.get('envelopes', { envelope_id: retry.envelope_id });
+        if (
+          row?.direction !== 'out' ||
+          row.delivery !== 'queued' ||
+          tx.count('outbox', { envelope_id: retry.envelope_id }) !== 0
+        ) {
+          tx.delete('outbox_staged', { envelope_id: retry.envelope_id });
+        }
+      }
+      return expired;
+    });
+  }
+
+  /** After a transient fault: records the failure, so the message goes behind the others. */
+  async #recordStagedFailure(envelopeId: string): Promise<void> {
+    const failedAt = nowOf(this.#ctx);
+    await this.#ctx.store.transaction((tx) => {
+      const row = tx.get('envelopes', { envelope_id: envelopeId });
+      if (
+        row?.direction !== 'out' ||
+        row.delivery !== 'queued' ||
+        tx.count('outbox', { envelope_id: envelopeId }) !== 0
+      ) {
+        return;
+      }
+      const seen = tx.get('outbox_staged', { envelope_id: envelopeId });
+      if (seen === undefined) {
+        tx.insert('outbox_staged', { envelope_id: envelopeId, failures: 1, failed_at: failedAt });
+      } else {
+        tx.update(
+          'outbox_staged',
+          { envelope_id: envelopeId },
+          { failures: seen.failures + 1, failed_at: failedAt },
+        );
+      }
+    });
   }
 
   /**

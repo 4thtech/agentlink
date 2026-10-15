@@ -11,7 +11,9 @@ import { join } from 'node:path';
 import {
   AgentLinkClient,
   OUTBOX_CLAIM_SECONDS,
+  STAGED_MAX_AGE_SECONDS,
   type ApprovalChannel,
+  type StoreCipher,
   type TransportFactory,
 } from '@agentlink/core';
 import {
@@ -105,14 +107,31 @@ async function party(name: string): Promise<Party> {
   return { keychain, agentId, owner, ownerCode: shown(), path: join(dir, `${name}.sqlite`) };
 }
 
-async function openClient(p: Party, spy: RelaySpy): Promise<AgentLinkClient> {
+/** A per-row fault that does not clear by itself: staged pairing cards that do not open. */
+interface PairingFault {
+  on: boolean;
+}
+
+async function openClient(p: Party, spy: RelaySpy, fault?: PairingFault): Promise<AgentLinkClient> {
   const store = await openAgentStoreWith('keychain', p.agentId, p.path, { keychain: p.keychain });
   const keyStore = await openRecordedKeyStore('keychain', p.agentId, { keychain: p.keychain });
   opened.push({ store, keyStore });
+  const real = store.cipher;
+  const cipher: StoreCipher =
+    fault === undefined
+      ? real
+      : {
+          seal: (context, plaintext) => real.seal(context, plaintext),
+          open: (context, sealed) =>
+            fault.on && context.table === 'pairings'
+              ? Promise.reject(new Error('unreadable'))
+              : real.open(context, sealed),
+          indexDigest: (data) => real.indexDigest(data),
+        };
   return AgentLinkClient.create({
     keyStore,
     store: store.store,
-    cipher: store.cipher,
+    cipher,
     approvals,
     clock: () => t,
     policyMark: store.policyMark,
@@ -193,5 +212,44 @@ describe('outbox over one SQLite store shared by two clients (M1-7k, 06 §6)', (
     t += 3_600;
     await three.outbox.processDue();
     expect(spy3.published).toHaveLength(0);
+  });
+
+  it('ages out a staged handshake whose fault never clears; neither process ever publishes it (IR-M1-7k-1 F08)', async () => {
+    const a = await party('a');
+    const b = await party('b');
+    const inviter = await openClient(a, new RelaySpy());
+    await initIdentity(a, inviter, RELAYS_A);
+    const fault: PairingFault = { on: false };
+    const spy1 = new RelaySpy();
+    const one = await openClient(b, spy1, fault);
+    await initIdentity(b, one, RELAYS_B);
+    const invite = await inviter.pairing.createInvite();
+    const accepted = await one.pairing.acceptInvite({ link: invite.inviteUrl, allowed: true });
+    if (accepted.status !== 'pending') throw new Error('expected a staged pairing');
+    const spy2 = new RelaySpy();
+    const two = await openClient(b, spy2, fault);
+    const store = opened.at(-1)?.store.store;
+    if (store === undefined) throw new Error('no store');
+    const delivery = async () =>
+      (await store.transaction((tx) => tx.get('envelopes', { envelope_id: accepted.pairingId })))
+        ?.delivery;
+
+    fault.on = true;
+    await Promise.all([one.outbox.processDue(), two.outbox.processDue()]);
+    expect(await delivery()).toBe('queued');
+
+    t += STAGED_MAX_AGE_SECONDS;
+    await Promise.all([one.outbox.processDue(), two.outbox.processDue()]);
+    expect(await delivery()).toBe('not_delivered');
+
+    fault.on = false;
+    t += 3_600;
+    await Promise.all([one.outbox.processDue(), two.outbox.processDue()]);
+    expect(spy1.published).toHaveLength(0);
+    expect(spy2.published).toHaveLength(0);
+    expect(await delivery()).toBe('not_delivered');
+    expect(
+      await store.transaction((tx) => tx.count('outbox', { envelope_id: accepted.pairingId })),
+    ).toBe(0);
   });
 });
