@@ -757,19 +757,39 @@ describe('termsFromInput: the mapping to terms with the core-filled fields', () 
     expect((t.price as Obj).payer).toBe(CONTACT_A);
   });
 
-  it('defaults deliverable ids to d1, d2, … by position and keeps given ids', () => {
+  it('D-74: ids are given on every deliverable or on none; none defaults to d1, d2, …', () => {
     const t = ok(
       termsInput({
         deliverables: [
           { description: 'a', by: 'me' },
-          { id: 'x', description: 'b', by: 'me' },
+          { description: 'b', by: 'me' },
           { description: 'c', by: 'me' },
         ],
-        deadlines: [{ ref: 'x', due: '2026-11-30T17:00:00Z' }],
+        deadlines: [{ ref: 'd2', due: '2026-11-30T17:00:00Z' }],
       }),
     );
-    expect((t.deliverables as Obj[]).map((d) => d.id)).toEqual(['d1', 'x', 'd3']);
+    expect((t.deliverables as Obj[]).map((d) => d.id)).toEqual(['d1', 'd2', 'd3']);
     expect((t.deliverables as Obj[]).map((d) => d.plaintextSha256)).toEqual([null, null, null]);
+    const given = ok(
+      termsInput({
+        deliverables: [
+          { id: 'x', description: 'a', by: 'me' },
+          { id: 'y', description: 'b', by: 'me' },
+        ],
+        deadlines: [{ ref: 'y', due: '2026-11-30T17:00:00Z' }],
+      }),
+    );
+    expect((given.deliverables as Obj[]).map((d) => d.id)).toEqual(['x', 'y']);
+    // A mix is refused, even without a collision.
+    const mixed = termsInput({
+      deliverables: [
+        { description: 'a', by: 'me' },
+        { id: 'x9', description: 'b', by: 'them' },
+      ],
+      deadlines: [],
+    });
+    expectReject(termsInputSchema, mixed);
+    expect(termsFromInput(mixed, ctx()).success).toBe(false);
   });
 
   it('refuses a default id that collides with a given one (never renames)', () => {
