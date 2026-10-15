@@ -5,6 +5,7 @@ import boundaries from './tools/deps-check/eslint-plugin.mjs';
 import {
   BUILTINS,
   CRYPTO_MSG,
+  ENTRY_TEST_DIRS,
   LIBRARIES,
   NODE_MSG,
   NODE_ZONES,
@@ -32,7 +33,7 @@ const SOURCE = '{ts,tsx,mts,cts}';
 // handled by no-restricted-imports; dynamic import(), require(), `import x = require()`, import()
 // types, cross-package relative paths and `crypto.subtle` by the local boundaries/no-bypass rule.
 
-function restrictionsFor(zone, { test = false } = {}) {
+function restrictionsFor(zone, { test = false, testDir = null } = {}) {
   const nodeAllowed = NODE_ZONES.includes(zone);
   const paths = nodeAllowed
     ? ['crypto', 'node:crypto'].map((name) => ({ name, message: CRYPTO_MSG }))
@@ -48,7 +49,11 @@ function restrictionsFor(zone, { test = false } = {}) {
   for (const entry of RESTRICTED_ENTRY_POINTS) {
     if (zone !== null && entry.zones.includes(zone)) continue;
     const exact =
-      zone !== null && test && (entry.testZones ?? []).includes(zone) ? entryTestNames(entry) : [];
+      zone !== null &&
+      test &&
+      ((entry.testZones ?? []).includes(zone) || (entry.testDirs ?? []).includes(testDir))
+        ? entryTestNames(entry)
+        : [];
     const group = entry.group.filter((pattern) => !exact.includes(pattern));
     patterns.push({ group, message: restrictedEntryMessage(entry) });
   }
@@ -146,6 +151,15 @@ export default tseslint.config(
   ].map((zone) => ({
     files: [`${zone}/**/*.test.ts`],
     rules: restrictionsFor(zone, { test: true }),
+  })),
+  // Test files of an entry's testDirs only (IR-M1-9k-1 F01): `apps/cli/test/**/*.test.ts` may import
+  // the crypto test seam by name; apps/cli/src (production and tests) keeps the production rules.
+  ...ENTRY_TEST_DIRS.map((dir) => ({
+    files: [`${dir}/**/*.test.ts`],
+    rules: restrictionsFor(Object.keys(ZONES).find((zone) => dir.startsWith(`${zone}/`)) ?? null, {
+      test: true,
+      testDir: dir,
+    }),
   })),
   {
     // Node-only code gets Node globals: build tooling, config files and tests (which run in Node).
