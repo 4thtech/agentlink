@@ -38,6 +38,10 @@ The owner exported the brand (`agentlink-brand`) and the application design (`ag
 | **D2** Rationale notes (13) | **missing** | the direction is recorded in the manifests only |
 | **D3** Marketing site (6.15), final brand | **missing** | not due; social images (OG, GitHub preview) arrived early in `brand/social/` |
 
+### Re-export of 15 Oct 2026 (DESIGN-D2 intake check)
+
+The owner exported the brand and the application design again. Compared byte for byte with `docs/design/`, the application design (`agentlink-app-design`) is **identical** to the 14 Oct intake, so **no surface gained a design**: the Status table and the tables above stand, DESIGN-D2 stays partial, and the surfaces marked missing or partial stay functional and unstyled. The only new files are the logo and social JPG renderings, now in `brand/logo/jpg/` and `brand/social/` (see `brand/MANIFEST.md`). The production-domain and trademark check (M1-24) is still pending, so the brand is not final.
+
 **Drift from 11.** The drop was designed from an older handoff text than `claude-design-handoff.md` here (pairing safety-code timing, scope of "Remember for this contact", per-contact proof rules, invite answered twice). **11 wins**; the differences are listed in `d1/MANIFEST.md`. The D2 vocabulary check (hits such as "owner key" in the console) is in `d2/MANIFEST.md`.
 
 **Intake cards.** DESIGN-D1's acceptance is met (drop recorded), so M1-9g, M1-11b and the M1-19 restyle no longer wait on design (their other dependencies still apply). DESIGN-D2 is partial: M2-1a can start from the delivered tokens and components; M2-1b, M2-5a/b and M2-11g build only the surfaces listed as delivered and keep the rest functional and unstyled until the owner delivers or waives the missing items.
