@@ -429,36 +429,66 @@ const gitList = (root, args) =>
  *              linked directory is one entry without a source extension and would hide its files.
  */
 export function listSourceFiles(root, dir) {
-  const zonePath = relative(root, dir).split('\\').join('/');
-  let paths;
-  const symlinks = new Set();
-  try {
-    paths = gitList(root, ['--cached', '--others', '--exclude-standard', '--', zonePath]).map(
-      (path) => join(root, path),
-    );
-    for (const entry of gitList(root, ['-s', '--', zonePath])) {
-      const [meta, path] = entry.split('\t');
-      if (meta.startsWith('120000 ')) symlinks.add(path);
-    }
-  } catch {
-    paths = walk(dir);
-  }
-  const live = paths.filter((path) => !path.split(/[\\/]/).includes('node_modules'));
-  for (const path of live) {
-    try {
-      if (lstatSync(path).isSymbolicLink()) {
-        symlinks.add(relative(root, path).split('\\').join('/'));
+  return listSourceFilesIn(root, [dir]).get(dir);
+}
+
+/**
+ * The same listing for several directories at once: 2 `git ls-files` runs in total instead of 2 per
+ * directory (the repository scan spawned 34 processes, which dominated its time on a loaded CI
+ * runner). A path belongs to the deepest listed directory that contains it. Returns Map(dir -> result).
+ */
+export function listSourceFilesIn(root, dirs) {
+  const zonePaths = new Map(dirs.map((dir) => [dir, relative(root, dir).split('\\').join('/')]));
+  const pathsOf = new Map(dirs.map((dir) => [dir, []]));
+  const symlinksOf = new Map(dirs.map((dir) => [dir, new Set()]));
+  const ownerOf = (path) => {
+    let best = null;
+    for (const [dir, zonePath] of zonePaths) {
+      if (
+        (path === zonePath || path.startsWith(`${zonePath}/`)) &&
+        (best === null || zonePath.length > zonePaths.get(best).length)
+      ) {
+        best = dir;
       }
-    } catch {
-      // deleted but still listed: nothing to scan
     }
+    return best;
+  };
+  let listedByGit = false;
+  try {
+    const specs = ['--', ...zonePaths.values()];
+    const listed = gitList(root, ['--cached', '--others', '--exclude-standard', ...specs]);
+    const staged = gitList(root, ['-s', ...specs]);
+    for (const path of listed) pathsOf.get(ownerOf(path))?.push(join(root, path));
+    for (const entry of staged) {
+      const [meta, path] = entry.split('\t');
+      if (meta.startsWith('120000 ')) symlinksOf.get(ownerOf(path))?.add(path);
+    }
+    listedByGit = true;
+  } catch {
+    // no repository metadata: walk each directory
   }
-  const files = live
-    .filter(
-      (path) => SOURCE_EXT.test(path) && existsSync(path) && !symlinks.has(relative(root, path)),
-    )
-    .sort();
-  return { files, symlinks: [...symlinks].sort() };
+  const result = new Map();
+  for (const dir of dirs) {
+    const paths = listedByGit ? pathsOf.get(dir) : walk(dir);
+    const symlinks = symlinksOf.get(dir);
+    const live = paths.filter((path) => !path.split(/[\\/]/).includes('node_modules'));
+    for (const path of live) {
+      try {
+        if (lstatSync(path).isSymbolicLink()) {
+          symlinks.add(relative(root, path).split('\\').join('/'));
+        }
+      } catch {
+        // deleted but still listed: nothing to scan
+      }
+    }
+    const files = live
+      .filter(
+        (path) => SOURCE_EXT.test(path) && existsSync(path) && !symlinks.has(relative(root, path)),
+      )
+      .sort();
+    result.set(dir, { files, symlinks: [...symlinks].sort() });
+  }
+  return result;
 }
 
 /** Workspace directories under packages/* and apps/*: [{ zone, dir }]. */
@@ -482,6 +512,10 @@ export function runChecks(root) {
   const graph = {};
   let files = 0;
   const zones = workspaceZones(root);
+  const subtleDirs = SUBTLE_ONLY_ZONES.map((zone) => join(root, zone)).filter((dir) =>
+    existsSync(dir),
+  );
+  const listings = listSourceFilesIn(root, [...zones.map(({ dir }) => dir), ...subtleDirs]);
 
   for (const { zone, dir } of zones) {
     const manifestPath = join(dir, 'package.json');
@@ -504,7 +538,7 @@ export function runChecks(root) {
       );
     }
     if (!ZONES[zone]) continue; // already reported; do not guess its policy
-    const listed = listSourceFiles(root, dir);
+    const listed = listings.get(dir);
     for (const link of listed.symlinks) {
       problems.push(
         `${link}: symbolic links are not allowed in packages/ and apps/ (they hide files from the scan)`,
@@ -526,7 +560,7 @@ export function runChecks(root) {
   for (const zone of SUBTLE_ONLY_ZONES) {
     const dir = join(root, zone);
     if (!existsSync(dir)) continue;
-    const listed = listSourceFiles(root, dir);
+    const listed = listings.get(dir);
     for (const link of listed.symlinks)
       problems.push(`${link}: symbolic links are not allowed here`);
     for (const file of listed.files) {
