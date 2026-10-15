@@ -33,6 +33,15 @@ import {
   type SyncInboxResult,
 } from './sync.js';
 import type { Store, StoreCipher } from './store/store.js';
+import {
+  TermsService,
+  type ProposeTermsInput,
+  type ProposeTermsResult,
+  type RecordLookup,
+  type RespondToTermsInput,
+  type RespondToTermsResult,
+} from './terms-flow.js';
+import { TermsInbound } from './terms-store.js';
 
 export interface AgentLinkClientOptions {
   /** The agent's KeyStore (04 §3.1.1): keychain or file backend (M1-8a, M1-8f), Worker (M2-3a). */
@@ -61,6 +70,11 @@ export interface AgentLinkClientOptions {
    * "received" `ack` for each new message from a contact. Default false.
    */
   readonly deliveryAcks?: boolean;
+  /**
+   * The verified on-chain records this agent knows (M1-7g, M1b): lets a commitment see whether the
+   * answered envelope is recorded. Without it, no record is known.
+   */
+  readonly records?: RecordLookup;
 }
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
@@ -89,6 +103,11 @@ export class AgentLinkClient {
   readonly inbox: InboxService;
   /** Delivery acknowledgements (02 F-23; M1-7h): behind the `deliveryAcks` flag. */
   readonly acks: DeliveryAcks;
+  /**
+   * Terms and commitments (M1-32; 06 §2.2a, 04 §3.4.2): propose, respond, the negotiations, the
+   * commitment card, and the deferred-receipt lookup and part claim for M1-7g.
+   */
+  readonly terms: TermsService;
   readonly #send: SendService;
   readonly #sync: SyncService;
 
@@ -99,6 +118,7 @@ export class AgentLinkClient {
     policyMark: PolicyVersionMark | undefined,
     transport: TransportFactory | undefined,
     deliveryAcks: boolean,
+    records: RecordLookup | undefined,
   ) {
     this.agentId = agentId;
     this.identity = new IdentityService(ctx);
@@ -114,6 +134,8 @@ export class AgentLinkClient {
         limit: async () => policyLimits(await ownerActions.loadPolicy()).rateLimitPerContactPerHour,
         countTx: countRateTx,
       },
+      // M1-32: the negotiation chain runs on receive, from this agent's own store (04 §3.4).
+      terms: new TermsInbound(ctx, async () => (await this.identity.get())?.agentId),
     });
     this.approvals = approvals;
     this.idempotency = new IdempotencyService(ctx);
@@ -135,6 +157,15 @@ export class AgentLinkClient {
       outbox: this.outbox,
     });
     this.inbox = new InboxService(ctx, this.contacts, this.requests);
+    this.terms = new TermsService(ctx, {
+      identity: this.identity,
+      contacts: this.contacts,
+      envelopes: this.envelopes,
+      outbox: this.outbox,
+      ownerActions: this.ownerActions,
+      approvals: this.approvalService,
+      ...(records === undefined ? {} : { records }),
+    });
     this.acks = new DeliveryAcks(
       ctx,
       {
@@ -180,6 +211,22 @@ export class AgentLinkClient {
    */
   sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
     return this.#send.send(input);
+  }
+
+  /**
+   * Sends an `offer` (07 §2 `proposeTerms`; 06 §2.2a `agentlink_propose_terms`; M1-32): the core
+   * fills `termsId`, `version`, `parties`, `previousTermsHash` and `termsHash` from its store.
+   */
+  proposeTerms(input: ProposeTermsInput): Promise<ProposeTermsResult> {
+    return this.terms.propose(input);
+  }
+
+  /**
+   * Answers an offer, or their accept of our offer (07 §2 `respondToTerms`; 06 §2.2a; M1-32):
+   * `accept` is a commitment under one approval per agreement (04 §3.4.2).
+   */
+  respondToTerms(input: RespondToTermsInput): Promise<RespondToTermsResult> {
+    return this.terms.respond(input);
   }
 
   /**
@@ -233,6 +280,7 @@ export class AgentLinkClient {
       options.policyMark,
       options.transport,
       options.deliveryAcks === true,
+      options.records,
     );
   }
 }

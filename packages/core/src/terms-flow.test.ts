@@ -1135,25 +1135,29 @@ describe('property: random interleavings never send two accepts or run without a
       s = (s * 1_103_515_245 + 12_345) % 2_147_483_648;
       return s % n;
     };
-    for (let round = 0; round < 6; round += 1) {
+    for (let round = 0; round < 8; round += 1) {
       const { a, b, offer } = await offered();
       const offers = [offer.envelopeId];
       const approvals: string[] = [];
-      for (let step = 0; step < 14; step += 1) {
+      for (let step = 0; step < 18; step += 1) {
         const head = offers[offers.length - 1]!;
-        switch (rnd(7)) {
+        // Weighted toward the commitment path: ask, approve, run (twice at once), then the rest.
+        const pick = [0, 0, 1, 1, 2, 2, 3, 4, 5, 6][rnd(10)];
+        switch (pick) {
           case 0: {
             const r = await b.client.respondToTerms({ envelopeId: head, decision: 'accept' });
             if (r.status === 'pending_approval') approvals.push(r.approvalId);
             break;
           }
           case 1: {
-            const id = approvals[rnd(approvals.length || 1)];
+            // Mostly the newest request; sometimes an older one (void, used or superseded).
+            const id = rnd(3) === 0 ? approvals[rnd(approvals.length || 1)] : approvals.at(-1);
             if (id !== undefined) await approve(b, id).catch(() => undefined);
             break;
           }
           case 2: {
-            const id = approvals[rnd(approvals.length || 1)];
+            // Mostly the newest request; sometimes an older one (void, used or superseded).
+            const id = rnd(3) === 0 ? approvals[rnd(approvals.length || 1)] : approvals.at(-1);
             if (id === undefined) break;
             const env = await b.store.transaction((tx) => tx.get('approvals', { approval_id: id }));
             const target = env?.answers_envelope_id ?? head;
