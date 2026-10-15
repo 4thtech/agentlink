@@ -5,6 +5,12 @@
 import { readFileSync } from 'node:fs';
 import process from 'node:process';
 import { isatty } from 'node:tty';
+import { acceptHandler } from './commands/accept.js';
+import { contactsHandler } from './commands/contacts.js';
+import { doctorHandler } from './commands/doctor.js';
+import { inviteHandler } from './commands/invite.js';
+import { requestsHandler } from './commands/requests.js';
+import { statusHandler } from './commands/status.js';
 import { createInitHandler, nodeInitDeps } from './commands/init.js';
 import { ownerCommandHandlers } from './commands/owner/index.js';
 import { createDispatcher } from './dispatch.js';
@@ -24,6 +30,12 @@ function packageVersion(): string {
 
 const dispatch = createDispatcher({
   init: createInitHandler(nodeInitDeps()),
+  invite: inviteHandler,
+  accept: acceptHandler,
+  contacts: contactsHandler,
+  status: statusHandler,
+  doctor: doctorHandler,
+  requests: requestsHandler,
   // M1-9b: the owner commands (owner init, approve, deny, cancel).
   ...ownerCommandHandlers(),
 });

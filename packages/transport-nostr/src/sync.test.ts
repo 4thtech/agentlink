@@ -767,17 +767,23 @@ describe('dedup', () => {
   });
 
   it('bounds the dedup memory whatever a relay sends', async () => {
-    const s = setup({ dedupCacheEntries: 16 });
+    // The cap is injected (dedupCacheEntries), so a small one proves the bound with few inputs. Each
+    // valid wrap costs real secp256k1 and NIP-44 work (create and open), which is slow on CI runners,
+    // so the input is a multiple of the cap rather than of the production default.
+    const CAP = 4;
+    const VALID = CAP * 4;
+    const JUNK = CAP * 50;
+    const s = setup({ dedupCacheEntries: CAP });
     const [relay] = relayUrls('bound', 1) as [string];
     s.net.configure(relay);
-    // 60 valid wraps and 200 wraps that are junk (random id and signature, not for us).
-    const wraps = Array.from({ length: 60 }, (_, i) =>
+    // VALID valid wraps and JUNK wraps that are junk (random id and signature, not for us).
+    const wraps = Array.from({ length: VALID }, (_, i) =>
       makeWrap(s.recipient, { createdAt: NOW - (i + 1) * 60 }),
     );
     for (const w of wraps) s.net.inject(relay, w.event);
     s.net.configure(relay, {
       extraFrames: (subId) =>
-        Array.from({ length: 200 }, () =>
+        Array.from({ length: JUNK }, () =>
           JSON.stringify([
             'EVENT',
             subId,
@@ -798,9 +804,9 @@ describe('dedup', () => {
       identities: identity(s),
       onEnvelope: s.handler(),
     });
-    expect(first.delivered).toBe(60);
-    expect(first.dropped).toBe(200);
-    expect(s.engine.dedupStats()).toEqual({ processed: 16, junk: 16, inflight: 0 });
+    expect(first.delivered).toBe(VALID);
+    expect(first.dropped).toBe(JUNK);
+    expect(s.engine.dedupStats()).toEqual({ processed: CAP, junk: CAP, inflight: 0 });
     // Evicted entries are still deduplicated by the persisted seen-set.
     const second = await s.engine.sync({
       relays: [relay],
@@ -808,8 +814,8 @@ describe('dedup', () => {
       onEnvelope: s.handler(),
     });
     expect(second.delivered).toBe(0);
-    expect(s.items).toHaveLength(60);
-    expect(s.engine.dedupStats().processed).toBe(16);
+    expect(s.items).toHaveLength(VALID);
+    expect(s.engine.dedupStats().processed).toBe(CAP);
     expect(DEDUP_CACHE_ENTRIES).toBeGreaterThan(0);
   });
 });
