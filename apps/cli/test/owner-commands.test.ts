@@ -520,6 +520,27 @@ describe('approve with no ID: one agent list, one owner code entry (D-68, 04 §2
     expect(await use(w, b)).toEqual({ status: 'used' });
   });
 
+  it('a refused batch names the failed item and holds the others back, still pending (IR-M1-9b-1 L-2)', async () => {
+    const w = await world();
+    const a = await w.request();
+    const b = await w.request();
+    const decide = w.deps.decide;
+    w.deps.decide = async (context, reviewed) => {
+      const signed = await decide(context, reviewed);
+      // Between the signature and the apply, another surface denies `a`.
+      const other = await w.signDecision([
+        { approvalId: a.approvalId, actionDigest: a.actionDigest, decision: 'deny' },
+      ]);
+      expect((await w.client.ownerActions.apply(other)).status).toBe('applied');
+      return signed;
+    };
+    w.answers.push('a', 'a');
+    expect(await w.run(['approve'])).toBe(1);
+    expect(w.out.filter((l) => l.startsWith("Problem  Didn't go through: "))).toHaveLength(1);
+    expect(w.out.filter((l) => l.startsWith('Waiting  Held back'))).toHaveLength(1);
+    expect((await row(w, b.approvalId))?.status).toBe('pending');
+  });
+
   it('a pending commitment is listed but cannot be selected', async () => {
     const w = await world();
     const r = await w.request();

@@ -29,6 +29,7 @@ export const OWNER_TEXT = Object.freeze({
   nothingDecided: 'Nothing was decided. Everything stays waiting.',
   moreWaiting: 'More are waiting. Review them next, or each with `agentlink approve <approvalId>`.',
   dropped: 'No longer waiting, so left out:',
+  heldBack: 'Waiting  Held back because another item failed; still waiting for you:',
   noneLeft: 'None of your choices is still waiting. Nothing was changed.',
 
   // Cancel (D-55, 04 §3.4.2 rule 6).

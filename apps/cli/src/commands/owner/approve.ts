@@ -77,7 +77,11 @@ async function signAndApply(
   const applied = printOutcome(
     context.output,
     outcome,
-    chosen.map((c) => ({ summary: c.facts.summary, decision: c.decision })),
+    chosen.map((c) => ({
+      approvalId: c.request.approvalId,
+      summary: c.facts.summary,
+      decision: c.decision,
+    })),
   );
   return applied ? EXIT_OK : EXIT_FAILED;
 }

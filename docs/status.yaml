@@ -194,7 +194,7 @@ areas:
     components:
       - name: "MCP server and CLI"
         state: in-progress
-        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising) has landed; the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) are in review; the other commands and the MCP server follow."
+        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising) and `agentlink init` have landed; the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) are in review; the other commands and the MCP server follow."
       - name: "Local approval page"
         state: planned
         summary: "A small page on 127.0.0.1 for owner approvals and settings (M1b)."

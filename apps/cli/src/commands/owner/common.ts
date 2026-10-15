@@ -87,20 +87,34 @@ export async function ownerContext(agent: OwnerAgent): Promise<ApprovalContext |
   };
 }
 
-/** One result line per decided item, then the footer (11 §6.10). */
+/**
+ * One result line per decided item, then the footer (11 §6.10). A refused batch applies nothing
+ * (04 §2.5.2): the items the core named as not matching get the failed line, and the others are
+ * told they were held back with it and still wait (04 §2.5.2 "reports which items failed").
+ */
 export function printOutcome(
   output: Output,
   outcome: OwnerActionOutcome,
-  items: readonly { readonly summary: string; readonly decision: 'approve' | 'deny' }[],
+  items: readonly {
+    readonly approvalId: string;
+    readonly summary: string;
+    readonly decision: 'approve' | 'deny';
+  }[],
 ): boolean {
   const applied = outcome.status === 'applied';
+  const failedIds = new Set(
+    outcome.status === 'refused' ? (outcome.items ?? []).map((i) => i.approvalId) : [],
+  );
   for (const item of items) {
-    const key = !applied
-      ? 'cli.approve.resultFailed'
-      : item.decision === 'approve'
-        ? 'cli.approve.resultApproved'
-        : 'cli.approve.resultDenied';
-    output.print(copy(key, { action: item.summary }));
+    if (applied) {
+      const key =
+        item.decision === 'approve' ? 'cli.approve.resultApproved' : 'cli.approve.resultDenied';
+      output.print(copy(key, { action: item.summary }));
+    } else if (failedIds.size === 0 || failedIds.has(item.approvalId)) {
+      output.print(copy('cli.approve.resultFailed', { action: item.summary }));
+    } else {
+      output.print(`${OWNER_TEXT.heldBack} ${item.summary}`);
+    }
   }
   output.print(copy('cli.approve.footer'));
   return applied;
