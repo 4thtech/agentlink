@@ -1,45 +1,49 @@
 # @talirezun — sync
-**Headline:** M1-7d owner actions, contact.check routing, policy mark and public knowledge base merged; M1a: encodings, requests and CLI/MCP next
-_Updated 2026-10-15 07:30 · claude-code / claude-opus-5-5 · orchestrator_
+**Headline:** M1a: CLI + MCP server, pairing, send/inbox, invites, owner approvals and policies merged; terms tools, inbox wiring, background loop and e2e next
+_Updated 2026-10-15 12:15 UTC · claude-code / claude-opus-5-5 · orchestrator_
 
 ## Now
-- merged 2026-10-15:
-  - #79 M1-7d (D-70 paired contacts Talk without approval);
-  - #85 contact.check routing;
-  - #86 M1-8g policy mark;
-  - #88 public knowledge base (knowledge/ + llms.txt);
-  - #89 D-71 decisions;
-  - #83 and #84 CI.
+Merged 2026-10-15 (#74–#127, key items):
+- **Specs and decisions:** D-72–D-77; M1-9 decomposition and D-73 (#97); terms canonical form (#100).
+- **Core:** send pipeline and outbox (#99); inbox sync and delivery acks (#106); request accept/block (#105); approvals and use-once (#95, #116); pairing (#78, #80); owner-signed actions and policy engine (#79); commitments policy D-31 (#114); terms schema and termsHash (#101).
+- **CLI:** init and harness detection (#111); owner init, approve, deny, cancel (#115); invite, accept, contacts, status, doctor, requests (#112); runtime and M1a approval channel (#107); copy sheet (#102).
+- **MCP server:** frozen M1a tool surface and read-only tools (#113); invite and send/inbox tools (#125, #127).
+- **Node:** owner init signs first agent card (#118); policy mark (#86); public knowledge base (#88).
+- **CI hardening:** false-red fixes (#109); keychain job runs CLI two-process test (#108); relays-docker job (#84); deterministic dedup test (#117); pinned runner images (#83).
+- **Relays:** default public relay set and vetting script (#119).
 
 ## In flight
-| Task | Branch / PR | Status | Next step |
-|---|---|---|---|
-| M1-5f outbox window | #87 | PR open | Review, then merge |
-| M1-7b-b sender-owner entry | #90 | PR open | Review, then merge |
-| docs status source | #91 | PR open | Review, then merge |
-| Docs-impact section | #92 | PR open | Review, then merge |
-| M1-2a encodings | #93 | PR open | Review, then merge |
-| M1-7e requests | #94 | PR open | Review, then merge |
-| 4thTech wiki redesign | — | plan done | Build |
+| PR | Work | Status |
+|---|---|---|
+| #130 | M1-7h-c inbox page read with read marking | open |
+| #126 | M1-32 terms flow, one approval per agreement (D-55) | open |
+| #123 | DOCS: decisions, spec follow-ups, backlog pass | open |
+| #124 | CHORE: version packages | open |
+| #120, #121, #128, #129 | DEPS: dependency updates | open |
 
 ## Next
-1. M1-9 CLI + MCP, M1-12 docs.
-2. M1-13 e2e, J9 dogfood → v0.1.0.
+1. M1-9q terms tools; M1-9p-b inbox on.
+2. M1-7k-b / M1-9r background loop.
+3. M1-21-b UCD vendoring.
+4. M1-13a e2e; J9 dogfood.
 
-## Decisions made (still relevant)
-- D-61: G-4 batches all-or-nothing, identical duplicates skipped; notarize gas ≤ 170k; pause blocks receipts; fresh salt per record; G-46 one-plaintext requirement.
-- D-62 (confirmed at #34 merge): replacement rule at finalized block, held envelopes (48 h, ≤ 100 per owner kid), pause works after freeze, `soloAfterRevertSeconds` 1 h, G-46 timing before M1-7b.
-- D-52/D-57: build → independent review → CI → merge; services auto-deploy; npm `latest` keeps Tali's click.
-- D-67: same-user agent risk (G-1) accepted for M1 testnets, re-decided at the M2 gate.
-- D-68: batch owner approval, one code entry per reviewed batch, no unlock session; commitments never batched.
+## Decisions (still relevant)
+- D-72 request accept/block; D-73 M1-9 owner answers; D-74 terms rules.
+- D-75 default relays: nos.lol, relay.primal.net, relay.snort.social, nostr.mom.
+- D-76 MCP SDK, with module-graph guard; D-77 interim Unicode table.
+- D-52/D-57: build → independent review → CI → merge; services auto-deploy.
+- D-61/D-62: G-4 batches all-or-nothing; notarize gas ≤ 170k; pause blocks receipts; replacement at finalized block; held envelopes 48 h; `soloAfterRevertSeconds` 1 h.
+- D-67: same-user agent risk (G-1) accepted for M1 testnets; re-decided at M2 gate.
+- D-68: batch owner approval, one code per reviewed batch, no unlock session; commitments never batched.
 - D-69: invite links use raw DEFLATE (RFC 1951).
 - D-70: paired contacts Talk without approval by default.
-- D-71: deployer keys (testnets: repo secret, process-only safeguards; mainnet: separate hardware key).
+- D-71: deployer keys (testnets: repo secret; mainnet: separate hardware key).
 
 ## Asks
 - [ ] @denisjazbec: start with `docs/README.md` and `docs/process/onboarding.md`. (2026-10-12)
 - [ ] @denisjazbec: D-59 proposes you hold one of two ops pause hardware keys. OK? Needed before M3. (2026-10-14)
 - [ ] @denisjazbec: review spec 05 §5.1 and the contract cards M1-3*; D-61 changes pause scope (receipts too). (2026-10-14)
+- [ ] @denisjazbec: Tali will share a private review of the Encryptor extension; please look when you can (2026-10-15)
 
 ## Heads-up
 - OCC v2 is clean-room (D-20); no v1 code is copied.
