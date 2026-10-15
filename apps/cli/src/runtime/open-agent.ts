@@ -105,6 +105,14 @@ export const NO_AGENT_MESSAGE =
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
 
+/**
+ * The https origins of the 4thTech encrypted drop (D-48) that an inbox page shows as `drop` (06 §2.2
+ * `FileInfo.delivery`; any other file URL shows as `own`). No drop origin is configured yet (the
+ * drop service and its config land with the files cards), so the list is empty: every received
+ * file URL shows as `own` until then (M1-9p-b).
+ */
+export const DROP_ORIGINS: readonly string[] = Object.freeze([]);
+
 /** Opens a local agent for a command or an `agentlink mcp` process. */
 export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAgentResult> {
   const name = options.agent ?? DEFAULT_AGENT_NAME;
@@ -159,6 +167,7 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
       logger,
       policyMark: agentStore.policyMark,
       transport: deps.transport(),
+      dropOrigins: DROP_ORIGINS,
     });
   } catch (error) {
     await agentStore.close().catch(() => undefined);

@@ -6,7 +6,7 @@
 //   the short owner fingerprint, and the self-declared name for the block's `from` attribute only.
 //   The label comes from the stored contact, never from the name, and is never "verified" alone.
 // - Counts (`counts`) read the store only. They serve the fetch-only catch-up (M1-7h addendum,
-//   D-73): unread is the contact's unread messages plus the `received` rows whose verified `from` is
+//   D-73): unread is the contact's unread messages of the types an inbox page returns (PAGE_TYPES) plus the `received` rows whose verified `from` is
 //   that contact's current agent key, so a catch-up can count what it fetched without processing it
 //   (06 §2.0). Unknown senders are a count only.
 //
@@ -16,7 +16,13 @@ import { parseJson } from '@agentlink/crypto';
 import { payloadSchema, type ContactDisplayName, type Payload } from '@agentlink/types';
 import type { ContactBook, ContactView } from './contacts.js';
 import { open, type CoreContext } from './context.js';
-import { dropOriginsOf, readInboxPage, type InboxPage, type InboxPageQuery } from './inbox-page.js';
+import {
+  PAGE_TYPES,
+  dropOriginsOf,
+  readInboxPage,
+  type InboxPage,
+  type InboxPageQuery,
+} from './inbox-page.js';
 import type { RequestsQueue } from './requests.js';
 
 export {
@@ -191,6 +197,10 @@ export class InboxService {
    * opened or processed and nothing is written (06 §2.0). A `received` row counts for the contact
    * whose current agent key signed it (its signature passed 04 §3.1.1 step 4 when it was stored);
    * its type is not known until it is processed, so it counts as one unread item.
+   *
+   * A processed row counts only if the inbox page can return it (PAGE_TYPES, M1-9p-b;
+   * IR-M1-7h-c-1): a `proof` or another type the page never returns would otherwise leave an unread
+   * count that no inbox read clears.
    */
   async counts(): Promise<InboxCounts> {
     const inbox = await this.#ctx.store.transaction((tx) => {
@@ -207,7 +217,7 @@ export class InboxService {
             contact_id: contact.contact_id,
             state: 'ok',
             read_at: null,
-            type: { in: [...INBOX_TYPES] },
+            type: { in: [...PAGE_TYPES] },
           }) +
           tx.count('envelopes', {
             direction: 'in',

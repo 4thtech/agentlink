@@ -57,6 +57,7 @@ function toolClient(over: Partial<ToolClient> = {}): ToolClient {
         sentAt: '2026-10-15T10:00:00Z',
       }),
     syncInbox: () => Promise.resolve(),
+    inboxPage: () => Promise.resolve({ status: 'ok', items: [], requests: 0 }),
     approvalState: () => Promise.resolve({ check: { status: 'void' }, decidedAt: 1_760_000_000 }),
     ...over,
   };
@@ -122,7 +123,8 @@ describe('MCP server (stdio binding, 06 §1)', () => {
       ['agentlink_get_approval', { approvalId: 'bad' }, 'error'],
       ['agentlink_send', { to: 'Marko', text: 'hi' }, 'ok'],
       ['agentlink_send', { to: 'Marko', body: { terms: {} } }, 'error'],
-      ['agentlink_inbox', {}, 'error'],
+      ['agentlink_inbox', {}, 'ok'],
+      ['agentlink_inbox', { before: 'Q2xhaW1zQ2xhaW1zQ2xhaQ' }, 'ok'],
       ['agentlink_create_invite', {}, 'error'],
       ['agentlink_accept_invite', { inviteUrl: 'x' }, 'error'],
     ];

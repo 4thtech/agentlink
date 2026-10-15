@@ -192,11 +192,8 @@ export interface ToolClient {
   send(input: SendMessageInput): Promise<SendMessageResult>;
   /** Core `syncInbox` (M1-7h): fetches, stores and processes envelopes within the budget (06 §6). */
   syncInbox(budgetMs: number): Promise<void>;
-  /**
-   * One inbox page with its read marks (06 §2.2). Absent until the core page read lands (proposed card M1-7h-c);
-   * until then `agentlink_inbox` answers with the fixed "not available yet" error and syncs nothing.
-   */
-  inboxPage?(query: InboxPageQuery): Promise<InboxPage>;
+  /** One inbox page with its read marks (06 §2.2): core `inbox.page` (M1-7h-c; wired by M1-9p-b). */
+  inboxPage(query: InboxPageQuery): Promise<InboxPage>;
   /** Invites and pairing (M1-9o). Absent in a double that does not need them: the tools then answer "not available". */
   readonly invites?: InviteTools;
 }
@@ -265,6 +262,7 @@ export function coreToolClient(client: AgentLinkClient): ToolClient {
     async syncInbox(budgetMs) {
       await client.syncInbox({ budgetMs });
     },
+    inboxPage: (query) => client.inbox.page(query),
     invites: coreInviteTools(client),
     async storageMode() {
       const effective = await client.ownerActions.loadPolicy();
