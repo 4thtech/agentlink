@@ -23,7 +23,7 @@ import {
   parseJson,
   randomBytes,
 } from '@agentlink/crypto';
-import { CLOCK_SKEW_SECONDS } from '@agentlink/types';
+import { CLOCK_SKEW_SECONDS, MCP_TOOL_NAMES } from '@agentlink/types';
 import {
   IDEMPOTENCY_KEY_REUSED,
   IDEMPOTENCY_LEASE_SECONDS,
@@ -36,6 +36,25 @@ import type { StoreTx } from './store/store.js';
 
 /** 07 §3.3: run_id is 16 random bytes, base64url. */
 const RUN_ID_BYTES = 16;
+
+/** 07 §3.3 (IR-M1-7e-1 F02): `clientRequestId` is 1 to 256 bytes (UTF-8). */
+export const CLIENT_REQUEST_ID_MAX_BYTES = 256;
+
+/** The 06 §2.0 tool names: the only valid `tool` of an idempotency row. */
+const TOOL_NAMES: ReadonlySet<string> = new Set(MCP_TOOL_NAMES);
+
+/** True when `text` is `min` to `max` bytes of UTF-8; text that does not encode is out of bounds. */
+function withinBytes(text: string, min: number, max: number): boolean {
+  // Every UTF-16 code unit is at least one byte: longer text is out of bounds without encoding it.
+  if (text.length === 0 || text.length > max) return false;
+  let bytes: number;
+  try {
+    bytes = encodeUtf8(text).length;
+  } catch {
+    return false;
+  }
+  return bytes >= min && bytes <= max;
+}
 
 export interface IdempotencyKey {
   /** The MCP tool name (06 §2.0). */
@@ -138,10 +157,14 @@ export class IdempotencyService {
 
   async begin(key: IdempotencyKey): Promise<IdempotencyStart> {
     const approvalId = key.approvalId ?? '';
+    // A defensive bound here as well as in the MCP input schemas (07 §3.3; IR-M1-7e-1 F02): `tool`
+    // from the 06 §2.0 name set, `clientRequestId` 1 to 256 bytes of UTF-8. One fixed error, which
+    // never echoes the input (I-5, I-7).
     if (
       typeof key.tool !== 'string' ||
-      key.tool.length === 0 ||
+      !TOOL_NAMES.has(key.tool) ||
       typeof key.clientRequestId !== 'string' ||
+      !withinBytes(key.clientRequestId, 1, CLIENT_REQUEST_ID_MAX_BYTES) ||
       typeof approvalId !== 'string'
     ) {
       throw new CoreError('idempotency_args_invalid', 'The call input could not be recorded.');

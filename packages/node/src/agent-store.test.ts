@@ -3,7 +3,7 @@
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { rowKeyOf, type Sealed } from '@agentlink/core';
+import { STORE_SCHEMA_VERSION, rowKeyOf, type Sealed } from '@agentlink/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openAgentStoreWith } from './agent-store.js';
 import { NodeKeyStoreError } from './errors.js';
@@ -44,7 +44,7 @@ describe('openAgentStoreWith', () => {
   it('opens the store with a cipher under the agent store key, and reopens it to the same key', async () => {
     const path = join(dir, 'agent.sqlite');
     const first = await openAgentStoreWith('keychain', agentId, path, { keychain });
-    expect(first.store.schemaVersion).toBe(1);
+    expect(first.store.schemaVersion).toBe(STORE_SCHEMA_VERSION);
     const sealedName = await first.cipher.seal(context, 'Denis');
     await first.close();
     const second = await openAgentStoreWith('keychain', agentId, path, { keychain });

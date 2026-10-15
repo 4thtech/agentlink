@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ESLint } from 'eslint';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { violationFor } from './policy.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BOUNDARY = new Set([
@@ -369,5 +370,44 @@ describe('IR-M1-1f-1 L-2: no deep imports into a workspace package (dist/, src/)
   it('keeps the package entry points open', async () => {
     const main = `import { bip340Verify } from '@agentlink/crypto';\nvoid bip340Verify;\n`;
     expect(await lint('packages/core/src/a.ts', main)).toEqual([]);
+  });
+});
+
+describe('IR-M1-9k-1 F01: the crypto test seam in apps/cli/test test files only', () => {
+  const byName = `import { MemoryOwnerKeyStore } from '@agentlink/crypto/testing';\nvoid MemoryOwnerKeyStore;\n`;
+  const dynamic = `const m = await import('@agentlink/crypto/testing');\nvoid m;\n`;
+  const subpath = `import { x } from '@agentlink/crypto/testing/deep';\nvoid x;\n`;
+
+  it('allows it by name in apps/cli/test/**/*.test.ts, static and dynamic', async () => {
+    for (const code of [byName, dynamic]) {
+      expect(await lint('apps/cli/test/a.test.ts', code)).toEqual([]);
+      expect(await lint('apps/cli/test/sub/b.test.ts', code)).toEqual([]);
+    }
+  });
+
+  it.each([
+    'apps/cli/src/a.ts',
+    'apps/cli/src/a.test.ts',
+    'apps/cli/src/runtime/a.test.ts',
+    'apps/cli/test/fixtures/helper.ts',
+    'apps/cli/test/a.test.mts',
+    'apps/cli/testing/a.test.ts',
+  ])('still rejects it in %s (production src, src tests, non-test files)', async (filePath) => {
+    for (const code of [byName, dynamic]) {
+      expect(rules(await lint(filePath, code)).length, filePath).toBeGreaterThan(0);
+    }
+  });
+
+  it('never allows a subpath of the seam, even in apps/cli/test', async () => {
+    expect(rules(await lint('apps/cli/test/a.test.ts', subpath)).length).toBeGreaterThan(0);
+  });
+
+  it('deps-check decides the same (policy.violationFor)', () => {
+    expect(
+      violationFor('apps/cli', '@agentlink/crypto/testing', 'apps/cli/test/a.test.ts'),
+    ).toBeNull();
+    for (const file of ['apps/cli/src/a.ts', 'apps/cli/src/a.test.ts', 'apps/cli/test/x.ts']) {
+      expect(violationFor('apps/cli', '@agentlink/crypto/testing', file), file).not.toBeNull();
+    }
   });
 });
