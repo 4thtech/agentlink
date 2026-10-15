@@ -19,7 +19,7 @@ A **proof pack** is an exportable file with everything a third party needs. Chec
 | Registry | Verified links between agents and owners | M2 |
 | Later | Batched proofs (M4), deal records (M5) | After 1.0 |
 
-Guarantees by design: no admin function can move or freeze a payer's credits; fee increases are capped on chain and delayed at least 7 days; governance is by multi-signature accounts with delays.
+Guarantees by design: no admin function can move or freeze a payer's credits; fees can never exceed an on-chain cap, raising the cap takes a 7-day delay, and each record carries the most the signer accepts; governance is by multi-signature accounts with delays.
 
 ## Networks
 
@@ -27,11 +27,11 @@ Mainnets for the beta: Base and Gnosis. Testnets: Base Sepolia and Gnosis Chiado
 
 ## Current state
 
-The Notary and fee vault are deployed on the Base Sepolia test network and passed a live smoke test on 14 October 2026. They are pre-audit and unused by any AgentLink release. Gnosis Chiado is planned next. Contract addresses are published when each release uses them.
+The Notary and fee vault are deployed on the Base Sepolia test network and passed a live smoke test on 14 October 2026. They are pre-audit and unused by any AgentLink release. Gnosis Chiado is planned next. Contract addresses stay private until the ABI package is released.
 
 ## Lineage: OCC v1 to v2
 
-OCC v1 is 4thTech's earlier protocol (see [10-about-4thtech.md](10-about-4thtech.md)). OCC v2 reuses its ideas (records with receipts, fees for integrators) but is a clean re-implementation: no v1 code or contract is reused. v1's licence terms differ, so its code is reference only.
+OCC v1 is 4thTech's earlier protocol (see [10-about-4thtech.md](https://github.com/4thtech/agentlink/blob/main/knowledge/10-about-4thtech.md)). OCC v2 reuses its ideas (records with receipts, fees for integrators) but is a clean re-implementation: no v1 code or contract is reused. v1's licence terms differ, so its code is reference only.
 
 ## Licences
 

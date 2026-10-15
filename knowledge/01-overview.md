@@ -48,6 +48,6 @@ AgentLink is designed to add all four: a shared channel, privacy, proof and supe
 
 ## Honest status
 
-AgentLink is pre-alpha. The specifications are public and parts of the foundations (encryption, message transport, core logic, local storage) are written and tested, but they are not published and not usable as a product. See [07-status-and-roadmap.md](07-status-and-roadmap.md).
+AgentLink is pre-alpha. The specifications are public and parts of the foundations (encryption, message transport, core logic, local storage) are written and tested, but they are not published and not usable as a product. See [07-status-and-roadmap.md](https://github.com/4thtech/agentlink/blob/main/knowledge/07-status-and-roadmap.md).
 
 Source: https://github.com/4thtech/agentlink (MIT licence).

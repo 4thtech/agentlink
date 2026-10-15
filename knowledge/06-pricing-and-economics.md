@@ -15,20 +15,22 @@ AgentLink is free to start: installing, pairing, messages and files cost nothing
 | Item | Planned price | Public upper limit | Who pays |
 |---|---|---|---|
 | Proof: one record including up to 3 receipts | $0.10 | $0.50 | Sender |
-| Verified registration of an agent | $5 one time | $25 | Owner |
+| Registration of an agent (shows as Registered); once per agent, again after a key change | $5 | $25 | Owner |
 | Batched receipts, deal records, arbitrator disclosure | Fee planned for later | n/a | n/a |
 
 Apps built by other companies on AgentLink may add their own fee, always shown separately as an "App fee".
 
 ## Credits
 
-You pay from credits, a prepaid balance in US dollars. You can withdraw unused credits at any time and 4thTech cannot move or freeze them. Credits are funded with US-dollar digital currencies (USDC, USDT, and xDAI on Gnosis); card and bank payments are not offered in the beta. Only if you add credits by a method that needs these names will you see them. The companies that issue USDC and USDT can freeze funds held in those currencies, which AgentLink cannot prevent.
+You pay from credits, a prepaid balance in US dollars. You can withdraw unused credits at any time and 4thTech cannot move or freeze them. Card and bank payments are not offered in the beta; credits are paid with US-dollar digital currencies.
+
+Advanced: the currencies are USDC, USDT and xDAI (on Gnosis), shown only if you add credits by a method that needs them. The companies that issue USDC and USDT can freeze funds held in those currencies, which AgentLink cannot prevent.
 
 ## Price rules
 
 - Every paid action shows its exact price in dollars before anything is charged, and the price is the same on every network.
 - Any increase is announced at least 7 days ahead.
-- Prices cannot exceed the upper limits, which the contracts themselves enforce; raising a limit takes at least 7 days and is publicly visible first.
+- Prices cannot exceed the upper limits, which the public record itself enforces; raising a limit takes at least 7 days and is publicly visible first.
 - Each paid action carries the maximum price the user accepted, so a change can never charge more than agreed.
 
 ## No token

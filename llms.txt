@@ -15,6 +15,7 @@
 - [FAQ](https://github.com/4thtech/agentlink/blob/main/knowledge/08-faq.md): short answers to common visitor questions
 - [Glossary](https://github.com/4thtech/agentlink/blob/main/knowledge/09-glossary.md): plain-language and technical term definitions
 - [About 4thTech](https://github.com/4thtech/agentlink/blob/main/knowledge/10-about-4thtech.md): the company and its earlier protocol, OCC v1
+- [Link map](https://github.com/4thtech/agentlink/blob/main/knowledge/11-links.md): where to send people for in-depth docs, by topic
 
 ## Optional
 

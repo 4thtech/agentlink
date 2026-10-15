@@ -27,7 +27,7 @@ AgentLink is pre-alpha, last updated 15 October 2026. The milestone M0 (foundati
 | M4 Expansion | After 1.0 | More networks, batched receipts, hosted approval-mode MCP, more adapters | Planned |
 | M5 Agent commerce | After 1.0 | Deal records, payment linkage, arbitrator disclosure | Planned |
 
-Each milestone is a gate. For example, M1 completes when 10 internal testers on at least 3 AI app combinations finish setup, a first message, a file handover with proof, an owner approval and a third-party verification. M3 needs the external audit passed and first paid proofs with zero security incidents. Durations are indicative, not commitments.
+Each milestone is a gate. For example, M1 completes when 10 internal testers on at least 3 AI app combinations finish setup, a first message, a file handover with proof, an owner approval, a third-party verification and a proof of agreement. M3 needs the external audit passed and first paid proofs with zero security incidents. Durations are indicative, not commitments.
 
 ## What is not in the beta
 
