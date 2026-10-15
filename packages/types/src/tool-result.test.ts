@@ -71,7 +71,6 @@ describe('tool results (06 §1 rule 3, §2.5)', () => {
     ['an approvalId without its prefix', ['approvalId'], ID16],
     ['an approvalId padded', ['approvalId'], `${APPROVAL_ID}==`],
     ['a missing approvalId', ['approvalId'], DELETE],
-    ['a missing url', ['url'], DELETE],
     ['a missing nextStep', ['nextStep'], DELETE],
     ['a javascript: url', ['url'], 'javascript:alert(1)'],
     ['a plain http url to a remote host', ['url'], 'http://approve.example/apr'],
@@ -84,6 +83,19 @@ describe('tool results (06 §1 rule 3, §2.5)', () => {
     ['a policy', ['policy'], {}],
   ] as [string, Path, unknown][])('rejects %s', (_l, path, value) => {
     expectReject(toolResultSchema, edit(pendingApprovalResult(), path, value));
+  });
+
+  it('M1a pending_approval has no url: the owner approves in the CLI (06 §2.5, D-73 (3))', () => {
+    const m1a = edit(pendingApprovalResult(), ['url'], DELETE);
+    expectRoundTrip(toolResultSchema, {
+      ...m1a,
+      nextStep:
+        'Tell the user: Approval needed. In your own terminal, run `agentlink approve ' +
+        `${APPROVAL_ID}\`. Your AI can't approve this for you. After they approve, call the same ` +
+        'tool again with approvalId.',
+    });
+    // The url, when present, is still checked.
+    expectReject(toolResultSchema, edit(pendingApprovalResult(), ['url'], 'http://evil.example/'));
   });
 
   it('every non-ok status needs nextStep (06 §1 rule 3)', () => {
@@ -167,6 +179,11 @@ describe('agentlink_get_approval result (06 §2.5; IR-M1-2b-1 Q3)', () => {
       result('denied', { decidedAt: '2026-10-14T12:00:00Z' }),
     );
     expectRoundTrip(getApprovalResultSchema, result('expired'));
+    // 06 §2.5: an approval already used once reads `expired` with `used: true`.
+    expectRoundTrip(
+      getApprovalResultSchema,
+      result('expired', { used: true, decidedAt: '2026-10-14T12:00:00Z' }),
+    );
     expectRoundTrip(getApprovalResultSchema, {
       status: 'not_found',
       summary: 'No such approval.',
@@ -187,6 +204,14 @@ describe('agentlink_get_approval result (06 §2.5; IR-M1-2b-1 Q3)', () => {
     ['decidedAt with an offset', result('approved', { decidedAt: '2026-10-14T14:00:00+02:00' })],
     ['an approvalId on an ok result', result('approved', { approvalId: APPROVAL_ID })],
     ['a decision key', result('pending', { decision: 'approve' })],
+    ['used on a pending approval', result('pending', { used: true })],
+    ['used on an approved approval', result('approved', { used: true })],
+    ['used on a denied approval', result('denied', { used: true })],
+    ['used: false', result('expired', { used: false })],
+    [
+      'used on a result that is not ok',
+      { ...result('expired', { used: true }), status: 'error', nextStep: 'x' },
+    ],
   ] as const)('rejects %s', (_l, value) => {
     expectReject(getApprovalResultSchema, value);
   });
