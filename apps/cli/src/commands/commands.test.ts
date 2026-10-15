@@ -213,13 +213,39 @@ describe('requests (D-72, 06 §8)', () => {
     expect(text).not.toContain('Unknown');
   });
 
-  it('names an unknown sender only with the supplied sender code, never as a contact', async () => {
-    const f = fakeAgent({ requests: { list: () => Promise.resolve([entry()]) } });
-    const without = await harness(f).run(['requests']);
+  it('names an unknown sender only by the core sender code, never as a contact', async () => {
+    const without = await harness(
+      fakeAgent({ requests: { list: () => Promise.resolve([entry()]) } }),
+    ).run(['requests']);
     expect(without.out.join('\n')).not.toContain('·');
     expect(without.out.join('\n')).not.toMatch(/Contact/);
-    const withCode = await harness(f, { senderCode: () => '2B9E·04D1' }).run(['requests']);
+    const withCode = await harness(
+      fakeAgent({
+        requests: { list: () => Promise.resolve([entry({ senderCode: '2B9E·04D1' })]) },
+      }),
+    ).run(['requests']);
     expect(withCode.out.join('\n')).toContain('From unknown sender · 2B9E·04D1: their content');
+    expect(withCode.out.join('\n')).not.toMatch(/Contact/);
+  });
+
+  it('shows the extended form of a colliding sender code (04 §2.9) and nothing else as a name', async () => {
+    const extended = '2B9E·04D1·5D0E·88B1';
+    const result = await harness(
+      fakeAgent({
+        requests: { list: () => Promise.resolve([entry({ senderCode: extended })]) },
+      }),
+    ).run(['requests']);
+    expect(result.out.join('\n')).toContain(`From unknown sender · ${extended}: their content`);
+    // A value that is not a sender code is never printed as one (fail closed).
+    const hostile = await harness(
+      fakeAgent({
+        requests: {
+          list: () => Promise.resolve([entry({ senderCode: 'Alice (your bank)\u001b[2J' })]),
+        },
+      }),
+    ).run(['requests']);
+    expect(hostile.text).not.toContain('Alice');
+    expect(hostile.text).toContain('From an unknown sender: their content');
   });
 
   it('lists nothing when the queue is empty', async () => {

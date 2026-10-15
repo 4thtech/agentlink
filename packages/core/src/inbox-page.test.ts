@@ -429,6 +429,35 @@ describe('inbox page: what is returned (06 §2.2 "What is returned"; D-72)', () 
     expect(await page({ includeRead: true, contactId: b.id })).toEqual([]);
   });
 
+  it('shows colliding sender codes of two accepted requests in the extended form (04 §2.9)', async () => {
+    const seen = new Map<string, string>();
+    let pair: readonly [string, string] | undefined;
+    for (let i = 0; pair === undefined; i += 1) {
+      const bytes = new Uint8Array(32);
+      new DataView(bytes.buffer).setUint32(0, i);
+      const code = formatFingerprint(senderCode(bytes), 'short');
+      const prior = seen.get(code);
+      if (prior !== undefined) pair = [prior, encodeHex(bytes)];
+      else seen.set(code, encodeHex(bytes));
+    }
+    const [x, y] = pair;
+    const other = encodeHex(randomBytes(32));
+    for (const [n, key] of [x, y, other].entries()) {
+      await put({ contact: null, fromKey: key, createdAt: T0 + n, acceptedAt: clock.t });
+    }
+    const result = await a.client.inbox.page(query());
+    if (result.status !== 'ok') throw new Error('expected a page');
+    const codes = new Map<string, string | undefined>();
+    for (const item of result.items) {
+      if (item.direction === 'in') codes.set(item.createdAt.toString(), item.senderCode);
+    }
+    const extended = (key: string) => formatFingerprint(senderCode(decodeHex(key)), 'extended');
+    const short = (key: string) => formatFingerprint(senderCode(decodeHex(key)), 'short');
+    expect(codes.get(String(T0))).toBe(extended(x));
+    expect(codes.get(String(T0 + 1))).toBe(extended(y));
+    expect(codes.get(String(T0 + 2))).toBe(short(other));
+  });
+
   it('names a contact item by the 06 §2.1 rule, with the declared name only as data', async () => {
     await put({ contact: b.id, createdAt: T0 });
     const [item] = await page();

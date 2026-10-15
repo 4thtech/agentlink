@@ -3,7 +3,13 @@
 // count and the insert in one store transaction; a refusal is not stored, nothing goes to the
 // sender, and the owner gets one aggregated count. Held envelopes keep their own pool. A request
 // never becomes a contact (04 §2.9: contacts come only from a completed pairing; I-4).
-import { encodeHex, randomBytes } from '@agentlink/crypto';
+import {
+  decodeHex,
+  encodeHex,
+  formatFingerprint,
+  randomBytes,
+  senderCode,
+} from '@agentlink/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
 import { createLogger } from '@agentlink/log';
 import { describe, expect, it } from 'vitest';
@@ -302,5 +308,68 @@ describe('the owner view: count, list and ignore (02 F-65, 11 §5.2)', () => {
     expect(await a.store.transaction((tx) => tx.count('contacts'))).toBe(0);
     expect(await a.store.transaction((tx) => tx.count('pairings'))).toBe(0);
     expect(await a.client.contacts.list()).toEqual([]);
+  });
+});
+
+/** Two distinct 32-byte keys (hex) whose sender codes share the short form (a birthday search: ~2^16 tries). */
+function collidingKeys(): readonly [string, string] {
+  const seen = new Map<string, string>();
+  for (let i = 0; ; i += 1) {
+    const bytes = new Uint8Array(32);
+    new DataView(bytes.buffer).setUint32(0, i);
+    const code = formatFingerprint(senderCode(bytes), 'short');
+    const prior = seen.get(code);
+    if (prior !== undefined) return [prior, encodeHex(bytes)];
+    seen.set(code, encodeHex(bytes));
+  }
+}
+
+describe('the sender code of a request (04 §2.9, D-72; M1-9c-b)', () => {
+  const shortOf = (key: string) => formatFingerprint(senderCode(decodeHex(key)), 'short');
+  const extendedOf = (key: string) => formatFingerprint(senderCode(decodeHex(key)), 'extended');
+
+  it('is on every entry, in the short form from the crypto helper, never from sender-chosen data', async () => {
+    const a = await agentA();
+    const key = 'aa'.repeat(32);
+    await fill(a, 2, 'request', key);
+    const entries = await a.client.requests.list();
+    expect(entries).toHaveLength(2);
+    // Two requests from one sender share one code and do not collide with themselves.
+    for (const entry of entries) expect(entry.senderCode).toBe(shortOf(key));
+    expect(entries[0]?.senderCode).toMatch(/^[0-9A-F]{4}·[0-9A-F]{4}$/);
+  });
+
+  it('shows two colliding senders in the extended form, and the others in the short form', async () => {
+    const a = await agentA();
+    const [x, y] = collidingKeys();
+    const other = 'cc'.repeat(32);
+    expect(shortOf(x)).toBe(shortOf(y));
+    expect(extendedOf(x)).not.toBe(extendedOf(y));
+    await fill(a, 1, 'request', x);
+    await fill(a, 1, 'request', y);
+    await fill(a, 1, 'request', other);
+    const byKey = new Map((await a.client.requests.list()).map((e) => [e.fromKey, e.senderCode]));
+    expect(byKey.get(x)).toBe(extendedOf(x));
+    expect(byKey.get(y)).toBe(extendedOf(y));
+    expect(byKey.get(other)).toBe(shortOf(other));
+  });
+
+  it('returns to the short form once the colliding sender is ignored', async () => {
+    const a = await agentA();
+    const [x, y] = collidingKeys();
+    await fill(a, 1, 'request', x);
+    await fill(a, 1, 'request', y);
+    await a.client.requests.ignore(y);
+    const [entry] = await a.client.requests.list();
+    expect(entry?.senderCode).toBe(shortOf(x));
+  });
+
+  it('counts a refused row from an unknown key toward a collision', async () => {
+    const a = await agentA();
+    const [x, y] = collidingKeys();
+    await fill(a, 1, 'request', x);
+    await fill(a, 1, 'refused', y);
+    const [entry] = await a.client.requests.list();
+    expect(entry?.senderCode).toBe(extendedOf(x));
   });
 });
