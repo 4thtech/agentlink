@@ -86,6 +86,21 @@ export type ApprovalCheck =
         'approval_unknown' | 'digest_mismatch' | 'decision_invalid' | 'cancel_invalid';
     };
 
+/**
+ * What a stored approval says when it is read for its own stored action (06 §2.5
+ * `agentlink_get_approval`; M1-7e-3). Like ApprovalCheck, but the signed objects are verified
+ * before the `status` cache is read, so a use (`void` after an approve decision that verifies) is
+ * told apart from a request voided before any decision. Read-only; it authorises nothing.
+ */
+export type ApprovalReading =
+  | {
+      readonly status:
+        'approved' | 'denied' | 'pending' | 'expired' | 'cancelled' | 'used' | 'void';
+    }
+  | ApprovalCheckRefusal;
+
+type ApprovalCheckRefusal = Extract<ApprovalCheck, { status: 'refused' }>;
+
 type Refused = Extract<OwnerActionOutcome, { status: 'refused' }>;
 
 type SelfView =
@@ -568,24 +583,15 @@ export class OwnerActions {
    * as authority. Freshness and the nonce are not checked again (they applied once).
    */
   async checkApproval(approvalId: string, action: unknown): Promise<ApprovalCheck> {
-    if (!approvalIdSchema.safeParse(approvalId).success) {
-      return { status: 'refused', reason: 'approval_unknown' };
-    }
-    const row = await this.#ctx.store.transaction((tx) =>
-      tx.get('approvals', { approval_id: approvalId }),
-    );
-    if (row === undefined) return { status: 'refused', reason: 'approval_unknown' };
-    const self = await this.#self();
-    if ('refusal' in self) return { status: 'refused', reason: 'decision_invalid' };
+    const loaded = await this.#loadApproval(approvalId);
+    if ('status' in loaded) return loaded;
+    const { row, self } = loaded;
     const now = nowOf(this.#ctx);
 
     if (row.signed_cancel !== null) {
-      const cancel = verifyStoredOwnerAction(row.signed_cancel, self);
-      const ok =
-        cancel.ok &&
-        cancel.signed.body.op === 'approval.cancel' &&
-        cancel.signed.body.params.approvalId === approvalId;
-      if (!ok) return { status: 'refused', reason: 'cancel_invalid' };
+      if (!cancelVerifies(row.signed_cancel, self, approvalId)) {
+        return { status: 'refused', reason: 'cancel_invalid' };
+      }
       // A cancel of a request that was never decided denied it (04 §2.5.1).
       return row.signed_decision === null ? { status: 'denied' } : { status: 'cancelled' };
     }
@@ -595,22 +601,95 @@ export class OwnerActions {
     if (row.signed_decision === null) {
       return now > row.expires_at ? { status: 'expired' } : { status: 'pending' };
     }
-    const decision = verifyStoredOwnerAction(row.signed_decision, self);
-    if (!decision.ok) return { status: 'refused', reason: 'decision_invalid' };
-    const body = decision.signed.body;
-    const items =
-      body.op === 'approval.decide'
-        ? [body.params]
-        : body.op === 'approval.decideBatch'
-          ? body.params.items
-          : [];
-    const mine = items.filter((i) => i.approvalId === approvalId);
-    if (mine.length !== 1) return { status: 'refused', reason: 'decision_invalid' };
-    const item = mine[0]!;
-    if (computeActionDigest(action) !== item.actionDigest) {
-      return { status: 'refused', reason: 'digest_mismatch' };
-    }
-    if (item.decision === 'deny') return { status: 'denied' };
+    const decision = storedDecision(row.signed_decision, self, approvalId, action);
+    if (typeof decision !== 'string') return decision;
+    if (decision === 'deny') return { status: 'denied' };
     return now > row.expires_at ? { status: 'expired' } : { status: 'approved' };
   }
+
+  /**
+   * What the stored approval says for `approvalId`, read for `action`, the row's own stored action
+   * (06 §2.5 `agentlink_get_approval`; M1-7e-3). The stored cancel and decision are re-verified
+   * first; only then is the `status` cache read, and only to take authority away. `used` is a
+   * `void` row whose approve decision verifies for this action and that is not a commitment (whose
+   * parts are used one by one, M1-32). Never writes and never claims.
+   */
+  async readApproval(approvalId: string, action: unknown): Promise<ApprovalReading> {
+    const loaded = await this.#loadApproval(approvalId);
+    if ('status' in loaded) return loaded;
+    const { row, self } = loaded;
+    const lapsed = row.status === 'expired' || nowOf(this.#ctx) > row.expires_at;
+
+    if (row.signed_cancel !== null) {
+      if (!cancelVerifies(row.signed_cancel, self, approvalId)) {
+        return { status: 'refused', reason: 'cancel_invalid' };
+      }
+      return row.signed_decision === null ? { status: 'denied' } : { status: 'cancelled' };
+    }
+    if (row.signed_decision === null) {
+      if (row.status === 'void') return { status: 'void' };
+      return lapsed ? { status: 'expired' } : { status: 'pending' };
+    }
+    const decision = storedDecision(row.signed_decision, self, approvalId, action);
+    if (typeof decision !== 'string') return decision;
+    if (decision === 'deny') return { status: 'denied' };
+    if (row.status === 'void') return { status: row.scope_json === null ? 'used' : 'void' };
+    return lapsed ? { status: 'expired' } : { status: 'approved' };
+  }
+
+  /** The approval row and the own identity, or the fail-closed refusal (04 §2.5.1). */
+  async #loadApproval(
+    approvalId: string,
+  ): Promise<{ readonly row: Row<'approvals'>; readonly self: Self } | ApprovalCheckRefusal> {
+    if (!approvalIdSchema.safeParse(approvalId).success) {
+      return { status: 'refused', reason: 'approval_unknown' };
+    }
+    const row = await this.#ctx.store.transaction((tx) =>
+      tx.get('approvals', { approval_id: approvalId }),
+    );
+    if (row === undefined) return { status: 'refused', reason: 'approval_unknown' };
+    const self = await this.#self();
+    if ('refusal' in self) return { status: 'refused', reason: 'decision_invalid' };
+    return { row, self };
+  }
+}
+
+type Self = Exclude<SelfView, { readonly refusal: unknown }>;
+
+/** Does the stored `approval.cancel` verify for this approval? */
+function cancelVerifies(text: string, self: Self, approvalId: string): boolean {
+  const cancel = verifyStoredOwnerAction(text, self);
+  return (
+    cancel.ok &&
+    cancel.signed.body.op === 'approval.cancel' &&
+    cancel.signed.body.params.approvalId === approvalId
+  );
+}
+
+/**
+ * The stored decision for this approval (an `approval.decide`, or the batch with exactly one item
+ * for this ID), re-verified, with the digest recomputed from `action`.
+ */
+function storedDecision(
+  text: string,
+  self: Self,
+  approvalId: string,
+  action: unknown,
+): 'approve' | 'deny' | ApprovalCheckRefusal {
+  const decision = verifyStoredOwnerAction(text, self);
+  if (!decision.ok) return { status: 'refused', reason: 'decision_invalid' };
+  const body = decision.signed.body;
+  const items =
+    body.op === 'approval.decide'
+      ? [body.params]
+      : body.op === 'approval.decideBatch'
+        ? body.params.items
+        : [];
+  const mine = items.filter((i) => i.approvalId === approvalId);
+  if (mine.length !== 1) return { status: 'refused', reason: 'decision_invalid' };
+  const item = mine[0]!;
+  if (computeActionDigest(action) !== item.actionDigest) {
+    return { status: 'refused', reason: 'digest_mismatch' };
+  }
+  return item.decision === 'deny' ? 'deny' : 'approve';
 }
