@@ -104,6 +104,14 @@ function fakeClient(options: FakeOptions = {}): ToolClient & { calls: string[] }
       calls.push('storageMode');
       return Promise.resolve('drop');
     },
+    send: () => {
+      calls.push('send');
+      return Promise.reject(new Error('not used'));
+    },
+    syncInbox: () => {
+      calls.push('syncInbox');
+      return Promise.resolve();
+    },
   };
   if (options.pendingApprovals !== undefined) {
     const n = options.pendingApprovals;
@@ -468,10 +476,8 @@ describe('tools whose card has not landed answer "not available yet"', () => {
   for (const name of [
     'agentlink_create_invite',
     'agentlink_accept_invite',
-    'agentlink_send',
     'agentlink_propose_terms',
     'agentlink_respond_to_terms',
-    'agentlink_inbox',
   ]) {
     it(name, async () => {
       const client = fakeClient();
@@ -525,13 +531,20 @@ describe('tools whose card has not landed answer "not available yet"', () => {
       needsSetup: { message: 'AgentLink is not set up for this agent on this machine yet.' },
       logger: capture().logger,
     };
-    for (const name of ['agentlink_status', 'agentlink_list_contacts', 'agentlink_get_approval']) {
+    for (const name of [
+      'agentlink_status',
+      'agentlink_list_contacts',
+      'agentlink_get_approval',
+      'agentlink_send',
+      'agentlink_inbox',
+    ]) {
       const result = await callTool(name, VALID_INPUT[name], env);
       expect(result.structured.status).toBe('needs_setup');
       expect(result.structured.nextStep).toBe(TOOL_TEXT.setupFollowNextStep);
     }
     expect(
-      (await callTool('agentlink_send', VALID_INPUT['agentlink_send'], env)).structured.code,
+      (await callTool('agentlink_propose_terms', VALID_INPUT['agentlink_propose_terms'], env))
+        .structured.code,
     ).toBe('NOT_AVAILABLE');
   });
 });

@@ -29,11 +29,16 @@ function shownName(display: ContactDisplayName): string {
 }
 
 export function contactRef(view: ContactView): ContactRef {
+  return displayRef(view.id, view.display);
+}
+
+/** `ContactRef` from a contact ID and the core's `display` (e.g. an inbox item's sender). */
+export function displayRef(id: string, display: ContactDisplayName): ContactRef {
   return Object.freeze({
-    id: view.id,
-    name: shownName(view.display),
-    label: view.display.label,
-    nameSource: view.display.nameSource,
+    id,
+    name: shownName(display),
+    label: display.label,
+    nameSource: display.nameSource,
   });
 }
 
