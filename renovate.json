@@ -50,6 +50,44 @@
     },
     {
       "description": [
+        "Non-runtime dev tooling (devDependencies: eslint, prettier, playwright, vitest, typescript, turbo, changesets, globals, vite and so on) in ONE weekly PR, so a week's tooling bumps touch pnpm-lock.yaml once and never rebase each other (a rebase drops the code-owner approval review-gate needs on the head commit). Security-critical packages and the S2 @types set are excluded and keep their own rules. Majors still wait for dashboard approval."
+      ],
+      "matchDepTypes": [
+        "devDependencies"
+      ],
+      "matchPackageNames": [
+        "*",
+        "!@noble/*",
+        "!@hpke/*",
+        "!nostr-tools",
+        "!viem",
+        "!aws4fetch",
+        "!@napi-rs/keyring",
+        "!better-sqlite3",
+        "!ws",
+        "!@types/node",
+        "!@types/ws",
+        "!@types/better-sqlite3"
+      ],
+      "groupName": "dev tooling",
+      "schedule": [
+        "before 6am on monday"
+      ]
+    },
+    {
+      "description": [
+        "GitHub Actions digest and version updates join the same weekly dev tooling PR (workflow files are sensitive paths; the group is reviewed as a whole)"
+      ],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "dev tooling",
+      "schedule": [
+        "before 6am on monday"
+      ]
+    },
+    {
+      "description": [
         "Security-critical crypto and transport dependencies (allowlisted in 04 section 8): longer cooldown, one reviewed group, labelled security-sensitive"
       ],
       "matchPackageNames": [
@@ -130,5 +168,7 @@
         "## Tests-first evidence\n\nThis is a pure dependency bump, so there is no RED commit and none is claimed (audit-rules.md section 3.4). The evidence is the full required suite on this head commit; the approver confirms it is green. A code owner (talirezun or denisjazbec) confirms this section and the Threat note by an APPROVED review on the head commit, which is how an automated PR meets the independent-review requirement (audit-rules.md section 3.3). A new approval is needed after every new commit."
       ]
     }
-  ]
+  ],
+  "prConcurrentLimit": 5,
+  "branchConcurrentLimit": 8
 }

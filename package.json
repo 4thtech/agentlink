@@ -5,7 +5,7 @@
   "description": "AgentLink monorepo root: encrypted, provable exchange between AI agents.",
   "license": "MIT",
   "type": "module",
-  "packageManager": "pnpm@12.8.1",
+  "packageManager": "pnpm@12.11.2",
   "engines": {
     "node": ">=22.12.0"
   },
@@ -31,11 +31,11 @@
     "ajv": "8.20.0",
     "eslint": "10.12.0",
     "globals": "17.13.0",
-    "playwright": "1.63.0",
+    "playwright": "1.64.0",
     "prettier": "3.9.10",
     "turbo": "2.11.7",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.71.1",
+    "typescript-eslint": "8.71.2",
     "vite": "8.3.4",
     "vitest": "4.1.11"
   }
