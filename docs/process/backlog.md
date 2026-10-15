@@ -2366,7 +2366,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `doctor` reports each subsystem.
 
 #### M1-9b · CLI: owner key and approvals (†)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** in-progress (4thtech/agentlink#115) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`src/commands/owner/{owner-init,approve,cancel}.ts`)
 - **Depends on:** M1-9k, M1-8c, M1-7e, M1-2e (M1-7e and M1-2e are merged)
 - **Spec:** 06 §7, §8 (†); 04 §2.2, §2.5, §2.5.2; 11 §6.10; D-67, D-68, D-73 (3)

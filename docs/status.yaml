@@ -190,11 +190,11 @@ areas:
         summary: "M1-8f."
   - id: apps
     title: "MCP server, CLI and apps"
-    intro: "The CLI runtime and its everyday commands are in place or in review; nothing is usable end to end yet."
+    intro: "The CLI runtime and its everyday commands have landed and the owner commands are in review; nothing is usable end to end yet."
     components:
       - name: "MCP server and CLI"
         state: in-progress
-        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising) has landed; `invite`, `accept`, `contacts`, `status`, `doctor` and `requests` are in review (M1-9l); `init`, the owner and approval commands and the MCP server follow."
+        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising), `init`, `invite`, `accept`, `contacts`, `status`, `doctor` and `requests` have landed; the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) are in review; the MCP server follows."
       - name: "Local approval page"
         state: planned
         summary: "A small page on 127.0.0.1 for owner approvals and settings (M1b)."
