@@ -1356,7 +1356,7 @@ describe('review IR-M1-7b-1', () => {
       createdAt: clock.t,
     });
     expect(await deliver(a, env)).toEqual([
-      { envelopeId: env.id, outcome: 'dropped', reason: 'type_unhandled', flagged: false },
+      { envelopeId: env.id, outcome: 'dropped', reason: 'revoke_invalid', flagged: false },
     ]);
     expect(await row(a, env.id)).toBeUndefined();
   });

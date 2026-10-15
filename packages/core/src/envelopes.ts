@@ -165,7 +165,11 @@ export type InboundReason =
   /** `receive` was given a gift-wrap id that is not 64 lowercase hex (a caller bug). */
   | 'wrap_id_invalid'
   /** The requests queue is at a limit for this unknown key or in total (07 §3.2; M1-7e). */
-  | 'requests_full';
+  | 'requests_full'
+  /** A `revoke` whose SignedOwnerAction does not verify against the named agent (04 §3.4.1). */
+  | 'revoke_invalid'
+  /** Above `contacts.rateLimitPerContactPerHour` for the sender's contact (07 §3.2). */
+  | 'rate_limited';
 
 export interface InboundReport {
   /** The validated envelope `id` (base64url, 16 bytes); absent when the envelope did not parse. */
@@ -225,6 +229,39 @@ export interface PairingHandler {
 export interface ReceiveResult {
   readonly status: ReceiveStatus;
   readonly report: InboundReport;
+}
+
+/**
+ * A verified `revoke` (04 §3.4.1, 07 §3.4; M1-7h): `effect` runs inside the store transaction that
+ * stores the revoke envelope and returns `noop` when the agent is already revoked (a re-published
+ * copy: nothing is stored).
+ */
+export interface PreparedRevoke {
+  /** The revoked contact; absent when the own agent is revoked. */
+  readonly contactId?: string;
+  readonly effect: (tx: StoreTx) => 'applied' | 'noop';
+}
+
+/** The revocation flow as the envelope pipeline sees it (M1-7h). */
+export interface RevokeHandler {
+  /** Verifies the carried `agent.revoke`; a reason drops the envelope (fail closed). */
+  prepare(payload: Payload): Promise<PreparedRevoke | { readonly reason: InboundReason }>;
+}
+
+/**
+ * The per-contact rate limit (07 §3.2 `rate_counters`; M1-7h): `limit` is read once per processing
+ * pass; `countTx` runs in the transaction that stores a contact's envelope (`ok` or `refused`) and
+ * returns false when it would go above the limit, so the envelope is dropped instead.
+ */
+export interface RateLimitHook {
+  limit(): Promise<number>;
+  countTx(tx: StoreTx, contactId: string, limit: number, now: number): boolean;
+}
+
+/** Optional handlers of the processing pass. */
+export interface EnvelopeHooks {
+  readonly revocation?: RevokeHandler;
+  readonly rateLimit?: RateLimitHook;
 }
 
 // --- Constants -----------------------------------------------------------------------------------
@@ -321,6 +358,8 @@ type Disposition =
       readonly contactId?: string;
       readonly senderCard?: AgentCard;
       readonly cardUpdate?: PreparedCardUpdate;
+      /** A verified revoke's effects (M1-7h): applied with the envelope row, or `noop`. */
+      readonly revoke?: PreparedRevoke;
     }
   | { readonly kind: 'deferred'; readonly contactId?: string; readonly senderCard?: AgentCard }
   | { readonly kind: 'pairing'; readonly contactId?: string; readonly senderCard: AgentCard }
@@ -355,17 +394,22 @@ export class EnvelopeService {
   readonly #identity: IdentityService;
   readonly #contacts: ContactBook;
   readonly #pairing: PairingHandler | undefined;
+  readonly #hooks: EnvelopeHooks;
+  /** The rate limit of the current processing pass (RateLimitHook.limit), when a hook is set. */
+  #rateLimit: number | undefined;
 
   constructor(
     ctx: CoreContext,
     identity: IdentityService,
     contacts: ContactBook,
     pairing?: PairingHandler,
+    hooks: EnvelopeHooks = {},
   ) {
     this.#ctx = ctx;
     this.#identity = identity;
     this.#contacts = contacts;
     this.#pairing = pairing;
+    this.#hooks = hooks;
   }
 
   // --- Send --------------------------------------------------------------------------------------
@@ -601,6 +645,9 @@ export class EnvelopeService {
     const ctx = this.#ctx;
     const own = await this.#ownKeys();
     let book = await this.#book();
+    // 07 §3.2 rate_counters: the limit is read once per pass; a policy that cannot be read gives the
+    // fail-closed hard caps (policyLimits), never no limit.
+    this.#rateLimit = await this.#hooks.rateLimit?.limit();
     const reports: InboundReport[] = [];
     reports.push(...(await this.#runHeld(own, book)));
 
@@ -881,6 +928,9 @@ export class EnvelopeService {
     if (disposition.kind === 'pairing') {
       return { report: await this.#pairingOutcome(o, disposition) };
     }
+    if (o.payload.type === 'revoke' && disposition.kind === 'deferred') {
+      return { report: await this.#revokeOutcome(o) };
+    }
     if (
       disposition.kind === 'deferred' ||
       (disposition.state !== 'sent_copy' && DEFERRED_TYPES.has(o.payload.type))
@@ -917,12 +967,12 @@ export class EnvelopeService {
     }
     const sender = screen.sender;
     if (type === 'revoke') {
-      // Authority comes from the carried SignedOwnerAction, whatever the `from` (M1-7h). Until
-      // M1-7h handles it, one from an unknown key is dropped rather than parked in `received`,
-      // where a stranger could fill the 1 000-row cap (IR-M1-7b-1 M-1). From a contact key it
-      // waits for M1-7h.
-      if (sender.kind === 'unknown') return { kind: 'drop', reason: 'type_unhandled' };
-      return { kind: 'deferred', contactId: sender.contactId };
+      // Authority comes from the carried SignedOwnerAction, whatever the `from` (04 §3.4.1, D-58):
+      // usually the revoked agent's owner key, which is not a contact key. It is verified and
+      // applied, or dropped, in this pass (#decide), never parked in `received` (IR-M1-7h-1 F01).
+      return sender.kind === 'unknown'
+        ? { kind: 'deferred' }
+        : { kind: 'deferred', contactId: sender.contactId };
     }
     if (book.ownerNostr.has(from)) return { kind: 'drop', reason: 'owner_key_type' };
     if (OWNER_CHANNEL_TYPES.has(type)) return { kind: 'drop', reason: 'owner_channel_type' };
@@ -1036,6 +1086,34 @@ export class EnvelopeService {
     return this.#settle(o.item, outcome, o.envelope, o.payload.type);
   }
 
+  /**
+   * A `revoke` (04 §3.4.1, 07 §3.4; IR-M1-7h-1 F01): verified against the named agent's stored card
+   * and applied with its envelope row in one store transaction, or dropped. Without a handler it is
+   * dropped, so it never stays `received`.
+   */
+  async #revokeOutcome(o: Opened): Promise<InboundReport | undefined> {
+    const handler = this.#hooks.revocation;
+    const prepared =
+      handler === undefined
+        ? { reason: 'type_unhandled' as const }
+        : await handler.prepare(o.payload).catch((error: unknown) => {
+            if (error instanceof CoreError && error.code !== 'store_unreadable') {
+              return { reason: 'revoke_invalid' as const };
+            }
+            throw error;
+          });
+    if ('reason' in prepared) {
+      return this.#settle(o.item, { kind: 'drop', reason: prepared.reason }, o.envelope, 'revoke');
+    }
+    const { report: done } = await this.#accept(o, {
+      kind: 'accept',
+      state: 'ok',
+      ...(prepared.contactId === undefined ? {} : { contactId: prepared.contactId }),
+      revoke: prepared,
+    });
+    return done;
+  }
+
   /** A card-update for `contactId`: §3.4.1 through ContactBook; its card is the step 8 sender card. */
   async #cardUpdate(o: Opened, contactId: string): Promise<Disposition> {
     if (o.payload.type !== 'card-update' || o.payload.body.card.agentEvm !== contactId) {
@@ -1132,11 +1210,34 @@ export class EnvelopeService {
           deleteRow(tx, item);
           return 'full' as const;
         }
+        if (d.revoke !== undefined && d.revoke.effect(tx) === 'noop') {
+          deleteRow(tx, item);
+          return 'noop' as const;
+        }
+        // 07 §3.2 rate_counters: counted in the transaction that stores the contact's envelope.
+        if (
+          d.state === 'ok' &&
+          d.revoke === undefined &&
+          d.contactId !== undefined &&
+          !this.#countRate(tx, d.contactId)
+        ) {
+          deleteRow(tx, item);
+          return 'rate' as const;
+        }
         d.cardUpdate?.apply(tx);
         writeRow(tx, item, row);
         return 'stored' as const;
       });
       if (done === 'lost') return {};
+      if (done === 'noop') return { report: report(item.envelopeId, 'duplicate') };
+      if (done === 'rate') {
+        return {
+          report: report(item.envelopeId, 'dropped', {
+            reason: 'rate_limited',
+            ...(d.contactId === undefined ? {} : { contactId: d.contactId }),
+          }),
+        };
+      }
       if (done === 'full') {
         return { report: report(item.envelopeId, 'dropped', { reason: REQUESTS_FULL }) };
       }
@@ -1208,6 +1309,14 @@ export class EnvelopeService {
     return done ? report(item.envelopeId, 'held') : undefined;
   }
 
+  /** One envelope of `contactId` counted for the hour; false when it is over the limit. */
+  #countRate(tx: StoreTx, contactId: string): boolean {
+    const hook = this.#hooks.rateLimit;
+    const limit = this.#rateLimit;
+    if (hook === undefined || limit === undefined) return true;
+    return hook.countTx(tx, contactId, limit, nowOf(this.#ctx));
+  }
+
   /**
    * Stores a final drop or refusal. A drop deletes the row (its seen rows stay). A refusal keeps a
    * `refused` row without the ciphertext or the payload (07 §3). For a step 5 `kc` mismatch the
@@ -1256,6 +1365,14 @@ export class EnvelopeService {
         requestsFullTx(tx, envelope.from)
       ) {
         effective = { kind: 'drop', reason: REQUESTS_FULL };
+      }
+      // 07 §3.2 rate_counters: a contact's refused envelope counts too; above the limit it is dropped.
+      if (
+        effective.kind === 'refuse' &&
+        effective.contactId !== undefined &&
+        !this.#countRate(tx, effective.contactId)
+      ) {
+        effective = { kind: 'drop', reason: 'rate_limited', contactId: effective.contactId };
       }
       if (effective.kind === 'drop' || envelope === undefined) {
         deleteRow(tx, item);

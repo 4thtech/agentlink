@@ -449,7 +449,13 @@ interface Transport {
   wrap(envelope: Envelope, recipients: NostrRecipient[], keys: EnvelopeKeys): Promise<WrappedEnvelope>; // one gift wrap per distinct recipient key; publishes nothing
   publish(storedWrap: SignedWrap, relays: RelayUrl[]): Promise<PublishResult>; // exactly the row's relays (§3.2, §4.3), never any other
   subscribe(keys: EnvelopeKeys, onEnvelope: (e: Envelope, meta) => void): Unsubscribe;
-  sync(keys: EnvelopeKeys, since: number): Promise<Envelope[]>;
+  sync(options: {
+    relays: RelayUrl[];                          // the own list only (§4.3); AUTH only there
+    identities: { pubkey: string; epoch?: number }[]; // own Nostr keys at every epoch: the REQ's #p
+    persistence: { getCursor; setCursor; isSeen }; // the core's sync_cursors and seen (§3.2)
+    onEnvelope(item: { envelope; giftWrapId; relay; recipient }): 'processed' | 'verified' | 'retry';
+    budgetMs?: number;                           // 3 000 by default (06 §6)
+  }): Promise<{ partial: boolean }>;
 }
 
 // EnvelopeKeys (03 §3, 04 §3.1.1) exposes the secret-key operations the transport needs:
@@ -460,6 +466,8 @@ interface Transport {
 ```
 
 **Two steps, store first (proposed, owner confirms at merge; IR-M1-7k-1 Q1).** Wrapping and publishing are separate calls so that the core can meet §3.2: it calls `wrap`, stores the outbound envelope with one outbox row per returned wrap in one store transaction, and only then calls `publish` for each stored wrap, with that row's relay list. A retry republishes the same stored wrap; nothing is wrapped or signed again. `wrap` publishes nothing; `publish` sends to exactly the relays it is given.
+
+**Sync owned by the core (proposed, owner confirms at merge; M1-7h, IR-M1-7h-1 F05).** `sync` reads the relays it is given with the 48 h look-back of §4.2 and hands each newly opened wrap's strictly parsed, not yet verified envelope to `onEnvelope`. The core owns the cursors and the seen-set: the transport deduplicates by gift-wrap ID only (never by the sender-chosen envelope ID), and the handler's answer decides whether the wrap counts as handled and whether the relay's cursor may move (`retry` keeps both). The core skips a copy whose `envelopeHash` is already in `seen` before its signature check, by design: that row is written only after a signature over the same hash passed, so the envelope is verified once. `subscribe` follows the same handler shape.
 
 An XMTP adapter (P2) implements the same interface, in the same two steps; envelopes are unchanged.
 
