@@ -90,12 +90,13 @@ describe('policy data', () => {
 });
 
 describe('the repository itself', () => {
-  // The scan reads only packages/*, apps/* and test-vectors/ (433 source files; it never lists
-  // docs/), about 0.3 s alone, mostly parsing. It lists them with two git ls-files runs in total; it
-  // used to spawn 34 (two per zone), which starved on a loaded runner (30 s timeouts on PR #143).
-  // On the CI runner it shares the CPU with every package's tests (turbo) and took 4.0 to 5.1 s,
-  // past the 5 s default. Same assertions, a timeout with headroom over the worst seen.
-  it('passes every boundary check', { timeout: 30_000 }, () => {
+  // The scan reads only packages/*, apps/* and test-vectors/ (434 source files) and never lists
+  // docs/. Its cost is TypeScript parsing (CPU), not git: 0.46 s cold locally (git listing 20 ms;
+  // PR #146 cut the spawns from 34 to 2, which was not the cause). On CI the "Unit tests" step runs
+  // every package's tests at once (turbo, browser projects included), and the scan took 16.2 s there
+  // (run 38769544356) and exceeded 30 s on a slower runner (run 38770433435). Same assertions, a
+  // 120 s timeout for this one test, with headroom over the contended worst case.
+  it('passes every boundary check', { timeout: 120_000 }, () => {
     const { problems, packages } = runChecks(REPO);
     expect(problems).toEqual([]);
     expect(packages).toBeGreaterThan(10);
