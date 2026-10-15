@@ -17,6 +17,11 @@ function main() {
     );
     process.exit(1);
   }
+  // Sanity floor (policy.test.mjs asserts it too): an empty or misdetected repository must not pass.
+  if (packages <= 10) {
+    console.error(`deps-check: only ${packages} package(s) found; expected more than 10.`);
+    process.exit(1);
+  }
   console.log(
     `deps-check: ${packages} packages, ${files} source files OK (layering, primitive libraries, runtime-dependency allowlist, no cycles).`,
   );
