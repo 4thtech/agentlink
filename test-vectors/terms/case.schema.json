@@ -1,0 +1,506 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/terms/case.schema.json",
+  "title": "terms case",
+  "description": "04 \u00a73.4 (D-32, D-55, D-74), 06 \u00a72.2a: terms, termsHash, the offer/accept/reject body, TermsInput and its mapping, the Unicode 15.0 runtime probe, and the negotiation chain (see tools/vectors/generate_terms.py for the abstract envelope model).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "terms"
+          ],
+          "properties": {
+            "op": {
+              "const": "parseTerms"
+            },
+            "terms": {}
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome",
+                "termsHash"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                },
+                "termsHash": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "json"
+          ],
+          "properties": {
+            "op": {
+              "const": "parseTermsJson"
+            },
+            "json": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome",
+                "termsHash"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                },
+                "termsHash": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "type",
+            "body"
+          ],
+          "properties": {
+            "op": {
+              "const": "parseTermsBody"
+            },
+            "type": {
+              "type": "string"
+            },
+            "body": {}
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome",
+                "termsHash"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                },
+                "termsHash": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "termsInput",
+            "now"
+          ],
+          "properties": {
+            "op": {
+              "const": "parseTermsInput"
+            },
+            "termsInput": {},
+            "now": {
+              "type": "integer"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "termsInput",
+            "context"
+          ],
+          "properties": {
+            "op": {
+              "const": "mapTermsInput"
+            },
+            "termsInput": {
+              "type": "object"
+            },
+            "context": {
+              "type": "object"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "termsHash",
+            "termsJcs"
+          ],
+          "properties": {
+            "termsHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "termsJcs": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "probe"
+          ],
+          "properties": {
+            "op": {
+              "const": "unicodeProbe"
+            },
+            "probe": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "nfc"
+          ],
+          "properties": {
+            "nfc": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "self",
+            "now",
+            "log",
+            "incoming"
+          ],
+          "properties": {
+            "op": {
+              "const": "chainReceive"
+            },
+            "self": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{40}$"
+            },
+            "now": {
+              "type": "integer"
+            },
+            "log": {
+              "type": "array"
+            },
+            "incoming": {
+              "type": "object"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "outcome",
+            "newestVersion",
+            "newestTermsHash"
+          ],
+          "properties": {
+            "outcome": {
+              "enum": [
+                "valid",
+                "refused",
+                "conflict",
+                "duplicate"
+              ]
+            },
+            "newestVersion": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$"
+            },
+            "newestTermsHash": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{64}|null)$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "self",
+            "contact",
+            "termsId",
+            "log"
+          ],
+          "properties": {
+            "op": {
+              "const": "nextOffer"
+            },
+            "self": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{40}$"
+            },
+            "contact": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{40}$"
+            },
+            "termsId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            },
+            "log": {
+              "type": "array"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "previousTermsHash",
+            "replyTo"
+          ],
+          "properties": {
+            "version": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            },
+            "previousTermsHash": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{64}|null)$"
+            },
+            "replyTo": {
+              "type": "string",
+              "pattern": "^([A-Za-z0-9_-]{22}|null)$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "self",
+            "now",
+            "log",
+            "answers"
+          ],
+          "properties": {
+            "op": {
+              "const": "sendAccept"
+            },
+            "self": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{40}$"
+            },
+            "now": {
+              "type": "integer"
+            },
+            "log": {
+              "type": "array"
+            },
+            "answers": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome",
+                "termsHash"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "allowed"
+                },
+                "termsHash": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "refused"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
