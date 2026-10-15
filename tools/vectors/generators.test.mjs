@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generatorCheck } from './generators.mjs';
+import { MISMATCH_EXIT, describeGeneratorRun, generatorCheck } from './generators.mjs';
 
 const path = 'test-vectors/placeholder-sha256/vectors.json';
 const present = () => true;
@@ -50,5 +50,54 @@ describe('generatorCheck', () => {
       problems: [`${path}: generator.script does not exist`],
       argv: null,
     });
+  });
+});
+
+// M1-1h-d (IR-M1-2a-1 note): a generator that crashes or refuses to run (wrong interpreter, a
+// missing or unpinned package) was reported as "does not match its generator's output", the same
+// words as a real mismatch, so a broken environment read as drifted vectors. The generator now
+// exits with MISMATCH_EXIT only when it compared and found a difference; every other failure is
+// reported as a failure to compare. Both still fail the check.
+describe('describeGeneratorRun', () => {
+  it('uses a dedicated exit status for a mismatch, distinct from 1 (sys.exit) and 2 (argparse)', () => {
+    expect(MISMATCH_EXIT).toBe(3);
+  });
+
+  it('reports nothing when the generator output matches', () => {
+    expect(describeGeneratorRun(path, { status: 0, signal: null })).toBeNull();
+  });
+
+  it('reports a mismatch only for the mismatch exit status', () => {
+    expect(describeGeneratorRun(path, { status: MISMATCH_EXIT, signal: null })).toBe(
+      `${path}: does not match its generator's output`,
+    );
+  });
+
+  it.each([1, 2, 4, 127])(
+    'reports any other exit status (%i) as a failure to compare, never as a match or a mismatch',
+    (status) => {
+      const problem = describeGeneratorRun(path, { status, signal: null });
+      expect(problem).toBe(
+        `${path}: the generator failed (exit ${String(status)}) before comparing; its message is above ` +
+          '(VECTORS_PYTHON must be a virtual environment with the pinned packages, test-vectors/README.md)',
+      );
+      expect(problem).not.toContain('does not match');
+    },
+  );
+
+  it('reports a generator stopped by a signal as a failure to compare', () => {
+    expect(describeGeneratorRun(path, { status: null, signal: 'SIGKILL' })).toBe(
+      `${path}: the generator was stopped by SIGKILL before comparing`,
+    );
+  });
+
+  it('reports a generator that could not start', () => {
+    expect(
+      describeGeneratorRun(path, { status: null, signal: null, error: new Error('spawn ENOENT') }),
+    ).toBe(`${path}: could not run the generator: spawn ENOENT`);
+  });
+
+  it('never treats a missing status as a match', () => {
+    expect(describeGeneratorRun(path, { status: null, signal: null })).not.toBeNull();
   });
 });
