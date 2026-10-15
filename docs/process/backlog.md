@@ -2295,7 +2295,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** spec-lint and the vocabulary lint pass; the gap register is updated; no change to 04.
 
 #### M1-9k · CLI runtime: open an agent, local approval channel, dispatcher (new, D-73)
-- **Status:** ready · **Size:** M · **Tier:** Opus · **Security:** S2 (opens the KeyStore and builds the approval channel, §2.4) · **Phase:** M1a
+- **Status:** in-progress · **Size:** M · **Tier:** Opus · **Security:** S2 (opens the KeyStore and builds the approval channel, §2.4) · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`package.json` bin and dependencies, `src/cli.ts`, `src/runtime/**`)
 - **Depends on:** M1-8a, M1-8b, M1-8g, M1-5b-b, M1-7e (all merged); M1-7k for the transport injection (stubbed until then)
 - **Spec:** 03 §3; 06 §6, §7, §8; 07 §2, §9.1; 04 §2.5; D-73 (3)

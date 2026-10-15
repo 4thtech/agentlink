@@ -181,11 +181,11 @@ areas:
         summary: "M1-8f."
   - id: apps
     title: "MCP server, CLI and apps"
-    intro: "Nothing built yet."
+    intro: "The CLI runtime is in review; nothing is usable yet."
     components:
       - name: "MCP server and CLI"
-        state: planned
-        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a)."
+        state: in-progress
+        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising) is in review; the commands and the MCP server follow."
       - name: "Local approval page"
         state: planned
         summary: "A small page on 127.0.0.1 for owner approvals and settings (M1b)."
