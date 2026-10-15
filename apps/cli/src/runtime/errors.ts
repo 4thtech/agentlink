@@ -7,8 +7,13 @@ export type RuntimeErrorCode =
   | 'agent_name_invalid'
   /** The agent's config file is missing a field, has an unknown one, or is not the agent's own. */
   | 'agent_config_invalid'
-  /** The agent's directory or config resolves outside `~/.agentlink/agents` or is a link. */
+  /**
+   * A folder or file under `~/.agentlink` breaks the folder rules: a link, the wrong file type, group
+   * or other access, another owner, or a realpath outside `~/.agentlink/agents` (IR-M1-9k-1 F02).
+   */
   | 'agent_path_invalid'
+  /** `init` found an agent with this name already; it is never replaced unless asked (F03). */
+  | 'agent_exists'
   /** The agent's store or keys could not be opened. */
   | 'agent_open_failed'
   /** An approval ID failed its exact pattern (04 §2.4.1). */
@@ -20,7 +25,9 @@ export const RUNTIME_MESSAGES: Readonly<Record<RuntimeErrorCode, string>> = Obje
   agent_config_invalid:
     "This agent's local settings are damaged. Run `agentlink doctor` in your own terminal to see how to fix them.",
   agent_path_invalid:
-    "This agent's folder under ~/.agentlink is not a plain folder. Run `agentlink doctor` in your own terminal to see how to fix it.",
+    "This agent's folder under ~/.agentlink must be a private folder of yours, with no links, readable only by you. Run `agentlink doctor` in your own terminal to see how to fix it.",
+  agent_exists:
+    'An agent with this name is already set up on this machine. AgentLink never replaces it. Choose another name with --agent.',
   agent_open_failed:
     "AgentLink couldn't open this agent on this machine. Run `agentlink doctor` in your own terminal to see why.",
   approval_id_invalid: "That approval ID isn't valid. Check it and try again.",

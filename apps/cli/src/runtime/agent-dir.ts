@@ -6,11 +6,34 @@
 // `init` (M1-9a) writes the config through `writeAgentConfig`; every other command and every
 // `agentlink mcp` process reads it through `readAgentConfig`, so all of them open the same store
 // file (06 §6). The config is not owner-signed: changing it can only make the agent fail to open
-// (07 §9.1). Paths follow the realpath rule (04 §4): the resolved agent folder must sit directly in
-// the resolved `agents` folder, and neither the folder nor the config may be a link.
-import { constants } from 'node:fs';
-import { lstat, mkdir, open, readdir, realpath, rename } from 'node:fs/promises';
+// (07 §9.1).
+//
+// Folder rules (IR-M1-9k-1 F02; the same as the keystore folder, 04 §2.8, and the realpath rule,
+// 04 §4). On POSIX: `~/.agentlink`, `agents` and the agent folder are each a real directory (never a
+// link) with mode 0700 owned by this user; the config and any store file (`store.sqlite`, `-wal`,
+// `-shm`) are regular files (never a link, a FIFO or a folder) with mode 0600 owned by this user;
+// the agent folder's realpath is exactly `<realpath(home)>/.agentlink/agents/<name>`. Anything else
+// fails closed with fixed text that names the fix (`agentlink doctor`), never a path. Existing
+// folders are never loosened or tightened here. On Windows the mode and owner checks do not apply
+// (no POSIX modes); the link, type and containment checks do.
+//
+// Same-user processes can change all of this (G-1, D-67): these checks keep mistakes and other
+// users out; they are not a boundary against the agent.
+import { encodeHex, randomBytes } from '@agentlink/crypto';
+import { constants, type Stats } from 'node:fs';
+import {
+  chmod,
+  link,
+  lstat,
+  mkdir,
+  open,
+  readdir,
+  realpath,
+  rename,
+  unlink,
+} from 'node:fs/promises';
 import { join } from 'node:path';
+import process from 'node:process';
 import { assertAgentId, type KeyStoreBackendKind } from '@agentlink/node';
 import { isAgentName } from './agent-name.js';
 import { RuntimeError } from './errors.js';
@@ -28,8 +51,14 @@ export interface AgentConfig {
 
 export const CONFIG_FILE = 'config.json';
 export const STORE_FILE = 'store.sqlite';
+/** The store and the files SQLite keeps beside it in WAL mode. */
+const STORE_FILES = [STORE_FILE, `${STORE_FILE}-wal`, `${STORE_FILE}-shm`];
 /** A config is a few hundred bytes; anything larger is refused unread. */
 export const MAX_CONFIG_BYTES = 4_096;
+
+const DIR_MODE = 0o700;
+const FILE_MODE = 0o600;
+const POSIX = process.platform !== 'win32';
 
 export interface AgentPaths {
   readonly root: string;
@@ -37,6 +66,11 @@ export interface AgentPaths {
   readonly dir: string;
   readonly config: string;
   readonly store: string;
+}
+
+/** Who must own the folder and files. Default: this process's user (POSIX). Tests pass another. */
+export interface OwnerCheck {
+  readonly uid?: number;
 }
 
 /** `~/.agentlink` and the agent's folder, config and store under it. `name` must already be valid. */
@@ -48,11 +82,62 @@ export function agentPaths(home: string, name: string): AgentPaths {
   return { root, agents, dir, config: join(dir, CONFIG_FILE), store: join(dir, STORE_FILE) };
 }
 
-const isMissing = (error: unknown): boolean =>
-  typeof error === 'object' &&
-  error !== null &&
-  ((error as { code?: unknown }).code === 'ENOENT' ||
-    (error as { code?: unknown }).code === 'ENOTDIR');
+const codeOf = (error: unknown): unknown =>
+  typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : undefined;
+const isMissing = (error: unknown): boolean => {
+  const code = codeOf(error);
+  return code === 'ENOENT' || code === 'ENOTDIR';
+};
+
+const expectedUid = (options: OwnerCheck): number | undefined =>
+  options.uid ?? (POSIX && typeof process.getuid === 'function' ? process.getuid() : undefined);
+
+/** Mode and owner of an lstat result (POSIX only). */
+function privateTo(info: Stats, uid: number | undefined): boolean {
+  if (!POSIX) return true;
+  if ((info.mode & 0o077) !== 0) return false;
+  return uid === undefined || info.uid === uid;
+}
+
+/** lstat without throwing on a missing entry; any other failure is a fixed refusal. */
+async function lstatOrMissing(path: string): Promise<Stats | undefined> {
+  try {
+    return await lstat(path);
+  } catch (error) {
+    if (isMissing(error)) return undefined;
+    throw new RuntimeError('agent_path_invalid');
+  }
+}
+
+/** A real, private directory; undefined when it does not exist. */
+async function checkDir(path: string, uid: number | undefined): Promise<'ok' | undefined> {
+  const info = await lstatOrMissing(path);
+  if (info === undefined) return undefined;
+  if (info.isSymbolicLink() || !info.isDirectory() || !privateTo(info, uid)) {
+    throw new RuntimeError('agent_path_invalid');
+  }
+  return 'ok';
+}
+
+/** A regular, private file (never a link, FIFO, socket, device or folder). */
+function checkFileInfo(info: Stats, uid: number | undefined): void {
+  if (info.isSymbolicLink() || !info.isFile() || !privateTo(info, uid)) {
+    throw new RuntimeError('agent_path_invalid');
+  }
+}
+
+/** The agent folder's realpath must be exactly where it is expected (04 §4). */
+async function checkContained(home: string, name: string): Promise<string> {
+  try {
+    const homeReal = await realpath(home);
+    const expected = join(homeReal, '.agentlink', 'agents', name);
+    const dirReal = await realpath(join(home, '.agentlink', 'agents', name));
+    if (dirReal !== expected) throw new RuntimeError('agent_path_invalid');
+    return dirReal;
+  } catch {
+    throw new RuntimeError('agent_path_invalid');
+  }
+}
 
 /** Strict parse: exactly the four keys, each of its exact type and form. */
 export function parseAgentConfig(text: string, expectedName: string): AgentConfig {
@@ -85,56 +170,48 @@ export function parseAgentConfig(text: string, expectedName: string): AgentConfi
 }
 
 /**
- * Resolves the agent folder under the realpath rule (04 §4): `agents` and the agent folder are real
- * folders (not links), and the folder's realpath sits directly in the realpath of `agents`.
- * Returns undefined when the folder does not exist.
- */
-async function resolveAgentDir(paths: AgentPaths, name: string): Promise<string | undefined> {
-  let agentsReal: string;
-  try {
-    agentsReal = await realpath(paths.agents);
-  } catch (error) {
-    if (isMissing(error)) return undefined;
-    throw new RuntimeError('agent_path_invalid');
-  }
-  let info;
-  try {
-    info = await lstat(paths.dir);
-  } catch (error) {
-    if (isMissing(error)) return undefined;
-    throw new RuntimeError('agent_path_invalid');
-  }
-  if (!info.isDirectory() || info.isSymbolicLink()) throw new RuntimeError('agent_path_invalid');
-  const dirReal = await realpath(paths.dir).catch(() => {
-    throw new RuntimeError('agent_path_invalid');
-  });
-  if (dirReal !== join(agentsReal, name)) throw new RuntimeError('agent_path_invalid');
-  return dirReal;
-}
-
-/**
- * Reads and checks an agent's recorded config. Returns undefined when the agent does not exist
- * (no folder or no config): the caller answers `needs_setup`, never by creating one.
+ * Reads and checks an agent's recorded config and the folder rules above. Returns undefined when the
+ * agent does not exist (no folder or no config): the caller answers `needs_setup`, never by
+ * creating one.
  */
 export async function readAgentConfig(
   home: string,
   name: string,
+  options: OwnerCheck = {},
 ): Promise<{ config: AgentConfig; paths: AgentPaths } | undefined> {
   const paths = agentPaths(home, name);
-  const dirReal = await resolveAgentDir(paths, name);
-  if (dirReal === undefined) return undefined;
+  const uid = expectedUid(options);
+  for (const dir of [paths.root, paths.agents, paths.dir]) {
+    if ((await checkDir(dir, uid)) === undefined) return undefined;
+  }
+  const dirReal = await checkContained(home, name);
   const configPath = join(dirReal, CONFIG_FILE);
+
+  // lstat first, so a FIFO or a link is refused without being opened.
+  const before = await lstatOrMissing(configPath);
+  if (before === undefined) return undefined;
+  checkFileInfo(before, uid);
+  for (const file of STORE_FILES) {
+    const info = await lstatOrMissing(join(dirReal, file));
+    if (info !== undefined) checkFileInfo(info, uid);
+  }
+
   let handle;
   try {
-    // O_NOFOLLOW: a config that is a link is refused, not followed (04 §4).
-    handle = await open(configPath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    handle = await open(
+      configPath,
+      constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0),
+    );
   } catch (error) {
     if (isMissing(error)) return undefined;
     throw new RuntimeError('agent_path_invalid');
   }
   try {
     const info = await handle.stat();
-    if (!info.isFile()) throw new RuntimeError('agent_path_invalid');
+    // The file opened is the one checked (not swapped in between).
+    if (!info.isFile() || info.ino !== before.ino || info.dev !== before.dev) {
+      throw new RuntimeError('agent_path_invalid');
+    }
     if (info.size > MAX_CONFIG_BYTES) throw new RuntimeError('agent_config_invalid');
     const buffer = Buffer.alloc(MAX_CONFIG_BYTES + 1);
     const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
@@ -155,48 +232,90 @@ export async function readAgentConfig(
   }
 }
 
+/** Creates a missing folder with mode 0700 (explicitly, not through the umask), then checks it. */
+async function ensurePrivateDir(path: string, uid: number | undefined): Promise<void> {
+  if ((await checkDir(path, uid)) === 'ok') return;
+  try {
+    await mkdir(path, { mode: DIR_MODE });
+    if (POSIX) await chmod(path, DIR_MODE);
+  } catch (error) {
+    if (codeOf(error) !== 'EEXIST') throw new RuntimeError('agent_path_invalid');
+  }
+  if ((await checkDir(path, uid)) !== 'ok') throw new RuntimeError('agent_path_invalid');
+}
+
+export interface WriteAgentConfigOptions extends OwnerCheck {
+  /** Replace an existing config. Default false: an existing agent is never replaced (IR-M1-9k-1 F03). */
+  readonly replace?: boolean;
+}
+
 /**
- * Writes an agent's config for `init` (M1-9a): the folders with mode 0700, the file with mode 0600,
- * written to a temporary name and renamed into place. Refuses an invalid name or agent ID.
+ * Writes an agent's config for `init` (M1-9a): missing folders with mode 0700, the file with mode
+ * 0600, written to a fresh temporary name and then linked into place, so an existing config is never
+ * replaced unless `replace` is set (`agent_exists`). Refuses an invalid name or agent ID and a
+ * folder that breaks the rules above (never loosened or tightened).
  */
-export async function writeAgentConfig(home: string, config: AgentConfig): Promise<AgentPaths> {
+export async function writeAgentConfig(
+  home: string,
+  config: AgentConfig,
+  options: WriteAgentConfigOptions = {},
+): Promise<AgentPaths> {
   const paths = agentPaths(home, config.name);
   assertAgentId(config.agentId);
   if (config.keyStore !== 'keychain' && config.keyStore !== 'file') {
     throw new RuntimeError('agent_config_invalid');
   }
-  await mkdir(paths.dir, { recursive: true, mode: 0o700 });
-  if ((await resolveAgentDir(paths, config.name)) === undefined) {
-    throw new RuntimeError('agent_path_invalid');
-  }
+  const uid = expectedUid(options);
+  for (const dir of [paths.root, paths.agents, paths.dir]) await ensurePrivateDir(dir, uid);
+  const dirReal = await checkContained(home, config.name);
+  const target = join(dirReal, CONFIG_FILE);
+
   const text = `${JSON.stringify({ v: 1, name: config.name, agentId: config.agentId, keyStore: config.keyStore })}\n`;
-  const temp = join(paths.dir, `.${CONFIG_FILE}.tmp`);
+  const temp = join(dirReal, `.${CONFIG_FILE}.${encodeHex(randomBytes(8))}.tmp`);
   const handle = await open(
     temp,
-    constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | (constants.O_NOFOLLOW ?? 0),
-    0o600,
+    constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0),
+    FILE_MODE,
   );
   try {
+    if (POSIX) await handle.chmod(FILE_MODE);
     await handle.writeFile(text, 'utf8');
     await handle.sync();
   } finally {
     await handle.close();
   }
-  await rename(temp, paths.config);
-  return paths;
+  try {
+    if (options.replace === true) {
+      await rename(temp, target);
+      return { ...paths, dir: dirReal, config: target, store: join(dirReal, STORE_FILE) };
+    }
+    try {
+      await link(temp, target);
+    } catch (error) {
+      if (codeOf(error) === 'EEXIST') throw new RuntimeError('agent_exists');
+      throw new RuntimeError('agent_path_invalid');
+    }
+  } finally {
+    await unlink(temp).catch(() => undefined);
+  }
+  return { ...paths, dir: dirReal, config: target, store: join(dirReal, STORE_FILE) };
 }
 
 /**
  * The local agents that have a folder with a valid name, sorted. Entries whose name fails the
- * pattern are skipped, never listed or shown (06 §6).
+ * pattern are skipped, never listed or shown (06 §6). `~/.agentlink` and `agents` must follow the
+ * folder rules; each agent folder is checked when it is opened.
  */
-export async function listAgentNames(home: string): Promise<string[]> {
-  const agents = join(home, '.agentlink', 'agents');
+export async function listAgentNames(home: string, options: OwnerCheck = {}): Promise<string[]> {
+  const uid = expectedUid(options);
+  const root = join(home, '.agentlink');
+  const agents = join(root, 'agents');
+  if ((await checkDir(root, uid)) === undefined) return [];
+  if ((await checkDir(agents, uid)) === undefined) return [];
   let entries;
   try {
     entries = await readdir(agents, { withFileTypes: true });
-  } catch (error) {
-    if (isMissing(error)) return [];
+  } catch {
     throw new RuntimeError('agent_path_invalid');
   }
   return entries

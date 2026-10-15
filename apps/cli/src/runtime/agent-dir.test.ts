@@ -158,7 +158,7 @@ describe('listing agents', () => {
   it('lists only folders with a valid name, sorted', async () => {
     const agents = join(home, '.agentlink', 'agents');
     for (const name of ['work', 'default', 'Bad', '-x', 'with space']) {
-      await mkdir(join(agents, name), { recursive: true });
+      await mkdir(join(agents, name), { recursive: true, mode: 0o700 });
     }
     await writeFile(join(agents, 'file'), '');
     expect(await listAgentNames(home)).toEqual(['default', 'work']);
@@ -303,7 +303,12 @@ describe('no clobber (IR-M1-9k-1 F03)', () => {
   });
 
   it('replace: true is the explicit way to rewrite it', async () => {
-    await writeAgentConfig(home, { v: 1, name: 'default', agentId: agentId(), keyStore: 'keychain' });
+    await writeAgentConfig(home, {
+      v: 1,
+      name: 'default',
+      agentId: agentId(),
+      keyStore: 'keychain',
+    });
     const second = agentId();
     await writeAgentConfig(
       home,

@@ -3,9 +3,13 @@
 // its kind needs before its handler sees anything:
 //
 // - Owner commands (†) and interactive-only commands need an interactive terminal with no harness
-//   marker set (04 §2.5, §2.8; 06 §8). A UX guard, not a boundary: authority is only the owner
-//   signature core verifies (I-4). An `agentlink mcp` process, whose stdin is the MCP pipe, can never
-//   pass it, so it cannot reach an approval decision.
+//   marker set (04 §2.5, §2.8; 06 §8). This is a UX guard, NOT a security boundary (G-1, D-67).
+//   The `agentlink mcp` process itself never passes it, because its stdin and stdout are the MCP
+//   pipe. But any shell the agent controls can pass it (a pseudo-terminal such as `script`, with the
+//   markers removed from the environment), so nothing may rely on it. What stops the agent is the
+//   owner-presence step each owner handler takes (the owner code at the prompt, M1-9b) and the
+//   owner signature core verifies (I-4); the D-67 residual (an agent that fakes the prompt and
+//   learns the code) is accepted for M1.
 // - `--agent` is checked against the local agent-name pattern (06 §6); an approval ID against its
 //   exact pattern (04 §2.4.1).
 // - Nothing the caller typed is ever echoed: usage errors and refusals are fixed text (I-5), and
