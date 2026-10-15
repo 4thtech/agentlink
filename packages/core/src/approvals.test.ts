@@ -97,7 +97,9 @@ async function setup() {
     decision,
   });
   const approve = async (r: Req, decision = 'approve') => {
-    const over = r.expiresAt < clock.t + 600 ? { expiresAt: r.expiresAt } : {};
+    // Near the request's expiry the decision must expire with it, and be issued before it.
+    const over =
+      r.expiresAt < clock.t + 600 ? { issuedAt: clock.t - 60, expiresAt: r.expiresAt } : {};
     return client.ownerActions.apply(await signed('approval.decide', decide(r, decision), over));
   };
   const row = (approvalId: string) =>
