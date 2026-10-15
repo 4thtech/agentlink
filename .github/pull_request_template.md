@@ -4,7 +4,8 @@ Title format: start with the task ID, e.g. `M1-5 transport-nostr sync`
 
 Two required checks read this description:
 - `pr-hygiene`: every section below up to "Checklist" must contain something.
-  Write "None" or "N/A" where nothing applies.
+  Write "None" or "N/A" where nothing applies, except in "Docs impact", which must list
+  the docs updated or say "none: <reason>".
 - `review-gate`: reads "Security class", "Independent review", "Threat note" and
   "Tests-first evidence". It derives the class from the changed files and fails
   if the ticked class is lower (docs/process/audit-rules.md §2-§3).
@@ -40,7 +41,11 @@ Write "None" if no invariant is touched.
 
 
 ## Docs / spec updated
-<!-- Cross-package interfaces change only through a PR that updates the relevant spec document. README Status section updated if a milestone, release or user-visible capability changed (never claim unimplemented features). "None" if nothing changed. -->
+<!-- Cross-package interfaces change only through a PR that updates the relevant spec document. Status changes (a card done, a milestone or component moved, a deploy, a release) go in docs/status.yaml, then run `node tools/docs-status/index.mjs` to regenerate the README Status and the docs-site and knowledge pages; never claim unimplemented features. "None" if nothing changed. -->
+
+
+## Docs impact
+<!-- Required. List every doc updated by this PR (README Status, docs/status.yaml and its generated blocks, docs-site/, knowledge/, CHANGELOG, specs, runbooks), or write "none: <reason>" (for example "none: internal refactor, no behaviour or interface change"). A bare "None" is refused by pr-hygiene. -->
 
 
 ## Dependencies added
@@ -80,6 +85,6 @@ S0: N/A.
 - [ ] Spec sections implemented are listed above
 - [ ] Invariants touched are listed above (and how they hold)
 - [ ] Tests added; `pnpm test`, `pnpm lint` and `pnpm typecheck` pass
-- [ ] Docs/spec updated if an interface changed; README Status updated if a user-visible capability changed
+- [ ] Docs/spec updated if an interface changed; `docs/status.yaml` updated (and `node tools/docs-status/index.mjs` run) if status changed; "Docs impact" filled in
 - [ ] No private keys, seeds, plaintext, file keys, salts or presigned URLs in code, tests, logs or fixtures (labelled test vectors excepted)
 - [ ] No OCC v2 Solidity source, docs 01/09 or unfixed vulnerability details (this repository is public)

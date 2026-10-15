@@ -5,7 +5,9 @@
 // its recipient key. This worker republishes that stored event, never a re-wrapped one, to exactly
 // that list (a wrap is never published to a relay outside its row's list), and marks the row:
 //   - `sent` once 2 relays of the list have returned OK (for `owner` rows as for `contact` rows);
-//   - `not_delivered` (timeout) if that has not happened by give_up_at (created_at + 24 h);
+//   - `not_delivered` (timeout) if that has not happened by give_up_at, the earlier of created_at +
+//     24 h and the wrap's own created_at + 48 h + S (G-49, D-71 (5)): a wrap is never published
+//     where a receiver's sync (`lastSync - 48 h - S`) could no longer find it;
 //   - `not_delivered` (unreadable) if the row cannot be read; nothing is published for it.
 // Between attempts it backs off (30 s, doubling, at most 1 h), and never past give_up_at.
 //
@@ -16,8 +18,9 @@ import { MIN_ACKS, MAX_RELAYS_PER_WRAP, type RelayPool } from './relay-pool.js';
 import { verifyNostrEvent, parseJson, type NostrEvent } from '@agentlink/crypto';
 import type { Logger } from '@agentlink/log';
 import { isAllowedRelayUrl } from '@agentlink/types';
+import { SYNC_LOOKBACK_SECONDS, SYNC_SKEW_SECONDS } from './sync.js';
 
-/** 07 §3.2: give_up_at = created_at + 86 400. */
+/** 07 §3.2: give_up_at = min(created_at + 86 400, wrap created_at + 48 h + S) (G-49); this is the first term. */
 export const OUTBOX_GIVE_UP_SECONDS = 86_400;
 const BACKOFF_BASE_SECONDS = 30;
 const BACKOFF_MAX_SECONDS = 3_600;
@@ -190,14 +193,21 @@ export class OutboxWorker {
       relays === undefined ||
       event === undefined ||
       !Number.isSafeInteger(created) ||
-      !Number.isSafeInteger(row.giveUpAt)
+      !Number.isSafeInteger(row.giveUpAt) ||
+      !Number.isSafeInteger(event.created_at)
     ) {
       return (await this.persistence.markNotDelivered(row.wrapId, 'unreadable'))
         ? { kind: 'not_delivered' }
         : { kind: 'skipped' };
     }
-    // The stored give_up_at is not trusted: it is never later than created_at + 24 h (07 §3.2).
-    const giveUpAt = Math.min(row.giveUpAt, created + OUTBOX_GIVE_UP_SECONDS);
+    // The stored give_up_at is not trusted (07 §3.2): the bound is recomputed here as
+    // min(created_at + 24 h, the signed wrap's created_at + sync look-back + skew), so no copy is
+    // ever published later than a receiver's sync (since = lastSync - 48 h - S) can still reach it.
+    const giveUpAt = Math.min(
+      row.giveUpAt,
+      created + OUTBOX_GIVE_UP_SECONDS,
+      event.created_at + SYNC_LOOKBACK_SECONDS + SYNC_SKEW_SECONDS,
+    );
     const acks = this.listedAcks(row, relays);
     if (Object.keys(acks).length >= MIN_ACKS) {
       // a crash after the publish, before the mark
