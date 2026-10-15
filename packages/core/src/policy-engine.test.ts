@@ -43,6 +43,11 @@ const send = (sizeBytes = 100, contact = A): PolicyAction => ({
   sizeBytes,
 });
 const hour = (n: number): PolicyContext => ({ contactEnvelopesLastHour: n });
+/** A commitment without terms (an `accepted` acknowledgement): the plain rule; limits in commitments.test.ts. */
+const ACK: PolicyAction = {
+  kind: 'commitment',
+  facts: { kind: 'acknowledge', receipt: 'ACCEPTED' },
+};
 
 interface Row {
   readonly name: string;
@@ -174,32 +179,32 @@ const RULES: readonly Row[] = [
     action: send(KB + 1),
     expected: 'deny',
   },
-  // commitments.accept (auto-accept limits: M1-20)
+  // commitments.accept (the auto-accept limits: commitments.test.ts, M1-20)
   {
     name: 'commitment, defaults',
     policy: defaults,
-    action: { kind: 'commitment' },
+    action: ACK,
     expected: 'approval',
   },
   {
     name: 'commitment, allow',
     policy: signed((p) => (p.commitments.accept = 'allow')),
-    action: { kind: 'commitment' },
+    action: ACK,
     expected: 'allow',
   },
   {
     name: 'commitment, deny',
     policy: signed((p) => (p.commitments.accept = 'deny')),
-    action: { kind: 'commitment' },
+    action: ACK,
     expected: 'deny',
   },
   {
-    name: 'commitment, approval with an allowlisted contact (no auto-accept before M1-20)',
+    name: 'commitment without terms, allowlisted contact: never auto-accepted (M1-20)',
     policy: signed((p) => {
       p.commitments.autoAcceptContacts = [A];
       p.commitments.autoAcceptMaxUSD = '100';
     }),
-    action: { kind: 'commitment' },
+    action: ACK,
     expected: 'approval',
   },
   // proofs (M1-7i adds the budget rules; a deny always wins)
@@ -326,7 +331,7 @@ const FAIL_CLOSED: readonly Row[] = [
     action: send(24 * KB + 1),
     expected: 'deny',
   },
-  { name: 'commitment', policy: failClosed, action: { kind: 'commitment' }, expected: 'approval' },
+  { name: 'commitment', policy: failClosed, action: ACK, expected: 'approval' },
   { name: 'paid proof', policy: failClosed, action: { kind: 'proof' }, expected: 'approval' },
   {
     name: 'file access',
@@ -470,7 +475,7 @@ describe('evaluate is deterministic and side-effect free (property)', () => {
         () => fromContact(int(30 * KB), pick([A, B, C])),
         () => fromUnknown(int(30 * KB)),
         () => send(int(30 * KB), pick([A, B, C])),
-        () => ({ kind: 'commitment' }) as const,
+        () => ACK,
         () => ({ kind: 'proof' }) as const,
         () => ({ kind: 'file.send', sizeBytes: int(300 * MB) }) as const,
         () => ({ kind: 'key.disclose' }) as const,
