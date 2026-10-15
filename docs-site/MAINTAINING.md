@@ -97,13 +97,17 @@ Milestones map to versions per [versioning.md](../docs/process/versioning.md): M
 | Technical: Self-host the cloud agent | — | — | Fill in | Review |
 | Technical: Status and roadmap; Versioning | Update | Update | Update | Update |
 
+### Generated status blocks
+
+The Status and roadmap page (`technical/project/status-and-roadmap.md`) is generated from [`docs/status.yaml`](../docs/status.yaml): the blocks between `<!-- status-hint:start -->`, `<!-- status-summary:start -->` and `<!-- status-milestones:start -->` and their `:end` markers. Never edit them by hand. Change `docs/status.yaml`, run `node tools/docs-status/index.mjs` and commit both; `pnpm lint` fails when a block has drifted. The same source feeds the README Status and Roadmap and the knowledge base.
+
 ### Per-release docs pass
 
 For every release (milestone or patch):
 
 1. Change the status hints of everything in the release from **Planned** to **Available since vX.Y.Z**; leave everything else as it is.
 2. Fill in the skeleton pages listed for the milestone; replace planned names (package, commands, tools) with the released ones.
-3. Update "What works today" on the guide's landing page, Status and roadmap, and Versioning (format table).
+3. Update "What works today" on the guide's landing page and Versioning (format table); Status and roadmap comes from `docs/status.yaml` (run `node tools/docs-status/index.mjs`).
 4. Check every user-facing sentence against the released software, not against the plan.
 5. Check the guide's vocabulary against 11 §5, that every page is in its `SUMMARY.md`, and that every relative link resolves (DOCS-LINT automates this).
 6. Add redirects for moved pages.
