@@ -796,9 +796,7 @@ export class EnvelopeService {
     book: Book,
   ): Promise<'pass' | 'skip' | 'drop'> {
     const from = envelope.from;
-    const blocked = await this.#ctx.store.transaction(
-      (tx) => isBlockedTx(tx, from) && tx.count('contacts', { agent_nostr: from }) === 0,
-    );
+    const blocked = await this.#ctx.store.transaction((tx) => blockedSenderTx(tx, from));
     if (!blocked) return 'pass';
     if (item.source === 'received' && envelope.recipients.some((r) => book.byOwnerKid.has(r.kid))) {
       return 'skip';
@@ -849,7 +847,10 @@ export class EnvelopeService {
     let keep = false;
     try {
       if (!checkKeyCommitment(envelope, cek)) {
-        // Signature-valid (step 4) and a commitment its wrap for this agent does not carry.
+        // Signature-valid (step 4) and a commitment its wrap for this agent does not carry. From a
+        // blocked key that took the rotation skip it is dropped, never stored, so a blocked key
+        // uses no queue space (IR-M1-7e-2-1 F01).
+        if (gate === 'skip') return { kind: 'drop', reason: 'sender_blocked' };
         return { kind: 'refuse', reason: 'key_commitment', flagged: true };
       }
       let plaintext: Uint8Array;
@@ -1190,6 +1191,12 @@ export class EnvelopeService {
         if (!claim(tx, item)) return 'lost' as const;
         // The requests-queue limits: the count and the insert in this one transaction (07 §3.2).
         // Over a limit nothing is stored and nothing is sent; the seen rows stay.
+        // A Block from another process since the step 5 gate (IR-M1-7e-2-1 F02): checked again
+        // here, so a blocked key's envelope is never stored as a request.
+        if (d.state === 'request' && blockedSenderTx(tx, envelope.from)) {
+          deleteRow(tx, item);
+          return 'blocked' as const;
+        }
         if (d.state === 'request' && requestsFullTx(tx, envelope.from, now)) {
           deleteRow(tx, item);
           return 'full' as const;
@@ -1204,6 +1211,9 @@ export class EnvelopeService {
         return 'stored' as const;
       });
       if (done === 'lost') return {};
+      if (done === 'blocked') {
+        return { report: report(item.envelopeId, 'dropped', { reason: 'sender_blocked' }) };
+      }
       if (done === 'full') {
         return { report: report(item.envelopeId, 'dropped', { reason: REQUESTS_FULL }) };
       }
@@ -1313,6 +1323,16 @@ export class EnvelopeService {
             flagged: true,
           };
         }
+      }
+      // A refusal from a key blocked since the step 5 gate (another process) is dropped, never
+      // stored: a blocked key uses no queue space (IR-M1-7e-2-1 F02).
+      if (
+        effective.kind === 'refuse' &&
+        effective.contactId === undefined &&
+        envelope !== undefined &&
+        blockedSenderTx(tx, envelope.from)
+      ) {
+        effective = { kind: 'drop', reason: 'sender_blocked' };
       }
       // A refusal from an unknown key counts toward the requests-queue limits (07 §3.2); over a
       // limit it is not stored. Pairing refusals keep their own rules (04 §3.6).
@@ -1530,6 +1550,11 @@ export async function sealPairingEnvelope(
 }
 
 // --- Store helpers (inside one transaction) ------------------------------------------------------
+
+/** `from` is in the owner's blocked keys and is not a contact's current key (D-72, 07 §3.2). */
+function blockedSenderTx(tx: StoreTx, from: string): boolean {
+  return isBlockedTx(tx, from) && tx.count('contacts', { agent_nostr: from }) === 0;
+}
 
 /** True while the item is still where this pass found it, with the same envelopeHash. */
 function claim(tx: StoreTx, item: Item): boolean {
