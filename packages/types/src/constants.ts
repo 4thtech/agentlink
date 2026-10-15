@@ -284,19 +284,21 @@ export const BYTE_LENGTHS = freeze({
 
 /** Serialized envelope limit: 24 KB (04 §3.5; policy `envelopes.maxEnvelopeKB`, 06 §3). KB = 1024 bytes. */
 export const MAX_ENVELOPE_BYTES = 24 * 1024;
-/** Files up to 12 KB travel inline (04 §3.5, §4; 07 §5.3). Applies to the file's plaintext size. */
-export const MAX_INLINE_FILE_BYTES = 12 * 1024;
 /** ALF1 header: magic (4) + version (1) + chunkSize (4) + noncePrefix (8) (04 §4). */
 export const ALF1_HEADER_BYTES = 4 + 1 + 4 + 8;
 /** AES-GCM tag, one per ALF1 chunk (04 §4). */
 export const AEAD_TAG_BYTES = 16;
 /**
- * Inline ciphertext cap: a 12 KB file is one ALF1 chunk (default chunk 1 MiB), so its ciphertext is
- * header + plaintext + one tag. The inline field carries the ALF1 ciphertext (it has `fileKey` and
- * `ciphertextSha256` like any other file).
+ * Inline ciphertext cap (04 §3.1.1, §3.4): the `inline` field is at most 16 384 base64url characters,
+ * 12 288 bytes of ALF1 ciphertext (it has `fileKey` and `ciphertextSha256` like any other file).
  */
-export const MAX_INLINE_CIPHERTEXT_BYTES =
-  MAX_INLINE_FILE_BYTES + ALF1_HEADER_BYTES + AEAD_TAG_BYTES;
+export const MAX_INLINE_CIPHERTEXT_BYTES = 12 * 1024;
+/**
+ * The largest file that travels inline (04 §3.4; 07 §5.3), as plaintext size: one ALF1 chunk
+ * (default chunk 1 MiB), so the cap above less the header and one tag, 12 255 bytes.
+ */
+export const MAX_INLINE_FILE_BYTES =
+  MAX_INLINE_CIPHERTEXT_BYTES - ALF1_HEADER_BYTES - AEAD_TAG_BYTES;
 
 /** Recipient set: at least an agent and an owner (I-9, §3.4.1 owner channel); at most 5 (04 §3.2). */
 export const MIN_RECIPIENTS = 2;

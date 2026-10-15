@@ -82,7 +82,7 @@ export const fileEntrySchema = z
     mime: z.string().max(MAX_MIME_LENGTH).regex(MIME, 'must be a MIME type without parameters'),
     plaintextSha256: sha256Hex,
     ciphertextSha256: sha256Hex,
-    // The ALF1 ciphertext of a file up to 12 KB (see MAX_INLINE_CIPHERTEXT_BYTES).
+    // The ALF1 ciphertext, at most 12 288 bytes (04 §3.1.1; see MAX_INLINE_CIPHERTEXT_BYTES).
     inline: base64urlBounded(0, MAX_INLINE_CIPHERTEXT_BYTES).nullable(),
     url: downloadUrlSchema.nullable(),
     fileKey: base64url(BYTE_LENGTHS.key),

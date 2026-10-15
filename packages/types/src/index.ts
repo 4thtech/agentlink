@@ -12,3 +12,4 @@ export * from './envelope.js';
 export * from './proof.js';
 export * from './tool-result.js';
 export * from './names.js';
+export * from './encoding-paths.js';

@@ -144,21 +144,22 @@ describe('file entries', () => {
     expectRoundTrip(fileEntrySchema, fileEntryUrl());
   });
 
-  it(`accepts inline ciphertext up to ${MAX_INLINE_CIPHERTEXT_BYTES} bytes for a ${MAX_INLINE_FILE_BYTES}-byte file`, () => {
-    expectAccept(fileEntrySchema, {
-      ...fileEntryInline(),
-      size: MAX_INLINE_FILE_BYTES,
-      inline: b64u(MAX_INLINE_CIPHERTEXT_BYTES),
-    });
+  // 04 §3.1.1: the inline field is at most 16 384 base64url characters, 12 288 bytes of ALF1
+  // ciphertext, so the largest inline file is 12 288 − 17 (header) − 16 (tag) = 12 255 bytes.
+  it('accepts inline ciphertext up to 12288 bytes (16384 characters) for a 12255-byte file', () => {
+    expect(MAX_INLINE_CIPHERTEXT_BYTES).toBe(12288);
+    expect(MAX_INLINE_FILE_BYTES).toBe(12255);
+    expect(b64u(12288)).toHaveLength(16384);
+    expectAccept(fileEntrySchema, { ...fileEntryInline(), size: 12255, inline: b64u(12288) });
   });
 
   it.each([
-    ['inline over the cap', ['inline'], b64u(MAX_INLINE_CIPHERTEXT_BYTES + 1)],
+    ['inline over the cap', ['inline'], b64u(12289)],
     ['inline padded', ['inline'], `${b64u(1033)}=`],
     ['inline standard base64', ['inline'], `+/${b64u(1033).slice(2)}`],
     ['inline and url both set', ['url'], 'https://drop.example/x'],
     ['inline and url both null', ['inline'], null],
-    ['inline file larger than 12 KB', ['size'], MAX_INLINE_FILE_BYTES + 1],
+    ['inline file larger than 12255 bytes', ['size'], 12256],
     ['size negative', ['size'], -1],
     ['size fractional', ['size'], 1.5],
     ['size 2^53', ['size'], 2 ** 53],

@@ -22,7 +22,7 @@ Because gift-wrap timestamps are randomized, inbox sync looks back at least 48 h
 
 ## Size limits
 
-Serialized envelopes are at most 24 KB and inline files at most 12 KB. Nesting roughly doubles the size, so the client checks the final gift-wrap size against each relay's advertised maximum.
+Serialized envelopes are at most 24 KB and inline files at most 12 255 bytes (12 288 bytes, 12 KB, of `ALF1` ciphertext). Nesting roughly doubles the size, so the client checks the final gift-wrap size against each relay's advertised maximum.
 
 ## Inbox behaviour by packaging
 

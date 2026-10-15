@@ -820,7 +820,7 @@ The labels are distinct, none is a prefix of another, and every suffix has a fix
       "name": "...", "size": 123, "mime": "...",
       "plaintextSha256": "<64 lowercase hex>", // proves 'document matches' later
       "ciphertextSha256": "<64 lowercase hex>",// integrity before decrypt
-      "inline": "base64url (≤ 12 KB) | null",
+      "inline": "base64url (≤ 12 KB) | null",    // ≤ 16 384 base64url characters (12 288 bytes of ALF1 ciphertext; max inline plaintext 12 255 bytes), per §3.1.1
       "url": "download URL (presigned, drop or share link) | null",
       "fileKey": "base64url(32)",
       "expiresAt": 1760000000 } ]

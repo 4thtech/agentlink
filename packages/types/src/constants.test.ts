@@ -179,11 +179,13 @@ describe('constants (04, 05, 06)', () => {
 
   it('has the size limits of 04 §3.5 and 06 §3 (KB = 1024 bytes)', () => {
     expect(MAX_ENVELOPE_BYTES).toBe(24 * 1024);
-    expect(MAX_INLINE_FILE_BYTES).toBe(12 * 1024);
     // ALF1 header: magic 4 + version 1 + chunkSize 4 + noncePrefix 8 (04 §4); one GCM tag per chunk.
     expect(ALF1_HEADER_BYTES).toBe(17);
     expect(AEAD_TAG_BYTES).toBe(16);
-    expect(MAX_INLINE_CIPHERTEXT_BYTES).toBe(12 * 1024 + 17 + 16);
+    // 04 §3.1.1: inline field ≤ 16 384 base64url characters = 12 288 bytes of ALF1 ciphertext, so
+    // the largest inline plaintext is 12 288 − 17 − 16 = 12 255 bytes.
+    expect(MAX_INLINE_CIPHERTEXT_BYTES).toBe(12 * 1024);
+    expect(MAX_INLINE_FILE_BYTES).toBe(12 * 1024 - 17 - 16);
     expect(MIN_RECIPIENTS).toBe(2);
     expect(MAX_RECIPIENTS).toBe(5);
     expect(INVITE_DEFAULT_EXPIRY_DAYS).toBe(7);
