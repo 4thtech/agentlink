@@ -8,12 +8,13 @@ import { DEFAULT_RELAYS as FROM_INDEX } from './index.js';
 import { isGloballyRoutable } from './relay-address.js';
 
 describe('DEFAULT_RELAYS (D-75)', () => {
-  it('is the exported list and holds the three public relays of D-75', () => {
+  it('is the exported list and holds the four public relays of D-75', () => {
     expect(FROM_INDEX).toBe(DEFAULT_RELAYS);
     expect([...DEFAULT_RELAYS]).toEqual([
-      'wss://relay.damus.io',
       'wss://nos.lol',
       'wss://relay.primal.net',
+      'wss://relay.snort.social',
+      'wss://nostr.mom',
     ]);
   });
 

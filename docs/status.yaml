@@ -120,7 +120,7 @@ areas:
       - name: "Default relay set"
         state: done
         prs: [119]
-        summary: "One shared list of three public relays (relay.damus.io, nos.lol, relay.primal.net) and an opt-in script and checklist to vet them; the relays are not yet signed off."
+        summary: "One shared list of four public relays (nos.lol, relay.primal.net, relay.snort.social, nostr.mom) and an opt-in script and checklist to vet them; the relays are not yet signed off."
   - id: core
     title: "Core (@agentlink/core)"
     intro: "Code merged, not published. Nothing in it is user-runnable yet."

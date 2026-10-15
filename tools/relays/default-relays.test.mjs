@@ -24,7 +24,7 @@ describe('default relay set: single source', () => {
   const hosts = [...src.matchAll(/'wss:\/\/([^']+)'/g)].map((m) => m[1]);
 
   it('the source file lists the D-75 relays', () => {
-    expect(hosts).toEqual(['relay.damus.io', 'nos.lol', 'relay.primal.net']);
+    expect(hosts).toEqual(['nos.lol', 'relay.primal.net', 'relay.snort.social', 'nostr.mom']);
   });
 
   it('no other source file in packages, apps or tools names a default relay', () => {

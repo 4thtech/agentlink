@@ -51,9 +51,9 @@ A relay that fails a check stays out of any new default list; the owner decides 
 | `wss://nos.lol` | yes | yes | yes | 131 072 (ok) | no challenge; open reads |
 | `wss://relay.primal.net` | yes | yes | yes | 1 000 000 (ok) | no challenge; open reads |
 
-**damus fails the sync read today**: it demands AUTH for a `#p` query, then refuses every login because of its own configuration, so a sync against it returns nothing. Publishing works. This is a relay-side fault that may be fixed; re-run before relying on it. Until then it should not count as one of the 2 acknowledgements a user depends on for reading, so D-75's list needs the owner's decision (replace it, or keep it as a write-only extra).
+**Outcome: damus is dropped (D-75).** The owner chose nos.lol, relay.primal.net, relay.snort.social and nostr.mom, in that order. **damus failed the sync read**: it demands AUTH for a `#p` query, then refuses every login because of its own configuration, so a sync against it returns nothing. Publishing works. This is a relay-side fault that may be fixed; re-run before relying on it. 
 
-Not yet measured: retention beyond 0 minutes (use `--recheck` after 10 minutes, 24 hours and 7 days) and uptime. M1-18 is not signed off until the damus decision and retention are done.
+Not yet measured for the final four: retention beyond 0 minutes (use `--recheck` after 10 minutes, 24 hours and 7 days) and uptime. M1-18 is not signed off until the damus decision and retention are done.
 
 ### Replacement candidates for damus (15 Oct 2026, same checks, one tiny event each)
 
@@ -65,4 +65,4 @@ Not yet measured: retention beyond 0 minutes (use `--recheck` after 10 minutes, 
 | `wss://relay.nostr.band` | no: connection error, NIP-11 timed out | no | no | unknown | unknown (looks down; re-run later) |
 | `wss://nostr.oxtr.dev` | yes | yes | yes | 131 072 (ok) | none, open reads |
 
-Retention and uptime are not measured for any of them. `DEFAULT_RELAYS` is unchanged; the owner decides.
+Retention and uptime are not measured for any of them. The owner chose nostr.mom and relay.snort.social from this table.

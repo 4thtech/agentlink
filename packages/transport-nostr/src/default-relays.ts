@@ -6,7 +6,8 @@
 
 /** The default public relays (D-75). Vetted with `tools/relays/vet.mjs`; see `docs/runbooks/relay-vetting.md`. */
 export const DEFAULT_RELAYS: readonly string[] = Object.freeze([
-  'wss://relay.damus.io',
   'wss://nos.lol',
   'wss://relay.primal.net',
+  'wss://relay.snort.social',
+  'wss://nostr.mom',
 ]);
