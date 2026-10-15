@@ -2310,6 +2310,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests: opening twice in two processes shares one store; no keychain → `needs_setup` with the 07 §9.4 copy; the channel's `status()` of a row edited to `approved` without a signed object still authorises nothing (the core test re-run here).
   - `agentlink --help` lists exactly the 06 §8 M1a commands; `pnpm deps-check` is green.
+- **Known residuals (IR-M1-9k-1 F08, Info; inside the D-67 same-user residual except the last):** hard links are refused (nlink 1 on the config and the store files); a store file or parent folder swapped after the check and before SQLite opens it by path is followed (only the config has the fstat dev/ino check); on Windows `O_NOFOLLOW` is 0 and modes, owners and ACLs are not checked (links and junctions are refused); no-clobber uses `link()`, so on a filesystem without hard links (exFAT, some SMB mounts) `writeAgentConfig` fails with `agent_path_invalid` instead of a clear message (a `doctor` message is M1-9l). Record (2) and (3) in 07 §9.1 when the folder layout is confirmed.
 
 #### M1-9a · CLI: init and harness setup
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a

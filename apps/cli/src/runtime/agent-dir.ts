@@ -121,7 +121,8 @@ async function checkDir(path: string, uid: number | undefined): Promise<'ok' | u
 
 /** A regular, private file (never a link, FIFO, socket, device or folder). */
 function checkFileInfo(info: Stats, uid: number | undefined): void {
-  if (info.isSymbolicLink() || !info.isFile() || !privateTo(info, uid)) {
+  // nlink 1: no second name elsewhere can read or replace it (IR-M1-9k-1 F08).
+  if (info.isSymbolicLink() || !info.isFile() || info.nlink !== 1 || !privateTo(info, uid)) {
     throw new RuntimeError('agent_path_invalid');
   }
 }
