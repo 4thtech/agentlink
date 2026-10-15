@@ -1,0 +1,190 @@
+// Opening an agent (M1-9k; 06 §6, 07 §9.1, D-73 (3)). Every `agentlink` command and every
+// `agentlink mcp` process opens an agent the same way, so all of them share one KeyStore and one
+// SQLite store file (06 §6: SQLite WAL and the store's busy timeout order their transactions):
+//
+// 1. the local agent name (06 §6 pattern), then its recorded config under ~/.agentlink;
+// 2. the recorded KeyStore backend: for the keychain, the probe and `selectKeyStoreBackend`
+//    (`needs_setup` with the 07 §9.4 copy without a usable keychain), then `openAgentKeyStore`;
+// 3. `openAgentStore` (store, cipher, policy mark);
+// 4. the relay I/O from @agentlink/node as the client's transport (07 §4.2);
+// 5. the M1a approval channel over the same store, and `AgentLinkClient.create`.
+//
+// I-1/I-4: the runtime holds only the agent's KeyStore interface; it never holds an owner key and
+// takes no owner presence. Owner commands (M1-9b) take presence themselves, through @agentlink/node.
+// I-7: errors carry fixed text only (RuntimeError, or @agentlink/node's own fixed messages).
+import { homedir } from 'node:os';
+import {
+  AgentLinkClient,
+  nostrTransport,
+  type ApprovalChannel,
+  type TransportFactory,
+} from '@agentlink/core';
+import type { KeyStore } from '@agentlink/crypto';
+import { createLogger, type Logger } from '@agentlink/log';
+import {
+  nodeHostResolver,
+  nodeNip11Fetcher,
+  nodeRelayConnector,
+  openAgentKeyStore,
+  openAgentStore,
+  probeOsKeychain,
+  selectKeyStoreBackend,
+  type AgentStore,
+  type KeyStoreBackendKind,
+  type KeychainProbe,
+} from '@agentlink/node';
+import { createLocalApprovalChannel, storeApprovalReader } from '../approval/local-channel.js';
+import { readAgentConfig, type AgentPaths } from './agent-dir.js';
+import { DEFAULT_AGENT_NAME, isAgentName } from './agent-name.js';
+import { RuntimeError } from './errors.js';
+
+/** The Node pieces the runtime is built from. Tests pass doubles; production uses @agentlink/node. */
+export interface RuntimeDeps {
+  readonly probeKeychain: () => Promise<KeychainProbe>;
+  readonly openKeyStore: (backend: KeyStoreBackendKind, agentId: string) => Promise<KeyStore>;
+  readonly openStore: (
+    backend: KeyStoreBackendKind,
+    agentId: string,
+    path: string,
+  ) => Promise<AgentStore>;
+  readonly transport: () => TransportFactory;
+  readonly createClient: typeof AgentLinkClient.create;
+}
+
+export const nodeRuntimeDeps: RuntimeDeps = Object.freeze<RuntimeDeps>({
+  probeKeychain: () => probeOsKeychain(),
+  openKeyStore: (backend: KeyStoreBackendKind, agentId: string) =>
+    openAgentKeyStore(backend, agentId),
+  openStore: (backend: KeyStoreBackendKind, agentId: string, path: string) =>
+    openAgentStore(backend, agentId, path),
+  transport: () =>
+    nostrTransport({
+      connector: nodeRelayConnector(),
+      addressCheck: { resolver: nodeHostResolver() },
+      nip11: nodeNip11Fetcher(),
+    }),
+  createClient: (options) => AgentLinkClient.create(options),
+});
+
+export interface OpenAgentOptions {
+  /** The local agent name (06 §6). Default `default`. */
+  readonly agent?: string;
+  /** The home directory that holds `.agentlink`. Default the OS user's home. */
+  readonly home?: string;
+  readonly deps?: RuntimeDeps;
+  /** Unix seconds. Default the system clock. */
+  readonly clock?: () => number;
+  readonly logger?: Logger;
+}
+
+/** An opened agent. `close()` closes the KeyStore and the store, once. */
+export interface OpenedAgent {
+  readonly name: string;
+  readonly agentId: string;
+  readonly paths: AgentPaths;
+  readonly client: AgentLinkClient;
+  /** The M1a approval channel the client was built with (06 §2.5). */
+  readonly approvals: ApprovalChannel;
+  close(): Promise<void>;
+}
+
+export type OpenAgentResult =
+  | { readonly status: 'ok'; readonly agent: OpenedAgent }
+  | {
+      readonly status: 'needs_setup';
+      readonly reason: 'no_agent' | 'no_keychain';
+      /** Fixed copy for the user (07 §9.4 for `no_keychain`). */
+      readonly message: string;
+      /** How to make the keychain usable, when the probe said so (07 §9.1). */
+      readonly fix?: string;
+    };
+
+/** `needs_setup` `no_agent`: nothing is set up for this name. Fixed text; never names the agent. */
+export const NO_AGENT_MESSAGE =
+  'AgentLink is not set up for this agent on this machine yet. Run `agentlink init` yourself, in your own terminal.';
+
+const systemClock = (): number => Math.floor(Date.now() / 1000);
+
+/** Opens a local agent for a command or an `agentlink mcp` process. */
+export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAgentResult> {
+  const name = options.agent ?? DEFAULT_AGENT_NAME;
+  if (!isAgentName(name)) throw new RuntimeError('agent_name_invalid');
+  const deps = options.deps ?? nodeRuntimeDeps;
+  const clock = options.clock ?? systemClock;
+  const logger = options.logger ?? createLogger({ name: 'cli' });
+
+  const found = await readAgentConfig(options.home ?? homedir(), name);
+  if (found === undefined) {
+    return { status: 'needs_setup', reason: 'no_agent', message: NO_AGENT_MESSAGE };
+  }
+  const { config, paths } = found;
+
+  if (config.keyStore === 'keychain') {
+    const probe = await deps.probeKeychain();
+    const selection = selectKeyStoreBackend(probe, { fileOptIn: false });
+    if (!selection.ok) {
+      if (selection.status === 'needs_setup') {
+        return {
+          status: 'needs_setup',
+          reason: 'no_keychain',
+          message: selection.message,
+          fix: selection.fix,
+        };
+      }
+      throw new RuntimeError('agent_open_failed');
+    }
+  }
+
+  // Each step's own errors are fixed text (@agentlink/node); anything opened is closed on failure.
+  const keyStore = await deps.openKeyStore(config.keyStore, config.agentId);
+  let agentStore: AgentStore;
+  try {
+    agentStore = await deps.openStore(config.keyStore, config.agentId, paths.store);
+  } catch (error) {
+    await keyStore.close().catch(() => undefined);
+    throw error;
+  }
+  const approvals = createLocalApprovalChannel({
+    reader: storeApprovalReader(agentStore.store),
+    clock,
+  });
+  let client: AgentLinkClient;
+  try {
+    client = await deps.createClient({
+      keyStore,
+      store: agentStore.store,
+      cipher: agentStore.cipher,
+      approvals,
+      clock,
+      logger,
+      policyMark: agentStore.policyMark,
+      transport: deps.transport(),
+    });
+  } catch (error) {
+    await agentStore.close().catch(() => undefined);
+    await keyStore.close().catch(() => undefined);
+    throw error;
+  }
+  if (client.agentId !== config.agentId) {
+    await agentStore.close().catch(() => undefined);
+    await keyStore.close().catch(() => undefined);
+    throw new RuntimeError('agent_config_invalid');
+  }
+
+  let closing: Promise<void> | undefined;
+  const agent: OpenedAgent = Object.freeze({
+    name,
+    agentId: config.agentId,
+    paths,
+    client,
+    approvals,
+    close: (): Promise<void> => {
+      closing ??= (async () => {
+        await agentStore.close().catch(() => undefined);
+        await keyStore.close().catch(() => undefined);
+      })();
+      return closing;
+    },
+  });
+  return { status: 'ok', agent };
+}

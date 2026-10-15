@@ -2304,7 +2304,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** spec-lint and the vocabulary lint pass; the gap register is updated; no change to 04.
 
 #### M1-9k · CLI runtime: open an agent, local approval channel, dispatcher (new, D-73)
-- **Status:** ready · **Size:** M · **Tier:** Opus · **Security:** S2 (opens the KeyStore and builds the approval channel, §2.4) · **Phase:** M1a
+- **Status:** in-progress (4thtech/agentlink#107) · **Size:** M · **Tier:** Opus · **Security:** S2 (opens the KeyStore and builds the approval channel, §2.4) · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`package.json` bin and dependencies, `src/cli.ts`, `src/runtime/**`)
 - **Depends on:** M1-8a, M1-8b, M1-8g, M1-5b-b, M1-7e (all merged); M1-7k for the transport injection (stubbed until then)
 - **Spec:** 03 §3; 06 §6, §7, §8; 07 §2, §9.1; 04 §2.5; D-73 (3)
@@ -2319,6 +2319,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests: opening twice in two processes shares one store; no keychain → `needs_setup` with the 07 §9.4 copy; the channel's `status()` of a row edited to `approved` without a signed object still authorises nothing (the core test re-run here).
   - `agentlink --help` lists exactly the 06 §8 M1a commands; `pnpm deps-check` is green.
+- **Known residuals (IR-M1-9k-1 F08, Info; inside the D-67 same-user residual except the last):** hard links are refused (nlink 1 on the config and the store files); a store file or parent folder swapped after the check and before SQLite opens it by path is followed (only the config has the fstat dev/ino check); on Windows `O_NOFOLLOW` is 0 and modes, owners and ACLs are not checked (links and junctions are refused); no-clobber uses `link()`, so on a filesystem without hard links (exFAT, some SMB mounts) `writeAgentConfig` fails with `agent_path_invalid` instead of a clear message (a `doctor` message is M1-9l). Record (2) and (3) in 07 §9.1 when the folder layout is confirmed.
 
 #### M1-9a · CLI: init and harness setup
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
@@ -2414,6 +2415,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-4, I-5, I-7
 - **Scope:**
   - Pre-owns the shared tool files so that the handler cards (M1-9o, M1-9p, M1-9q) edit only their own handler files and tests: `src/mcp/**`, `src/tools/registry.ts` (all nine M1a tool definitions: names, schemas, annotations, frozen; handlers stubbed), `result.ts`, `untrusted.ts` and all M1a string keys in `src/tools/strings/**`. Schema changes go through a registry change reviewed with M1-9e's snapshot.
+  - (IR-M1-9k-1 recommendation 1) Owns the `@modelcontextprotocol/sdk` pin: the exact version in `apps/cli/package.json`, its `pnpm-lock.yaml` delta, the justification in the PR and the deps-check allowlist row (already present); M1-9k deferred it because nothing there uses it. M1-9c also passes M1-9k's `approvalNextStep` (`src/approval/next-step.ts`) to the handlers through the handler context, since `src/tools/` may not import it (06 §1).
   - stdio server on the official MCP TypeScript SDK; every tool declares `inputSchema` and `outputSchema` and returns `structuredContent` plus a one-sentence summary; status values with `nextStep` and `url`; contact resolution with `AMBIGUOUS_CONTACT`; server instructions verbatim from 06 §5.
   - The registry holds all nine M1a tools: seven now, and the two terms tools when M1-21's `TermsInput` exists (else M1-9q adds them). Annotations exactly per the 06 §2.0 table; `approvalId?` on every tool that can return `pending_approval`; unimplemented handlers return `status: "error"` with fixed text.
   - Untrusted-content wrapper exactly per 06 §4, in text and `structuredContent`: escape `</untrusted_content>` including case, whitespace and look-alike variants, control, bidi and zero-width characters; attribute escaping; 128 code points.

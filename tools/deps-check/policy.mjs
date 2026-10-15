@@ -125,6 +125,11 @@ export const RESTRICTED_ENTRY_POINTS = [
     group: ['@agentlink/crypto/testing', '@agentlink/crypto/testing/*'],
     zones: ['test-vectors', 'e2e'],
     testZones: ['packages/core', 'packages/transport-nostr'],
+    // IR-M1-9k-1 F01 (S1, owner-side decision on #107): narrower than a test zone. Only *.test.ts
+    // files under these directories may import it, never the package's src/ (production or tests):
+    // apps/cli/test holds the two-process keychain test, which needs a test owner identity
+    // (MemoryOwnerKeyStore) beside the real agent KeyStore.
+    testDirs: ['apps/cli/test'],
     via: 'the public entry points (the test seam is never built)',
     reason:
       'a fixed nonce, IV or ephemeral key, or an in-memory seed holder, must never reach production code (M1-1c, M1-1f, M1-1g)',
@@ -135,18 +140,29 @@ export const RESTRICTED_ENTRY_POINTS = [
  * True when `entry` (RESTRICTED_ENTRY_POINTS) may be used in `zone`: everywhere in its zones; in a
  * test file of its testZones, by an exact (non-`/*`) name of its group only, never a subpath.
  */
-export function entryAllowed(entry, zone, specifier, { test = false } = {}) {
+export function entryAllowed(entry, zone, specifier, { test = false, file = '' } = {}) {
   if (entry.zones.includes(zone)) return true;
   return (
     test &&
-    (entry.testZones ?? []).includes(zone) &&
+    ((entry.testZones ?? []).includes(zone) || inTestDir(entry, file)) &&
     entry.group.some((pattern) => !pattern.endsWith('/*') && pattern === specifier)
   );
 }
 
+/** True when the repo-relative `file` sits under one of the entry's `testDirs` (IR-M1-9k-1 F01). */
+export const inTestDir = (entry, file) =>
+  (entry.testDirs ?? []).some((dir) => (file ?? '').startsWith(`${dir}/`));
+
+/** Every `testDirs` directory of the restricted entry points, for the ESLint blocks. */
+export const ENTRY_TEST_DIRS = [
+  ...new Set(RESTRICTED_ENTRY_POINTS.flatMap((entry) => entry.testDirs ?? [])),
+];
+
 /** The exact names of `entry` that its testZones' test files may import (ESLint needs them apart). */
 export const entryTestNames = (entry) =>
-  (entry.testZones ?? []).length === 0 ? [] : entry.group.filter((p) => !p.endsWith('/*'));
+  (entry.testZones ?? []).length === 0 && (entry.testDirs ?? []).length === 0
+    ? []
+    : entry.group.filter((p) => !p.endsWith('/*'));
 
 /**
  * The test seam's source file (M1-1c, M1-1f), without extension. RESTRICTED_ENTRY_POINTS refuses
@@ -453,7 +469,7 @@ export function violationFor(zone, specifier, file) {
   for (const entry of RESTRICTED_ENTRY_POINTS) {
     if (
       matchesGroup(specifier, entry.group) &&
-      !entryAllowed(entry, zone, specifier, { test: isTestFile(file) })
+      !entryAllowed(entry, zone, specifier, { test: isTestFile(file), file })
     ) {
       return restrictedEntryMessage(entry);
     }

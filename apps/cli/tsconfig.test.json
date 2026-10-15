@@ -4,7 +4,14 @@
     "composite": false,
     "noEmit": true,
     "declaration": false,
-    "rootDir": "."
+    // `../..` (the repository): the seam source below is outside this package; noEmit, so no output.
+    "rootDir": "../..",
+    // The crypto test seam (M1-1g-b) is never built and has no package export: type-check it from
+    // source, as vitest.config.ts resolves it. Only test/**/*.test.ts may import it (deps-check
+    // `testDirs`, IR-M1-9k-1 F01); this mapping only resolves types.
+    "paths": {
+      "@agentlink/crypto/testing": ["../../packages/crypto/src/testing.ts"]
+    }
   },
   "include": ["src", "test"],
   "exclude": [],
