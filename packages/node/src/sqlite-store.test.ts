@@ -461,9 +461,26 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
       ]
     `);
     // Version 2 is unchanged by version 3.
-    expect(digestOf(1)).toMatchInlineSnapshot();
+    expect(digestOf(1)).toMatchInlineSnapshot(
+      `"fedd589fba4ecf879e17a9b7c085c401507ed18e951abcdb3a0cf31c63f2591b"`,
+    );
     // Version 3 (M1-7k-b): publisher_lease (07 §3.2, 06 §6) and outbox_staged (IR-M1-7k-1 F08).
-    expect(MIGRATIONS[2]?.statements).toMatchInlineSnapshot();
+    expect(MIGRATIONS[2]?.statements).toMatchInlineSnapshot(`
+      [
+        "CREATE TABLE "publisher_lease" (
+        "name" TEXT NOT NULL CHECK (typeof("name") = 'text' AND length("name") > 0),
+        "holder" TEXT NOT NULL CHECK (typeof("holder") = 'text' AND length("holder") > 0),
+        "lease_until" INTEGER NOT NULL CHECK (typeof("lease_until") = 'integer' AND "lease_until" BETWEEN 0 AND 9007199254740991),
+        PRIMARY KEY ("name")
+      ) STRICT",
+        "CREATE TABLE "outbox_staged" (
+        "envelope_id" TEXT NOT NULL CHECK (typeof("envelope_id") = 'text' AND length("envelope_id") > 0),
+        "failures" INTEGER NOT NULL CHECK (typeof("failures") = 'integer' AND "failures" BETWEEN 0 AND 9007199254740991),
+        "failed_at" INTEGER NOT NULL CHECK (typeof("failed_at") = 'integer' AND "failed_at" BETWEEN 0 AND 9007199254740991),
+        PRIMARY KEY ("envelope_id")
+      ) STRICT",
+      ]
+    `);
   });
 
   it('migrates a version 2 file to version 3 (M1-7k-b): rows kept, publisher_lease and outbox_staged added', async () => {
@@ -499,7 +516,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     expect(await v3.transaction((tx) => tx.count('blocked_keys'))).toBe(1);
     await v3.transaction((tx) => {
       tx.insert('publisher_lease', { name: 'subscriptions', holder: 'h', lease_until: 60 });
-      tx.insert('outbox_staged', { envelope_id: 'e1', failures: 1, retry_at: 65 });
+      tx.insert('outbox_staged', { envelope_id: 'e1', failures: 1, failed_at: 65 });
     });
     // One lease row per name: a second holder cannot insert beside it.
     expect(
@@ -531,8 +548,9 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
       )
       .run();
     raw.close();
+    // Opening runs version 2 and then version 3 (M1-7k-b, new tables only).
     const v2 = await SqliteStore.open(path());
-    expect(v2.schemaVersion).toBe(2);
+    expect(v2.schemaVersion).toBe(3);
     expect(await v2.transaction((tx) => tx.get('envelopes', { envelope_id: 'e1' }))).toMatchObject({
       state: 'refused',
       refused_at: null,
@@ -543,9 +561,9 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     );
     expect(await v2.transaction((tx) => tx.count('blocked_keys'))).toBe(1);
     await v2.close();
-    // A fresh file through both migrations is the same schema as the migrated one.
+    // A fresh file through every migration is the same schema as the migrated one.
     const fresh = await SqliteStore.open(join(dir, 'fresh.db'));
-    expect(fresh.schemaVersion).toBe(2);
+    expect(fresh.schemaVersion).toBe(3);
     await fresh.close();
   });
 

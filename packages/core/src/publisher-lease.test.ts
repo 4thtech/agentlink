@@ -141,13 +141,13 @@ describe('publisher lease: clock jumps (one machine clock shared by every proces
     expect(await a.renew()).toBe(true);
   });
 
-  it('backward jump: a lease dated beyond now + 60 s is lapsed, so a crashed holder cannot keep it for the size of the jump, and never two holders', async () => {
+  it('backward jump: a lease dated beyond now + 120 s is lapsed, so a crashed holder cannot keep it for the size of the jump, and never two holders', async () => {
     const store = new MemoryStore();
     const clock = new FakeClock();
     const { a, b } = pair(store, clock);
     expect(await a.take()).toBe(true);
     clock.t -= 3_600;
-    // No live holder could have written lease_until > now + 60 on this clock.
+    // No live holder could have written lease_until > now + 120 on this clock.
     expect(a.held).toBe(false);
     expect(await b.take()).toBe(true);
     expect(holders(a, b)).toBe(1);
@@ -183,9 +183,9 @@ describe('publisher lease: clock jumps (one machine clock shared by every proces
     const clock = new FakeClock();
     const { a, b } = pair(store, clock);
     expect(await a.take()).toBe(true); // lease_until = t0 + 60
-    clock.t -= 10;
-    expect(await b.take()).toBe(true); // A's lease is dated beyond now + 60: lapsed
-    clock.t += 10;
+    clock.t -= 70;
+    expect(await b.take()).toBe(true); // A's lease is dated beyond now + 120: lapsed
+    clock.t += 20;
     // A has not looked at the store since: on its own view its lease is valid again.
     expect(holders(a, b)).toBe(2);
     // Its next renewal (every 20 s) changes no row, and it stops (06 §6).

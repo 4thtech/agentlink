@@ -182,10 +182,17 @@ export {
 } from './transport.js';
 export {
   OUTBOX_CLAIM_SECONDS,
+  OUTBOX_STAGED_BATCH,
   OutboxService,
   type OutboxPeer,
   type OutboxRoute,
 } from './outbox.js';
+// M1-7k-b: the per-agent publisher lease (07 §3.2 `publisher_lease`; 06 §6).
+export {
+  PublisherLease,
+  SUBSCRIPTIONS_LEASE,
+  type PublisherLeaseOptions,
+} from './publisher-lease.js';
 export {
   ACK_KIND_RECEIVED,
   DeliveryAcks,

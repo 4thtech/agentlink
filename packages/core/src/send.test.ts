@@ -701,7 +701,7 @@ describe('outbox: stale staged messages are bounded (IR-M1-7k-1 F08)', () => {
 
     // The fault clears: the fresh one is published once, the expired one never.
     restore();
-    clock.t += 3_600; // past the fresh one's retry time
+    clock.t += 3_600;
     await b.client.outbox.processDue();
     expect(await delivery(b, fresh)).toBe('sent');
     expect(await delivery(b, old)).toBe('not_delivered');
@@ -749,10 +749,10 @@ describe('outbox: stale staged messages are bounded (IR-M1-7k-1 F08)', () => {
     expect(b.spy.published).toHaveLength(4);
     for (const id of failing) expect(await delivery(b, id)).toBe('queued');
 
-    // The failing ones step aside until their retry time; a second newer one is wrapped at once.
+    // The failing ones recorded their failure and go behind; a second newer one is wrapped at once.
     const retries = await b.store.transaction((tx) => tx.select('outbox_staged'));
     expect(retries).toHaveLength(OUTBOX_STAGED_BATCH);
-    for (const r of retries) expect(r.retry_at).toBeGreaterThan(clock.t);
+    for (const r of retries) expect(r).toMatchObject({ failures: 1, failed_at: clock.t });
     const second = await stage(a, b);
     await b.client.outbox.processDue();
     expect(await delivery(b, second)).toBe('sent');

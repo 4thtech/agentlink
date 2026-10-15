@@ -313,6 +313,22 @@ export const TABLES = {
     columns: { contact_id: id, bucket: int, count: int },
     primaryKey: ['contact_id', 'bucket'],
   },
+  // 07 §3.2 (06 §6, D-73; schema version 3, M1-7k-b). One row per lease name; `subscriptions` is the
+  // only name in M1. holder is 16 random bytes, base64url, chosen by each server process at start.
+  publisher_lease: {
+    columns: { name: id, holder: id, lease_until: int },
+    primaryKey: ['name'],
+  },
+  // M1-7k-b (IR-M1-7k-1 F08; schema version 3): the transient faults of a staged pairing message
+  // (`handshake` or `handshake-ack`, still `queued`, no outbox rows yet): how many, and the last one's
+  // time, so that a message whose fault does not clear goes behind the others and never blocks newer
+  // ones. A row lives
+  // only while its message is staged: it is deleted in the transaction that gives the message its
+  // outbox rows, drops it or expires it. In clear (an envelope ID and times).
+  outbox_staged: {
+    columns: { envelope_id: id, failures: int, failed_at: int },
+    primaryKey: ['envelope_id'],
+  },
   // 07 §3.3. approval_id is the empty string for a call without one, so it is `text`.
   idempotency: {
     columns: {

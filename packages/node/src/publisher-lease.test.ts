@@ -9,7 +9,6 @@
 // itself imports it.
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -22,7 +21,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SqliteStore } from './sqlite-store.js';
 
 const SRC = fileURLToPath(new URL('.', import.meta.url));
-const CORE = pathToFileURL(createRequire(import.meta.url).resolve('@agentlink/core')).href;
+/** The built @agentlink/core of this workspace (its package `exports` point at dist/index.js). */
+const CORE = new URL('../../core/dist/index.js', import.meta.url).href;
 
 const HOOKS = `
 export async function resolve(specifier, context, next) {
