@@ -46,8 +46,9 @@ for (const path of files) {
   if (problem !== null) problems.push(problem);
 }
 
-// M1-21 (D-74): the pinned UCD 15.0.0 category table of @agentlink/types is generated, not edited;
-// its generator needs the same Python 3.12 (unicodedata 15.0.0) as the vector generators.
+// M1-21 (D-74): the pinned UCD 15.0.0 category table of @agentlink/types is generated, not edited.
+// Its generator reads only the vendored tools/unicode/ucd-15.0.0/DerivedGeneralCategory.txt
+// (M1-21-b); `pnpm lint` runs the full drift check (tools/unicode/check-ucd15.mjs), this repeats it.
 {
   const run = spawnSync(python, ['-I', 'tools/unicode/generate_ucd15_table.py', '--check'], {
     cwd: root,
@@ -56,7 +57,7 @@ for (const path of files) {
   if (run.status !== 0) {
     problems.push(
       `packages/types/src/ucd15.ts: drift check failed (status ${String(run.status)}); ` +
-        'regenerate with tools/unicode/generate_ucd15_table.py --write under CPython 3.12',
+        'regenerate with python3 -I tools/unicode/generate_ucd15_table.py --write',
     );
   }
 }

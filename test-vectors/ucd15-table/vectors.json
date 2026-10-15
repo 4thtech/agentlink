@@ -1,0 +1,633 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "ucd15-table",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib)",
+    "version": "cpython 3.12.13",
+    "script": "tools/vectors/generate_ucd15_table.py"
+  },
+  "cases": [
+    {
+      "id": "table-hash",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): SHA-256 of the canonical serialization of the refused-category table",
+      "input": {
+        "op": "tableHash"
+      },
+      "expected": {
+        "hash": "c6fe8aee51e3c1a62b2cc3579d84cdfe13b0d36f1443284cea8a25a942cb6d95",
+        "runs": "736"
+      }
+    },
+    {
+      "id": "category-counts",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): code points per refused category (the file's Total code points)",
+      "input": {
+        "op": "categoryCounts"
+      },
+      "expected": {
+        "Cc": "65",
+        "Cf": "170",
+        "Zl": "1",
+        "Zp": "1",
+        "Co": "137468",
+        "Cs": "2048",
+        "Cn": "825345"
+      }
+    },
+    {
+      "id": "category-0000",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+0000 C0 NUL is Cc in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 0
+      },
+      "expected": {
+        "category": "Cc"
+      }
+    },
+    {
+      "id": "category-0009",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+0009 C0 tab is Cc in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 9
+      },
+      "expected": {
+        "category": "Cc"
+      }
+    },
+    {
+      "id": "category-000a",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+000A C0 line feed is Cc in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 10
+      },
+      "expected": {
+        "category": "Cc"
+      }
+    },
+    {
+      "id": "category-001f",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+001F last C0 is Cc in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 31
+      },
+      "expected": {
+        "category": "Cc"
+      }
+    },
+    {
+      "id": "category-0020",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+0020 space is Zs in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 32
+      },
+      "expected": {
+        "category": "none"
+      }
+    },
+    {
+      "id": "category-0041",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+0041 LATIN CAPITAL LETTER A is Lu in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 65
+      },
+      "expected": {
+        "category": "none"
+      }
+    },
+    {
+      "id": "category-007e",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+007E TILDE, last printable ASCII is Sm in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 126
+      },
+      "expected": {
+        "category": "none"
+      }
+    },
+    {
+      "id": "category-007f",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+007F DEL is Cc in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 127
+      },
+      "expected": {
+        "category": "Cc"
+      }
+    },
+    {
+      "id": "category-0080",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+0080 first C1 is Cc in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 128
+      },
+      "expected": {
+        "category": "Cc"
+      }
+    },
+    {
+      "id": "category-009f",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+009F last C1 is Cc in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 159
+      },
+      "expected": {
+        "category": "Cc"
+      }
+    },
+    {
+      "id": "category-00a0",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+00A0 NO-BREAK SPACE is Zs in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 160
+      },
+      "expected": {
+        "category": "none"
+      }
+    },
+    {
+      "id": "category-00ad",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+00AD SOFT HYPHEN is Cf in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 173
+      },
+      "expected": {
+        "category": "Cf"
+      }
+    },
+    {
+      "id": "category-0378",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+0378 unassigned in Greek is Cn in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 888
+      },
+      "expected": {
+        "category": "Cn"
+      }
+    },
+    {
+      "id": "category-061c",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+061C ARABIC LETTER MARK is Cf in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 1564
+      },
+      "expected": {
+        "category": "Cf"
+      }
+    },
+    {
+      "id": "category-200b",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+200B ZERO WIDTH SPACE is Cf in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 8203
+      },
+      "expected": {
+        "category": "Cf"
+      }
+    },
+    {
+      "id": "category-200c",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+200C ZERO WIDTH NON-JOINER is Cf in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 8204
+      },
+      "expected": {
+        "category": "Cf"
+      }
+    },
+    {
+      "id": "category-200d",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+200D ZERO WIDTH JOINER is Cf in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 8205
+      },
+      "expected": {
+        "category": "Cf"
+      }
+    },
+    {
+      "id": "category-200e",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+200E LEFT-TO-RIGHT MARK is Cf in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 8206
+      },
+      "expected": {
+        "category": "Cf"
+      }
+    },
+    {
+      "id": "category-2028",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+2028 LINE SEPARATOR is Zl in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 8232
+      },
+      "expected": {
+        "category": "Zl"
+      }
+    },
+    {
+      "id": "category-2029",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+2029 PARAGRAPH SEPARATOR is Zp in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 8233
+      },
+      "expected": {
+        "category": "Zp"
+      }
+    },
+    {
+      "id": "category-202e",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+202E RIGHT-TO-LEFT OVERRIDE is Cf in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 8238
+      },
+      "expected": {
+        "category": "Cf"
+      }
+    },
+    {
+      "id": "category-2066",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+2066 LEFT-TO-RIGHT ISOLATE is Cf in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 8294
+      },
+      "expected": {
+        "category": "Cf"
+      }
+    },
+    {
+      "id": "category-2069",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+2069 POP DIRECTIONAL ISOLATE is Cf in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 8297
+      },
+      "expected": {
+        "category": "Cf"
+      }
+    },
+    {
+      "id": "category-0415",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+0415 CYRILLIC CAPITAL LETTER IE is Lu in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 1045
+      },
+      "expected": {
+        "category": "none"
+      }
+    },
+    {
+      "id": "category-d800",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+D800 first surrogate is Cs in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 55296
+      },
+      "expected": {
+        "category": "Cs"
+      }
+    },
+    {
+      "id": "category-dfff",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+DFFF last surrogate is Cs in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 57343
+      },
+      "expected": {
+        "category": "Cs"
+      }
+    },
+    {
+      "id": "category-e000",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+E000 first private use is Co in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 57344
+      },
+      "expected": {
+        "category": "Co"
+      }
+    },
+    {
+      "id": "category-f8ff",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+F8FF last BMP private use is Co in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 63743
+      },
+      "expected": {
+        "category": "Co"
+      }
+    },
+    {
+      "id": "category-fdd0",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+FDD0 first noncharacter of the FDD0 block is Cn in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 64976
+      },
+      "expected": {
+        "category": "Cn"
+      }
+    },
+    {
+      "id": "category-fdef",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+FDEF last noncharacter of the FDD0 block is Cn in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 65007
+      },
+      "expected": {
+        "category": "Cn"
+      }
+    },
+    {
+      "id": "category-feff",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+FEFF ZERO WIDTH NO-BREAK SPACE (BOM) is Cf in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 65279
+      },
+      "expected": {
+        "category": "Cf"
+      }
+    },
+    {
+      "id": "category-fffd",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+FFFD REPLACEMENT CHARACTER is So in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 65533
+      },
+      "expected": {
+        "category": "none"
+      }
+    },
+    {
+      "id": "category-fffe",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+FFFE noncharacter U+FFFE is Cn in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 65534
+      },
+      "expected": {
+        "category": "Cn"
+      }
+    },
+    {
+      "id": "category-ffff",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+FFFF noncharacter U+FFFF is Cn in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 65535
+      },
+      "expected": {
+        "category": "Cn"
+      }
+    },
+    {
+      "id": "category-10efd",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+10EFD ARABIC SMALL LOW WORD SAKTA, new in 15.0 is Mn in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 69373
+      },
+      "expected": {
+        "category": "none"
+      }
+    },
+    {
+      "id": "category-11f00",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+11F00 KAWI SIGN CANDRABINDU, new in 15.0 is Mn in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 73472
+      },
+      "expected": {
+        "category": "none"
+      }
+    },
+    {
+      "id": "category-1e4d0",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+1E4D0 NAG MUNDARI LETTER O, new in 15.0 is Lo in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 124112
+      },
+      "expected": {
+        "category": "none"
+      }
+    },
+    {
+      "id": "category-1f6dc",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+1F6DC WIRELESS, new in 15.0 is So in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 128732
+      },
+      "expected": {
+        "category": "none"
+      }
+    },
+    {
+      "id": "category-1fae8",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+1FAE8 SHAKING FACE, new in 15.0 is So in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 129768
+      },
+      "expected": {
+        "category": "none"
+      }
+    },
+    {
+      "id": "category-31350",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+31350 first CJK Extension H ideograph, new in 15.0 is Lo in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 201552
+      },
+      "expected": {
+        "category": "none"
+      }
+    },
+    {
+      "id": "category-323af",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+323AF last CJK Extension H ideograph, new in 15.0 is Lo in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 205743
+      },
+      "expected": {
+        "category": "none"
+      }
+    },
+    {
+      "id": "category-323b0",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+323B0 unassigned after CJK Extension H is Cn in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 205744
+      },
+      "expected": {
+        "category": "Cn"
+      }
+    },
+    {
+      "id": "category-1fabe",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+1FABE unassigned in 15.0, assigned in a later version is Cn in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 129726
+      },
+      "expected": {
+        "category": "Cn"
+      }
+    },
+    {
+      "id": "category-2ebf0",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+2EBF0 unassigned in 15.0 (CJK Extension I in 15.1) is Cn in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 191472
+      },
+      "expected": {
+        "category": "Cn"
+      }
+    },
+    {
+      "id": "category-1f7d9",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+1F7D9 NINE POINTED WHITE STAR, new in 15.0 is So in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 128985
+      },
+      "expected": {
+        "category": "none"
+      }
+    },
+    {
+      "id": "category-1f7da",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+1F7DA unassigned in 15.0, right after U+1F7D9 is Cn in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 128986
+      },
+      "expected": {
+        "category": "Cn"
+      }
+    },
+    {
+      "id": "category-e0001",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+E0001 LANGUAGE TAG is Cf in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 917505
+      },
+      "expected": {
+        "category": "Cf"
+      }
+    },
+    {
+      "id": "category-e0020",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+E0020 TAG SPACE is Cf in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 917536
+      },
+      "expected": {
+        "category": "Cf"
+      }
+    },
+    {
+      "id": "category-e007f",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+E007F CANCEL TAG is Cf in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 917631
+      },
+      "expected": {
+        "category": "Cf"
+      }
+    },
+    {
+      "id": "category-e0100",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+E0100 VARIATION SELECTOR-17 is Mn in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 917760
+      },
+      "expected": {
+        "category": "none"
+      }
+    },
+    {
+      "id": "category-f0000",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+F0000 first plane 15 private use is Co in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 983040
+      },
+      "expected": {
+        "category": "Co"
+      }
+    },
+    {
+      "id": "category-10fffd",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+10FFFD last private use is Co in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 1114109
+      },
+      "expected": {
+        "category": "Co"
+      }
+    },
+    {
+      "id": "category-10fffe",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+10FFFE noncharacter U+10FFFE is Cn in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 1114110
+      },
+      "expected": {
+        "category": "Cn"
+      }
+    },
+    {
+      "id": "category-10ffff",
+      "source": "04 \u00a73.4 Characters and Table provenance (D-74, M1-21-b): U+10FFFF last code point is Cn in UCD 15.0.0",
+      "input": {
+        "op": "category",
+        "codePoint": 1114111
+      },
+      "expected": {
+        "category": "Cn"
+      }
+    }
+  ]
+}

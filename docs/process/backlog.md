@@ -3076,7 +3076,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Vectors include rejected inputs for every canonical-form rule (an RLO in `subject`, a zero-width space in a deliverable, Cyrillic `ЕUR`, `1500.0000001`, `0`, a due date with an offset instead of `Z`, upper-case hex) and chain cases (a version gap, a pointer to an older version, the same `termsId` from another pair, two envelopes for one version from the same sender, a fork after an accept, concurrent counters from both sides).
 
 #### M1-21-b · terms: vendor the UCD file, drift check and table-hash vector (new, D-77)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (the table decides which strings are signed and hashed, `packages/types` and `test-vectors/**`, audit-rules §2.2, §2.4) · **Phase:** M1a (before the M1a release)
+- **Status:** in review (4thtech/agentlink#147; vendored file SHA-256 `fe29a45c…06f9`; regenerated table equals the interim table, no code point differs) · **Size:** S · **Tier:** Opus · **Security:** S2 (the table decides which strings are signed and hashed, `packages/types` and `test-vectors/**`, audit-rules §2.2, §2.4) · **Phase:** M1a (before the M1a release)
 - **Repo/path:** agentlink · packages/types, tools/ (generator and lint check), test-vectors/, tools/vectors/generators/
 - **Depends on:** M1-21 (merged)
 - **Spec:** D-74 (pinned UCD 15.0.0 table, SHA-256, CI drift check), D-77 (interim table); 04 §3.4 ("Canonical-form and chain clarifications")

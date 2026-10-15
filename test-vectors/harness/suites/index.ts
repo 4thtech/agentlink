@@ -19,6 +19,7 @@ import { safetyCode } from './safety-code';
 import { safetyCodeRecompute } from './safety-code-recompute';
 import { taggedHashSuite } from './tagged-hash';
 import { terms } from './terms';
+import { ucd15Table } from './ucd15-table';
 
 /**
  * Suite name (= directory under test-vectors/) to suite module. A vector file without one fails,
@@ -46,4 +47,5 @@ export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['safety-code-recompute', safetyCodeRecompute],
   ['tagged-hash', taggedHashSuite],
   ['terms', terms],
+  ['ucd15-table', ucd15Table],
 ]);
