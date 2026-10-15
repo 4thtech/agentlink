@@ -80,6 +80,14 @@ const BANNED_WORDS: readonly [string, RegExp][] = [
 const DENIED_NAME =
   /polic|export|key|credential|secret|storage|approve|decide|deny|hook|config|install|setting|block|ignore|read_file|read_path|backup|restore/i;
 /** Argument names that would carry a key, a credential, a path or a decision (I-4). */
+/**
+ * Descriptions and titles must not offer a denied capability (I-4, 06 §1 rule 4, "no hooks").
+ * NOTE for M1-9d: the name and argument rules also flag legitimate M1b tools (`export` in
+ * agentlink_export_proof_pack; `path` and `file` on send and fetch_file). Do not loosen them: add an
+ * explicit per-tool allowlist entry with a justification when those tools land.
+ */
+const DENIED_TEXT =
+  /\b(set|change|update|edit|modify|install|remove|export|reveal|read)\s+(the\s+|your\s+|any\s+)?(polic(y|ies)|hooks?|harness (config\w*|settings)|private keys?|keys?|credentials?|passphrase|arbitrary files?)/i;
 const DENIED_ARG =
   /private|secret|seed|passphrase|password|token|credential|accesskey|apikey|signature|signed|polic|path|file|hook|decide|approve\b|approved\b|owner/i;
 
@@ -109,6 +117,12 @@ export function auditSurface(
     if (!name.startsWith('agentlink_')) bad.push(`${name}: name lacks the agentlink_ prefix`);
     if (row === undefined) bad.push(`${name}: not a tool of the 06 §2.0 table`);
     if (DENIED_NAME.test(name)) bad.push(`${name}: name suggests a denied capability (I-4)`);
+    for (const [where, text] of [
+      ['title', tool.title ?? ''],
+      ['description', tool.description ?? ''],
+    ] as const) {
+      if (DENIED_TEXT.test(text)) bad.push(`${name}: ${where} offers a denied capability (I-4)`);
+    }
     const a = tool.annotations ?? {};
     for (const hint of ['readOnlyHint', 'destructiveHint', 'idempotentHint', 'openWorldHint']) {
       if (typeof a[hint] !== 'boolean') bad.push(`${name}: annotation ${hint} not set explicitly`);
@@ -162,12 +176,16 @@ const surface = TOOLS.map(toMcpTool) as unknown as SurfaceTool[];
 const table = readTable();
 
 describe('tool-surface snapshot', () => {
-  const current = surface.map(({ name, inputSchema, outputSchema, annotations }) => ({
-    name,
-    inputSchema,
-    outputSchema,
-    annotations,
-  }));
+  const current = surface.map(
+    ({ name, title, description, inputSchema, outputSchema, annotations }) => ({
+      name,
+      title,
+      description,
+      inputSchema,
+      outputSchema,
+      annotations,
+    }),
+  );
 
   it('matches the committed snapshot (changes need the owner\'s "merge" in chat)', () => {
     const text = `${JSON.stringify(current, null, 2)}\n`;
@@ -275,6 +293,18 @@ describe('auditSurface catches bad surfaces (local demonstration, kept as a test
     };
     const tools = surface.map((t) => (t === send ? { ...t, inputSchema } : t));
     expect(audit(tools).join('\n')).toMatch(/carries "offer"/);
+  });
+  it('a description that offers a denied capability', () => {
+    const tools = fixture({
+      name: 'agentlink_status',
+      description: 'Change the policy for a contact.',
+    });
+    expect(audit(tools).join('\n')).toMatch(/description offers a denied capability/);
+    const hook = fixture({
+      name: 'agentlink_status',
+      description: 'Install hooks into your harness.',
+    });
+    expect(audit(hook).join('\n')).toMatch(/description offers a denied capability/);
   });
   it('banned vocabulary in a description and in the instructions', () => {
     expect(

@@ -52,7 +52,11 @@ describe('MCP conformance over stdio (06 §9)', () => {
         'mcp',
       ],
       env: { PATH: process.env['PATH'] ?? '', HOME: home, USERPROFILE: home },
-      stderr: 'ignore',
+      stderr: 'pipe',
+    });
+    let stderr = '';
+    transport.stderr?.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
     });
     const client = new Client({ name: 'conformance', version: '0' });
     try {
@@ -76,6 +80,10 @@ describe('MCP conformance over stdio (06 §9)', () => {
         const result = await client.callTool({ name: tool.name, arguments: args! });
         expect(result.structuredContent, tool.name).toMatchObject({ status: expect.any(String) });
       }
+    } catch (error) {
+      // The child runs against an empty test home: its stderr holds no secret.
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`${reason}\nagentlink mcp stderr:\n${stderr}`, { cause: error });
     } finally {
       await client.close();
     }
