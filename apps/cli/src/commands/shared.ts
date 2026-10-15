@@ -36,12 +36,6 @@ export interface CommandDeps {
   /** A terminal prompt, created only when a command needs to ask (interactive commands). */
   readonly prompter: () => Prompter;
   /**
-   * The sender code of an unknown sender key (04 §2.9, D-72). It must come from the crypto helper
-   * `senderCode` (card M1-1-sc), never from a tag literal here. Until that helper lands the CLI
-   * shows no code and names requests by their request ID.
-   */
-  readonly senderCode?: (fromKey: string) => string;
-  /**
    * Keychain hygiene (IR-M1-8a-1 L-10): the unrecorded seed and `probe:` items an interrupted
    * keychain write can leave. @agentlink/node exports no such listing yet, so there is no default.
    */

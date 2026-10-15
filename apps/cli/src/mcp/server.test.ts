@@ -58,7 +58,13 @@ function toolClient(over: Partial<ToolClient> = {}): ToolClient {
       }),
     syncInbox: () => Promise.resolve(),
     inboxPage: () => Promise.resolve({ status: 'ok', items: [], requests: 0 }),
-    approvalState: () => Promise.resolve({ check: { status: 'void' }, decidedAt: 1_760_000_000 }),
+    pendingApprovals: () => Promise.resolve(0),
+    approvalState: () =>
+      Promise.resolve({
+        status: 'used',
+        actionDigest: 'a'.repeat(64),
+        expiresAt: 1_760_700_000,
+      }),
     ...over,
   };
 }
@@ -153,7 +159,11 @@ describe('MCP server (stdio binding, 06 §1)', () => {
     expect(status.structuredContent).toMatchObject({ status: 'needs_setup' });
 
     const missing = await connect(
-      toolContext(toolClient({ approvalState: () => Promise.resolve(undefined) })),
+      toolContext(
+        toolClient({
+          approvalState: () => Promise.resolve({ status: 'unknown', reason: 'not_found' }),
+        }),
+      ),
     );
     await missing.client.listTools();
     const result = await missing.client.callTool({

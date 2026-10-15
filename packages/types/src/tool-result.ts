@@ -91,6 +91,15 @@ export function toolResult<S extends z.core.$ZodShape>(
 /** The common shape alone. */
 export const toolResultSchema = toolResult({});
 
+/**
+ * The common fields and their rules for a result that also carries a tool's own fields (which this
+ * schema lets through unchecked). The MCP server checks every result with it before it leaves
+ * (apps/cli `finalizeResult`; IR-M1-9c-1 F06), so there is one rule set, not two.
+ */
+export const toolResultCommonSchema = z
+  .looseObject(toolResultShape)
+  .superRefine((value, ctx) => checkToolResult(value as CommonFields, ctx));
+
 /** `agentlink_notarize` and `agentlink_get_proof` return a ProofStatus (06 §2.4) as their result. */
 export const proofStatusResultSchema = toolResult(proofStatusShape, checkProofStatus);
 

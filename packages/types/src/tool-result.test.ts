@@ -8,6 +8,7 @@ import {
   getApprovalResultSchema,
   proofStatusResultSchema,
   toolResult,
+  toolResultCommonSchema,
   toolResultSchema,
 } from './index.js';
 import { expectAccept, expectReject, expectRoundTrip } from './testing/assert.js';
@@ -214,5 +215,33 @@ describe('agentlink_get_approval result (06 §2.5; IR-M1-2b-1 Q3)', () => {
     ],
   ] as const)('rejects %s', (_l, value) => {
     expectReject(getApprovalResultSchema, value);
+  });
+});
+
+describe('toolResultCommonSchema (IR-M1-9c-1 F06: one rule set for the server and the types)', () => {
+  it('lets a tool’s own fields through and applies the common rules', () => {
+    expect(
+      toolResultCommonSchema.safeParse({ ...ok(), contacts: 2, inbox: [], used: true }).success,
+    ).toBe(true);
+    // M1a: pending_approval without a url is valid (06 §2.5, D-73 (3)).
+    expect(
+      toolResultCommonSchema.safeParse({
+        status: 'pending_approval',
+        summary: 'Waiting for your approval.',
+        nextStep: 'Ask the user to approve it in the terminal.',
+        approvalId: APPROVAL_ID,
+      }).success,
+    ).toBe(true);
+  });
+
+  it.each([
+    ['a non-ok result without nextStep', { status: 'error', summary: 'No.' }],
+    ['pending_approval without an approvalId', notOk('pending_approval')],
+    ['an approvalId on a non-pending result', { ...notOk('error'), approvalId: APPROVAL_ID }],
+    ['an error code on ok', { ...ok(), code: 'INTERNAL' }],
+    ['control characters in the summary', { ...ok(), summary: 'a\u001b[2Jb' }],
+    ['a url that is not a local or https link', { ...ok(), url: 'javascript:alert(1)' }],
+  ])('rejects %s', (_name, value) => {
+    expect(toolResultCommonSchema.safeParse(value).success).toBe(false);
   });
 });

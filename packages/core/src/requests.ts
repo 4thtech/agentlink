@@ -30,6 +30,7 @@ import {
 } from './constants.js';
 import { nowOf, type CoreContext } from './context.js';
 import type { InboundReport } from './envelopes.js';
+import { unknownSenderCodesTx } from './sender-codes.js';
 import type { StoreTx } from './store/store.js';
 
 /** The fixed reason of an envelope refused because the requests queue is full (07 §3.2). */
@@ -97,6 +98,12 @@ export interface RequestEntry {
    * code (04 §2.9), never "Contact".
    */
   readonly fromKey: string;
+  /**
+   * The sender code of `fromKey` (04 §2.9, D-72), computed here with the crypto helper: the short
+   * form `2B9E·04D1`, or the extended form when another unknown sender in this store shares the
+   * short form. Surfaces print "unknown sender" plus this code and nothing else as a name.
+   */
+  readonly senderCode: string;
   readonly type: string;
   /** The envelope's `createdAt` (sender-chosen, within the freshness window of 04 §3.1.1). */
   readonly createdAt: number;
@@ -135,17 +142,19 @@ export class RequestsQueue {
 
   /** Queued requests, oldest first. */
   async list(): Promise<RequestEntry[]> {
-    const rows = await this.#ctx.store.transaction((tx) =>
-      tx.select('envelopes', REQUESTS, {
+    const { rows, codes } = await this.#ctx.store.transaction((tx) => ({
+      rows: tx.select('envelopes', REQUESTS, {
         orderBy: [
           ['created_at', 'asc'],
           ['envelope_id', 'asc'],
         ],
       }),
-    );
+      codes: unknownSenderCodesTx(tx),
+    }));
     return rows.map((r) => ({
       envelopeId: r.envelope_id,
       fromKey: r.from_key,
+      senderCode: codes.get(r.from_key) ?? '',
       type: r.type,
       createdAt: r.created_at,
       acceptedAt: r.request_accepted_at,

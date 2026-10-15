@@ -23,20 +23,13 @@
 // I-5: sender-chosen values (bodies, terms, notes, file names and types, the declared name) are
 // returned only as data under fields the CLI wraps. File URLs, file keys, inline bytes and the
 // ciphertext hash are never copied into an item (zero access). I-7: logs carry counts only.
-import {
-  ENVELOPE_ID_LENGTH,
-  decodeBase64url,
-  decodeHex,
-  formatFingerprint,
-  parseJson,
-  senderCode,
-  verifyTermsHash,
-} from '@agentlink/crypto';
+import { ENVELOPE_ID_LENGTH, decodeBase64url, parseJson, verifyTermsHash } from '@agentlink/crypto';
 import { payloadSchema, type Payload } from '@agentlink/types';
 import type { ContactBook, ContactView } from './contacts.js';
 import { nowOf, open, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import type { InboxSender } from './inbox.js';
+import { unknownSenderCodesTx } from './sender-codes.js';
 import type { Row } from './store/schema.js';
 import type { StoreTx, Where } from './store/store.js';
 
@@ -135,7 +128,7 @@ export interface InboundPageItem extends InboxPageItemBase {
   readonly direction: 'in';
   /** The contact under the 06 §2.1 rule; null only for an accepted request (D-72). */
   readonly from: InboxSender | null;
-  /** Only when `from` is null: the 04 §2.9 sender code, short form (`2B9E·04D1`). */
+  /** Only when `from` is null: the 04 §2.9 sender code: short (`2B9E·04D1`), extended on a collision. */
   readonly senderCode?: string;
   /** True if it had been returned before this call (06 §2.2 "Read state"). */
   readonly read: boolean;
@@ -305,7 +298,13 @@ function inCategory(row: Row<'envelopes'>, category: Category, scope: readonly s
 }
 
 type Selection =
-  | { readonly status: 'ok'; readonly candidates: readonly Candidate[]; readonly requests: number }
+  | {
+      readonly status: 'ok';
+      readonly candidates: readonly Candidate[];
+      readonly requests: number;
+      /** Sender codes of the unknown senders, collisions judged store-wide (04 §2.9). */
+      readonly codes: ReadonlyMap<string, string>;
+    }
   | { readonly status: 'before_not_found' };
 
 /**
@@ -367,7 +366,7 @@ function selectTx(tx: StoreTx, q: InboxPageQuery): Selection {
   }
   const candidates = [...found.values()].sort((x, y) => byPosition(y, x)).slice(0, q.limit);
   const requests = tx.count('envelopes', { direction: 'in', contact_id: null, state: 'request' });
-  return { status: 'ok', candidates, requests };
+  return { status: 'ok', candidates, requests, codes: unknownSenderCodesTx(tx) };
 }
 
 /** The item fields every direction shares, from an opened payload. */
@@ -474,7 +473,7 @@ export async function readInboxPage(deps: InboxPageDeps, q: InboxPageQuery): Pro
     let bytes = 0;
     let unreadable = 0;
     for (const candidate of selection.candidates) {
-      const item = await buildItem(ctx, candidate, dropOrigins, sender);
+      const item = await buildItem(ctx, candidate, dropOrigins, sender, selection.codes);
       if (item === undefined) {
         unreadable += 1;
         continue;
@@ -509,6 +508,7 @@ async function buildItem(
   candidate: Candidate,
   drop: ReadonlySet<string>,
   sender: (contactId: string) => Promise<InboxSender | undefined>,
+  codes: ReadonlyMap<string, string>,
 ): Promise<InboxPageItem | undefined> {
   const { row, category } = candidate;
   if (row.payload_json === null) return undefined;
@@ -523,12 +523,8 @@ async function buildItem(
   }
   const base = baseOf(row, payload, drop);
   if (category === 'request') {
-    let code: string;
-    try {
-      code = formatFingerprint(senderCode(decodeHex(row.from_key, { length: 32 })), 'short');
-    } catch {
-      return undefined;
-    }
+    const code = codes.get(row.from_key);
+    if (code === undefined) return undefined;
     return { ...base, direction: 'in', from: null, senderCode: code, read: row.read_at !== null };
   }
   if (row.contact_id === null) return undefined;

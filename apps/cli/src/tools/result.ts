@@ -9,12 +9,7 @@
 //   IR-M1-2b-1 F-5). M1a has none (D-73 (3)), so any `url` is refused.
 // - A result that breaks a rule is replaced by a fixed internal error: the server never echoes the
 //   offending text.
-import {
-  approvalIdSchema,
-  toolErrorCodeSchema,
-  toolTextSchema,
-  type McpStatus,
-} from '@agentlink/types';
+import { toolResultCommonSchema, type McpStatus } from '@agentlink/types';
 import type { ToolContext } from './context.js';
 
 /** A tool result: the common fields plus the tool's own `structuredContent` fields. */
@@ -106,8 +101,6 @@ export const notAvailable = (): HandlerOutput =>
 export const internalError = (): HandlerOutput =>
   fail('error', RESULT_TEXT.internalSummary, RESULT_TEXT.internalNextStep, 'INTERNAL');
 
-const isText = (value: unknown): boolean => toolTextSchema.safeParse(value).success;
-
 /** True when the url starts with one of the allowed origins followed by `/`, `?`, `#` or nothing. */
 function urlAllowed(url: unknown, origins: readonly string[]): boolean {
   if (typeof url !== 'string') return false;
@@ -116,19 +109,14 @@ function urlAllowed(url: unknown, origins: readonly string[]): boolean {
   );
 }
 
-/** The rule check of 06 §1 rule 3 and §2.5; returns false on any break. */
+/**
+ * The rule check of 06 §1 rule 3 and §2.5; returns false on any break. The field rules (text, `code`,
+ * `nextStep` on every non-ok result, `approvalId` only on `pending_approval`, a well-formed `url`)
+ * are the ones in @agentlink/types; only the origin pin of `url` is ours (IR-M1-9c-1 F06).
+ */
 export function resultIsValid(result: ToolResult, urlOrigins: readonly string[]): boolean {
-  if (!isText(result.summary)) return false;
-  if (result.nextStep !== undefined && !isText(result.nextStep)) return false;
-  if (result.status !== 'ok' && result.nextStep === undefined) return false;
-  if (result.status === 'ok' && result.code !== undefined) return false;
-  if (result.code !== undefined && !toolErrorCodeSchema.safeParse(result.code).success)
-    return false;
-  const pending = result.status === 'pending_approval';
-  if (pending !== (result.approvalId !== undefined)) return false;
-  if (pending && !approvalIdSchema.safeParse(result.approvalId).success) return false;
-  if (result.url !== undefined && !urlAllowed(result.url, urlOrigins)) return false;
-  return true;
+  if (!toolResultCommonSchema.safeParse(result).success) return false;
+  return result.url === undefined || urlAllowed(result.url, urlOrigins);
 }
 
 /** The default text block: the summary, then the `nextStep` on its own line. */

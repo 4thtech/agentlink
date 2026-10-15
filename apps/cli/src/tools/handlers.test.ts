@@ -4,7 +4,7 @@
 import {
   restrictName,
   type AgentLinkClient,
-  type ApprovalCheck,
+  type ApprovalState,
   type ContactView,
 } from '@agentlink/core';
 import { createLogger, type Logger } from '@agentlink/log';
@@ -15,7 +15,14 @@ import { coreToolClient, type Counts, type ToolClient, type ToolContext } from '
 import { approvalStateOf } from './get-approval.js';
 import { callTool, HANDLERS, TOOLS } from './index.js';
 import { contactsSummary } from './list-contacts.js';
-import { finalizeResult, ok, pendingApproval, RESULT_TEXT, type FinishedResult } from './result.js';
+import {
+  finalizeResult,
+  ok,
+  pendingApproval,
+  RESULT_TEXT,
+  resultIsValid,
+  type FinishedResult,
+} from './result.js';
 import { statusSummary } from './status.js';
 import { TOOL_TEXT } from './text.js';
 
@@ -69,7 +76,7 @@ interface FakeOptions {
   counts?: Counts;
   catchUpFails?: boolean;
   contacts?: ContactView[];
-  approval?: { check: ApprovalCheck; decidedAt: number | null } | 'unknown' | 'absent' | undefined;
+  approval?: ApprovalState;
   pendingApprovals?: number;
 }
 
@@ -116,16 +123,10 @@ function fakeClient(options: FakeOptions = {}): ToolClient & { calls: string[] }
       calls.push('inboxPage');
       return Promise.resolve({ status: 'ok', items: [], requests: 0 });
     },
+    pendingApprovals: () => Promise.resolve(options.pendingApprovals ?? 0),
+    approvalState: () =>
+      Promise.resolve(options.approval ?? { status: 'unknown', reason: 'not_found' }),
   };
-  if (options.pendingApprovals !== undefined) {
-    const n = options.pendingApprovals;
-    client.pendingApprovals = () => Promise.resolve(n);
-  }
-  if (options.approval !== 'absent') {
-    const approval = options.approval;
-    client.approvalState = () =>
-      Promise.resolve(approval === undefined || approval === 'unknown' ? undefined : approval);
-  }
   return client;
 }
 
@@ -183,6 +184,7 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
         },
       ],
       requests: 1,
+      pendingApprovals: 0,
       storage: { mode: 'drop' },
     });
     expect(result.text).toBe(result.structured.summary);
@@ -194,15 +196,15 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
     expect(result.structured['inbox']).toEqual([]);
   });
 
-  it('reports pendingApprovals once the core read exists', async () => {
+  it('reports pendingApprovals from the core count', async () => {
     const result = await callTool(
       'agentlink_status',
       {},
       context(fakeClient({ pendingApprovals: 3 })),
     );
     expect(result.structured['pendingApprovals']).toBe(3);
-    const without = await callTool('agentlink_status', {}, context(fakeClient()));
-    expect(without.structured).not.toHaveProperty('pendingApprovals');
+    const none = await callTool('agentlink_status', {}, context(fakeClient()));
+    expect(none.structured['pendingApprovals']).toBe(0);
   });
 
   it('needs_setup when the agent has no identity yet', async () => {
@@ -279,6 +281,7 @@ describe('coreToolClient (read-only in fact, 06 §2.0)', () => {
       catchUp: () => Promise.resolve({ partial: false, inbox: [], requests: 0 }),
       inbox: { counts: () => Promise.resolve({ inbox: [], requests: 0 }) },
       contacts: { list: () => Promise.resolve([]) },
+      approvalService: { countPending: () => Promise.resolve(0) },
       ownerActions: {
         loadPolicy: () =>
           Promise.resolve({ mode: 'defaults', policy: { files: { storage: 'auto' } } }),
@@ -303,13 +306,16 @@ describe('coreToolClient (read-only in fact, 06 §2.0)', () => {
     return { client, touched };
   }
 
-  it('reads only identity, the fetch-only catch-up, contacts and the policy', async () => {
+  it('reads only identity, the fetch-only catch-up, contacts, the pending count and the policy', async () => {
     const { client, touched } = spyClient();
     const tools = coreToolClient(client);
     const result = await callTool('agentlink_status', {}, context(tools));
     expect(result.structured.status).toBe('ok');
     const roots = [...new Set(touched.map((t) => t.split('.')[0]))].sort();
-    expect(roots).toEqual(['catchUp', 'contacts', 'identity', 'ownerActions']);
+    expect(roots).toEqual(['approvalService', 'catchUp', 'contacts', 'identity', 'ownerActions']);
+    expect(touched.filter((t) => t.startsWith('approvalService.'))).toEqual([
+      'approvalService.countPending',
+    ]);
     for (const write of [
       'syncInbox',
       'sendMessage',
@@ -318,7 +324,6 @@ describe('coreToolClient (read-only in fact, 06 §2.0)', () => {
       'acks',
       'outbox',
       'requests',
-      'approvalService',
       'idempotency',
     ]) {
       expect(touched).not.toContain(write);
@@ -390,21 +395,22 @@ describe('agentlink_list_contacts (06 §2.1)', () => {
 // ---- agentlink_get_approval -----------------------------------------------------------------------
 
 describe('agentlink_get_approval (06 §2.5)', () => {
-  const run = (approval: FakeOptions['approval'], input: unknown = { approvalId: APPROVAL }) =>
+  const run = (approval: ApprovalState, input: unknown = { approvalId: APPROVAL }) =>
     callTool('agentlink_get_approval', input, context(fakeClient({ approval })));
+  const base = { actionDigest: 'a'.repeat(64), expiresAt: 1_760_700_000 };
+  const read = (status: string, decidedAt?: number): ApprovalState =>
+    ({ status, ...base, ...(decidedAt === undefined ? {} : { decidedAt }) }) as ApprovalState;
 
   it.each([
-    [{ status: 'pending' }, 'pending', undefined],
-    [{ status: 'approved' }, 'approved', undefined],
-    [{ status: 'denied' }, 'denied', undefined],
-    [{ status: 'cancelled' }, 'denied', undefined],
-    [{ status: 'expired' }, 'expired', undefined],
-    [{ status: 'void' }, 'expired', true],
-    [{ status: 'refused', reason: 'digest_mismatch' }, 'denied', undefined],
-    [{ status: 'refused', reason: 'decision_invalid' }, 'denied', undefined],
-    [{ status: 'refused', reason: 'cancel_invalid' }, 'denied', undefined],
-  ] as const)('maps %o to %s', async (check, approval, used) => {
-    const result = await run({ check: check as ApprovalCheck, decidedAt: 1_760_000_000 });
+    ['pending', 'pending', undefined],
+    ['approved', 'approved', undefined],
+    ['denied', 'denied', undefined],
+    ['cancelled', 'denied', undefined],
+    ['expired', 'expired', undefined],
+    ['used', 'expired', true],
+    ['void', 'expired', undefined],
+  ] as const)('maps %s to %s (used: %s)', async (status, approval, used) => {
+    const result = await run(read(status, 1_760_000_000));
     expect(result.structured.status).toBe('ok');
     expect(result.structured['approval']).toBe(approval);
     expect(result.structured['used']).toBe(used);
@@ -413,18 +419,32 @@ describe('agentlink_get_approval (06 §2.5)', () => {
   });
 
   it('has no decidedAt before a decision', async () => {
-    const result = await run({ check: { status: 'expired' }, decidedAt: null });
+    const result = await run(read('expired'));
     expect(result.structured).not.toHaveProperty('decidedAt');
   });
 
-  it("not_found for an unknown ID (and for the core's approval_unknown)", async () => {
-    const unknown = await run('unknown');
+  it('unknown with reason invalid (a tampered row) is denied, never approved, with no decidedAt', async () => {
+    const result = await run({ status: 'unknown', reason: 'invalid' });
+    expect(result.structured['status']).toBe('ok');
+    expect(result.structured['approval']).toBe('denied');
+    expect(result.structured).not.toHaveProperty('decidedAt');
+    expect(result.structured).not.toHaveProperty('used');
+  });
+
+  it('an unrecognised core status fails closed to denied, and signed is never reported', async () => {
+    const result = await run({ status: 'signed' } as unknown as ApprovalState);
+    expect(result.structured['approval']).toBe('denied');
+    expect(dump(result)).not.toContain('signed');
+  });
+
+  it('not_found for an unknown ID', async () => {
+    const unknown = await run({ status: 'unknown', reason: 'not_found' });
     expect(unknown.structured).toEqual({
       status: 'not_found',
       summary: TOOL_TEXT.approvalNotFound,
       nextStep: TOOL_TEXT.approvalNotFoundNextStep,
     });
-    expect(approvalStateOf({ status: 'refused', reason: 'approval_unknown' })).toBe('not_found');
+    expect(approvalStateOf({ status: 'unknown', reason: 'not_found' })).toBe('not_found');
   });
 
   it('error INVALID_ARGUMENT for a bad ID or an extra field, never echoing it', async () => {
@@ -435,20 +455,15 @@ describe('agentlink_get_approval (06 §2.5)', () => {
       { approvalId: APPROVAL, extra: 1 },
       { approvalId: MESSAGE_CANARY },
     ]) {
-      const result = await run({ check: { status: 'approved' }, decidedAt: null }, input);
+      const result = await run(read('approved'), input);
       expect(result.structured.code).toBe('INVALID_ARGUMENT');
       expect(dump(result)).not.toContain('CANARY');
       expect(dump(result)).not.toContain('apr_x');
     }
   });
 
-  it('error NOT_AVAILABLE until the core exposes the stored-approval read', async () => {
-    const result = await run('absent');
-    expect(result.structured.code).toBe('NOT_AVAILABLE');
-  });
-
   it('never applies, claims or changes anything (only approvalState is read)', async () => {
-    const client = fakeClient({ approval: { check: { status: 'approved' }, decidedAt: 1 } });
+    const client = fakeClient({ approval: read('approved', 1) });
     await callTool('agentlink_get_approval', { approvalId: APPROVAL }, context(client));
     expect(client.calls).toEqual([]);
   });
@@ -499,7 +514,9 @@ describe('tools whose card has not landed answer "not available yet"', () => {
 
   it('every tool refuses input outside its inputSchema before any handler runs (IR-M1-9c-1 F04)', async () => {
     for (const tool of TOOLS) {
-      const client = fakeClient({ approval: { check: { status: 'approved' }, decidedAt: null } });
+      const client = fakeClient({
+        approval: { status: 'approved', actionDigest: 'a'.repeat(64), expiresAt: 1_760_700_000 },
+      });
       const valid = VALID_INPUT[tool.name]!;
       for (const bad of [
         { ...valid, [MESSAGE_CANARY]: 1 },
@@ -747,5 +764,35 @@ describe('injection suite (I-5): canaries never leave the untrusted block', () =
     const texts = [...Object.values(RESULT_TEXT), ...Object.values(TOOL_TEXT)];
     for (const text of texts)
       for (const pattern of banned) expect(text, `${text} ~ ${pattern}`).not.toMatch(pattern);
+  });
+});
+
+describe('the result rules are the types package rules (IR-M1-9c-1 F06)', () => {
+  const pending = {
+    status: 'pending_approval',
+    summary: 'Waiting for your approval.',
+    nextStep: 'Ask the user to approve it in the terminal.',
+    approvalId: APPROVAL,
+  } as const;
+
+  it('accepts a pending_approval without a url, and get_approval with used: true', () => {
+    expect(resultIsValid(pending, [])).toBe(true);
+    expect(
+      resultIsValid(
+        { status: 'ok', summary: 'Already used.', approval: 'expired', used: true },
+        [],
+      ),
+    ).toBe(true);
+  });
+
+  it('still refuses a broken result and any url outside the allowed origins', () => {
+    expect(resultIsValid({ ...pending, nextStep: undefined } as never, [])).toBe(false);
+    expect(resultIsValid({ ...pending, approvalId: 'apr_x' }, [])).toBe(false);
+    const url = 'http://127.0.0.1:47321/approve/x';
+    expect(resultIsValid({ ...pending, url }, [])).toBe(false);
+    expect(resultIsValid({ ...pending, url }, ['http://127.0.0.1:47321'])).toBe(true);
+    expect(
+      resultIsValid({ ...pending, url: 'https://evil.example/x' }, ['http://127.0.0.1:47321']),
+    ).toBe(false);
   });
 });
