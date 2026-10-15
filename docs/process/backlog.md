@@ -2884,7 +2884,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Passes the vocabulary lint; contains no instruction to act on inbound content; used unchanged in the M1-13c LLM runs.
 
 #### M1-12b · quickstart and harness permission guidance
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · docs-site/guide/get-started/, docs-site/technical/reference/harness-configuration.md (published to GitBook through Git Sync, DOCS-PUB)
 - **Depends on:** M1-9a, M1-9b, M1-9l; gap G-1 accepted as a documented M1 residual (D-67)
 - **Spec:** 04 §2.2 (owner code, opt-in passphrase), §2.5 (residual risk; same-user agents, D-67); 06 §7; 02 J1; 10 M1-12; 11 §5

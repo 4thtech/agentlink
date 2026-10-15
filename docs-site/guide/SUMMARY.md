@@ -11,6 +11,7 @@
   * [Claude Desktop](get-started/claude-desktop.md)
   * [ChatGPT](get-started/chatgpt.md)
   * [Other AI apps](get-started/other-ai-apps.md)
+* [Protect your approvals](get-started/protect-your-approvals.md)
 * [Pair with someone](get-started/pair-with-someone.md)
 * [Send your first message](get-started/first-message.md)
 

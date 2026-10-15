@@ -1,16 +1,63 @@
 # Codex
 
-> **Status: Planned for v0.1.0 (M1a).** This page is an outline. The install prompt and steps are added when v0.1.0 ships; nothing can be installed yet.
+> **Status: Planned for v0.1.0 (M1a).** Nothing is released yet, so the install below does not work until v0.1.0 ships. The steps match the current source.
 
 **Purpose:** set up AgentLink in Codex (command line, IDE extension, and Codex in the ChatGPT desktop app).
 
-## Outline
+You need Node.js (a current LTS version) and Codex.
 
-- The install prompt to paste into Codex
-- What Codex will run, and the settings change it will show you
-- Protecting your approvals (owner code or passphrase, in a terminal you opened yourself; passkey from v0.2.0) and the recovery kit
-- Recommended sandbox settings, to keep Codex away from AgentLink's private files, its saved keys in your system keychain and its installed program files, and what these settings can and cannot stop
-- Checking it works: ask "What's my AgentLink status?"
-- Next: [Pair with someone](pair-with-someone.md)
+## 1. Ask Codex to install it
 
-**Filled in at:** M1a (v0.1.0), backlog card DOCS-M1a.
+Paste this into Codex:
+
+> Install AgentLink for me. Run `npx -y @4thtech/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then tell me the one command to run in my own terminal to protect my approvals; never ask me for the code. Tell me to restart Codex when it's done.
+
+What happens:
+
+1. Codex runs `npx -y @4thtech/agentlink init`. It looks for Claude Code, Codex and Gemini CLI on your computer, prints the exact change to each settings file and a short confirmation code, and writes nothing yet.
+2. Codex shows you the change. For Codex it adds a short `[mcp_servers.agentlink]` section to the end of `~/.codex/config.toml`. Nothing else in the file changes.
+3. If you agree, Codex runs the command again with `--confirm <code>`. The code only works for exactly the change you were shown. A backup of your old file is kept.
+4. Restart Codex.
+
+Prefer to do it yourself? Run `npx -y @4thtech/agentlink init` in your own terminal. It shows the same change and asks `y/N`. AgentLink writes this file itself rather than through `codex mcp add`, so you see the exact change first.
+
+Check that the package name is exactly `@4thtech/agentlink`.
+
+## 2. Protect your approvals
+
+Do this yourself, in a terminal you opened, never through Codex: [Protect your approvals](protect-your-approvals.md).
+
+## 3. Check it works
+
+Ask Codex: "What's my AgentLink status?" If not, run `npx -y @4thtech/agentlink doctor` in your own terminal.
+
+## Keep your AI away from AgentLink's files
+
+Codex runs commands in a sandbox. Its permission profiles (still in beta) can block a folder completely. **This is a guard, not a lock**: read [Protect your approvals](protect-your-approvals.md) for what it can't stop. Codex has no setting to block system keychain commands by name.
+
+### Advanced: the settings
+
+In `~/.codex/config.toml`. A permission profile can't be combined with `sandbox_mode`; use one or the other.
+
+```toml
+default_permissions = "agentlink-guard"
+
+[permissions.agentlink-guard.filesystem]
+":minimal" = "read"
+"~/.agentlink" = "deny"
+"~/.npm/_npx" = "deny"
+"~/.zshrc" = "deny"
+"~/.zprofile" = "deny"
+"~/.bashrc" = "deny"
+"~/.bash_profile" = "deny"
+"~/.profile" = "deny"
+"~/.config/fish" = "deny"
+"~/.npmrc" = "deny"
+"~/.local/bin" = "deny"
+```
+
+Check that your own projects still work with this profile before you rely on it. The [technical reference](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/harness-configuration.md) has more, including how to make Codex ask before every AgentLink action.
+
+Source: [Codex permissions](https://learn.chatgpt.com/docs/permissions).
+
+Next: [Pair with someone](pair-with-someone.md)
