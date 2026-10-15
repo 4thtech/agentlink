@@ -581,6 +581,48 @@ describe('outbox: staged pairing messages (04 §3.6; M1-7c)', () => {
   });
 });
 
+describe('outbox: only vetted core flows stage envelopes (IR-M1-7k-1 F01)', () => {
+  it('never publishes an envelope from envelopes.build, even to a contact the policy denies', async () => {
+    const mark = new MemoryPolicyMark();
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A, { mark });
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    const policy = defaultPolicy();
+    (policy.contacts as { allowed: unknown }).allowed = [
+      '0x00000000000000000000000000000000000000aa',
+    ];
+    const signed = await signWith(ownerA, {
+      v: 1,
+      agent: a.id,
+      owner: await ownerHex(ownerA),
+      op: 'policy.set',
+      params: { version: 1, policy: policy as unknown as JsonObject },
+      nonce: newNonce(),
+      issuedAt: clock.t,
+      expiresAt: clock.t + 600,
+    });
+    expect(await a.client.ownerActions.apply(JSON.stringify(signed))).toMatchObject({
+      status: 'applied',
+    });
+    expect((await a.client.sendMessage({ to: b.id, text: 'hello' })).status).toBe('rejected');
+
+    // The public build primitive stores a `queued` envelope; it must stay unpublishable.
+    await a.client.envelopes.build({
+      to: { contact: b.id },
+      payload: { type: 'text', body: 'around the policy', replyTo: null, files: [] },
+    });
+    await a.client.envelopes.build({
+      to: { contact: b.id },
+      payload: { type: 'request', body: { terms: { price: '1' } }, replyTo: null, files: [] },
+    });
+    expect(await a.client.outbox.enqueueStaged()).toBe(0);
+    const summary = await a.client.outbox.processDue();
+    expect(summary.sent + summary.retrying).toBe(0);
+    expect(a.spy.published).toHaveLength(0);
+    expect((await rows(a.store)).outbox).toHaveLength(0);
+  });
+});
+
 describe('logs (I-7)', () => {
   it('carry counts only: no relay URL, message text, key or envelope id', async () => {
     const lines: string[] = [];
