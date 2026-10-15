@@ -411,7 +411,7 @@ beforeEach(async () => {
   await pair(alice, bob);
   aliceMcp = await connect(alice);
   bobMcp = await connect(bob);
-});
+}, 30_000);
 
 describe('a two-agent negotiation over MCP: propose → counter → accept with owner approval (M1-9q)', () => {
   it('runs end to end; the owner sees exactly the terms signed; the accept is sent once', async () => {

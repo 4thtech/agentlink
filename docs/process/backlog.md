@@ -2596,6 +2596,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - `agentlink_respond_to_terms` with `accept` under the default policy → `pending_approval`; the retry with the `approvalId` sends exactly one `accept` (relay spy) and a second retry sends nothing (`APPROVAL_USED`); `terms` passed with `accept` → `INVALID_ARGUMENT`; `agentlink_send` with `type: "accept"` fails schema validation.
   - A canary in an offer's subject, deliverables, note or price never appears in a summary, `nextStep`, error or approval summary.
+- **Note (IR-M1-9q-1 F-2, F-3, 2026-10-15):** two core gaps found here are fixed in the new card M1-32-b, which must land before the M1a gate. F-2: the core terms flow ignores `clientRequestId`, so a repeated propose sends a second offer. F-3: when v1 and its `revises` v2 have the same `createdAt` and arrive in one sync, the receiver drops v2 and leaves v1 pending.
 
 #### M1-9r · MCP server: background loop and relay subscriptions (new, split from M1-9c)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
