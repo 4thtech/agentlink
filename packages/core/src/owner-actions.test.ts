@@ -85,10 +85,18 @@ async function setup(options: { mark?: MemoryPolicyMark | null } = {}) {
 
   /** A pending request row as M1-7e will write it: `action_json` sealed, digest not stored. */
   async function addRequest(
-    opts: { commitment?: boolean; expiresAt?: number; status?: 'pending' | 'approved' } = {},
+    opts: {
+      commitment?: boolean;
+      expiresAt?: number;
+      status?: 'pending' | 'approved';
+      action?: JsonObject;
+    } = {},
   ) {
     const approvalId = newApprovalId();
-    const action = { tool: 'agentlink_send', args: { to: 'Bob', text: `hi ${approvalId}` } };
+    const action = opts.action ?? {
+      tool: 'agentlink_send',
+      args: { to: 'Bob', text: `hi ${approvalId}` },
+    };
     const sealedAction = await cipher.seal(
       { table: 'approvals', column: 'action_json', rowKey: rowKeyOf([approvalId]) },
       canonicalize(action),
@@ -340,6 +348,28 @@ describe('approval.decideBatch (D-68, 04 §2.5.2)', () => {
     await refusedBatch(async (t) => {
       const a = await t.addRequest();
       const b = await t.addRequest({ commitment: true });
+      return {
+        text: await t.signed('approval.decideBatch', t.batch([a, b])),
+        ids: [a.approvalId, b.approvalId],
+      };
+    }, 'item_refused');
+  });
+
+  it('a batch with an accepted acknowledgement (a commitment without a scope, D-31) applies none (M1-20)', async () => {
+    await refusedBatch(async (t) => {
+      const a = await t.addRequest();
+      const b = await t.addRequest({
+        action: {
+          tool: 'agentlink_acknowledge',
+          args: { envelopeId: 'AgICAgICAgICAgICAgICAg', type: 'accepted' },
+          context: {
+            triggers: ['commitments.accept'],
+            counterparty: { agentId: `0x${'3d'.repeat(20)}`, ownerKey: 'c4'.repeat(32) },
+            recordId: `0x${'e2'.repeat(32)}`,
+            receipt: 'ACCEPTED',
+          },
+        },
+      });
       return {
         text: await t.signed('approval.decideBatch', t.batch([a, b])),
         ids: [a.approvalId, b.approvalId],
@@ -635,7 +665,9 @@ describe('loading the signed policy (G-6, 06 §3)', () => {
     expect(evaluate(loaded, { kind: 'proof' })).toBe('approval');
     // G-6 owner decision (Tali, 2026-10-15): paired contacts Talk without approval; commitments
     // (D-31) and paid proofs still need the owner.
-    expect(evaluate(loaded, { kind: 'commitment' })).toBe('approval');
+    expect(
+      evaluate(loaded, { kind: 'commitment', facts: { kind: 'acknowledge', receipt: 'ACCEPTED' } }),
+    ).toBe('approval');
     expect(
       evaluate(
         loaded,

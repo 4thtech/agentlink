@@ -1,0 +1,507 @@
+// `agentlink init` (M1-9a): harness detection, the exact diff per harness, confirmation (prompt and
+// one-time code), refusal without it, malformed configs, unsafe paths and agent names. The keychain
+// is a double; the files are real, in a temporary home folder.
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { KeychainProbe } from '@agentlink/node';
+import {
+  EXIT_FAILED,
+  EXIT_OK,
+  EXIT_USAGE,
+  createDispatcher,
+  type DispatchIO,
+} from '../dispatch.js';
+import { RUNTIME_MESSAGES } from '../runtime/errors.js';
+import { readAgentConfig } from '../runtime/index.js';
+import type { TerminalContext } from '../runtime/guards.js';
+import { copy } from '../tools/strings/index.js';
+import { INIT_TEXT, createInitHandler, type InitDeps } from './init.js';
+
+const POSIX = process.platform !== 'win32';
+const AGENT_ID = `0x${'ab'.repeat(20)}`;
+const NOW = 1_800_000_000;
+const NO_KEYCHAIN_COPY =
+  "This machine has no system keychain (common in containers, WSL and SSH sessions), so AgentLink can't protect your agent's identity here yet. To keep it in a passphrase-locked file instead, run `agentlink init --keystore file` yourself, in your own terminal.";
+
+const TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
+const PIPE: TerminalContext = { stdinIsTTY: false, stdoutIsTTY: false, env: {} };
+const AGENT_RUN: TerminalContext = {
+  stdinIsTTY: true,
+  stdoutIsTTY: true,
+  env: { CLAUDECODE: '1' },
+};
+
+let home: string;
+let outside: string;
+
+beforeEach(async () => {
+  home = await realpath(await mkdtemp(join(tmpdir(), 'agentlink-init-')));
+  outside = await realpath(await mkdtemp(join(tmpdir(), 'agentlink-init-out-')));
+});
+afterEach(async () => {
+  await rm(home, { recursive: true, force: true });
+  await rm(outside, { recursive: true, force: true });
+});
+
+interface Run {
+  readonly code: number;
+  readonly out: string;
+  readonly err: string;
+  readonly created: number;
+  readonly asked: number;
+}
+
+interface RunOptions {
+  readonly terminal?: TerminalContext;
+  readonly probe?: KeychainProbe;
+  readonly answers?: readonly string[];
+}
+
+async function init(argv: readonly string[], options: RunOptions = {}): Promise<Run> {
+  const out: string[] = [];
+  const err: string[] = [];
+  let created = 0;
+  let asked = 0;
+  const answers = [...(options.answers ?? [])];
+  const deps: InitDeps = {
+    home,
+    probeKeychain: () => Promise.resolve(options.probe ?? { ok: true }),
+    createAgent: () => {
+      created += 1;
+      return Promise.resolve(AGENT_ID);
+    },
+    readLine: () => {
+      asked += 1;
+      return Promise.resolve(answers.shift() ?? '');
+    },
+    clock: () => NOW,
+  };
+  const dispatch = createDispatcher({ init: createInitHandler(deps) });
+  const io: DispatchIO = {
+    output: { print: (t) => out.push(t), printError: (t) => err.push(t) },
+    terminal: options.terminal ?? PIPE,
+    version: '0.0.0',
+  };
+  const code = await dispatch(['init', ...argv], io);
+  return { code, out: out.join('\n'), err: err.join('\n'), created, asked };
+}
+
+/** The confirmation code printed by an agent-run `init`. */
+function codeOf(run: Run): string {
+  const match = /--confirm ([0-9a-f]{4}-[0-9a-f]{4})/.exec(run.out);
+  if (match?.[1] === undefined) throw new Error('no confirmation code printed');
+  return match[1];
+}
+
+const read = (...parts: string[]): Promise<string> => readFile(join(home, ...parts), 'utf8');
+const exists = (...parts: string[]): Promise<boolean> =>
+  readFile(join(home, ...parts)).then(
+    () => true,
+    () => false,
+  );
+const names = (): Promise<string[]> => readdir(home);
+
+const CLAUDE_JSON = `${JSON.stringify({ numStartups: 7, mcpServers: { other: { command: 'x', env: { KEY: 'v' } } } }, null, 2)}\n`;
+
+describe('detection', () => {
+  it('finds nothing and says so, then still creates the agent identity on confirmation', async () => {
+    const plan = await init([]);
+    expect(plan.code).toBe(EXIT_OK);
+    expect(plan.out).toContain("didn't find Claude Code, Codex or Gemini CLI");
+    expect(plan.created).toBe(0);
+    const run = await init(['--confirm', codeOf(plan)]);
+    expect(run.code).toBe(EXIT_OK);
+    expect(run.created).toBe(1);
+    expect((await readAgentConfig(home, 'default'))?.config.agentId).toBe(AGENT_ID);
+  });
+
+  it('detects a harness by its folder', async () => {
+    await mkdir(join(home, '.codex'));
+    const plan = await init([]);
+    expect(plan.out).toContain(copy('cli.init.found', { count: 1 }));
+    expect(plan.out).toContain('Codex');
+    expect(plan.out).not.toContain('Gemini CLI');
+  });
+});
+
+describe('the exact diff of each harness', () => {
+  it('Claude Code: ~/.claude.json keeps its other servers, and only adds lines', async () => {
+    await writeFile(join(home, '.claude.json'), CLAUDE_JSON, { mode: 0o600 });
+    const plan = await init([]);
+    expect(plan.out).toContain(copy('cli.init.changesFor', { appName: 'Claude Code' }));
+    const lines = plan.out.split('\n');
+    const start = lines.indexOf('--- a/~/.claude.json');
+    expect(lines.slice(start, start + 13)).toEqual([
+      '--- a/~/.claude.json',
+      '+++ b/~/.claude.json',
+      '@@ -3,0 +4,10 @@',
+      '+    "agentlink": {',
+      '+      "type": "stdio",',
+      '+      "command": "npx",',
+      '+      "args": [',
+      '+        "-y",',
+      '+        "@4thtech/agentlink",',
+      '+        "mcp"',
+      '+      ],',
+      '+      "env": {}',
+      '+    },',
+    ]);
+    expect(plan.out).not.toContain('KEY');
+    expect(await read('.claude.json')).toBe(CLAUDE_JSON);
+  });
+
+  it('Claude Code: writes the merged file after confirmation, with a backup', async () => {
+    await writeFile(join(home, '.claude.json'), CLAUDE_JSON, { mode: 0o600 });
+    const plan = await init([]);
+    const run = await init(['--confirm', codeOf(plan)]);
+    expect(run.code).toBe(EXIT_OK);
+    const written = JSON.parse(await read('.claude.json'));
+    expect(written.mcpServers.agentlink).toEqual({
+      type: 'stdio',
+      command: 'npx',
+      args: ['-y', '@4thtech/agentlink', 'mcp'],
+      env: {},
+    });
+    expect(written.mcpServers.other).toEqual({ command: 'x', env: { KEY: 'v' } });
+    expect(written.numStartups).toBe(7);
+    expect(await read(`.claude.json.agentlink-backup-${NOW}`)).toBe(CLAUDE_JSON);
+    expect(run.out).toContain(copy('cli.init.restart', { appName: 'Claude Code' }));
+  });
+
+  it('Gemini CLI: ~/.gemini/settings.json gets command and args only', async () => {
+    await mkdir(join(home, '.gemini'));
+    await writeFile(
+      join(home, '.gemini', 'settings.json'),
+      `${JSON.stringify({ theme: 'x' }, null, 2)}\n`,
+    );
+    const plan = await init([]);
+    expect(plan.out).toContain('--- a/~/.gemini/settings.json');
+    expect(plan.out).toContain('+  "mcpServers": {');
+    expect(plan.out).toContain('+      "command": "npx",');
+    expect(plan.out).not.toContain('"type"');
+    await init(['--confirm', codeOf(plan)]);
+    expect(JSON.parse(await read('.gemini', 'settings.json'))).toEqual({
+      mcpServers: { agentlink: { command: 'npx', args: ['-y', '@4thtech/agentlink', 'mcp'] } },
+      theme: 'x',
+    });
+  });
+
+  it('Codex: the TOML diff for ~/.codex/config.toml, written without `codex mcp add`', async () => {
+    await mkdir(join(home, '.codex'));
+    const before = 'model = "gpt-5"\n\n[mcp_servers.other]\ncommand = "x"\n';
+    await writeFile(join(home, '.codex', 'config.toml'), before);
+    const plan = await init([]);
+    const lines = plan.out.split('\n');
+    const start = lines.indexOf('--- a/~/.codex/config.toml');
+    expect(lines.slice(start, start + 7)).toEqual([
+      '--- a/~/.codex/config.toml',
+      '+++ b/~/.codex/config.toml',
+      '@@ -4,0 +5,4 @@',
+      '+',
+      '+[mcp_servers.agentlink]',
+      '+command = "npx"',
+      '+args = ["-y", "@4thtech/agentlink", "mcp"]',
+    ]);
+    await init(['--confirm', codeOf(plan)]);
+    expect(await read('.codex', 'config.toml')).toBe(
+      `${before}\n[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech/agentlink", "mcp"]\n`,
+    );
+  });
+
+  it('a new Codex file is created with only the table', async () => {
+    await mkdir(join(home, '.codex'));
+    const plan = await init([]);
+    await init(['--confirm', codeOf(plan)]);
+    expect(await read('.codex', 'config.toml')).toBe(
+      '[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech/agentlink", "mcp"]\n',
+    );
+    expect(await exists('.codex', 'config.toml')).toBe(true);
+  });
+
+  it('a non-default agent adds --agent to the entry, and no secret is ever in a config', async () => {
+    await mkdir(join(home, '.codex'));
+    const plan = await init(['--agent', 'work-1']);
+    expect(plan.out).toContain('args = ["-y", "@4thtech/agentlink", "mcp", "--agent", "work-1"]');
+    expect(plan.out).toContain('agentlink init --agent work-1 --confirm');
+    await init(['--agent', 'work-1', '--confirm', codeOf(plan)]);
+    const text = await read('.codex', 'config.toml');
+    expect(text).not.toMatch(/PASSPHRASE|0x[0-9a-f]{40}|token|secret/i);
+    expect((await readAgentConfig(home, 'work-1'))?.config.name).toBe('work-1');
+  });
+});
+
+describe('confirmation', () => {
+  it('without a TTY prints the diff and a code and writes nothing', async () => {
+    await mkdir(join(home, '.codex'));
+    const run = await init([]);
+    expect(run.code).toBe(EXIT_OK);
+    expect(run.out).toContain(copy('cli.init.agentConfirm', { code: codeOf(run) }));
+    expect(run.created).toBe(0);
+    expect(await exists('.codex', 'config.toml')).toBe(false);
+    expect(await readAgentConfig(home, 'default')).toBeUndefined();
+    expect(await names()).toEqual(['.codex']);
+  });
+
+  it('with a harness marker set it is treated as agent-run even on a terminal', async () => {
+    await mkdir(join(home, '.codex'));
+    const run = await init([], { terminal: AGENT_RUN, answers: ['y', 'y'] });
+    expect(run.asked).toBe(0);
+    expect(run.out).toContain('--confirm');
+    expect(await exists('.codex', 'config.toml')).toBe(false);
+  });
+
+  it('refuses a wrong code, a malformed code and a code for other changes, writing nothing', async () => {
+    await mkdir(join(home, '.codex'));
+    const plan = await init([]);
+    const wrong = await init(['--confirm', '0000-0000']);
+    expect(wrong.code).toBe(EXIT_FAILED);
+    expect(wrong.err).toBe(INIT_TEXT.codeMismatch);
+    const malformed = await init(['--confirm', 'not a code']);
+    expect(malformed.code).toBe(EXIT_USAGE);
+    expect(malformed.err).toBe(INIT_TEXT.badCode);
+    expect(malformed.err).not.toContain('not a code');
+    // A code made for one agent name does not work for another.
+    const other = await init(['--agent', 'other', '--confirm', codeOf(plan)]);
+    expect(other.code).toBe(EXIT_FAILED);
+    expect(await exists('.codex', 'config.toml')).toBe(false);
+    expect(wrong.created + malformed.created + other.created).toBe(0);
+  });
+
+  it('a code stops working when the file changed after it was shown', async () => {
+    await mkdir(join(home, '.codex'));
+    await writeFile(join(home, '.codex', 'config.toml'), 'a = 1\n');
+    const plan = await init([]);
+    await writeFile(join(home, '.codex', 'config.toml'), 'a = 2\n');
+    const run = await init(['--confirm', codeOf(plan)]);
+    expect(run.code).toBe(EXIT_FAILED);
+    expect(await read('.codex', 'config.toml')).toBe('a = 2\n');
+  });
+
+  it('a used code does not match again (nothing left to change)', async () => {
+    await mkdir(join(home, '.codex'));
+    const plan = await init([]);
+    expect((await init(['--confirm', codeOf(plan)])).code).toBe(EXIT_OK);
+    const again = await init(['--confirm', codeOf(plan)]);
+    expect(again.out).toContain(INIT_TEXT.nothingToDo);
+    expect((await read('.codex', 'config.toml')).match(/\[mcp_servers\.agentlink\]/g)).toHaveLength(
+      1,
+    );
+  });
+
+  it('in a terminal, asks per harness and writes only what is confirmed', async () => {
+    await mkdir(join(home, '.codex'));
+    await mkdir(join(home, '.gemini'));
+    const run = await init([], { terminal: TTY, answers: ['y', 'n'] });
+    expect(run.asked).toBe(2);
+    expect(run.out).toContain(copy('cli.init.apply'));
+    expect(await exists('.codex', 'config.toml')).toBe(true);
+    expect(await exists('.gemini', 'settings.json')).toBe(false);
+    expect(run.created).toBe(1);
+  });
+
+  it('in a terminal, names the app in front of each question (IR-M1-9a-1 F07)', async () => {
+    await mkdir(join(home, '.codex'));
+    await mkdir(join(home, '.gemini'));
+    const run = await init([], { terminal: TTY, answers: ['y', 'n'] });
+    const lines = run.out.split('\n');
+    const questions = lines.flatMap((l, i) => (l === copy('cli.init.apply') ? [i] : []));
+    expect(questions).toHaveLength(2);
+    expect(lines[(questions[0] ?? 0) - 1]).toBe(copy('cli.init.changesFor', { appName: 'Codex' }));
+    expect(lines[(questions[1] ?? 0) - 1]).toBe(
+      copy('cli.init.changesFor', { appName: 'Gemini CLI' }),
+    );
+  });
+
+  it('does not write to ~/.claude.json when CLAUDE_CONFIG_DIR moves Claude Code elsewhere (F05)', async () => {
+    await writeFile(join(home, '.claude.json'), CLAUDE_JSON, { mode: 0o600 });
+    const plan = await init([], { terminal: { ...PIPE, env: { CLAUDE_CONFIG_DIR: outside } } });
+    expect(plan.err).toContain("Claude Code's settings");
+    expect(plan.out).not.toContain('--- a/~/.claude.json');
+  });
+
+  it('in a terminal, declining everything changes nothing and creates no identity', async () => {
+    await mkdir(join(home, '.codex'));
+    const run = await init([], { terminal: TTY, answers: ['', 'maybe'] });
+    expect(run.out).toContain(copy('cli.init.cancelled'));
+    expect(run.created).toBe(0);
+    expect(await exists('.codex', 'config.toml')).toBe(false);
+    expect(await readAgentConfig(home, 'default')).toBeUndefined();
+  });
+
+  it('never prints or asks for an owner secret, and points to `owner init`', async () => {
+    await mkdir(join(home, '.codex'));
+    const plan = await init([]);
+    const run = await init(['--confirm', codeOf(plan)]);
+    expect(run.out).toContain('agentlink owner init');
+    expect(`${plan.out}${run.out}`).not.toMatch(/passphrase|owner code:/i);
+  });
+});
+
+describe('an existing agent', () => {
+  it('is reused, never replaced, so init can add another harness later', async () => {
+    await mkdir(join(home, '.codex'));
+    const first = await init([]);
+    await init(['--confirm', codeOf(first)]);
+    await mkdir(join(home, '.gemini'));
+    const second = await init([]);
+    expect(second.out).not.toContain(INIT_TEXT.identity);
+    await init(['--confirm', codeOf(second)]);
+    expect((await readAgentConfig(home, 'default'))?.config.agentId).toBe(AGENT_ID);
+    expect(await exists('.gemini', 'settings.json')).toBe(true);
+  });
+});
+
+describe('malformed or unusable configs', () => {
+  it('an invalid JSON config is reported, never written, and others still proceed', async () => {
+    await writeFile(join(home, '.claude.json'), '{ "mcpServers": ');
+    await mkdir(join(home, '.codex'));
+    const plan = await init([]);
+    expect(plan.err).toContain("Claude Code's settings file isn't valid");
+    expect(plan.out).not.toContain('--- a/~/.claude.json');
+    const run = await init(['--confirm', codeOf(plan)]);
+    expect(run.code).toBe(EXIT_FAILED);
+    expect(await read('.claude.json')).toBe('{ "mcpServers": ');
+    expect(await names()).not.toContain(`.claude.json.agentlink-backup-${NOW}`);
+    expect(await exists('.codex', 'config.toml')).toBe(true);
+  });
+
+  it('an invalid TOML config is reported and never written', async () => {
+    await mkdir(join(home, '.codex'));
+    await writeFile(join(home, '.codex', 'config.toml'), 'model = "unterminated\n');
+    const plan = await init([]);
+    expect(plan.err).toContain("Codex's settings file isn't valid");
+    expect(plan.code).toBe(EXIT_OK);
+    const run = await init(['--confirm', codeOf(plan)]);
+    expect(run.code).toBe(EXIT_FAILED);
+    expect(await read('.codex', 'config.toml')).toBe('model = "unterminated\n');
+    expect(await readdir(join(home, '.codex'))).toEqual(['config.toml']);
+  });
+
+  it('only malformed configs and no agent to create exits with a failure and writes nothing', async () => {
+    await mkdir(join(home, '.codex'));
+    await writeFile(join(home, '.codex', 'config.toml'), 'x = [\n');
+    const first = await init([]);
+    await init(['--confirm', codeOf(first)]);
+    const again = await init([]);
+    expect(again.code).toBe(EXIT_FAILED);
+    expect(await read('.codex', 'config.toml')).toBe('x = [\n');
+  });
+
+  it('a different existing agentlink entry is left as it is', async () => {
+    await mkdir(join(home, '.codex'));
+    await writeFile(
+      join(home, '.codex', 'config.toml'),
+      '[mcp_servers.agentlink]\ncommand = "mine"\n',
+    );
+    const plan = await init([]);
+    expect(plan.out).toContain('Codex already has an entry named agentlink');
+    const run = await init(['--confirm', codeOf(plan)]);
+    expect(await read('.codex', 'config.toml')).toBe('[mcp_servers.agentlink]\ncommand = "mine"\n');
+    expect(run.code).toBe(EXIT_OK);
+  });
+
+  it.skipIf(!POSIX)(
+    'a symlinked config is refused, and nothing is written through it',
+    async () => {
+      await writeFile(join(outside, 'real.toml'), 'a = 1\n');
+      await mkdir(join(home, '.codex'));
+      await symlink(join(outside, 'real.toml'), join(home, '.codex', 'config.toml'));
+      const plan = await init([]);
+      expect(plan.err).toContain("Codex's settings are in a place AgentLink won't write to");
+      await init(['--confirm', codeOf(plan)]);
+      expect(await readFile(join(outside, 'real.toml'), 'utf8')).toBe('a = 1\n');
+    },
+  );
+
+  it.skipIf(!POSIX)('a symlinked harness folder pointing outside home is refused', async () => {
+    await symlink(outside, join(home, '.gemini'));
+    const plan = await init([]);
+    expect(plan.err).toContain("Gemini CLI's settings are in a place AgentLink won't write to");
+    await init(['--confirm', codeOf(plan)]);
+    expect(await readdir(outside)).toEqual([]);
+  });
+});
+
+describe('keychain and agent names', () => {
+  it('without a keychain answers needs_setup with the 07 §9.4 copy and writes nothing', async () => {
+    await mkdir(join(home, '.codex'));
+    const run = await init([], {
+      probe: { ok: false, reason: 'unavailable', fix: 'security unlock-keychain' },
+    });
+    expect(run.code).toBe(EXIT_FAILED);
+    expect(run.err).toContain(NO_KEYCHAIN_COPY);
+    expect(run.created).toBe(0);
+    expect(await names()).toEqual(['.codex']);
+    const confirmed = await init(['--confirm', '0000-0000'], {
+      probe: { ok: false, reason: 'unavailable', fix: 'fix it' },
+    });
+    expect(confirmed.err).toContain(NO_KEYCHAIN_COPY);
+    expect(await names()).toEqual(['.codex']);
+  });
+
+  it.each([
+    ['upper case', 'Work'],
+    ['a leading dash', '-x'],
+    ['a leading digit', '1a'],
+    ['too long', 'a'.repeat(33)],
+    ['a trailing newline', 'work\n'],
+    ['a path', '../x'],
+    ['a space', 'a b'],
+    ['empty', ''],
+  ])('refuses an agent name with %s, with fixed text and no write', async (_label, name) => {
+    await mkdir(join(home, '.codex'));
+    const run = await init([`--agent=${name}`]);
+    expect(run.code).toBe(EXIT_USAGE);
+    expect(run.err).toBe(RUNTIME_MESSAGES.agent_name_invalid);
+    expect(run.err).not.toContain(name === '' ? 'never matches' : name);
+    expect(run.created).toBe(0);
+    expect(await names()).toEqual(['.codex']);
+  });
+
+  it('refuses an invalid agent name when the handler is called without the dispatcher', async () => {
+    const out: string[] = [];
+    const err: string[] = [];
+    const handler = createInitHandler({
+      home,
+      probeKeychain: () => Promise.resolve({ ok: true }),
+      createAgent: () => Promise.reject(new Error('must not be called')),
+      readLine: () => Promise.resolve(''),
+      clock: () => NOW,
+    });
+    const code = await handler({
+      command: 'init',
+      parsed: { values: {}, positionals: [], agent: 'Bad Name\n' },
+      output: { print: (t) => out.push(t), printError: (t) => err.push(t) },
+      terminal: PIPE,
+    });
+    expect(code).toBe(EXIT_USAGE);
+    expect(err).toEqual([RUNTIME_MESSAGES.agent_name_invalid]);
+    expect(await names()).toEqual([]);
+  });
+
+  it('accepts the longest valid name and the default name', async () => {
+    const long = `a${'b'.repeat(31)}`;
+    const plan = await init(['--agent', long]);
+    expect(plan.code).toBe(EXIT_OK);
+    const run = await init(['--agent', long, '--confirm', codeOf(plan)]);
+    expect(run.code).toBe(EXIT_OK);
+    expect((await readAgentConfig(home, long))?.config.name).toBe(long);
+  });
+
+  it('refuses extra arguments with fixed text', async () => {
+    const run = await init(['whatever']);
+    expect(run.code).toBe(EXIT_USAGE);
+    expect(run.err).not.toContain('whatever');
+  });
+});

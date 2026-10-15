@@ -5,6 +5,7 @@
 import { readFileSync } from 'node:fs';
 import process from 'node:process';
 import { isatty } from 'node:tty';
+import { createInitHandler, nodeInitDeps } from './commands/init.js';
 import { ownerCommandHandlers } from './commands/owner/index.js';
 import { createDispatcher } from './dispatch.js';
 import { createOutput } from './output.js';
@@ -22,6 +23,7 @@ function packageVersion(): string {
 }
 
 const dispatch = createDispatcher({
+  init: createInitHandler(nodeInitDeps()),
   // M1-9b: the owner commands (owner init, approve, deny, cancel).
   ...ownerCommandHandlers(),
 });
