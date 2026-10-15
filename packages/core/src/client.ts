@@ -21,6 +21,14 @@ import { RequestsQueue } from './requests.js';
 import { OutboxService } from './outbox.js';
 import { SendService, type SendMessageInput, type SendMessageResult } from './send.js';
 import type { TransportFactory } from './transport.js';
+import { DeliveryAcks } from './acks.js';
+import { InboxService } from './inbox.js';
+import {
+  SyncService,
+  type CatchUpResult,
+  type SyncInboxOptions,
+  type SyncInboxResult,
+} from './sync.js';
 import type { Store, StoreCipher } from './store/store.js';
 
 export interface AgentLinkClientOptions {
@@ -45,6 +53,11 @@ export interface AgentLinkClientOptions {
    * (`transport_unavailable`); reading the store still works.
    */
   readonly transport?: TransportFactory;
+  /**
+   * Delivery acknowledgements (02 F-23, P1; M1-7h): when true, `syncInbox` sends a signed
+   * "received" `ack` for each new message from a contact. Default false.
+   */
+  readonly deliveryAcks?: boolean;
 }
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
@@ -69,7 +82,12 @@ export class AgentLinkClient {
   readonly idempotency: IdempotencyService;
   /** The outbox: staged envelopes, delivery passes and retries (M1-7k; 07 §3.2, §4.2). */
   readonly outbox: OutboxService;
+  /** Inbox items with their untrusted-content metadata, and store-only counts (M1-7h; 06 §2.1, §4). */
+  readonly inbox: InboxService;
+  /** Delivery acknowledgements (02 F-23; M1-7h): behind the `deliveryAcks` flag. */
+  readonly acks: DeliveryAcks;
   readonly #send: SendService;
+  readonly #sync: SyncService;
 
   private constructor(
     agentId: string,
@@ -77,6 +95,7 @@ export class AgentLinkClient {
     approvals: ApprovalChannel,
     policyMark: PolicyVersionMark | undefined,
     transport: TransportFactory | undefined,
+    deliveryAcks: boolean,
   ) {
     this.agentId = agentId;
     this.identity = new IdentityService(ctx);
@@ -103,6 +122,42 @@ export class AgentLinkClient {
       idempotency: this.idempotency,
       outbox: this.outbox,
     });
+    this.inbox = new InboxService(ctx, this.contacts, this.requests);
+    this.acks = new DeliveryAcks(
+      ctx,
+      {
+        identity: this.identity,
+        envelopes: this.envelopes,
+        outbox: this.outbox,
+        ownerActions: this.ownerActions,
+      },
+      deliveryAcks,
+    );
+    this.#sync = new SyncService(ctx, {
+      envelopes: this.envelopes,
+      outbox: this.outbox,
+      ownerActions: this.ownerActions,
+      inbox: this.inbox,
+      acks: this.acks,
+    });
+  }
+
+  /**
+   * Pulls from the transport, stores, processes, and returns the new messages from contacts (07 §2;
+   * M1-7h): fetch with the 48 h look-back, dedup, verify once, store, per-contact rate limit, then
+   * 04 §3.1.1 steps 5 to 9 (`card-update` first) and, behind the flag, delivery acks.
+   */
+  syncInbox(options?: SyncInboxOptions): Promise<SyncInboxResult> {
+    return this.#sync.syncInbox(options);
+  }
+
+  /**
+   * The fetch-only catch-up for read-only callers (M1-7h addendum, D-73; 06 §2.0): fetches and
+   * stores envelopes and counts them by sender. Processes nothing: no handshake, ack, card update,
+   * receipt or read mark.
+   */
+  catchUp(options?: SyncInboxOptions): Promise<CatchUpResult> {
+    return this.#sync.catchUp(options);
   }
 
   /**
@@ -165,6 +220,7 @@ export class AgentLinkClient {
       approvals,
       options.policyMark,
       options.transport,
+      options.deliveryAcks === true,
     );
   }
 }

@@ -5,7 +5,9 @@
 // outbox rows in one store transaction, and only then publishes the stored events. So this
 // interface splits it: `wrap` makes one NIP-59 gift wrap per distinct recipient key and publishes
 // nothing; `publish` sends one stored, signed wrap to exactly the relays its row lists (07 §4.3: a
-// wrap never goes to a relay outside its row's list). `subscribe` and `sync` join with M1-7h.
+// wrap never goes to a relay outside its row's list). `sync` joins with M1-7h: one catch-up pass
+// through transport-nostr's SyncEngine (cursor, paging, dedup by gift-wrap id), sharing the pool,
+// over the persistence the core gives it (`sync_cursors`, `seen`). `subscribe` joins later.
 //
 // The runtime supplies the relay I/O (connector, address check, NIP-11; packages/node for Node,
 // 07 §4.2), so the core opens no socket itself. The core supplies the keys: the agent's KeyStore
@@ -19,9 +21,27 @@ import {
   type Nip11Fetcher,
   type PublishOutcome,
   type RelayConnector,
+  SyncEngine,
+  type EnvelopeHandler,
+  type SyncIdentity,
+  type SyncPersistence,
+  type SyncResult,
   type Timers,
   type WrappedEnvelope,
 } from '@agentlink/transport-nostr';
+
+/** One catch-up pass (07 §4.2 "Sync"; M1-7h). */
+export interface TransportSyncOptions {
+  /** The agent's own relays (07 §4.3), 1 to 64. */
+  readonly relays: readonly string[];
+  /** The agent's own Nostr keys with their epochs: the `#p` of the REQ. */
+  readonly identities: readonly SyncIdentity[];
+  /** The core's `sync_cursors` and `seen` (07 §3.2). The same object on every pass. */
+  readonly persistence: SyncPersistence;
+  readonly onEnvelope: EnvelopeHandler;
+  /** Time budget in milliseconds (06 §6: 3 s by default). */
+  readonly budgetMs?: number;
+}
 
 /** The transport as the core's send pipeline and outbox use it (07 §4.1, split as above). */
 export interface Transport {
@@ -36,6 +56,12 @@ export interface Transport {
   ): Promise<WrappedEnvelope>;
   /** Publishes one stored, signed wrap to exactly `relays` (1 to 32). Never to any other relay. */
   publish(event: NostrEvent, relays: readonly string[]): Promise<PublishOutcome>;
+  /**
+   * One catch-up pass (M1-7h): unwraps each new gift wrap for an own key and hands the parsed,
+   * not yet verified envelope to `onEnvelope`. Optional: without it the client cannot sync
+   * (`transport_unavailable`).
+   */
+  sync?(options: TransportSyncOptions): Promise<SyncResult>;
 }
 
 /** What the core hands a transport factory when it opens a client. */
@@ -73,10 +99,35 @@ export function nostrTransport(options: NostrTransportOptions): TransportFactory
       authKeys: deps.keys,
       mayAuthenticate: deps.mayAuthenticate,
     });
+    // One engine per persistence, so its bounded in-memory dedup caches live across passes.
+    const engines = new WeakMap<SyncPersistence, SyncEngine>();
+    const engineFor = (persistence: SyncPersistence): SyncEngine => {
+      let engine = engines.get(persistence);
+      if (engine === undefined) {
+        engine = new SyncEngine({
+          pool,
+          persistence,
+          keys: deps.keys,
+          // The store's clock (07 §3.1), so cursors and seen rows use one time base.
+          now: () => deps.now() * 1000,
+          ...(options.timers === undefined ? {} : { timers: options.timers }),
+          ...(deps.logger === undefined ? {} : { logger: deps.logger }),
+        });
+        engines.set(persistence, engine);
+      }
+      return engine;
+    };
     return {
       wrap: (envelope, recipients, keys) =>
         wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
       publish: (event, relays) => pool.publish(event, relays),
+      sync: (sync) =>
+        engineFor(sync.persistence).sync({
+          relays: sync.relays,
+          identities: sync.identities,
+          onEnvelope: sync.onEnvelope,
+          ...(sync.budgetMs === undefined ? {} : { budgetMs: sync.budgetMs }),
+        }),
     };
   };
 }

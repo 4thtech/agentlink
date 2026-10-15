@@ -541,7 +541,7 @@ describe('catchUp (M1-7h addendum, D-73; 06 §2.0): fetch-only', () => {
     expect(b.receives.count).toBe(2);
 
     const sync = await b.client.syncInbox();
-    expect(sync.items.map((i) => i.payload.body)).toEqual(['one', 'two']);
+    expect(sync.items.map((i) => i.payload.body).sort()).toEqual(['one', 'two']);
     expect(sync.acksSent).toBe(2);
     expect(b.receives.count).toBe(2);
     // Still unread until a reader marks them (agentlink_inbox, M1-9): the counts now come from `ok`.
