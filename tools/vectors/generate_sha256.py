@@ -133,12 +133,19 @@ def main():
         return
 
     target = Path(args.check)
-    committed = json.loads(target.read_text(encoding="utf-8"))
-    # The generator's own version may differ between machines; everything else must match.
-    committed.get("generator", {}).pop("version", None)
-    document["generator"].pop("version")
-    if committed != document:
-        sys.exit(f"{target} differs from the generator output")
+    committed_text = target.read_text(encoding="utf-8")
+    try:
+        committed_version = json.loads(committed_text)["generator"]["version"]
+    except (ValueError, KeyError, TypeError):
+        sys.exit(f"{target}: not a vector file")
+    # The generator's own version (the Python version) may differ between machines; everything
+    # else must match byte for byte, as in vectorlib.py (M1-1h-d).
+    document["generator"]["version"] = committed_version
+    if committed_text != json.dumps(document, indent=2) + "\n":
+        # Exit status 3 means "compared and found a difference" (vectorlib.MISMATCH,
+        # generators.mjs MISMATCH_EXIT); every other failure exits with 1.
+        print(f"{target} differs from the generator output", file=sys.stderr)
+        sys.exit(3)
     print(f"{target}: matches the generator output ({len(document['cases'])} cases)")
 
 
