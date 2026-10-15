@@ -57,6 +57,6 @@ The owner exported the same brand folder again. Byte for byte it equals the 14 O
 
 ## Checks done at intake
 
-SVGs contain no scripts, external references or embedded raster images (scanned). No hidden files, no executables, no keys, tokens or addresses. Sizes are within the README limits (this folder is about 1.2 MB).
+SVGs contain no scripts, external references or embedded raster images (scanned). No hidden files, no executables, no keys, tokens or addresses. Sizes are within the README limits (this folder is about 3.0 MB, 1.0 MB of it the JPG renderings added on 15 Oct 2026).
 
 Nothing private is included: no real personal data, keys or addresses, nothing from docs 01 or 09, no unreleased security details.
