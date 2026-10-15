@@ -106,6 +106,49 @@ const CONSOLE_SYNTAX = [
 // `no-restricted-syntax` for some files silently drops CONSOLE_SYNTAX there. Such a block must
 // include ...CONSOLE_SYNTAX in its own list. tools/console-ban.test.mjs checks every zone.
 
+// --- The runtime-agnostic tool module (06 §1, D-73 (1); M1-9c) ----------------------------------
+// apps/cli/src/tools/ moves unchanged into a shared package for the cloud agent (M2-3b), so it may
+// import no Node built-in, nothing from @agentlink/node or the MCP SDK, and nothing outside
+// src/tools/ by a relative path; no dynamic import(), require or Node global. These are guards for
+// portability and hygiene, not a security boundary (06 §1). The block keeps the apps/cli zone's own
+// list (ESLint applies only the last matching no-restricted-imports block) and CONSOLE_SYNTAX.
+const TOOLS_MSG =
+  'apps/cli/src/tools/ is runtime-agnostic (06 §1, D-73): no Node built-ins, @agentlink/node, MCP SDK or imports from outside src/tools/.';
+
+function toolModuleRestrictions(escapes) {
+  const zone = restrictionsFor('apps/cli');
+  const [, { paths, patterns }] = zone['no-restricted-imports'];
+  return {
+    ...zone,
+    'no-restricted-imports': [
+      'error',
+      {
+        paths: [...paths, ...BUILTINS.map((name) => ({ name, message: TOOLS_MSG }))],
+        patterns: [
+          ...patterns,
+          { group: ['node:*'], message: TOOLS_MSG },
+          { group: ['@agentlink/node', '@agentlink/node/*'], message: TOOLS_MSG },
+          { group: ['@modelcontextprotocol/*'], message: TOOLS_MSG },
+          { group: escapes, message: TOOLS_MSG },
+        ],
+      },
+    ],
+    'no-restricted-syntax': [
+      'error',
+      ...CONSOLE_SYNTAX,
+      { selector: 'ImportExpression', message: TOOLS_MSG },
+      { selector: "CallExpression[callee.name='require']", message: TOOLS_MSG },
+      { selector: 'TSImportEqualsDeclaration', message: TOOLS_MSG },
+    ],
+    'no-restricted-globals': [
+      'error',
+      ...['process', 'Buffer', '__dirname', '__filename', 'require', 'module', 'global'].map(
+        (name) => ({ name, message: TOOLS_MSG }),
+      ),
+    ],
+  };
+}
+
 export default tseslint.config(
   {
     // Build output is ignored only where a build writes it (the root of a workspace), never at any
@@ -161,6 +204,16 @@ export default tseslint.config(
       testDir: dir,
     }),
   })),
+  // The tool module's fence (above): files directly in src/tools/ may not go up a level, files in
+  // its subfolders not two levels.
+  {
+    files: [`apps/cli/src/tools/*.${SOURCE}`],
+    rules: toolModuleRestrictions(['../*', '../**']),
+  },
+  {
+    files: [`apps/cli/src/tools/*/**/*.${SOURCE}`],
+    rules: toolModuleRestrictions(['../../*', '../../**']),
+  },
   {
     // Node-only code gets Node globals: build tooling, config files and tests (which run in Node).
     // Shared packages get none. The repository scripts under tools/ print to the terminal.
