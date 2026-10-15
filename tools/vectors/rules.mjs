@@ -33,6 +33,11 @@ export const RUNTIME_EXCEPTIONS = Object.freeze({
  * runtime without the marker still needs every case, and a suite with both a marker and any case
  * result is a problem.
  *
+ * An implemented suite may leave single cases to a later card (pending-suites.json `cases`, M1-7d):
+ * each such case records a passing `kind: 'pending-case'` marker instead of a result. Fail closed in
+ * the same way: a failed marker leaves the case missing, and a case with both a marker and a passing
+ * result is a problem.
+ *
  * A suite may declare `runtimes` (its vector file's `runtimes.only`, citing a spec runtime table;
  * IR-M1-1h-1 Q7). It then needs exactly those runtimes, and any result from another runtime is a
  * problem.
@@ -51,6 +56,7 @@ export function checkCoverage(report, suites, required = REQUIRED_RUNTIMES) {
 
   const passed = new Set();
   const pending = new Set();
+  const pendingCase = new Set();
   const ranCases = new Set();
   const ranIn = new Set();
   for (const file of results) {
@@ -62,13 +68,22 @@ export function checkCoverage(report, suites, required = REQUIRED_RUNTIMES) {
         continue;
       }
       if (meta.kind === 'case') ranCases.add(meta.suite);
-      if (meta.kind === 'case' || meta.kind === 'pending')
+      if (meta.kind === 'case' || meta.kind === 'pending' || meta.kind === 'pending-case')
         ranIn.add(`${meta.runtime}\u0000${meta.suite}`);
       if (assertion.status !== 'passed') continue;
       if (meta.kind === 'identity') passed.add(`${meta.runtime}\u0000identity`);
       if (meta.kind === 'pending') pending.add(`${meta.runtime}\u0000${meta.suite}`);
       if (meta.kind === 'case')
         passed.add(`${meta.runtime}\u0000${meta.suite}\u0000${meta.caseId}`);
+      // A single case left to a later card (pending-suites.json `cases`): it ran nothing.
+      if (meta.kind === 'pending-case')
+        pendingCase.add(`${meta.runtime}\u0000${meta.suite}\u0000${meta.caseId}`);
+    }
+  }
+  for (const key of pendingCase) {
+    if (passed.has(key)) {
+      const [, suite, caseId] = key.split('\u0000');
+      problems.push(`${String(suite)}: case ${String(caseId)} reported as pending but also ran`);
     }
   }
 
@@ -110,7 +125,11 @@ export function checkCoverage(report, suites, required = REQUIRED_RUNTIMES) {
         if (ranCases.has(suite)) problems.push(`${suite}: reported as pending but ran cases`);
         continue;
       }
-      const missing = caseIds.filter((id) => !passed.has(`${runtime}\u0000${suite}\u0000${id}`));
+      const missing = caseIds.filter(
+        (id) =>
+          !passed.has(`${runtime}\u0000${suite}\u0000${id}`) &&
+          !pendingCase.has(`${runtime}\u0000${suite}\u0000${id}`),
+      );
       if (missing.length > 0) {
         problems.push(`${runtime}: ${suite}: no passing result for ${missing.join(', ')}`);
       }
@@ -147,6 +166,106 @@ export function pendingSuites(report, suites = [], required = REQUIRED_RUNTIMES)
     if (needed.every((runtime) => runtimes.has(runtime))) out.set(suite, card);
   }
   return out;
+}
+
+/**
+ * The single cases reported as pending in every runtime their suite runs in: suite -> card and ids.
+ * For display only; checkCoverage decides pass or fail.
+ *
+ * @param {unknown} report Parsed Vitest JSON report.
+ * @param {ReadonlyArray<{ suite: string, runtimes?: readonly string[] }>} [suites] Declared runtimes.
+ * @param {readonly string[]} [required]
+ * @returns {Map<string, { card: string, ids: string[] }>}
+ */
+export function pendingCases(report, suites = [], required = REQUIRED_RUNTIMES) {
+  const seen = new Map();
+  const results = /** @type {{ testResults?: unknown }} */ (report ?? {}).testResults;
+  for (const file of Array.isArray(results) ? results : []) {
+    for (const assertion of file?.assertionResults ?? []) {
+      const meta = assertion?.meta?.vectors;
+      if (meta?.kind !== 'pending-case' || assertion.status !== 'passed') continue;
+      const key = `${String(meta.suite)}\u0000${String(meta.caseId)}`;
+      const entry = seen.get(key) ?? { card: String(meta.detail), runtimes: new Set() };
+      entry.runtimes.add(meta.runtime);
+      seen.set(key, entry);
+    }
+  }
+  const out = new Map();
+  for (const [key, { card, runtimes }] of seen) {
+    const [suite, caseId] = key.split('\u0000');
+    const declared = suites.find((s) => s.suite === suite)?.runtimes;
+    const needed = Array.isArray(declared) ? declared : required;
+    if (!needed.every((runtime) => runtimes.has(runtime))) continue;
+    const entry = out.get(suite) ?? { card, ids: [] };
+    entry.ids.push(caseId);
+    out.set(suite, entry);
+  }
+  return out;
+}
+
+/**
+ * Pending cases only shrink, like pending suites (M1-7d). Each `cases` entry of pending-suites.json
+ * names a card, a phase and a non-empty list of distinct case ids. Compared with the base branch, a
+ * case may be pending only if it did not run there: it was pending there under the same card and
+ * phase, or its whole suite was pending there (and the cases keep that suite's phase), or the suite
+ * is new. A suite that ran all its cases on the base can never start skipping one.
+ *
+ * @param {{ cases: ReadonlyMap<string, { card?: unknown, phase?: unknown, ids?: unknown }> }} head
+ * @param {{ pending: ReadonlyMap<string, { phase?: unknown }>, cases: ReadonlyMap<string, { card?: unknown, phase?: unknown, ids?: unknown }>, suites: ReadonlySet<string> }} base
+ * @returns {string[]} Problems.
+ */
+export function checkPendingCaseShrinks(head, base) {
+  const problems = [];
+  for (const [suite, entry] of head.cases) {
+    if (!CARD.test(String(entry?.card)) || !PHASE.test(String(entry?.phase))) {
+      problems.push(
+        `${suite}: a pending-cases entry needs a card (e.g. M1-1a) and a phase (e.g. M1a)`,
+      );
+    }
+    const ids = entry?.ids;
+    if (
+      !Array.isArray(ids) ||
+      ids.length === 0 ||
+      ids.some((id) => typeof id !== 'string' || id === '') ||
+      new Set(ids).size !== ids.length
+    ) {
+      problems.push(`${suite}: a pending-cases entry needs a non-empty list of distinct case ids`);
+      continue;
+    }
+    const before = base.cases.get(suite);
+    if (before !== undefined) {
+      if (before.card !== entry.card || before.phase !== entry.phase) {
+        problems.push(
+          `${suite}: its pending cases changed card or phase from ${String(before.card)}/${String(before.phase)}; an existing entry can only shrink`,
+        );
+      }
+      const earlier = new Set(Array.isArray(before.ids) ? before.ids : []);
+      const added = ids.filter((id) => !earlier.has(id));
+      if (added.length > 0 && !base.pending.has(suite)) {
+        problems.push(
+          `${suite}: cases ${added.join(', ')} ran on the base; pending cases only shrink`,
+        );
+      }
+    } else if (base.pending.has(suite)) {
+      // Suite -> cases transition (IR-M1-7d-1 F-3): the leftover cases keep the suite's phase, so
+      // they cannot move to a later card's phase and leave its release gate. checkPendingCards then
+      // ties that phase to the card's backlog phase.
+      const suiteEntry = /** @type {{ phase?: unknown } | undefined} */ (base.pending.get(suite));
+      if (suiteEntry?.phase !== entry.phase) {
+        problems.push(
+          `${suite}: pending cases must keep the phase ${String(suiteEntry?.phase)} the suite had on the base, not ${String(entry.phase)}`,
+        );
+      }
+    } else if (base.suites.has(suite)) {
+      problems.push(`${suite}: ran all its cases on the base branch; pending cases only shrink`);
+    }
+  }
+  return problems;
+}
+
+/** The `cases` entries keyed for checkPendingCards and checkPendingGate. */
+export function pendingCaseEntries(cases) {
+  return new Map([...cases].map(([suite, entry]) => [`${suite} (pending cases)`, entry]));
 }
 
 const CARD = /^M[0-9]+-[0-9A-Za-z]+(-[0-9A-Za-z]+)*$/;

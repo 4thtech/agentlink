@@ -372,6 +372,9 @@ importers:
 
   test-vectors:
     devDependencies:
+      '@agentlink/core':
+        specifier: workspace:*
+        version: link:../packages/core
       '@agentlink/crypto':
         specifier: workspace:*
         version: link:../packages/crypto

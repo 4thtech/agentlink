@@ -18,7 +18,7 @@ declare module 'vitest' {
   }
   interface TaskMeta {
     vectors?: {
-      readonly kind: 'identity' | 'case' | 'pending';
+      readonly kind: 'identity' | 'case' | 'pending' | 'pending-case';
       readonly runtime: string;
       readonly detail?: string;
       readonly suite?: string;
@@ -30,6 +30,10 @@ declare module 'vitest' {
 const expectedRuntime = inject('vectorsRuntime');
 const pendingSuites: ReadonlyMap<string, { readonly card: string; readonly phase: string }> =
   new Map(Object.entries(pending.suites));
+const pendingCases: ReadonlyMap<
+  string,
+  { readonly card: string; readonly phase: string; readonly ids: readonly string[] }
+> = new Map(Object.entries(pending.cases));
 
 test('runtime identity', ({ task }) => {
   const observed = observeRuntime();
@@ -92,7 +96,29 @@ for (const { directory, file } of vectorFiles) {
       return;
     }
 
+    // Single cases left to a later card (pending-suites.json `cases`, M1-7d): every listed id must
+    // be a case of this file, and each records a pending marker instead of running.
+    const pendingIds = new Set<string>(pendingCases.get(file.suite)?.ids ?? []);
+    test('every pending case is a case of this file', () => {
+      const ids = new Set(cases.map((c) => c.id));
+      expect([...pendingIds].filter((id) => !ids.has(id))).toEqual([]);
+    });
+
     for (const testCase of cases) {
+      if (pendingIds.has(testCase.id)) {
+        const card = pendingCases.get(file.suite)?.card ?? '';
+        test(`${testCase.id} (pending: ${card})`, ({ task }) => {
+          task.meta.vectors = {
+            kind: 'pending-case',
+            runtime: observeRuntime().id,
+            suite: file.suite,
+            caseId: testCase.id,
+            detail: card,
+          };
+          expect(suite, `"${file.suite}" has pending cases but no module`).toBeDefined();
+        });
+        continue;
+      }
       test(testCase.id, async ({ task }) => {
         task.meta.vectors = {
           kind: 'case',

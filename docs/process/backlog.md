@@ -67,7 +67,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 117 (M1a 62, M1b 55; recounted from the cards on 2026-10-14; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| M1 Local beta | 118 (M1a 63, M1b 55; recounted from the cards on 2026-10-14; M1-8g added from IR-M1-7d-1 F-2; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 21 (incl. 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
@@ -1855,7 +1855,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Threat note (draft):** "Safety code checked" is the owner's statement that the code matched; a wrong one hides a MITM the owner believes was ruled out. Threats: (a) the label is set without the owner: a forged or replayed `contact.check`, one signed by another key, for another agent, expired, with a lifetime over 24 h, or a database edit of `safety_check` or `safety_code_checked` (I-4); (b) the label is set for another contact or another pairing than the one the owner compared: a check for contact X applied to Y, an upper-case or checksummed `contact` that normalises to a stored ID, a digest of an earlier pairing kept across a re-pair, or a digest compared with a stored digest instead of a fresh recomputation; (c) a tampered stored `handshake` or `handshake-ack` still yields a checked label; (d) a race: a re-pair completes between the recomputation and the write, so the stored check names the old pairing; two deliveries of one object both apply; (e) inbound or untrusted content (the contact's name, the stored envelopes) reaches an error or a log line (I-5). Stopped by: the strict `contact.check` schema (M1-2f), which rejects instead of normalising; the owner signature checked against `ownerNostr` of the agent's own stored card, with `agent` bound to the agent's own ID; the G-7 freshness and lifetime bounds; `pairingDigest` compared only with the digest recomputed from the stored signed `handshake` and `handshake-ack` (04 §3.6.1 steps 1-5, M1-7c), which fails closed on any tampered message; one store transaction that re-reads the contact's pairing envelope IDs, checks and records the nonce (07 §3.4) and writes `safety_check`; `safetyCodeChecked` derived on every read by re-verifying the stored object against a fresh recomputation, never from `safety_code_checked`; a completed re-pair clears it; fixed refusal codes with no input text; no MCP tool produces or passes a `contact.check` (I-4). Residual: a same-OS-user process that deletes nonce rows can replay an unexpired check (G-1, bounded by 24 h and by the digest, which still has to match the current pairing); a modified installation can show one code and have another digest signed (G-1, 04 §2.5).
 
 #### M1-7d · core: policy engine and owner-signed policies
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** ready (planning 2026-10-15: dependencies M1-7a #48, M1-2b #31, M1-2e #72 merged; G-6 and G-7 resolved in 04 §2.5.1 and 06 §3) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7a, M1-2b, M1-2e; gaps G-6, G-7 resolved
 - **Spec:** 07 §2 (pure `evaluate`); 06 §3; 04 §2.5, §2.5.2 (D-68); 02 F-61–F-63
@@ -1873,6 +1873,10 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - G-7 boundaries (04 §2.5.1), per op: `issuedAt = now + 300` is accepted and `now + 301` refused; `now = expiresAt` is accepted and `expiresAt + 1` refused; a lifetime of exactly `L(op)` is accepted and `L(op) + 1` refused; an `approval.decide` whose `expiresAt` is after the request's is refused; a replay of an applied `approval.cancel` within its lifetime is refused by its nonce; two concurrent deliveries of one object apply it once (nonce check, record and apply in one transaction); a re-published `agent.revoke` is a no-op, not an error.
   - Property test: `evaluate` is deterministic and has no side effects.
   - `approval.decideBatch` verification (D-68, 04 §2.5.1, §2.5.2; moved here from M1-2e, which covers only the schema and its vectors). Each is refused and reported, applies nothing and burns the nonce where 04 §2.5.2 says so: items for more than one agent (the object's `agent` must own every item's request); a commitment item in a batch; `expiresAt` later than the earliest item's request expiry, or a lifetime above `L(op)`; an item whose `actionDigest` does not match its pending request; a batch signature presented as another op, or another op's signature presented as a batch (cross-op replay); a batch signed by a key other than the agent's owner key.
+- **Planning notes (2026-10-15):**
+  - The policy-version high-water mark is a KeyStore item (04 §2.5.1, §2.2, §2.8), but the `KeyStore` interface (`@agentlink/crypto`) has no such item yet. M1-7d defines a narrow `PolicyVersionMark` interface in core (read; raise to max(mark, version), never lower) that the client takes as an option; without one, a stored policy always fails closed. The Node keychain and file backends implement it in M1-8g (S2, filed from IR-M1-7d-1 F-2); until then a Node client cannot apply a policy, and every loaded policy fails closed.
+  - Out of scope here, with their owners: applying `contact.check` (M1-7c-b); revocation envelopes and the `revoked_agents` write (M1-7h; `agent.revoke` verification, which skips expiry, lifetime and the nonce, is here); the auto-accept limits of `commitments` (M1-20; until then `commitments.accept` is read as is and auto-accept never applies); the files, proofs and receipts rules (M1-7i; until then a proof or file action that the policy does not deny gives `approval`, never `allow`); creating requests, use-once and the requests queue (M1-7e).
+- **Threat note (draft):** assets: the owner's authority over approvals and policy (I-4) and the policy itself. Entry points: a `SignedOwnerAction` from the CLI, the local UI or an `approval` / `policy` envelope (untrusted bytes until verified, I-5); the stored `policies`, `approvals` and `owner_action_nonces` rows (writable by a same-user process); the KeyStore policy mark. Abuse cases: (a) a forged, re-encoded or cross-op object (envelope-tagged signature, another agent's or another owner's object, a batch read as a decide) is applied; (b) a replay of an applied object within its lifetime, or two concurrent deliveries applying twice; (c) a stale or future-dated object, or a decision that outlives its request; (d) a batch that slips in another agent's, an already-decided, an expired, a mismatched or a commitment item, or is applied in part, or whose refused nonce can be reused later; (e) a policy row edited, deleted or rolled back in the store, or the mark deleted, falling back to looser defaults (G-6); (f) a stored approval reused for another action after its row was edited. Stopped by: strict parsing (I-JSON, integers only) and the strict schemas, which reject instead of normalising; the owner-action tag over sha256(JCS(body)) with `op` and `params` inside; the `agent` and `owner` binding against the own card; G-7 skew, expiry and `L(op)` with `now` passed in; nonce check, record and effects in one store transaction, with a refused batch's nonce burnt in that transaction; the digest recomputed from the stored request; re-verification on every load and use; fail closed when the mark is above 0 or unknown. Residual: a same-user process that rolls back both the store and the KeyStore mark, or deletes nonce rows, can replay or roll back within the G-1 residual (04 §2.5, D-67); a modified installation can have a different object signed (G-1).
 
 #### M1-7i · core: policy rules for files, proofs and receipts (new, split from M1-7d)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -1891,7 +1895,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-7e · core: approvals, requests queue, idempotency
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
-- **Depends on:** M1-7d
+- **Depends on:** M1-7d, M1-8g (a Node client applies no policy before it)
 - **Spec:** 06 §1 rule 6, §2.5; 03 §3, §4.5; 04 §2.5.2 (batch approval, D-68); 07 §3 (`approvals.signed_decision`); 02 F-62, F-65, J4
 - **Invariants:** I-4
 - **Scope:**
@@ -2123,7 +2127,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-8f · node: passphrase-locked file KeyStore for headless machines (new, D-54)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the critical path: M1-9a needs only M1-8a's `needs_setup`; only the `--keystore file` branch of M1-9a waits for this card; proposed, owner confirms at merge)
 - **Repo/path:** agentlink · packages/node
-- **Depends on:** M1-1f (`ALKS`/`ALKO` seal/open), M1-1g, M1-8a (keychain probe, recorded backend), M1-8c (owner passphrase path); M1-8b for the shared inter-process lock
+- **Depends on:** M1-1f (`ALKS`/`ALKO` seal/open), M1-1g, M1-8a (keychain probe, recorded backend), M1-8c (owner passphrase path); M1-8b for the shared inter-process lock; M1-8g (the policy-version mark item of the file KeyStore)
 - **Spec:** 04 §2.8 (format, KDF, unlock, owner key on a headless machine, file handling, threat delta, required tests); 07 §9; 06 §7; D-54
 - **Invariants:** I-1, I-4, I-7, I-10
 - **Scope:**
@@ -2141,6 +2145,22 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `KeyEpochControl` as in M1-8a (IR-M1-1g-d-1 M-1, L-5). The advance writes the epoch with the 04 §2.8 write protocol, so it is atomic and durable. Every open `KeyStore` instance over the same file sees it at once. The control accepts only sessions the paired `OwnerKeyStore` minted.
   - Unlock time on the reference container is recorded in the PR. Up to 5 s is accepted (async); above that it goes to the owner (04 §2.8), never a silent parameter change. Node's built-in `crypto.argon2` is not used without an owner allowlist decision.
   - (IR-M1-8c-1 F-10, F-11) The TTY prompt tests run unconditionally in CI (a pseudo-terminal, not skipped when no TTY is present), and the owner and passphrase prompts refuse C0 control characters in the typed input.
+
+#### M1-8g · node: policy-version mark in the keychain and file KeyStores (new, IR-M1-7d-1 F-2)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/node (keychain item; file KeyStore item), packages/crypto (`ALKS` item kind, if the file format changes), test-vectors (`keystore-file`, if it changes)
+- **Depends on:** M1-7d (the `PolicyVersionMark` interface in `@agentlink/core`), M1-8a, M1-8b (the inter-process lock)
+- **Spec:** 04 §2.5.1 ("Stored objects are re-verified": the highest applied version is a KeyStore item), §2.2, §2.8; 07 §3.4 (`policies` apply order: store first, then the mark; max-only); 06 §6 (inter-process lock); 06 §3 (G-6)
+- **Invariants:** I-4
+- **Scope:**
+  - Implement core's `PolicyVersionMark` (`read`, `raise`) for both Node backends, and pass it as the client's `policyMark` wherever the Node runtime opens a client. Until this lands, a Node client refuses every `policy.set` and every loaded policy fails closed (M1-7d).
+  - Keychain: one item per agent under service `agentlink`, account `<agentId>:policy-version` (04 §2.2 naming), value the version as a canonical integer.
+  - File KeyStore: the mark as an item of the agent's `ALKS` file, or a documented sibling item; if `ALKS` v1 changes, the 04 §2.8 text, the strict parser and the `keystore-file` vectors change with it (M1-8f implements the file KeyStore with the item from the start).
+  - `raise(version)` sets max(mark, version) under the inter-process lock and never lowers the mark; a missing item reads 0 (the core then fails closed when a `policies` row exists, M1-7d), and a failed read throws, which the core treats as fail closed.
+- **Acceptance:**
+  - Tests first. Two processes raising concurrently end at the larger version; a raise to a lower version changes nothing; a raise failure leaves the store row ahead of the mark and the next load fails closed.
+  - A same-user script that deletes the `policies` row, or puts back an older signed row, gets the fail-closed result, never the defaults (M1-7d tests repeated against the real backends).
+  - An unreadable or malformed mark item is never read as 0.
 
 ### CLI and MCP server (`@4thtech/agentlink`, `apps/cli`)
 

@@ -12,7 +12,13 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkCoverage, diffSnapshots, pendingSuites, REQUIRED_RUNTIMES } from './rules.mjs';
+import {
+  checkCoverage,
+  diffSnapshots,
+  pendingCases,
+  pendingSuites,
+  REQUIRED_RUNTIMES,
+} from './rules.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const vectorsDir = join(root, 'test-vectors');
@@ -111,6 +117,22 @@ if (pending.size > 0) {
     if (process.env.GITHUB_ACTIONS === 'true') {
       console.log(
         `::warning title=vectors pending::${suite} (${String(count)} cases) is not run until ${card} implements it`,
+      );
+    }
+  }
+}
+
+// Single cases of implemented suites left to a later card (pending-suites.json `cases`).
+const skipped = pendingCases(report, suites);
+if (skipped.size > 0) {
+  console.log(
+    '\nvectors:check pending cases (suite implemented, these cases left to a later card)',
+  );
+  for (const [suite, { card, ids }] of skipped) {
+    console.log(`  ${suite.padEnd(16)} ${String(ids.length)} case(s), not run: ${card}`);
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      console.log(
+        `::warning title=vector cases pending::${suite} (${String(ids.length)} cases) are not run until ${card} implements them`,
       );
     }
   }
