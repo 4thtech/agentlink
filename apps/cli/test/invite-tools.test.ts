@@ -413,9 +413,13 @@ describe('agentlink_create_invite', () => {
     const made = await call(w.alice, 'agentlink_create_invite', { label });
     expect(made.structured.status).toBe('ok');
     expect(everything(made)).not.toContain('Marko');
-    const stored = (await rows(w.alice)).invites[0]!.label;
-    expect(stored).not.toBeNull();
-    expect(String(stored)).not.toContain('Marko');
+    const row = (await rows(w.alice)).invites[0]!;
+    expect(row.label).not.toBeNull();
+    const opened = await w.alice.cipher.open(
+      { table: 'invites', column: 'label', rowKey: rowKeyOf([row.invite_id]) },
+      row.label!,
+    );
+    expect(opened).toBe(label);
   });
 
   it('answers an invalid label with fixed text and no invite', async () => {
@@ -639,9 +643,16 @@ describe('hostile invite contents (I-5)', () => {
         expect(text).not.toContain(part);
       }
     }
-    const stored = (await rows(hostile.bob)).approvals.map((a) => a.summary);
-    for (const summary of stored) {
-      for (const part of PARTS) expect(String(summary)).not.toContain(part);
+    // Read the stored summaries through the cipher (the column is sealed), as `approve` does.
+    const approvalRows = (await rows(hostile.bob)).approvals;
+    expect(approvalRows.length).toBeGreaterThan(0);
+    for (const row of approvalRows) {
+      const summary = await hostile.bob.cipher.open(
+        { table: 'approvals', column: 'summary', rowKey: rowKeyOf([row.approval_id]) },
+        row.summary,
+      );
+      expect(summary).toContain('Accept an invite from');
+      for (const part of PARTS) expect(summary).not.toContain(part);
     }
   });
 

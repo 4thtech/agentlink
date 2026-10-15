@@ -33,7 +33,7 @@ export const INVITE_TEXT = Object.freeze({
   approvalExpiredNextStep: 'Call the tool again without approvalId to ask the owner again.',
   approvalUsed: 'That approval was already used, so nothing was done.',
   approvalUsedNextStep:
-    'The invite was accepted the first time. Check agentlink_list_contacts before asking again.',
+    'Check agentlink_list_contacts. If the contact is not there, pairing did not complete: call the tool again without approvalId to ask the owner for a new approval.',
   approvalVoid: "That approval can't be used for this invite, so nothing was done.",
   approvalVoidNextStep: 'Call the tool again without approvalId to ask the owner for a new one.',
   approvalPending: "The owner hasn't decided on this request yet, so nothing was done.",
