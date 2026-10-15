@@ -16,6 +16,15 @@ AgentLink is built in public, and its full specifications are long. This folder 
 - It contains no private material: no secrets, no contract addresses, no details of unfixed vulnerabilities.
 - Report a mistake by opening an issue at https://github.com/4thtech/agentlink/issues. Report a security problem privately, as described in [SECURITY.md](../SECURITY.md).
 
+## Size budget
+
+The whole knowledge base (`llms.txt` plus every file in this folder) is loaded into the chat's context on every answer, so its size costs money.
+
+- **Target:** at most 30,000 tokens in total. **Hard maximum:** 80,000 tokens.
+- **Method:** tokens are estimated as bytes divided by 4, rounded up. The check `node tools/check-knowledge-size.mjs` (part of `pnpm lint`) prints each file's estimate, warns above the target and fails above the hard maximum.
+- Prefer tightening over growth: when adding something, remove or shorten something else.
+- Each file states its purpose in its first sentence or two.
+
 ## Files
 
 | File | What it covers |

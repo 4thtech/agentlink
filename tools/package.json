@@ -2,11 +2,11 @@
   "name": "@agentlink/tools",
   "version": "0.0.0",
   "private": true,
-  "description": "Repository check scripts (manifest policy, architecture boundaries). Not published.",
+  "description": "Repository check scripts (manifest policy, knowledge-base size budget, architecture boundaries). Not published.",
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "check": "node check-manifests.mjs && node deps-check/index.mjs",
+    "check": "node check-manifests.mjs && node check-knowledge-size.mjs && node deps-check/index.mjs",
     "lint": "eslint .",
     "test": "vitest run"
   }
