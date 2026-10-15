@@ -3198,6 +3198,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Review cases (IR-D55-1): two concurrent retries with one `approvalId` → one `accept` (F06); a second scope for the same envelope voids the pending first, and both approved never yields two accepts (F06); a grant row inserted directly in the store authorises nothing (F10); `cancel` voids a waiting receipt (F11); `note` with `accept` → `INVALID_ARGUMENT` (F03); a counterparty offer whose `previousTermsHash` points to an older version, or a second envelope for an existing version, is refused, and concurrent counters void pending scopes on both versions but never one whose `accept` ran (F04, IR-D55-2 N01); an `accept` of version 3 arriving after version 4 was sent is stored and offered for `confirm` with the warning (F08); the digest computed at creation verifies at run time (F05).
   - Property test: across random interleavings of offers, counters, approvals and `proof` envelopes, no scope ever sends more than one `accept` or signs more than one receipt, and nothing runs without an owner-signed approval or a matching grant.
 
+#### M1-32-b · core: terms idempotency and order-independent receive (new, IR-M1-9q-1 F-2, F-3)
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (must land before the M1a gate, and before firm offers, M1-9d)
+- **Repo/path:** agentlink · packages/core
+- **Depends on:** M1-32, M1-7e (idempotency)
+- **Spec:** 04 §3.4 (the chain rules, envelopeHash duplicates, signed createdAt only for judging answers); D-74; 06 §1 rule 6, §2.2a; 07 §3.2, §3.3
+- **Invariants:** I-4, I-5, I-7
+- **Scope:**
+  - F-2: `proposeTerms` and `respondToTerms` honour `clientRequestId` exactly as `sendMessage` does (M1-7e, M1-7k): the same key and request return the identical result with no second publish; another request under the key returns `IDEMPOTENCY_KEY_REUSED` and runs nothing; a concurrent repeat is `in_progress`; a kept `pending_approval` whose approval was decided reports the approval state; every effect transaction (the envelope, the approval request, the policy grant) carries the call's lease; a takeover resumes from the stored effects.
+  - F-3: the receive path never depends on arrival order or createdAt. An `offer` the chain refuses only because a version it links to has not arrived (version gap, pointer to an envelope not held yet) waits, stays `received`, and is decided again in link order once other envelopes of its chain are taken, in the same pass or a later one. It is refused (`terms_refused`) only when the wait lapses, 48 h after its signed createdAt.
+- **Acceptance:**
+  - Tests first (RED commit). The reviewer's repro: v1 and v2 created in the same second and received in one sync → v2 is applied, v1 gives `TERMS_SUPERSEDED`, v2 gives `pending_approval`.
+  - Property test: a chain from both parties arriving in random permutations and random sync batches, the same second and a reversed createdAt included, always ends in the same state.
+  - A repeated propose, counter, reject or accept under one `clientRequestId` sends exactly once (relay spy) and returns the identical result; a different request under the key is `IDEMPOTENCY_KEY_REUSED`.
+
 #### M1-GATE · Milestone 1 gate: internal audit and user testing
 - **Status:** backlog · **Size:** M · **Tier:** Opus (audit session) + Owner (sign-off) · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** private audit store (`audit-rules.md` §4.5); summary in the owner's sync file

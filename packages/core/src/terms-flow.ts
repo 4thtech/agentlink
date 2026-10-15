@@ -20,6 +20,10 @@
 // - The receipt parts (ACCEPTED / REJECTED, and the deferred receipt of 07 §2.1 step 4) are signed
 //   by M1-7g (M1b): this module creates them, keeps their state, and gives M1-7g the lookup and the
 //   atomic claim. Records (`notarize`, firm offers) are M1-7i: `notarize` is refused for now.
+// - With a `clientRequestId`, propose() and respond() are idempotent as sendMessage is (06 §1 rule
+//   6, 07 §3.3; M1-32-b): a repeat returns the original result and sends nothing; another request
+//   under the same key is IDEMPOTENCY_KEY_REUSED. Every effect transaction (the envelope, the
+//   approval request, the policy grant) carries the call's lease.
 //
 // Errors and log lines carry fixed codes only; nothing from inbound terms or the contact's name goes
 // into an error, a log line or a summary beyond the 06 §2.1 name rule (I-5, I-7). No MCP tool can
@@ -51,9 +55,12 @@ import {
   insertCommitmentPartsTx,
   voidPendingScopeTx,
   type ApprovalService,
+  type ApprovalState,
   type CommitmentPartRow,
   type PendingApproval,
 } from './approvals.js';
+import { IDEMPOTENCY_KEY_REUSED } from './constants.js';
+import type { IdempotencyRun, IdempotencyService } from './idempotency.js';
 import {
   checkCommitmentBinding,
   commitmentParts,
@@ -114,7 +121,9 @@ export type TermsCode =
   | 'APPROVAL_VOID'
   | 'POLICY_DENIED'
   /** `notarize` (records, firm offers) needs the proof flow (M1-7i, M1b). Nothing is sent. */
-  | 'NOTARIZE_UNAVAILABLE';
+  | 'NOTARIZE_UNAVAILABLE'
+  /** The same clientRequestId with a different request (06 §1 rule 6, 07 §3.3). Nothing runs. */
+  | typeof IDEMPOTENCY_KEY_REUSED;
 
 /** The verified on-chain record of an envelope that this agent knows (M1-7g supplies it). */
 export interface KnownRecord {
@@ -137,6 +146,8 @@ export interface ProposeTermsInput {
   readonly note?: string;
   readonly notarize?: boolean;
   readonly approvalId?: string;
+  /** Repeats with the same value return the original result and send nothing (07 §3.3). */
+  readonly clientRequestId?: string;
 }
 
 export type RespondDecision = 'accept' | 'reject' | 'counter';
@@ -149,6 +160,24 @@ export interface RespondToTermsInput {
   readonly note?: string;
   readonly notarize?: boolean;
   readonly approvalId?: string;
+  /** Repeats with the same value return the original result and send nothing (07 §3.3). */
+  readonly clientRequestId?: string;
+}
+
+/** Another execution holds this clientRequestId: nothing ran; call again shortly (07 §3.3). */
+export interface TermsInProgress {
+  readonly status: 'in_progress';
+}
+
+/**
+ * A repeat of a call whose kept result was `pending_approval`, after that approval stopped being
+ * pending: its current state, as `agentlink_get_approval` reports it, never the stale result
+ * (07 §3.3 "Stale approvals"). To run an approved call, call again with `approvalId`.
+ */
+export interface TermsApprovalState {
+  readonly status: 'approval_state';
+  readonly approvalId: string;
+  readonly approval: ApprovalState;
 }
 
 /** What a receipt part is doing (06 §2.2a). */
@@ -220,21 +249,26 @@ export interface TermsSent {
   readonly validUntil: number;
 }
 
-export type ProposeTermsResult = TermsSent | TermsRejected | TermsPending;
+/** One run of a propose call: what is kept for its clientRequestId. */
+type ProposeOutcome = TermsSent | TermsRejected | TermsPending;
 
-export type RespondToTermsResult =
-  | {
-      readonly status: 'ok';
-      readonly decision: RespondDecision;
-      readonly thread: string;
-      readonly termsId: string;
-      readonly version: number;
-      readonly termsHash: string;
-      readonly envelopeId?: string;
-      readonly receipt?: ReceiptState;
-    }
-  | TermsRejected
-  | TermsPending;
+export type ProposeTermsResult = ProposeOutcome | TermsInProgress | TermsApprovalState;
+
+export interface TermsResponded {
+  readonly status: 'ok';
+  readonly decision: RespondDecision;
+  readonly thread: string;
+  readonly termsId: string;
+  readonly version: number;
+  readonly termsHash: string;
+  readonly envelopeId?: string;
+  readonly receipt?: ReceiptState;
+}
+
+/** One run of a respond call: what is kept for its clientRequestId. */
+type RespondOutcome = TermsResponded | TermsRejected | TermsPending;
+
+export type RespondToTermsResult = RespondOutcome | TermsInProgress | TermsApprovalState;
 
 /** One negotiation as the agent may list it (the terms stay untrusted content, I-5). */
 export interface NegotiationSummary {
@@ -267,6 +301,8 @@ export interface TermsDeps {
   readonly ownerActions: OwnerActions;
   readonly approvals: ApprovalService;
   readonly records?: RecordLookup;
+  /** `clientRequestId` idempotency (07 §3.3). Without it a call with a clientRequestId fails closed. */
+  readonly idempotency?: IdempotencyService;
 }
 
 const rejected = (code: TermsCode, extra: Partial<TermsRejected> = {}): TermsRejected => ({
@@ -279,6 +315,15 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
 const isEnvelopeId = (v: unknown): v is string => base64url(BYTE_LENGTHS.id).safeParse(v).success;
+
+/** A kept terms result (07 §3.3): only these are ever stored for a clientRequestId. */
+const isKeptResult = (v: unknown): boolean =>
+  isObject(v) && (v.status === 'ok' || v.status === 'rejected' || v.status === 'pending_approval');
+
+/** The optional `clientRequestId` and `approvalId` are strings when present. */
+const keyFieldsValid = (input: Record<string, unknown>): boolean =>
+  (input.clientRequestId === undefined || typeof input.clientRequestId === 'string') &&
+  (input.approvalId === undefined || typeof input.approvalId === 'string');
 
 /** The parts of a decision as stored rows (07 §3.5): the envelope, the record, the receipt. */
 function partRows(parts: readonly CommitmentPart[]): CommitmentPartRow[] {
@@ -361,6 +406,8 @@ interface CommitCall {
   readonly envelopeId: string;
   readonly decision: RespondDecision;
   readonly notarize: boolean;
+  /** The call's idempotency execution: every effect transaction carries its lease (07 §3.3). */
+  readonly run?: IdempotencyRun;
 }
 
 /** A commitment about to be scoped: the answered record and what the decision needs. */
@@ -407,6 +454,76 @@ export class TermsService {
     return contact;
   }
 
+  #idempotency(): IdempotencyService {
+    const service = this.#deps.idempotency;
+    if (service === undefined) {
+      throw new CoreError('idempotency_unavailable', 'Repeat protection is not available.');
+    }
+    return service;
+  }
+
+  /**
+   * `clientRequestId` idempotency for the terms tools (06 §1 rule 6, 07 §3.3; IR-M1-9q-1 F-2), as
+   * for `sendMessage`: the row decides replay (the identical result, nothing runs or is
+   * published), IDEMPOTENCY_KEY_REUSED (another request under the key: nothing runs, nothing of the
+   * original is returned), in progress, a stale pending approval (its current state), resume (a
+   * takeover finishes from the stored effects, never runs blindly), or run. Every effect
+   * transaction of the run carries the lease (#sendEnvelope, #insertGrant, approvals.request). A run
+   * that throws before any effect deletes its row, so a retry runs once the cause is fixed.
+   */
+  async #idempotent<R extends ProposeOutcome | RespondOutcome>(
+    tool: string,
+    input: { readonly clientRequestId?: unknown; readonly approvalId?: unknown },
+    args: Record<string, unknown>,
+    run: (run: IdempotencyRun | undefined) => Promise<R>,
+    resume: (run: IdempotencyRun) => Promise<R>,
+  ): Promise<R | TermsRejected | TermsInProgress | TermsApprovalState> {
+    const clientRequestId = input.clientRequestId;
+    if (clientRequestId === undefined) return run(undefined);
+    const idempotency = this.#idempotency();
+    const start = await idempotency.begin({
+      tool,
+      clientRequestId: clientRequestId as string,
+      ...(typeof input.approvalId === 'string' ? { approvalId: input.approvalId } : {}),
+      args,
+    });
+    switch (start.kind) {
+      case 'replay':
+        if (!isKeptResult(start.result)) {
+          throw new CoreError('store_unreadable', 'A stored value could not be read.');
+        }
+        return start.result as R;
+      case 'key_reused':
+        return rejected(IDEMPOTENCY_KEY_REUSED);
+      case 'in_progress':
+        return { status: 'in_progress' };
+      case 'stale_approval':
+        return {
+          status: 'approval_state',
+          approvalId: start.approvalId,
+          approval: await this.#deps.approvals.read(start.approvalId),
+        };
+      case 'resume': {
+        const done = await resume(start.run);
+        await idempotency.finish(start.run, done);
+        return done;
+      }
+      case 'run': {
+        let done: R;
+        try {
+          done = await run(start.run);
+        } catch (error) {
+          if (start.run.effects.length === 0) {
+            await idempotency.finish(start.run, null, { keep: false }).catch(() => false);
+          }
+          throw error;
+        }
+        await idempotency.finish(start.run, done);
+        return done;
+      }
+    }
+  }
+
   async #policy(): Promise<EffectivePolicy> {
     return this.#deps.ownerActions.loadPolicy();
   }
@@ -427,6 +544,7 @@ export class TermsService {
     readonly thread?: string;
     readonly snapshot: TermsSnapshot;
     readonly claimTx?: (tx: StoreTx, envelopeId: string, envelopeJson: string) => boolean;
+    readonly run?: IdempotencyRun | undefined;
   }): Promise<
     | { readonly kind: 'sent'; readonly envelopeId: string; readonly thread: string }
     | { readonly kind: 'stale' | 'denied' | 'lost' }
@@ -451,6 +569,9 @@ export class TermsService {
     }
     const rows = await outbox.prepareRows(built.envelope, routes);
     const envelopeId = built.envelope.id;
+    const run = input.run;
+    const effect =
+      run === undefined ? undefined : await this.#idempotency().prepareEffect(run, [envelopeId]);
     const outcome = await this.#ctx.store.transaction((tx) => {
       if (!snapshotCurrentTx(tx, input.snapshot)) return 'stale' as const;
       const contact = tx.get('contacts', { contact_id: input.to });
@@ -460,11 +581,17 @@ export class TermsService {
       if (input.claimTx !== undefined && !input.claimTx(tx, envelopeId, json)) {
         return 'lost' as const;
       }
+      // The call's lease, in the transaction that stores the envelope (07 §3.3 "Effects"): if
+      // another execution owns the call, the whole transaction aborts and nothing is stored.
+      if (run !== undefined && !this.#idempotency().effectTx(tx, run, effect!)) {
+        throw new CoreError('idempotency_lost', 'This request is already being handled.');
+      }
       tx.insert('envelopes', row);
       for (const r of rows) tx.insert('outbox', r);
       return 'stored' as const;
     });
     if (outcome !== 'stored') return { kind: outcome };
+    if (run !== undefined) this.#idempotency().committed(run, effect!);
     this.#ctx.log.info('terms envelope stored for sending', { wraps: rows.length });
     await this.#publish(envelopeId);
     return { kind: 'sent', envelopeId, thread: built.thread };
@@ -498,8 +625,33 @@ export class TermsService {
     if (input.notarize === true && input.note !== undefined) return rejected('INVALID_ARGUMENT');
     const note = readNote(input.note);
     if (!note.ok) return rejected('INVALID_ARGUMENT');
+    if (!keyFieldsValid(input as unknown as Record<string, unknown>)) {
+      return rejected('INVALID_ARGUMENT');
+    }
     if (input.notarize === true) return rejected('NOTARIZE_UNAVAILABLE');
+    // `args` as for `action.args` (04 §3.4.1): defaults applied, without approvalId and
+    // clientRequestId. The terms are the caller's TermsInput as given.
+    const args = {
+      to: input.to,
+      terms: input.terms,
+      revises: input.revises ?? null,
+      note: note.note,
+      notarize: false,
+    };
+    return this.#idempotent(
+      PROPOSE_TERMS_TOOL,
+      input,
+      args,
+      (run) => this.#proposeRun(input, note.note, run),
+      (run) => this.#resumeOffer(run),
+    );
+  }
 
+  async #proposeRun(
+    input: ProposeTermsInput,
+    note: string | null,
+    run: IdempotencyRun | undefined,
+  ): Promise<ProposeOutcome> {
     const to = input.to;
     for (let attempt = 0; attempt < CHAIN_ATTEMPTS; attempt += 1) {
       await this.#deps.identity.assertCanSend();
@@ -547,10 +699,49 @@ export class TermsService {
         now,
       });
       if (!terms.success) return rejected('INVALID_ARGUMENT');
-      const sent = await this.#sendOffer(to, terms.data, note.note, link.replyTo, thread, snapshot);
+      const sent = await this.#sendOffer(to, terms.data, note, link.replyTo, thread, snapshot, run);
       if (sent !== 'stale') return sent;
     }
     return rejected('TERMS_SUPERSEDED');
+  }
+
+  /**
+   * A takeover of a propose call that already stored its offer (07 §3.3 "Resume"): the result from
+   * the stored offer, and its pending rows published; never a second offer.
+   */
+  async #resumeOffer(run: IdempotencyRun): Promise<TermsSent> {
+    const { record } = await this.#storedEffect(run);
+    if (record.type !== 'offer') {
+      throw new CoreError('store_unreadable', 'A stored value could not be read.');
+    }
+    await this.#publish(record.envelopeId);
+    return {
+      status: 'ok',
+      envelopeId: record.envelopeId,
+      thread: record.thread,
+      termsId: record.terms.termsId,
+      version: record.terms.version,
+      termsHash: record.termsHash,
+      validUntil: record.terms.validUntil,
+    };
+  }
+
+  /** The envelope a run stored (its last envelope effect), read back through the chain. */
+  async #storedEffect(run: IdempotencyRun): Promise<{ readonly record: TermsRecord }> {
+    const unreadable = () => new CoreError('store_unreadable', 'A stored value could not be read.');
+    const envelopeId = [...run.effects].reverse().find((e) => isEnvelopeId(e));
+    if (envelopeId === undefined) throw unreadable();
+    const row = await this.#ctx.store.transaction((tx) =>
+      tx.get('envelopes', { envelope_id: envelopeId }),
+    );
+    if (row === undefined || row.direction !== 'out' || row.contact_id === null) {
+      throw unreadable();
+    }
+    const self = (await this.#self()).agentId;
+    const snapshot = await loadTermsSnapshot(this.#ctx, self, row.contact_id);
+    const record = snapshot.byEnvelope.get(envelopeId)?.record;
+    if (record === undefined || record.direction !== 'out') throw unreadable();
+    return { record };
   }
 
   async #sendOffer(
@@ -560,6 +751,7 @@ export class TermsService {
     replyTo: string | null,
     thread: string | undefined,
     snapshot: TermsSnapshot,
+    run: IdempotencyRun | undefined,
   ): Promise<TermsSent | TermsRejected | 'stale'> {
     const hash = termsHashOf(terms);
     const sent = await this.#sendEnvelope({
@@ -572,6 +764,7 @@ export class TermsService {
       },
       ...(thread === undefined ? {} : { thread }),
       snapshot,
+      run,
     });
     if (sent.kind === 'stale') return 'stale';
     if (sent.kind !== 'sent') return rejected('POLICY_DENIED');
@@ -613,25 +806,96 @@ export class TermsService {
     }
     const note = readNote(input.note);
     if (!note.ok) return rejected('INVALID_ARGUMENT');
-    if (input.approvalId !== undefined && typeof input.approvalId !== 'string') {
+    if (!keyFieldsValid(input as unknown as Record<string, unknown>)) {
       return rejected('INVALID_ARGUMENT');
     }
     if (notarize) return rejected('NOTARIZE_UNAVAILABLE');
+    // `args` as for `action.args` (04 §3.4.1): defaults applied, without approvalId and
+    // clientRequestId (the approvalId is part of the key instead).
+    const args = {
+      envelopeId: input.envelopeId,
+      decision,
+      terms: input.terms ?? null,
+      note: note.note,
+      notarize: false,
+    };
+    return this.#idempotent(
+      RESPOND_TO_TERMS_TOOL,
+      input,
+      args,
+      async (run) => {
+        for (let attempt = 0; attempt < CHAIN_ATTEMPTS; attempt += 1) {
+          const result = await this.#respondOnce(input, decision, note.note, run);
+          if (result !== 'stale') return result;
+        }
+        return rejected('TERMS_SUPERSEDED');
+      },
+      (run) => this.#resumeResponse(input, decision, run),
+    );
+  }
 
-    for (let attempt = 0; attempt < CHAIN_ATTEMPTS; attempt += 1) {
-      const result = await this.#respondOnce(input, decision, note.note);
-      if (result !== 'stale') return result;
+  /**
+   * A takeover of a respond call with stored effects (07 §3.3 "Resume"): never runs it blindly.
+   * A commitment (an approval among the effects, or a call with `approvalId`) continues through its
+   * scope, whose parts run at most once and are only ever republished; a sent `reject` or counter
+   * is reported from the stored envelope and its pending rows are published.
+   */
+  async #resumeResponse(
+    input: RespondToTermsInput,
+    decision: RespondDecision,
+    run: IdempotencyRun,
+  ): Promise<RespondOutcome> {
+    const self = (await this.#self()).agentId;
+    const call: CommitCall = { envelopeId: input.envelopeId, decision, notarize: false, run };
+    const approvalId =
+      [...run.effects].reverse().find((e) => e.startsWith('apr_')) ??
+      (decision === 'accept' ? input.approvalId : undefined);
+    if (approvalId !== undefined) {
+      const r = await this.#runScope(approvalId, call, self);
+      // This call's own accept already went out: report it as this call's result.
+      if (r.status === 'rejected' && r.code === 'APPROVAL_USED' && r.envelopeId !== undefined) {
+        const stored = await this.#stored(approvalId);
+        if (stored !== undefined) {
+          return {
+            status: 'ok',
+            decision,
+            thread: stored.scope.thread,
+            termsId: stored.scope.termsId,
+            version: stored.scope.version,
+            termsHash: stored.scope.termsHash,
+            envelopeId: r.envelopeId,
+            ...(r.receipt === undefined ? {} : { receipt: r.receipt }),
+          };
+        }
+      }
+      return r;
     }
-    return rejected('TERMS_SUPERSEDED');
+    const { record } = await this.#storedEffect(run);
+    await this.#publish(record.envelopeId);
+    return {
+      status: 'ok',
+      decision,
+      thread: record.thread,
+      termsId: record.terms.termsId,
+      version: record.terms.version,
+      termsHash: record.termsHash,
+      envelopeId: record.envelopeId,
+    };
   }
 
   async #respondOnce(
     input: RespondToTermsInput,
     decision: RespondDecision,
     note: string | null,
-  ): Promise<RespondToTermsResult | 'stale'> {
+    run: IdempotencyRun | undefined,
+  ): Promise<RespondOutcome | 'stale'> {
     const self = (await this.#self()).agentId;
-    const call: CommitCall = { envelopeId: input.envelopeId, decision, notarize: false };
+    const call: CommitCall = {
+      envelopeId: input.envelopeId,
+      decision,
+      notarize: false,
+      ...(run === undefined ? {} : { run }),
+    };
     if (input.approvalId !== undefined && decision === 'accept') {
       const used = await this.#runApproved(input.approvalId, call, self);
       if (used !== 'fresh') return used;
@@ -667,7 +931,7 @@ export class TermsService {
       if (now > own.terms.validUntil) return rejected('TERMS_EXPIRED');
       if (decision === 'reject') {
         // 06 §2.2a path (b): replyTo names our own offer, whose terms it carries (IR-D-74-1 F04).
-        return this.#sendAnswer('reject', own, note, snapshot, contactId);
+        return this.#sendAnswer('reject', own, note, snapshot, contactId, run);
       }
       // `confirm`: ACCEPTED on their ACCEPT record. No message.
       const record = await this.#deps.records?.recordOf(rec.envelopeHash);
@@ -711,6 +975,7 @@ export class TermsService {
         link.replyTo,
         rec.thread,
         snapshot,
+        run,
       );
       if (sent === 'stale') return 'stale';
       if (sent.status !== 'ok') return sent;
@@ -730,7 +995,7 @@ export class TermsService {
       }
       if (newestOffer(n)?.envelopeId !== rec.envelopeId) return rejected('TERMS_SUPERSEDED');
       if (now > rec.terms.validUntil) return rejected('TERMS_EXPIRED');
-      return this.#sendAnswer('reject', rec, note, snapshot, contactId);
+      return this.#sendAnswer('reject', rec, note, snapshot, contactId, run);
     }
 
     // accept on (a): a commitment. After our accept for it ran, a new scope covers the receipt only.
@@ -779,7 +1044,8 @@ export class TermsService {
     note: string | null,
     snapshot: TermsSnapshot,
     contactId: string,
-  ): Promise<RespondToTermsResult | 'stale'> {
+    run: IdempotencyRun | undefined,
+  ): Promise<RespondOutcome | 'stale'> {
     const sent = await this.#sendEnvelope({
       to: contactId,
       payload: {
@@ -790,6 +1056,7 @@ export class TermsService {
       },
       thread: offer.thread,
       snapshot,
+      run,
     });
     if (sent.kind === 'stale') return 'stale';
     if (sent.kind !== 'sent') return rejected('POLICY_DENIED');
@@ -851,7 +1118,7 @@ export class TermsService {
   }
 
   /** A new scope for `plan`: void, deny, a policy grant that runs now, or one pending request. */
-  async #commit(plan: CommitPlan): Promise<RespondToTermsResult | 'stale'> {
+  async #commit(plan: CommitPlan): Promise<RespondOutcome | 'stale'> {
     const self = (await this.#self()).agentId;
     const now = nowOf(this.#ctx);
     const scope = this.#scopeOf(plan, self, now);
@@ -872,12 +1139,15 @@ export class TermsService {
     const scopeKey = plan.answered.envelopeId;
     const parts = partRows(plan.parts);
     if (evaluation.decision === 'approval') {
-      const pending = await this.#deps.approvals.request({
-        action,
-        summary: this.#summaryOf(plan),
-        answersEnvelopeId: plan.answered.envelopeId,
-        commitment: { scopeKey, parts },
-      });
+      const pending = await this.#deps.approvals.request(
+        {
+          action,
+          summary: this.#summaryOf(plan),
+          answersEnvelopeId: plan.answered.envelopeId,
+          commitment: { scopeKey, parts },
+        },
+        plan.call.run === undefined ? {} : { run: plan.call.run },
+      );
       const card = this.#card(plan, scope, evaluation.autoAccept);
       return { ...pending, card };
     }
@@ -889,6 +1159,7 @@ export class TermsService {
       parts,
       evaluation.grant.policyHash,
       this.#summaryOf(plan),
+      plan.call.run,
     );
     return this.#runScope(approvalId, plan.call, self);
   }
@@ -900,6 +1171,7 @@ export class TermsService {
     parts: readonly CommitmentPartRow[],
     policyHash: string,
     summary: string,
+    run: IdempotencyRun | undefined,
   ): Promise<string> {
     const ctx = this.#ctx;
     const now = nowOf(ctx);
@@ -908,7 +1180,13 @@ export class TermsService {
     const sealedAction = await seal(ctx, 'approvals', 'action_json', key, canonicalize(action));
     const sealedSummary = await seal(ctx, 'approvals', 'summary', key, summary);
     const sealedHash = await seal(ctx, 'approvals', 'policy_hash', key, policyHash);
+    const effect =
+      run === undefined ? undefined : await this.#idempotency().prepareEffect(run, [approvalId]);
     await ctx.store.transaction((tx) => {
+      // The call's lease, in the transaction that stores the grant (07 §3.3 "Effects").
+      if (run !== undefined && !this.#idempotency().effectTx(tx, run, effect!)) {
+        throw new CoreError('idempotency_lost', 'This request is already being handled.');
+      }
       voidPendingScopeTx(tx, scopeKey, now);
       tx.insert('approvals', {
         approval_id: approvalId,
@@ -928,6 +1206,7 @@ export class TermsService {
       });
       insertCommitmentPartsTx(tx, approvalId, parts, now);
     });
+    if (run !== undefined) this.#idempotency().committed(run, effect!);
     return approvalId;
   }
 
@@ -1109,7 +1388,7 @@ export class TermsService {
     approvalId: string,
     call: CommitCall,
     self: string,
-  ): Promise<RespondToTermsResult | 'fresh'> {
+  ): Promise<RespondOutcome | 'fresh'> {
     const stored = await this.#stored(approvalId);
     if (stored === undefined) return rejected('APPROVAL_VOID');
     if (stored.scope.agentId !== self) return rejected('APPROVAL_VOID');
@@ -1125,11 +1404,7 @@ export class TermsService {
   }
 
   /** Runs the parts of a stored scope that have not run, each at most once. */
-  async #runScope(
-    approvalId: string,
-    call: CommitCall,
-    selfId: string,
-  ): Promise<RespondToTermsResult> {
+  async #runScope(approvalId: string, call: CommitCall, selfId: string): Promise<RespondOutcome> {
     for (let attempt = 0; attempt < CHAIN_ATTEMPTS; attempt += 1) {
       const r = await this.#runScopeOnce(approvalId, call, selfId);
       if (r !== 'stale') return r;
@@ -1141,7 +1416,7 @@ export class TermsService {
     approvalId: string,
     call: CommitCall,
     selfId: string,
-  ): Promise<RespondToTermsResult | 'stale'> {
+  ): Promise<RespondOutcome | 'stale'> {
     const stored = await this.#stored(approvalId);
     if (stored === undefined) return rejected('APPROVAL_VOID');
     const self = await this.#self();
@@ -1161,7 +1436,7 @@ export class TermsService {
             status: receiptPart.state === 'done' ? 'recorded' : 'waiting_for_record',
             until: scope.expiresAt,
           };
-    const ok = (envelopeId?: string): RespondToTermsResult => {
+    const ok = (envelopeId?: string): RespondOutcome => {
       const rc = receipt();
       return {
         status: 'ok',
@@ -1284,6 +1559,7 @@ export class TermsService {
       },
       thread: offer.thread,
       snapshot,
+      run: call.run,
       claimTx: (tx, envelopeId, json) => {
         // Another scope for the same answered envelope already claimed its envelope part (F06).
         if (scopeKey !== null) {

@@ -170,6 +170,7 @@ export class AgentLinkClient {
       outbox: this.outbox,
       ownerActions: this.ownerActions,
       approvals: this.approvalService,
+      idempotency: this.idempotency,
       ...(records === undefined ? {} : { records }),
     });
     this.acks = new DeliveryAcks(
