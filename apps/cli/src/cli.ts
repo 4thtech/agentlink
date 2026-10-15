@@ -11,6 +11,7 @@ import { doctorHandler } from './commands/doctor.js';
 import { inviteHandler } from './commands/invite.js';
 import { requestsHandler } from './commands/requests.js';
 import { statusHandler } from './commands/status.js';
+import { createInitHandler, nodeInitDeps } from './commands/init.js';
 import { createDispatcher } from './dispatch.js';
 import { createOutput } from './output.js';
 
@@ -27,6 +28,7 @@ function packageVersion(): string {
 }
 
 const dispatch = createDispatcher({
+  init: createInitHandler(nodeInitDeps()),
   invite: inviteHandler,
   accept: acceptHandler,
   contacts: contactsHandler,

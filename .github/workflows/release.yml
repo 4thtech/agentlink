@@ -98,7 +98,7 @@ jobs:
   guard:
     name: guard
     if: github.repository_owner == '4thtech'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -145,7 +145,7 @@ jobs:
     name: select-mode
     needs: guard
     if: needs.guard.outputs.enabled == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -171,7 +171,7 @@ jobs:
     name: version
     needs: select-mode
     if: needs.select-mode.outputs.mode == 'version'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     concurrency:
       group: release-version
@@ -206,7 +206,7 @@ jobs:
     name: pack
     needs: select-mode
     if: needs.select-mode.outputs.mode == 'publish'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read # no id-token here: build code never sees the OIDC token
@@ -245,7 +245,7 @@ jobs:
     name: publish-next
     needs: [guard, select-mode, pack]
     if: needs.select-mode.outputs.mode == 'publish' && needs.guard.outputs.channel == 'next' && vars.DEPLOY_FREEZE != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: npm-next
     concurrency:
@@ -396,7 +396,7 @@ jobs:
     name: smoke-next
     needs: publish-next
     if: needs.publish-next.result == 'success' && needs.publish-next.outputs.published == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read # no credentials: this job runs the published code
@@ -440,7 +440,7 @@ jobs:
     name: publish-latest
     needs: [guard, select-mode, pack]
     if: needs.select-mode.outputs.mode == 'publish' && needs.guard.outputs.channel == 'latest' && vars.DEPLOY_FREEZE != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     # Required reviewer @talirezun: this job waits for the approval click.
     environment: npm-publish
@@ -693,7 +693,7 @@ jobs:
     name: smoke-latest
     needs: publish-latest
     if: needs.publish-latest.result == 'success' && needs.publish-latest.outputs.published == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read # no credentials: this job runs the published code
@@ -736,7 +736,7 @@ jobs:
     name: rollback-latest
     needs: [publish-latest, smoke-latest]
     if: always() && needs.smoke-latest.result == 'failure'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: npm-publish
     concurrency:
@@ -803,7 +803,7 @@ jobs:
       (needs.publish-next.outputs.published == 'true' && needs.publish-next.result != 'success') ||
       (needs.publish-latest.outputs.published == 'true' && needs.publish-latest.result != 'success') ||
       needs.smoke-latest.result == 'failure')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     environment: deploy-freeze
     permissions: {}
@@ -827,7 +827,7 @@ jobs:
     name: record
     needs: [publish-latest, smoke-latest]
     if: always() && needs.publish-latest.outputs.published == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       actions: read # who approved the deployment

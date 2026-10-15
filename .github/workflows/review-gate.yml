@@ -62,7 +62,7 @@ jobs:
     name: review-gate
     # pull_request_review has no branch filter: ignore reviews on PRs into the coordination branch.
     if: github.event_name == 'merge_group' || github.event.pull_request.base.ref != 'sync'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read # repository metadata for the API calls
