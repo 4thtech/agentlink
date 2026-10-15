@@ -12,6 +12,8 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'KEYCHAIN_SERVICE',
       'LOCAL_APPROVAL_LIFETIME_S',
       'MAX_APPROVAL_BATCH_ITEMS',
+      // M1-5b-b: the relay connector, resolver and NIP-11 fetcher (no seam, no CA or route option).
+      'NIP11_TIMEOUT_MS',
       'NodeKeyStoreError',
       // M1-8b: the store entry returns the Store and its cipher, never the store key.
       'NodeStoreError',
@@ -19,6 +21,9 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'createOsKeychainAgent',
       'decideReviewedApprovals',
       'initOwner',
+      'nodeHostResolver',
+      'nodeNip11Fetcher',
+      'nodeRelayConnector',
       'openAgentKeyStore',
       'openAgentStore',
       'packageName',
@@ -48,6 +53,10 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'openAgentStoreWith',
       'createAgentStoreCipher',
       'SqliteStore',
+      // M1-5b-b: the test seams (extra CA, route to a local port, injected lookup) stay internal.
+      'createRelayConnectorWith',
+      'createNip11FetcherWith',
+      'createHostResolverWith',
     ]) {
       expect(names).not.toContain(name);
     }

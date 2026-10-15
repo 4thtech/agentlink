@@ -786,3 +786,20 @@ describe('IR-M1-1f-1 L-2: deep imports into a workspace package', () => {
     ).not.toMatch(DEEP);
   });
 });
+
+describe('M1-5b-b: relay sockets only in packages/node', () => {
+  it('allows ws in packages/node and refuses it everywhere else', () => {
+    expect(violationFor('packages/node', 'ws', 'packages/node/src/relay-io.ts')).toBeNull();
+    for (const zone of ['packages/core', 'packages/transport-nostr', 'apps/cli', 'apps/console']) {
+      expect(violationFor(zone, 'ws', `${zone}/src/a.ts`)).toMatch(/@agentlink\/node/);
+      expect(violationFor(zone, 'ws/lib/websocket.js', `${zone}/src/a.ts`)).toMatch(
+        /@agentlink\/node/,
+      );
+    }
+  });
+
+  it('allows ws as a runtime dependency of packages/node only', () => {
+    expect(manifest('packages/node', { dependencies: { ws: '8.22.0' } })).toEqual([]);
+    expect(manifest('packages/core', { dependencies: { ws: '8.22.0' } })).not.toEqual([]);
+  });
+});
