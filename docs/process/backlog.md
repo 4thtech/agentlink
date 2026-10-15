@@ -2283,7 +2283,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### CLI and MCP server (`@4thtech/agentlink`, `apps/cli`)
 
 #### M1-9j · spec: InboundMessage shape, M1a approval channel, handler module (new, D-73)
-- **Status:** in-progress · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
+- **Status:** in-progress (spec in 4thtech/agentlink#103) · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · docs/foundation/06-mcp-server.md, 03-architecture.md, 07-sdk-transport-storage.md, docs/process/backlog.md
 - **Depends on:** D-73 (1) and (3) (decided)
 - **Spec:** 06 §2.2, §2.5, §4, §6; 03 §3, §4.5; IR-D48-1 F15f; G-15
