@@ -157,6 +157,7 @@ function fake(
     storedCounts: reject,
     storageMode: reject,
     syncInbox: reject,
+    inboxPage: reject,
     send: reject,
     contacts: () =>
       Promise.resolve(options.contacts ?? [contact(B, 'Marko'), contact(C, 'Ana', 'pending')]),
