@@ -2911,7 +2911,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Two people new to AgentLink complete J1 from the docs alone (observed, times recorded; install → first message under 5 minutes).
 
 #### M1-13a · e2e: two agents on two harnesses
-- **Status:** in review (4thtech/agentlink#155; IR-M1-13a-1 PASS with changes; LLM variant runs by manual dispatch only, no schedule until the owner sizes the credit; pending first dispatch on main) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#155; IR-M1-13a-1 PASS with changes; LLM variant runs by manual dispatch only, no schedule until the owner sizes the credit; first dispatch on main 2026-10-15: 7 of 13, L04 failed because Codex omitted approvalId; see the test report 5.2) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · e2e/, .github/workflows/e2e.yml
 - **Depends on:** M1-9c, M1-9o, M1-9p, M1-12a, M1-1g-c (boundary guards scan e2e/); the e2e runner and credentials are decided in D-73 (9)
 - **Spec:** 10 M1-13; 06 §9; 02 J1, J9
@@ -2922,6 +2922,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Deterministic variant green on PRs within 15 minutes; LLM variant pass rate reported per run.
   - Canary scan of all e2e logs and artifacts finds no plaintext or keys.
+  - Follow-up from the first LLM dispatch (run 38798822130, test report 5.2): L04 failed because Codex (`gpt-5.4-mini`) called `agentlink_accept_invite` again without `approvalId`. Check that the tool description and skill make the second call with the `approvalId` clear, then re-run the LLM variant; decide whether L04 should retry once or stay a hard failure.
 
 #### M1-13c · e2e: files, proof and proof of agreement (new, split from M1-13a)
 - **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
