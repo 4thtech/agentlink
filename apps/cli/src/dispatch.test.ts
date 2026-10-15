@@ -237,6 +237,17 @@ describe('an MCP-side process cannot approve (04 §2.5, I-4)', () => {
     expect(r.calls[0]?.parsed.positionals).toEqual([id]);
   });
 
+  it('a shell the agent controls with a faked TTY and cleared markers passes the guard: it is not the boundary (D-67)', async () => {
+    // IR-M1-9k-1 F04: e.g. `env -u CLAUDECODE script -q /dev/null agentlink approve <id>`. Nothing may
+    // rely on the guard; the owner-presence step in the handler (M1-9b) is what stops the agent.
+    const r = recorder();
+    const faked = io({ stdinIsTTY: true, stdoutIsTTY: true, env: { PATH: '/usr/bin' } });
+    expect(await createDispatcher({ approve: r.handler })(['approve', newId()], faked.value)).toBe(
+      EXIT_OK,
+    );
+    expect(r.calls).toHaveLength(1);
+  });
+
   it('`contacts` without --verify and `mcp` are not owner commands', async () => {
     const r = recorder();
     const dispatch = createDispatcher({ contacts: r.handler, mcp: r.handler });
