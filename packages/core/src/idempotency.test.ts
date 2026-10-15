@@ -324,3 +324,46 @@ describe('finish (07 §3.3 "Which results are kept")', () => {
     expect(await t.store.transaction((tx) => tx.count('approvals'))).toBe(0);
   });
 });
+
+describe('input bounds in begin (07 §3.3; IR-M1-7e-1 F02)', () => {
+  type Setup = Awaited<ReturnType<typeof setup>>;
+  const refused = async (t: Setup, key: Parameters<Setup['idem']['begin']>[0]) => {
+    const error = await t.idem.begin(key).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(CoreError);
+    expect((error as CoreError).code).toBe('idempotency_args_invalid');
+    expect((error as CoreError).message).toBe('The call input could not be recorded.');
+    expect(await t.store.transaction((tx) => tx.count('idempotency'))).toBe(0);
+  };
+
+  it('refuses an empty clientRequestId', async () => {
+    const t = await setup();
+    await refused(t, t.key({ clientRequestId: '' }));
+  });
+
+  it('refuses 257 bytes, counted as UTF-8 bytes, not characters', async () => {
+    const t = await setup();
+    await refused(t, t.key({ clientRequestId: 'r'.repeat(257) }));
+    // 86 three-byte characters are 258 bytes in 86 UTF-16 code units.
+    await refused(t, t.key({ clientRequestId: '€'.repeat(86) }));
+  });
+
+  it('accepts exactly 256 bytes', async () => {
+    const t = await setup();
+    expect((await t.idem.begin(t.key({ clientRequestId: 'r'.repeat(256) }))).kind).toBe('run');
+    const u = await setup();
+    // 85 three-byte characters and one ASCII byte: 256 bytes.
+    const mixed = `${'€'.repeat(85)}r`;
+    expect((await u.idem.begin(u.key({ clientRequestId: mixed }))).kind).toBe('run');
+  });
+
+  it('refuses a clientRequestId that is not well-formed text', async () => {
+    const t = await setup();
+    await refused(t, t.key({ clientRequestId: 'req-\ud800' }));
+  });
+
+  it('refuses a tool outside the 06 §2.0 name set', async () => {
+    const t = await setup();
+    await refused(t, { ...t.key(), tool: 'agentlink_requests_accept' });
+    await refused(t, { ...t.key(), tool: '' });
+  });
+});

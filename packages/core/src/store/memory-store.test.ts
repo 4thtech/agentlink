@@ -55,6 +55,7 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
         'outbox',
         'seen',
         'held_envelopes',
+        'blocked_keys',
         'rate_counters',
         'idempotency',
         'owner_action_nonces',
