@@ -2,8 +2,8 @@
 // helpers and the untrusted-content wrapper. `callTool` is the one entry the MCP binding
 // (src/mcp/) and the mirroring CLI commands use, so a command and its tool cannot drift.
 //
-// Handlers for invites and terms land with M1-9o and M1-9q; until then their tools are registered
-// and answer with the fixed "not available yet" error (06 §1 rule 3). Send and inbox are M1-9p's.
+// Every M1a tool has its handler: invites (M1-9o), send and inbox (M1-9p), terms (M1-9q). A tool
+// whose card has not landed would answer the fixed "not available yet" error (06 §1 rule 3).
 import type { McpToolName } from '@agentlink/types';
 import { acceptInviteHandler } from './accept-invite.js';
 import type { HandlerEnvironment, ToolContext } from './context.js';
@@ -11,6 +11,8 @@ import { createInviteHandler } from './create-invite.js';
 import { getApprovalHandler } from './get-approval.js';
 import { inboxHandler } from './inbox.js';
 import { matchesSchema } from './input.js';
+import { proposeTermsHandler } from './propose-terms.js';
+import { respondToTermsHandler } from './respond-to-terms.js';
 import { listContactsHandler } from './list-contacts.js';
 import { findTool } from './registry.js';
 import {
@@ -37,8 +39,8 @@ export const HANDLERS: Readonly<Partial<Record<McpToolName, ToolHandler>>> = Obj
   agentlink_accept_invite: acceptInviteHandler,
   agentlink_list_contacts: listContactsHandler,
   agentlink_send: sendHandler,
-  agentlink_propose_terms: stub, // M1-9q
-  agentlink_respond_to_terms: stub, // M1-9q
+  agentlink_propose_terms: proposeTermsHandler,
+  agentlink_respond_to_terms: respondToTermsHandler,
   agentlink_inbox: inboxHandler,
   agentlink_get_approval: getApprovalHandler,
 });

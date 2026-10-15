@@ -18,6 +18,8 @@ export const OWNER_TEXT = Object.freeze({
     "That approval isn't waiting for a decision any more: it was already decided, cancelled or has expired.",
   problem:
     "Problem  This approval doesn't match what was requested, so it can't be approved. Ask your AI to make the request again.",
+  problemTerms:
+    "Problem  These terms don't match what was requested, so they can't be approved. Ask your AI to make the request again.",
   problemListed:
     "Problem  One approval doesn't match what was requested, so it isn't offered. Ask your AI to make the request again.",
   noIdentity:
