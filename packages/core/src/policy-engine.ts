@@ -146,15 +146,13 @@ function isAllowedContact(policy: PolicyDocument, contact: string): boolean {
 }
 
 /**
- * TODO(G-6 reading (owner decision pending, IR-M1-7d-1 F-1)): what a paired contact's envelope gets
- * while the policy fails closed. `strict` (current): `contacts.allowed` is a decision value that can
- * no longer be read, so an unreadable narrower list counts as a deny and becomes approval (06 §3):
- * receiving from and sending to a paired contact both need the owner. `paired`: read `allowed` as
- * "paired" under fail closed, so paired-contact Talk keeps working within the hard caps (a narrower
- * list is then not honoured while the policy is invalid). Switching is this one constant plus its
- * test rows; 06 §3 is not changed here.
+ * What a paired contact's envelope gets while the policy fails closed (06 §3, G-6; D-70, decided by
+ * the owner on 2026-10-15, IR-M1-7d-1 F-1): `contacts.allowed` reads as "paired", so a paired
+ * contact may Talk (receive and send) without approval, within the hard caps. Residual: a narrower
+ * `allowed` list is not honoured while the policy is invalid. Commitments, paid actions and
+ * owner-gated actions still need approval, and unknown senders are still queued.
  */
-export const FAIL_CLOSED_CONTACTS = 'strict' as 'strict' | 'paired';
+export const FAIL_CLOSED_CONTACTS = 'paired' as 'strict' | 'paired';
 
 /** A paired contact's envelope while the policy fails closed (see FAIL_CLOSED_CONTACTS). */
 const failClosedContact = (): PolicyDecision =>

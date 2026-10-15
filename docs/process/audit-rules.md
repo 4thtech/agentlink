@@ -232,7 +232,7 @@ Reviewers apply every checklist the diff touches. Item IDs are stable; new items
 - KY-1 Agent seed only in the OS keychain (service `agentlink`, account `<agentId>`, the agent's EVM address, 04 §2.9; the loaded seed must derive it), or Worker secret / DO storage in the user's account.
 - KY-2 Owner seed never stored unwrapped on the agent machine; unlock only by localhost passkey PRF or owner passphrase.
 - KY-3 Every owner operation (04 §2.5 list) is an owner-signed object verified against the owner key in the agent card before it applies; nonce and `issuedAt` prevent replay.
-- KY-4 Policies are signed documents re-verified on load; unsigned or tampered → defaults.
+- KY-4 Policies are signed documents re-verified on load; once a version has been applied, a missing, unsigned, tampered or rolled-back policy fails closed (06 §3, G-6), never the defaults.
 - KY-5 Local UI: bound to `127.0.0.1`; session token in memory only; token grants viewing only; `Host` and `Origin` checks; no reusable bearer token on disk.
 - KY-6 The same-OS-user test (M1-8) exists, covers the change and passes.
 - KY-7 No MCP tool code path reaches `OwnerKeyStore`.
