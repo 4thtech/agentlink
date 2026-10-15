@@ -112,6 +112,10 @@ interface Store { /* contacts, threads, envelopes, records, approvals, policies 
 interface ApprovalChannel { request(a: ApprovalRequest): Promise<{ approvalId; url? }>; status(id): Promise<ApprovalChannelStatus>; }
 ```
 
+**Channels per packaging (D-73 (3); proposed details, owner confirms at merge).** Local M1a: `LocalApprovalChannel` (`apps/cli`, M1-9k) returns no URL and reports only `pending` or `unknown`, because the owner's own CLI process applies the signed decision through core on the shared store (§4.5, 06 §2.5). Local M1b: the local approval server returns the `127.0.0.1` page URL. Desktop app: the native approval window. Console: the signed object arrives in an `approval` envelope, `status` returns it as `signed` and the core verifies it (`collect`).
+
+**Tool handlers (G-15, D-73 (1)).** The MCP tool handlers are one runtime-agnostic module in `apps/cli/src/tools/` (no `node:*` and no `@agentlink/node` imports), which the stdio server uses in M1 and which moves into a shared package for the cloud agent at M2-3b (06 §1).
+
 ---
 
 ## 4. Data flows
@@ -180,7 +184,8 @@ Direct mode: any core may call the contract itself (paying gas in the chain's na
 
 ### 4.5 Approval
 
-Local: tool returns `pending_approval{id, summary, url}` → local UI at `http://127.0.0.1:<port>/approve/<id>` plus OS notification → owner confirms **with passkey (or owner passphrase)**, producing an owner-signed approval → core verifies the signature and marks it approved → agent retries with `approvalId`. A shell-capable agent cannot approve its own request (04 §2.5).
+Local, M1a (D-73 (3); 06 §2.5): there is no approval page yet. The tool returns `pending_approval{id, summary}` with no URL, and `nextStep` names `agentlink approve <id>`, which the owner runs personally in a terminal the agent does not control. That CLI process opens the same agent and store, asks for owner presence once, signs the `approval.decide` and applies it through its own core client on the shared SQLite store; the core verifies the owner signature and stores the signed object with the nonce in one transaction (04 §2.5.1). The agent retries with `approvalId`, and the server's core re-verifies the stored signed object before the action runs. The M1a `ApprovalChannel` only returns the ticket and reports `pending`; it never carries a decision, and nothing passes between the processes except through the store.
+Local, M1b: tool returns `pending_approval{id, summary, url}` → local UI at `http://127.0.0.1:<port>/approve/<id>` plus OS notification → owner confirms **with passkey (or owner passphrase)**, producing an owner-signed approval → core verifies the signature and marks it approved → agent retries with `approvalId`. A shell-capable agent cannot approve its own request (04 §2.5).
 Batch (D-68): the owner reviews one agent's pending requests as one list (`agentlink approve` in M1a, the local UI in M1b) and confirms once; one owner signature covers exactly the reviewed items (`approval.decideBatch`, 04 §2.5.2). Commitments are never batched; each keeps its own approval. No unlock session outlives that one operation.
 Desktop app (M2): same flow, but the approval opens in a **native approval window** and the owner confirms with OS biometrics (Touch ID / Windows Hello) instead of a localhost page (04 §2.5).
 Console: approval request is sent as an encrypted envelope to the owner key; the console shows it; the owner's signed approval is returned over Talk to the agent.

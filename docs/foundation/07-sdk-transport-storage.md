@@ -16,7 +16,7 @@ All packages live in the public `agentlink` monorepo (see 09). Every package mus
 | `@agentlink/storage` | types, crypto | `StorageAdapter` interface; `inline`, `drop` (default, D-48) and `s3` adapters (P0); `gdrive`, `dropbox`, `onedrive` connectors (P1, M2, D-49); `ipfs-pinning` (P2); storage selection (§5.6) |
 | `@agentlink/core` | all above | `AgentLinkClient`: identity, contacts, envelopes, threads, files, proofs, policies, approvals; `Store`, `ApprovalChannel` interfaces (the key interfaces are in crypto, G-2) |
 | `@agentlink/node` | core | Node implementations: keychain `KeyStore` and the opt-in passphrase-locked file `KeyStore` for headless machines (§9, D-54), SQLite `Store`, local approval server (Node only) |
-| `@4thtech/agentlink` | node, core | CLI + MCP server (stdio) (Node only) |
+| `@4thtech/agentlink` | node, core | CLI + MCP server (stdio) (Node only). Its tool handlers (`src/tools/`) import no Node module and are moved into a shared package for the cloud agent at M2-3b (06 §1, G-15, D-73 (1)) |
 
 Integrators use `@agentlink/core` directly (with their own `KeyStore`/`Store`) and pass their `appId` to earn integrator fees.
 
@@ -84,7 +84,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | `approvals` | approval_id, action_json (`enc`: `args` can hold message text), scope_json (commitments, D-55; immutable after creation, carried in `action.context.scope`, 04 §3.4.2), answers_envelope_id, scope_key (at most one live scope per value, §3.5), source (owner \| policy grant, with the policy hash `enc`), signed_decision (the owner's `SignedOwnerAction`: an `approval.decide`, or the `approval.decideBatch` that covers this row, copied per row and re-verified for this row's `approvalId`, 04 §2.5.2, D-68; re-verified on every use, `status` is only a cache, 04 §2.5.1), signed_cancel (the owner's `approval.cancel`, if any; re-verified on use), parts in `commitment_parts` (§3.5; this replaces the earlier parts_used_json), summary (`enc`: it names the contact), status (pending \| approved \| denied \| expired \| cancelled \| void; an approval other than a commitment becomes `void` in the transaction of its one use, and a status only ever takes authority away, never grants it: proposed, owner confirms at merge, M1-7e), expires_at, created_at, decided_at |
 | `policies` | The current signed policy, one row (§3.4); this replaces the earlier key, value_json, updated_at |
 | `sync_cursors` | relay_url, last_seen |
-| `outbox`, `seen`, `held_envelopes`, `blocked_keys`, `rate_counters` | Delivery (§3.2) |
+| `outbox`, `seen`, `held_envelopes`, `blocked_keys`, `rate_counters`, `publisher_lease` | Delivery (§3.2) |
 | `idempotency` | Tool results by `clientRequestId` (§3.3) |
 | `owner_action_nonces`, `revoked_agents` | Owner authority (§3.4) |
 | `budget_ledger`, `budget_state`, `commitment_parts` | Money and commitments (§3.5) |
@@ -227,6 +227,22 @@ Every mutating call runs: **policy check → (approval) → action → store →
 - **Retention.** Buckets with bucket ≤ now − 3 600 are deleted.
 - **At rest.** In clear (IDs and counts).
 - **On failure.** A counter that cannot be read counts as being at the limit for that contact. Other contacts are not affected.
+
+**`publisher_lease`**: which process of an agent keeps the relay subscriptions and runs the background loop (06 §6; D-73, derived; proposed, owner confirms at merge; M1-9r).
+
+| Column | Type and meaning |
+|---|---|
+| name | text: the lease, `subscriptions` (the only value in M1) |
+| holder | `id`: 16 random bytes, base64url, chosen by each server process at start |
+| lease_until | `int`: unix seconds |
+
+- **Keys.** name is the primary key; the store holds one agent, so there is one row.
+- **Take.** In one store transaction a process inserts the row with its holder and lease_until = now + 60, or replaces a row whose lease_until ≤ now with a compare-and-set on the old holder. A process whose take changes no row is not the holder and tries again 20 s later.
+- **Renew.** The holder sets lease_until = now + 60 every 20 s, with a compare-and-set on holder = its own. If that changes no row, it has lost the lease: it closes its subscriptions and stops the loop before doing anything else.
+- **Release.** On clean shutdown the holder deletes the row with a compare-and-set on holder = its own.
+- **At rest.** In clear (a random ID and a time).
+- **On failure.** A lease that cannot be read or written counts as not held: the process keeps no subscriptions, and its tools still work (06 §6).
+- **Not authority.** The lease decides only who keeps relay connections. Every effect is still idempotent and claimed per row (outbox claim, M1-7k; idempotency lease, §3.3), so two holders at once cost connections, never a second effect.
 
 ### 3.3 Idempotency results (06 §1 rule 6)
 
