@@ -1,0 +1,292 @@
+# Single source of project status (Tali, 2026-10-15).
+#
+# The README Status and Roadmap, the docs-site "Status and roadmap" page and (when present) the
+# knowledge-base status file are GENERATED from this file. Do not edit the generated blocks
+# (between `<!-- NAME:start -->` and `<!-- NAME:end -->`); edit this file and run:
+#
+#   node tools/docs-status/index.mjs          # regenerate
+#   node tools/docs-status/index.mjs --check  # what CI runs (pnpm lint): fails on any drift
+#
+# A pull request that changes status (a card done, a milestone moved, a deploy, a release)
+# updates this file in the same PR. Public-safe: no addresses, keys or private details.
+#
+# Format: a small YAML subset (maps, lists, plain or double-quoted strings, [a, b] lists of
+# scalars, full-line comments), read by tools/docs-status/yaml.mjs. Pull requests are numbers
+# (4thtech/agentlink) or `contracts#N` (private repo, shown without a link).
+
+updated: "2026-10-15"
+version: "v0.0.1"
+versionLabel: "M0 Foundations"
+milestone: "M0 Foundations"
+phase: "M0 Foundations nearly complete, M1a (walking skeleton) in progress (pre-alpha)"
+
+# Components by area. state: done | in-progress | planned.
+# `done` = code merged; nothing is published or user-runnable until a release says so.
+areas:
+  - id: m0
+    title: "M0 Foundations"
+    intro: "Repository, process and CI."
+    components:
+      - name: "Monorepo skeleton"
+        state: done
+        summary: "pnpm workspace with Turborepo, strict CI, the Foundry skeleton in the private contracts repo, architecture boundary guards and the cross-runtime test-vector harness (M0-9)."
+      - name: "Delivery pipeline and runbooks"
+        state: done
+        summary: "The automated delivery pipeline (D-52) and the runbooks."
+      - name: "Public documentation"
+        state: done
+        prs: [88]
+        summary: "`docs-site/` (D-57), published through GitBook Git Sync, and the public knowledge base (`knowledge/` and `llms.txt`)."
+      - name: "Redacting logger (@agentlink/log)"
+        state: done
+        summary: "Structured logging for Node, browsers and Workers that redacts secrets by field name and value shape (M0-8)."
+      - name: "Specifications and process"
+        state: done
+        summary: "The specifications (`docs/foundation`), including decisions D-53 to D-59 (D-55: dedicated terms tools, one approval per agreement, decided 14 Oct 2026), the development and audit process and a security policy."
+      - name: "CI follow-ups"
+        state: in-progress
+        summary: "A few CI follow-ups are still open."
+  - id: crypto
+    title: "Crypto (@agentlink/crypto)"
+    intro: "Code merged, none of it published."
+    components:
+      - name: "Encodings, hashing, JSON canonicalisation"
+        state: done
+        prs: [27]
+        summary: "Strict canonical encodings, SHA-256 and keccak-256, tagged hashes, RFC 8785 canonicalisation."
+      - name: "Key derivation and public identities"
+        state: done
+        prs: [29]
+        summary: "Agent keys derived from one seed; public identity bundles."
+      - name: "Envelope encryption"
+        state: in-progress
+        prs: [38, 61]
+        summary: "Content-key wrap (RFC 9180 HPKE) and payload encryption (AES-256-GCM) with key commitment are merged; the recompute vectors follow."
+      - name: "EIP-712 typed data and the agent card"
+        state: done
+        prs: [32]
+        summary: "Typed-data hashing and the signed agent card."
+      - name: "Owner passphrase wrap, pairing proof, safety code"
+        state: done
+        prs: [37]
+        summary: "The owner passphrase wrap, the pairing proof and the pairing safety code."
+      - name: "Key interfaces, NIP-44 v2, gift wrap"
+        state: done
+        prs: [41, 42, 55]
+        summary: "`KeyStore`, `OwnerKeyStore`, an in-memory test store, NIP-44 v2 and gift wrap; owner-only epoch advance."
+      - name: "Independent test vectors"
+        state: in-progress
+        prs: [25, 35, 72, 75]
+        summary: "Vector suites from independent generators for the merged crypto suites; more follow with each suite."
+      - name: "File encryption (ALF1)"
+        state: planned
+        summary: "STREAM file encryption, with M1b."
+  - id: types
+    title: "Shared types (@agentlink/types)"
+    intro: "Code merged, none of it published."
+    components:
+      - name: "Constants and the envelope, payload, card and invite schemas"
+        state: in-progress
+        prs: [23, 93]
+        summary: "Merged; per-path canonical decoders and the `encodings` vector suite are in review (#93)."
+      - name: "Policy, approval, proof pack and tool-result types"
+        state: done
+        prs: [31, 36, 71, 72, 76]
+        summary: "The policy document, approvals including batch approval, pairing bodies, relay lists, `contact.check` params; tested in Node, three browsers and workerd."
+  - id: transport
+    title: "Transport (@agentlink/transport-nostr)"
+    intro: "Code merged, not published."
+    components:
+      - name: "Gift wrap and unwrap"
+        state: done
+        prs: [45]
+        summary: "Each envelope is sealed with the sender's key and wrapped once per recipient key; tested for interop with the `nostr-tools` reference."
+      - name: "Relay pool and delivery outbox"
+        state: done
+        prs: [59]
+        summary: "Publishes a wrap to its relays, counts it sent at 2 acknowledgements and retries for 24 h."
+      - name: "Sync"
+        state: done
+        prs: [63]
+        summary: "Reads each relay for new gift wraps, 48 h back from a per-relay cursor, hands each over once, and returns what it has after 3 s, flagged as partial."
+      - name: "Outbox stays inside the sync look-back"
+        state: in-progress
+        prs: [87]
+        summary: "The outbox stops republishing outside the sync look-back (M1-5f); in review."
+  - id: core
+    title: "Core (@agentlink/core)"
+    intro: "Code merged, not published. Nothing in it is user-runnable yet."
+    components:
+      - name: "Skeleton: identity, contacts, store and approval interfaces"
+        state: done
+        prs: [48]
+        summary: "The agent's identity and signed card, contacts (pairing commit, block, remove), an in-memory test store."
+      - name: "Envelopes"
+        state: done
+        prs: [66]
+        summary: "Building, signing and verifying envelopes in the specified order; the owner can always read; held envelopes across a contact's key rotation."
+      - name: "Invites and pairing"
+        state: done
+        prs: [78]
+        summary: "Single-use invite links, the handshake and ack with the commit-then-reveal safety code."
+      - name: "Safety code checked"
+        state: done
+        prs: [80, 85]
+        summary: "The owner's signed check, applied only when it matches the recomputed pairing and re-verified on every read; it goes through the owner-action path."
+      - name: "Owner-signed actions and policies"
+        state: done
+        prs: [79]
+        summary: "Approvals, batch approvals, cancellations and policy changes apply only with a valid owner signature, once each; a stored policy that no longer verifies makes the agent ask the owner."
+      - name: "Approval requests and the requests queue"
+        state: in-progress
+        prs: [95]
+        summary: "Approval requests with use-once, requests-queue limits and idempotency (M1-7e); in review."
+      - name: "Held cards need the sender's own owner entry"
+        state: in-progress
+        prs: [90]
+        summary: "A held card is accepted only with the sender's own owner entry (G-51); in review."
+      - name: "Inbox sync, delivery acknowledgements, owner card update"
+        state: planned
+        summary: "Inbox sync and delivery acknowledgements (M1-7h), owner card update (M1-7j)."
+  - id: node
+    title: "Node runtime (@agentlink/node)"
+    intro: "Code merged, not published. Nothing in it is user-runnable yet."
+    components:
+      - name: "Agent key store in the OS keychain"
+        state: done
+        prs: [54, 57, 83]
+        summary: "macOS Keychain, Windows Credential Manager, Linux Secret Service, with the \"needs setup\" answer on machines without one; CI runs on all three."
+      - name: "Local SQLite database"
+        state: done
+        prs: [60, 68]
+        summary: "Sensitive columns encrypted under a key from the keychain, shared safely by several processes."
+      - name: "Owner code at a prompt"
+        state: done
+        prs: [67]
+        summary: "The owner's key store unlocked with the owner code or passphrase; batch approval."
+      - name: "Relay connection"
+        state: done
+        prs: [81, 84]
+        summary: "Connects only to an address that passed the relay address check, refuses redirects and proxies, caps incoming messages; a Docker relay suite runs in CI."
+      - name: "Policy version record in the keychain"
+        state: done
+        prs: [86]
+        summary: "Stops an older owner-signed policy from being put back."
+      - name: "Passphrase-locked key file for headless machines"
+        state: planned
+        summary: "M1-8f."
+  - id: apps
+    title: "MCP server, CLI and apps"
+    intro: "Nothing built yet."
+    components:
+      - name: "MCP server and CLI"
+        state: planned
+        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a)."
+      - name: "Local approval page"
+        state: planned
+        summary: "A small page on 127.0.0.1 for owner approvals and settings (M1b)."
+      - name: "Owner console, desktop apps, cloud agent"
+        state: planned
+        summary: "M2."
+  - id: contracts
+    title: "OCC v2 contracts (private repo)"
+    intro: "Pre-audit. Nothing in AgentLink uses them yet."
+    components:
+      - name: "Notary and fee vault"
+        state: done
+        prs: ["contracts#4"]
+        summary: "Developed in the private contracts repo; their test and static-analysis review continues."
+      - name: "Testnet deployment"
+        state: done
+        prs: [65, "contracts#8", "contracts#9"]
+        summary: "Deployed on the Base Sepolia testnet; a live smoke test passed on 14 Oct 2026."
+      - name: "Gnosis Chiado deployment, ABI package, pre-audit fixes"
+        state: planned
+        summary: "Follow-ups for M1b; mainnet follows the external audit (M3)."
+  - id: design
+    title: "Design"
+    intro: "Tracked in `docs/design/`."
+    components:
+      - name: "Design drop D1"
+        state: done
+        prs: [33]
+        summary: "Brand core, tokens, components and the local approvals screens."
+      - name: "Design drop D2"
+        state: in-progress
+        prs: [82]
+        summary: "Console, desktop apps, onboarding and more; partly in."
+
+# The deploy state of the OCC v2 contracts and services. No addresses here (public-safe).
+deploy:
+  testnet:
+    state: deployed
+    network: "Base Sepolia"
+    note: "OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit; AgentLink does not use them yet."
+  mainnet:
+    state: planned
+    note: "After the external audit (M3). Not deployed."
+  services:
+    state: planned
+    note: "Submitter, faucet and encrypted drop are not built or deployed yet."
+
+# Prose for the README Status block and the docs-site page.
+inProgress: "In review as pull requests: approval requests and the requests queue (M1-7e), the held-card owner entry (G-51), the encodings vectors and the outbox look-back. Next: inbox sync, file encryption, the MCP server and CLI, and the remaining contract work."
+notYet: "a usable product. The packages are private and nothing is published; only the crypto, types, transport, core, node and logging foundations listed here contain code. **There is nothing to install or run yet.** The design is described throughout and marked \"planned\" where it is not built."
+next: "The rest of the M1a crypto and core layers, then the walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets."
+
+# Milestones. state: done | in-progress | planned. `gate` is the README wording, `outcome` the
+# docs-site wording, `progress` an optional README note on what is done so far.
+roadmap:
+  - id: "M0"
+    name: "Foundations"
+    state: in-progress
+    stateNote: "nearly complete"
+    version: "0.0.x"
+    duration: "~1 week"
+    outcome: "Repository, CI and rules in place"
+    gate: "Specs, repositories, CI and open decisions in place."
+    progress: "Done so far: monorepo skeleton, Foundry skeleton in the private contracts repo, boundary guards, test-vector harness, redacting logger, delivery pipeline, runbooks, public docs structure and specs D-53 to D-59. Still open: a few CI follow-ups."
+  - id: "M1a"
+    name: "Walking skeleton: pair and talk"
+    state: in-progress
+    stateNote: "in progress"
+    version: "0.1.0"
+    duration: "~2–3 weeks"
+    outcome: "Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals"
+    gate: "Two developers' agents (Claude Code and Codex) pair and keep a shared project in sync over AgentLink, and negotiate terms with owner approval."
+    progress: "Crypto foundations, the transport (gift wrap, relays, sync), most of the core (envelopes, pairing, owner-signed actions and policies) and the node keychain, database and relay connection are merged; the approvals queue, inbox sync, MCP server and CLI come next."
+  - id: "M1b"
+    name: "Files, proof, credits"
+    state: planned
+    version: "0.2.0 (M1 gate)"
+    duration: "~3–4 weeks"
+    outcome: "Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI"
+    gate: "10 internal testers on at least 3 harness combinations complete setup, first message, a file handover with proof, an owner approval, a third-party verification and a proof of agreement (completes M1, testnets)."
+  - id: "M2"
+    name: "Owner console, desktop apps, self-host, design"
+    state: planned
+    version: "0.3.0"
+    duration: "~4–6+ weeks"
+    outcome: "Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors"
+    gate: "20 to 50 external early adopters on testnets; install to first message in under 5 minutes."
+  - id: "M3"
+    name: "Mainnet beta (Base, Gnosis)"
+    state: planned
+    version: "1.0.0"
+    duration: "~4 weeks"
+    outcome: "External audit; contracts on Base and Gnosis; paid proof with credits"
+    gate: "External audit findings (high and medium) fixed; first paid proofs with zero security incidents."
+  - id: "M4"
+    name: "Expansion"
+    state: planned
+    version: "after 1.0.0"
+    duration: "rolling"
+    outcome: "More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters"
+    gate: "Rolling, no single gate yet: more proof networks, batched receipts, hosted approval-mode MCP, more adapters."
+  - id: "M5"
+    name: "Agent commerce"
+    state: planned
+    version: "after 1.0.0"
+    duration: "rolling"
+    outcome: "Deal records, payment linkage, arbitrator disclosure"
+    gate: "Rolling, no single gate yet: deal records, x402 settlement linkage, arbitrator disclosure."

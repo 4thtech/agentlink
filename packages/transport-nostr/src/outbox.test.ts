@@ -13,6 +13,7 @@ import {
   type OutboxRow,
 } from './outbox.js';
 import { CONNECT_TIMEOUT_MS, RelayPool } from './relay-pool.js';
+import { SYNC_LOOKBACK_SECONDS, SYNC_SKEW_SECONDS } from './sync.js';
 import { MockNetwork, makeWrapEvent, relayUrls } from './testing/mock-network.js';
 
 const START = Date.UTC(2026, 9, 14, 12, 0, 0);
@@ -75,9 +76,11 @@ function makeRow(
   relays: readonly string[],
   overrides: Partial<OutboxRow> = {},
   content = 'AAAA',
+  /** The signed wrap's own created_at (NIP-59 dates it up to 48 h back); default: at send time. */
+  wrapCreatedAt = nowSeconds(),
 ): OutboxRow {
   const recipientKey = getPublicKey(generateSecretKey());
-  const event = makeWrapEvent({ recipient: recipientKey, content });
+  const event = makeWrapEvent({ recipient: recipientKey, content, createdAt: wrapCreatedAt });
   const createdAt = nowSeconds();
   return {
     wrapId: event.id,
@@ -498,5 +501,121 @@ describe('logging (I-7)', () => {
     expect(text).not.toContain(row.recipientKey);
     expect(text).not.toContain(row.wrapId);
     expect(text).not.toContain(row.wrapJson.slice(0, 40));
+  });
+});
+
+// M1-5f (G-49, D-71 (5); 07 §3.2, §4.2): the outbox never republishes a wrap that a receiver's sync
+// could no longer find. give_up_at = min(created_at + 24 h, wrap created_at + 48 h + S).
+describe('sync look-back window (G-49)', () => {
+  const WINDOW = SYNC_LOOKBACK_SECONDS + SYNC_SKEW_SECONDS;
+  /** 47 h 50 min back, as NIP-59 may date a wrap. */
+  const BACK = 47 * 3600 + 50 * 60;
+
+  it('publishes a wrap dated 47 h 50 min back at once, then stops at its bound and gives up (timeout)', async () => {
+    const { net, outbox, worker } = setup();
+    const relays = relayUrls('winlate', 3);
+    for (const url of relays) net.configure(url, { blackHole: true });
+    const wrapCreated = nowSeconds() - BACK;
+    const bound = wrapCreated + WINDOW;
+    expect(bound - nowSeconds()).toBe(15 * 60); // about 10 min plus S
+    const row = makeRow(relays, {}, 'AAAA', wrapCreated);
+    expect(row.giveUpAt).toBeGreaterThan(bound); // the stored 24 h value is later than the bound
+    outbox.add(row);
+    const w = worker();
+
+    const first = w.processDue();
+    await vi.advanceTimersByTimeAsync(CONNECT_TIMEOUT_MS);
+    const summary = await first;
+    expect(summary).toMatchObject({ retrying: 1, notDelivered: 0 });
+    expect(net.opens.length).toBeGreaterThan(0); // the first publish happened
+    expect(summary.nextAttemptAt).toBeLessThanOrEqual(bound);
+
+    // Retry through the window; no pass ever starts at or after the bound.
+    let guard = 0;
+    while (outbox.get(row.wrapId).nextAttemptAt < bound && guard < 50) {
+      guard += 1;
+      vi.setSystemTime(outbox.get(row.wrapId).nextAttemptAt * 1000);
+      expect(nowSeconds()).toBeLessThan(bound);
+      const pass = w.processDue();
+      await vi.advanceTimersByTimeAsync(CONNECT_TIMEOUT_MS);
+      await pass;
+    }
+    expect(outbox.get(row.wrapId).state).toBe('pending');
+    expect(outbox.get(row.wrapId).nextAttemptAt).toBe(bound);
+
+    const opens = net.opens.length;
+    vi.setSystemTime(bound * 1000);
+    expect(await w.processDue()).toMatchObject({ notDelivered: 1, sent: 0, retrying: 0 });
+    expect(outbox.get(row.wrapId)).toMatchObject({ state: 'not_delivered', reason: 'timeout' });
+    expect(net.opens.length).toBe(opens); // nothing published at or after the bound
+  });
+
+  it('does not republish a wrap that is already past its bound, and gives up with timeout', async () => {
+    const { net, outbox, worker } = setup();
+    const relays = relayUrls('winpast', 2);
+    for (const url of relays) net.configure(url, { reject: true });
+    const row = makeRow(relays, {}, 'AAAA', nowSeconds() - WINDOW - 1);
+    outbox.add(row);
+    expect(await worker().processDue()).toMatchObject({ notDelivered: 1, retrying: 0, sent: 0 });
+    expect(outbox.get(row.wrapId)).toMatchObject({ state: 'not_delivered', reason: 'timeout' });
+    expect(net.opens).toHaveLength(0);
+  });
+
+  it('publishes up to the last second before the bound', async () => {
+    const { net, outbox, worker } = setup();
+    const relays = relayUrls('winedge', 2);
+    for (const url of relays) net.configure(url, { reject: true });
+    const row = makeRow(relays, {}, 'AAAA', nowSeconds() - WINDOW + 1);
+    outbox.add(row);
+    const summary = await worker().processDue();
+    expect(summary).toMatchObject({ retrying: 1, notDelivered: 0 });
+    expect(net.opens.length).toBeGreaterThan(0);
+    expect(summary.nextAttemptAt).toBe(nowSeconds() + 1); // capped at the bound
+  });
+
+  it('ignores a stored give_up_at that is later than the bound', async () => {
+    const { net, outbox, worker } = setup();
+    const relays = relayUrls('winstored', 2);
+    for (const url of relays) net.configure(url, { reject: true });
+    const wrapCreated = nowSeconds() - BACK;
+    const row = makeRow(
+      relays,
+      { giveUpAt: nowSeconds() + 10 * OUTBOX_GIVE_UP_SECONDS },
+      'AAAA',
+      wrapCreated,
+    );
+    outbox.add(row);
+    const bound = wrapCreated + WINDOW;
+    const first = await worker().processDue();
+    expect(first.nextAttemptAt).toBeLessThanOrEqual(bound);
+    vi.setSystemTime(bound * 1000);
+    const opens = net.opens.length;
+    expect(await worker().processDue()).toMatchObject({ notDelivered: 1 });
+    expect(outbox.get(row.wrapId)).toMatchObject({ state: 'not_delivered', reason: 'timeout' });
+    expect(net.opens.length).toBe(opens);
+  });
+
+  it('keeps the full 24 h for a wrap dated at send time', async () => {
+    const { net, outbox, worker } = setup();
+    const relays = relayUrls('winfull', 2);
+    for (const url of relays) net.configure(url, { reject: true });
+    const createdAt = nowSeconds() - OUTBOX_GIVE_UP_SECONDS + 100;
+    const row = makeRow(relays, { createdAt, attempts: 20 }, 'AAAA', createdAt);
+    outbox.add(row);
+    const summary = await worker().processDue();
+    expect(summary).toMatchObject({ retrying: 1, notDelivered: 0 });
+    expect(net.opens.length).toBeGreaterThan(0);
+    expect(summary.nextAttemptAt).toBe(createdAt + OUTBOX_GIVE_UP_SECONDS); // 24 h, not the 48 h bound
+  });
+
+  it('does not give up a row that reached 2 acks before the bound', async () => {
+    const { net, outbox, worker } = setup();
+    const [a, b] = relayUrls('winacks', 2) as [string, string];
+    const wrapCreated = nowSeconds() - WINDOW - 60;
+    const row = makeRow([a, b], { acks: { [a]: 1, [b]: 1 } }, 'AAAA', wrapCreated);
+    outbox.add(row);
+    expect(await worker().processDue()).toMatchObject({ sent: 1, notDelivered: 0 });
+    expect(outbox.get(row.wrapId).state).toBe('sent');
+    expect(net.opens).toHaveLength(0);
   });
 });
