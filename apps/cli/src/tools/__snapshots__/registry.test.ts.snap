@@ -546,6 +546,7 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
         "clientRequestId": {
           "maxLength": 256,
           "minLength": 1,
+          "pattern": "^[\\x21-\\x7e]{1,256}$",
           "type": "string",
         },
         "replyTo": {
@@ -694,6 +695,7 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
         "clientRequestId": {
           "maxLength": 256,
           "minLength": 1,
+          "pattern": "^[\\x21-\\x7e]{1,256}$",
           "type": "string",
         },
         "note": {
@@ -950,6 +952,7 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
         "clientRequestId": {
           "maxLength": 256,
           "minLength": 1,
+          "pattern": "^[\\x21-\\x7e]{1,256}$",
           "type": "string",
         },
         "decision": {

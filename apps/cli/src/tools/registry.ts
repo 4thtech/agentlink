@@ -127,7 +127,11 @@ const termsInput = obj(
   ['subject', 'deliverables'],
 );
 const termsNote = str({ minLength: 1, maxLength: MAX_TERMS_NOTE_CODE_POINTS });
-const clientRequestId = str({ minLength: 1, maxLength: 256 });
+/**
+ * 07 §3.3 bounds `clientRequestId` to 1..256 UTF-8 bytes; JSON Schema counts code points, so the
+ * schema admits printable ASCII only, where the two agree (IR-M1-9c-1 F05).
+ */
+const clientRequestId = str({ minLength: 1, maxLength: 256, pattern: '^[\\x21-\\x7e]{1,256}$' });
 const termsOutput = {
   thread: envelopeId,
   termsId: str({ maxLength: 64 }),

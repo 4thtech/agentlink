@@ -444,6 +444,26 @@ describe('agentlink_get_approval (06 §2.5)', () => {
 
 // ---- Stubs, unknown tools, environments ------------------------------------------------------------
 
+/** A valid input per tool (agent-written text carries the canary). */
+const VALID_INPUT: Record<string, Record<string, unknown>> = {
+  agentlink_status: {},
+  agentlink_create_invite: { label: MESSAGE_CANARY, expiresInDays: 3 },
+  agentlink_accept_invite: { inviteUrl: MESSAGE_CANARY },
+  agentlink_list_contacts: {},
+  agentlink_send: { to: MESSAGE_CANARY, text: MESSAGE_CANARY, clientRequestId: 'req-1' },
+  agentlink_propose_terms: {
+    to: 'Marko',
+    terms: { subject: MESSAGE_CANARY, deliverables: [{ description: 'Drafts', by: 'them' }] },
+  },
+  agentlink_respond_to_terms: {
+    envelopeId: 'A'.repeat(22),
+    decision: 'reject',
+    note: MESSAGE_CANARY,
+  },
+  agentlink_inbox: { contact: MESSAGE_CANARY, limit: 5 },
+  agentlink_get_approval: { approvalId: APPROVAL },
+};
+
 describe('tools whose card has not landed answer "not available yet"', () => {
   for (const name of [
     'agentlink_create_invite',
@@ -455,20 +475,38 @@ describe('tools whose card has not landed answer "not available yet"', () => {
   ]) {
     it(name, async () => {
       const client = fakeClient();
-      const result = await callTool(
-        name,
-        { to: MESSAGE_CANARY, text: MESSAGE_CANARY },
-        context(client),
-      );
+      const result = await callTool(name, VALID_INPUT[name], context(client));
       expect(result.structured).toEqual({
         status: 'error',
         summary: RESULT_TEXT.notAvailableSummary,
         nextStep: RESULT_TEXT.notAvailableNextStep,
         code: 'NOT_AVAILABLE',
       });
+      expect(dump(result)).not.toContain('CANARY');
       expect(client.calls).toEqual([]);
     });
   }
+
+  it('every tool refuses input outside its inputSchema before any handler runs (IR-M1-9c-1 F04)', async () => {
+    for (const tool of TOOLS) {
+      const client = fakeClient({ approval: { check: { status: 'approved' }, decidedAt: null } });
+      const valid = VALID_INPUT[tool.name]!;
+      for (const bad of [
+        { ...valid, [MESSAGE_CANARY]: 1 },
+        { ...valid, extra: true },
+        ...(tool.name === 'agentlink_send'
+          ? [{ ...valid, clientRequestId: '\u00e9'.repeat(200) }]
+          : []),
+        ...(tool.name === 'agentlink_send' ? [{ ...valid, type: 'offer' }] : []),
+        ...(tool.name === 'agentlink_inbox' ? [{ limit: 101 }, { limit: 1.5 }] : []),
+      ]) {
+        const result = await callTool(tool.name, bad, context(client));
+        expect(result.structured.code, tool.name).toBe('INVALID_ARGUMENT');
+        expect(dump(result)).not.toContain('CANARY');
+      }
+      expect(client.calls, tool.name).toEqual([]);
+    }
+  });
 
   it('has a handler for every registered tool and none for anything else', () => {
     expect(Object.keys(HANDLERS).sort()).toEqual(TOOLS.map((t) => t.name).sort());
@@ -488,11 +526,13 @@ describe('tools whose card has not landed answer "not available yet"', () => {
       logger: capture().logger,
     };
     for (const name of ['agentlink_status', 'agentlink_list_contacts', 'agentlink_get_approval']) {
-      const result = await callTool(name, { approvalId: APPROVAL }, env);
+      const result = await callTool(name, VALID_INPUT[name], env);
       expect(result.structured.status).toBe('needs_setup');
       expect(result.structured.nextStep).toBe(TOOL_TEXT.setupFollowNextStep);
     }
-    expect((await callTool('agentlink_send', {}, env)).structured.code).toBe('NOT_AVAILABLE');
+    expect(
+      (await callTool('agentlink_send', VALID_INPUT['agentlink_send'], env)).structured.code,
+    ).toBe('NOT_AVAILABLE');
   });
 });
 

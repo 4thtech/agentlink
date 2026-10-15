@@ -7,6 +7,7 @@
 import type { McpToolName } from '@agentlink/types';
 import type { HandlerEnvironment, ToolContext } from './context.js';
 import { getApprovalHandler } from './get-approval.js';
+import { matchesSchema } from './input.js';
 import { listContactsHandler } from './list-contacts.js';
 import { findTool } from './registry.js';
 import {
@@ -56,7 +57,9 @@ export async function callTool(
   if (tool === undefined || handler === undefined)
     return finalizeResult(invalidArgument(), origins);
   const args = input ?? {};
-  if (!isPlainObject(args)) return finalizeResult(invalidArgument(), origins);
+  if (!isPlainObject(args) || !matchesSchema(tool.inputSchema, args)) {
+    return finalizeResult(invalidArgument(), origins);
+  }
   if ('needsSetup' in env) {
     const output =
       handler === stub

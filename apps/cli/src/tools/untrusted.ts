@@ -18,7 +18,9 @@ export const UNTRUSTED_ATTRIBUTE_MAX = 128;
 
 // C0 except LF (CR and TAB are mapped first), DEL, C1; format characters (bidi controls, zero-width
 // characters, soft hyphen, BOM, …); line and paragraph separators.
-const INVISIBLE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
+// Also the blank letters and symbols that render as nothing (Hangul fillers, the braille blank;
+// IR-M1-9c-1 F03): they are Lo/So, not Cf, so the classes above miss them.
+const INVISIBLE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\u115f\u1160\u3164\uffa0\u2800]/gu;
 const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
 
 /** Removes control (except LF), bidi, zero-width and other format characters (06 §4). */
@@ -46,6 +48,11 @@ const LESS_THAN = new Set([
   '\u1438', // Canadian syllabics pa
   '\u29fc', // left-pointing curved angle bracket
   '\u227a', // precedes
+  '\u276c', // medium left-pointing angle bracket ornament
+  '\u2770', // heavy left-pointing angle bracket ornament
+  '\u16b2', // runic kauna
+  '\u300a', // left double angle bracket
+  '\u00ab', // left-pointing double angle quotation mark
 ]);
 
 /** Characters a reader may take for `/`. */
@@ -65,6 +72,7 @@ const CONFUSABLE: Readonly<Record<string, string>> = {
   '\u0455': 's',
   '\u0442': 't',
   '\u0443': 'y',
+  '\u043f': 'n',
   '\u0445': 'x',
   // Greek
   '\u03b1': 'a',
@@ -77,6 +85,8 @@ const CONFUSABLE: Readonly<Record<string, string>> = {
   '\u03c5': 'u',
   '\u03bd': 'v',
   '\u03b7': 'n',
+  // IPA
+  '\u028a': 'u',
   // Armenian
   '\u0578': 'n',
   '\u057d': 'u',
@@ -102,13 +112,16 @@ function fold(cp: string): string {
   for (const ch of cp.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase()) {
     if (LESS_THAN.has(ch)) out += '<';
     else if (SLASH.has(ch)) out += '/';
+    else if (/\p{Lm}/u.test(ch))
+      out += '_'; // modifier letters such as U+02CD read as separators
     else out += CONFUSABLE[ch] ?? ch;
   }
   return out;
 }
 
-// After folding: `<`, optional `/`, the tag name with any separators between its two words.
-const TAG = /<\s*\/?\s*untrusted[\s_\-.\u00b7\u2010-\u2015\u2212]*content/gu;
+// After folding: `<`, optional `/`, the tag name with up to eight characters that are not letters
+// or digits between its two words (`_`, `-`, `*`, `:`, spaces, …; IR-M1-9c-1 F03).
+const TAG = /<\s*\/?\s*untrusted[^\p{L}\p{N}]{0,8}content/gu;
 
 /** Escapes every opening or closing `untrusted_content` tag, including look-alike forms. */
 function escapeTags(text: string): string {

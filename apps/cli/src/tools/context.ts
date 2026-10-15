@@ -49,14 +49,14 @@ export interface ToolClient {
   /** The backend for files above the inline limit under the current policy (06 §2.1). */
   storageMode(): Promise<'drop' | 'own'>;
   /**
-   * Pending approval requests. Absent until the core exposes a read for it (no public core API
-   * reads the `approvals` table in M1a); `agentlink_status` then leaves `pendingApprovals` out.
+   * Pending approval requests. Absent until the core read lands (card M1-7e-3, PR #116; wired in
+   * `coreToolClient` by M1-9c-b); until then `agentlink_status` leaves `pendingApprovals` out.
    */
   pendingApprovals?(): Promise<number>;
   /**
    * The core's approval check for the row's own stored action (06 §2.5), or undefined for an
-   * unknown ID. Absent until the core exposes it; `agentlink_get_approval` then answers with the
-   * fixed "not available yet" error.
+   * unknown ID. Absent until the core read lands (card M1-7e-3, PR #116; wired by M1-9c-b);
+   * until then `agentlink_get_approval` answers with the fixed "not available yet" error.
    */
   approvalState?(approvalId: string): Promise<StoredApprovalState | undefined>;
 }
