@@ -435,8 +435,7 @@ def map_input(ti, ctx):
 class Chain:
     """One core's view, replayed from its log. Per key (termsId, unordered pair): the live offer for
     each version, the first envelope seen per (sender, version), locked versions, the latest conflict
-    per version (one envelope id per side, and who has resent since), and the offers this core
-    accepted."""
+    per version (one envelope id per side, and who has resent since)."""
 
     def __init__(self, me):
         self.me = me
@@ -445,7 +444,7 @@ class Chain:
         self.seen = []
 
     def state(self, key):
-        return self.keys.setdefault(key, {"live": {}, "senders": {}, "locked": set(), "conflict": {}, "accepted": set()})
+        return self.keys.setdefault(key, {"live": {}, "senders": {}, "locked": set(), "conflict": {}})
 
     @staticmethod
     def key_of(terms):
@@ -554,16 +553,16 @@ class Chain:
             return "refused"  # an answer copies its offer's terms exactly
         if direction == "received" and env["createdAt"] > offer["body"]["terms"]["validUntil"]:
             return "refused"  # judged by the signed createdAt, never the receiver's clock
+        if n in st["locked"]:
+            # Rule 2: once an accept for a version was sent or received, any other envelope for it
+            # is refused, and rule 2 takes precedence. A path-(b) reject (06 §2.2a) names the
+            # sender's own offer, which the receiver has accepted, so its version is locked and it
+            # is refused here, read literally (see the PR notes).
+            return "refused"
         if offer["from"] == receiver and offer["to"] == sender:
             if env["type"] == "accept":
-                if n in st["locked"]:
-                    return "refused"  # rule 2: one accept per version
                 st["locked"].add(n)
-                if sender == self.me:
-                    st["accepted"].add(offer["id"])
             return "valid"
-        if env["type"] == "reject" and offer["from"] == sender and offer["to"] == receiver and offer["id"] in st["accepted"]:
-            return "valid"  # 06 §2.2a path (b): the reject names the sender's own offer
         return "refused"
 
     def replay(self, log):
@@ -1288,9 +1287,17 @@ def build():
     chain_case("reject-created-at-after-valid-until", f"{S_VALID}: a reject signed after validUntil has lapsed", A, [sent(a1), sent(a2)], answer("rej-late", B, "reject", a2, created_at=VALID_UNTIL + 1), "refused")
     acc_b_a1 = answer("acc-b-a1", B, "accept", a1)
     log_path_b = [received(a1), sent(acc_b_a1)]
-    chain_case("reject-path-b", f"{S_ANSWER}, 06 §2.2a path (b): after B accepted A's version 1, A's reject names A's own offer and carries its terms", B, log_path_b, answer("rej-path-b", A, "reject", a1, reply_to=a1["id"]), "valid")
+    chain_case(
+        "reject-path-b-locked",
+        f"{S_CHAIN} rule 2, {S_RESEND} (\"Rule 2 takes precedence over items 1\u20134: for a locked version every such envelope is refused\"): "
+        "after B accepted A's version 1, A's path-(b) reject names A's own offer (06 §2.2a, D-74) but version 1 is locked, so it is refused",
+        B,
+        log_path_b,
+        answer("rej-path-b", A, "reject", a1, reply_to=a1["id"]),
+        "refused",
+    )
     chain_case("reject-path-b-names-accept", f"{S_ANSWER}: a path-(b) reject whose replyTo names B's accept, not A's own offer, is refused", B, log_path_b, env("rej-path-b-acc", A, B, "reject", a1["body"]["terms"], reply_to=acc_b_a1["id"]), "refused")
-    chain_case("reject-own-offer-not-accepted", f"{S_ANSWER}: a reject naming the sender's own offer that the receiver never accepted is refused", B, [received(a1)], answer("rej-own", A, "reject", a1, reply_to=a1["id"]), "refused")
+    chain_case("reject-own-offer-not-accepted", f"{S_ANSWER}: a reject naming the sender's own offer (not an offer the receiver sent) when no accept was sent is refused", B, [received(a1)], answer("rej-own", A, "reject", a1, reply_to=a1["id"]), "refused")
 
     # A sending core sets version, previousTermsHash and, for a resend, replyTo.
     def next_case(case_id, source, me, contact, tid, log, version, prev, reply_to=None):

@@ -22846,8 +22846,8 @@
       }
     },
     {
-      "id": "chain-reject-path-b",
-      "source": "04 \u00a73.4 D-74 how an answer names its offer, 06 \u00a72.2a path (b): after B accepted A's version 1, A's reject names A's own offer and carries its terms",
+      "id": "chain-reject-path-b-locked",
+      "source": "04 \u00a73.4 negotiation chain (D-55) rule 2, 04 \u00a73.4 D-74 resending after a conflict (\"Rule 2 takes precedence over items 1\u20134: for a locked version every such envelope is refused\"): after B accepted A's version 1, A's path-(b) reject names A's own offer (06 \u00a72.2a, D-74) but version 1 is locked, so it is refused",
       "input": {
         "op": "chainReceive",
         "self": "0x3ab7f9d7dc7a0df70f0f56e4deaf272e48c5b91c",
@@ -23006,7 +23006,7 @@
         }
       },
       "expected": {
-        "outcome": "valid",
+        "outcome": "refused",
         "newestVersion": "1",
         "newestTermsHash": "2e560e7e8f1586d47c506fe25461742f043dcb2c4d63ec3139f720aa0db62b7b"
       }
@@ -23179,7 +23179,7 @@
     },
     {
       "id": "chain-reject-own-offer-not-accepted",
-      "source": "04 \u00a73.4 D-74 how an answer names its offer: a reject naming the sender's own offer that the receiver never accepted is refused",
+      "source": "04 \u00a73.4 D-74 how an answer names its offer: a reject naming the sender's own offer (not an offer the receiver sent) when no accept was sent is refused",
       "input": {
         "op": "chainReceive",
         "self": "0x3ab7f9d7dc7a0df70f0f56e4deaf272e48c5b91c",
