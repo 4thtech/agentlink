@@ -6,7 +6,13 @@
 // (cursor, paging, dedup by gift-wrap id) over an in-memory relay network that speaks the NIP-01
 // frames they use (EVENT/OK, REQ/EVENT/EOSE, CLOSE). Wraps are real NIP-59 gift wraps. Every key is
 // derived at runtime from fixed test seeds.
-import { encodeHex, type Envelope, type KeyStore, type NostrEvent } from '@agentlink/crypto';
+import {
+  encodeHex,
+  type Envelope,
+  type JsonObject,
+  type KeyStore,
+  type NostrEvent,
+} from '@agentlink/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
 import { createLogger } from '@agentlink/log';
 import { POLICY_DEFAULTS } from '@agentlink/types';
@@ -36,11 +42,13 @@ import {
   cardUpdatePayload,
   craft,
   ownerEnc,
+  ownerSigner,
   pairWith,
   rotate,
   textPayload,
 } from './testing/envelopes.js';
 import type { TestAgent, TestOwner } from './testing/envelopes.js';
+import { newNonce, ownerHex, signWith } from './testing/owner.js';
 import { nostrTransport } from './transport.js';
 
 const RELAYS_A = Object.freeze(['wss://one.relay-alpha.net', 'wss://two.relay-alpha.net']);
@@ -717,4 +725,189 @@ describe('StoreSyncPersistence (07 §3.2)', () => {
     );
     expect(await p.isSeen('envelope', 'AAAAAAAAAAAAAAAAAAAAAA')).toBe(false);
   });
+});
+
+// --- IR-M1-7h-1 F01: revocation (04 §2.5.1, §3.4.1; 07 §3.4) --------------------------------------
+
+/** An `agent.revoke` signed by `owner` for `agent` (04 §2.5.1: expiresAt 0). */
+async function revokeObject(owner: TestOwner, agent: string, issuedAt: number) {
+  const body: JsonObject = {
+    v: 1,
+    agent,
+    owner: await ownerHex(owner),
+    op: 'agent.revoke',
+    params: { reason: 'compromised' },
+    nonce: newNonce(),
+    issuedAt,
+    expiresAt: 0,
+  };
+  return signWith(owner, body);
+}
+
+/** Wraps an owner-signed envelope with an owner session and puts it on `to`'s relays. */
+async function deliverFromOwner(
+  net: RelayNetwork,
+  owner: TestOwner,
+  to: Agent,
+  envelope: Envelope,
+): Promise<void> {
+  const session = await owner.unlock(passphrase());
+  try {
+    const wrapped = await wrapEnvelope(envelope, [to.nostr], session, { now: clock.now });
+    const event = wrapped.wraps[0]?.event as NostrEvent;
+    for (const relay of to.relays) net.inject(relay, event);
+  } finally {
+    await session.close();
+  }
+}
+
+const revokePayload = (signed: unknown) =>
+  ({ type: 'revoke', body: { signed }, replyTo: null, files: [] }) as unknown as JsonObject;
+
+describe('IR-M1-7h-1 F01: revoke envelopes are applied or dropped, never parked', () => {
+  it('a contact owner-signed revoke is applied: revoked_agents, status revoked, outbox stopped, later envelopes dropped', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    await pair(a, b);
+    // A pending delivery from B to A, which the revoke must stop (07 §3.2 "Revocation").
+    const pending = await b.client.sendMessage({ to: a.id, text: 'pending' });
+    if (pending.status !== 'ok') throw new Error('test: not sent');
+    await b.store.transaction((tx) =>
+      tx.update('outbox', { envelope_id: pending.envelopeId }, { state: 'pending' }),
+    );
+    // 04 §3.4.1: recipients per §3.2 with the owner as sender.
+    const envelope = await craft({
+      signer: await ownerSigner(a.owner),
+      entries: [
+        { pk: await agentEnc(b) },
+        { pk: await ownerEnc(b.owner) },
+        { pk: await ownerEnc(a.owner) },
+        { pk: await agentEnc(a) },
+      ],
+      payload: revokePayload(await revokeObject(a.owner, a.id, clock.t)),
+      createdAt: clock.t,
+    });
+    await deliverFromOwner(net, a.owner, b, envelope);
+    const result = await b.client.syncInbox();
+    expect(result.items).toEqual([]);
+    const state = await rowsOf(b);
+    expect(state.envelopes.filter((r) => r.state === 'received')).toEqual([]);
+    expect(state.contacts.find((c) => c.contact_id === a.id)?.status).toBe('revoked');
+    const revoked = await b.store.transaction((tx) =>
+      tx.get('revoked_agents', { agent_evm: a.id }),
+    );
+    expect(revoked).toMatchObject({ source: 'envelope', reason: 'compromised' });
+    expect(JSON.parse(revoked?.nostr_keys ?? '[]')).toContain(a.nostr);
+    const toA = state.outbox.filter(
+      (r) => r.envelope_id === pending.envelopeId && r.recipient_key === a.nostr,
+    );
+    expect(toA.length).toBeGreaterThan(0);
+    for (const row of toA) {
+      expect(row).toMatchObject({ state: 'not_delivered', reason: 'revoked', wrap_json: null });
+    }
+
+    clock.t += 10;
+    const later = await a.client.envelopes.build({
+      to: { contact: b.id },
+      payload: textPayload('after revoke'),
+    });
+    await deliverRaw(net, a, b, later.envelope);
+    expect((await b.client.syncInbox()).items).toEqual([]);
+    expect(await inboundText(b)).toHaveLength(0);
+    // A re-published copy is a no-op (07 §3.4).
+    await deliverFromOwner(net, a.owner, b, envelope);
+    await b.client.syncInbox();
+    expect((await rowsOf(b)).envelopes.filter((r) => r.state === 'received')).toEqual([]);
+  });
+
+  it('revokes that do not verify (wrong owner) are dropped: none is left received to fill the cap', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    const c = await openAgent(3, 'carol', RELAYS_C, net);
+    await pair(a, b);
+    await pair(c, b);
+    // The contact's agent key sends revoke-typed envelopes with objects signed by another owner.
+    for (let i = 0; i < 5; i += 1) {
+      const built = await craft({
+        signer: { from: a.nostr, sign: (h) => a.keyStore.signEnvelopeHash(h) },
+        entries: [
+          { pk: await agentEnc(b) },
+          { pk: await ownerEnc(b.owner) },
+          { pk: await ownerEnc(a.owner) },
+          { pk: await agentEnc(a) },
+        ],
+        payload: revokePayload(await revokeObject(c.owner, a.id, clock.t)),
+        createdAt: clock.t,
+      });
+      await deliverRaw(net, a, b, built);
+    }
+    const fromC = await c.client.envelopes.build({
+      to: { contact: b.id },
+      payload: textPayload('still here'),
+    });
+    await deliverRaw(net, c, b, fromC.envelope);
+    const result = await b.client.syncInbox();
+    expect(result.items.map((i) => i.envelopeId)).toEqual([fromC.envelope.id]);
+    const state = await rowsOf(b);
+    expect(state.envelopes.filter((r) => r.state === 'received')).toEqual([]);
+    expect(state.contacts.find((x) => x.contact_id === a.id)?.status).toBe('active');
+    expect((await b.client.catchUp()).inbox).toEqual([{ contactId: c.id, unread: 1 }]);
+  });
+
+  it('the own owner revoke stops the agent from sending (07 §3.4)', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    await pair(a, b);
+    const envelope = await craft({
+      signer: await ownerSigner(b.owner),
+      entries: [{ pk: await agentEnc(b) }, { pk: await ownerEnc(b.owner) }],
+      payload: revokePayload(await revokeObject(b.owner, b.id, clock.t)),
+      createdAt: clock.t,
+    });
+    await deliverFromOwner(net, b.owner, b, envelope);
+    await b.client.syncInbox();
+    expect(await b.client.identity.sendState()).toBe('revoked');
+    expect((await rowsOf(b)).envelopes.filter((r) => r.state === 'received')).toEqual([]);
+  });
+});
+
+// --- IR-M1-7h-1 F02: the rate limit counts where the contact envelope is stored (07 §3.2) ---------
+
+describe('IR-M1-7h-1 F02: rate limit at processing time', () => {
+  it('a card-update with 300 texts from the new key in one pass delivers no more than the limit', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    await pair(a, b);
+    await rotate(a);
+    const limit = POLICY_DEFAULTS.contacts.rateLimitPerContactPerHour;
+    const update = await a.client.envelopes.build({
+      to: { contact: b.id },
+      payload: await cardUpdatePayload(a),
+    });
+    await deliverRaw(net, a, b, update.envelope, [RELAYS_B[0] as string]);
+    for (let i = 0; i < 300; i += 1) {
+      const built = await a.client.envelopes.build({
+        to: { contact: b.id },
+        payload: textPayload(`new key ${i}`),
+      });
+      await deliverRaw(net, a, b, built.envelope, [RELAYS_B[0] as string]);
+    }
+    const result = await b.client.syncInbox({ budgetMs: 60_000 });
+    expect((await b.client.contacts.get(a.id)).keyEpoch).toBe(1);
+    // The card-update is the contact's envelope too, so it counts toward the hour.
+    expect(result.items).toHaveLength(limit - 1);
+    expect(result.rateLimited).toEqual([{ contactId: a.id, dropped: 300 - (limit - 1) }]);
+    const okFromA = (await rowsOf(b)).envelopes.filter(
+      (r) =>
+        r.direction === 'in' &&
+        r.contact_id === a.id &&
+        r.state === 'ok' &&
+        (r.type === 'text' || r.type === 'card-update'),
+    );
+    expect(okFromA).toHaveLength(limit);
+  }, 120_000);
 });
