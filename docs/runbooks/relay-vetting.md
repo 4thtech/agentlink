@@ -54,3 +54,15 @@ A relay that fails a check stays out of any new default list; the owner decides 
 **damus fails the sync read today**: it demands AUTH for a `#p` query, then refuses every login because of its own configuration, so a sync against it returns nothing. Publishing works. This is a relay-side fault that may be fixed; re-run before relying on it. Until then it should not count as one of the 2 acknowledgements a user depends on for reading, so D-75's list needs the owner's decision (replace it, or keep it as a write-only extra).
 
 Not yet measured: retention beyond 0 minutes (use `--recheck` after 10 minutes, 24 hours and 7 days) and uptime. M1-18 is not signed off until the damus decision and retention are done.
+
+### Replacement candidates for damus (15 Oct 2026, same checks, one tiny event each)
+
+| Relay | Accepts 1059 | Read by `#p` + `since` | Read by id | NIP-11 max message | NIP-42 AUTH |
+|---|---|---|---|---|---|
+| `wss://nostr.mom` | yes | yes | yes | 131 072 (ok) | none, open reads |
+| `wss://relay.snort.social` | yes | yes | yes | 524 288 (ok) | none, open reads |
+| `wss://offchain.pub` | yes | yes | yes | 131 072 (ok) | none, open reads |
+| `wss://relay.nostr.band` | no: connection error, NIP-11 timed out | no | no | unknown | unknown (looks down; re-run later) |
+| `wss://nostr.oxtr.dev` | yes | yes | yes | 131 072 (ok) | none, open reads |
+
+Retention and uptime are not measured for any of them. `DEFAULT_RELAYS` is unchanged; the owner decides.
