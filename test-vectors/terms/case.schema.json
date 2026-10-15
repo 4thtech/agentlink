@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/4thtech/agentlink/test-vectors/terms/case.schema.json",
   "title": "terms case",
-  "description": "04 \u00a73.4 (D-32, D-55), 06 \u00a72.2a: terms, termsHash, the offer/accept/reject body, TermsInput and its mapping, and the negotiation chain. Cases whose source starts with OPEN QUESTION depend on a reading the spec leaves open (see tools/vectors/generate_terms.py).",
+  "description": "04 \u00a73.4 (D-32, D-55, D-74), 06 \u00a72.2a: terms, termsHash, the offer/accept/reject body, TermsInput and its mapping, the Unicode 15.0 runtime probe, and the negotiation chain (see tools/vectors/generate_terms.py for the abstract envelope model).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -196,13 +196,17 @@
           "additionalProperties": false,
           "required": [
             "op",
-            "termsInput"
+            "termsInput",
+            "now"
           ],
           "properties": {
             "op": {
               "const": "parseTermsInput"
             },
-            "termsInput": {}
+            "termsInput": {},
+            "now": {
+              "type": "integer"
+            }
           }
         },
         "expected": {
@@ -285,6 +289,39 @@
           "additionalProperties": false,
           "required": [
             "op",
+            "probe"
+          ],
+          "properties": {
+            "op": {
+              "const": "unicodeProbe"
+            },
+            "probe": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "nfc"
+          ],
+          "properties": {
+            "nfc": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
             "self",
             "now",
             "log",
@@ -322,7 +359,8 @@
               "enum": [
                 "valid",
                 "refused",
-                "conflict"
+                "conflict",
+                "duplicate"
               ]
             },
             "newestVersion": {
@@ -376,7 +414,8 @@
           "additionalProperties": false,
           "required": [
             "version",
-            "previousTermsHash"
+            "previousTermsHash",
+            "replyTo"
           ],
           "properties": {
             "version": {
@@ -386,6 +425,10 @@
             "previousTermsHash": {
               "type": "string",
               "pattern": "^([0-9a-f]{64}|null)$"
+            },
+            "replyTo": {
+              "type": "string",
+              "pattern": "^([A-Za-z0-9_-]{22}|null)$"
             }
           }
         }
