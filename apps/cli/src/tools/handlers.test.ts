@@ -541,15 +541,13 @@ describe('tools whose card has not landed answer "not available yet"', () => {
       'agentlink_get_approval',
       'agentlink_send',
       'agentlink_inbox',
+      'agentlink_propose_terms',
+      'agentlink_respond_to_terms',
     ]) {
       const result = await callTool(name, VALID_INPUT[name], env);
       expect(result.structured.status).toBe('needs_setup');
       expect(result.structured.nextStep).toBe(TOOL_TEXT.setupFollowNextStep);
     }
-    expect(
-      (await callTool('agentlink_propose_terms', VALID_INPUT['agentlink_propose_terms'], env))
-        .structured.code,
-    ).toBe('NOT_AVAILABLE');
   });
 });
 

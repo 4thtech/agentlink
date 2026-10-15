@@ -218,8 +218,8 @@ areas:
     components:
       - name: "MCP server and CLI"
         state: in-progress
-        prs: [102, 103, 107, 111, 112, 113, 115, 125, 127]
-        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising), `init`, `invite`, `accept`, `contacts`, `status`, `doctor`, `requests` and the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) have landed, with the in-chat copy sheet. The MCP server over stdio (the frozen M1a tool list, the untrusted-content wrapper and the read-only status and contacts tools) and the invite, accept, send and inbox tools have landed; the terms tools and the background loop follow."
+        prs: [102, 103, 107, 111, 112, 113, 115, 125, 127, 132]
+        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising), `init`, `invite`, `accept`, `contacts`, `status`, `doctor`, `requests` and the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) have landed, with the in-chat copy sheet. The MCP server over stdio (the frozen M1a tool list, the untrusted-content wrapper and the read-only status and contacts tools) and the invite, accept, send and inbox tools have landed; the terms tools (propose, respond, and the owner's terms approval card in `approve`) are in review; the background loop follows."
       - name: "Local approval page"
         state: planned
         summary: "A small page on 127.0.0.1 for owner approvals and settings (M1b)."
