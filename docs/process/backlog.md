@@ -2911,7 +2911,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Two people new to AgentLink complete J1 from the docs alone (observed, times recorded; install → first message under 5 minutes).
 
 #### M1-13a · e2e: two agents on two harnesses
-- **Status:** in review (4thtech/agentlink#155; LLM variant pending first dispatch on main) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#155; IR-M1-13a-1 PASS with changes; LLM variant runs by manual dispatch only, no schedule until the owner sizes the credit; pending first dispatch on main) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · e2e/, .github/workflows/e2e.yml
 - **Depends on:** M1-9c, M1-9o, M1-9p, M1-12a, M1-1g-c (boundary guards scan e2e/); the e2e runner and credentials are decided in D-73 (9)
 - **Spec:** 10 M1-13; 06 §9; 02 J1, J9

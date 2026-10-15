@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(~/.agentlink/**)",
+      "Edit(~/.agentlink/**)",
+      "Bash(secret-tool *)",
+      "Bash(agentlink owner *)",
+      "Bash(agentlink approve *)",
+      "Bash(agentlink deny *)",
+      "Bash(agentlink cancel *)",
+      "Bash(npx @4thtech/agentlink owner *)",
+      "Bash(npx @4thtech/agentlink approve *)",
+      "Bash(npx @4thtech/agentlink deny *)",
+      "Bash(npx @4thtech/agentlink cancel *)",
+      "Edit(~/.npm/_npx/**)",
+      "Edit(~/.claude/settings.json)",
+      "Edit(~/.bashrc)",
+      "Edit(~/.bash_profile)",
+      "Edit(~/.profile)",
+      "Edit(~/.config/fish/**)",
+      "Edit(~/.npmrc)",
+      "Edit(~/.local/bin/**)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "filesystem": {
+      "denyRead": ["~/.agentlink"],
+      "denyWrite": ["~/.npm/_npx", "~/.agentlink"]
+    }
+  }
+}

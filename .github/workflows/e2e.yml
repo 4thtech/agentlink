@@ -6,8 +6,9 @@
 #   main and in the merge queue. Local strfry relays in Docker, the real OS keychain (gnome-keyring)
 #   and SQLite store, the built CLI. No LLM, no secrets, read-only token. Must finish in < 15 min.
 # - `e2e-llm`: agent A is Claude Code (headless, Haiku), agent B is Codex with an OpenRouter model
-#   (or Claude Code too: dispatch input `agent_b`). It runs ONLY on main, by the nightly schedule or
-#   a manual dispatch, never for a pull request (no `pull_request_target` anywhere). The API keys are
+#   (or Claude Code too: dispatch input `agent_b`). It runs ONLY on main, by manual dispatch (no
+#   schedule until the owner sizes the credit, IR-M1-13a-1), never for a pull request (no
+#   `pull_request_target` anywhere). The API keys are
 #   secrets of the GitHub environment `e2e` (deployment branches: main only), which the owner adds
 #   himself; agents never handle them. They are referenced only in the one step that runs the
 #   harnesses and in the canary scan, never printed, and checked absent from every log and artifact.
@@ -27,9 +28,6 @@ on:
   push:
     branches: [main]
   merge_group:
-  schedule:
-    # Nightly, 03:17 UTC.
-    - cron: "17 3 * * *"
   workflow_dispatch:
     inputs:
       agent_b:
@@ -116,7 +114,7 @@ jobs:
         run: node e2e/src/canary-scan.mjs --canaries "$AGENTLINK_E2E_CANARIES" "$AGENTLINK_E2E_ARTIFACTS"
 
       - name: Summary (step timings)
-        if: success()
+        if: always() && steps.scan.outcome == 'success'
         run: |
           set -euo pipefail
           node -e '
@@ -137,7 +135,7 @@ jobs:
 
   e2e-llm:
     name: e2e-llm
-    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: e2e
@@ -170,6 +168,17 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 dbus
+
+      # The Claude Code Bash sandbox on Linux needs bubblewrap and socat; Ubuntu 24.04 restricts
+      # unprivileged user namespaces, so bwrap gets the AppArmor profile from the Claude Code docs.
+      - name: Install the Claude Code sandbox dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends bubblewrap socat
+          if [ "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || echo 0)" = "1" ]; then
+            printf '%s\n' 'abi <abi/4.0>,' 'include <tunables/global>' '' 'profile bwrap /usr/bin/bwrap flags=(unconfined) {' '  userns,' '  include if exists <local/bwrap>' '}' | sudo tee /etc/apparmor.d/bwrap > /dev/null
+            sudo apparmor_parser -r /etc/apparmor.d/bwrap
+          fi
 
       - name: Build the e2e dependencies (the CLI and its packages)
         run: pnpm exec turbo run build --filter='@agentlink/e2e^...'
@@ -224,7 +233,8 @@ jobs:
 
       # The only step that sees the API keys besides the canary scan. Each harness process gets only
       # its own key (e2e/llm/harness.ts); the MCP servers get neither. Hard caps: 8 turns and
-      # $0.25 per Claude Code call, 180 s per harness call, 30 min for the job; no retries.
+      # $0.25 per Claude Code call, $0.75 of Claude Code spend per run (the remaining Claude steps are
+      # skipped), 180 s per harness call, 30 min for the job; no retries.
       - name: Run the LLM scenario
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -247,7 +257,7 @@ jobs:
         run: node e2e/src/canary-scan.mjs --canaries "$AGENTLINK_E2E_CANARIES" --env-secret ANTHROPIC_API_KEY --env-secret OPENROUTER_API_KEY "$AGENTLINK_E2E_ARTIFACTS"
 
       - name: Summary (pass rate per step)
-        if: always()
+        if: always() && steps.scan.outcome == 'success'
         run: |
           set -euo pipefail
           results="$AGENTLINK_E2E_ARTIFACTS/llm-results.md"

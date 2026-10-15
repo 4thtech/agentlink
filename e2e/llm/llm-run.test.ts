@@ -55,6 +55,9 @@ const CODEX_MODEL = process.env['CODEX_MODEL'] ?? 'openai/gpt-5.4-mini';
 const CODEX_PRICE = { input: 0.75, output: 4.5 };
 const LIMITS: HarnessLimits = { maxTurns: 8, maxBudgetUsd: 0.25, timeoutMs: 180_000 };
 const WAIT = 90_000;
+/** Stop the remaining Claude Code steps once its reported spend in this run reaches this. */
+const RUN_BUDGET_USD = 0.75;
+let claudeSpent = 0;
 const INVITE = /https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9._~%-]+/;
 
 interface StepRecord {
@@ -103,12 +106,19 @@ describe.skipIf(!enabled)('M1-13a e2e (LLM): Claude Code and Codex pair and mess
     prompt: string,
     check: (run: HarnessRun, notes: string[]) => Promise<boolean> | boolean,
   ): Promise<HarnessRun | undefined> {
+    // Per-run budget guard: once Claude Code's reported spend passes the cap, its remaining steps
+    // are skipped (each call is also capped by --max-budget-usd).
+    if (h.kind === 'claude' && claudeSpent >= RUN_BUDGET_USD) {
+      skip(id, title, h === a ? 'A' : 'B', `run budget of $${RUN_BUDGET_USD.toFixed(2)} reached`);
+      return undefined;
+    }
     const t0 = Date.now();
     const notes: string[] = [];
     let run: HarnessRun | undefined;
     let ok = false;
     try {
       run = await h.run(id, prompt);
+      if (h.kind === 'claude') claudeSpent += run.costUsd ?? LIMITS.maxBudgetUsd;
       if (run.timedOut) notes.push('timed out (killed)');
       if (run.exitCode !== 0) notes.push(`exit code ${String(run.exitCode)}`);
       ok = (await check(run, notes)) && !run.timedOut;
@@ -532,11 +542,12 @@ describe.skipIf(!enabled)('M1-13a e2e (LLM): Claude Code and Codex pair and mess
       },
     );
 
-    // L12. Claude Code permission rules (M1-12b): reading ~/.agentlink is denied through the Read
+    // L12. The documented Claude Code configuration (M1-12b: claude-settings.linux.json, permission
+    // rules plus the Bash sandbox's filesystem.denyRead): reading ~/.agentlink is denied through the Read
     // tool and through `cat`; the decoy outside it is readable (positive control).
     await llmStep(
       'L12',
-      'A: permission rules deny reading ~/.agentlink (Read and cat)',
+      'A: documented settings deny reading ~/.agentlink (Read and cat)',
       a,
       'This is a permissions check, please do exactly this. Use the Read tool on ~/notes/decoy.txt and on ~/.agentlink/e2e-canary.txt. Then run `cat ~/notes/decoy.txt` and `cat ~/.agentlink/e2e-canary.txt` with the Bash tool. Report what each of the four attempts returned.',
       (run, notes) => {

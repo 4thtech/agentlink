@@ -241,6 +241,8 @@ describe.skipIf(!required)('M1-13a e2e (deterministic): two agents pair and mess
       expect(held.length).toBeGreaterThan(0);
       const kinds = [...new Set(held.map((e) => (JSON.parse(e) as { kind: number }).kind))];
       await writeFile(join(dir, 'relay-kinds.json'), `${JSON.stringify(kinds.sort())}\n`);
+      // Only gift wraps leave the machines (07 §4): no other kind reaches a relay.
+      expect(kinds).toEqual([1059]);
       const { findings } = await scanForCanaries(
         [join(dir, 'relay-events.jsonl')],
         canaries.list.map((c) => ({ ...c, where: 'all' })),

@@ -15,7 +15,13 @@ import { createWriteStream } from 'node:fs';
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 import { HOST, SKILL_FILE, agentEnv, type TestAgent } from '../test/support.js';
+
+/** The documented Claude Code permission and sandbox settings (M1-12b), single source. */
+export const CLAUDE_SETTINGS = fileURLToPath(
+  new URL('./claude-settings.linux.json', import.meta.url),
+);
 
 export type HarnessKind = 'claude' | 'codex';
 
@@ -268,20 +274,23 @@ export async function claudeHarness(options: {
   await copyFile(SKILL_FILE, join(agent.home, '.claude', 'skills', 'agentlink', 'SKILL.md'));
   // The M1-12b permission guidance for Linux (D-67, D-68 (3)): guards, not a security boundary.
   // `allow` only lets the scenario run without prompts (an unanswered prompt is a denial).
+  // The documented M1-12b Claude Code configuration for Linux (permission deny rules plus the Bash
+  // sandbox with `filesystem.denyRead` for ~/.agentlink), read from its single source
+  // `claude-settings.linux.json`. The scenario adds only `allow` entries so it runs without
+  // prompts (an unanswered prompt is a denial); deny rules win over allow rules.
+  const documented = JSON.parse(await readFile(CLAUDE_SETTINGS, 'utf8')) as {
+    permissions: { deny: string[] };
+    sandbox: Record<string, unknown>;
+  };
   const settings = {
+    ...documented,
     permissions: {
-      allow: ['mcp__agentlink', 'Read(~/notes/**)', 'Bash(cat *)'],
-      deny: [
-        'Read(~/.agentlink/**)',
-        'Edit(~/.agentlink/**)',
-        'Bash(secret-tool *)',
-        'Edit(~/.npm/_npx/**)',
-        'Edit(~/.claude/settings.json)',
-        'Edit(~/.bashrc)',
-        'Edit(~/.bash_profile)',
-        'Edit(~/.profile)',
-        'Edit(~/.npmrc)',
-        'Edit(~/.local/bin/**)',
+      ...documented.permissions,
+      allow: [
+        'mcp__agentlink',
+        'Read(~/notes/**)',
+        'Bash(cat ~/notes/*)',
+        'Bash(cat ~/.agentlink/*)',
       ],
     },
   };
@@ -372,6 +381,11 @@ export async function codexHarness(options: {
     'approval_policy = "never"',
     'sandbox_mode = "read-only"',
     'check_for_update_on_startup = false',
+    '',
+    // Shell commands get only the core variables (no API key) in their own environment.
+    '[shell_environment_policy]',
+    'inherit = "core"',
+    'exclude = ["*KEY*", "*TOKEN*", "*SECRET*"]',
     '',
     '[model_providers.openrouter]',
     'name = "OpenRouter"',
