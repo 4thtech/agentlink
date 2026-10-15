@@ -124,6 +124,8 @@ export async function storePairingEnvelope(
       payload_json: null,
       read_at: null,
       delivery: options.direction === 'out' ? 'sent' : null,
+      refused_at: null,
+      request_accepted_at: null,
     }),
   );
   return id;

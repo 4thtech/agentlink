@@ -75,7 +75,7 @@ import { nowOf, seal, type CoreContext } from './context.js';
 import { checkRecipientWrap, kidOf } from './envelope-wraps.js';
 import { CoreError } from './errors.js';
 import type { IdentityService } from './identity.js';
-import { REQUESTS_FULL, requestsFullTx } from './requests.js';
+import { REQUESTS_FULL, isBlockedTx, pruneRefusedTx, requestsFullTx } from './requests.js';
 import type { Row } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 
@@ -165,7 +165,13 @@ export type InboundReason =
   /** `receive` was given a gift-wrap id that is not 64 lowercase hex (a caller bug). */
   | 'wrap_id_invalid'
   /** The requests queue is at a limit for this unknown key or in total (07 §3.2; M1-7e). */
-  | 'requests_full';
+  | 'requests_full'
+  /**
+   * `from` is in the owner's blocked keys (D-72; 04 §3.1.1 step 5): dropped before any HPKE open,
+   * or after step 6 for an envelope that skipped that drop and is neither held for a contact's key
+   * change nor a contact's card-update (IR-D-72-1 F01, F10).
+   */
+  | 'sender_blocked';
 
 export interface InboundReport {
   /** The validated envelope `id` (base64url, 16 bytes); absent when the envelope did not parse. */
@@ -302,6 +308,12 @@ interface Opened {
   cek: Uint8Array | undefined;
   readonly payload: Payload;
   readonly payloadText: string;
+  /**
+   * `from` is a blocked key and this first run skipped the step 5 drop because step 7 could hold it
+   * for a contact's rotation (D-72, IR-D-72-1 F01): once the type is known it is dropped unless it is
+   * held or a contact's card-update.
+   */
+  readonly blockedSkip: boolean;
 }
 
 type Final =
@@ -579,6 +591,8 @@ export class EnvelopeService {
           payload_json: null,
           read_at: null,
           delivery: null,
+          refused_at: null,
+          request_accepted_at: null,
         });
         markSeen();
         return { status: 'verified', report: report(envelope.id, 'deferred') };
@@ -599,6 +613,10 @@ export class EnvelopeService {
    */
   async processReceived(): Promise<InboundReport[]> {
     const ctx = this.#ctx;
+    // D-72 retention: expired refusals from unknown keys are pruned first (07 §3.2). The count in
+    // requestsFullTx ignores them already, so this only reclaims the rows.
+    const pruneAt = nowOf(ctx);
+    await ctx.store.transaction((tx) => pruneRefusedTx(tx, pruneAt));
     const own = await this.#ownKeys();
     let book = await this.#book();
     const reports: InboundReport[] = [];
@@ -631,7 +649,7 @@ export class EnvelopeService {
             envelopeJson: row.envelope_json ?? '',
             source: 'received',
           };
-          const result = await this.#open(item, own);
+          const result = await this.#open(item, own, book);
           if ('kind' in result) {
             const done = await this.#settle(item, result);
             if (done !== undefined) reports.push(done);
@@ -710,7 +728,7 @@ export class EnvelopeService {
       };
       const claimed = screen.action === 'continue' && screen.sender.kind === 'contact';
       if (screen.action === 'continue' && !claimed && row.release_at > now) continue;
-      const result = await this.#open(item, own);
+      const result = await this.#open(item, own, book);
       if ('kind' in result) {
         const done = await this.#settle(item, result);
         if (done !== undefined) reports.push(done);
@@ -765,19 +783,47 @@ export class EnvelopeService {
   }
 
   /**
+   * The blocked-key drop at the start of step 5 (D-72; 07 §3.2 `blocked_keys`). `from` in the
+   * blocked keys and not a contact's current key: `drop`, unless this is a first run (a `received`
+   * row) whose recipients include a stored contact's owner `kid`, the step 7 hold condition visible
+   * before any open: then `skip`, so a contact's card-update from a blocked new epoch key can still
+   * arrive (IR-D-72-1 F01). A held row run again gets no skip: unclaimed, it is dropped when due. A
+   * blocked set that cannot be read throws, and the pass stops with nothing processed (07 §3.2).
+   */
+  async #blockedGate(
+    item: Item,
+    envelope: Envelope,
+    book: Book,
+  ): Promise<'pass' | 'skip' | 'drop'> {
+    const from = envelope.from;
+    const blocked = await this.#ctx.store.transaction(
+      (tx) => isBlockedTx(tx, from) && tx.count('contacts', { agent_nostr: from }) === 0,
+    );
+    if (!blocked) return 'pass';
+    if (item.source === 'received' && envelope.recipients.some((r) => book.byOwnerKid.has(r.kid))) {
+      return 'skip';
+    }
+    return 'drop';
+  }
+
+  /**
    * Steps 5 and 6. Step 5: the entry whose `kid` is one of the agent's own `enc` keys, at the
    * highest matching epoch, opened with exactly one `unwrapCek`; the `kc` check before AES-GCM.
    * A `kc` mismatch (the commitment check fails) is told apart from a failed tag only here, through
    * the separate commitment check; `decryptPayload` reports both as `open_failed`. Step 6: the
    * payload's strict schema. On success the CEK stays in the result for step 8.
    */
-  async #open(item: Item, own: OwnKeys): Promise<Opened | Final> {
+  async #open(item: Item, own: OwnKeys, book: Book): Promise<Opened | Final> {
     let envelope: Envelope;
     try {
       envelope = parseEnvelope(parseJson(item.envelopeJson));
     } catch {
       return { kind: 'drop', reason: 'unreadable' };
     }
+    // Blocked key first (D-72): after the step 4 signature, before the own-entry lookup and any
+    // unwrapCek, so only an envelope that key signed is dropped and it costs no decryption.
+    const gate = await this.#blockedGate(item, envelope, book);
+    if (gate === 'drop') return { kind: 'drop', reason: 'sender_blocked' };
     const id = decodeBase64url(envelope.id, { length: ENVELOPE_ID_LENGTH });
     let pick: { readonly entry: EnvelopeRecipient; readonly epoch: number } | undefined;
     for (const entry of envelope.recipients) {
@@ -825,7 +871,7 @@ export class EnvelopeService {
         wipe(plaintext);
       }
       keep = true;
-      return { item, envelope, id, cek, payload, payloadText };
+      return { item, envelope, id, cek, payload, payloadText, blockedSkip: gate === 'skip' };
     } finally {
       if (!keep) wipe(cek);
     }
@@ -842,6 +888,19 @@ export class EnvelopeService {
     book: Book,
   ): Promise<{ readonly report?: InboundReport | undefined; readonly applied?: AgentCard }> {
     const disposition = await this.#senderRole(o, own, book);
+    // D-72, IR-D-72-1 F01 and F10: an envelope from a blocked key that skipped the step 5 drop is
+    // dropped now, unless step 7 holds it for a contact's key change or it is a contact's
+    // card-update that passed 04 §3.4.1. A pairing message from a blocked key never gets through.
+    if (
+      o.blockedSkip &&
+      disposition.kind !== 'hold' &&
+      !(disposition.kind === 'accept' && disposition.cardUpdate !== undefined)
+    ) {
+      wipeCek(o);
+      return {
+        report: await this.#settle(o.item, { kind: 'drop', reason: 'sender_blocked' }),
+      };
+    }
     if (disposition.kind === 'hold' || disposition.kind === 'keep_held') {
       wipeCek(o);
       if (disposition.kind === 'keep_held') return {};
@@ -1122,17 +1181,25 @@ export class EnvelopeService {
       payload_json: sealed,
       read_at: null,
       delivery: null,
+      refused_at: null,
+      request_accepted_at: null,
     };
+    const now = nowOf(ctx);
     try {
       const done = await ctx.store.transaction((tx) => {
         if (!claim(tx, item)) return 'lost' as const;
         // The requests-queue limits: the count and the insert in this one transaction (07 §3.2).
         // Over a limit nothing is stored and nothing is sent; the seen rows stay.
-        if (d.state === 'request' && requestsFullTx(tx, envelope.from)) {
+        if (d.state === 'request' && requestsFullTx(tx, envelope.from, now)) {
           deleteRow(tx, item);
           return 'full' as const;
         }
-        d.cardUpdate?.apply(tx);
+        if (d.cardUpdate !== undefined) {
+          d.cardUpdate.apply(tx);
+          // 07 §3.2: a card-update that makes a blocked key a contact's current key removes the
+          // block in the same transaction; the contact's status governs that key from then on.
+          tx.delete('blocked_keys', { from_key: agentNostrKey(d.cardUpdate.card) });
+        }
         writeRow(tx, item, row);
         return 'stored' as const;
       });
@@ -1221,6 +1288,7 @@ export class EnvelopeService {
     type?: PayloadType,
   ): Promise<InboundReport | undefined> {
     const ctx = this.#ctx;
+    const now = nowOf(ctx);
     let envelope = parsed;
     if (envelope === undefined && final.kind === 'refuse') {
       envelope = parseEnvelope(parseJson(item.envelopeJson));
@@ -1253,7 +1321,7 @@ export class EnvelopeService {
         effective.contactId === undefined &&
         envelope !== undefined &&
         !(type !== undefined && PAIRING_TYPES.has(type)) &&
-        requestsFullTx(tx, envelope.from)
+        requestsFullTx(tx, envelope.from, now)
       ) {
         effective = { kind: 'drop', reason: REQUESTS_FULL };
       }
@@ -1281,6 +1349,9 @@ export class EnvelopeService {
         payload_json: null,
         read_at: null,
         delivery: null,
+        // D-72: the local time it was stored as refused, for its retention (07 §3.2).
+        refused_at: now,
+        request_accepted_at: null,
       });
       return report(item.envelopeId, 'refused', {
         reason: effective.reason,
@@ -1413,6 +1484,8 @@ export async function outboundRow(
     payload_json: await seal(ctx, 'envelopes', 'payload_json', [envelope.id], sealed.payloadText),
     read_at: null,
     delivery: 'queued',
+    refused_at: null,
+    request_accepted_at: null,
   };
 }
 

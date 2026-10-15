@@ -4,7 +4,7 @@
 // imported from there and not repeated here.
 
 /** The logical schema version of 07 §3 that this code implements (forward migrations only, §3.7). */
-export const STORE_SCHEMA_VERSION = 1;
+export const STORE_SCHEMA_VERSION = 2;
 
 /** 04 §2.9: `storagePrefix` is 16 random bytes, base64url, generated at init. */
 export const STORAGE_PREFIX_BYTES = 16;
@@ -37,6 +37,13 @@ export const MAX_HELD_PER_OWNER_KID = 100;
 export const MAX_REQUESTS_PER_SENDER = 5;
 /** Requests queue: at most 200 pending requests in total (decided at #44). */
 export const MAX_REQUESTS_TOTAL = 200;
+
+/**
+ * Requests queue: a `refused` row from an unknown key stops counting this long after its local
+ * `refused_at`, and is pruned at the start of the next processing pass (D-72; 07 §3.2; equal to the
+ * seen-set's minimum retention, IR-D-72-1 F04).
+ */
+export const REFUSED_RETENTION_SECONDS = 604_800;
 
 /** rate_counters: 60-second buckets over a sliding hour. */
 export const RATE_BUCKET_SECONDS = 60;

@@ -83,9 +83,14 @@ function columnCheck(column: string, spec: ColumnSpec): string {
   }
 }
 
-function columnDef(table: TableName, column: string, spec: ColumnSpec): string {
+function columnDef(
+  table: TableName,
+  column: string,
+  spec: ColumnSpec,
+  parent: TableSpec = tableSpec(table),
+): string {
   const type = spec.kind === 'int' || spec.kind === 'flag' ? 'INTEGER' : 'TEXT';
-  const isKey = tableSpec(table).primaryKey.includes(column);
+  const isKey = parent.primaryKey.includes(column);
   const check = columnCheck(column, spec);
   if (spec.nullable && !isKey) {
     return `${q(column)} ${type} CHECK (${q(column)} IS NULL OR (${check}))`;
@@ -101,14 +106,20 @@ export const SECOND_LAYER_TRIGGERS = [
   'contacts__revoked_is_final',
 ] as const;
 
-/** The statements that create the schema of `tables` from an empty database. */
+/**
+ * The statements that create the schema of `tables` from an empty database. `specOf` gives each
+ * table's spec (default: the current TABLES); a frozen migration passes its own snapshot.
+ */
 export function createSchemaStatements(
   tables: readonly TableName[] = TABLE_NAMES,
+  specOf: (table: TableName) => TableSpec = tableSpec,
 ): readonly string[] {
   const out: string[] = [];
   for (const table of tables) {
-    const spec = tableSpec(table);
-    const defs = Object.entries(spec.columns).map(([column, c]) => columnDef(table, column, c));
+    const spec = specOf(table);
+    const defs = Object.entries(spec.columns).map(([column, c]) =>
+      columnDef(table, column, c, spec),
+    );
     defs.push(`PRIMARY KEY (${spec.primaryKey.map(q).join(', ')})`);
     out.push(`CREATE TABLE ${q(table)} (\n  ${defs.join(',\n  ')}\n) STRICT`);
     (spec.unique ?? []).forEach((u, i) => {
@@ -148,14 +159,63 @@ export function createSchemaStatements(
   return Object.freeze(out);
 }
 
+// --- Frozen snapshots ------------------------------------------------------------------------------
+
+/** Tables added after version 1, and envelope columns added after version 1 (D-72, version 2). */
+const V2_TABLES: readonly TableName[] = ['blocked_keys'];
+const V2_ENVELOPE_COLUMNS: readonly string[] = ['refused_at', 'request_accepted_at'];
+
+/**
+ * The version 1 (G-9) schema: today's TABLES without what version 2 added. Its statements are
+ * pinned by digest in sqlite-store.test.ts, so this snapshot cannot drift.
+ */
+function v1Spec(table: TableName): TableSpec {
+  const spec = tableSpec(table);
+  if (table !== 'envelopes') return spec;
+  return {
+    ...spec,
+    columns: Object.fromEntries(
+      Object.entries(spec.columns).filter(([column]) => !V2_ENVELOPE_COLUMNS.includes(column)),
+    ),
+  };
+}
+
+/**
+ * Version 2 (D-72, M1-7e-2): `envelopes.refused_at` and `envelopes.request_accepted_at`, appended
+ * (ALTER TABLE ADD COLUMN appends, which is also their place in TABLES), and the `blocked_keys`
+ * table. A `refused` row stored before version 2 has a null refused_at: the core treats it as
+ * expired, so it stops counting toward the requests-queue limits and is pruned on the next pass.
+ */
+function v2Statements(): readonly string[] {
+  const envelopes = tableSpec('envelopes');
+  return [
+    ...V2_ENVELOPE_COLUMNS.map(
+      (column) =>
+        `ALTER TABLE "envelopes" ADD COLUMN ${columnDef(
+          'envelopes',
+          column,
+          envelopes.columns[column] as ColumnSpec,
+        )}`,
+    ),
+    ...createSchemaStatements(V2_TABLES),
+  ];
+}
+
 /**
  * The forward migrations, oldest first; the last one's version is STORE_SCHEMA_VERSION. Version 1
- * is the G-9 schema. A later schema version appends a migration (ALTER TABLE, new tables) and never
- * edits an earlier one: version 1 is generated from TABLES only while STORE_SCHEMA_VERSION is 1, and
- * sqlite-store.test.ts pins its digest so a TABLES change without a new migration fails the build.
+ * is the G-9 schema, version 2 adds D-72's columns and table. A later schema version appends a
+ * migration (ALTER TABLE, new tables) and never edits an earlier one; sqlite-store.test.ts pins the
+ * digest of every version, so a TABLES change without a new migration fails the build.
  */
 export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
-  Object.freeze({ version: 1, statements: createSchemaStatements() }),
+  Object.freeze({
+    version: 1,
+    statements: createSchemaStatements(
+      TABLE_NAMES.filter((t) => !V2_TABLES.includes(t)),
+      v1Spec,
+    ),
+  }),
+  Object.freeze({ version: 2, statements: Object.freeze(v2Statements()) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

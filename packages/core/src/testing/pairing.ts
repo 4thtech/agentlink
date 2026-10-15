@@ -177,6 +177,8 @@ export async function storeTranscript(
       ),
       read_at: null,
       delivery: r.out ? ('sent' as const) : null,
+      refused_at: null,
+      request_accepted_at: null,
     });
   }
   await self.store.transaction((tx) => {
