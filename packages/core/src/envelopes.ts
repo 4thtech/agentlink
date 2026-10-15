@@ -76,6 +76,7 @@ import { checkRecipientWrap, kidOf } from './envelope-wraps.js';
 import { CoreError } from './errors.js';
 import type { IdentityService } from './identity.js';
 import { REQUESTS_FULL, isBlockedTx, pruneRefusedTx, requestsFullTx } from './requests.js';
+import { isTermsType, type TermsAdmission, type TermsInboundHook } from './terms-store.js';
 import type { Row } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 
@@ -175,7 +176,13 @@ export type InboundReason =
   /** A `revoke` whose SignedOwnerAction does not verify against the named agent (04 §3.4.1). */
   | 'revoke_invalid'
   /** Above `contacts.rateLimitPerContactPerHour` for the sender's contact (07 §3.2). */
-  | 'rate_limited';
+  | 'rate_limited'
+  /**
+   * An `offer`, `accept` or `reject` the negotiation chain refuses (04 §3.4: version gap, fork,
+   * locked version, resend link, answer rules; M1-32). Stored as refused and shown in the activity
+   * feed; a second envelope for a version from the same sender also flags the contact (rule 1).
+   */
+  | 'terms_refused';
 
 export interface InboundReport {
   /** The validated envelope `id` (base64url, 16 bytes); absent when the envelope did not parse. */
@@ -268,6 +275,8 @@ export interface RateLimitHook {
 export interface EnvelopeHooks {
   readonly revocation?: RevokeHandler;
   readonly rateLimit?: RateLimitHook;
+  /** The negotiation chain rules for a contact's `offer`, `accept` and `reject` (M1-32). */
+  readonly terms?: TermsInboundHook;
 }
 
 // --- Constants -----------------------------------------------------------------------------------
@@ -372,6 +381,8 @@ type Disposition =
       readonly cardUpdate?: PreparedCardUpdate;
       /** A verified revoke's effects (M1-7h): applied with the envelope row, or `noop`. */
       readonly revoke?: PreparedRevoke;
+      /** A terms envelope the chain took (M1-32): re-checked and applied with the envelope row. */
+      readonly terms?: Extract<TermsAdmission, { refused: false }>;
     }
   | { readonly kind: 'deferred'; readonly contactId?: string; readonly senderCard?: AgentCard }
   | { readonly kind: 'pairing'; readonly contactId?: string; readonly senderCard: AgentCard }
@@ -1001,6 +1012,34 @@ export class EnvelopeService {
         }),
       };
     }
+    // The negotiation chain (04 §3.4; M1-32): computed from this agent's own store, before the
+    // envelope is stored. A refusal is stored as refused, never taken into the chain.
+    const termsHook = this.#hooks.terms;
+    if (
+      termsHook !== undefined &&
+      disposition.state === 'ok' &&
+      disposition.contactId !== undefined &&
+      isTermsType(o.payload.type)
+    ) {
+      const admission = await termsHook.admit({
+        envelopeId: o.item.envelopeId,
+        envelopeHash: o.item.envelopeHash,
+        contactId: disposition.contactId,
+        createdAt: o.envelope.createdAt,
+        thread: o.envelope.thread,
+        payload: o.payload,
+      });
+      if (admission.refused) {
+        const final: Final = {
+          kind: 'refuse',
+          reason: 'terms_refused',
+          contactId: disposition.contactId,
+          flagged: admission.flagged,
+        };
+        return { report: await this.#settle(o.item, final, o.envelope, o.payload.type) };
+      }
+      return this.#accept(o, { ...disposition, terms: admission });
+    }
     return this.#accept(o, disposition);
   }
 
@@ -1267,6 +1306,9 @@ export class EnvelopeService {
     try {
       const done = await ctx.store.transaction((tx) => {
         if (!claim(tx, item)) return 'lost' as const;
+        // The chain rows are still those the terms decision was made on; otherwise nothing is
+        // written, the row stays `received` and the next pass decides it again (M1-32).
+        if (d.terms !== undefined && !d.terms.checkTx(tx)) return 'lost' as const;
         // The requests-queue limits: the count and the insert in this one transaction (07 §3.2).
         // Over a limit nothing is stored and nothing is sent; the seen rows stay.
         // A Block from another process since the step 5 gate (IR-M1-7e-2-1 F02): checked again
@@ -1293,6 +1335,7 @@ export class EnvelopeService {
           deleteRow(tx, item);
           return 'rate' as const;
         }
+        if (d.terms !== undefined) d.terms.effectTx(tx, now);
         if (d.cardUpdate !== undefined) {
           d.cardUpdate.apply(tx);
           // 07 §3.2: a card-update that makes a blocked key a contact's current key removes the
