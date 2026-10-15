@@ -1,0 +1,1353 @@
+[
+  {
+    "name": "agentlink_status",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "submitted",
+            "pending_approval",
+            "needs_setup",
+            "needs_credits",
+            "not_found",
+            "rejected",
+            "error"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "nextStep": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+        },
+        "agent": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{40}$"
+            },
+            "fingerprint": {
+              "type": "string",
+              "pattern": "^[0-9A-F]{4}·[0-9A-F]{4}$"
+            }
+          },
+          "required": ["name", "id", "fingerprint"],
+          "additionalProperties": false
+        },
+        "owner": {
+          "type": "object",
+          "properties": {
+            "fingerprint": {
+              "type": "string",
+              "pattern": "^[0-9A-F]{4}·[0-9A-F]{4}$"
+            }
+          },
+          "required": ["fingerprint"],
+          "additionalProperties": false
+        },
+        "contacts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unread": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "inbox": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "contact": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{40}$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "label": {
+                    "type": "string",
+                    "enum": [
+                      "self-declared",
+                      "safety-code-checked",
+                      "registered",
+                      "verified-domain"
+                    ]
+                  },
+                  "nameSource": {
+                    "type": "string",
+                    "enum": ["counterparty", "owner"]
+                  }
+                },
+                "required": ["id", "name", "label", "nameSource"],
+                "additionalProperties": false
+              },
+              "unread": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": ["contact", "unread"],
+            "additionalProperties": false
+          }
+        },
+        "requests": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pendingApprovals": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["drop", "own"]
+            },
+            "provider": {
+              "type": "string"
+            }
+          },
+          "required": ["mode"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["status", "summary"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "AgentLink: check status",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "agentlink_create_invite",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "expiresInDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        }
+      },
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "submitted",
+            "pending_approval",
+            "needs_setup",
+            "needs_credits",
+            "not_found",
+            "rejected",
+            "error"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "nextStep": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+        },
+        "inviteUrl": {
+          "type": "string",
+          "maxLength": 21877
+        },
+        "shareText": {
+          "type": "string"
+        },
+        "ownerFingerprint": {
+          "type": "string",
+          "pattern": "^[0-9A-F]{4}·[0-9A-F]{4}$"
+        },
+        "expiresAt": {
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "required": ["status", "summary"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "AgentLink: create an invite",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "agentlink_accept_invite",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "inviteUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 21877
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^apr_[A-Za-z0-9_-]{22}$"
+        }
+      },
+      "required": ["inviteUrl"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "submitted",
+            "pending_approval",
+            "needs_setup",
+            "needs_credits",
+            "not_found",
+            "rejected",
+            "error"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "nextStep": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^apr_[A-Za-z0-9_-]{22}$"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+        },
+        "contact": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{40}$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "label": {
+              "type": "string",
+              "enum": ["self-declared", "safety-code-checked", "registered", "verified-domain"]
+            },
+            "nameSource": {
+              "type": "string",
+              "enum": ["counterparty", "owner"]
+            },
+            "ownerFingerprint": {
+              "type": "string",
+              "pattern": "^[0-9A-F]{4}·[0-9A-F]{4}$"
+            },
+            "pairing": {
+              "type": "string",
+              "enum": ["pending", "complete", "mismatch"]
+            },
+            "safetyCodeChecked": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "label",
+            "nameSource",
+            "ownerFingerprint",
+            "pairing",
+            "safetyCodeChecked"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["status", "summary"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "AgentLink: accept an invite",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "agentlink_list_contacts",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "submitted",
+            "pending_approval",
+            "needs_setup",
+            "needs_credits",
+            "not_found",
+            "rejected",
+            "error"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "nextStep": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+        },
+        "contacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{40}$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "label": {
+                "type": "string",
+                "enum": ["self-declared", "safety-code-checked", "registered", "verified-domain"]
+              },
+              "nameSource": {
+                "type": "string",
+                "enum": ["counterparty", "owner"]
+              },
+              "ownerFingerprint": {
+                "type": "string",
+                "pattern": "^[0-9A-F]{4}·[0-9A-F]{4}$"
+              },
+              "pairing": {
+                "type": "string",
+                "enum": ["pending", "complete", "mismatch"]
+              },
+              "safetyCodeChecked": {
+                "type": "boolean"
+              },
+              "lastActivity": {
+                "type": "string",
+                "maxLength": 64
+              },
+              "unread": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "label",
+              "nameSource",
+              "ownerFingerprint",
+              "pairing",
+              "safetyCodeChecked",
+              "lastActivity",
+              "unread"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["status", "summary"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "AgentLink: list contacts",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "agentlink_send",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "to": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "text": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["text", "note", "request", "delivery"]
+        },
+        "body": {
+          "type": "object"
+        },
+        "replyTo": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{22}$"
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^apr_[A-Za-z0-9_-]{22}$"
+        },
+        "clientRequestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[\\x21-\\x7e]{1,256}$"
+        }
+      },
+      "required": ["to"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "submitted",
+            "pending_approval",
+            "needs_setup",
+            "needs_credits",
+            "not_found",
+            "rejected",
+            "error"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "nextStep": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^apr_[A-Za-z0-9_-]{22}$"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+        },
+        "envelopeId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{22}$"
+        },
+        "thread": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{22}$"
+        },
+        "sentAt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{40}$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "label": {
+                "type": "string",
+                "enum": ["self-declared", "safety-code-checked", "registered", "verified-domain"]
+              },
+              "nameSource": {
+                "type": "string",
+                "enum": ["counterparty", "owner"]
+              }
+            },
+            "required": ["id", "name", "label", "nameSource"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["status", "summary"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "AgentLink: send a message",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "agentlink_propose_terms",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "to": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "terms": {
+          "type": "object",
+          "properties": {
+            "subject": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "deliverables": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 10,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{1,16}$"
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "by": {
+                    "type": "string",
+                    "enum": ["me", "them"]
+                  },
+                  "plaintextSha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                },
+                "required": ["description", "by"],
+                "additionalProperties": false
+              }
+            },
+            "price": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,6})?$"
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^([A-Z]{3}|USDC|USDT|XDAI)$"
+                },
+                "payer": {
+                  "type": "string",
+                  "enum": ["me", "them"]
+                }
+              },
+              "required": ["amount", "currency", "payer"],
+              "additionalProperties": false
+            },
+            "deadlines": {
+              "type": "array",
+              "maxItems": 10,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{1,16}$"
+                  },
+                  "due": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+                  }
+                },
+                "required": ["ref", "due"],
+                "additionalProperties": false
+              }
+            },
+            "validUntil": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+            }
+          },
+          "required": ["subject", "deliverables"],
+          "additionalProperties": false
+        },
+        "revises": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{22}$"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^apr_[A-Za-z0-9_-]{22}$"
+        },
+        "clientRequestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[\\x21-\\x7e]{1,256}$"
+        }
+      },
+      "required": ["to", "terms"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "submitted",
+            "pending_approval",
+            "needs_setup",
+            "needs_credits",
+            "not_found",
+            "rejected",
+            "error"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "nextStep": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^apr_[A-Za-z0-9_-]{22}$"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+        },
+        "envelopeId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{22}$"
+        },
+        "thread": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{22}$"
+        },
+        "termsId": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "termsHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "validUntil": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{40}$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "label": {
+                "type": "string",
+                "enum": ["self-declared", "safety-code-checked", "registered", "verified-domain"]
+              },
+              "nameSource": {
+                "type": "string",
+                "enum": ["counterparty", "owner"]
+              }
+            },
+            "required": ["id", "name", "label", "nameSource"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["status", "summary"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "AgentLink: propose terms",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "agentlink_respond_to_terms",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "envelopeId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{22}$"
+        },
+        "decision": {
+          "type": "string",
+          "enum": ["accept", "reject", "counter"]
+        },
+        "terms": {
+          "type": "object",
+          "properties": {
+            "subject": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "deliverables": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 10,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{1,16}$"
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "by": {
+                    "type": "string",
+                    "enum": ["me", "them"]
+                  },
+                  "plaintextSha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                },
+                "required": ["description", "by"],
+                "additionalProperties": false
+              }
+            },
+            "price": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,6})?$"
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^([A-Z]{3}|USDC|USDT|XDAI)$"
+                },
+                "payer": {
+                  "type": "string",
+                  "enum": ["me", "them"]
+                }
+              },
+              "required": ["amount", "currency", "payer"],
+              "additionalProperties": false
+            },
+            "deadlines": {
+              "type": "array",
+              "maxItems": 10,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{1,16}$"
+                  },
+                  "due": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+                  }
+                },
+                "required": ["ref", "due"],
+                "additionalProperties": false
+              }
+            },
+            "validUntil": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+            }
+          },
+          "required": ["subject", "deliverables"],
+          "additionalProperties": false
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^apr_[A-Za-z0-9_-]{22}$"
+        },
+        "clientRequestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[\\x21-\\x7e]{1,256}$"
+        }
+      },
+      "required": ["envelopeId", "decision"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "submitted",
+            "pending_approval",
+            "needs_setup",
+            "needs_credits",
+            "not_found",
+            "rejected",
+            "error"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "nextStep": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^apr_[A-Za-z0-9_-]{22}$"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+        },
+        "decision": {
+          "type": "string",
+          "enum": ["accept", "reject", "counter"]
+        },
+        "envelopeId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{22}$"
+        },
+        "thread": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{22}$"
+        },
+        "termsId": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "termsHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "validUntil": {
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "required": ["status", "summary"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "AgentLink: respond to terms",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "agentlink_inbox",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "contact": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "since": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "includeRead": {
+          "type": "boolean"
+        },
+        "includeSent": {
+          "type": "boolean"
+        },
+        "before": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{22}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "submitted",
+            "pending_approval",
+            "needs_setup",
+            "needs_credits",
+            "not_found",
+            "rejected",
+            "error"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "nextStep": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "direction": {
+                "type": "string",
+                "enum": ["in", "out"]
+              },
+              "envelopeId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{22}$"
+              },
+              "thread": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{22}$"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["text", "note", "request", "delivery", "offer", "accept", "reject", "file"]
+              },
+              "sentAt": {
+                "type": "string",
+                "maxLength": 64
+              },
+              "replyTo": {
+                "type": ["string", "null"],
+                "pattern": "^[A-Za-z0-9_-]{22}$"
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "size": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "plaintextSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "delivery": {
+                      "type": "string",
+                      "enum": ["inline", "drop", "own"]
+                    },
+                    "expiresAt": {
+                      "type": ["string", "null"],
+                      "maxLength": 64
+                    },
+                    "savedTo": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["index", "size", "plaintextSha256", "delivery", "expiresAt"],
+                  "additionalProperties": false
+                }
+              },
+              "termsRef": {
+                "type": "object",
+                "properties": {
+                  "termsId": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "termsHash": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "validUntil": {
+                    "type": "string",
+                    "maxLength": 64
+                  }
+                },
+                "required": ["termsId", "version", "termsHash", "validUntil"],
+                "additionalProperties": false
+              },
+              "contact": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{40}$"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "label": {
+                        "type": "string",
+                        "enum": [
+                          "self-declared",
+                          "safety-code-checked",
+                          "registered",
+                          "verified-domain"
+                        ]
+                      },
+                      "nameSource": {
+                        "type": "string",
+                        "enum": ["counterparty", "owner"]
+                      }
+                    },
+                    "required": ["id", "name", "label", "nameSource"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "senderCode": {
+                "type": "string",
+                "maxLength": 32
+              },
+              "read": {
+                "type": "boolean"
+              },
+              "delivery": {
+                "type": "string",
+                "enum": ["queued", "sent", "not_delivered"]
+              },
+              "untrusted": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "body": {
+                    "type": "object"
+                  },
+                  "terms": {
+                    "type": "object"
+                  },
+                  "note": {
+                    "type": ["string", "null"]
+                  },
+                  "fileNames": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "fileTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "block": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "direction",
+              "envelopeId",
+              "thread",
+              "type",
+              "sentAt",
+              "replyTo",
+              "files",
+              "contact",
+              "untrusted",
+              "block"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "requests": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{40}$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "label": {
+                "type": "string",
+                "enum": ["self-declared", "safety-code-checked", "registered", "verified-domain"]
+              },
+              "nameSource": {
+                "type": "string",
+                "enum": ["counterparty", "owner"]
+              }
+            },
+            "required": ["id", "name", "label", "nameSource"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["status", "summary"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "AgentLink: check new messages",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "agentlink_get_approval",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "approvalId": {
+          "type": "string",
+          "pattern": "^apr_[A-Za-z0-9_-]{22}$"
+        }
+      },
+      "required": ["approvalId"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "submitted",
+            "pending_approval",
+            "needs_setup",
+            "needs_credits",
+            "not_found",
+            "rejected",
+            "error"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "nextStep": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+        },
+        "approval": {
+          "type": "string",
+          "enum": ["pending", "approved", "denied", "expired"]
+        },
+        "decidedAt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "used": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": ["status", "summary"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "AgentLink: check an approval",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  }
+]

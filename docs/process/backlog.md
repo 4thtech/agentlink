@@ -2640,7 +2640,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (IR-D48-1 F15f) A scan of every file-tool result and error in the test run finds no URL from the drop or a connector, and no key material.
 
 #### M1-9e · MCP conformance and tool-surface guard
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli/test, .github/workflows/ci.yml
 - **Depends on:** M1-9c (the registry exists; extended when M1-9d lands). It runs on the frozen nine-tool M1a surface: the "exactly the 15 tools" assertion checks the 06 §2.0 table with the M1b rows marked pending until M1-9d
 - **Spec:** 06 §1 rule 4, §2.0, §9; 04 I-4; 11 §5; D-53
@@ -2650,6 +2650,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Committed tool-surface snapshot (names, input and output schemas, annotations); changes need the owner's "merge" in chat (D-51, D-52).
   - D-53 and D-55 assertions: the snapshot holds exactly the 15 tools of 06 §2.0 (M1b rows pending until M1-9d); `agentlink_send`'s `type` enum has no `offer`, `accept` or `reject`; every name starts with `agentlink_`; the four annotations are set explicitly on every tool and match the 06 §2.0 table; every tool that can return `pending_approval` accepts `approvalId`; after 0.1.0, a removed or renamed tool or a removed or newly required field fails CI unless the PR records a decision-log entry; no tool name, description or argument installs, changes or removes harness hooks or harness configuration.
   - Deny assertions: no tool name, description or argument that changes policy, exports keys, adds storage credentials, decides approvals or reads arbitrary files. Vocabulary lint over summaries and server instructions.
+  - Delivered in review: `apps/cli/test/tool-surface.test.ts` (snapshot `test/fixtures/tool-surface.json`, 06 §2.0 table read from the spec, `auditSurface` rules with bad-fixture self-tests) and `test/inspector-cli.test.ts` (pinned `@modelcontextprotocol/inspector-cli` 1.0.2, devDependency; the deps-check allowlist covers runtime dependencies only, so it needs no row). **TODO (post-0.1.0):** the "removed or renamed tool or field fails unless a decision-log entry" comparison needs the 0.1.0 surface as a baseline; add it with the 0.1.0 release card.
 - **Acceptance:**
   - Adding a fixture tool `set_policy` or an argument `privateKey` fails the check when run locally (local demonstration, output in PR; not pushed); so do a fixture tool without the `agentlink_` prefix and a fixture write tool marked `readOnlyHint: true` (local demonstrations); Inspector validation passes for every tool.
 
