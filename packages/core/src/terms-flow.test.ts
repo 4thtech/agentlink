@@ -25,7 +25,7 @@ import {
   passphrase,
   seed,
 } from './testing/fixtures.js';
-import { pairWith, type TestOwner } from './testing/envelopes.js';
+import { cardUpdatePayload, pairWith, rotate, type TestOwner } from './testing/envelopes.js';
 import { MemoryPolicyMark, newNonce, ownerHex, signWith } from './testing/owner.js';
 import type {
   KnownRecord,
@@ -1222,4 +1222,181 @@ describe('property: random interleavings never send two accepts or run without a
     // The interleavings did reach accepts (the property is not vacuous).
     expect(totalAccepts).toBeGreaterThan(0);
   }, 120_000);
+});
+
+describe('IR-M1-32-1 regressions', () => {
+  const run = (b: Agent, envelopeId: string, approvalId: string) =>
+    b.client.respondToTerms({ envelopeId, decision: 'accept', approvalId });
+
+  it('F01: an approved, unrun accept of v1 stays superseded after a conflict on v2 (void rule 1)', async () => {
+    const { a, b, offer } = await offered();
+    const p = pending(
+      await b.client.respondToTerms({ envelopeId: offer.envelopeId, decision: 'accept' }),
+    );
+    await approve(b, p.approvalId);
+    ok(
+      await b.client.respondToTerms({
+        envelopeId: offer.envelopeId,
+        decision: 'counter',
+        terms: input(),
+      }),
+    );
+    ok(
+      await a.client.proposeTerms({
+        to: b.id,
+        terms: input({ subject: 'A v2' }),
+        revises: offer.envelopeId,
+      }),
+    );
+    await deliver(a, b);
+    await deliver(b, a);
+    expect(await run(b, offer.envelopeId, p.approvalId)).toEqual({
+      status: 'rejected',
+      code: 'TERMS_SUPERSEDED',
+    });
+    // A fresh accept of v1 is refused too: higher versions are in the store.
+    expect(
+      await b.client.respondToTerms({ envelopeId: offer.envelopeId, decision: 'accept' }),
+    ).toEqual({ status: 'rejected', code: 'TERMS_SUPERSEDED' });
+    expect(await outRows(b, 'accept')).toHaveLength(0);
+  });
+
+  it('F02: deferredReceipt is never ready for a scope whose accept was not sent', async () => {
+    const { a, b, offer } = await offered();
+    const p = pending(
+      await b.client.respondToTerms({ envelopeId: offer.envelopeId, decision: 'accept' }),
+    );
+    await approve(b, p.approvalId);
+    ok(
+      await a.client.proposeTerms({
+        to: b.id,
+        terms: input({ subject: 'v2' }),
+        revises: offer.envelopeId,
+      }),
+    );
+    await deliver(a, b);
+    const offerHash = (await inRow(b, offer.envelopeId))!.envelope_hash;
+    expect(
+      (
+        await b.client.terms.deferredReceipt({
+          envelopeHash: offerHash,
+          kind: 'OFFER',
+          signer: a.id,
+        })
+      ).status,
+    ).not.toBe('ready');
+  });
+
+  it('F04: claimReceiptPartTx re-checks a cancel inside the claim transaction', async () => {
+    const { b, offer } = await offered();
+    const p = pending(
+      await b.client.respondToTerms({ envelopeId: offer.envelopeId, decision: 'accept' }),
+    );
+    await approve(b, p.approvalId);
+    ok(await run(b, offer.envelopeId, p.approvalId));
+    // A cancel that landed between the lookup and the claim, before the parts were voided.
+    await b.store.transaction((tx) =>
+      tx.update(
+        'approvals',
+        { approval_id: p.approvalId },
+        { status: 'cancelled', signed_cancel: '{}' },
+      ),
+    );
+    expect(
+      await b.store.transaction((tx) =>
+        b.client.terms.claimReceiptPartTx(tx, p.approvalId, 'ref', '{}', clock.t),
+      ),
+    ).toBe(false);
+  });
+
+  it('F05: the card diffs against the live resend, not a conflicted original', async () => {
+    const { a, b, offer } = await offered();
+    ok(
+      await b.client.respondToTerms({
+        envelopeId: offer.envelopeId,
+        decision: 'counter',
+        terms: input(),
+      }),
+    );
+    ok(
+      await a.client.proposeTerms({
+        to: b.id,
+        terms: input({ subject: 'A v2' }),
+        revises: offer.envelopeId,
+      }),
+    );
+    await deliver(a, b);
+    await deliver(b, a);
+    const resend = ok(
+      await a.client.proposeTerms({
+        to: b.id,
+        terms: input({ subject: 'Same' }),
+        revises: offer.envelopeId,
+      }),
+    );
+    const v3 = ok(
+      await a.client.proposeTerms({
+        to: b.id,
+        terms: input({
+          subject: 'Same',
+          price: { amount: '700.00', currency: 'USD', payer: 'me' },
+        }),
+        revises: resend.envelopeId,
+      }),
+    );
+    // In order: the resend, then v3 on top of it.
+    await deliver(a, b, [resend.envelopeId]);
+    await deliver(a, b, [v3.envelopeId]);
+    const p = pending(
+      await b.client.respondToTerms({ envelopeId: v3.envelopeId, decision: 'accept' }),
+    );
+    expect(p.card.changes).toEqual([{ field: 'price' }]);
+  });
+
+  it('F06: a repeat call on a receipt-only scope returns APPROVAL_USED', async () => {
+    const { b, offer } = await offered();
+    const p1 = pending(
+      await b.client.respondToTerms({ envelopeId: offer.envelopeId, decision: 'accept' }),
+    );
+    await approve(b, p1.approvalId);
+    ok(await run(b, offer.envelopeId, p1.approvalId));
+    // The accept ran: a new call covers the receipt only.
+    const p2 = pending(
+      await b.client.respondToTerms({ envelopeId: offer.envelopeId, decision: 'accept' }),
+    );
+    expect(p2.card.parts).toEqual(['accepted_receipt']);
+    await approve(b, p2.approvalId);
+    expect((await run(b, offer.envelopeId, p2.approvalId)).status).toBe('ok');
+    expect(await run(b, offer.envelopeId, p2.approvalId)).toMatchObject({
+      status: 'rejected',
+      code: 'APPROVAL_USED',
+      receipt: { type: 'ACCEPTED', status: 'waiting_for_record' },
+    });
+    expect(await outRows(b, 'accept')).toHaveLength(1);
+  });
+
+  it('F03: a contact card change with a backdated issuedAt still voids the scope (rule 3)', async () => {
+    const { a, b, offer } = await offered();
+    const t0 = clock.t;
+    clock.t = t0 + 1_000;
+    const p = pending(
+      await b.client.respondToTerms({ envelopeId: offer.envelopeId, decision: 'accept' }),
+    );
+    await approve(b, p.approvalId);
+    // A's owner rotates with a card issued before the scope was created.
+    clock.t = t0 + 500;
+    await rotate(a);
+    const built = await a.client.envelopes.build({
+      to: { contact: b.id },
+      payload: await cardUpdatePayload(a),
+    });
+    clock.t = t0 + 1_010;
+    await b.client.envelopes.receive({ envelope: built.envelope });
+    expect((await b.client.envelopes.processReceived()).map((r) => r.outcome)).toEqual(['ok']);
+    expect(await run(b, offer.envelopeId, p.approvalId)).toEqual({
+      status: 'rejected',
+      code: 'APPROVAL_VOID',
+    });
+    expect(await outRows(b, 'accept')).toHaveLength(0);
+  });
 });
