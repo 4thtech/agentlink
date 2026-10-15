@@ -57,6 +57,13 @@ const RELAY_IMAGES = {
   rnostr: 'rnostr/rnostr@sha256:c022e4384f8fe1eb6023d497fe0c5cf9cd13d239f62160713546de4522f69214',
 } as const;
 
+/** strfry does not create its database directory; the image has no entrypoint, so start it from a shell. */
+const STRFRY_COMMAND = [
+  'sh',
+  '-c',
+  'mkdir -p /app/strfry-db && exec /app/strfry --config=/etc/strfry.conf relay',
+];
+
 const OPEN = 'wss://relay-open.nostr-test.dev';
 const SMALL = 'wss://relay-small.nostr-test.dev';
 const AUTH = 'wss://relay-auth.nostr-test.dev';
@@ -330,8 +337,8 @@ describe.skipIf(!required)(
             image: RELAY_IMAGES.strfry,
             containerPort: 7777,
             config: strfryConfig(131_072),
-            configPath: '/app/strfry.conf',
-            command: ['--config=/app/strfry.conf', 'relay'],
+            configPath: '/etc/strfry.conf',
+            command: STRFRY_COMMAND,
           },
           dir,
         ),
@@ -341,8 +348,8 @@ describe.skipIf(!required)(
             image: RELAY_IMAGES.strfry,
             containerPort: 7777,
             config: strfryConfig(1_024),
-            configPath: '/app/strfry.conf',
-            command: ['--config=/app/strfry.conf', 'relay'],
+            configPath: '/etc/strfry.conf',
+            command: STRFRY_COMMAND,
           },
           dir,
         ),
