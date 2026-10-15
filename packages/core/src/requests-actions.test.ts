@@ -2,7 +2,7 @@
 // (Accept, Ignore, Ignore all, Block, Unblock), refused-row retention on the local clock, and the
 // blocked-key drop at the start of 04 §3.1.1 step 5. A request never becomes a contact (04 §2.9):
 // none of these actions writes a contact or a pairing (07 §3.2).
-import { encodeBase64url, encodeHex, randomBytes } from '@agentlink/crypto';
+import { encodeBase64url, encodeHex, generateCek, randomBytes } from '@agentlink/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -553,5 +553,81 @@ describe('a contact’s rotation through a block (IR-D-72-1 F01)', () => {
       { envelopeId: env.id, outcome: 'dropped', reason: 'sender_blocked', flagged: false },
     ]);
     expect(await a.client.requests.count()).toBe(0);
+  });
+});
+
+describe('review IR-M1-7e-2-1', () => {
+  it('F01: a blocked key that takes the rotation skip and fails key commitment leaves no row', async () => {
+    const a = await agentA();
+    const b = await makeAgent(clock, new MemoryKeyStore(seed(39)), ownerB, 'bob');
+    await pairWith(clock, a, b);
+    const s = await stranger();
+    const key = await keyOf(s);
+    await a.client.requests.block(await requestFrom(a, s));
+    const env = await craft({
+      signer: await agentSigner(s.keyStore),
+      entries: [
+        // A's entry seals another CEK: its kc does not match aead.kc.
+        { pk: await agentEnc(a), cek: generateCek() },
+        { pk: await ownerEnc(ownerA) },
+        { pk: await ownerEnc(ownerB) },
+        { pk: await agentEnc(s) },
+      ],
+      createdAt: clock.t,
+    });
+    expect(await deliver(a, env)).toEqual([
+      { envelopeId: env.id, outcome: 'dropped', reason: 'sender_blocked', flagged: false },
+    ]);
+    expect(await rowOf(a, env.id)).toBeUndefined();
+    expect(await countWhere(a, 'refused', key)).toBe(0);
+  });
+
+  /** Blocks `key` from "another process" between the step 5 gate and the store transaction. */
+  function blockDuringOpen(a: TestAgent, key: string) {
+    const original = a.keyStore.unwrapCek.bind(a.keyStore);
+    vi.spyOn(a.keyStore, 'unwrapCek').mockImplementation(async (wrapped, envelopeId, options) => {
+      const cek = await original(wrapped, envelopeId, options);
+      await a.store.transaction((tx) => {
+        if (tx.get('blocked_keys', { from_key: key }) === undefined) {
+          tx.insert('blocked_keys', { from_key: key, blocked_at: clock.t, via_envelope_id: 'x' });
+        }
+      });
+      return cek;
+    });
+  }
+
+  it('F02: a Block that lands after the gate still keeps a request out', async () => {
+    const a = await agentA();
+    const s = await stranger();
+    blockDuringOpen(a, await keyOf(s));
+    const env = await fromKey(a, s);
+    expect(await deliver(a, env)).toEqual([
+      { envelopeId: env.id, outcome: 'dropped', reason: 'sender_blocked', flagged: false },
+    ]);
+    expect(await rowOf(a, env.id)).toBeUndefined();
+    expect(await a.client.requests.count()).toBe(0);
+  });
+
+  it('F02: a Block that lands after the gate still keeps an unknown-key refusal out', async () => {
+    const a = await agentA();
+    const s = await stranger();
+    const key = await keyOf(s);
+    blockDuringOpen(a, key);
+    const env = await fromKey(a, s, { withOwnEntry: false });
+    expect(await deliver(a, env)).toEqual([
+      { envelopeId: env.id, outcome: 'dropped', reason: 'sender_blocked', flagged: false },
+    ]);
+    expect(await countWhere(a, 'refused', key)).toBe(0);
+  });
+
+  it('F03: block refuses a request whose key is now a contact’s current key', async () => {
+    const a = await agentA();
+    const b = await makeAgent(clock, new MemoryKeyStore(seed(40)), ownerB, 'bob');
+    // B's envelope is a request while B is unknown; A then pairs with B.
+    const request = await requestFrom(a, b);
+    await pairWith(clock, a, b);
+    expect(await a.client.requests.block(request)).toEqual({ status: 'sender_is_contact' });
+    expect(await a.client.requests.listBlocked()).toEqual([]);
+    expect(await rowOf(a, request)).toMatchObject({ state: 'request' });
   });
 });
