@@ -90,8 +90,9 @@ describe('policy data', () => {
 });
 
 describe('the repository itself', () => {
-  // The scan reads only packages/*, apps/* and test-vectors/ (git ls-files per zone, 167 source
-  // files; it never lists docs/), about 0.4 s alone: ~0.2 s in 34 git ls-files calls, ~0.1 s parsing.
+  // The scan reads only packages/*, apps/* and test-vectors/ (433 source files; it never lists
+  // docs/), about 0.3 s alone, mostly parsing. It lists them with two git ls-files runs in total; it
+  // used to spawn 34 (two per zone), which starved on a loaded runner (30 s timeouts on PR #143).
   // On the CI runner it shares the CPU with every package's tests (turbo) and took 4.0 to 5.1 s,
   // past the 5 s default. Same assertions, a timeout with headroom over the worst seen.
   it('passes every boundary check', { timeout: 30_000 }, () => {
