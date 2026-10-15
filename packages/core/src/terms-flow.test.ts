@@ -1615,6 +1615,39 @@ describe('M1-32-b: the chain on receive never depends on arrival order or create
     expect(await inRow(b, v3.envelopeId)).toMatchObject({ state: 'ok' });
   });
 
+  it('IR-M1-32-b-1 F01: a waiting offer is not counted unread; it counts once the chain takes it', async () => {
+    const { a, b, offer } = await offered();
+    const unread = async () =>
+      (await b.client.inbox.counts()).inbox.find((e) => e.contactId === a.id)?.unread ?? 0;
+    // B reads v1, so nothing is unread.
+    await b.client.inbox.page({
+      limit: 100,
+      includeRead: false,
+      includeSent: false,
+      sizeOf: () => 1,
+      maxBytes: 1_000_000,
+    });
+    expect(await unread()).toBe(0);
+    const v2 = ok(
+      await a.client.proposeTerms({ to: b.id, terms: input(), revises: offer.envelopeId }),
+    );
+    const v3 = ok(
+      await a.client.proposeTerms({
+        to: b.id,
+        terms: input({ subject: 'v3' }),
+        revises: v2.envelopeId,
+      }),
+    );
+    await deliverInOrder(a, b, [v3.envelopeId]);
+    // v3 waits: the inbox page can never return it, so it is not unread.
+    expect(await unread()).toBe(0);
+    clock.t += 60;
+    await b.client.envelopes.processReceived();
+    expect(await unread()).toBe(0);
+    await deliverInOrder(a, b, [v2.envelopeId]);
+    expect(await unread()).toBe(2);
+  });
+
   it('property: a chain arriving in any order and any sync split (same second included) always ends in the same state', async () => {
     const a = await openAgent(1, ownerA, 'alice');
     const b = await openAgent(2, ownerB, 'bob');
