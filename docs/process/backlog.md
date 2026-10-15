@@ -2462,7 +2462,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Note (IR-M1-9c-1 F01, 2026-10-15):** core has no public read of a stored approval's own action or of the pending count, so #113 ships the `agentlink_get_approval` handler and the 06 §2.5 mapping against the `ToolClient.approvalState` / `pendingApprovals` port, with a "not available yet" stub in production. The core read is card M1-7e-3 (PR #116). Once it merges, M1-9c-b wires it into `coreToolClient` (`approvalState` → `{check, decidedAt}`, `pendingApprovals` → the count) and adds the end-to-end test.
 
 #### M1-9o · MCP tools: invite and accept (new, split from M1-9c)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#125) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`src/tools/{create-invite,accept-invite}.ts`)
 - **Depends on:** M1-9c, M1-7c, M1-7e, M1-7k
 - **Spec:** 06 §2.1, §7.1; 04 §3.6, §3.6.1; 11 §6.1; D-53

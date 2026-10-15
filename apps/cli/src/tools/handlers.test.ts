@@ -543,7 +543,7 @@ describe('tools whose card has not landed answer "not available yet"', () => {
       expect(result.structured.nextStep).toBe(TOOL_TEXT.setupFollowNextStep);
     }
     expect(
-      (await callTool('agentlink_create_invite', VALID_INPUT['agentlink_create_invite'], env))
+      (await callTool('agentlink_propose_terms', VALID_INPUT['agentlink_propose_terms'], env))
         .structured.code,
     ).toBe('NOT_AVAILABLE');
   });
