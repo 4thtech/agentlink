@@ -18,6 +18,9 @@ import { ApprovalService } from './approvals.js';
 import { IdempotencyService } from './idempotency.js';
 import { PairingService } from './pairing.js';
 import { RequestsQueue } from './requests.js';
+import { OutboxService } from './outbox.js';
+import { SendService, type SendMessageInput, type SendMessageResult } from './send.js';
+import type { TransportFactory } from './transport.js';
 import type { Store, StoreCipher } from './store/store.js';
 
 export interface AgentLinkClientOptions {
@@ -36,6 +39,12 @@ export interface AgentLinkClientOptions {
    * applies and a loaded policy always fails closed (G-6).
    */
   readonly policyMark?: PolicyVersionMark;
+  /**
+   * The relay transport (07 §4.1; M1-7k): `nostrTransport({connector, addressCheck, nip11})` with the
+   * runtime's relay I/O (packages/node supplies it). Without one the client cannot send or publish
+   * (`transport_unavailable`); reading the store still works.
+   */
+  readonly transport?: TransportFactory;
 }
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
@@ -58,12 +67,16 @@ export class AgentLinkClient {
   readonly requests: RequestsQueue;
   /** `clientRequestId` idempotency (M1-7e; 06 §1 rule 6, 07 §3.3). */
   readonly idempotency: IdempotencyService;
+  /** The outbox: staged envelopes, delivery passes and retries (M1-7k; 07 §3.2, §4.2). */
+  readonly outbox: OutboxService;
+  readonly #send: SendService;
 
   private constructor(
     agentId: string,
     ctx: CoreContext,
     approvals: ApprovalChannel,
     policyMark: PolicyVersionMark | undefined,
+    transport: TransportFactory | undefined,
   ) {
     this.agentId = agentId;
     this.identity = new IdentityService(ctx);
@@ -81,6 +94,25 @@ export class AgentLinkClient {
       this.idempotency,
     );
     this.requests = new RequestsQueue(ctx);
+    this.outbox = new OutboxService(ctx, this.identity, this.contacts, transport);
+    this.#send = new SendService(ctx, {
+      identity: this.identity,
+      contacts: this.contacts,
+      envelopes: this.envelopes,
+      ownerActions: this.ownerActions,
+      idempotency: this.idempotency,
+      outbox: this.outbox,
+    });
+  }
+
+  /**
+   * Sends a Talk message (`text | note | request | delivery`) to a paired contact (07 §2; 06 §2.2;
+   * M1-7k): policy check, envelope, one gift wrap per distinct recipient key, the envelope and its
+   * outbox rows in one store transaction, then the first publish. Idempotent under
+   * `clientRequestId` (06 §1 rule 6).
+   */
+  sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
+    return this.#send.send(input);
   }
 
   /**
@@ -127,6 +159,12 @@ export class AgentLinkClient {
       log: options.logger ?? createLogger({ name: 'core' }),
     };
     if (row !== undefined) await finishPendingRotation(ctx);
-    return new AgentLinkClient(bundle.agentId, ctx, approvals, options.policyMark);
+    return new AgentLinkClient(
+      bundle.agentId,
+      ctx,
+      approvals,
+      options.policyMark,
+      options.transport,
+    );
   }
 }
