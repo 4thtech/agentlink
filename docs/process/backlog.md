@@ -2858,7 +2858,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Agent instructions, docs, end-to-end
 
 #### M1-12a · skill file and AGENTS.md snippet for users' harnesses
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (#151) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · skills/agentlink/SKILL.md
 - **Depends on:** M1-9c, M1-9o, M1-9p, M1-9q (the tools it documents; D-73)
 - **Spec:** 06 §3 (`commitments`), §5, §6.1, §7.1; 02 J1, J4, J7, J8, J9, F-62; 11 §5, §6.1; D-31, D-32, D-53
