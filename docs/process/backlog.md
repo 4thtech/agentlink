@@ -2174,7 +2174,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A staged handshake from M1-7c is published once and survives a restart (outbox row).
 
 #### M1-7k-b · core: stale staged rows and the publisher lease (new, IR-M1-7k-1 F08)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (outbox and store schema, audit-rules §2.4) · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#133) · **Size:** M · **Tier:** Opus · **Security:** S2 (outbox and store schema, audit-rules §2.4) · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core, packages/node
 - **Depends on:** M1-7k (merged), M1-8b
 - **Spec:** 07 §3 (outbox, `publisher_lease`), D-73 (single active publisher per agent); M1-9r note (IR-M1-7k-1 Q3)
