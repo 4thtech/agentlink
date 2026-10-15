@@ -896,3 +896,131 @@ describe('counting pending approvals (06 §2.1 agentlink_status pendingApprovals
     expect(await t.client.approvalService.countPending()).toBe(1);
   });
 });
+
+describe('finding the open request for an identical action (06 §2.5 reuse; M1-13a follow-up)', () => {
+  /** The only keys a find may carry: no signature, decision payload, summary or action. */
+  const FIND_KEYS = new Set(['approvalId', 'status', 'expiresAt']);
+
+  it('a pending request for the identical action is found; nothing else is returned', async () => {
+    const t = await setup();
+    const r = await t.request(exportAction(SECRET));
+    const found = await t.client.approvalService.findOpen(exportAction(SECRET));
+    expect(found).toEqual({ approvalId: r.approvalId, status: 'pending', expiresAt: r.expiresAt });
+    expect(Object.keys(found ?? {}).every((k) => FIND_KEYS.has(k))).toBe(true);
+    expect(t.lines.join('\n')).not.toContain(SECRET);
+  });
+
+  it('a request for a different action is not found', async () => {
+    const t = await setup();
+    await t.request(exportAction('one'));
+    expect(await t.client.approvalService.findOpen(exportAction('two'))).toBeUndefined();
+  });
+
+  it('finding is read-only: the row is unchanged and no new request is made', async () => {
+    const t = await setup();
+    const r = await t.request();
+    const before = await t.row(r.approvalId);
+    await t.client.approvalService.findOpen(r.action);
+    expect(await t.row(r.approvalId)).toEqual(before);
+    expect(await t.client.approvalService.countPending()).toBe(1);
+  });
+
+  it('an approved, unused request is found as approved and stays usable once (I-4)', async () => {
+    const t = await setup();
+    const r = await t.request();
+    await t.approve(r);
+    expect(await t.client.approvalService.findOpen(r.action)).toEqual({
+      approvalId: r.approvalId,
+      status: 'approved',
+      expiresAt: r.expiresAt,
+    });
+    expect((await t.row(r.approvalId))?.status).toBe('approved');
+    expect(await t.client.approvalService.use(r.approvalId, r.action, 'approval')).toEqual({
+      status: 'used',
+    });
+  });
+
+  it('used, denied, cancelled, withdrawn, voided and expired requests are not found', async () => {
+    const t = await setup();
+    const used = await t.request();
+    await t.approve(used);
+    await t.client.approvalService.use(used.approvalId, used.action, 'approval');
+    expect(await t.client.approvalService.findOpen(used.action)).toBeUndefined();
+
+    const denied = await t.request();
+    await t.approve(denied, 'deny');
+    expect(await t.client.approvalService.findOpen(denied.action)).toBeUndefined();
+
+    const cancelled = await t.request();
+    await t.approve(cancelled);
+    await t.client.ownerActions.apply(
+      await t.signed('approval.cancel', { approvalId: cancelled.approvalId }),
+    );
+    expect(await t.client.approvalService.findOpen(cancelled.action)).toBeUndefined();
+
+    const withdrawn = await t.request();
+    await t.client.ownerActions.apply(
+      await t.signed('approval.cancel', { approvalId: withdrawn.approvalId }),
+    );
+    expect(await t.client.approvalService.findOpen(withdrawn.action)).toBeUndefined();
+
+    const voided = await t.request();
+    await t.store.transaction((tx) =>
+      tx.update('approvals', { approval_id: voided.approvalId }, { status: 'void' }),
+    );
+    expect(await t.client.approvalService.findOpen(voided.action)).toBeUndefined();
+
+    const lapsed = await t.request();
+    t.clock.t = lapsed.expiresAt + 1;
+    expect(await t.client.approvalService.findOpen(lapsed.action)).toBeUndefined();
+    await t.client.approvalService.expireDue();
+    expect(await t.client.approvalService.findOpen(lapsed.action)).toBeUndefined();
+  });
+
+  it('an approved request is preferred over a pending one for the same action', async () => {
+    const t = await setup();
+    const first = await t.request();
+    const second = await t.request();
+    await t.approve(second);
+    await t.request();
+    expect(await t.client.approvalService.findOpen(first.action)).toMatchObject({
+      approvalId: second.approvalId,
+      status: 'approved',
+    });
+  });
+
+  it('a status edited to approved without a signed decision is found as pending, never approved (I-4)', async () => {
+    const t = await setup();
+    const r = await t.request();
+    await t.store.transaction((tx) =>
+      tx.update('approvals', { approval_id: r.approvalId }, { status: 'approved' }),
+    );
+    expect(await t.client.approvalService.findOpen(r.action)).toEqual({
+      approvalId: r.approvalId,
+      status: 'pending',
+      expiresAt: r.expiresAt,
+    });
+  });
+
+  it('a row whose stored action does not open is skipped (fail closed)', async () => {
+    const t = await setup();
+    const r = await t.request();
+    const other = await t.request(exportAction('other'));
+    const moved = await t.row(other.approvalId);
+    await t.store.transaction((tx) =>
+      tx.update('approvals', { approval_id: r.approvalId }, { action_json: moved!.action_json }),
+    );
+    // `r`'s row now holds a sealed action bound to another row's key: it does not open.
+    await t.store.transaction((tx) =>
+      tx.update('approvals', { approval_id: other.approvalId }, { status: 'void' }),
+    );
+    expect(await t.client.approvalService.findOpen(r.action)).toBeUndefined();
+  });
+
+  it('an action the strict schema refuses is never matched', async () => {
+    const t = await setup();
+    await t.request();
+    expect(await t.client.approvalService.findOpen({ tool: 'nope' })).toBeUndefined();
+    expect(await t.client.approvalService.findOpen('x')).toBeUndefined();
+  });
+});
