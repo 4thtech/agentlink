@@ -610,7 +610,8 @@ describe('the host resolver (07 §4.2 step 1)', () => {
       (err: unknown) => err,
     );
     expect(error).toBeInstanceOf(Error);
-    expect((error as Error).message.includes('relay.example.com')).toBe(false);
+    // Exactly the fixed text: no host name, no resolver message.
+    expect((error as Error).message).toBe('relay host lookup failed');
   });
 
   it('uses the system resolver by default, with all answers', async () => {
