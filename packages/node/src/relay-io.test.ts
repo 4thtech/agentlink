@@ -39,9 +39,9 @@ const relays: TestRelay[] = [];
 beforeAll(() => {
   certificate = makeTestCertificate([
     RELAY_HOST,
-    'relay-a.agentlink.test',
-    'relay-b.agentlink.test',
-    'relay-c.agentlink.test',
+    'relay-a.nostr-test.dev',
+    'relay-b.nostr-test.dev',
+    'relay-c.nostr-test.dev',
   ]);
 });
 
@@ -191,6 +191,7 @@ describe('the connector connects to the checked address only (07 §4.2 step 3)',
     ['a host name as the address', { address: RELAY_HOST }],
     ['an address with a zone id', { address: 'fe80::1%lo0' }],
     ['a ws:// URL', { url: `ws://${RELAY_HOST}:1/` }],
+    ['a URL that names another host than the target', { url: `wss://${OTHER_HOST}/` }],
   ])('fails closed on %s, without connecting', async (_name, overrides) => {
     const server = await relay();
     const lookup = vi.spyOn(dns, 'lookup');
@@ -367,6 +368,21 @@ describe('inbound messages are capped at 131 072 bytes in the socket layer (04 �
     await connection.closed;
   });
 
+  it('turns a connection the relay drops without a close frame into one close, never an uncaught error', async () => {
+    const server = await relay({
+      onSocket: (ws) =>
+        setTimeout(() => (ws as unknown as { _socket: { destroy(): void } })._socket.destroy(), 20),
+    });
+    const connection = observe(
+      createRelayConnectorWith({ ca: certificate.cert }),
+      targetFor(server.port),
+    );
+    expect(await connection.opened).toBe(true);
+    await connection.closed;
+    await settle();
+    expect(connection.counts()).toEqual({ opens: 1, closes: 1 });
+  });
+
   it('sends text frames, and reports one close after close()', async () => {
     const received: string[] = [];
     const server = await relay({
@@ -397,8 +413,8 @@ describe('the NIP-11 read (07 §4.2 "Size")', () => {
   });
 
   it('GETs the relay path with Accept: application/nostr+json, pinned, and returns the body', async () => {
-    const lookup = vi.spyOn(dns, 'lookup');
     const server = await relay(nip11('{"limitation":{"max_message_length":4096}}'));
+    const lookup = vi.spyOn(dns, 'lookup');
     const body = await createNip11FetcherWith({ ca: certificate.cert }).fetch(
       targetFor(server.port, { url: `wss://${RELAY_HOST}:${server.port}/nostr` }),
     );
@@ -578,9 +594,9 @@ describe('with the relay pool of @agentlink/transport-nostr', () => {
       ['93.184.215.3', small.port],
     ]);
     const answers = new Map([
-      ['relay-a.agentlink.test', '93.184.215.1'],
-      ['relay-b.agentlink.test', '93.184.215.2'],
-      ['relay-c.agentlink.test', '93.184.215.3'],
+      ['relay-a.nostr-test.dev', '93.184.215.1'],
+      ['relay-b.nostr-test.dev', '93.184.215.2'],
+      ['relay-c.nostr-test.dev', '93.184.215.3'],
     ]);
     const route = (address: string) => ({ address: '127.0.0.1', port: routes.get(address) ?? 1 });
     const pool = new RelayPool({
@@ -594,19 +610,19 @@ describe('with the relay pool of @agentlink/transport-nostr', () => {
     try {
       const event = await makeSignedWrap(keys, 512);
       const outcome = await pool.publish(event, [
-        'wss://relay-a.agentlink.test',
-        'wss://relay-b.agentlink.test',
-        'wss://relay-c.agentlink.test',
+        'wss://relay-a.nostr-test.dev',
+        'wss://relay-b.nostr-test.dev',
+        'wss://relay-c.nostr-test.dev',
       ]);
-      expect(outcome.sent).toBe(true);
       expect(Object.fromEntries(outcome.results.map((r) => [r.relay, r.reason]))).toEqual({
-        'wss://relay-a.agentlink.test': 'ok',
-        'wss://relay-b.agentlink.test': 'ok',
-        'wss://relay-c.agentlink.test': 'too_large',
+        'wss://relay-a.nostr-test.dev': 'ok',
+        'wss://relay-b.nostr-test.dev': 'ok',
+        'wss://relay-c.nostr-test.dev': 'too_large',
       });
+      expect(outcome.sent).toBe(true);
       expect(a.seen.find((s) => s.kind === 'upgrade')).toMatchObject({
-        servername: 'relay-a.agentlink.test',
-        host: 'relay-a.agentlink.test',
+        servername: 'relay-a.nostr-test.dev',
+        host: 'relay-a.nostr-test.dev',
       });
     } finally {
       pool.close();

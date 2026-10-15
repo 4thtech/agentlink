@@ -149,6 +149,7 @@ export async function startTestRelay(
   });
   server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
     seen.push(seenOf('upgrade', req));
+    socket.on('error', () => undefined); // a client that resets the connection is not a test failure
     if (options.upgrade !== undefined && !options.upgrade(req, socket)) return;
     wss.handleUpgrade(req, socket, head, (ws) => {
       sockets.push(ws);

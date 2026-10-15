@@ -55,19 +55,19 @@ const RELAY_IMAGES = {
   rnostr: 'rnostr/rnostr@sha256:c022e4384f8fe1eb6023d497fe0c5cf9cd13d239f62160713546de4522f69214',
 } as const;
 
-const OPEN = 'wss://relay-open.agentlink.test';
-const SMALL = 'wss://relay-small.agentlink.test';
-const AUTH = 'wss://relay-auth.agentlink.test';
+const OPEN = 'wss://relay-open.nostr-test.dev';
+const SMALL = 'wss://relay-small.nostr-test.dev';
+const AUTH = 'wss://relay-auth.nostr-test.dev';
 const HOSTS = [
-  'relay-open.agentlink.test',
-  'relay-small.agentlink.test',
-  'relay-auth.agentlink.test',
+  'relay-open.nostr-test.dev',
+  'relay-small.nostr-test.dev',
+  'relay-auth.nostr-test.dev',
 ];
 /** The stub resolver's public answers; `route` maps each to its local TLS terminator. */
 const ANSWERS: Record<string, string> = {
-  'relay-open.agentlink.test': '93.184.215.11',
-  'relay-small.agentlink.test': '93.184.215.12',
-  'relay-auth.agentlink.test': '93.184.215.13',
+  'relay-open.nostr-test.dev': '93.184.215.11',
+  'relay-small.nostr-test.dev': '93.184.215.12',
+  'relay-auth.nostr-test.dev': '93.184.215.13',
 };
 
 interface RunningRelay {
@@ -351,15 +351,15 @@ describe.skipIf(!required)(
             platform: 'linux/amd64',
             containerPort: 8080,
             config: rnostrConfig(authPubkey),
-            configPath: '/tmp/rnostr.toml',
-            command: ['relay', '-c', '/tmp/rnostr.toml'],
+            configPath: '/rnostr/config/rnostr.toml',
+            command: ['relay', '-c', '/rnostr/config/rnostr.toml'],
           },
           dir,
         ),
       ]);
-      running['relay-open.agentlink.test'] = open;
-      running['relay-small.agentlink.test'] = small;
-      running['relay-auth.agentlink.test'] = auth;
+      running['relay-open.nostr-test.dev'] = open;
+      running['relay-small.nostr-test.dev'] = small;
+      running['relay-auth.nostr-test.dev'] = auth;
     }, 900_000);
 
     afterAll(async () => {
@@ -393,8 +393,8 @@ describe.skipIf(!required)(
         });
         expect(outcome.sent).toBe(true);
         expect(pool.relayHealth().find((h) => h.relay === SMALL)?.maxMessageLength).toBe(1_024);
-        const openRelay = running['relay-open.agentlink.test'] as RunningRelay;
-        const authRelay = running['relay-auth.agentlink.test'] as RunningRelay;
+        const openRelay = running['relay-open.nostr-test.dev'] as RunningRelay;
+        const authRelay = running['relay-auth.nostr-test.dev'] as RunningRelay;
         expect((await fetchEventById(openRelay.wsPort, event.id))?.id).toBe(event.id);
         expect((await fetchEventById(authRelay.wsPort, event.id))?.id).toBe(event.id);
       } finally {
@@ -439,7 +439,7 @@ describe.skipIf(!required)(
       FileOutbox.create(file, [row]);
 
       // First run: relay-open is unreachable, so only relay-auth acknowledges; the row stays pending.
-      blocked.add('relay-open.agentlink.test');
+      blocked.add('relay-open.nostr-test.dev');
       const pool1 = newPool(true);
       try {
         const first = await new OutboxWorker({
@@ -449,12 +449,12 @@ describe.skipIf(!required)(
         expect(first).toMatchObject({ sent: 0, retrying: 1 });
       } finally {
         pool1.close();
-        blocked.delete('relay-open.agentlink.test');
+        blocked.delete('relay-open.nostr-test.dev');
       }
       const pending = new FileOutbox(file).row(event.id);
       expect(pending?.state).toBe('pending');
       expect(Object.keys(pending?.acks ?? {})).toEqual([AUTH]);
-      const openRelay = running['relay-open.agentlink.test'] as RunningRelay;
+      const openRelay = running['relay-open.nostr-test.dev'] as RunningRelay;
       expect(await fetchEventById(openRelay.wsPort, event.id)).toBeUndefined();
 
       // Restart: a new persistence instance over the same file, a new pool and a new worker, at the
