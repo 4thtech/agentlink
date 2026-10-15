@@ -2352,8 +2352,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - An agent-run `init` never writes without `--confirm` and never prints or accepts an owner secret; `init` on clean macOS, Windows and Linux machines completes (recorded).
 
 #### M1-9l · CLI: everyday commands (new, split from M1-9a)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
-- **Repo/path:** agentlink · apps/cli (`src/commands/{invite,accept,contacts,status,doctor}.ts`)
+- **Status:** in review (#112) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Repo/path:** agentlink · apps/cli (`src/commands/{invite,accept,contacts,status,doctor,requests}.ts`)
 - **Depends on:** M1-9k, M1-7c; M1-7k for `accept` to complete the pairing; the M1-7h catch-up for the `status --brief` counts
 - **Spec:** 06 §2.1 (contact-name rule), §6.1, §7.1, §8; 07 §9.4; 11 §6.10; D-53
 - **Invariants:** I-4, I-5
