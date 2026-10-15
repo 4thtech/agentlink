@@ -9,11 +9,37 @@
 // - The code is display-only: never written to a file, never offered as one (04 §2.8).
 // - The owner fingerprint and the lost-code consequence are shown before the code.
 // - File-KeyStore machines: a chosen passphrase is refused; their `owner.alko` is M1-8f.
-import { equalBytes, wipe, type Argon2idParams, type OwnerPublicKeys } from '@agentlink/crypto';
+// - M1-8h: in the same owner operation, the agent's first card (04 §2.5 "the card signature at owner
+//   setup"; owner-first-card.ts). The new owner is stored, unlocked once with the secret still in
+//   memory (no second entry), and core `identity.init` gets a session that signs exactly one card for
+//   this agent and this owner. All or nothing: if no card naming this owner is stored, the new owner
+//   item is removed again, so the owner can simply run `owner init` again. An agent that already has
+//   a card is refused before any code is shown (never replaces an owner or a card).
+import {
+  OWNER_SESSION_DEFAULT_TTL_MS,
+  encodeHex0x,
+  equalBytes,
+  verifyAgentCard,
+  wipe,
+  type AgentCard,
+  type Argon2idParams,
+  type OwnerPublicKeys,
+} from '@agentlink/crypto';
 import { generateSecretCode } from '@agentlink/crypto/keystore';
 import { NodeKeyStoreError } from './errors.js';
-import { osKeychain, type KeyStoreBackendKind, type KeychainBackend } from './keychain.js';
+import { KEYCHAIN_CALL_TIMEOUT_MS, guarded } from './keychain-keystore.js';
 import {
+  assertAgentId,
+  osKeychain,
+  type KeyStoreBackendKind,
+  type KeychainBackend,
+} from './keychain.js';
+import { FirstCardSession, type FirstAgentCard } from './owner-first-card.js';
+
+export type { FirstAgentCard } from './owner-first-card.js';
+import {
+  KeychainOwnerKeyStore,
+  OWNER_ACCOUNT,
   assertOwnerPassphraseLength,
   newOwnerSeed,
   ownerFingerprintText,
@@ -32,7 +58,15 @@ export interface OwnerInitOptions {
   readonly cardOwner?: OwnerPublicKeys;
   /** Checked for AI-app markers; default process.env. Never read for a secret. */
   readonly env?: Readonly<Record<string, string | undefined>>;
+  /**
+   * M1-8h: the agent whose first card this operation signs (owner-first-card.ts). Required by the
+   * package entry (`initOwner`); internal callers that set up an owner alone (tests) omit it.
+   */
+  readonly firstCard?: FirstAgentCard;
 }
+
+/** The package entry's options: `owner init` always issues the agent's first card (M1-8h). */
+export type OwnerSetupOptions = OwnerInitOptions & { readonly firstCard: FirstAgentCard };
 
 export interface OwnerInitResult {
   /** The new owner's public keys, for the agent card (04 §2.4). */
@@ -41,6 +75,8 @@ export interface OwnerInitResult {
   readonly fingerprint: string;
   /** 1 = generated owner code, 2 = chosen owner passphrase. */
   readonly secretKind: 1 | 2;
+  /** M1-8h: the first card, signed by the new owner and stored, when `firstCard` was given. */
+  readonly card?: AgentCard;
 }
 
 /** Internal options (tests): Argon2id parameters and keychain timeout. */
@@ -78,6 +114,14 @@ const COPY = {
     'On a computer without a system keychain, approvals are protected by a generated owner code only.',
   fileUnavailable:
     "This agent's identity is kept in a passphrase-locked file, which this version of AgentLink can't set up an owner for yet. Update AgentLink.",
+  ownerExistsCard:
+    "This agent already has an owner. AgentLink won't replace it. To use an owner from another device, link it from that device.",
+  cardFailed:
+    "Your agent's card couldn't be signed, so the owner wasn't saved. Run `agentlink owner init` again.",
+  cardUnknown:
+    "Owner setup didn't finish. Run `agentlink doctor` in your own terminal to see what is missing.",
+  keychainFailed:
+    'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
 } as const;
 
 /** The code as groups of four, for display only (04 §2.8). */
@@ -135,6 +179,14 @@ export async function initOwnerWith(
       COPY.ownerExists(ownerFingerprintText(options.cardOwner)),
     );
   }
+  const first = options.firstCard;
+  if (first !== undefined) {
+    assertAgentId(first.agent);
+    // Never replaces a card (04 §2.8): an agent with a card already has an owner.
+    if ((await first.identity.get()) !== undefined) {
+      throw new NodeKeyStoreError('owner_exists', COPY.ownerExistsCard);
+    }
+  }
   const existing = await readOwnerItem(keychain, internals.timeoutMs);
   if (existing !== null) {
     wipe(existing);
@@ -168,11 +220,88 @@ export async function initOwnerWith(
       terminal.clearScreen();
     }
     await storeOwnerSeed(keychain, seed, { secret, secretKind: usePassphrase ? 2 : 1 }, internals);
+    const card =
+      first === undefined
+        ? undefined
+        : await issueFirstCard(keychain, keys, secret, first, internals.timeoutMs);
     terminal.write(COPY.done(fingerprint));
-    return Object.freeze({ owner: keys, fingerprint, secretKind: usePassphrase ? 2 : 1 });
+    return Object.freeze({
+      owner: keys,
+      fingerprint,
+      secretKind: usePassphrase ? 2 : 1,
+      ...(card === undefined ? {} : { card }),
+    });
   } finally {
     wipe(seed, secret);
   }
+}
+
+/** True when `card` is a verified stored card for `agent` that names exactly `owner`. */
+function namesOwner(
+  stored: { card: AgentCard; cardSig: string; cardAgentSig: string } | undefined,
+  agent: string,
+  owner: OwnerPublicKeys,
+): stored is { card: AgentCard; cardSig: string; cardAgentSig: string } {
+  return (
+    stored !== undefined &&
+    stored.card.agentEvm === agent &&
+    stored.card.ownerEvm === encodeHex0x(owner.ownerEvm) &&
+    stored.card.ownerNostr === encodeHex0x(owner.ownerNostr) &&
+    stored.card.ownerEnc === encodeHex0x(owner.ownerEnc) &&
+    verifyAgentCard(stored.card, stored.cardSig, stored.cardAgentSig)
+  );
+}
+
+/**
+ * M1-8h: signs and stores the first card with the owner just stored, unlocked once with `secret`
+ * (a copy; `secret` itself is wiped by the caller). Whatever happens, the result is read back from
+ * core: a verified card for this agent naming this owner is success; anything else removes the new
+ * owner item and is `owner_card_failed` (fixed text; the cause is not echoed, I-5).
+ */
+async function issueFirstCard(
+  keychain: KeychainBackend,
+  owner: OwnerPublicKeys,
+  secret: Uint8Array,
+  first: FirstAgentCard,
+  timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+): Promise<AgentCard> {
+  try {
+    const store = await KeychainOwnerKeyStore.open(keychain, owner, { timeoutMs });
+    try {
+      // unlock wipes the copy it is given (OwnerKeyStore contract).
+      const inner = await store.unlock(
+        { kind: 'passphrase', secret: secret.slice() },
+        { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS },
+      );
+      const session = new FirstCardSession(inner, first.agent, owner);
+      try {
+        await first.identity.init({
+          owner: session,
+          ownerKeys: owner,
+          name: first.name,
+          relays: first.relays,
+        });
+      } finally {
+        await session.close();
+      }
+    } finally {
+      await store.close();
+    }
+  } catch {
+    // Decided below from what core stored, never from the error (whose text is not shown).
+  }
+  let stored: Awaited<ReturnType<FirstAgentCard['identity']['get']>>;
+  try {
+    stored = await first.identity.get();
+  } catch {
+    // Unknown whether a card naming this owner was stored: keep the owner key (removing it could
+    // leave a card whose owner key is gone).
+    throw new NodeKeyStoreError('owner_card_failed', COPY.cardUnknown);
+  }
+  if (namesOwner(stored, first.agent, owner)) return stored.card;
+  const removed = await guarded(() => keychain.delete(OWNER_ACCOUNT), timeoutMs).catch(() => false);
+  if (!removed) throw new NodeKeyStoreError('keychain_failed', COPY.keychainFailed);
+  throw new NodeKeyStoreError('owner_card_failed', COPY.cardFailed);
 }
 
 async function confirmCode(terminal: OwnerTerminal, code: Uint8Array): Promise<void> {
@@ -216,8 +345,15 @@ async function readNewPassphrase(terminal: OwnerTerminal): Promise<Uint8Array> {
  * Refused with an AI-app marker set (`harness_detected`) or without an interactive terminal
  * (`owner_prompt_unavailable`), before the keychain is touched.
  */
-export function initOwner(options: OwnerInitOptions): Promise<OwnerInitResult> {
+export function initOwner(options: OwnerSetupOptions): Promise<OwnerInitResult> {
   return Promise.resolve().then(() => {
+    // M1-8h: `owner init` always signs the agent's first card in the same operation (04 §2.5).
+    if (typeof options !== 'object' || options === null || options.firstCard === undefined) {
+      throw new NodeKeyStoreError(
+        'owner_operation_invalid',
+        "Owner setup needs this agent's card to sign. Run `agentlink owner init`.",
+      );
+    }
     assertNoHarnessMarker(options.env ?? process.env);
     return initOwnerWith(osKeychain(), ttyOwnerTerminal(), options);
   });

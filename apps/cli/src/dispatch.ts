@@ -90,7 +90,12 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
     options: { ...AGENT, brief: { type: 'boolean' } },
   },
   { name: 'invite', usage: ['agentlink invite'], guard: 'none', options: AGENT },
-  { name: 'accept', usage: ['agentlink accept <url>'], guard: 'none', options: AGENT },
+  {
+    name: 'accept',
+    usage: ['agentlink accept <url> [--approval <approvalId>]'],
+    guard: 'none',
+    options: { ...AGENT, approval: { type: 'string' } },
+  },
   {
     name: 'contacts',
     usage: ['agentlink contacts', 'agentlink contacts --verify <id>       †'],

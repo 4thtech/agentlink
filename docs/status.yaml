@@ -189,16 +189,19 @@ areas:
         state: done
         prs: [86]
         summary: "Stops an older owner-signed policy from being put back."
+      - name: "First agent card at owner setup"
+        state: in-progress
+        summary: "`owner init` signs the agent's first card in the same owner step, so a new agent can pair; the owner key signs only the agent card and the defined owner decisions (M1-8h, in review)."
       - name: "Passphrase-locked key file for headless machines"
         state: planned
         summary: "M1-8f."
   - id: apps
     title: "MCP server, CLI and apps"
-    intro: "The CLI runtime is in review; nothing is usable yet."
+    intro: "The CLI runtime and its everyday commands have landed and the owner commands and the MCP server skeleton are in review; nothing is usable end to end yet."
     components:
       - name: "MCP server and CLI"
         state: in-progress
-        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising) is in review; the commands and the MCP server follow."
+        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising), `init`, `invite`, `accept`, `contacts`, `status`, `doctor` and `requests` have landed; the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) are in review; the MCP server skeleton (stdio, the frozen M1a tool list, the untrusted-content wrapper and the read-only status and contacts tools) is in review; the remaining MCP tools follow."
       - name: "Local approval page"
         state: planned
         summary: "A small page on 127.0.0.1 for owner approvals and settings (M1b)."
