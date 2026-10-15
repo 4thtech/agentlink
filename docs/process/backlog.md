@@ -2866,7 +2866,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - RFP sent to ≥ 3 firms; ≥ 2 quotes received; signed engagement with dates before M3 starts; code-freeze date fed into M2 planning.
 
 #### M1-18 · Default relay set and optional 4thTech relay (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/transport-nostr (defaults); agentlink-ops · relay/ (optional relay)
 - **Depends on:** M1-5b; DECISION NEEDED: `agentlink-ops` pipeline (`release-and-deployment.md` §4.7)
 - **Spec:** 07 §4.2 (relays, retention); 03 §2; 08 §6
