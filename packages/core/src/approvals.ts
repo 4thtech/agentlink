@@ -124,6 +124,19 @@ export interface PendingApproval {
   readonly url?: string;
 }
 
+/**
+ * An open request found for an identical action (ApprovalService.findOpen). Only the ID, the
+ * re-verified state and the expiry: never the action, the summary or a signed object (I-4, I-5).
+ */
+export interface OpenApproval {
+  readonly approvalId: string;
+  readonly status: 'pending' | 'approved';
+  readonly expiresAt: number;
+}
+
+/** How many open requests findOpen looks at, newest first (a bound on work, not a rule). */
+const MAX_OPEN_SCAN = 200;
+
 type CheckRefusal = Extract<ApprovalCheck, { status: 'refused' }>['reason'];
 
 export type ApprovalRefusal =
@@ -488,6 +501,61 @@ export class ApprovalService {
       expiresAt: row.expires_at,
       ...(decided && row.decided_at !== null ? { decidedAt: row.decided_at } : {}),
     };
+  }
+
+  /**
+   * The open request for this exact `action`, so a tool called again without `approvalId` can hand
+   * back the request it already made instead of asking the owner twice (06 §2.5; M1-13a follow-up).
+   * Matches by the action digest, which binds the whole action; a commitment (scope) or an action
+   * the strict schema refuses never matches. Each candidate's stored action is opened and its
+   * signed objects re-verified (OwnerActions.readApproval): only `pending` or `approved` (unused,
+   * unlapsed) is returned, an approved one before a pending one, newest first. A row that does not
+   * open or verify is skipped (fail closed). Read-only: it never decides, claims or changes a row,
+   * and an `approved` answer authorises nothing by itself; the call must still name the ID (I-4).
+   */
+  async findOpen(action: unknown): Promise<OpenApproval | undefined> {
+    if (!approvalActionSchema.safeParse(action).success) return undefined;
+    if (commitmentScopeOf(action) !== undefined) return undefined;
+    const digest = computeActionDigest(action);
+    const now = nowOf(this.#ctx);
+    const candidates = await this.#ctx.store.transaction((tx) =>
+      tx.select(
+        'approvals',
+        {
+          status: { in: ['pending', 'approved'] },
+          scope_json: null,
+          signed_cancel: null,
+          expires_at: { gte: now },
+        },
+        { orderBy: [['created_at', 'desc']], limit: MAX_OPEN_SCAN },
+      ),
+    );
+    let pending: OpenApproval | undefined;
+    for (const row of candidates) {
+      let stored: unknown;
+      try {
+        const text = await open(
+          this.#ctx,
+          'approvals',
+          'action_json',
+          [row.approval_id],
+          row.action_json,
+        );
+        stored = parseJson(text);
+      } catch {
+        continue;
+      }
+      if (!approvalActionSchema.safeParse(stored).success) continue;
+      if (computeActionDigest(stored) !== digest) continue;
+      const reading = await this.#owner.readApproval(row.approval_id, stored);
+      if (reading.status === 'approved') {
+        return { approvalId: row.approval_id, status: 'approved', expiresAt: row.expires_at };
+      }
+      if (reading.status === 'pending' && pending === undefined) {
+        pending = { approvalId: row.approval_id, status: 'pending', expiresAt: row.expires_at };
+      }
+    }
+    return pending;
   }
 
   /**

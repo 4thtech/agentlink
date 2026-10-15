@@ -3,6 +3,7 @@
 // `nextStep` or error except through the 06 §2.1 name rule (I-5). Moving these sentences into the
 // copy sheet is M1-9g's, after M1-9o/p/q.
 import { CoreError } from '@agentlink/core';
+import { approvalIdSchema } from '@agentlink/types';
 import { fail, type HandlerOutput } from './result.js';
 import { TOOL_TEXT } from './text.js';
 
@@ -37,6 +38,8 @@ export const INVITE_TEXT = Object.freeze({
   approvalVoid: "That approval can't be used for this invite, so nothing was done.",
   approvalVoidNextStep: 'Call the tool again without approvalId to ask the owner for a new one.',
   approvalPending: "The owner hasn't decided on this request yet, so nothing was done.",
+  approvedNeedsId:
+    "The owner already approved accepting this invite, but this call didn't include the approvalId, so nothing was done yet.",
   accepted:
     "Invite accepted. You'll be connected when the other agent answers. The safety code appears on the owner's own screen.",
   acceptedOffline:
@@ -44,6 +47,29 @@ export const INVITE_TEXT = Object.freeze({
   acceptedNextStep:
     'Tell the user to compare the safety code on their own screen (the local app, or `agentlink contacts --verify` in their own terminal) once they are connected, never in this chat.',
 });
+
+/** The core's `apr_` ID: the schema and the exact character pattern (04 §2.4.1). */
+const APPROVAL_ID_CHARS = /^apr_[A-Za-z0-9_-]{22}$/;
+
+function checkedApprovalId(approvalId: string): string {
+  if (!APPROVAL_ID_CHARS.test(approvalId) || !approvalIdSchema.safeParse(approvalId).success) {
+    // The core made this ID; anything else is a bug and becomes the generic internal error.
+    throw new Error('approval id out of pattern');
+  }
+  return approvalId;
+}
+
+/**
+ * The accept-specific sentence after the `pending_approval` nextStep (M1-13a follow-up): the second
+ * call must repeat the same link AND name the approval. The only inserted value is the core's
+ * `apr_` ID, checked against its exact pattern first; the link is never echoed (I-5).
+ */
+export const acceptRetryStep = (approvalId: string): string =>
+  `That is: call agentlink_accept_invite with the same inviteUrl and approvalId ${checkedApprovalId(approvalId)}. Without approvalId it does not accept the invite.`;
+
+/** The nextStep when the owner already approved but the call named no approval (M1-13a follow-up). */
+export const approvedNeedsIdStep = (approvalId: string): string =>
+  `Call agentlink_accept_invite again now with the same inviteUrl and approvalId ${checkedApprovalId(approvalId)}.`;
 
 /**
  * Maps the core's errors for a bad or unusable invite, or an agent that cannot send, to fixed

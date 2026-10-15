@@ -1,6 +1,9 @@
 // `agentlink_accept_invite` (06 §2.1, §2.5; 04 §3.6, §3.6.1; M1-9o). Policy `contacts.acceptInvites`
 // is `approval` by default: the first call stores nothing and returns `pending_approval` with the
-// fixed `nextStep` that sends the owner to `agentlink approve` in their own terminal. The retry with
+// fixed `nextStep` that sends the owner to `agentlink approve` in their own terminal, plus one
+// sentence that names this tool, the same `inviteUrl` and the `approvalId`. A call again without the
+// ID gets the open request back (the same ID while pending; while approved, a refusal that names the
+// ID, never a use), so a confused agent cannot pile up requests (M1-13a follow-up). The retry with
 // the `approvalId` pairs once: core re-verifies the owner's stored signature against the digest it
 // recomputes from THIS call's action and claims the approval in one compare-and-set (I-4).
 //
@@ -15,7 +18,12 @@ import type { PendingContact } from '@agentlink/core';
 import { acceptInviteAction, acceptInviteApprovalSummary } from './accept-action.js';
 import { renderRef, type ContactRef } from './contacts.js';
 import type { ToolContext } from './context.js';
-import { INVITE_TEXT, inviteFailure } from './invite-common.js';
+import {
+  INVITE_TEXT,
+  acceptRetryStep,
+  approvedNeedsIdStep,
+  inviteFailure,
+} from './invite-common.js';
 import { fail, notAvailable, ok, pendingApproval, type HandlerOutput } from './result.js';
 import { removeInvisible } from './untrusted.js';
 
@@ -31,6 +39,18 @@ function refOf(contact: PendingContact): ContactRef {
     label: contact.display.label,
     nameSource: contact.display.nameSource,
   });
+}
+
+/** `pending_approval` with the accept-specific retry sentence after the shared nextStep. */
+function acceptPending(context: ToolContext, approvalId: string, summary: string): HandlerOutput {
+  const out = pendingApproval(context, approvalId, summary);
+  return {
+    ...out,
+    result: {
+      ...out.result,
+      nextStep: `${out.result.nextStep ?? ''} ${acceptRetryStep(approvalId)}`.trim(),
+    },
+  };
 }
 
 const oneLine = (text: string): string => removeInvisible(text).replace(/\n/g, ' ').trim();
@@ -68,11 +88,23 @@ export async function acceptInviteHandler(
 
     if (decision === 'approval') {
       if (approvalId === undefined) {
-        const id = await invites.requestApproval(action, askSummary);
-        return pendingApproval(context, id, askSummary);
+        // Called again without the ID (M1-13a follow-up): hand back the open request for this same
+        // action instead of asking the owner twice. An approved one is never used from here: the
+        // call must name it, so the owner's decision stays tied to an explicit retry (I-4).
+        const open = await invites.findOpenApproval(action);
+        if (open?.status === 'approved') {
+          return fail(
+            'rejected',
+            INVITE_TEXT.approvedNeedsId,
+            approvedNeedsIdStep(open.approvalId),
+            'APPROVAL_ID_MISSING',
+          );
+        }
+        const id = open?.approvalId ?? (await invites.requestApproval(action, askSummary));
+        return acceptPending(context, id, askSummary);
       }
       const used = await invites.useApproval(approvalId, action, decision);
-      if (used.status === 'pending') return pendingApproval(context, approvalId, askSummary);
+      if (used.status === 'pending') return acceptPending(context, approvalId, askSummary);
       if (used.status === 'denied' || used.status === 'cancelled') {
         return fail(
           'rejected',

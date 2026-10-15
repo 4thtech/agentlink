@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Changed
+
+- `agentlink_accept_invite` two-step flow (M1-13a follow-up, S2, 06 §2.1): the tool description and the `pending_approval` next step now say plainly to call the tool again with the same `inviteUrl` and the `approvalId`. Called again without the `approvalId`, the tool no longer makes a second request for the same invite: while the owner has not decided it returns the same `approvalId`; once the owner approved, it runs nothing and says which `approvalId` to call again with (`APPROVAL_ID_MISSING`). A bare invite code and the full link now count as the same invite. Denied, used or expired requests still lead to a new request. Core gains `ApprovalService.findOpen`, a read-only lookup of the open request for an identical action.
+
 ### Added
 
 - End-to-end tests (M1-13a, S1, 10 M1-13, 06 §9, D-73 (9)): two agents pair through an invite (with the owner's approval) and exchange messages, each in its own home directory and process with the built `agentlink mcp`, the real keychain and store, over local relays. A deterministic variant with a scripted MCP client runs on every pull request (`e2e.yml`, `e2e-deterministic`); an LLM variant with Claude Code (Haiku) as agent A and Codex with an OpenRouter model as agent B runs by manual dispatch on `main` only (no schedule yet), with API keys in the `e2e` environment, and also records the session-habit, handoff and `~/.agentlink` deny transcripts (documented Claude Code permission rules plus the Bash sandbox) for M1-12a and M1-12b. A canary scan of every log and artifact (owner seeds and codes, message plaintext, API keys) gates each run. Report: `docs/process/test-reports/2026-10-15-m1-13a-e2e.md`.

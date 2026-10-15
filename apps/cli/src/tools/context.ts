@@ -14,6 +14,7 @@ import {
   type ContactView,
   type CreatedInvite,
   type InboxSender,
+  type OpenApproval,
   type PendingContact,
   type PolicyDecision,
   type ProposeTermsInput,
@@ -155,6 +156,12 @@ export interface InviteTools {
   decision(): Promise<PolicyDecision>;
   /** Creates the pending approval for `action`; returns its `apr_` ID. */
   requestApproval(action: unknown, summary: string): Promise<string>;
+  /**
+   * The open request for this exact `action` (core `approvalService.findOpen`): `pending`, or
+   * `approved` and unused, re-verified; undefined otherwise. Read-only: an `approved` answer lets
+   * nothing run (the call must still name the ID, I-4).
+   */
+  findOpenApproval(action: unknown): Promise<OpenApproval | undefined>;
   /** Re-verifies the owner's signature against `action`'s digest and claims the approval once. */
   useApproval(approvalId: string, action: unknown, decision: PolicyDecision): Promise<ApprovalUse>;
   /** Stages the pairing and its handshake (only after `allow` or a used approval). */
@@ -330,6 +337,7 @@ function coreInviteTools(client: AgentLinkClient): InviteTools {
       });
       return pending.approvalId;
     },
+    findOpenApproval: (action) => client.approvalService.findOpen(action),
     useApproval: (approvalId, action, decision) =>
       client.approvalService.use(approvalId, action, decision),
     async start(link) {

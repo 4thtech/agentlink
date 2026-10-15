@@ -2922,6 +2922,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Deterministic variant green on PRs within 15 minutes; LLM variant pass rate reported per run.
   - Canary scan of all e2e logs and artifacts finds no plaintext or keys.
+- **Follow-up (owner, 2026-10-15; first LLM run, step L04):** a small model called `agentlink_accept_invite` again without `approvalId` and made a second request. Fix in review (branch `m1-13a-accept-invite-wording`, S2): explicit two-step wording in the description and `nextStep`; a call without `approvalId` returns the open request for the same invite (same ID while pending; `APPROVAL_ID_MISSING` once approved, never a use).
 
 #### M1-13c · e2e: files, proof and proof of agreement (new, split from M1-13a)
 - **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
