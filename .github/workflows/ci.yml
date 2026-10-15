@@ -267,7 +267,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        # Exact runner images, no `*-latest` (M1-8a-d): an image change must not silently change the
+        # keychain behaviour under test. These are the images `*-latest` resolved to when pinned
+        # (2026-10-15); a bump is its own reviewed change.
+        os: [macos-26, windows-2025-vs2026, ubuntu-24.04]
     env:
       AGENTLINK_REQUIRE_KEYCHAIN: "1"
     steps:
@@ -332,6 +335,50 @@ jobs:
             const bad = tests.filter((t) => t.status !== "passed");
             console.log(`keychain-native.test.ts: ${tests.length} tests, ${bad.length} not passed`);
             if (tests.length < 3 || bad.length > 0) { console.error("::error::keychain-native.test.ts must run at least 3 tests, all passed (none skipped)"); process.exit(1); }
+          '
+
+  # M1-5b-b: the Node relay connector's Docker suite (packages/node/src/relay-docker.test.ts): the
+  # pool and the outbox against real relays, strfry and rnostr, pinned by digest in the test file.
+  # AGENTLINK_REQUIRE_DOCKER=1 turns a missing Docker daemon into a failed test instead of a skip.
+  # Not part of `ci-gate` yet on purpose: it joins `ci-gate`'s `needs` in a follow-up PR once it has
+  # run green here.
+  relays-docker:
+    name: relays-docker
+    needs: detect
+    if: needs.detect.outputs.has_skeleton == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      AGENTLINK_REQUIRE_DOCKER: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build the workspace dependencies of @agentlink/node
+        run: pnpm exec turbo run build --filter='@agentlink/node^...'
+
+      - name: Choose the test report path
+        run: echo "DOCKER_REPORT=$RUNNER_TEMP/relay-docker-vitest.json" >> "$GITHUB_ENV"
+
+      - name: Run the Docker relay suite
+        run: pnpm --filter @agentlink/node exec vitest run src/relay-docker.test.ts --reporter=default --reporter=json --outputFile.json="$DOCKER_REPORT"
+
+      - name: Check that relay-docker.test.ts ran in full, with no skipped test
+        run: |
+          node -e '
+            const r = JSON.parse(require("node:fs").readFileSync(process.env.DOCKER_REPORT, "utf8"));
+            const f = r.testResults.filter((x) => /relay-docker\.test\.ts$/.test(x.name));
+            const t = f.length === 1 ? f[0].assertionResults : [];
+            const bad = t.filter((x) => x.status !== "passed");
+            console.log(`relay-docker.test.ts: ${t.length} tests, ${bad.length} not passed`);
+            if (t.length < 4 || bad.length > 0) { console.error("::error::the Docker relay suite must run 4+ tests, all passed"); process.exit(1); }
           '
 
   # AGENTS.md and CLAUDE.md are auto-loaded into every agent session, so they have hard

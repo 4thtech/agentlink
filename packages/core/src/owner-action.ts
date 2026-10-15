@@ -56,6 +56,8 @@ export type OwnerActionRefusal =
   | 'outlives_request'
   | 'commitment_in_batch'
   | 'item_refused'
+  | 'contact_unknown'
+  | 'pairing_unavailable'
   | 'unsupported_op'
   // store side (owner-actions.ts)
   | 'not_approved'
@@ -235,8 +237,9 @@ function matchItem(
 
 /**
  * Verifies a parsed SignedOwnerAction for the receiving core in `ctx`. Pure; refuses anything that
- * is not exactly canonical. Ops whose rule another card builds (`contact.check`, M1-7c-b) are
- * refused at the match stage.
+ * is not exactly canonical. A `contact.check` is refused at the match stage here: its rule needs the
+ * pairing digest recomputed from the stored pair, which is verifyContactCheck (contact-check.ts),
+ * and OwnerActions.apply routes it there (M1-7c-b, M1-7d).
  */
 export function verifyOwnerAction(
   input: unknown,
@@ -277,7 +280,8 @@ export function verifyOwnerAction(
       break;
     }
     case 'contact.check':
-      // The pairing digest is recomputed from the stored handshake pair (M1-7c-b).
+      // Not decidable here: the pairing digest is recomputed from the stored handshake pair, which
+      // is verifyContactCheck's lookup (M1-7c-b). OwnerActions.apply never calls this for it.
       return match('unsupported_op');
     case 'approval.cancel':
     case 'policy.set':
