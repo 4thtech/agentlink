@@ -40,6 +40,37 @@ def fail(message):
     sys.exit(f"vector generator: {message}; nothing written")
 
 
+# `--check` exit status when it compared and found a difference (tools/vectors/generators.mjs
+# MISMATCH_EXIT). Distinct from 1 (fail(), any other error) and 2 (argparse), so a broken
+# environment is never reported as drifted vectors (M1-1h-d).
+MISMATCH = 3
+
+
+def mismatch(target, committed_text, expected_text):
+    """Report a `--check` difference, naming where it starts, and exit with MISMATCH."""
+    where = "the file text (formatting or key order)"
+    try:
+        committed = json.loads(committed_text)
+        expected = json.loads(expected_text)
+        if {k: x for k, x in committed.items() if k != "cases"} != {
+            k: x for k, x in expected.items() if k != "cases"
+        }:
+            where = "the file header (suite, version, generator, runtimes)"
+        else:
+            old, new = committed.get("cases"), expected["cases"]
+            if not isinstance(old, list) or len(old) != len(new):
+                where = f"the case count ({len(old) if isinstance(old, list) else '?'} committed, {len(new)} generated)"
+            else:
+                for a, b in zip(old, new):
+                    if a != b:
+                        where = f"case {b['id']}"
+                        break
+    except (ValueError, AttributeError, KeyError, TypeError):
+        where = "the file text (not a vector file)"
+    print(f"{target} differs from the generator output, first at {where}", file=sys.stderr)
+    sys.exit(MISMATCH)
+
+
 # --- pinned dependencies -------------------------------------------------------------------------
 
 
@@ -518,8 +549,9 @@ def main(*, suite, version, script, libraries, build, schema, doc, runtimes=None
     # Only the Python version of the machine that wrote the file may differ (generate_sha256.py).
     document["generator"]["version"] = committed_version
     if committed_text != render(document):
-        sys.exit(f"{target} differs from the generator output")
+        mismatch(target, committed_text, render(document))
     if target.resolve() == out.resolve():
         if schema_path.read_text(encoding="utf-8") != schema_text:
-            sys.exit(f"{schema_path} differs from the generator output")
+            print(f"{schema_path} differs from the generator output", file=sys.stderr)
+            sys.exit(MISMATCH)
     print(f"{target}: matches the generator output ({len(cases)} cases)")
