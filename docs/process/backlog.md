@@ -2898,7 +2898,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Walking skeleton, negotiation and UX (D-31…D-41) (new)
 
 #### M1-20 · Commitments policy: owner approval for binding accepts and receipts (D-31) (new)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#114) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types (policy schema), packages/core (policy engine)
 - **Depends on:** M1-7d, M1-21
 - **Spec:** D-31, D-32, D-55; 06 §3 (`commitments` policy and its "Commitments (D-31, D-55)" paragraph; open there and in 11 §14 Q1: whether a notarized `offer` is also a commitment), §2.2a (`agentlink_respond_to_terms`), §2.4 (`agentlink_acknowledge` on records without `terms`); 04 §2.5 (Commitments), §3.4 (`terms` checks), §3.4.2 (one approval per agreement); 02 F-61, F-62, J8
