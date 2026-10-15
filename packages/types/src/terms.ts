@@ -158,7 +158,9 @@ export const termsSchema = z
     deliverables: z.array(termsDeliverableSchema).min(1).max(TERMS_LIMITS.deliverables),
     price: termsPriceSchema.exactOptional(),
     deadlines: z.array(deadlineSchema).max(TERMS_LIMITS.deadlines),
-    validUntil: positiveInt,
+    // A JSON integer in [0, 2^53 - 1] (04 §3.4 "validUntil is an integer", 04 §3.4 shape rules);
+    // whether it has passed is a check at use (TERMS_EXPIRED), not a shape rule.
+    validUntil: uint53,
     previousTermsHash: sha256Hex.nullable(),
   })
   .superRefine((t, ctx) => {
@@ -197,25 +199,34 @@ const side = z.enum(['me', 'them']);
  * and any unknown key are refused. The same canonical-form rules and TERMS_LIMITS as `terms`.
  * `validUntil` is the strict UTC form `YYYY-MM-DDTHH:MM:SSZ`; `by` and `payer` are `me` or `them`.
  */
-export const termsInputSchema = z.strictObject({
-  subject,
-  deliverables: z
-    .array(
-      z.strictObject({
-        id: deliverableId.exactOptional(),
-        description,
-        by: side,
-        plaintextSha256: sha256Hex.exactOptional(),
-      }),
-    )
-    .min(1)
-    .max(TERMS_LIMITS.deliverables),
-  price: z
-    .strictObject({ amount: termsAmountSchema, currency: termsCurrencySchema, payer: side })
-    .exactOptional(),
-  deadlines: z.array(deadlineSchema).max(TERMS_LIMITS.deadlines).exactOptional(),
-  validUntil: termsDueSchema.exactOptional(),
-});
+export const termsInputSchema = z
+  .strictObject({
+    subject,
+    deliverables: z
+      .array(
+        z.strictObject({
+          id: deliverableId.exactOptional(),
+          description,
+          by: side,
+          plaintextSha256: sha256Hex.exactOptional(),
+        }),
+      )
+      .min(1)
+      .max(TERMS_LIMITS.deliverables),
+    price: z
+      .strictObject({ amount: termsAmountSchema, currency: termsCurrencySchema, payer: side })
+      .exactOptional(),
+    deadlines: z.array(deadlineSchema).max(TERMS_LIMITS.deadlines).exactOptional(),
+    validUntil: termsDueSchema.exactOptional(),
+  })
+  .superRefine((t, ctx) => {
+    // The id rules of `terms`, on the ids the mapping will give (defaults d1, d2, … by position),
+    // so a duplicate or an unknown deadline ref is refused at the tool input, never renamed.
+    const ids = (t.deliverables ?? []).map((d, n) => ({ id: d?.id ?? `d${n + 1}` }));
+    checkIdsAndRefs(ids, t.deadlines, (message, path) =>
+      ctx.addIssue({ code: 'custom', message, path }),
+    );
+  });
 
 export type TermsInput = z.infer<typeof termsInputSchema>;
 
@@ -357,6 +368,8 @@ export interface StoredTermsOffer {
   readonly version: number;
   readonly termsHash: string;
   readonly state: 'open' | 'conflict';
+  /** The offer's `terms.validUntil` (unix seconds); `checkSendAccept` needs it. */
+  readonly validUntil?: number;
 }
 
 /** The newest open offer of a negotiation (highest version; conflicted offers are skipped). */
@@ -423,6 +436,7 @@ const storedOfferSchema = z.strictObject({
   version: positiveInt,
   termsHash: sha256Hex,
   state: z.enum(['open', 'conflict']),
+  validUntil: uint53.exactOptional(),
 });
 const incomingSchema = z.strictObject({
   envelopeId: base64url(BYTE_LENGTHS.id),
@@ -493,6 +507,120 @@ export function evaluateIncomingOffer(
     }
     const refusal = linkRefusal(terms, head);
     return refusal === null ? { result: 'accept' } : { result: 'refuse', reason: refusal };
+  } catch {
+    return { result: 'refuse', reason: 'invalid' };
+  }
+}
+
+// --- answers: accept and reject (04 §3.4, 06 §2.2a) -----------------------------------------------
+
+export type AnswerRefusal =
+  | 'invalid'
+  | 'not_a_party'
+  | 'unknown_offer'
+  | 'not_own_offer'
+  | 'conflicted'
+  | 'hash_mismatch'
+  | 'locked';
+
+export interface IncomingAnswer {
+  readonly envelopeId: string;
+  readonly type: 'accept' | 'reject';
+  /** The verified sender's agent ID. */
+  readonly sender: string;
+  /** This agent's ID (the receiver). */
+  readonly self: string;
+  /** The envelope's `replyTo`: the offer it answers (PROPOSED reading of 04 §3.4). */
+  readonly replyTo: string | null;
+  readonly terms: Terms;
+  /** The body's `termsHash`, already recomputed and checked by the core with @agentlink/crypto. */
+  readonly termsHash: string;
+}
+
+const incomingAnswerSchema = z.strictObject({
+  envelopeId: base64url(BYTE_LENGTHS.id),
+  type: z.enum(['accept', 'reject']),
+  sender: evmAddress,
+  self: evmAddress,
+  replyTo: base64url(BYTE_LENGTHS.id).nullable(),
+  terms: termsSchema,
+  termsHash: sha256Hex,
+});
+
+/**
+ * The receiving core's check for an incoming `accept` or `reject` (04 §3.4): it must answer, by
+ * `replyTo`, an open offer this agent sent in this negotiation and quote exactly that offer's
+ * `termsHash`, so an accept whose hash does not match the offer it answers is refused. A second
+ * accept for a locked version is refused (no-fork rule 2). An answer to an offer this side has
+ * since superseded is still valid; the owner's approval card says so (06 §2.2a path (b)). After a
+ * valid `accept` the core adds the version to `lockedVersions`. Never throws.
+ */
+export function evaluateIncomingAnswer(
+  incoming: IncomingAnswer,
+  state: NegotiationState,
+): { readonly result: 'accept' } | { readonly result: 'refuse'; readonly reason: AnswerRefusal } {
+  try {
+    const inc = incomingAnswerSchema.safeParse(incoming);
+    const st = stateSchema.safeParse(state);
+    if (!inc.success || !st.success) return { result: 'refuse', reason: 'invalid' };
+    const { type, sender, self, replyTo, terms, termsHash } = inc.data;
+    const { offers, lockedVersions } = st.data;
+    const [a, b] = terms.parties;
+    if (sender === self || !((a === sender && b === self) || (a === self && b === sender))) {
+      return { result: 'refuse', reason: 'not_a_party' };
+    }
+    const answered = offers.find((o) => o.envelopeId === replyTo);
+    if (answered === undefined) return { result: 'refuse', reason: 'unknown_offer' };
+    if (answered.sender !== self) return { result: 'refuse', reason: 'not_own_offer' };
+    if (answered.state !== 'open') return { result: 'refuse', reason: 'conflicted' };
+    if (!sameTermsHash(answered.termsHash, termsHash) || answered.version !== terms.version) {
+      return { result: 'refuse', reason: 'hash_mismatch' };
+    }
+    if (type === 'accept' && lockedVersions.includes(terms.version)) {
+      return { result: 'refuse', reason: 'locked' };
+    }
+    return { result: 'accept' };
+  } catch {
+    return { result: 'refuse', reason: 'invalid' };
+  }
+}
+
+export type SendAcceptRefusal =
+  'invalid' | 'unknown_offer' | 'own_offer' | 'conflicted' | 'superseded' | 'locked' | 'expired';
+
+/**
+ * The sending core's check before an `accept` (04 §3.4): the offer is stored and was received from
+ * the contact, is not conflicted, is the newest open version of its negotiation (`superseded`,
+ * TERMS_SUPERSEDED), its version is not locked by an earlier accept, and `now` is not after its
+ * `validUntil` (`expired`, TERMS_EXPIRED; PROPOSED: `now == validUntil` is still within). The
+ * caller passes the offers of the offer's negotiation key. Never throws.
+ */
+export function checkSendAccept(
+  state: NegotiationState,
+  offerEnvelopeId: string,
+  self: string,
+  now: number,
+):
+  | { readonly result: 'allowed' }
+  | { readonly result: 'refuse'; readonly reason: SendAcceptRefusal } {
+  try {
+    const st = stateSchema.safeParse(state);
+    if (!st.success || !evmAddress.safeParse(self).success || !uint53.safeParse(now).success) {
+      return { result: 'refuse', reason: 'invalid' };
+    }
+    const { offers, lockedVersions } = st.data;
+    const offer = offers.find((o) => o.envelopeId === offerEnvelopeId);
+    if (offer === undefined) return { result: 'refuse', reason: 'unknown_offer' };
+    if (offer.sender === self) return { result: 'refuse', reason: 'own_offer' };
+    if (offer.state !== 'open') return { result: 'refuse', reason: 'conflicted' };
+    if (newestOpenOffer(offers)?.envelopeId !== offer.envelopeId) {
+      return { result: 'refuse', reason: 'superseded' };
+    }
+    if (lockedVersions.includes(offer.version)) return { result: 'refuse', reason: 'locked' };
+    if (offer.validUntil === undefined || now > offer.validUntil) {
+      return { result: 'refuse', reason: 'expired' };
+    }
+    return { result: 'allowed' };
   } catch {
     return { result: 'refuse', reason: 'invalid' };
   }

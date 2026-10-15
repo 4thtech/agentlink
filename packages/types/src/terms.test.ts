@@ -8,6 +8,8 @@ import {
   TERMS_LIMITS,
   TERMS_TOKEN_SYMBOLS,
   approvalActionSchema,
+  checkSendAccept,
+  evaluateIncomingAnswer,
   evaluateIncomingOffer,
   isCanonicalTermsText,
   negotiationKey,
@@ -134,8 +136,10 @@ describe('terms schema (04 §3.4, D-32)', () => {
     expectReject(termsSchema, terms({ version: 2, previousTermsHash: null }));
   });
 
-  it('validUntil is a positive JSON integer (unix seconds)', () => {
-    for (const validUntil of [0, -1, 1.5, '1760600000', '2025-10-16T07:33:20Z', null]) {
+  it('validUntil is a JSON integer in [0, 2^53 - 1] (unix seconds; expiry is checked at use)', () => {
+    // 04 §3.4 "validUntil is an integer"; 0 is in range (vector terms-accept-valid-until-zero).
+    expectAccept(termsSchema, terms({ validUntil: 0 }));
+    for (const validUntil of [-1, 1.5, 2 ** 53, '1760600000', '2025-10-16T07:33:20Z', null]) {
       expectReject(termsSchema, terms({ validUntil }));
     }
   });
@@ -1018,5 +1022,96 @@ describe('commitment approval actions use the strict terms and TermsInput (M1-21
     expectAccept(approvalActionSchema, a);
     a.args.terms = termsInput({ version: 4 });
     expectReject(approvalActionSchema, a);
+  });
+});
+
+// --- answers and sending an accept (04 §3.4, 06 §2.2a) --------------------------------------------
+
+describe('evaluateIncomingAnswer: an accept or reject binds the offer it answers', () => {
+  // This agent is AGENT_EVM; its own v2 (H2) answers the contact's v1 (H1).
+  const offers = [offer(1, CONTACT_A, 1, H1), offer(2, AGENT_EVM, 2, H2)];
+  const answer = (over: Obj = {}) =>
+    ({
+      envelopeId: ENV(9),
+      type: 'accept',
+      sender: CONTACT_A,
+      self: AGENT_EVM,
+      replyTo: ENV(2),
+      terms: terms({ version: 2, previousTermsHash: H1 }),
+      termsHash: H2,
+      ...over,
+    }) as never;
+  const st = (lockedVersions: number[] = []) => ({ offers, lockedVersions });
+
+  it('accepts an answer to this side’s open offer with its termsHash', () => {
+    expect(evaluateIncomingAnswer(answer(), st())).toEqual({ result: 'accept' });
+    expect(evaluateIncomingAnswer(answer({ type: 'reject' }), st([2]))).toEqual({
+      result: 'accept',
+    });
+  });
+
+  it('refuses a hash that is not the answered offer’s', () => {
+    expect(evaluateIncomingAnswer(answer({ termsHash: H3 }), st())).toEqual({
+      result: 'refuse',
+      reason: 'hash_mismatch',
+    });
+  });
+
+  it('refuses an answer to the sender’s own offer, an unknown offer and a locked version', () => {
+    expect(evaluateIncomingAnswer(answer({ replyTo: ENV(1) }), st())).toEqual({
+      result: 'refuse',
+      reason: 'not_own_offer',
+    });
+    expect(evaluateIncomingAnswer(answer({ replyTo: ENV(7) }), st())).toEqual({
+      result: 'refuse',
+      reason: 'unknown_offer',
+    });
+    expect(evaluateIncomingAnswer(answer(), st([2]))).toEqual({
+      result: 'refuse',
+      reason: 'locked',
+    });
+    expect(evaluateIncomingAnswer(answer({ sender: CONTACT_B }), st())).toEqual({
+      result: 'refuse',
+      reason: 'not_a_party',
+    });
+  });
+
+  it('never throws', () => {
+    fc.assert(
+      fc.property(fc.anything(), fc.anything(), (a, b) => {
+        expect(() => evaluateIncomingAnswer(a as never, b as never)).not.toThrow();
+      }),
+      { numRuns: 200, seed: 0x7e23 },
+    );
+  });
+});
+
+describe('checkSendAccept: only the newest open offer received from the contact, in time', () => {
+  const received = { ...offer(2, CONTACT_A, 2, H2), validUntil: 1000 };
+  const st = (extra: StoredTermsOffer[] = [], lockedVersions: number[] = []) => ({
+    offers: [offer(1, AGENT_EVM, 1, H1), received, ...extra],
+    lockedVersions,
+  });
+
+  it('allows the newest received offer up to and including validUntil', () => {
+    expect(checkSendAccept(st(), ENV(2), AGENT_EVM, 999)).toEqual({ result: 'allowed' });
+    expect(checkSendAccept(st(), ENV(2), AGENT_EVM, 1000)).toEqual({ result: 'allowed' });
+  });
+
+  it('refuses expired, superseded, own, unknown, conflicted and locked offers', () => {
+    const refuse = (reason: string) => ({ result: 'refuse', reason });
+    expect(checkSendAccept(st(), ENV(2), AGENT_EVM, 1001)).toEqual(refuse('expired'));
+    expect(checkSendAccept(st([offer(3, AGENT_EVM, 3, H3)]), ENV(2), AGENT_EVM, 0)).toEqual(
+      refuse('superseded'),
+    );
+    expect(checkSendAccept(st(), ENV(1), AGENT_EVM, 0)).toEqual(refuse('own_offer'));
+    expect(checkSendAccept(st(), ENV(9), AGENT_EVM, 0)).toEqual(refuse('unknown_offer'));
+    expect(checkSendAccept(st([], [2]), ENV(2), AGENT_EVM, 0)).toEqual(refuse('locked'));
+    const conflicted = {
+      offers: [offer(1, AGENT_EVM, 1, H1), { ...received, state: 'conflict' as const }],
+      lockedVersions: [],
+    };
+    expect(checkSendAccept(conflicted, ENV(2), AGENT_EVM, 0)).toEqual(refuse('conflicted'));
+    expect(checkSendAccept(null as never, ENV(2), AGENT_EVM, 0)).toEqual(refuse('invalid'));
   });
 });
