@@ -439,6 +439,15 @@ export function listSourceFiles(root, dir) {
  */
 export function listSourceFilesIn(root, dirs) {
   const zonePaths = new Map(dirs.map((dir) => [dir, relative(root, dir).split('\\').join('/')]));
+  // Fail closed: with nested zones the deepest-owner rule would narrow what the outer zone scans.
+  const all = [...zonePaths.values()];
+  for (const a of all) {
+    for (const b of all) {
+      if (a === b ? false : b.startsWith(`${a}/`)) {
+        throw new Error(`deps-check: zones must not nest (${a}, ${b})`);
+      }
+    }
+  }
   const pathsOf = new Map(dirs.map((dir) => [dir, []]));
   const symlinksOf = new Map(dirs.map((dir) => [dir, new Set()]));
   const ownerOf = (path) => {

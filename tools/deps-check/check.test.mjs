@@ -3,7 +3,14 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ZONES } from './policy.mjs';
-import { checkManifest, checkSource, findCycle, realPackageName, runChecks } from './check.mjs';
+import {
+  checkManifest,
+  checkSource,
+  findCycle,
+  listSourceFilesIn,
+  realPackageName,
+  runChecks,
+} from './check.mjs';
 
 const ROOT = '/repo';
 const src = (zone, code, name = 'src/a.ts') =>
@@ -310,5 +317,12 @@ describe('runChecks on a fixture repository', () => {
       'packages/crypto/src/node_modules/dep/index.js': `require('node:fs')`,
     });
     expect(runChecks(root)).toMatchObject({ problems: [], files: 0 });
+  });
+});
+
+describe('listSourceFilesIn', () => {
+  it('fails closed when zones nest', () => {
+    const a = join(ROOT, 'packages/a');
+    expect(() => listSourceFilesIn(ROOT, [a, join(a, 'b')])).toThrow(/nest/);
   });
 });
