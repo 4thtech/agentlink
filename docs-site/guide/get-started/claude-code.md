@@ -65,11 +65,18 @@ Add to `~/.claude/settings.json` (create it if it doesn't exist). This is the ma
       "Bash(agentlink deny *)",
       "Bash(agentlink cancel *)",
       "Bash(agentlink owner *)",
-      "Bash(agentlink policy *)"
+      "Bash(agentlink policy *)",
+      "Bash(npx *@4thtech/agentlink owner *)",
+      "Bash(npx *@4thtech/agentlink approve *)",
+      "Bash(npx *@4thtech/agentlink deny *)",
+      "Bash(npx *@4thtech/agentlink cancel *)",
+      "Bash(npx *@4thtech/agentlink policy *)"
     ]
   },
   "sandbox": {
     "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
     "filesystem": {
       "denyRead": ["~/.agentlink"],
       "denyWrite": [
@@ -89,7 +96,7 @@ Add to `~/.claude/settings.json` (create it if it doesn't exist). This is the ma
 }
 ```
 
-The `Bash(agentlink ...)` lines match the command text only, so they don't cover the `npx -y @4thtech/agentlink ...` form. The owner commands also refuse to run in a terminal your AI controls. Both are guards.
+The `Bash(...)` lines match the command text only, so a script can still get around them. The owner commands also refuse to run in a terminal your AI controls. Both are guards.
 
 
 You can let Claude check your AgentLink status without asking each time. Everything else should ask you first:

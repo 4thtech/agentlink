@@ -128,7 +128,12 @@ Settings in `~/.claude/settings.json`. Rule syntax: `~/` is your home folder, `/
       "Bash(agentlink deny *)",
       "Bash(agentlink cancel *)",
       "Bash(agentlink owner *)",
-      "Bash(agentlink policy *)"
+      "Bash(agentlink policy *)",
+      "Bash(npx *@4thtech/agentlink owner *)",
+      "Bash(npx *@4thtech/agentlink approve *)",
+      "Bash(npx *@4thtech/agentlink deny *)",
+      "Bash(npx *@4thtech/agentlink cancel *)",
+      "Bash(npx *@4thtech/agentlink policy *)"
     ]
   }
 }
@@ -140,7 +145,7 @@ Adjust it to your system:
 - The `Edit(//...)` line is for a global install. Replace the placeholder with the output of `npm root -g`, starting with `//` (for example `//usr/local/lib/node_modules/@4thtech/agentlink/**`).
 - Add `Edit(<npm global prefix>/bin/**)` as an absolute path (`npm prefix -g`).
 - On Windows, the npx cache is `Edit(~/AppData/Local/npm-cache/_npx/**)` and the PowerShell profile is `Edit(~/Documents/PowerShell/**)`.
-- A `Bash(...)` rule matches the command text only, so `npx -y @4thtech/agentlink approve ...` is not covered by the `agentlink approve` lines. Those commands refuse to run from a terminal an AI app controls anyway; the rules add a second guard, not a boundary.
+- A `Bash(...)` rule matches the command text only. Those commands refuse to run from a terminal an AI app controls anyway; the rules add a second guard, not a boundary.
 - The last five rules stop an agent from running owner commands in its own shell. Owner commands also refuse when no terminal is attached or a harness marker is set. Both are guards ([06 §8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#8-cli-commands)).
 
 On macOS, Linux and WSL2, also turn on the sandbox, which the operating system enforces for every shell command, including scripts. The Read and Edit rules above cover only Claude Code's file tools. `sandbox.filesystem.denyRead` and `denyWrite` are enforced for Bash subprocesses ([sandboxing](https://code.claude.com/docs/en/sandboxing)); the sandbox does not run on native Windows.
@@ -149,6 +154,8 @@ On macOS, Linux and WSL2, also turn on the sandbox, which the operating system e
 {
   "sandbox": {
     "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
     "filesystem": {
       "denyRead": ["~/.agentlink"],
       "denyWrite": [
