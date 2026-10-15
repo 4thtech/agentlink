@@ -67,7 +67,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 117 (M1a 62, M1b 55; recounted from the cards on 2026-10-14; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| M1 Local beta | 119 (M1a 63, M1b 56; recounted from the cards on 2026-10-14, plus M1-7b-b and M1-5f from D-70 on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 21 (incl. 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
@@ -1369,7 +1369,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - No deployer-only window (IR-M1-3a-1 M-1). Until `OCCRoleSetup.configure` runs, every selector is unmapped and defaults to `ADMIN_ROLE`, so the deployer would hold 0-delay `upgradeToAndCall`, `setTreasury` and `registerModule` on live proxies. The vault's initial configuration therefore goes in its initializer (M1-3b), and the script either (a) does manager deployment, proxies, initialisation and `OCCRoleSetup` in one transaction through a one-shot deployer contract, or (b) calls `configure` against the CREATE3-predicted proxy addresses before deploying the proxies. The Notary is registered as a module through the initializer, not by a later call. 05 §9.1 (proposed) adopts (a), the stage deployer: with (b) the deployer key would still hold `ADMIN_ROLE` across several transactions, before the configured grant delays take effect.
   - Post-deploy check script (in CI): deployer holds no role; delays equal `docs/roles.md`; addresses equal the campaign's address file (05 §9.1); the ERC-1967 implementation slot of each proxy equals the expected implementation; `authority()`, `paused()` and the vault configuration read back as configured.
   - Open Lows (IR-M1-3a-1 L-1, L-2, I-2): `OCCRoleSetup.calls` checks the mainnet delay floor itself (make it `view` and call `checkDelays` first), not only `configure`; on a mainnet `configure` reverts unless the vault, the Notary (and the Registry, if set) report `paused()` true, with a test; on a mainnet it requires exactly two ops keys (05 §5.1).
-  - Deploy runs from CI in the private repo, triggered manually by the owner (Free plan: no environment protection); low balance. Agents never broadcast from a workstation. Proposed (05 §9.1 control 3; owner confirms at merge of D-63): the key is a CI secret only during a deploy window (the owner adds it before the run and deletes it after). Under D-64 it is kept for the whole campaign, testnet and mainnet.
+  - Deploy runs from CI in the private repo, triggered manually by the owner (Free plan: no environment protection); low balance. Agents never broadcast from a workstation. Proposed (05 §9.1 control 3; owner confirms at merge of D-63): the key is a CI secret only during a deploy window (the owner adds it before the run and deletes it after). Under D-64 it is kept for the whole campaign, testnet and mainnet. **Amended by D-70 (1) (owner decision, 15 Oct 2026):** for the further testnet deploys the secret stays stored as an environment secret with the owner as required reviewer, and is deleted after the last testnet deploy, before any mainnet deploy; until that protection is enforced on the private repo, the window rule above applies (`release-and-deployment.md` §4.2).
   - D-64 (owner decision, 14 Oct 2026, against the documented default): the deployer key this card uses is also the mainnet deployment key unless the owner switches it before mainnet, so the CI secret is mainnet-grade (`release-and-deployment.md` §4.2; 05 §9.1 control 3). Mitigations (a)–(k) apply from the first deploy window, including the deployer monitoring (f) and the CI hardening (h) of the deploy workflow (proposed; owner confirms at merge). Mainnet prerequisite, checked on M3-2b and M3-2c: "Owner reassesses the campaign deployer key (D-64) and records go/switch."
   - D-64 (2) (owner decision, 14 Oct 2026): testnet and mainnet share one campaign label, so the addresses this card deploys are also the mainnet addresses. Proposed (05 §9.1; owner confirms at merge): the label is `campaign-1`; upgrades keep the addresses; a full redeploy (for example a storage redesign) needs a new label, and mainnet uses the final testnet campaign's label.
   - Order (D-63 (1), build-plan deviation announced by the owner, 14 Oct 2026): **Base Sepolia first; Gnosis Chiado later at the same CREATE3 addresses.** This card covers Base Sepolia; the Chiado run is card M1-3j. Proposed (D-63 (2)): the stage transaction is sized now for the lower of the two chains' block gas limits and per-transaction gas caps (EIP-7825), and the stage deployer's init code stays within EIP-3860, so the Chiado run can reproduce it (05 §9.1). Proposed under D-64 (2) (owner confirms at merge): the stage is sized, with margin, for the lowest block gas limit and per-transaction gas cap (EIP-7825) of every chain of the campaign, the testnets, Base and Gnosis mainnet and the planned M4 chains (Arbitrum One, Optimism, Polygon PoS), with the limits recorded in this card's PR, and for the audited build as well as the testnet build (headroom for audit fixes). The guard layout of the M1 stage (the AccessManager under the stage deployer, or the fallback under the deployer key) and every label are frozen for the campaign from this card, because changing either changes the mainnet addresses (05 §9.1, **Gas and size**).
@@ -1404,7 +1404,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Owner decision (D-63 (1)): Gnosis Chiado later at the same CREATE3 addresses as Base Sepolia. Proposed (D-63 (2)): the M1-3g script runs unchanged with the same testnet deployer key, campaign label and salts, and the Chiado per-chain config (native xDAI per D-46; stablecoins as verified by M1-14).
   - Fork dry-run first; the predictions must equal the campaign's address file, which equals the published Base Sepolia addresses; otherwise the run fails closed (05 §9.1).
-  - Proposed: deploy soon after Base Sepolia, to shorten the squat window (05 §9.1 control 3); the key is a CI secret only during the deploy window.
+  - Proposed: deploy soon after Base Sepolia, to shorten the squat window (05 §9.1 control 3). D-70 (1) (owner decision, 15 Oct 2026): the key stays an environment secret of the private repo with the owner as required reviewer, so this run needs the owner's approval; it is deleted after the last testnet deploy, before any mainnet deploy. Until that protection is enforced, the key is a CI secret only during the deploy window (D-64 (a)).
   - Hard prerequisite of M2-4a (Registry stage on both testnets) and M3-2c (mainnet), so two-chain zero-config selection (D-40), the native-xDAI fee path (D-46) and the Gnosis gas limits run on a live testnet before mainnet. Not an M1-GATE blocker (gate residual in M1-3g, proposed).
   - After the run: the faucet is configured against the Chiado vault (M1-10b); the next `@agentlink/occ-v2-abi` prerelease and the `@agentlink/chain` config list Chiado.
 - **Acceptance:**
@@ -1462,7 +1462,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - In M3-1a scope; independent review.
 
 #### M1-3n · contracts: stabilise the batch invariant suite's non-vacuity checks (new, follow-up to M1-3e)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`test/**` in `occ-v2-contracts`, audit-rules §2.3, as M1-3e and M1-3h) · **Phase:** M1b
+- **Status:** done (private repo; the invariant floors fix merged, recorded 2026-10-15) · **Size:** S · **Tier:** Opus · **Security:** S2 (`test/**` in `occ-v2-contracts`, audit-rules §2.3, as M1-3e and M1-3h) · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · test/invariant/**
 - **Depends on:** M1-3e
 - **Spec:** `audit-rules.md` CT-1 (the invariant tests) and §3.4 (the local red run); 05 §3.3 (batch outcomes)
@@ -1643,7 +1643,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Existing M1-5b tests stay green; no test is weakened.
 
 #### M1-5c · transport-nostr: subscribe and sync with cursors and dedup
-- **Status:** done (4thtech/agentlink#63, merged 2026-10-14; IR-M1-5c-1 follow-ups in M1-5d, M1-5e and G-49) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#63, merged 2026-10-14; IR-M1-5c-1 follow-ups in M1-5d, M1-5e and G-49, now M1-5f) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/transport-nostr
 - **Depends on:** M1-5b; gap G-9 resolved (branch `docs/G-9-store-schema`, pending owner)
 - **Spec:** 07 §4.2 (sync), §3.2 (`seen`); 04 §3.5; 06 §6 (48 h look-back, 3 s budget)
@@ -1686,6 +1686,23 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests: a relay that requires AUTH and a REQ for two own keys delivers wraps for both; a first sync on a new relay after `seen` pruning stores nothing twice; junk events on a relay do not move the saved page position; the `envelopeSeen` hint matches core's `seen` rows, or is gone.
   - Existing M1-5c tests stay green; no test is weakened.
+
+#### M1-5f · transport-nostr: outbox stops republishing outside the sync look-back (new, G-49, D-70 (5))
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b (before M1-GATE)
+- **Repo/path:** agentlink · packages/transport-nostr (outbox); the core/node outbox row writer if it sets give_up_at
+- **Depends on:** M1-5b, M1-5c
+- **Spec:** 07 §3.2 (`outbox` give_up_at), §4.2 (Delivery reliability, Sync), §4.3 (Sent); 04 §3.5; NIP-59; D-70 (5)
+- **Invariants:** I-5
+- **Scope:**
+  - give_up_at = min(created_at + 86 400, wrap_created_at + 172 800 + 300), where wrap_created_at is the `created_at` of the signed event in wrap_json (07 §3.2). The outbox never publishes a wrap after that bound, so every stored copy stays inside the receivers' sync look-back (`lastSync − 48 h − S`).
+  - As today for the stored give_up_at (outbox.ts): the value read back from the store is not trusted; the outbox recomputes the bound from wrap_json and created_at and takes the minimum.
+  - Use the sync constants (`SYNC_LOOKBACK_SECONDS`, `SYNC_SKEW_SECONDS`) rather than new literals, so the two bounds cannot drift apart.
+  - A row that reaches give_up_at without 2 `OK`s is `not_delivered` (reason `timeout`), unchanged.
+- **Acceptance:**
+  - Fake clock: a wrap dated 47 h 50 min back is published at once, is not republished after its bound (about 10 min plus `S`) and goes `not_delivered` (timeout) at that bound; a wrap dated at send time keeps the full 24 h.
+  - A stored give_up_at later than the bound is ignored.
+  - Existing M1-5b and M1-5c tests stay green; no test is weakened.
+  - Revisit in M2 (D-70 (5)); the alternatives are recorded in G-49.
 
 ### Storage (`@agentlink/storage`)
 
@@ -1768,7 +1785,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - deps-check and ESLint regressions: production source importing `@agentlink/core/testing` fails both tools; test files pass. The root entry no longer exports `MemoryStore`.
 
 #### M1-7b · core: envelope build/open and threads
-- **Status:** done (4thtech/agentlink#66, merged 2026-10-14; IR-M1-7b-1 follow-ups in G-50 and G-51; its spec lines are in 04 §3.1.1 and 07 §3.2) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#66, merged 2026-10-14; IR-M1-7b-1 follow-ups in G-50 and G-51, now M1-7b-b; its spec lines are in 04 §3.1.1 and 07 §3.2) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7a, M1-1c, M1-1l (G-46, D-66)
 - **Spec:** 04 §3.1–§3.4; 03 §4.1; 02 F-20, F-22, F-60
@@ -1802,6 +1819,24 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
     - A `kc` mismatch on a signature-valid envelope is refused and flagged, while a plain failed open is dropped as `open_failed`.
     - Exactly one `unwrapCek` per pass, and at most 7 recomputed seals.
   - (IR-M1-7a-1 R2-M1) A blocked or removed contact that rotates keys: its `card-update` is dropped, so its new key stays unknown. An envelope from an unknown key whose recipients include the `ownerEnc` `kid` of a **blocked or removed** contact's owner is dropped (recorded in `seen` after step 4), never held and never queued as a request, also after 48 h. Only active contacts' owner kids hold. Test, replacing the `it.todo` in `packages/core/src/contacts.test.ts`.
+
+#### M1-7b-b · core: require the sender's own owner entry when the sender's card is held (new, G-51, D-70 (4); follow-up to M1-7b)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/core
+- **Depends on:** M1-7b
+- **Spec:** 04 §3.1.1 step 8, §3.2; D-70 (4)
+- **Invariants:** I-5, I-9
+- **Scope:**
+  - Step 8 (04 §3.1.1): when the core holds the sender's card (a contact's current card; for a `card-update` the card it carries once it has passed §3.4.1; for the pairing types the card in the body once it has passed §3.6), refuse an envelope whose recipients lack that card's `ownerEnc` `kid`: stored as refused, shown in the activity feed, and the contact flagged. When `from` is not a contact's key, the refusal is recorded under the requests-queue and spam limits and no contact is flagged.
+  - The presence check needs no extra `unwrapCek`. Held envelopes meet it when they run again from step 5 after their `card-update`.
+  - Same owner on both sides: the one owner entry meets both rules. Owner-authored types and senders whose card is not held are unchanged.
+- **Acceptance:**
+  - Tests first: a `RED (expected):` commit with the local red run per `audit-rules.md` §3.4 (LL-15).
+  - A contact's envelope without its owner's `kid` is refused, stored as refused and the contact flagged; with it, accepted.
+  - A held envelope without the sender's owner `kid` is refused when its `card-update` is applied.
+  - A `handshake` without the sender's owner `kid` is refused, recorded under the requests-queue limits, and no contact is flagged.
+  - An envelope from an unknown key (no card held) is not refused for this reason; two agents of one owner (3 entries) are accepted.
+  - Existing M1-7b tests stay green; no test is weakened. Independent review.
 
 #### M1-7c · core: pairing protocol (invite, accept, handshake)
 - **Status:** done (4thtech/agentlink#78, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -3052,6 +3087,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Invariants:** I-3
 - **Scope:**
   - D-64 (2) (proposed; owner confirms at merge): testnet and mainnet contract addresses are identical, so the verify page labels a testnet chain ID prominently and never presents a testnet proof as a mainnet proof (05 §9.1 (iv)).
+  - G-52 (D-70 (6), 08 §4 "Proof-pack links"): the link uses the invite's format (raw DEFLATE, base64url) and the same bounded strict decoder, through one generic capped-inflate function in `@agentlink/core` with pack-sized caps; a pack above the link limit is shared as a file, never a link. The exact caps are set when the M1b proof work starts.
   - Drop zone, or a pack compressed in the URL fragment; verification in the browser via public RPC; plain-language result with self-declared labels; disclosed-key content check; what it proves and does not prove; print-friendly; Advanced data.
   - Beta at `verify.agentlink.4thtech.io`.
 - **Acceptance:**
@@ -3906,17 +3942,17 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 
 48. **G-48 (M) Different envelopes under one `id` per recipient.** Found in the G-46 decision note (T6), recorded by D-66. A sender can gift-wrap one signed envelope to some recipients and a different signed envelope with the same `id` to others, for example `E1` to the recipient agent and `E2` to its owner. The hashes differ, so G-46 does not apply. Each party sees one consistent envelope. Today it is detected only by a party that holds both copies (owner conflict display and step 9, 04 §3.1.1), and for a notarized envelope by the Record (one hash) and receipts that bind `envelopeHash`. *Proposed:* a cross-party comparison, for example the receiving agent reporting `envelopeHash` to its owner in the F-23 ack, with the owner surface comparing it with its own copy. A design is needed before M2 owner surfaces show copies as the agent's. *Blocks:* nothing in M1a.
 
-49. **G-49 (M, OWNER DECISION) Outbox republish window vs the sync look-back.** Found by IR-M1-5c-1 (M-1). 07 §4.2 (Delivery reliability, Sync); 04 §3.5; NIP-59. The outbox republishes the same gift wrap, with its randomised `created_at` (up to 48 h in the past), for up to 24 h. A relay that first stores the wrap late in that window holds an event dated up to about 72 h before then, while a receiver that synced in between asks only for `since = last_seen − 48 h − S`, so it can miss that copy on that relay. It costs delivery (a late or lost copy on one relay), never authenticity. Options for the owner, none adopted here:
+49. **G-49 (M) Outbox republish window vs the sync look-back.** **RESOLVED (D-70 (5), Tali, in chat, 15 Oct 2026, on the orchestrator's recommendation):** the outbox stops republishing once a wrap would fall outside the sync look-back (48 h + `S`): give_up_at = min(created_at + 24 h, the wrap's `created_at` + 48 h + `S`) (07 §3.2, §4.2). Implemented by card M1-5f (S1). Revisit in M2, with options (a) to (c) below. Found by IR-M1-5c-1 (M-1). 07 §4.2 (Delivery reliability, Sync); 04 §3.5; NIP-59. The outbox republishes the same gift wrap, with its randomised `created_at` (up to 48 h in the past), for up to 24 h. A relay that first stores the wrap late in that window holds an event dated up to about 72 h before then, while a receiver that synced in between asks only for `since = last_seen − 48 h − S`, so it can miss that copy on that relay. It costs delivery (a late or lost copy on one relay), never authenticity. Options for the owner, none adopted here:
    - (a) widen the sync look-back to 48 h + 24 h + `S`, with the matching `seen` retention bound (more re-read work per pass);
    - (b) make a fresh gift wrap (new ephemeral key and timestamp) for each republish after the first one, so every stored copy lies within 48 h of its publish time (more `seen` rows; dedup falls to the `envelopeHash`, which core already uses);
    - (c) narrow the timestamp randomisation to at most 24 h, so the 24 h republish stays inside the 48 h look-back (less timestamp noise than NIP-59 suggests).
-   - *Blocks:* nothing in M1a; the chosen option becomes a card before M1-GATE.
+   - *Blocks:* nothing in M1a; M1-5f before M1-GATE.
 
 50. **G-50 (M) An envelope ID reused by another sender delays the real envelope.** Found by IR-M1-7b-1 (L-3); documented in code by M1-7b. 04 §3.1.1 step 9; 07 §3 (`envelopes` keyed by `envelope_id`), §3.2. When a stored row from another key holds the same envelope ID, core returns `retry` instead of suppressing the new envelope (IR-M1-5a-1 L-3), so nothing is lost at once; but while that row stays stored, the real envelope keeps returning `retry` and can fall out of the 48 h look-back. Only a party that learns the ID in advance can cause this. Related: G-48. *Proposed:* key `envelopes` on (`envelope_id`, `envelope_hash`) in a later store schema version, so both rows can be stored and step 9 compares within one sender, with a migration note. *Blocks:* nothing in M1a; decide before M1-GATE.
 
-51. **G-51 (M, OWNER DECISION) Require the sender's own owner entry when the sender's card is held.** Raised by IR-M1-7b-1 (Q7). 04 §3.1.1 step 8, §3.2; I-9. Step 8 requires the receiving agent's own owner entry and, when it holds the sender's card, recomputes the sender's agent and owner entries **that are present**; an envelope that leaves out the sender's owner entry is not refused, and M1-7b follows step 8 as written. Question for the owner: should receive refuse (stored as refused, contact flagged) an envelope whose sender's card is held but whose recipients lack that card's `ownerEnc` `kid`? The independent reviewer recommends yes: it stops an agent from sending to contacts without its own owner being able to read the message (I-9 on the sender's side), and every honest sender already includes that entry (04 §3.2). Cost: a refusal path for senders whose card the receiver holds, and new tests. Not decided here. *Blocks:* a small core change in M1-7b's code if adopted; M1-GATE review of I-9.
+51. **G-51 (M) Require the sender's own owner entry when the sender's card is held.** **RESOLVED (D-70 (4), Tali, in chat, 15 Oct 2026: yes, on the orchestrator's and the reviewer's recommendation):** on receive, when the sender's card is held, the recipients must include that card's `ownerEnc` `kid`; otherwise the envelope is stored as refused and the contact is flagged (04 §3.1.1 step 8, §3.2). Implemented by card M1-7b-b (S2). Raised by IR-M1-7b-1 (Q7). 04 §3.1.1 step 8, §3.2; I-9. Step 8 requires the receiving agent's own owner entry and, when it holds the sender's card, recomputes the sender's agent and owner entries **that are present**; an envelope that leaves out the sender's owner entry is not refused, and M1-7b follows step 8 as written. Question for the owner: should receive refuse (stored as refused, contact flagged) an envelope whose sender's card is held but whose recipients lack that card's `ownerEnc` `kid`? The independent reviewer recommends yes: it stops an agent from sending to contacts without its own owner being able to read the message (I-9 on the sender's side), and every honest sender already includes that entry (04 §3.2). Cost: a refusal path for senders whose card the receiver holds, and new tests. *Blocks:* M1-7b-b; M1-GATE review of I-9.
 
-52. **G-52 (M) Proof-pack links.** 08 §4 (Verify) and M2-5a offer "a pack compressed in the URL fragment", with no format, size cap or decoder rules; D-69 covers only the invite (04 §3.6). Found by review IR-D-69-1. A proof pack (07 §8) can carry a disclosed envelope of up to 24 KB of mostly incompressible ciphertext, so a link could pass about 33 000 characters. *Proposed (owner decides):* the same format family and decoder as D-69 (raw DEFLATE, base64url, the bounded strict decoder), through one generic capped-inflate function in `@agentlink/core` parameterised per payload type; a pack-sized cap derived from the largest pack the 07 §8 schema allows; a size above which a pack is not offered as a link (drop zone or file only); and copy noting that a pack link with a disclosed key is itself a disclosure. *Blocks:* M2-5a (link form only).
+52. **G-52 (M) Proof-pack links.** **RESOLVED (D-70 (6), Tali, in chat, 15 Oct 2026, on the orchestrator's recommendation):** proof-pack links use the invite's raw DEFLATE link format and decoder with a pack-sized cap; larger packs are shared as files, not links (08 §4, "Proof-pack links"). The exact cap is set when the M1b proof work starts and stays proposed until then. 08 §4 (Verify) and M2-5a offered "a pack compressed in the URL fragment", with no format, size cap or decoder rules; D-69 covers only the invite (04 §3.6). Found by review IR-D-69-1. A proof pack (07 §8) can carry a disclosed envelope of up to 24 KB of mostly incompressible ciphertext, so a link could pass about 33 000 characters. *Proposal (adopted by D-70 (6)):* the same format family and decoder as D-69 (raw DEFLATE, base64url, the bounded strict decoder), through one generic capped-inflate function in `@agentlink/core` parameterised per payload type; a pack-sized cap derived from the largest pack the 07 §8 schema allows; a size above which a pack is not offered as a link (drop zone or file only); and copy noting that a pack link with a disclosed key is itself a disclosure. *Blocks:* M2-5a (link form only).
 
 ---
 
@@ -3944,11 +3980,10 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | OPS-L6, OPS-L7 | Decide whether PollinationX stays live |
 | OPS-L8 | Rotate every live credential found |
 | M1-3g | Testnet deployer key and testnet Safe; fund with low balances; trigger the private-repo deploy workflow for Base Sepolia (D-63); proposed (05 §9.1): keep the deployer key offline for the life of the campaign, add it as a CI secret only for a deploy window and delete it after (no testnet explorer verification: D-11, D-19). D-64: this key is also the mainnet key unless switched, and the addresses are also the mainnet addresses (one shared label); keep its offline backup, never import it into a browser extension or hot wallet, clear any terminal scrollback or history that showed it, and set up the deployer monitoring before the first window (proposed) |
-| M1-3j | Trigger the Chiado deploy with the same testnet deployer key, added to CI only for that run (D-63) |
+| M1-3j | Trigger the Chiado deploy with the same testnet deployer key (D-63). D-70 (1): create the deploy environment in the private repo with yourself as required reviewer and keep the key there as an environment secret once that rule is enforced on the repo's plan (until then, add it only for the run); approve each deploy run; delete the secret after the last testnet deploy, before any mainnet deploy |
 | M1-3f | **DECISION NEEDED:** where `@agentlink/occ-v2-abi` is built and published (G-10) |
 | M1-3k, M3-1a | Decided by D-66: EIP-7702-delegated agent keys, option (a) now and (b) before mainnet (G-47, M1-3l); the ERC-1271 gas bound is required (FA-1). No owner action left |
-| M1-5c follow-up | **DECISION NEEDED:** outbox republish window vs the sync look-back (G-49) |
-| M1-7b follow-up | **DECISION NEEDED:** require the sender's own owner entry when the sender's card is held (G-51) |
+| M1-5c, M1-7b follow-ups | Decided by D-70 (15 Oct 2026): G-49 (M1-5f) and G-51 (M1-7b-b). No owner action left |
 | M1-9f | **DECISION NEEDED:** Claude Desktop bundle build, signing and distribution |
 | M1-10c | Set submitter and faucet keys with `wrangler secret put`; fund them; approve promotions; **DECISION NEEDED:** Cloudflare staging account vs environments, environment names, beta environment (G-40) |
 | M1-13a | **DECISION NEEDED:** where e2e runs; provide harness API keys and testnet funds outside PR workflows |

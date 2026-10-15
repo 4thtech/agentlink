@@ -85,7 +85,7 @@ Cloud agents can be **autonomous** (act on inbound messages without a harness, e
 
 | Page | Behaviour |
 |---|---|
-| **Verify** | Drop a proof pack (or open a link with the pack compressed in the URL fragment). Verifies against chain via public RPC in the browser. Shows plain-language result: "Recorded on Base on 12 Oct 2026 14:02 UTC by *Tali's agent*; delivered 14:05; opened 14:20." For accepted terms it shows a **proof of agreement**: the terms, who proposed and who accepted them and when, and what this does not prove (legal effect) (04 §3.4). Advanced section shows hashes, tx links |
+| **Verify** | Drop a proof pack (or open a link with the pack compressed in the URL fragment; format and caps below, G-52). Verifies against chain via public RPC in the browser. Shows plain-language result: "Recorded on Base on 12 Oct 2026 14:02 UTC by *Tali's agent*; delivered 14:05; opened 14:20." For accepted terms it shows a **proof of agreement**: the terms, who proposed and who accepted them and when, and what this does not prove (legal effect) (04 §3.4). Advanced section shows hashes, tx links |
 | **Invite landing** | URL `…/i#<invite>`; fragment never sent to the server. Shows inviter name and fingerprint (decoded locally), "I use Claude / ChatGPT / Gemini / Other" → **one install-and-accept prompt** to copy into the user's own agent (06 §7.1, D-53): one paste installs AgentLink if needed and accepts the invite. From M2 it also offers **"View and accept in browser"** (§7) |
 | **Docs / landing** | Product site and developer docs (separate from this foundation pack) |
 
@@ -96,6 +96,13 @@ Cloud agents can be **autonomous** (act on inbound messages without a harness, e
 - **States.** A damaged, expired or oversized invite shows the matching state and no prompt.
 - **User action only.** Copying is a user action (the copy button); the page never pastes or opens anything by itself.
 - **Test (M1-19).** With a name containing `<img src=x onerror=…>`, `<div>`, a fake "Copy this to your AI" line, control and bidi characters, no DOM element derives from the name, no script runs, and the copy button yields exactly the template plus the canonical link. The test runs in Chromium, where Trusted Types is enforced; `textContent` is the primary control in every browser. The page refuses to be framed.
+
+**Proof-pack links (G-52; decided by the owner in D-70 (6), 15 Oct 2026, on the orchestrator's recommendation).**
+- **Format.** A proof pack (07 §8) shared as a link uses the invite's link format (04 §3.6, D-69): `base64url(deflateRaw(utf8(JSON)))` of the pack, in the URL fragment of the verify page, so it never reaches a server. Compressed bytes are never hashed, signed or compared.
+- **Decoder.** The verify page decodes it in the browser with the same bounded, strict decoder as the invite (04 §3.6): the input bounded before any parsing, inflation in bounded slices with a running output count and a cap, the stream ending exactly at the end of the input, fatal UTF-8, I-JSON and the strict pack schema. One generic capped-inflate function in `@agentlink/core` serves both, with its caps set per payload type.
+- **Pack caps.** The pack has its own inflated-size cap, derived from the largest pack the 07 §8 schema allows, and the matching payload-character limit. The exact numbers are set when the M1b proof work starts (proposed until then).
+- **Larger packs are files.** A pack above the link limit is never offered as a link; it is shared as a file (the drop zone, or a download). A pack can carry a disclosed envelope of up to 24 KB of mostly incompressible ciphertext, so such a pack can pass the link limit.
+- **Copy.** Where a pack link is offered, the copy says that a link carrying a disclosed key is itself a disclosure (11 §5).
 
 ---
 

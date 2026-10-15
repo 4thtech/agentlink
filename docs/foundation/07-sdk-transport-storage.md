@@ -127,7 +127,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 
 ### 3.2 Delivery: outbox, seen-set, held envelopes, requests and rate counters
 
-**`outbox`**: one row per gift wrap still to deliver (one per distinct recipient Nostr key, §4.1), for the 24 h retry of §4.2.
+**`outbox`**: one row per gift wrap still to deliver (one per distinct recipient Nostr key, §4.1), for the retry of §4.2, which ends at give_up_at (24 h, or earlier when the wrap would fall outside the receivers' sync look-back, G-49).
 
 | Column | Type and meaning |
 |---|---|
@@ -139,7 +139,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | acks | `enc` `json`: relay URL → time of its first `OK` |
 | attempt | `int`: 1 for the first wrap; a later wrap of the same stored envelope for the same key gets the next number |
 | role | `contact` \| `owner` (whose key recipient_key is, 04 §3.2) |
-| attempts, next_attempt_at, created_at, give_up_at | `int`; give_up_at = created_at + 86 400 |
+| attempts, next_attempt_at, created_at, give_up_at | `int`; give_up_at = min(created_at + 86 400, wrap_created_at + 172 800 + 300), where wrap_created_at is the `created_at` of the signed event in wrap_json (randomised up to 48 h back, NIP-59) and 172 800 + 300 is the sync look-back of §4.2 (48 h plus the skew `S`, 04 §2.5.1). The core computes it when it writes the row (G-49, D-70 (5)) |
 | state | `pending` \| `sent` \| `not_delivered` |
 | reason | for `not_delivered`: `timeout` \| `revoked` \| `unreadable` |
 
@@ -155,7 +155,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 
 | Column | Type and meaning |
 |---|---|
-| kind | `wrap` (gift-wrap event ID) \| `envelope` (the `envelopeHash`, 04 §3.1.1 step 9; never the sender-chosen envelope ID, IR-M1-5a-1 L-3, IR-M1-7b-1 Q1; proposed, owner confirms at merge) |
+| kind | `wrap` (gift-wrap event ID) \| `envelope` (the `envelopeHash`, 04 §3.1.1 step 9; never the sender-chosen envelope ID, IR-M1-5a-1 L-3, IR-M1-7b-1 Q1; confirmed by the owner, D-70 (3)) |
 | id | `id` |
 | first_seen_at | `int` |
 
@@ -430,8 +430,8 @@ An XMTP adapter (P2) implements the same interface; envelopes are unchanged.
   5. Ignore `HTTPS_PROXY`, `ALL_PROXY` and similar settings for relay connections: a proxy would resolve the name itself and bypass the check. A proxy option is a later owner decision.
 
   **Residual risk.** A browser `WebSocket` (the console) cannot resolve or pin an address. There, the schema rule and the platform apply: browsers enforce Private Network Access where it has shipped, and Workers cannot open connections to private addresses. M1-5 tests the steps above with a stub resolver: a rebinding answer, a mixed public and private answer, a 6to4 answer and a NAT64 answer are all skipped.
-- **Delivery reliability:** publish to all listed relays, consider sent when ≥ 2 acknowledge (`OK`). Retry with backoff for up to 24 h from the local outbox.
-- **Sync:** `REQ` with `#p` = own Nostr pubkeys, `kinds: [1059]`, `since = lastSync − 48 h` (NIP-59 randomizes gift-wrap timestamps up to 2 days back, so `created_at` cursors alone miss messages). The first sync on a relay with no cursor looks back 9 days (§4.3; G-24, accepted with D-65). Deduplicate by gift-wrap event ID before verification, and by `envelopeHash` once the signature has passed (04 §3.1.1 step 9), never by the sender-chosen envelope ID alone (keep a seen-set for ≥ 7 days, §3.2; proposed, owner confirms at merge). Support **NIP-42 AUTH**, since many DM relays serve kind 1059 only to the authenticated recipient.
+- **Delivery reliability:** publish to all listed relays, consider sent when ≥ 2 acknowledge (`OK`). Retry with backoff from the local outbox for up to 24 h, and **never republish a wrap that a receiver's sync could no longer find** (G-49; decided by the owner in D-70 (5), 15 Oct 2026, on the orchestrator's recommendation; revisit in M2). A relay that first stores a wrap at time `T` holds it under its randomised `created_at`, and a receiver that synced shortly before `T` next asks from `lastSync − 48 h − S`. So the outbox publishes a stored wrap only while `now ≤ created_at(wrap) + 48 h + S` (`S` = 300 s, the skew the sync uses), and the row's give_up_at is the earlier of that bound and its 24 h (§3.2). A row that reaches give_up_at without 2 `OK`s is `not_delivered` (reason `timeout`), as today; sending again makes a new wrap with a new timestamp (§3.2, "States"). The first publish is always inside the bound, because a wrap is never dated more than 48 h back. **Residual:** a wrap dated close to 48 h back gets a short retry window, so a relay outage at send time ends in `not_delivered` sooner; it costs delivery, never authenticity. The options left out (a wider look-back; a fresh wrap per republish; narrower timestamp randomisation) are recorded in G-49 for the M2 revisit.
+- **Sync:** `REQ` with `#p` = own Nostr pubkeys, `kinds: [1059]`, `since = lastSync − 48 h` (NIP-59 randomizes gift-wrap timestamps up to 2 days back, so `created_at` cursors alone miss messages). The first sync on a relay with no cursor looks back 9 days (§4.3; G-24, accepted with D-65). Deduplicate by gift-wrap event ID before verification, and by `envelopeHash` once the signature has passed (04 §3.1.1 step 9), never by the sender-chosen envelope ID alone (keep a seen-set for ≥ 7 days, §3.2; confirmed by the owner, D-70 (3)). Support **NIP-42 AUTH**, since many DM relays serve kind 1059 only to the authenticated recipient.
 - **Size:** envelope ≤ 24 KB serialized (24 576 bytes; the relay-frame, envelope, recipient and `ct` limits and where each is enforced are in 04 §3.1.1); inline files ≤ 12 KB; check the final gift-wrap size against each relay's NIP-11 `max_message_length` and skip relays that cannot carry it.
 - **Relay retention:** public relays may drop events; agents should sync at least daily. The optional 4thTech relay keeps gift wraps for 30 days (it only ever sees ciphertext).
 - **Owner copies:** the owner console subscribes with the owner Nostr key on the relays of all its agents and receives copies of all envelopes for its agents (§4.3). Reading them, including NIP-42 AUTH, runs in an `OwnerSession` with presence (04 §3.1.1).
@@ -454,7 +454,7 @@ An owner has no relay list of its own: a card carries only the agent's `relaysHa
 | `revoke` | The revoked agent and its owner: the revoked agent's list. Each contact's agent and owner: that contact's list, from the owner's copies (04 §3.4.1, "Revoke delivery"). A contact whose list the owner does not hold at all (a pairing from before `handshake-ack` carried `relays`) gets its wraps on the bootstrap set, and the console marks it as possibly not told |
 | Pairing (`handshake`, `handshake-ack`) | As the first two rows; the invitee takes the inviter's list from the invite, the inviter the invitee's from the `handshake`. The `handshake-ack` repeats the inviter's list (04 §3.4.1), so the invitee's owner holds it too |
 
-- **Sent.** A row of `outbox` (§3.2) is `sent` once 2 relays of the list it was published to returned `OK`, for `owner` rows as for `contact` rows. Per-key routing means each relay sees only the wraps of the agents that use it.
+- **Sent.** A row of `outbox` (§3.2) is `sent` once 2 relays of the list it was published to returned `OK`, for `owner` rows as for `contact` rows. Republishing to any of these relays stops at the row's give_up_at, which the sync look-back bounds (§4.2 "Delivery reliability", §3.2; G-49, D-70 (5)). Per-key routing means each relay sees only the wraps of the agents that use it.
 - **Placement is unaffected.** The relay a copy arrived on confers nothing. An owner surface places every copy only by the attribution rules of 04 §3.1.1 ("Where the owner shows a copy") and stores it in `owner_copies` (§3.6), deduplicated across relays by its key.
 
 **Where a list comes from, and how it is authenticated.** A relay list is the verbatim `relays` array whose `keccak256(JCS(relays))` equals the `relaysHash` of a card. The card's `cardSig` binds it to the owner (04 §2.4), so the list is as authentic as the card. No other source is used.
