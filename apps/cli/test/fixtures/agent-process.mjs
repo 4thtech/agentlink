@@ -3,15 +3,14 @@
 // agent's SQLite file. The parent talks to it over the fork IPC channel only; nothing is printed.
 //
 // Roles:
-// - `writer`: the server side. Opens the agent's store directly (as its core would), writes one
-//   pending approval row with a sealed action, then edits the row's status to `approved` without
-//   any signed object (the attack of 06 §2.5 step 4). It stays open until told to read the row back
-//   and exit, so both processes hold the store at the same time.
-// - `reader`: the other process. Opens the agent with `openAgent` (real deps), asks the M1a channel
-//   for the row and asks its own core to use the approval for that exact action.
+// - `cli`: the owner's CLI process (D-73 (3)). It opens the agent with `openAgent`, applies an
+//   owner-signed `approval.decide` for the second request through its own core client (as
+//   `agentlink approve <id>` will), and, as a same-user tamper, edits the first request's status
+//   column to `approved` with no signed object, through a direct handle on the same store file. It
+//   stays open until told to read both rows back.
+// - `server`: the MCP-side process. It opens the same agent with `openAgent`, asks the M1a channel
+//   about both requests and asks its own core to use each one for its exact action.
 import process from 'node:process';
-import { rowKeyOf } from '@agentlink/core';
-import { canonicalize } from '@agentlink/crypto';
 import { openAgentStore } from '@agentlink/node';
 import { openAgent, readAgentConfig } from '../../dist/runtime/index.js';
 
@@ -25,74 +24,68 @@ const onMessage = () =>
     process.once('message', resolve);
   });
 
-async function writer({ home, name, approvalId, action, now }) {
+const rowOf = (store, approvalId) =>
+  store.transaction((tx) => {
+    const row = tx.get('approvals', { approval_id: approvalId });
+    return row === undefined
+      ? null
+      : { status: row.status, signedDecision: row.signed_decision !== null };
+  });
+
+async function cli({ home, name, edited, decided }) {
+  const result = await openAgent({ home, agent: name });
+  if (result.status !== 'ok') throw Object.assign(new Error('not opened'), { code: result.reason });
+  const { agent } = result;
   const found = await readAgentConfig(home, name);
-  if (found === undefined) throw new Error('no agent');
-  const { config, paths } = found;
-  const opened = await openAgentStore(config.keyStore, config.agentId, paths.store);
+  const raw = await openAgentStore(found.config.keyStore, found.config.agentId, found.paths.store);
   try {
-    const sealedAction = await opened.cipher.seal(
-      { table: 'approvals', column: 'action_json', rowKey: rowKeyOf([approvalId]) },
-      canonicalize(action),
+    const applied = await agent.client.ownerActions.apply(decided.signedText);
+    // The tamper: the status cache says `approved`; no owner signature exists for this row.
+    await raw.store.transaction((tx) =>
+      tx.update(
+        'approvals',
+        { approval_id: edited.approvalId },
+        { status: 'approved', decided_at: Math.floor(Date.now() / 1000) },
+      ),
     );
-    const sealedSummary = await opened.cipher.seal(
-      { table: 'approvals', column: 'summary', rowKey: rowKeyOf([approvalId]) },
-      'Include the document key in an export',
-    );
-    await opened.store.transaction((tx) =>
-      tx.insert('approvals', {
-        approval_id: approvalId,
-        action_json: sealedAction,
-        scope_json: null,
-        answers_envelope_id: null,
-        scope_key: null,
-        source: 'owner',
-        policy_hash: null,
-        signed_decision: null,
-        signed_cancel: null,
-        summary: sealedSummary,
-        status: 'pending',
-        expires_at: now + 3_600,
-        created_at: now,
-        decided_at: null,
-      }),
-    );
-    // The edit: the status cache says `approved`; no owner signature exists.
-    await opened.store.transaction((tx) =>
-      tx.update('approvals', { approval_id: approvalId }, { status: 'approved', decided_at: now }),
-    );
-    await send({ step: 'written', storePath: paths.store, pid: process.pid });
-    await onMessage(); // the reader has finished
-    const row = await opened.store.transaction((tx) =>
-      tx.get('approvals', { approval_id: approvalId }),
-    );
+    await send({ step: 'prepared', pid: process.pid, storePath: agent.paths.store, applied });
+    await onMessage(); // the server has finished
     await send({
       step: 'final',
-      status: row?.status ?? null,
-      signedDecision: row?.signed_decision ?? null,
+      edited: await rowOf(raw.store, edited.approvalId),
+      decided: await rowOf(raw.store, decided.approvalId),
     });
   } finally {
-    await opened.close();
+    await raw.close();
+    await agent.close();
   }
 }
 
-async function reader({ home, name, approvalId, action }) {
+async function server({ home, name, edited, decided }) {
   const result = await openAgent({ home, agent: name });
-  if (result.status !== 'ok') {
-    await send({ step: 'read', opened: result.status, reason: result.reason });
-    return;
-  }
+  if (result.status !== 'ok') throw Object.assign(new Error('not opened'), { code: result.reason });
   const { agent } = result;
   try {
-    const channel = await agent.approvals.status(approvalId);
-    const use = await agent.client.approvalService.use(approvalId, action, 'approval');
+    const editedChannel = await agent.approvals.status(edited.approvalId);
+    const editedUse = await agent.client.approvalService.use(
+      edited.approvalId,
+      edited.action,
+      'approval',
+    );
+    const decidedChannel = await agent.approvals.status(decided.approvalId);
+    const decidedUse = await agent.client.approvalService.use(
+      decided.approvalId,
+      decided.action,
+      'approval',
+    );
     await send({
-      step: 'read',
-      opened: 'ok',
-      storePath: agent.paths.store,
+      step: 'used',
       pid: process.pid,
-      channel,
-      use,
+      storePath: agent.paths.store,
+      editedChannel,
+      editedUse,
+      decidedChannel,
+      decidedUse,
     });
   } finally {
     await agent.close();
@@ -101,8 +94,8 @@ async function reader({ home, name, approvalId, action }) {
 
 const task = await onMessage();
 try {
-  if (task.role === 'writer') await writer(task);
-  else if (task.role === 'reader') await reader(task);
+  if (task.role === 'cli') await cli(task);
+  else if (task.role === 'server') await server(task);
   else throw new Error('unknown role');
 } catch (error) {
   await send({ step: 'error', code: error?.code ?? null, name: error?.name ?? null });
