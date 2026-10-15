@@ -1400,3 +1400,59 @@ describe('IR-M1-32-1 regressions', () => {
     expect(await outRows(b, 'accept')).toHaveLength(0);
   });
 });
+
+describe('IR-M1-32-1 delta 1 regressions', () => {
+  it('D1-F01: the anchored resend after a conflict stays acceptable; a stale v1 scope does not', async () => {
+    const { a, b, offer } = await offered();
+    const stale = pending(
+      await b.client.respondToTerms({ envelopeId: offer.envelopeId, decision: 'accept' }),
+    );
+    await approve(b, stale.approvalId);
+    ok(
+      await b.client.respondToTerms({
+        envelopeId: offer.envelopeId,
+        decision: 'counter',
+        terms: input(),
+      }),
+    );
+    ok(
+      await a.client.proposeTerms({
+        to: b.id,
+        terms: input({ subject: 'A v2' }),
+        revises: offer.envelopeId,
+      }),
+    );
+    await deliver(a, b);
+    await deliver(b, a);
+    const resend = ok(
+      await a.client.proposeTerms({
+        to: b.id,
+        terms: input({ subject: 'A resend' }),
+        revises: offer.envelopeId,
+      }),
+    );
+    await deliver(a, b, [resend.envelopeId]);
+    // The resend (D-74 item 2) is the live version 2: a fresh owner approval accepts it.
+    const p = pending(
+      await b.client.respondToTerms({ envelopeId: resend.envelopeId, decision: 'accept' }),
+    );
+    await approve(b, p.approvalId);
+    const done = ok(
+      await b.client.respondToTerms({
+        envelopeId: resend.envelopeId,
+        decision: 'accept',
+        approvalId: p.approvalId,
+      }),
+    );
+    expect((await payloadOf(b, done.envelopeId!)).replyTo).toBe(resend.envelopeId);
+    // F01 still holds: the approved scope on v1 is superseded.
+    expect(
+      await b.client.respondToTerms({
+        envelopeId: offer.envelopeId,
+        decision: 'accept',
+        approvalId: stale.approvalId,
+      }),
+    ).toEqual({ status: 'rejected', code: 'TERMS_SUPERSEDED' });
+    expect(await outRows(b, 'accept')).toHaveLength(1);
+  });
+});
