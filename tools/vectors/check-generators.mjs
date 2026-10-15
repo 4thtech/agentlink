@@ -46,6 +46,21 @@ for (const path of files) {
   if (problem !== null) problems.push(problem);
 }
 
+// M1-21 (D-74): the pinned UCD 15.0.0 category table of @agentlink/types is generated, not edited;
+// its generator needs the same Python 3.12 (unicodedata 15.0.0) as the vector generators.
+{
+  const run = spawnSync(python, ['-I', 'tools/unicode/generate_ucd15_table.py', '--check'], {
+    cwd: root,
+    stdio: 'inherit',
+  });
+  if (run.status !== 0) {
+    problems.push(
+      `packages/types/src/ucd15.ts: drift check failed (status ${String(run.status)}); ` +
+        'regenerate with tools/unicode/generate_ucd15_table.py --write under CPython 3.12',
+    );
+  }
+}
+
 // Negative control: the check must be able to fail, and must say so in the right words. A copy of
 // the tagged-hash file (CPython hashlib only, no pinned package) with one expected value changed,
 // written outside the repository, must be reported as a mismatch naming that case.

@@ -93,6 +93,10 @@ areas:
         state: done
         prs: [31, 36, 71, 72, 76]
         summary: "The policy document, approvals including batch approval, pairing bodies, relay lists, `contact.check` params; tested in Node, three browsers and workerd."
+      - name: "Terms, TermsInput and termsHash"
+        state: in-progress
+        prs: [98, 101]
+        summary: "In review (#101): the strict `terms` schema with the D-74 canonical form (pinned UCD 15.0.0 characters), `TermsInput` with its JSON Schema and mapping, `termsHash` (in crypto) and the pure negotiation-chain reducer; all 381 `terms` vectors pass in Node, three browsers and workerd."
   - id: transport
     title: "Transport (@agentlink/transport-nostr)"
     intro: "Code merged, not published."

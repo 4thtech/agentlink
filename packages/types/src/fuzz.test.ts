@@ -158,12 +158,12 @@ describe('fuzzing: only validation errors, never a crash', () => {
                 if (Array.isArray(node)) for (const item of node) walk(item, generic);
                 return;
               }
-              // Free-form JSON (terms until M1-21, tool args) is deliberately open; the strict shapes
-              // around it are what this property covers. Since M1-2b the policy and the approval
-              // context are strict, so they are walked like every other shape.
+              // Free-form JSON (tool args) is deliberately open; the strict shapes around it are what
+              // this property covers. Since M1-2b the policy and the approval context are strict, and
+              // since M1-21 `terms` is too, so they are walked like every other shape.
               if (!generic) objects.push(node as Record<string, unknown>);
               for (const [k, v] of Object.entries(node)) {
-                walk(v, generic || ['terms', 'args'].includes(k));
+                walk(v, generic || k === 'args');
               }
             };
             walk(copy, false);

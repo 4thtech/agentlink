@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/4thtech/agentlink/test-vectors/fingerprint/case.schema.json",
   "title": "fingerprint case",
-  "description": "04 \u00a72.9 fingerprints: the 32-byte digest (hex), the short form (8 upper-case hex digits in two groups joined by U+00B7), the long form (64 upper-case hex digits) and the domain claim `fp` (the long form in lower case).",
+  "description": "04 \u00a72.9 fingerprints and the sender code: the 32-byte digest (hex), the short form (8 upper-case hex digits in two groups joined by U+00B7), the long form (64 upper-case hex digits) and the domain claim `fp` (the long form in lower case). A sender code (D-72) has the digest and the short form only.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -131,6 +131,46 @@
             "domainClaimFp": {
               "type": "string",
               "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "from"
+          ],
+          "properties": {
+            "op": {
+              "const": "senderCode"
+            },
+            "from": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "digest",
+            "short"
+          ],
+          "properties": {
+            "digest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "short": {
+              "type": "string",
+              "pattern": "^[0-9A-F]{4}\u00b7[0-9A-F]{4}$"
             }
           }
         }
