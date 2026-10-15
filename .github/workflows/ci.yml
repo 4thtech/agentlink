@@ -42,7 +42,7 @@ env:
 jobs:
   detect:
     name: detect
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -137,7 +137,7 @@ jobs:
     name: checks
     needs: detect
     if: needs.detect.outputs.has_skeleton == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -180,14 +180,16 @@ jobs:
     name: vectors
     needs: detect
     if: needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.has_vectors_script == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
     steps:
+      # Full history: the pending-suites check needs the merge base with main.
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Node.js and pnpm
@@ -200,7 +202,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium firefox webkit
 
       # Python for the independent vector generators, fixed at the version requirements.txt was
-      # compiled for (every pinned package has a cp312 wheel), whatever ubuntu-latest ships.
+      # compiled for (every pinned package has a cp312 wheel), whatever the runner image ships.
       - name: Set up Python for the vector generators
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -222,14 +224,30 @@ jobs:
       - name: Check committed vectors against their independent generators
         run: node tools/vectors/check-generators.mjs
 
-      # Pending suites (vectors before their code, M1-1h) may only shrink against main: a suite
-      # that was implemented on main can never become pending again (IR-M1-1h-1 F2).
-      - name: Check that pending vector suites only shrink against main
+      # Pending suites (vectors before their code, M1-1h) may only shrink against the point where this
+      # ref left main: a suite that was implemented on main can never become pending again
+      # (IR-M1-1h-1 F2). The base is the merge base with main, not today's tip of main, so a branch or
+      # pull request that is merely behind main never fails for what main changed since. On main itself
+      # (the merge base is HEAD) the base is the previous commit. On a pull request run HEAD is the
+      # merge ref, so the merge base is the main commit the ref was created from.
+      - name: Check that pending vector suites only shrink against the merge base with main
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
-          node tools/vectors/check-pending.mjs --base origin/main
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          base="$(git merge-base HEAD origin/main)"
+          if [ "$base" = "$(git rev-parse HEAD)" ]; then
+            base="$(git rev-parse HEAD^1)"
+          fi
+          echo "Pending-suites base: $base"
+          node tools/vectors/check-pending.mjs --base "$base"
+
+      # The workspace packages are built before the vectors run, so a cross-package import resolves
+      # (dist/) in every runtime without a source alias per package (a missing build was the cause of
+      # three red runs). The suites that must test source still use their aliases in
+      # test-vectors/vitest.config.ts.
+      - name: Build the workspace packages
+        run: pnpm exec turbo run build
 
       # Crypto + EIP-712 vectors across Node, browsers (Playwright) and Workers (workerd).
       - name: Check test vectors across runtimes
@@ -253,9 +271,11 @@ jobs:
   # (gnome-keyring in a headless D-Bus session). AGENTLINK_REQUIRE_KEYCHAIN=1 turns a failed
   # keychain probe into a failed test instead of a skip, so a runner without a working keychain
   # cannot pass green. The suite writes only under a random `agentlink-test-*` service on the
-  # ephemeral runner and deletes it afterwards. Not part of `ci-gate` on purpose: adding it to the
-  # required checks is the owner's call (backlog M1-8a-b); the way to do it is to list `keychain`
-  # in `ci-gate`'s `needs` (the ruleset keeps naming only the four gates).
+  # ephemeral runner and deletes it afterwards. The job runs only the keychain-specific tests (the
+  # keychain file and the CLI two-process test), so unrelated slow or timing-sensitive suites cannot
+  # turn it red; the whole @agentlink/node suite runs in `checks` (Linux) and in `node-os` below
+  # (macOS and Windows). `keychain` is in `ci-gate`'s `needs`; it needs the CLI two-process test from
+  # PR #107 on main, so that PR must merge first.
   keychain:
     name: keychain (${{ matrix.os }})
     needs: detect
@@ -304,18 +324,18 @@ jobs:
         shell: bash
         run: pnpm exec turbo run build --filter='@4thtech/agentlink...'
 
-      - name: Run the @agentlink/node tests against the real keychain (macOS, Windows)
+      - name: Run the keychain tests against the real keychain (macOS, Windows)
         if: runner.os != 'Linux'
         shell: bash
         run: |
           set -euo pipefail
-          pnpm --filter @agentlink/node exec vitest run --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
+          pnpm --filter @agentlink/node exec vitest run src/keychain-native.test.ts --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
           pnpm --filter @4thtech/agentlink exec vitest run test/two-process.keychain.test.ts --reporter=default --reporter=json --outputFile.json="$CLI_KEYCHAIN_REPORT"
 
       # A fresh D-Bus session, then gnome-keyring started with --unlock, which creates and unlocks
       # the default ("login") collection from a throwaway password read on stdin (random per run,
       # never printed; the runner is ephemeral).
-      - name: Run the @agentlink/node tests against the real keychain (Linux, gnome-keyring)
+      - name: Run the keychain tests against the real keychain (Linux, gnome-keyring)
         if: runner.os == 'Linux'
         shell: bash
         run: |
@@ -324,7 +344,7 @@ jobs:
             keyring_env="$(openssl rand -hex 16 | gnome-keyring-daemon --unlock --components=secrets)"
             eval "$keyring_env"
             export GNOME_KEYRING_CONTROL
-            pnpm --filter @agentlink/node exec vitest run --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
+            pnpm --filter @agentlink/node exec vitest run src/keychain-native.test.ts --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
             pnpm --filter @4thtech/agentlink exec vitest run test/two-process.keychain.test.ts --reporter=default --reporter=json --outputFile.json="$CLI_KEYCHAIN_REPORT"
           '
 
@@ -361,6 +381,39 @@ jobs:
             console.log(`two-process.keychain.test.ts: ${tests.length} tests, ${bad.length} not passed`);
             if (tests.length !== 1 || bad.length > 0) { console.error("::error::two-process.keychain.test.ts must run exactly 1 test, passed (none skipped)"); process.exit(1); }
           '
+
+  # The whole @agentlink/node suite on macOS and Windows (it used to run inside the keychain job).
+  # Not part of `ci-gate`: OS-timing flakes in unrelated suites must not block merges, but a real
+  # OS-specific bug stays visible here. The keychain files themselves run in `keychain`.
+  node-os:
+    name: node-os (${{ matrix.os }})
+    needs: detect
+    if: needs.detect.outputs.has_skeleton == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # The same exact images as `keychain` (no `*-latest`).
+        os: [macos-26, windows-2025-vs2026]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build the workspace dependencies of @agentlink/node
+        shell: bash
+        run: pnpm exec turbo run build --filter='@agentlink/node...'
+
+      - name: Run the @agentlink/node tests
+        shell: bash
+        run: pnpm --filter @agentlink/node exec vitest run
 
   # M1-5b-b: the Node relay connector's Docker suite (packages/node/src/relay-docker.test.ts): the
   # pool and the outbox against real relays, strfry and rnostr, pinned by digest in the test file.
@@ -410,7 +463,7 @@ jobs:
   # on a docs-only repository too and does not depend on `detect`. A missing file passes.
   context-budget:
     name: context-budget
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -452,9 +505,9 @@ jobs:
     # merge with `main`. Only the latter may satisfy the required check `ci-gate`, so a feature
     # branch push publishes `ci-gate (push)` instead.
     name: ${{ (github.event_name == 'push' && github.ref != 'refs/heads/main') && 'ci-gate (push)' || 'ci-gate' }}
-    needs: [detect, checks, vectors, context-budget, relays-docker]
+    needs: [detect, checks, vectors, keychain, context-budget, relays-docker]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
     steps:

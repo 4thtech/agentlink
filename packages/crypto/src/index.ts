@@ -60,6 +60,7 @@ export {
   agentFingerprint,
   formatFingerprint,
   ownerFingerprint,
+  senderCode,
   type FingerprintForm,
 } from './fingerprint.js';
 // M1-1c: the envelope (04 §3.1, §3.1.1, §3.3). Public: structure, encodings and limits,
