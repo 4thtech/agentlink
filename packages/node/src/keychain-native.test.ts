@@ -4,11 +4,16 @@
 // the flag is set, a keychain that fails the probe FAILS the suite instead of skipping it (M-1: the
 // CI keychain matrix sets the flag, so a runner without a keychain cannot pass green). Items go
 // under a random test service and are deleted afterwards; `agentlink` items are never touched.
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { encodeHex, randomBytes } from '@agentlink/crypto';
 import { deriveAgentId } from '@agentlink/crypto/keystore';
 import { afterAll, describe, expect, it } from 'vitest';
 import { KeychainKeyStore, createKeychainAgent } from './keychain-keystore.js';
+import { withInterProcessLock } from './inter-process-lock.js';
 import { keychainAccount, osKeychain, probeKeychain } from './keychain.js';
+import { keychainPolicyMark } from './policy-mark.js';
 
 const required = process.env['AGENTLINK_REQUIRE_KEYCHAIN'] === '1';
 const service = `agentlink-test-${encodeHex(randomBytes(8))}`;
@@ -22,6 +27,7 @@ describe.skipIf(!required)(`the OS keychain (${process.platform})`, () => {
       created.flatMap((agentId) => [
         keychain.delete(keychainAccount(agentId, 'seed')),
         keychain.delete(keychainAccount(agentId, 'store-key')),
+        keychain.delete(keychainAccount(agentId, 'policy-version')),
       ]),
     );
   });
@@ -52,5 +58,25 @@ describe.skipIf(!required)(`the OS keychain (${process.platform})`, () => {
     expect((await store.getPublicBundle()).agentId).toBe(agentId);
     expect(await store.signEnvelopeHash(new Uint8Array(32))).toMatch(/^[0-9a-f]{128}$/);
     await store.close();
+  });
+
+  it('keeps the policy-version mark as an item that only rises (M1-8g)', async () => {
+    const agentId = await createKeychainAgent(keychain);
+    created.push(agentId);
+    const dir = await mkdtemp(join(tmpdir(), 'agentlink-mark-native-'));
+    try {
+      const withLock = <T>(fn: () => Promise<T> | T): Promise<T> =>
+        withInterProcessLock(join(dir, 'agent.sqlite.lock'), fn);
+      const mark = keychainPolicyMark(keychain, agentId, withLock);
+      expect(await mark.read()).toBe(0);
+      expect(await mark.raise(3)).toBe(3);
+      expect(await mark.raise(2)).toBe(3);
+      expect(await keychainPolicyMark(keychain, agentId, withLock).read()).toBe(3);
+      expect(await keychain.get(keychainAccount(agentId, 'policy-version'))).toEqual(
+        Uint8Array.from([0x33]),
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
