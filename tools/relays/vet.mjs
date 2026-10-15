@@ -10,13 +10,23 @@
 // Checks (docs/runbooks/relay-vetting.md): (1) kind 1059 accepted and read back, (2) NIP-11
 // max_message_length against the largest valid wrap frame, (3) retention (method: the run saves
 // the event id; a later --recheck says whether it is still there), (4) read auth (NIP-42).
+// The read-back uses the sync's own filter (kinds [1059], "#p", since) and, for comparison, by id.
 // Sends ONE tiny kind-1059 event per relay, signed by a throwaway key made for this run. The
 // event carries random bytes, never a real envelope; the key is never printed or saved.
-// Signing uses nostr-tools, resolved from packages/transport-nostr (an allowlisted dependency);
-// this script adds no dependency. Uses the Node 22 global WebSocket and fetch.
+// Relay address checks (04 §4, 07 §4.2), applied to EVERY URL before any connection, the same
+// functions the node relay connector uses: `isAllowedRelayUrl` (wss only, a lowercase DNS name, no
+// IP literal, no local name) from @agentlink/types; then the host is resolved and EVERY answer must
+// pass `isGloballyRoutable` from @agentlink/transport-nostr. The connection is then pinned to the
+// checked address (no second lookup), with no redirects. A URL that fails is reported as refused
+// and never contacted. Needs the packages built (`pnpm -r build`) for those functions.
+// Signing uses nostr-tools, resolved from packages/transport-nostr, and the WebSocket client is
+// `ws`, resolved from packages/node (both existing allowlisted dependencies; this script adds none).
 import { randomBytes } from 'node:crypto';
+import dns from 'node:dns';
 import { readFileSync, writeFileSync } from 'node:fs';
+import https from 'node:https';
 import { createRequire } from 'node:module';
+import { isIP } from 'node:net';
 import { pathToFileURL } from 'node:url';
 
 /** Mirror of DEFAULT_RELAYS in packages/transport-nostr/src/default-relays.ts (D-75). */
@@ -95,21 +105,114 @@ async function makeEvent() {
   return { ev, pk, authEvent };
 }
 
-async function fetchNip11(relay) {
-  try {
-    const res = await fetch(relay.replace(/^wss:/, 'https:'), {
-      headers: { accept: 'application/nostr+json' },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    if (!res.ok) return { error: `HTTP ${res.status}` };
-    return judgeNip11(await res.json());
-  } catch (e) {
-    return { error: String(e?.name ?? 'error') };
+const MAX_NIP11_BYTES = 65_536;
+
+/**
+ * Pure apart from the injected `resolve`: the 04 §4 address check for one URL. Returns the address
+ * to pin, or a refusal. `deps` = { isAllowedRelayUrl, isGloballyRoutable, resolve(host) }.
+ */
+export async function checkRelayTarget(url, deps) {
+  if (typeof url !== 'string' || !url.startsWith('wss://')) {
+    return { ok: false, reason: 'not a wss:// URL' };
   }
+  if (!deps.isAllowedRelayUrl(url)) {
+    return { ok: false, reason: 'fails the relay URL rule (04 §4)' };
+  }
+  const host = /^wss:\/\/([^/:]+)/.exec(url)?.[1];
+  if (host === undefined) return { ok: false, reason: 'no host' };
+  let answers;
+  try {
+    answers = await deps.resolve(host);
+  } catch {
+    return { ok: false, reason: 'host did not resolve' };
+  }
+  if (!Array.isArray(answers) || answers.length === 0) {
+    return { ok: false, reason: 'host did not resolve' };
+  }
+  for (const a of answers) {
+    if (typeof a !== 'string' || a.includes('%') || isIP(a) === 0 || !deps.isGloballyRoutable(a)) {
+      return { ok: false, reason: 'resolves to an address that is not globally routable' };
+    }
+  }
+  return { ok: true, url, host, address: answers[0], family: isIP(answers[0]) };
 }
 
-// One WebSocket exchange: send frames, resolve with the frames that came back.
-function exchange(relay, frames, until, react) {
+async function loadTrusted() {
+  const dist = (pkg) => new URL(`../../packages/${pkg}/dist/index.js`, import.meta.url);
+  let types;
+  let transport;
+  try {
+    types = await import(dist('types').href);
+    transport = await import(dist('transport-nostr').href);
+  } catch {
+    throw new Error('build the packages first: pnpm -r build (the address check needs them)');
+  }
+  return {
+    isAllowedRelayUrl: types.isAllowedRelayUrl,
+    isGloballyRoutable: transport.isGloballyRoutable,
+    resolve: async (host) =>
+      (await dns.promises.lookup(host, { all: true, order: 'verbatim' })).map((e) => e.address),
+  };
+}
+
+function loadWs() {
+  const req = createRequire(new URL('../../packages/node/package.json', import.meta.url));
+  return req('ws');
+}
+
+// A lookup that returns only the address the check approved (Node may ask for `all` answers).
+const pin = (target) => (_host, options, cb) =>
+  options?.all === true
+    ? cb(null, [{ address: target.address, family: target.family }])
+    : cb(null, target.address, target.family);
+
+// NIP-11 over HTTPS to the checked address: SNI and Host from the name, no redirects, 64 KiB cap.
+function fetchNip11(target) {
+  return new Promise((resolve) => {
+    const req = https.request(
+      {
+        host: target.host,
+        path: '/',
+        method: 'GET',
+        headers: { accept: 'application/nostr+json' },
+        lookup: pin(target),
+        timeout: TIMEOUT_MS,
+      },
+      (res) => {
+        if (res.statusCode !== 200) {
+          res.resume();
+          resolve({ error: `HTTP ${res.statusCode}` });
+          return;
+        }
+        const chunks = [];
+        let size = 0;
+        res.on('data', (c) => {
+          size += c.length;
+          if (size > MAX_NIP11_BYTES) {
+            req.destroy();
+            resolve({ error: 'NIP-11 document too large' });
+            return;
+          }
+          chunks.push(c);
+        });
+        res.on('end', () => {
+          try {
+            resolve(judgeNip11(JSON.parse(Buffer.concat(chunks).toString('utf8'))));
+          } catch {
+            resolve({ error: 'NIP-11 not JSON' });
+          }
+        });
+      },
+    );
+    req.on('timeout', () => req.destroy());
+    req.on('error', () => resolve({ error: 'error' }));
+    req.end();
+  });
+}
+
+// One WebSocket exchange to the checked, pinned address: send frames, collect the frames back.
+function exchange(target, frames, until, react) {
+  const WebSocket = loadWs();
   return new Promise((resolve) => {
     const seen = [];
     let ws;
@@ -125,24 +228,29 @@ function exchange(relay, frames, until, react) {
     };
     timer = setTimeout(() => done('timeout'), TIMEOUT_MS);
     try {
-      ws = new WebSocket(relay);
+      ws = new WebSocket(target.url, {
+        lookup: pin(target),
+        followRedirects: false,
+        maxPayload: 131_072, // MAX_FRAME_BYTES (04 §3.1.1)
+        handshakeTimeout: TIMEOUT_MS,
+      });
     } catch {
       done('connect-failed');
       return;
     }
-    ws.onopen = () => frames.forEach((f) => ws.send(JSON.stringify(f)));
-    ws.onerror = () => done('error');
-    ws.onclose = () => done('closed');
-    ws.onmessage = (m) => {
+    ws.on('open', () => frames.forEach((f) => ws.send(JSON.stringify(f))));
+    ws.on('error', () => done('error'));
+    ws.on('close', () => done('closed'));
+    ws.on('message', (data) => {
       try {
-        const frame = JSON.parse(String(m.data));
+        const frame = JSON.parse(data.toString());
         seen.push(frame);
         react?.(frame, (f) => ws.send(JSON.stringify(f)));
         if (until(frame)) done('ok');
       } catch {
         /* ignore non-JSON */
       }
-    };
+    });
   });
 }
 
@@ -154,21 +262,21 @@ const isEvent = (f, id) => f[0] === 'EVENT' && f[2]?.id === id;
  * Reads with the sync's exact filter shape (sync.ts: kinds [1059], "#p", since). With `withAuth`,
  * answers a NIP-42 AUTH challenge with the throwaway key and asks again.
  */
-async function readByP(relay, made, withAuth) {
+async function readByP(target, made, withAuth) {
   const { ev, pk } = made;
   const filter = { kinds: [1059], '#p': [pk], since: ev.created_at - 60 };
   const id = randomBytes(4).toString('hex');
   let authed = false;
   let authEvent;
   const res = await exchange(
-    relay,
+    target,
     [['REQ', `p${id}`, filter]],
     // Without AUTH stop at the first answer; with AUTH wait for the answer to the second REQ.
     (f) => (f[0] === 'EOSE' || f[0] === 'CLOSED') && f[1] === (authed ? `q${id}` : `p${id}`),
     (f, send) => {
       if (f[0] === 'AUTH' && withAuth && typeof f[1] === 'string' && !authed) {
         authed = true;
-        authEvent = made.authEvent(relay, f[1]);
+        authEvent = made.authEvent(target.url, f[1]);
         send(['AUTH', authEvent]);
         setTimeout(() => send(['REQ', `q${id}`, filter]), 800);
       }
@@ -186,11 +294,13 @@ async function readByP(relay, made, withAuth) {
   };
 }
 
-async function vetRelay(relay) {
-  const out = { relay, nip11: await fetchNip11(relay) };
+async function vetRelay(relay, deps) {
+  const target = await checkRelayTarget(relay, deps);
+  if (!target.ok) return { relay, refused: target.reason }; // never contacted
+  const out = { relay, nip11: await fetchNip11(target) };
   const made = await makeEvent();
   const { ev } = made;
-  const pub = await exchange(relay, [['EVENT', ev]], (f) => f[0] === 'OK' && f[1] === ev.id);
+  const pub = await exchange(target, [['EVENT', ev]], (f) => f[0] === 'OK' && f[1] === ev.id);
   const ok = pub.seen.find((f) => f[0] === 'OK' && f[1] === ev.id);
   out.publish = {
     accepted: ok ? ok[2] === true : false,
@@ -198,14 +308,14 @@ async function vetRelay(relay) {
     authChallenge: pub.seen.some((f) => f[0] === 'AUTH'),
   };
   // The sync's read: by #p since a cursor, without AUTH; then with AUTH if the relay challenged.
-  out.readByP = await readByP(relay, made, false);
+  out.readByP = await readByP(target, made, false);
   if (!out.readByP.readByP && out.readByP.authChallenge) {
-    out.readByPAuth = await readByP(relay, made, true);
+    out.readByPAuth = await readByP(target, made, true);
   }
   // By id, for comparison only: the sync never reads by id.
   const sub = 'v' + randomBytes(4).toString('hex');
   const rd = await exchange(
-    relay,
+    target,
     [['REQ', sub, { ids: [ev.id] }]],
     (f) => f[0] === 'EOSE' || f[0] === 'CLOSED',
   );
@@ -220,13 +330,19 @@ async function vetRelay(relay) {
   return out;
 }
 
-async function recheck(file) {
+async function recheck(file, deps) {
   const saved = JSON.parse(readFileSync(file, 'utf8'));
   const results = [];
   for (const r of saved) {
+    if (r.retention === undefined) continue; // a refused relay has nothing to read back
+    const target = await checkRelayTarget(r.relay, deps); // the saved file is input too
+    if (!target.ok) {
+      results.push({ relay: r.relay, refused: target.reason });
+      continue;
+    }
     const sub = 'r' + randomBytes(4).toString('hex');
     const rd = await exchange(
-      r.relay,
+      target,
       [['REQ', sub, { ids: [r.retention.eventId] }]],
       (f) => f[0] === 'EOSE' || f[0] === 'CLOSED',
     );
@@ -242,7 +358,8 @@ async function recheck(file) {
 async function main(argv) {
   const live = argv.includes('--live');
   const ri = argv.indexOf('--recheck');
-  const given = argv.filter((a) => a.startsWith('wss://'));
+  // Every non-flag argument is a relay URL and is checked (a non-wss one is refused, not skipped).
+  const given = argv.filter((a, i) => !a.startsWith('--') && i !== ri + 1);
   const relays = given.length > 0 ? given : await loadDefaultRelays();
   if (!live) {
     console.log(planText(relays));
@@ -250,11 +367,12 @@ async function main(argv) {
     return;
   }
   if (ri >= 0) {
-    console.log(JSON.stringify(await recheck(argv[ri + 1]), null, 2));
+    console.log(JSON.stringify(await recheck(argv[ri + 1], await loadTrusted()), null, 2));
     return;
   }
+  const deps = await loadTrusted();
   const results = [];
-  for (const relay of relays) results.push(await vetRelay(relay));
+  for (const relay of relays) results.push(await vetRelay(relay, deps));
   const out = `relay-vet-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
   writeFileSync(out, JSON.stringify(results, null, 2));
   console.log(JSON.stringify(results, null, 2));

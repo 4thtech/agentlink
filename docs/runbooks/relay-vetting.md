@@ -10,12 +10,12 @@ Before the J9 dogfood and before external testers; whenever the default list cha
 The orchestrator or a builder (Sonnet or above) on a machine with network access. The owner confirms the sign-off.
 
 ## Preconditions
-- Dependencies installed (`pnpm install`); Node 22 or later (global `WebSocket` and `fetch`).
+- Dependencies installed and the packages built (`pnpm install`, `pnpm -r build`): the script imports `isAllowedRelayUrl` from `@agentlink/types` and `isGloballyRoutable` from `@agentlink/transport-nostr` (the functions the node relay connector uses), `nostr-tools` from transport-nostr and `ws` from `@agentlink/node`. Node 22 or later.
 - Run from an empty scratch directory: the script writes `relay-vet-<time>.json` into the current directory.
 
 ## Steps
 1. Print the plan without touching the network: `node tools/relays/vet.mjs`.
-2. Run the checks: `node <repo>/tools/relays/vet.mjs --live` (or pass `wss://…` URLs to try other relays). Per relay it sends **one** tiny kind-1059 event of random bytes, signed by a throwaway key made for the run. The key is never printed or saved and no real key or envelope is used.
+2. Run the checks: `node <repo>/tools/relays/vet.mjs --live` (or pass `wss://…` URLs to try other relays; every non-flag argument is treated as a relay URL). **Before any connection** each URL gets the 04 §4 relay address check: it must be `wss://`, pass the relay URL rule (a lowercase DNS name, no IP literal, no local name), and its host is resolved with every answer required to be globally routable. A URL that fails is reported as `refused` with a reason and is never contacted; the saved file of `--recheck` is checked the same way. The connection then goes to the checked address only (no second lookup), with no redirects, a 128 KiB frame cap and a 64 KiB cap on the NIP-11 document. Per relay it sends **one** tiny kind-1059 event of random bytes, signed by a throwaway key made for the run. The key is never printed or saved and no real key or envelope is used.
 3. Record the dated table (below) in the PR or in `docs/process/` notes.
 4. Retention: later (for example after 10 minutes, 24 hours and 7 days) run `node <repo>/tools/relays/vet.mjs --live --recheck relay-vet-<time>.json`. It asks each relay for the saved event id and says whether it is still there.
 5. If a check fails, do not edit the list on your own; report it to the owner (a list change is a decision-log entry).
