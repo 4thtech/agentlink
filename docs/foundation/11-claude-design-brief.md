@@ -336,7 +336,7 @@ Secrets are shown once, with Copy, Download or Print, and an "I've saved it" ste
 | 6.7 | Pay | **Separate** `{payHost}` | 360, 1280 | D2 | M2-2f, M3-4a, M3-4b | J3 |
 | 6.8 | Pricing | Onboarding section and standalone page | 360, 1280 | D2 | M2-8, M3-14 | J3 |
 | 6.9 | Cloud agent: deploy, setup, connect | User's own Worker; console | 360, 1280 | D2 | M2-3b–e, M2-2e | J6 |
-| 6.10 | Terminal (CLI) copy | Any terminal, 80 columns | Text | **D1** | M1-9a, M1-9b, M1-9h, M1-9i, M1-12b, M1-8f | J1, J9 |
+| 6.10 | Terminal (CLI) copy | Any terminal, 80 columns | Text | **D1** | M1-9a, M1-9b, M1-9l, M1-9m, M1-9h, M1-9i, M1-12b, M1-8f | J1, J9 |
 | 6.11 | Storage: drop and connectors | Local UI, desktop, console | As host surface | D1 (local), D2 | M1-11c, M2-15a–d | J1, J2 |
 | 6.12 | Proofs, receipts, printed records | Local UI, desktop, console, verify | As host surface, plus A4 and Letter | D1 (list), D2 | M1-11c, M2-2d, M2-5a | J2, J5, J8 |
 | 6.13 | Registration and domain verification | Console, desktop | As host surface | D2 | M2-4b, M2-12 | — |
