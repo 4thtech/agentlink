@@ -2599,7 +2599,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Note (IR-M1-9q-1 F-2, F-3, 2026-10-15):** two core gaps found here are fixed in the new card M1-32-b, which must land before the M1a gate. F-2: the core terms flow ignores `clientRequestId`, so a repeated propose sends a second offer. F-3: when v1 and its `revises` v2 have the same `createdAt` and arrive in one sync, the receiver drops v2 and leaves v1 pending.
 
 #### M1-9r · MCP server: background loop and relay subscriptions (new, split from M1-9c)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#142) · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`src/mcp/loop.ts`)
 - **Depends on:** M1-9c, M1-7h, M1-7k
 - **Spec:** 06 §6; 07 §4.2; D-71 (3)
