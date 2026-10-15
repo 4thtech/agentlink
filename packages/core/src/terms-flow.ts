@@ -316,6 +316,9 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
 
 const isEnvelopeId = (v: unknown): v is string => base64url(BYTE_LENGTHS.id).safeParse(v).success;
 
+/** An approval ID among a run's effects (IR-M1-32-b-1 I03: exact, never a prefix match). */
+const APPROVAL_EFFECT = /^apr_[A-Za-z0-9_-]{22}$/;
+
 /** A kept terms result (07 §3.3): only these are ever stored for a clientRequestId. */
 const isKeptResult = (v: unknown): boolean =>
   isObject(v) && (v.status === 'ok' || v.status === 'rejected' || v.status === 'pending_approval');
@@ -848,7 +851,7 @@ export class TermsService {
     const self = (await this.#self()).agentId;
     const call: CommitCall = { envelopeId: input.envelopeId, decision, notarize: false, run };
     const approvalId =
-      [...run.effects].reverse().find((e) => e.startsWith('apr_')) ??
+      [...run.effects].reverse().find((e) => APPROVAL_EFFECT.test(e) && !isEnvelopeId(e)) ??
       (decision === 'accept' ? input.approvalId : undefined);
     if (approvalId !== undefined) {
       const r = await this.#runScope(approvalId, call, self);

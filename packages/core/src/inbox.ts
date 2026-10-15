@@ -223,6 +223,9 @@ export class InboxService {
             direction: 'in',
             state: 'received',
             from_key: contact.agent_nostr,
+            // A terms offer waiting for a version it links to is not unread until the chain
+            // takes it (M1-32-b, IR-M1-32-b-1 F01).
+            refused_reason: null,
           });
         if (unread > 0) out.push({ contactId: contact.contact_id, unread });
       }

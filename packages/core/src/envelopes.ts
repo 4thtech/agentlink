@@ -1135,6 +1135,18 @@ export class EnvelopeService {
         // A version it links to has not arrived yet (M1-32-b): nothing is written; the row stays
         // where it is and #runWaiting decides it again in this pass, or a later one.
         const version = termsBodyOf(o.payload.type, o.payload.body)?.terms.version ?? 0;
+        // Marked as waiting, so it is not an unread item: the inbox page can never return it
+        // until the chain takes it (IR-M1-32-b-1 F01). Taking or refusing it rewrites the row.
+        if (o.item.source === 'received') {
+          const { envelopeId, envelopeHash } = o.item;
+          await this.#ctx.store.transaction((tx) =>
+            tx.update(
+              'envelopes',
+              { envelope_id: envelopeId, envelope_hash: envelopeHash, state: 'received' },
+              { refused_reason: 'terms_waiting' },
+            ),
+          );
+        }
         pass.waiting.push({
           item: o.item,
           contactId: disposition.contactId,
