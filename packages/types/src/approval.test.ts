@@ -34,6 +34,7 @@ import {
   firmOfferScope,
   payloads,
   proofPack,
+  termsInput,
 } from './testing/fixtures.js';
 
 type Path = (string | number)[];
@@ -464,7 +465,12 @@ describe('commitment args: no note, no path, no alias (04 §3.4; IR-M1-2b-1 F-1,
     // A notarized counter is a firm offer: scope "offer", the new terms in args.
     const counter = {
       ...respond(),
-      args: { envelopeId: ID16, decision: 'counter', terms: { subject: 'v4' }, notarize: true },
+      args: {
+        envelopeId: ID16,
+        decision: 'counter',
+        terms: termsInput({ subject: 'v4' }),
+        notarize: true,
+      },
       context: { ...respond().context, scope: firmOfferScope() },
     };
     expectAccept(approvalActionSchema, counter);

@@ -200,6 +200,7 @@ describe('constants (04, 05, 06)', () => {
       nonce: 16,
       inviteId: 16,
       approvalId: 16,
+      termsId: 16,
       key: 32,
       secret: 32,
       hmac: 32,

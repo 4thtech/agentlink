@@ -1,6 +1,7 @@
-// Owner and agent fingerprints (04 §2.9, G-23). Display strings: they tell contacts apart and do
-// not authenticate (only the safety code, a Registry registration or a verified domain does). No
-// input field accepts them, so §2.4.1 does not apply to their text forms.
+// Owner and agent fingerprints (04 §2.9, G-23) and the sender code (D-72). Display strings: they
+// tell contacts and senders apart and do not authenticate (only the safety code, a Registry
+// registration or a verified domain does). No input field accepts them, so §2.4.1 does not apply
+// to their text forms.
 import { assertBytes, concatBytes } from './bytes.js';
 import { encodeHex } from './encoding.js';
 import { CryptoInputError } from './errors.js';
@@ -37,6 +38,16 @@ export function ownerFingerprint(
 export function agentFingerprint(agentId: Uint8Array): Uint8Array {
   assertLength(agentId, 20, 'agentFingerprint: agentId');
   return taggedHash(TAGS.agentFingerprint, agentId);
+}
+
+/**
+ * The sender code of an unknown sender (04 §2.9, D-72): taggedHash(TAGS.senderCode, from) over the
+ * 32 raw bytes of its envelope `from` key. Shown with `formatFingerprint(…, 'short')`, as in
+ * "unknown sender · 2B9E·04D1". It only tells senders apart and authenticates nothing.
+ */
+export function senderCode(from: Uint8Array): Uint8Array {
+  assertLength(from, 32, 'senderCode: from');
+  return taggedHash(TAGS.senderCode, from);
 }
 
 function groups(hex: string): string {

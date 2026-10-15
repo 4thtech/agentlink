@@ -32,6 +32,9 @@ export {
   type ParseJsonOptions,
 } from './jcs.js';
 export { randomBytes } from './random.js';
+// M1-21 (D-32): termsHash = sha256(JCS(terms)), bare hex (04 §3.4). The terms schema is in
+// @agentlink/types; this hashes the JSON object it is given.
+export { termsHash, verifyTermsHash } from './terms-hash.js';
 export { wipe } from './wipe.js';
 // M1-1b: public keys, identities, BIP-340 verification and fingerprints. Everything that takes a
 // master seed or a secret key is in the restricted subpath @agentlink/crypto/keystore (keystore.ts).
@@ -57,6 +60,7 @@ export {
   agentFingerprint,
   formatFingerprint,
   ownerFingerprint,
+  senderCode,
   type FingerprintForm,
 } from './fingerprint.js';
 // M1-1c: the envelope (04 §3.1, §3.1.1, §3.3). Public: structure, encodings and limits,

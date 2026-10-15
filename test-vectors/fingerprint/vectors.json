@@ -1,7 +1,7 @@
 {
   "$schema": "../schema/vector-file.schema.json",
   "suite": "fingerprint",
-  "version": 1,
+  "version": 2,
   "generator": {
     "tool": "python (hashlib, cryptography 50.0.2, coincurve 21.0.0, pycryptodome 3.23.0)",
     "version": "cpython 3.12.13",
@@ -82,6 +82,18 @@
         "short": "95E5\u00b77EAE",
         "long": "95E57EAEC2A55B4071138C9ED93F3681FEB067F2F4DC5CC241D14391EB8A68DF",
         "domainClaimFp": "95e57eaec2a55b4071138c9ed93f3681feb067f2f4dc5cc241d14391eb8a68df"
+      }
+    },
+    {
+      "id": "sender-code",
+      "source": "04 \u00a72.9 fingerprints: sender code of an unknown sender over the 32 raw bytes of its `from` key (D-72)",
+      "input": {
+        "op": "senderCode",
+        "from": "0296b365646245d8a883d850cc44b5152f014f02ee3b29d5a71c3ad6c01a0c35"
+      },
+      "expected": {
+        "digest": "aac5623d7d1800ea2a3d64eaf9b1d224dee78859f23323ce42cb2f24d6ff1e79",
+        "short": "AAC5\u00b7623D"
       }
     }
   ]
