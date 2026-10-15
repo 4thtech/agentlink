@@ -1,0 +1,274 @@
+# E2E (M1-13a; 10 M1-13, 06 §9, D-73 (9)): two agents pair and exchange messages.
+#
+# Two jobs, one scenario (e2e/):
+#
+# - `e2e-deterministic`: a scripted MCP client in place of the model, on every pull request, on
+#   main and in the merge queue. Local strfry relays in Docker, the real OS keychain (gnome-keyring)
+#   and SQLite store, the built CLI. No LLM, no secrets, read-only token. Must finish in < 15 min.
+# - `e2e-llm`: agent A is Claude Code (headless, Haiku), agent B is Codex with an OpenRouter model
+#   (or Claude Code too: dispatch input `agent_b`). It runs ONLY on main, by manual dispatch (no
+#   schedule until the owner sizes the credit, IR-M1-13a-1), never for a pull request (no
+#   `pull_request_target` anywhere). The API keys are
+#   secrets of the GitHub environment `e2e` (deployment branches: main only), which the owner adds
+#   himself; agents never handle them. They are referenced only in the one step that runs the
+#   harnesses and in the canary scan, never printed, and checked absent from every log and artifact.
+#
+# Both jobs end with the canary scan (e2e/src/canary-scan.mjs) over every log and artifact of the
+# run, then upload the artifacts only when the scan passed.
+#
+# Security posture (docs/foundation/04 §7): `permissions: {}` at the top, `contents: read` per job,
+# every action pinned to a full commit SHA, no lifecycle scripts on install, no event data in
+# shell scripts, harness CLIs downloaded as exact versions and checked against pinned sha512
+# integrity values (no npm install, no install scripts).
+name: E2E
+
+on:
+  pull_request:
+    branches-ignore: [sync]
+  push:
+    branches: [main]
+  merge_group:
+  workflow_dispatch:
+    inputs:
+      agent_b:
+        description: "Agent B's harness: codex (Codex via OpenRouter) or claude (fallback: Claude Code on both sides)"
+        type: choice
+        options: [codex, claude]
+        default: codex
+
+permissions: {}
+
+concurrency:
+  group: e2e-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  TURBO_TELEMETRY_DISABLED: "1"
+  DO_NOT_TRACK: "1"
+
+jobs:
+  e2e-deterministic:
+    name: e2e-deterministic
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'merge_group'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      AGENTLINK_REQUIRE_E2E: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Install gnome-keyring and D-Bus
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 dbus
+
+      - name: Build the e2e dependencies (the CLI and its packages)
+        run: pnpm exec turbo run build --filter='@agentlink/e2e^...'
+
+      - name: Choose the artifact and canary paths
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/e2e-artifacts"
+          {
+            echo "AGENTLINK_E2E_ARTIFACTS=$RUNNER_TEMP/e2e-artifacts"
+            echo "AGENTLINK_E2E_CANARIES=$RUNNER_TEMP/e2e-canaries.json"
+            echo "E2E_REPORT=$RUNNER_TEMP/e2e-artifacts/vitest-report.json"
+          } >> "$GITHUB_ENV"
+
+      # A fresh D-Bus session and an unlocked throwaway keyring (as in ci.yml `keychain`). The
+      # vitest output is also kept as a file, so the canary scan covers it.
+      - name: Run the deterministic scenario
+        run: |
+          set -euo pipefail
+          dbus-run-session -- bash -euo pipefail -c '
+            keyring_env="$(openssl rand -hex 16 | gnome-keyring-daemon --unlock --components=secrets)"
+            eval "$keyring_env"
+            export GNOME_KEYRING_CONTROL
+            pnpm --filter @agentlink/e2e exec vitest run test/pair-and-message.test.ts --reporter=default --reporter=json --outputFile.json="$E2E_REPORT"
+          ' 2>&1 | tee "$AGENTLINK_E2E_ARTIFACTS/vitest-output.log"
+
+      - name: Check that the scenario ran in full, with no skipped test
+        run: |
+          set -euo pipefail
+          node -e '
+            const r = JSON.parse(require("node:fs").readFileSync(process.env.E2E_REPORT, "utf8"));
+            const f = r.testResults.filter((x) => /pair-and-message\.test\.ts$/.test(x.name));
+            const t = f.length === 1 ? f[0].assertionResults : [];
+            const bad = t.filter((x) => x.status !== "passed");
+            console.log(`pair-and-message.test.ts: ${t.length} tests, ${bad.length} not passed`);
+            if (t.length !== 2 || bad.length > 0) { console.error("::error::the e2e scenario must run 2 tests, all passed"); process.exit(1); }
+          '
+
+      - name: Canary scan of every log and artifact
+        id: scan
+        if: always()
+        run: node e2e/src/canary-scan.mjs --canaries "$AGENTLINK_E2E_CANARIES" "$AGENTLINK_E2E_ARTIFACTS"
+
+      - name: Summary (step timings)
+        if: always() && steps.scan.outcome == 'success'
+        run: |
+          set -euo pipefail
+          node -e '
+            const r = JSON.parse(require("node:fs").readFileSync(process.env.AGENTLINK_E2E_ARTIFACTS + "/deterministic-results.json", "utf8"));
+            const rows = r.steps.map((s) => `| ${s.step} | ${s.ok ? "pass" : "fail"} | ${(s.ms / 1000).toFixed(1)} s |`);
+            console.log(["### M1-13a deterministic e2e", "", `Total ${(r.totalMs / 1000).toFixed(1)} s`, "", "| Step | Result | Time |", "|---|---|---|", ...rows].join("\n"));
+          ' >> "$GITHUB_STEP_SUMMARY"
+
+      # Uploaded only after a clean canary scan (a failed scenario still uploads its logs).
+      - name: Upload the logs and results
+        if: always() && steps.scan.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-deterministic
+          path: ${{ runner.temp }}/e2e-artifacts
+          retention-days: 14
+          if-no-files-found: error
+
+  e2e-llm:
+    name: e2e-llm
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: e2e
+    permissions:
+      contents: read
+    env:
+      AGENTLINK_E2E_LLM: "1"
+      # Exact harness versions (each at least 3 days old when pinned, as the dependency cooldown)
+      # and the npm registry's sha512 integrity of each linux-x64 tarball. A bump is a reviewed PR.
+      CLAUDE_CODE_VERSION: "2.1.296"
+      CLAUDE_CODE_INTEGRITY: "sha512-+m01urgelnI+VJxPaKPEK0wixgq42uZ8PeCaUk5tX/8YoDBvSmC/REVQG2jQfJAr8dxunpjJ600FvLrcj1WWTw=="
+      CODEX_VERSION: "0.162.1"
+      CODEX_INTEGRITY: "sha512-cjK2mdHIfEepZ1lQ1MX3aTQC+8ncIsvnacl/6vI2dIIcfP8/MrhTQ2+qRlkXFNDzJSj1d36quIszP+3/4CUJWQ=="
+      CLAUDE_MODEL: claude-haiku-5-5
+      CODEX_MODEL: openai/gpt-5.4-mini
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # No pnpm store cache in a job that holds secrets (cache poisoning).
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Install gnome-keyring and D-Bus
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 dbus
+
+      # The Claude Code Bash sandbox on Linux needs bubblewrap and socat; Ubuntu 24.04 restricts
+      # unprivileged user namespaces, so bwrap gets the AppArmor profile from the Claude Code docs.
+      - name: Install the Claude Code sandbox dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends bubblewrap socat
+          if [ "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || echo 0)" = "1" ]; then
+            printf '%s\n' 'abi <abi/4.0>,' 'include <tunables/global>' '' 'profile bwrap /usr/bin/bwrap flags=(unconfined) {' '  userns,' '  include if exists <local/bwrap>' '}' | sudo tee /etc/apparmor.d/bwrap > /dev/null
+            sudo apparmor_parser -r /etc/apparmor.d/bwrap
+          fi
+
+      - name: Build the e2e dependencies (the CLI and its packages)
+        run: pnpm exec turbo run build --filter='@agentlink/e2e^...'
+
+      # The platform tarballs straight from the npm registry, checked against the pinned integrity
+      # before they are unpacked. Nothing is installed and no package script runs.
+      - name: Download and verify the harness CLIs
+        run: |
+          set -euo pipefail
+          tools="$RUNNER_TEMP/harness-tools"
+          mkdir -p "$tools"
+          fetch() {
+            local name="$1" url="$2" integrity="$3"
+            curl --fail --silent --show-error --location --proto '=https' --max-time 600 -o "$tools/$name.tgz" "$url"
+            local got
+            got="sha512-$(openssl dgst -sha512 -binary "$tools/$name.tgz" | openssl base64 -A)"
+            if [ "$got" != "$integrity" ]; then
+              echo "::error::$name: the downloaded tarball does not match the pinned integrity"
+              exit 1
+            fi
+            mkdir -p "$tools/$name"
+            tar -xzf "$tools/$name.tgz" -C "$tools/$name"
+            rm "$tools/$name.tgz"
+          }
+          fetch claude "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-${CLAUDE_CODE_VERSION}.tgz" "$CLAUDE_CODE_INTEGRITY"
+          fetch codex "https://registry.npmjs.org/@openai/codex/-/codex-${CODEX_VERSION}-linux-x64.tgz" "$CODEX_INTEGRITY"
+          claude_bin="$tools/claude/package/claude"
+          codex_bin="$tools/codex/package/vendor/x86_64-unknown-linux-musl/bin/codex"
+          chmod +x "$claude_bin" "$codex_bin"
+          "$claude_bin" --version
+          "$codex_bin" --version
+          {
+            echo "CLAUDE_BIN=$claude_bin"
+            echo "CODEX_BIN=$codex_bin"
+          } >> "$GITHUB_ENV"
+
+      - name: Choose the artifact and canary paths
+        env:
+          AGENT_B_INPUT: ${{ inputs.agent_b }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/e2e-artifacts"
+          case "${AGENT_B_INPUT:-codex}" in
+            claude) agent_b=claude ;;
+            *) agent_b=codex ;;
+          esac
+          {
+            echo "AGENTLINK_E2E_ARTIFACTS=$RUNNER_TEMP/e2e-artifacts"
+            echo "AGENTLINK_E2E_CANARIES=$RUNNER_TEMP/e2e-canaries.json"
+            echo "AGENT_B=$agent_b"
+          } >> "$GITHUB_ENV"
+
+      # The only step that sees the API keys besides the canary scan. Each harness process gets only
+      # its own key (e2e/llm/harness.ts); the MCP servers get neither. Hard caps: 8 turns and
+      # $0.25 per Claude Code call, $0.75 of Claude Code spend per run (the remaining Claude steps are
+      # skipped), 180 s per harness call, 30 min for the job; no retries.
+      - name: Run the LLM scenario
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -euo pipefail
+          dbus-run-session -- bash -euo pipefail -c '
+            keyring_env="$(openssl rand -hex 16 | gnome-keyring-daemon --unlock --components=secrets)"
+            eval "$keyring_env"
+            export GNOME_KEYRING_CONTROL
+            pnpm --filter @agentlink/e2e exec vitest run llm/llm-run.test.ts --reporter=default
+          ' 2>&1 | tee "$AGENTLINK_E2E_ARTIFACTS/vitest-output.log"
+
+      - name: Canary scan of every log, transcript and artifact (including the API keys)
+        id: scan
+        if: always()
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: node e2e/src/canary-scan.mjs --canaries "$AGENTLINK_E2E_CANARIES" --env-secret ANTHROPIC_API_KEY --env-secret OPENROUTER_API_KEY "$AGENTLINK_E2E_ARTIFACTS"
+
+      - name: Summary (pass rate per step)
+        if: always() && steps.scan.outcome == 'success'
+        run: |
+          set -euo pipefail
+          results="$AGENTLINK_E2E_ARTIFACTS/llm-results.md"
+          if [ -f "$results" ]; then cat "$results" >> "$GITHUB_STEP_SUMMARY"; fi
+
+      # Uploaded only when the canary scan passed (a failed scenario still uploads its transcripts).
+      - name: Upload the transcripts, logs and results
+        if: always() && steps.scan.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-llm
+          path: ${{ runner.temp }}/e2e-artifacts
+          retention-days: 14
+          if-no-files-found: error
