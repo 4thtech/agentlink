@@ -5,6 +5,7 @@
 import { readFileSync } from 'node:fs';
 import process from 'node:process';
 import { isatty } from 'node:tty';
+import { createInitHandler, nodeInitDeps } from './commands/init.js';
 import { createDispatcher } from './dispatch.js';
 import { createOutput } from './output.js';
 
@@ -20,7 +21,7 @@ function packageVersion(): string {
   }
 }
 
-const dispatch = createDispatcher();
+const dispatch = createDispatcher({ init: createInitHandler(nodeInitDeps()) });
 
 process.exitCode = await dispatch(process.argv.slice(2), {
   output: createOutput(),
