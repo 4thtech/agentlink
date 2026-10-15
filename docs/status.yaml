@@ -95,8 +95,8 @@ areas:
         summary: "The policy document, approvals including batch approval, pairing bodies, relay lists, `contact.check` params; tested in Node, three browsers and workerd."
       - name: "Terms, TermsInput and termsHash"
         state: in-progress
-        prs: [98]
-        summary: "In review: the strict `terms` schema and canonical form, `TermsInput` with its JSON Schema and mapping, `termsHash` (in crypto) and the pure negotiation-chain checks, with the `terms` vector suite; 3 vector cases wait on open spec questions."
+        prs: [98, 101]
+        summary: "In review (#101): the strict `terms` schema and canonical form, `TermsInput` with its JSON Schema and mapping, `termsHash` (in crypto) and the pure negotiation-chain checks, with the `terms` vector suite; 3 vector cases wait on open spec questions."
   - id: transport
     title: "Transport (@agentlink/transport-nostr)"
     intro: "Code merged, not published."

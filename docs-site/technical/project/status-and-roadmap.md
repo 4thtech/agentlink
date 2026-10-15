@@ -39,7 +39,7 @@ Code that is merged is not necessarily published: nothing is released or install
 | Crypto (@agentlink/crypto) | File encryption (ALF1) | Planned | - |
 | Shared types (@agentlink/types) | Constants and the envelope, payload, card and invite schemas | In progress | [#23](https://github.com/4thtech/agentlink/pull/23), [#93](https://github.com/4thtech/agentlink/pull/93) |
 | Shared types (@agentlink/types) | Policy, approval, proof pack and tool-result types | Done | [#31](https://github.com/4thtech/agentlink/pull/31), [#36](https://github.com/4thtech/agentlink/pull/36), [#71](https://github.com/4thtech/agentlink/pull/71), [#72](https://github.com/4thtech/agentlink/pull/72), [#76](https://github.com/4thtech/agentlink/pull/76) |
-| Shared types (@agentlink/types) | Terms, TermsInput and termsHash | In progress | [#98](https://github.com/4thtech/agentlink/pull/98) |
+| Shared types (@agentlink/types) | Terms, TermsInput and termsHash | In progress | [#98](https://github.com/4thtech/agentlink/pull/98), [#101](https://github.com/4thtech/agentlink/pull/101) |
 | Transport (@agentlink/transport-nostr) | Gift wrap and unwrap | Done | [#45](https://github.com/4thtech/agentlink/pull/45) |
 | Transport (@agentlink/transport-nostr) | Relay pool and delivery outbox | Done | [#59](https://github.com/4thtech/agentlink/pull/59) |
 | Transport (@agentlink/transport-nostr) | Sync | Done | [#63](https://github.com/4thtech/agentlink/pull/63) |
