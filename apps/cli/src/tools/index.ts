@@ -2,13 +2,14 @@
 // helpers and the untrusted-content wrapper. `callTool` is the one entry the MCP binding
 // (src/mcp/) and the mirroring CLI commands use, so a command and its tool cannot drift.
 //
-// Handlers for send, inbox, invites and terms land with M1-9p, M1-9o and M1-9q; until then their
-// tools are registered and answer with the fixed "not available yet" error (06 §1 rule 3).
+// Handlers for invites and terms land with M1-9o and M1-9q; until then their tools are registered
+// and answer with the fixed "not available yet" error (06 §1 rule 3). Send and inbox are M1-9p's.
 import type { McpToolName } from '@agentlink/types';
 import { acceptInviteHandler } from './accept-invite.js';
 import type { HandlerEnvironment, ToolContext } from './context.js';
 import { createInviteHandler } from './create-invite.js';
 import { getApprovalHandler } from './get-approval.js';
+import { inboxHandler } from './inbox.js';
 import { matchesSchema } from './input.js';
 import { listContactsHandler } from './list-contacts.js';
 import { findTool } from './registry.js';
@@ -21,6 +22,7 @@ import {
   type FinishedResult,
   type HandlerOutput,
 } from './result.js';
+import { sendHandler } from './send.js';
 import { statusHandler } from './status.js';
 import { TOOL_TEXT } from './text.js';
 
@@ -34,10 +36,10 @@ export const HANDLERS: Readonly<Partial<Record<McpToolName, ToolHandler>>> = Obj
   agentlink_create_invite: createInviteHandler,
   agentlink_accept_invite: acceptInviteHandler,
   agentlink_list_contacts: listContactsHandler,
-  agentlink_send: stub, // M1-9p
+  agentlink_send: sendHandler,
   agentlink_propose_terms: stub, // M1-9q
   agentlink_respond_to_terms: stub, // M1-9q
-  agentlink_inbox: stub, // M1-9p
+  agentlink_inbox: inboxHandler,
   agentlink_get_approval: getApprovalHandler,
 });
 
@@ -84,7 +86,13 @@ export { TOOLS, PENDING_M1A_TOOLS, findTool, type ToolDefinition } from './regis
 export {
   coreToolClient,
   type HandlerEnvironment,
+  type InboxPage,
+  type InboxPageQuery,
+  type InboundPageItem,
   type NeedsSetupContext,
+  type OutboundPageItem,
+  type PageFile,
+  type PageItem,
   type ToolClient,
   type ToolContext,
 } from './context.js';

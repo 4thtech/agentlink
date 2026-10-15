@@ -2489,7 +2489,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** per-status tests; an approval retry pairs exactly once (relay spy, with a core test signer; end to end with M1-9b); an agent-written label is shown restricted; no safety code in any result.
 
 #### M1-9p · MCP tools: send and inbox (new, split from M1-9c)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#127; send done; `agentlink_inbox` built against the `ToolClient.inboxPage` port and "not available yet" in production until the core page read lands, proposed card M1-7h-c) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`src/tools/{send,inbox}.ts`)
 - **Depends on:** M1-9c, M1-9j, M1-7k, M1-7h
 - **Spec:** 06 §2.2, §4, §6; 07 §3.3; IR-D48-1 F15f
@@ -2903,13 +2903,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - RFP sent to ≥ 3 firms; ≥ 2 quotes received; signed engagement with dates before M3 starts; code-freeze date fed into M2 planning.
 
 #### M1-18 · Default relay set and optional 4thTech relay (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/transport-nostr (defaults); agentlink-ops · relay/ (optional relay)
 - **Depends on:** M1-5b; DECISION NEEDED: `agentlink-ops` pipeline (`release-and-deployment.md` §4.7)
 - **Spec:** 07 §4.2 (relays, retention); 03 §2; 08 §6
 - **Invariants:** I-3
 - **Scope:**
-  - Evaluate public relays: kind 1059 accepted, NIP-42 AUTH for kind 1059 reads, NIP-11 `max_message_length` ≥ 64 KB, retention, uptime. Choose a default set of 3–5.
+  - Evaluate public relays: kind 1059 accepted, NIP-42 AUTH for kind 1059 reads, NIP-11 `max_message_length` ≥ 90 112 bytes (88 KiB; the largest valid wrap is about 88 KB as an `EVENT` frame, 04 §3.1.1; the earlier 64 KB figure was below a maximum wrap), retention, uptime. Choose a default set of 3–5.
   - Optional (not on the M1 critical path): 4thTech strfry relay, 30-day retention for kind 1059, AUTH-gated reads, no content logging.
 - **Acceptance:**
   - Evaluation table committed with test dates; the default set passes the M1-5b/M1-5c suites.

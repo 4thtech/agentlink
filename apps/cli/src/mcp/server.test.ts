@@ -49,6 +49,14 @@ function toolClient(over: Partial<ToolClient> = {}): ToolClient {
     storedCounts: () => Promise.resolve({ inbox: [{ contactId: B, unread: 2 }], requests: 1 }),
     contacts: () => Promise.resolve([marko]),
     storageMode: () => Promise.resolve('drop'),
+    send: () =>
+      Promise.resolve({
+        status: 'ok',
+        envelopeId: 'Q2xhaW1zQ2xhaW1zQ2xhaQ',
+        thread: 'Q2xhaW1zQ2xhaW1zQ2xhaQ',
+        sentAt: '2026-10-15T10:00:00Z',
+      }),
+    syncInbox: () => Promise.resolve(),
     approvalState: () => Promise.resolve({ check: { status: 'void' }, decidedAt: 1_760_000_000 }),
     ...over,
   };
@@ -112,7 +120,8 @@ describe('MCP server (stdio binding, 06 §1)', () => {
       ['agentlink_list_contacts', {}, 'ok'],
       ['agentlink_get_approval', { approvalId: APPROVAL }, 'ok'],
       ['agentlink_get_approval', { approvalId: 'bad' }, 'error'],
-      ['agentlink_send', { to: 'Marko', text: 'hi' }, 'error'],
+      ['agentlink_send', { to: 'Marko', text: 'hi' }, 'ok'],
+      ['agentlink_send', { to: 'Marko', body: { terms: {} } }, 'error'],
       ['agentlink_inbox', {}, 'error'],
       ['agentlink_create_invite', {}, 'error'],
       ['agentlink_accept_invite', { inviteUrl: 'x' }, 'error'],

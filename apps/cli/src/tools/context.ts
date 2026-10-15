@@ -13,8 +13,11 @@ import {
   type ApprovalUse,
   type ContactView,
   type CreatedInvite,
+  type InboxSender,
   type PendingContact,
   type PolicyDecision,
+  type SendMessageInput,
+  type SendMessageResult,
 } from '@agentlink/core';
 import {
   agentFingerprint,
@@ -46,6 +49,100 @@ export interface StoredApprovalState {
   readonly decidedAt: number | null;
 }
 
+/** A file as an inbox item shows it (06 §2.2 `FileInfo`): never a URL, a file key or inline bytes. */
+export interface PageFile {
+  readonly index: number;
+  readonly size: number;
+  readonly plaintextSha256: string;
+  readonly delivery: 'inline' | 'drop' | 'own';
+  /** Unix seconds, or null for inline. */
+  readonly expiresAt: number | null;
+  /** Untrusted (I-5): the sender's file name and MIME type, for the block only. */
+  readonly name: string;
+  readonly mime: string;
+}
+
+/** What every inbox page item carries (06 §2.2 `MessageBase`, before the wrapper). */
+interface PageItemBase {
+  readonly envelopeId: string;
+  readonly thread: string;
+  readonly type: string;
+  /** The envelope's `createdAt`, unix seconds. */
+  readonly createdAt: number;
+  readonly replyTo: string | null;
+  readonly files: readonly PageFile[];
+  /**
+   * Untrusted (I-5): the body of a Talk item (a string or a JSON object), or null for `offer`,
+   * `accept` and `reject`, whose content is `terms` and `note`.
+   */
+  readonly body: string | Readonly<Record<string, unknown>> | null;
+  /** Untrusted: the terms of an `offer`, `accept` or `reject`, as received. */
+  readonly terms?: Readonly<Record<string, unknown>>;
+  /** Untrusted: the free note of an `offer` or `reject`. */
+  readonly note?: string | null;
+  /** Ours (checked by the core): the terms reference of an `offer`, `accept` or `reject`. */
+  readonly termsRef?: {
+    readonly termsId: string;
+    readonly version: number;
+    readonly termsHash: string;
+    /** Unix seconds. */
+    readonly validUntil: number;
+  };
+}
+
+/** An inbound item: from a contact, or an accepted request (`from: null`, D-72). */
+export interface InboundPageItem extends PageItemBase {
+  readonly direction: 'in';
+  /** The contact under the 06 §2.1 rule; null only for an accepted request (D-72). */
+  readonly from: InboxSender | null;
+  /** Only when `from` is null: the 04 §2.9 sender code, short form (`2B9E·04D1`). */
+  readonly senderCode?: string;
+  /** True if it had been returned before this call (06 §2.2 "Read state"). */
+  readonly read: boolean;
+}
+
+/** An outbound item (06 §2.2 `OutboundMessage`). */
+export interface OutboundPageItem extends PageItemBase {
+  readonly direction: 'out';
+  readonly to: InboxSender;
+  readonly delivery: 'queued' | 'sent' | 'not_delivered';
+}
+
+export type PageItem = InboundPageItem | OutboundPageItem;
+
+/** One `agentlink_inbox` page query (06 §2.2 "Order and paging", "Read state"). */
+export interface InboxPageQuery {
+  /** Only this contact's items (the thread view). */
+  readonly contactId?: string;
+  /** Only items with `createdAt` at or after this, unix seconds. */
+  readonly since?: number;
+  /** Only items strictly older than this envelope, by (`createdAt`, envelopeId bytes). */
+  readonly before?: string;
+  /** 1 to 100. */
+  readonly limit: number;
+  /** False: unread inbound items only. */
+  readonly includeRead: boolean;
+  /** False: no outbound items. */
+  readonly includeSent: boolean;
+  /**
+   * The bytes an item takes in the text result. The core takes the newest matching items first and
+   * stops before the item that would take the sum above `maxBytes`, keeping at least one.
+   */
+  readonly sizeOf: (item: PageItem) => number;
+  readonly maxBytes: number;
+}
+
+export type InboxPage =
+  | {
+      readonly status: 'ok';
+      /** Oldest first. Inbound items here are marked read in the transaction that built the page. */
+      readonly items: readonly PageItem[];
+      /** The requests queue, a count only (06 §2.1). */
+      readonly requests: number;
+    }
+  /** `before` names no item this query can see: nothing was read or marked. */
+  | { readonly status: 'before_not_found' };
+
 /**
  * The invite and pairing calls of `agentlink_create_invite` and `agentlink_accept_invite` (M1-9o).
  * Nothing here sets `allowed`: `start` is called only after the handler has the policy `allow` or a
@@ -68,7 +165,7 @@ export interface InviteTools {
   publish(): Promise<boolean>;
 }
 
-/** The read surface the M1-9c handlers use. */
+/** The core surface the handlers use. */
 export interface ToolClient {
   /** The agent's identity, or undefined when it has none yet (needs `agentlink init`). */
   self(): Promise<SelfView | undefined>;
@@ -91,6 +188,15 @@ export interface ToolClient {
    * until then `agentlink_get_approval` answers with the fixed "not available yet" error.
    */
   approvalState?(approvalId: string): Promise<StoredApprovalState | undefined>;
+  /** Core `sendMessage` (M1-7k): policy, envelope, outbox, first publish; idempotent (07 §3.3). */
+  send(input: SendMessageInput): Promise<SendMessageResult>;
+  /** Core `syncInbox` (M1-7h): fetches, stores and processes envelopes within the budget (06 §6). */
+  syncInbox(budgetMs: number): Promise<void>;
+  /**
+   * One inbox page with its read marks (06 §2.2). Absent until the core page read lands (proposed card M1-7h-c);
+   * until then `agentlink_inbox` answers with the fixed "not available yet" error and syncs nothing.
+   */
+  inboxPage?(query: InboxPageQuery): Promise<InboxPage>;
   /** Invites and pairing (M1-9o). Absent in a double that does not need them: the tools then answer "not available". */
   readonly invites?: InviteTools;
 }
@@ -155,6 +261,10 @@ export function coreToolClient(client: AgentLinkClient): ToolClient {
       return { inbox, requests };
     },
     contacts: () => client.contacts.list(),
+    send: (input) => client.sendMessage(input),
+    async syncInbox(budgetMs) {
+      await client.syncInbox({ budgetMs });
+    },
     invites: coreInviteTools(client),
     async storageMode() {
       const effective = await client.ownerActions.loadPolicy();
