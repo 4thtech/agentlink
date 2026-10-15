@@ -2506,6 +2506,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:** `agentlink_send` (text and typed `note`, `request` and `delivery`; `type: offer | accept | reject` fails schema validation; a `body` with `terms` → `USE_TERMS_TOOLS`; `clientRequestId`; `path` and `notarize` are absent until M1-9d); `agentlink_inbox` (3 s sync budget; processes stored envelopes, marks them read; thread view with `contact`, `includeRead`, `includeSent` and `before`; `InboundMessage` per M1-9j; every inbound item wrapped; automatic DELIVERED once proofs land, M1-9d).
 - **Acceptance:** per-status tests; a canary URL and key in an inbound message appear only inside the wrapper and never in a summary, `nextStep` or error (IR-D48-1 F15f); an idempotent repeat sends nothing (relay spy); `idempotentHint: false` on `agentlink_inbox`.
 
+#### M1-9p-b · MCP inbox on in production; unread counts match the page (new, after M1-9p and M1-7h-c)
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (changes packages/core) · **Phase:** M1a
+- **Repo/path:** agentlink · apps/cli (`src/tools/{context,inbox}.ts`, `src/runtime/open-agent.ts`, `test/send-inbox-mcp.test.ts`), packages/core (`src/inbox.ts`), docs/foundation/06 §2.2
+- **Depends on:** M1-9p (#127), M1-7h-c (#130)
+- **Spec:** 06 §2.0, §2.1 (`agentlink_status`), §2.2 ("Order and paging", "Read state"), §4; IR-M1-7h-c-1
+- **Invariants:** I-5, I-7
+- **Scope:** `coreToolClient` wires `inboxPage` to core `client.inbox.page`, so production `agentlink_inbox` pages and marks read; the "not available yet" path for the inbox is removed and `inboxPage` is required on the port. The runtime passes the configured drop origins to the client (none configured yet: an empty list, so received file URLs show as `own`). Core unread counts count only the types an inbox page returns (`PAGE_TYPES`): `proof` and the protocol types are no longer counted, so a contact cannot create an unread count that never clears (IR-M1-7h-c-1, Medium). 06 §2.2 gains one proposed sentence: `before` names an item in scope regardless of read state and `since`.
+- **Acceptance:** tests first (RED commit): a processed `proof` or protocol-type row from a contact is not counted unread, and the count clears after the default page; end to end over the MCP protocol client between two real agents, A sends, B's `agentlink_inbox` returns the message inside the untrusted block, marks it read, and a second call does not return it as unread; `agentlink_status` counts it until then and not after.
+
 #### M1-9q · MCP tools: propose and respond to terms (new, split from M1-9c)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`src/tools/{propose-terms,respond-to-terms}.ts` and their two registry entries)
