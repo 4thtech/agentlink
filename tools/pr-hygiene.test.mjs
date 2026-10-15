@@ -159,7 +159,7 @@ describe('pr-hygiene: the existing rules still hold', () => {
   it('keeps the template headings the script requires', () => {
     for (const name of Object.keys(FILLED)) {
       if (name === 'Checklist') continue;
-      expect(template, name).toMatch(new RegExp(`^## ${name.replace(/[/&]/g, '\\$&')}$`, 'm'));
+      expect(template.split('\n'), name).toContain(`## ${name}`);
     }
   });
 });
