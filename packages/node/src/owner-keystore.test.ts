@@ -5,6 +5,8 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { isatty } from 'node:tty';
 import {
+  AGENT_CARD_DOMAIN,
+  AGENT_CARD_TYPES,
   CryptoInputError,
   KeyStoreError,
   TAGS,
@@ -185,6 +187,30 @@ const TYPED: TypedData = {
   domain: { name: 'AgentLink test' },
   message: { text: 'hello' },
 };
+
+/** An agent card for `owner` as EIP-712 typed data (04 §2.4). */
+function agentCardTyped(owner: OwnerPublicKeys): TypedData {
+  const hex = (bytes: Uint8Array): string => `0x${encodeHex(bytes)}`;
+  return {
+    types: AGENT_CARD_TYPES,
+    primaryType: 'AgentCard',
+    domain: AGENT_CARD_DOMAIN,
+    message: {
+      version: 1,
+      agentEvm: AGENT,
+      agentNostr: hex(new Uint8Array(32).fill(1)),
+      agentEnc: hex(new Uint8Array(32).fill(2)),
+      ownerEvm: hex(owner.ownerEvm),
+      ownerNostr: hex(owner.ownerNostr),
+      ownerEnc: hex(owner.ownerEnc),
+      nameHash: hex(new Uint8Array(32).fill(3)),
+      relaysHash: hex(new Uint8Array(32).fill(4)),
+      issuedAt: 1_760_000_000,
+      expiresAt: 0,
+      keyEpoch: 0,
+    },
+  };
+}
 
 const zeroed = (bytes: Uint8Array): boolean => bytes.every((b) => b === 0);
 /** Lets queued prompt reads attach their listener, as keystrokes arrive later than the prompt. */
@@ -458,11 +484,23 @@ describe('owner init on a keychain machine (04 §2.2, D-67)', () => {
   });
 
   it('the public initOwner needs an interactive terminal (no TTY here)', async () => {
-    expect(await codeOf(() => initOwner({ backend: 'keychain', env: { CLAUDECODE: '1' } }))).toBe(
-      'harness_detected',
-    );
+    // M1-8h: the public entry always issues the first card; these refusals come before it is used.
+    const firstCard = {
+      agent: AGENT,
+      name: 'Agent',
+      relays: ['wss://one.relay-alpha.net', 'wss://nos.lol'],
+      identity: {
+        get: () => Promise.resolve(undefined),
+        init: () => Promise.reject(new Error('not reached')),
+      },
+    };
+    expect(
+      await codeOf(() =>
+        initOwner({ backend: 'keychain', env: { CLAUDECODE: '1' }, firstCard }),
+      ),
+    ).toBe('harness_detected');
     if (!isatty(0) || !isatty(1)) {
-      expect(await codeOf(() => initOwner({ backend: 'keychain', env: CLEAN_ENV }))).toBe(
+      expect(await codeOf(() => initOwner({ backend: 'keychain', env: CLEAN_ENV, firstCard }))).toBe(
         'owner_prompt_unavailable',
       );
     }
@@ -498,18 +536,20 @@ describe('one owner operation (04 §2.5, D-68)', () => {
     );
   });
 
-  it('signs typed data with the owner EVM key', async () => {
+  it('signs typed data with the owner EVM key (the agent card, the one allowlisted type)', async () => {
     const { owner, code, store } = await ready();
     const run = scripted([code]);
+    // M1-8h: only the agent card is signed as typed data (owner-allowlist.test.ts refuses the rest).
+    const cardTyped = agentCardTyped(owner);
     const out = await runOwnerOperation(
       store,
       run.terminal,
       { lines: ['Sign your agent profile'] },
-      { kind: 'typed-data', typedData: TYPED },
+      { kind: 'typed-data', typedData: cardTyped },
     );
     if (out.kind !== 'typed-data') throw new Error('expected typed data');
     const recovered = recoverEvmAddress(
-      hashTypedData(TYPED).digest,
+      hashTypedData(cardTyped).digest,
       decodeHex(out.signature.slice(2)),
     );
     expect(equalBytes(recovered, owner.ownerEvm)).toBe(true);

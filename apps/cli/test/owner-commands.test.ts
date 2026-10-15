@@ -31,7 +31,7 @@ import { createLogger } from '@agentlink/log';
 import {
   NodeKeyStoreError,
   type ApprovalContext,
-  type OwnerInitOptions,
+  type OwnerSetupOptions,
   type ReviewedApproval,
 } from '@agentlink/node';
 import { describe, expect, it } from 'vitest';
@@ -111,7 +111,7 @@ interface World {
   readonly codeEntries: { op: string; reviewed?: readonly ReviewedApproval[] }[];
   readonly answers: string[];
   readonly asked: string[];
-  readonly inits: OwnerInitOptions[];
+  readonly inits: OwnerSetupOptions[];
   onAsk?: (question: string) => Promise<void>;
   request(
     args?: JsonObject,
@@ -135,7 +135,7 @@ async function world(): Promise<World> {
     codeEntries: [] as World['codeEntries'],
     answers: [] as string[],
     asked: [] as string[],
-    inits: [] as OwnerInitOptions[],
+    inits: [] as OwnerSetupOptions[],
   } as unknown as World;
   const client = await AgentLinkClient.create({
     keyStore: new MemoryKeyStore(new Uint8Array(32).fill(1)),
@@ -223,6 +223,7 @@ async function world(): Promise<World> {
       return w.answers.shift() ?? '';
     },
     now: () => w.t,
+    cardRelays: () => ['wss://relay.agentlink.dev', 'wss://nos.lol'],
   };
 
   const dispatch = createDispatcher(ownerCommandHandlers(deps));
@@ -367,7 +368,21 @@ describe('an agent without a terminal can never approve (04 §2.5, 06 §8; UX gu
     const b = await deps
       .signOwnerAction(owner, { kind: 'owner-action', action: { v: 1 }, summary: 'Cancel' })
       .catch(codeOf);
-    const c = await deps.initOwner({ backend: 'keychain', env: {} }).catch(codeOf);
+    const c = await deps
+      .initOwner({
+        backend: 'keychain',
+        env: {},
+        firstCard: {
+          agent: evm(),
+          name: 'Agent',
+          relays: ['wss://relay.agentlink.dev', 'wss://nos.lol'],
+          identity: {
+            get: () => Promise.resolve(undefined),
+            init: () => Promise.reject(new Error('not reached')),
+          },
+        },
+      })
+      .catch(codeOf);
     expect(refused).toContain(a);
     expect(refused).toContain(b);
     expect(refused).toContain(c);
