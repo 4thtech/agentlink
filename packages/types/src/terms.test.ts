@@ -1,5 +1,6 @@
-// M1-21 (D-32, D-55): the `terms` schema, its canonical form, `TermsInput` and the pure negotiation
-// chain rules (04 §3.4, 06 §2.2a). Hashing is in @agentlink/crypto (`termsHash`); nothing here hashes.
+// M1-21 (D-32, D-55, D-74): the `terms` schema, its canonical form, `TermsInput` and the body
+// shapes (04 §3.4, 06 §2.2a). Hashing is in @agentlink/crypto (`termsHash`); nothing here hashes.
+// The negotiation chain is in terms-chain.test.ts.
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -7,16 +8,17 @@ import {
   TERMS_DEFAULT_VALIDITY_SECONDS,
   TERMS_LIMITS,
   TERMS_TOKEN_SYMBOLS,
+  UNSUPPORTED_RUNTIME,
+  acceptBodySchema,
   approvalActionSchema,
-  checkSendAccept,
-  evaluateIncomingAnswer,
-  evaluateIncomingOffer,
+  approvalRequestBodySchema,
   isCanonicalTermsText,
-  negotiationKey,
-  newestOpenOffer,
-  nextTermsLink,
+  isTermsRuntimeSupported,
+  offerBodySchema,
+  parseTermsInput,
   payloadSchema,
-  sameTermsHash,
+  refusedCategory15,
+  rejectBodySchema,
   termsAmountSchema,
   termsCurrencySchema,
   termsDueSchema,
@@ -24,14 +26,15 @@ import {
   termsInputJsonSchema,
   termsInputSchema,
   termsSchema,
-  type StoredTermsOffer,
 } from './index.js';
 import { expectAccept, expectReject, expectRoundTrip } from './testing/assert.js';
 import {
   AGENT_EVM,
   CONTACT_A,
   CONTACT_B,
+  SHA,
   approvalActions,
+  approvalRequestFor,
   b64u,
   firstTerms,
   hex,
@@ -41,10 +44,6 @@ import {
 } from './testing/fixtures.js';
 
 const H1 = hex(32, 'a1');
-const H2 = hex(32, 'b2');
-const H3 = hex(32, 'c3');
-const H4 = hex(32, 'd4');
-const ENV = (n: number) => b64u(16, String.fromCharCode(0x41 + n));
 
 type Obj = Record<string, unknown>;
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -66,13 +65,11 @@ const withDeadline = (over: Obj): Obj => {
 
 // --- terms: shape ---------------------------------------------------------------------------------
 
-describe('terms schema (04 §3.4, D-32)', () => {
+describe('terms schema (04 §3.4, D-32, D-74)', () => {
   it('round-trips canonical terms unchanged', () => {
     expectRoundTrip(termsSchema, terms());
     expectRoundTrip(termsSchema, firstTerms());
-    const noPrice = terms();
-    delete noPrice.price;
-    expectRoundTrip(termsSchema, noPrice);
+    expectRoundTrip(termsSchema, terms({ price: null }));
     expectRoundTrip(termsSchema, terms({ deadlines: [] }));
     expectRoundTrip(termsSchema, withDeliverable({ plaintextSha256: H1 }));
   });
@@ -85,13 +82,14 @@ describe('terms schema (04 §3.4, D-32)', () => {
     expectReject(termsSchema, withDeadline({ extra: 1 }));
   });
 
-  it('requires every field except price', () => {
+  it('D-74 key presence: every key is always present; null only in the four nullable places', () => {
     for (const key of [
       'termsId',
       'version',
       'parties',
       'subject',
       'deliverables',
+      'price',
       'deadlines',
       'validUntil',
       'previousTermsHash',
@@ -110,8 +108,10 @@ describe('terms schema (04 §3.4, D-32)', () => {
       delete (t.price as Obj)[key];
       expectReject(termsSchema, t);
     }
-    // One spelling: an absent price is absent, never null.
-    expectReject(termsSchema, terms({ price: null }));
+    expectReject(termsSchema, terms({ deadlines: null }));
+    expectReject(termsSchema, terms({ subject: null }));
+    expectReject(termsSchema, withDeliverable({ id: null }));
+    expectReject(termsSchema, withPrice({ currency: null }));
   });
 
   it('rejects non-objects without throwing', () => {
@@ -127,7 +127,7 @@ describe('terms schema (04 §3.4, D-32)', () => {
     expectReject(termsSchema, terms({ termsId: 'TTTTTTTTTTTTTTTTTTTTTB' })); // non-zero tail bits
   });
 
-  it('version is a positive JSON integer; version 1 has no previous hash, later ones have one', () => {
+  it('D-74 version and pointer: version 1 exactly when previousTermsHash is null, at parse', () => {
     for (const version of [0, -1, 1.5, '1', 2 ** 53]) {
       expectReject(termsSchema, terms({ version }));
     }
@@ -136,10 +136,10 @@ describe('terms schema (04 §3.4, D-32)', () => {
     expectReject(termsSchema, terms({ version: 2, previousTermsHash: null }));
   });
 
-  it('validUntil is a JSON integer in [0, 2^53 - 1] (unix seconds; expiry is checked at use)', () => {
-    // 04 §3.4 "validUntil is an integer"; 0 is in range (vector terms-accept-valid-until-zero).
-    expectAccept(termsSchema, terms({ validUntil: 0 }));
-    for (const validUntil of [-1, 1.5, 2 ** 53, '1760600000', '2025-10-16T07:33:20Z', null]) {
+  it('D-74 validUntil is an integer from 1 to 2^53 - 1', () => {
+    expectAccept(termsSchema, terms({ validUntil: 1 }));
+    expectAccept(termsSchema, terms({ validUntil: Number.MAX_SAFE_INTEGER }));
+    for (const validUntil of [0, -1, 1.5, 2 ** 53, '1760600000', '2025-10-16T07:33:20Z', null]) {
       expectReject(termsSchema, terms({ validUntil }));
     }
   });
@@ -157,20 +157,15 @@ describe('terms schema (04 §3.4, D-32)', () => {
     }
   });
 
-  it('parties are two distinct canonical agent IDs (0x + 40 lower-case hex)', () => {
+  it('D-74 parties: two distinct canonical agent IDs in ascending byte order', () => {
     expectReject(termsSchema, terms({ parties: [AGENT_EVM] }));
     expectReject(termsSchema, terms({ parties: [AGENT_EVM, CONTACT_A, CONTACT_B] }));
     expectReject(termsSchema, terms({ parties: [AGENT_EVM, AGENT_EVM] }));
     expectReject(termsSchema, terms({ parties: [AGENT_EVM, CONTACT_A.toUpperCase()] }));
     expectReject(termsSchema, terms({ parties: [AGENT_EVM, `0x${'3D'.repeat(20)}`] }));
     expectReject(termsSchema, terms({ parties: [AGENT_EVM, CONTACT_A.slice(2)] }));
-    // Either order is a valid spelling; it is hashed as written.
-    expectAccept(
-      termsSchema,
-      terms({
-        parties: [CONTACT_A, AGENT_EVM],
-      }),
-    );
+    // AGENT_EVM (0x1a…) < CONTACT_A (0x3d…): only the ascending order is a valid spelling.
+    expectReject(termsSchema, terms({ parties: [CONTACT_A, AGENT_EVM] }));
   });
 
   it('payer and every deliverable `by` are one of the parties (04 §3.4)', () => {
@@ -180,7 +175,7 @@ describe('terms schema (04 §3.4, D-32)', () => {
     expectAccept(termsSchema, withDeliverable({ by: AGENT_EVM }));
   });
 
-  it('deliverable ids are unique, deadlines name a deliverable, once each', () => {
+  it('D-74 deliverable ids are unique; deadline refs name a deliverable and are unique', () => {
     const two = terms({
       deliverables: [
         { id: 'd1', description: 'one', by: CONTACT_A, plaintextSha256: null },
@@ -204,7 +199,7 @@ describe('terms schema (04 §3.4, D-32)', () => {
 
 // --- terms: canonical form ------------------------------------------------------------------------
 
-describe('canonical text (04 §3.4, IR-D55-1 F07): refused, never rewritten', () => {
+describe('D-74 characters: UCD 15.0.0 Cc, Cf, Zl, Zp, Co, Cs, Cn refused, and NFC', () => {
   const BAD = [
     ['RLO', 'Spec ‮v2'],
     ['LRM', 'Spec‎ v2'],
@@ -220,9 +215,17 @@ describe('canonical text (04 §3.4, IR-D55-1 F07): refused, never rewritten', ()
     ['DEL', 'Spec\u007F'],
     ['NEL (C1)', 'Spec\u0085v2'],
     ['CSI (C1)', 'Spec\u009B'],
+    ['LINE SEPARATOR (Zl)', 'Spec v2'],
+    ['PARAGRAPH SEPARATOR (Zp)', 'Spec v2'],
     ['private use', 'Spec '],
     ['supplementary private use', 'Spec \u{F0000}'],
     ['lone surrogate', 'Spec \uD800'],
+    ['unassigned (U+0378)', 'Spec ͸'],
+    ['noncharacter U+FDD0', 'Spec ﷐'],
+    ['noncharacter U+FFFF', 'Spec ￿'],
+    ['noncharacter U+10FFFF', 'Spec \u{10FFFF}'],
+    ['assigned only in 15.1 (U+2FFC)', 'Spec ⿼'],
+    ['assigned only in 16.0 (U+1CC00)', 'Spec \u{1CC00}'],
     ['NFD (e + combining acute)', 'Café'],
     ['not NFC (Angstrom sign)', 'Å'],
   ] as const;
@@ -231,8 +234,8 @@ describe('canonical text (04 §3.4, IR-D55-1 F07): refused, never rewritten', ()
     expect(isCanonicalTermsText(text)).toBe(false);
     expectReject(termsSchema, terms({ subject: text }));
     expectReject(termsSchema, withDeliverable({ description: text }));
-    expectReject(termsSchema, withDeliverable({ id: `d${text}` }));
     expectReject(termsInputSchema, termsInput({ subject: text }));
+    expectReject(offerBodySchema, { terms: firstTerms(), termsHash: SHA, note: text });
   });
 
   it('an RLO in subject and a zero-width space in a deliverable are refused (card acceptance)', () => {
@@ -240,8 +243,15 @@ describe('canonical text (04 §3.4, IR-D55-1 F07): refused, never rewritten', ()
     expectReject(termsSchema, withDeliverable({ description: 'Source​ code' }));
   });
 
-  it('accepts NFC text in any script, with emoji and punctuation', () => {
-    for (const text of ['Café', 'Спецификация v2', '仕様 第3段階', 'Deliver 🚀 — “now”', 'a']) {
+  it('accepts NFC text in any script, with emoji and punctuation, and a 15.0 addition', () => {
+    for (const text of [
+      'Café',
+      'Спецификация v2',
+      '仕様 第3段階',
+      'Deliver 🚀 — “now”',
+      'a',
+      'x\u{10EFD}́',
+    ]) {
       expect(isCanonicalTermsText(text)).toBe(true);
       expectAccept(termsSchema, terms({ subject: text }));
     }
@@ -252,7 +262,75 @@ describe('canonical text (04 §3.4, IR-D55-1 F07): refused, never rewritten', ()
   });
 });
 
-describe('price.amount (04 §3.4: ^(0|[1-9][0-9]*)(\\.[0-9]{1,6})?$, > 0)', () => {
+describe('the pinned UCD 15.0.0 table', () => {
+  it('gives the 15.0.0 category of known code points', () => {
+    const cases: [number, string | null][] = [
+      [0x41, null],
+      [0x00, 'Cc'],
+      [0x7f, 'Cc'],
+      [0x9f, 'Cc'],
+      [0xad, 'Cf'],
+      [0x200b, 'Cf'],
+      [0xfeff, 'Cf'],
+      [0x2028, 'Zl'],
+      [0x2029, 'Zp'],
+      [0xe000, 'Co'],
+      [0x10fffd, 'Co'],
+      [0xd800, 'Cs'],
+      [0xdfff, 'Cs'],
+      [0x0378, 'Cn'],
+      [0xfdd0, 'Cn'],
+      [0xffff, 'Cn'],
+      [0x10ffff, 'Cn'],
+      [0x2ffc, 'Cn'], // assigned in 15.1
+      [0x31ef, 'Cn'], // assigned in 15.1
+      [0x1cc00, 'Cn'], // assigned in 16.0
+      [0x10efd, null], // assigned in 15.0 (Mn)
+      [0x1f600, null],
+      [0x20, null],
+    ];
+    for (const [cp, category] of cases)
+      expect(refusedCategory15(cp), cp.toString(16)).toBe(category);
+    expect(refusedCategory15(-1)).toBe(null);
+    expect(refusedCategory15(0x110000)).toBe(null);
+  });
+
+  it('agrees with this runtime wherever Unicode stability guarantees it', () => {
+    // Cc, Co and Cs never change; a code point unassigned in this runtime (Unicode >= 15) was
+    // unassigned in 15.0.0 too. So each must be refused by the 15.0.0 table with the same category.
+    const runtime = /\p{Cc}|\p{Co}|\p{Cs}|\p{Cn}/u;
+    for (let cp = 0; cp <= 0x10ffff; cp++) {
+      const ch = String.fromCodePoint(cp);
+      if (!runtime.test(ch)) continue;
+      const expected = /\p{Cn}/u.test(ch)
+        ? 'Cn'
+        : /\p{Cc}/u.test(ch)
+          ? 'Cc'
+          : /\p{Co}/u.test(ch)
+            ? 'Co'
+            : 'Cs';
+      if (refusedCategory15(cp) !== expected) {
+        expect(refusedCategory15(cp), `U+${cp.toString(16)}`).toBe(expected);
+      }
+    }
+  });
+
+  it('the runtime implements Unicode 15.0 or later (the D-74 probe)', () => {
+    expect(isTermsRuntimeSupported()).toBe(true);
+    expect('x́\u{10EFD}'.normalize('NFC')).toBe('x\u{10EFD}́');
+    expect(UNSUPPORTED_RUNTIME).toBe('UNSUPPORTED_RUNTIME');
+  });
+
+  it('approval-request.summary uses the same table for Cc, Cf, Zl and Zp', () => {
+    const ok = approvalRequestFor(approvalActions().agentlink_send);
+    expectAccept(approvalRequestBodySchema, ok);
+    for (const bad of ['a b', 'a­b', 'a\u0085b', 'a‍b']) {
+      expectReject(approvalRequestBodySchema, { ...ok, summary: bad });
+    }
+  });
+});
+
+describe('D-74 price.amount: ^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,6})?$, > 0', () => {
   it.each([
     '1500.00',
     '1500',
@@ -261,7 +339,8 @@ describe('price.amount (04 §3.4: ^(0|[1-9][0-9]*)(\\.[0-9]{1,6})?$, > 0)', () =
     '0.5',
     '10',
     '1.000000',
-    '123456789012345678901234',
+    '999999999999999999.999999',
+    '100000000000000000',
   ])('accepts %s', (amount) => {
     expectAccept(termsAmountSchema, amount);
     expectAccept(termsSchema, withPrice({ amount }));
@@ -283,7 +362,8 @@ describe('price.amount (04 §3.4: ^(0|[1-9][0-9]*)(\\.[0-9]{1,6})?$, > 0)', () =
     '1,5',
     '١٢', // Arabic-Indic digits
     '',
-    '1'.repeat(TERMS_LIMITS.amountLength + 1),
+    '1'.repeat(19),
+    '1234567890123456789012345678901234567890.5',
   ])('rejects %j', (amount) => {
     expectReject(termsAmountSchema, amount);
     expectReject(termsSchema, withPrice({ amount }));
@@ -293,8 +373,11 @@ describe('price.amount (04 §3.4: ^(0|[1-9][0-9]*)(\\.[0-9]{1,6})?$, > 0)', () =
   });
 });
 
-describe('price.currency (04 §3.4: ISO 4217 shape or an allowlisted token symbol)', () => {
-  it.each(['EUR', 'USD', 'JPY', ...TERMS_TOKEN_SYMBOLS])('accepts %s', (currency) => {
+describe('D-74 price.currency: the grammar ^[A-Z]{3}$ or exactly USDC, USDT or XDAI', () => {
+  it('lists exactly the D-46 fee tokens', () => {
+    expect([...TERMS_TOKEN_SYMBOLS]).toEqual(['USDC', 'USDT', 'XDAI']);
+  });
+  it.each(['EUR', 'USD', 'JPY', 'ABC', 'DAI', 'USDC', 'USDT', 'XDAI'])('accepts %s', (currency) => {
     expectAccept(termsCurrencySchema, currency);
     expectAccept(termsSchema, withPrice({ currency }));
   });
@@ -308,6 +391,8 @@ describe('price.currency (04 §3.4: ISO 4217 shape or an allowlisted token symbo
     'EUR ',
     'usdc',
     'USDc',
+    'xDAI',
+    'WETH',
     'ＥＵＲ', // fullwidth
     '',
   ])('rejects %j', (currency) => {
@@ -316,7 +401,7 @@ describe('price.currency (04 §3.4: ISO 4217 shape or an allowlisted token symbo
   });
 });
 
-describe('deadlines[].due (04 §3.4: YYYY-MM-DDTHH:MM:SSZ)', () => {
+describe('deadlines[].due (04 §3.4, D-74: real dates, no leap second)', () => {
   it.each(['2026-11-30T17:00:00Z', '2028-02-29T00:00:00Z', '2026-12-31T23:59:59Z'])(
     'accepts %s',
     (due) => {
@@ -336,7 +421,7 @@ describe('deadlines[].due (04 §3.4: YYYY-MM-DDTHH:MM:SSZ)', () => {
     '2026-02-30T17:00:00Z',
     '2027-02-29T17:00:00Z',
     '2026-11-30T24:00:00Z',
-    '2026-12-31T23:59:60Z',
+    '2016-12-31T23:59:60Z',
     '2026-13-01T00:00:00Z',
     '２０２６-11-30T17:00:00Z',
   ])('rejects %j', (due) => {
@@ -350,7 +435,7 @@ describe('deadlines[].due (04 §3.4: YYYY-MM-DDTHH:MM:SSZ)', () => {
 
 // --- terms: size limits ---------------------------------------------------------------------------
 
-describe('size limits (inbound terms are untrusted, I-5)', () => {
+describe('D-74 size limits (code points; no empty strings)', () => {
   const deliverable = (i: number, description = 'x') => ({
     id: `d${i + 1}`,
     description,
@@ -358,60 +443,94 @@ describe('size limits (inbound terms are untrusted, I-5)', () => {
     plaintextSha256: null,
   });
 
+  it('has the D-74 values', () => {
+    expect(TERMS_LIMITS).toEqual({
+      subjectCodePoints: 200,
+      deliverables: 10,
+      deliverableIdLength: 16,
+      descriptionCodePoints: 160,
+      deadlines: 10,
+      amountIntegerDigits: 18,
+      amountFractionDigits: 6,
+      noteCodePoints: 500,
+    });
+  });
+
   it('bounds the subject', () => {
-    expectAccept(termsSchema, terms({ subject: 'a'.repeat(TERMS_LIMITS.subjectCodePoints) }));
-    expectAccept(termsSchema, terms({ subject: '😀'.repeat(TERMS_LIMITS.subjectCodePoints) }));
-    expectReject(termsSchema, terms({ subject: 'a'.repeat(TERMS_LIMITS.subjectCodePoints + 1) }));
+    expectAccept(termsSchema, terms({ subject: 'a'.repeat(200) }));
+    expectAccept(termsSchema, terms({ subject: '😀'.repeat(200) }));
+    expectReject(termsSchema, terms({ subject: 'a'.repeat(201) }));
     expectReject(termsSchema, terms({ subject: '' }));
   });
 
-  it('bounds deliverable ids and descriptions', () => {
-    const maxId = 'd'.repeat(TERMS_LIMITS.deliverableIdCodePoints);
-    expectAccept(
-      termsSchema,
-      terms({
-        deliverables: [{ ...deliverable(0), id: maxId }],
-        deadlines: [{ ref: maxId, due: '2026-11-30T17:00:00Z' }],
-      }),
-    );
-    expectReject(termsSchema, withDeliverable({ id: `${maxId}d` }));
-    expectReject(termsSchema, withDeliverable({ id: '' }));
-    expectAccept(
-      termsSchema,
-      withDeliverable({ description: 'a'.repeat(TERMS_LIMITS.descriptionCodePoints) }),
-    );
-    expectReject(
-      termsSchema,
-      withDeliverable({ description: 'a'.repeat(TERMS_LIMITS.descriptionCodePoints + 1) }),
-    );
+  it('deliverable ids match ^[A-Za-z0-9_-]{1,16}$', () => {
+    for (const id of ['d1', 'A', 'x_Y-9', 'a'.repeat(16)]) {
+      expectAccept(
+        termsSchema,
+        terms({ deliverables: [{ ...deliverable(0), id }], deadlines: [] }),
+      );
+    }
+    for (const id of ['', 'a'.repeat(17), 'd 1', 'd.1', 'é', 'ｄ1', 'd1​']) {
+      expectReject(
+        termsSchema,
+        terms({ deliverables: [{ ...deliverable(0), id }], deadlines: [] }),
+      );
+    }
+  });
+
+  it('bounds descriptions', () => {
+    expectAccept(termsSchema, withDeliverable({ description: '€'.repeat(160) }));
+    expectReject(termsSchema, withDeliverable({ description: 'a'.repeat(161) }));
     expectReject(termsSchema, withDeliverable({ description: '' }));
   });
 
   it('bounds the number of deliverables and deadlines', () => {
     const many = (n: number) => Array.from({ length: n }, (_, i) => deliverable(i));
-    expectAccept(termsSchema, terms({ deliverables: many(TERMS_LIMITS.deliverables) }));
-    expectReject(termsSchema, terms({ deliverables: many(TERMS_LIMITS.deliverables + 1) }));
     const deadlines = (n: number) =>
       Array.from({ length: n }, (_, i) => ({ ref: `d${i + 1}`, due: '2026-11-30T17:00:00Z' }));
-    expectAccept(
-      termsSchema,
-      terms({
-        deliverables: many(TERMS_LIMITS.deadlines),
-        deadlines: deadlines(TERMS_LIMITS.deadlines),
-      }),
-    );
+    expectAccept(termsSchema, terms({ deliverables: many(10), deadlines: deadlines(10) }));
+    expectReject(termsSchema, terms({ deliverables: many(11), deadlines: [] }));
+    expectReject(termsSchema, terms({ deliverables: many(11), deadlines: deadlines(11) }));
   });
 
-  it('bounds the whole terms object in UTF-8 bytes of its JSON form', () => {
-    // Every field within its own limit, the whole over TERMS_LIMITS.maxBytes.
-    const big = terms({
-      deliverables: Array.from({ length: TERMS_LIMITS.deliverables }, (_, i) =>
-        deliverable(i, '€'.repeat(TERMS_LIMITS.descriptionCodePoints)),
-      ),
-    });
-    expect(JSON.stringify(big).length).toBeGreaterThan(TERMS_LIMITS.maxBytes / 3);
-    expectReject(termsSchema, big);
-    expect(TERMS_LIMITS.maxBytes).toBeLessThan(24 * 1024);
+  it('bounds the note: null or 1 to 500 code points, canonical text', () => {
+    const body = (note: unknown) => ({ terms: firstTerms(), termsHash: SHA, note });
+    expectAccept(offerBodySchema, body(null));
+    expectAccept(offerBodySchema, body('😀'.repeat(500)));
+    expectReject(offerBodySchema, body('a'.repeat(501)));
+    expectReject(offerBodySchema, body(''));
+    expectReject(rejectBodySchema, body('too\nexpensive'));
+    const noNote = body(null) as Obj;
+    delete noNote.note;
+    expectReject(offerBodySchema, noNote);
+    expectReject(acceptBodySchema, body('ok'));
+  });
+
+  it('the largest terms body is at most 12 083 bytes as JSON', () => {
+    const big = '\u{10000}'; // 4 UTF-8 bytes, assigned (Lo)
+    const ids = Array.from(
+      { length: 10 },
+      (_, i) => `${'d'.repeat(14)}${String(i).padStart(2, '0')}`,
+    );
+    const t = {
+      termsId: b64u(16, 'T'),
+      version: Number.MAX_SAFE_INTEGER,
+      parties: [AGENT_EVM, CONTACT_A],
+      subject: big.repeat(200),
+      deliverables: ids.map((id) => ({
+        id,
+        description: big.repeat(160),
+        by: CONTACT_A,
+        plaintextSha256: H1,
+      })),
+      price: { amount: '999999999999999999.999999', currency: 'USDC', payer: AGENT_EVM },
+      deadlines: ids.map((ref) => ({ ref, due: '2026-11-30T17:00:00Z' })),
+      validUntil: Number.MAX_SAFE_INTEGER,
+      previousTermsHash: H1,
+    };
+    const body = { terms: t, termsHash: SHA, note: big.repeat(500) };
+    expectAccept(offerBodySchema, body);
+    expect(new TextEncoder().encode(JSON.stringify(body)).length).toBeLessThanOrEqual(12083);
   });
 });
 
@@ -445,7 +564,9 @@ describe('offer / accept / reject carry strict terms (04 §3.4)', () => {
 
 // --- TermsInput ------------------------------------------------------------------------------------
 
-describe('TermsInput (06 §2.2a, D-55)', () => {
+describe('TermsInput (06 §2.2a, D-55, D-74)', () => {
+  const NOW = 1_760_000_000;
+
   it('round-trips a valid input unchanged', () => {
     expectRoundTrip(termsInputSchema, termsInput());
     expectRoundTrip(termsInputSchema, {
@@ -482,6 +603,20 @@ describe('TermsInput (06 §2.2a, D-55)', () => {
     );
   });
 
+  it('D-74: an explicit null is refused everywhere', () => {
+    expectReject(termsInputSchema, termsInput({ price: null }));
+    expectReject(termsInputSchema, termsInput({ deadlines: null }));
+    expectReject(termsInputSchema, termsInput({ validUntil: null }));
+    expectReject(
+      termsInputSchema,
+      termsInput({ deliverables: [{ description: 'y', by: 'me', plaintextSha256: null }] }),
+    );
+    expectReject(
+      termsInputSchema,
+      termsInput({ deliverables: [{ id: null, description: 'y', by: 'me' }] }),
+    );
+  });
+
   it('`by` and `payer` are "me" or "them", never an agent ID', () => {
     expectReject(
       termsInputSchema,
@@ -507,11 +642,12 @@ describe('TermsInput (06 §2.2a, D-55)', () => {
       termsInputSchema,
       termsInput({ deadlines: [{ ref: 'd1', due: '2026-11-30T18:00:00+01:00' }] }),
     );
+    expectReject(termsInputSchema, termsInput({ subject: 'a'.repeat(201) }));
+    expectReject(termsInputSchema, termsInput({ deliverables: [] }));
     expectReject(
       termsInputSchema,
-      termsInput({ subject: 'a'.repeat(TERMS_LIMITS.subjectCodePoints + 1) }),
+      termsInput({ deliverables: [{ id: 'd 1', description: 'y', by: 'me' }], deadlines: [] }),
     );
-    expectReject(termsInputSchema, termsInput({ deliverables: [] }));
     expectReject(
       termsInputSchema,
       termsInput({
@@ -520,7 +656,30 @@ describe('TermsInput (06 §2.2a, D-55)', () => {
     );
     expectReject(termsInputSchema, termsInput({ validUntil: 1760600000 }));
     expectReject(termsInputSchema, termsInput({ validUntil: '2025-10-16T09:33:20+02:00' }));
-    expectReject(termsInputSchema, termsInput({ price: null }));
+  });
+
+  it('refuses duplicate ids and deadline refs that name no deliverable or repeat', () => {
+    const two = [
+      { id: 'd1', description: 'a', by: 'me' },
+      { id: 'd1', description: 'b', by: 'me' },
+    ];
+    expectReject(termsInputSchema, termsInput({ deliverables: two, deadlines: [] }));
+    expectReject(
+      termsInputSchema,
+      termsInput({ deadlines: [{ ref: 'd9', due: '2026-11-30T17:00:00Z' }] }),
+    );
+  });
+
+  it('D-74: parseTermsInput also requires validUntil after now', () => {
+    // termsInput().validUntil is 2025-10-16T07:33:20Z = 1760600000.
+    expect(parseTermsInput(termsInput(), NOW).success).toBe(true);
+    expect(parseTermsInput(termsInput(), 1760599999).success).toBe(true);
+    expect(parseTermsInput(termsInput(), 1760600000).success).toBe(false);
+    expect(parseTermsInput(termsInput({ termsId: b64u(16) }), NOW).success).toBe(false);
+    const noValidity = termsInput();
+    delete noValidity.validUntil;
+    expect(parseTermsInput(noValidity, NOW).success).toBe(true);
+    expect(parseTermsInput(termsInput(), -1).success).toBe(false);
   });
 
   it('has a JSON Schema for the MCP tools: strict objects, the same fields, no core-filled ones', () => {
@@ -533,7 +692,6 @@ describe('TermsInput (06 §2.2a, D-55)', () => {
     );
     expect(schema.required).toEqual(expect.arrayContaining(['subject', 'deliverables']));
     expect((schema.required as string[]).length).toBe(2);
-    // Every object at every depth is closed.
     const walk = (node: unknown) => {
       if (node === null || typeof node !== 'object') return;
       const o = node as Obj;
@@ -546,7 +704,6 @@ describe('TermsInput (06 §2.2a, D-55)', () => {
     expect(dProps.by?.enum).toEqual(['me', 'them']);
     expect((props.price?.properties as Record<string, Obj>).payer?.enum).toEqual(['me', 'them']);
     expect(JSON.stringify(schema)).not.toMatch(/termsId|previousTermsHash|parties|"version"/);
-    // It is plain JSON (it travels in the MCP tool list).
     expect(JSON.parse(JSON.stringify(schema))).toEqual(schema);
   });
 });
@@ -570,15 +727,19 @@ describe('termsFromInput: the mapping to terms with the core-filled fields', () 
 
   it('fills termsId, version, parties and previousTermsHash and maps me/them to agent IDs', () => {
     const t = ok(termsInput());
-    expect(t).toStrictEqual(
-      firstTerms({
-        validUntil: 1760600000,
-      }),
-    );
+    expect(t).toStrictEqual(firstTerms({ validUntil: 1760600000 }));
     expectRoundTrip(termsSchema, t);
     const v2 = ok(termsInput(), ctx({ version: 2, previousTermsHash: H1 }));
     expect(v2.version).toBe(2);
     expect(v2.previousTermsHash).toBe(H1);
+  });
+
+  it('D-74: parties are sorted whoever maps; me/them follow the agent, not the position', () => {
+    // CONTACT_A (0x3d…) maps with self = CONTACT_A: parties stay [AGENT_EVM, CONTACT_A].
+    const t = ok(termsInput(), ctx({ self: CONTACT_A, counterparty: AGENT_EVM }));
+    expect(t.parties).toEqual([AGENT_EVM, CONTACT_A]);
+    expect((t.deliverables as Obj[])[0]?.by).toBe(AGENT_EVM); // 'them'
+    expect((t.price as Obj).payer).toBe(CONTACT_A); // 'me'
   });
 
   it('maps `me` and `them` from this agent’s side', () => {
@@ -594,7 +755,6 @@ describe('termsFromInput: the mapping to terms with the core-filled fields', () 
     );
     expect((t.deliverables as Obj[]).map((d) => d.by)).toEqual([AGENT_EVM, CONTACT_A]);
     expect((t.price as Obj).payer).toBe(CONTACT_A);
-    expect(t.parties).toEqual([AGENT_EVM, CONTACT_A]);
   });
 
   it('defaults deliverable ids to d1, d2, … by position and keeps given ids', () => {
@@ -626,20 +786,17 @@ describe('termsFromInput: the mapping to terms with the core-filled fields', () 
     expect(r.success).toBe(false);
   });
 
-  it('omits price and fills deadlines with [] when absent', () => {
+  it('D-74: price null and deadlines [] when absent; validUntil default now + 604 800', () => {
     const t = ok({ subject: 's', deliverables: [{ description: 'd', by: 'them' }] });
-    expect('price' in t).toBe(false);
+    expect(t.price).toBe(null);
     expect(t.deadlines).toEqual([]);
     expect(t.validUntil).toBe(NOW + TERMS_DEFAULT_VALIDITY_SECONDS);
-    expect(TERMS_DEFAULT_VALIDITY_SECONDS).toBe(7 * 24 * 3600);
+    expect(TERMS_DEFAULT_VALIDITY_SECONDS).toBe(604800);
   });
 
   it('converts validUntil to unix seconds and refuses one that is not after now', () => {
     expect(ok(termsInput({ validUntil: '2025-10-09T08:53:21Z' })).validUntil).toBe(NOW + 1);
     expect(termsFromInput(termsInput({ validUntil: '2025-10-09T08:53:20Z' }), ctx()).success).toBe(
-      false,
-    );
-    expect(termsFromInput(termsInput({ validUntil: '2020-01-01T00:00:00Z' }), ctx()).success).toBe(
       false,
     );
   });
@@ -656,239 +813,6 @@ describe('termsFromInput: the mapping to terms with the core-filled fields', () 
       false,
     );
     expect(termsFromInput(termsInput(), ctx({ termsId: 'short' })).success).toBe(false);
-  });
-
-  it('refuses mapped terms over the byte limit', () => {
-    const r = termsFromInput(
-      termsInput({
-        deliverables: Array.from({ length: TERMS_LIMITS.deliverables }, () => ({
-          description: '€'.repeat(TERMS_LIMITS.descriptionCodePoints),
-          by: 'me',
-        })),
-        deadlines: [],
-      }),
-      ctx(),
-    );
-    expect(r.success).toBe(false);
-  });
-});
-
-// --- negotiation chain (04 §3.4, IR-D55-1 F04, IR-D55-2) -------------------------------------------
-
-describe('negotiation key: termsId plus the unordered pair of parties', () => {
-  it('is the same for either order and differs for another pair', () => {
-    const id = b64u(16, 'T');
-    expect(negotiationKey(id, [AGENT_EVM, CONTACT_A])).toBe(
-      negotiationKey(id, [CONTACT_A, AGENT_EVM]),
-    );
-    expect(negotiationKey(id, [AGENT_EVM, CONTACT_A])).not.toBe(
-      negotiationKey(id, [AGENT_EVM, CONTACT_B]),
-    );
-    expect(negotiationKey(id, [AGENT_EVM, CONTACT_A])).not.toBe(
-      negotiationKey(b64u(16, 'U'), [AGENT_EVM, CONTACT_A]),
-    );
-  });
-});
-
-describe('sameTermsHash compares bytes of canonical hashes only', () => {
-  it('is true only for the same canonical hash', () => {
-    expect(sameTermsHash(H1, H1)).toBe(true);
-    expect(sameTermsHash(H1, H2)).toBe(false);
-    expect(sameTermsHash(H1, H1.toUpperCase())).toBe(false);
-    expect(sameTermsHash(`0x${H1}`, `0x${H1}`)).toBe(false);
-    expect(sameTermsHash(null, null)).toBe(false);
-  });
-});
-
-const offer = (
-  n: number,
-  sender: string,
-  version: number,
-  termsHash: string,
-  state: 'open' | 'conflict' = 'open',
-): StoredTermsOffer => ({ envelopeId: ENV(n), sender, version, termsHash, state });
-
-/** Incoming offer `version` from `sender` pointing at `prev`, in envelope `n`. */
-const incoming = (
-  n: number,
-  sender: string,
-  version: number,
-  prev: string | null,
-  extra: Obj = {},
-) => ({
-  envelopeId: ENV(n),
-  sender,
-  self: sender === CONTACT_A ? AGENT_EVM : CONTACT_A,
-  terms: terms({ version, previousTermsHash: prev, ...extra }) as never,
-});
-
-describe('chain link for sending: newest + 1, pointer = newest hash', () => {
-  it('starts at version 1 with no pointer', () => {
-    expect(nextTermsLink([])).toEqual({ version: 1, previousTermsHash: null });
-  });
-  it('follows the newest open offer and skips conflicted ones', () => {
-    const offers = [offer(1, AGENT_EVM, 1, H1), offer(2, CONTACT_A, 2, H2)];
-    expect(nextTermsLink(offers)).toEqual({ version: 3, previousTermsHash: H2 });
-    const conflicted = [
-      ...offers,
-      offer(3, AGENT_EVM, 3, H3, 'conflict'),
-      offer(4, CONTACT_A, 3, H4, 'conflict'),
-    ];
-    expect(newestOpenOffer(conflicted)?.envelopeId).toBe(ENV(2));
-    expect(nextTermsLink(conflicted)).toEqual({ version: 3, previousTermsHash: H2 });
-  });
-});
-
-describe('evaluateIncomingOffer: chain checks against the receiver’s own store', () => {
-  const state = (offers: StoredTermsOffer[], lockedVersions: number[] = []) => ({
-    offers,
-    lockedVersions,
-  });
-
-  it('accepts a first offer (version 1, no pointer) and the next version on the newest hash', () => {
-    expect(evaluateIncomingOffer(incoming(1, CONTACT_A, 1, null), state([]))).toEqual({
-      result: 'accept',
-    });
-    expect(
-      evaluateIncomingOffer(
-        incoming(3, CONTACT_A, 3, H2),
-        state([offer(1, CONTACT_A, 1, H1), offer(2, AGENT_EVM, 2, H2)]),
-      ),
-    ).toEqual({ result: 'accept' });
-  });
-
-  it('refuses a version gap', () => {
-    expect(
-      evaluateIncomingOffer(incoming(3, CONTACT_A, 3, H1), state([offer(1, CONTACT_A, 1, H1)])),
-    ).toEqual({
-      result: 'refuse',
-      reason: 'version_gap',
-    });
-    expect(evaluateIncomingOffer(incoming(1, CONTACT_A, 2, H1), state([]))).toEqual({
-      result: 'refuse',
-      reason: 'version_gap',
-    });
-  });
-
-  it('refuses a pointer to an older version', () => {
-    const s = state([offer(1, CONTACT_A, 1, H1), offer(2, AGENT_EVM, 2, H2)]);
-    expect(evaluateIncomingOffer(incoming(3, CONTACT_A, 3, H1), s)).toEqual({
-      result: 'refuse',
-      reason: 'previous_mismatch',
-    });
-    // A pointer to a hash this side never saw is a mismatch too.
-    expect(evaluateIncomingOffer(incoming(3, CONTACT_A, 3, H3), s)).toEqual({
-      result: 'refuse',
-      reason: 'previous_mismatch',
-    });
-  });
-
-  it('refuses an old version re-sent as new', () => {
-    // v2 (the receiver's own) already has a v3 on top, so a contact's v2 is stale, not concurrent.
-    const s = state([
-      offer(1, CONTACT_A, 1, H1),
-      offer(2, AGENT_EVM, 2, H2),
-      offer(3, CONTACT_A, 3, H3),
-    ]);
-    expect(evaluateIncomingOffer(incoming(5, CONTACT_A, 2, H1), s)).toEqual({
-      result: 'refuse',
-      reason: 'stale_version',
-    });
-  });
-
-  it('the same termsId from another pair is another negotiation', () => {
-    // The receiver looks the state up by negotiationKey; the other pair's offers are never in it.
-    const t = terms({ parties: [AGENT_EVM, CONTACT_B] }) as {
-      termsId: string;
-      parties: [string, string];
-    };
-    expect(negotiationKey(t.termsId, t.parties)).not.toBe(
-      negotiationKey(t.termsId, [AGENT_EVM, CONTACT_A]),
-    );
-    expect(
-      evaluateIncomingOffer(
-        {
-          ...incoming(9, CONTACT_B, 1, null),
-          self: AGENT_EVM,
-          terms: firstTerms({
-            parties: [AGENT_EVM, CONTACT_B],
-            deliverables: [{ id: 'd1', description: 'x', by: CONTACT_B, plaintextSha256: null }],
-          }) as never,
-        },
-        state([]),
-      ),
-    ).toEqual({ result: 'accept' });
-  });
-
-  it('refuses terms whose parties are not exactly the sender and the receiver', () => {
-    expect(
-      evaluateIncomingOffer({ ...incoming(1, CONTACT_A, 1, null), sender: CONTACT_B }, state([])),
-    ).toEqual({ result: 'refuse', reason: 'not_a_party' });
-    expect(
-      evaluateIncomingOffer({ ...incoming(1, CONTACT_A, 1, null), self: CONTACT_B }, state([])),
-    ).toEqual({ result: 'refuse', reason: 'not_a_party' });
-  });
-
-  it('no fork 1: a second envelope for one version from the same sender is refused', () => {
-    const s = state([offer(1, CONTACT_A, 1, H1), offer(2, CONTACT_A, 2, H2)]);
-    expect(evaluateIncomingOffer(incoming(3, CONTACT_A, 2, H1), s)).toEqual({
-      result: 'refuse',
-      reason: 'same_sender',
-    });
-    // The same envelope seen again is a duplicate, not a fork.
-    expect(evaluateIncomingOffer(incoming(2, CONTACT_A, 2, H1), s)).toEqual({
-      result: 'duplicate',
-    });
-  });
-
-  it('no fork 2: a version is locked once an accept for it was sent or received', () => {
-    const s = state([offer(1, CONTACT_A, 1, H1), offer(2, AGENT_EVM, 2, H2)], [2]);
-    expect(evaluateIncomingOffer(incoming(3, CONTACT_A, 2, H1), s)).toEqual({
-      result: 'refuse',
-      reason: 'locked',
-    });
-  });
-
-  it('no fork 3: concurrent counters from both sides are a conflict, with no tie-break', () => {
-    // Both hold v1 (H1); this side already sent its own v2 (H2); the contact's v2 arrives.
-    const mine = state([offer(1, CONTACT_A, 1, H1), offer(2, AGENT_EVM, 2, H2)]);
-    expect(evaluateIncomingOffer(incoming(3, CONTACT_A, 2, H1), mine)).toEqual({
-      result: 'conflict',
-      with: ENV(2),
-    });
-    // The other side sees the mirror image and reaches the same result.
-    const theirs = state([offer(1, CONTACT_A, 1, H1), offer(3, CONTACT_A, 2, H3)]);
-    expect(evaluateIncomingOffer(incoming(2, AGENT_EVM, 2, H1), theirs)).toEqual({
-      result: 'conflict',
-      with: ENV(3),
-    });
-    // After the conflict the previous version stays the newest, and either side may send v2 again.
-    const after = state([
-      offer(1, CONTACT_A, 1, H1),
-      offer(2, AGENT_EVM, 2, H2, 'conflict'),
-      offer(3, CONTACT_A, 2, H3, 'conflict'),
-    ]);
-    expect(nextTermsLink(after.offers)).toEqual({ version: 2, previousTermsHash: H1 });
-    expect(evaluateIncomingOffer(incoming(4, CONTACT_A, 2, H1), after)).toEqual({
-      result: 'accept',
-    });
-  });
-
-  it('a concurrent counter that does not link to the shared base is refused, not a conflict', () => {
-    const mine = state([offer(1, CONTACT_A, 1, H1), offer(2, AGENT_EVM, 2, H2)]);
-    expect(evaluateIncomingOffer(incoming(3, CONTACT_A, 2, H4), mine)).toEqual({
-      result: 'refuse',
-      reason: 'previous_mismatch',
-    });
-  });
-
-  it('never throws on hostile input', () => {
-    fc.assert(
-      fc.property(fc.anything(), fc.anything(), (a, b) => {
-        expect(() => evaluateIncomingOffer(a as never, b as never)).not.toThrow();
-      }),
-      { numRuns: 200, seed: 0x7e21 },
-    );
   });
 });
 
@@ -938,11 +862,12 @@ describe('fuzzing: only validation errors (card acceptance)', () => {
     );
   });
 
-  it('termsFromInput never throws', () => {
+  it('termsFromInput and parseTermsInput never throw', () => {
     fc.assert(
       fc.property(anyInput, fc.nat(), (r, pick) => {
+        const input = mutate(termsInput(), r, pick);
         expect(() =>
-          termsFromInput(mutate(termsInput(), r, pick), {
+          termsFromInput(input, {
             termsId: b64u(16, 'T'),
             version: 1,
             previousTermsHash: null,
@@ -951,17 +876,18 @@ describe('fuzzing: only validation errors (card acceptance)', () => {
             now: 1_760_000_000,
           }),
         ).not.toThrow();
+        expect(() => parseTermsInput(input, 1_760_000_000)).not.toThrow();
       }),
       RUNS,
     );
   });
 
-  it('text fuzz: canonical text never contains a forbidden code point and is NFC', () => {
+  it('text fuzz: canonical text has no refused 15.0.0 code point and is NFC', () => {
     fc.assert(
       fc.property(fc.string({ unit: 'binary' }), (s) => {
         if (isCanonicalTermsText(s)) {
           expect(s.normalize('NFC')).toBe(s);
-          expect(/[\p{Cc}\p{Cf}\p{Co}\p{Cs}]/u.test(s)).toBe(false);
+          for (const ch of s) expect(refusedCategory15(ch.codePointAt(0) as number)).toBe(null);
         }
       }),
       { numRuns: 1000, seed: 0x7e22 },
@@ -996,9 +922,9 @@ describe('commitment approval actions use the strict terms and TermsInput (M1-21
         bad({
           parties: [AGENT_EVM, CONTACT_B],
           deliverables: [{ id: 'd1', description: 'x', by: CONTACT_B, plaintextSha256: null }],
+          price: null,
         }),
       );
-      // The scope never outlives the terms (04 §3.4.2: expiry no later than validUntil).
       expectReject(approvalActionSchema, bad({ validUntil: 1760599999 }));
       const loose = action(tool);
       loose.context.terms = { termsId: b64u(16, 'T'), version: 3 };
@@ -1022,96 +948,5 @@ describe('commitment approval actions use the strict terms and TermsInput (M1-21
     expectAccept(approvalActionSchema, a);
     a.args.terms = termsInput({ version: 4 });
     expectReject(approvalActionSchema, a);
-  });
-});
-
-// --- answers and sending an accept (04 §3.4, 06 §2.2a) --------------------------------------------
-
-describe('evaluateIncomingAnswer: an accept or reject binds the offer it answers', () => {
-  // This agent is AGENT_EVM; its own v2 (H2) answers the contact's v1 (H1).
-  const offers = [offer(1, CONTACT_A, 1, H1), offer(2, AGENT_EVM, 2, H2)];
-  const answer = (over: Obj = {}) =>
-    ({
-      envelopeId: ENV(9),
-      type: 'accept',
-      sender: CONTACT_A,
-      self: AGENT_EVM,
-      replyTo: ENV(2),
-      terms: terms({ version: 2, previousTermsHash: H1 }),
-      termsHash: H2,
-      ...over,
-    }) as never;
-  const st = (lockedVersions: number[] = []) => ({ offers, lockedVersions });
-
-  it('accepts an answer to this side’s open offer with its termsHash', () => {
-    expect(evaluateIncomingAnswer(answer(), st())).toEqual({ result: 'accept' });
-    expect(evaluateIncomingAnswer(answer({ type: 'reject' }), st([2]))).toEqual({
-      result: 'accept',
-    });
-  });
-
-  it('refuses a hash that is not the answered offer’s', () => {
-    expect(evaluateIncomingAnswer(answer({ termsHash: H3 }), st())).toEqual({
-      result: 'refuse',
-      reason: 'hash_mismatch',
-    });
-  });
-
-  it('refuses an answer to the sender’s own offer, an unknown offer and a locked version', () => {
-    expect(evaluateIncomingAnswer(answer({ replyTo: ENV(1) }), st())).toEqual({
-      result: 'refuse',
-      reason: 'not_own_offer',
-    });
-    expect(evaluateIncomingAnswer(answer({ replyTo: ENV(7) }), st())).toEqual({
-      result: 'refuse',
-      reason: 'unknown_offer',
-    });
-    expect(evaluateIncomingAnswer(answer(), st([2]))).toEqual({
-      result: 'refuse',
-      reason: 'locked',
-    });
-    expect(evaluateIncomingAnswer(answer({ sender: CONTACT_B }), st())).toEqual({
-      result: 'refuse',
-      reason: 'not_a_party',
-    });
-  });
-
-  it('never throws', () => {
-    fc.assert(
-      fc.property(fc.anything(), fc.anything(), (a, b) => {
-        expect(() => evaluateIncomingAnswer(a as never, b as never)).not.toThrow();
-      }),
-      { numRuns: 200, seed: 0x7e23 },
-    );
-  });
-});
-
-describe('checkSendAccept: only the newest open offer received from the contact, in time', () => {
-  const received = { ...offer(2, CONTACT_A, 2, H2), validUntil: 1000 };
-  const st = (extra: StoredTermsOffer[] = [], lockedVersions: number[] = []) => ({
-    offers: [offer(1, AGENT_EVM, 1, H1), received, ...extra],
-    lockedVersions,
-  });
-
-  it('allows the newest received offer up to and including validUntil', () => {
-    expect(checkSendAccept(st(), ENV(2), AGENT_EVM, 999)).toEqual({ result: 'allowed' });
-    expect(checkSendAccept(st(), ENV(2), AGENT_EVM, 1000)).toEqual({ result: 'allowed' });
-  });
-
-  it('refuses expired, superseded, own, unknown, conflicted and locked offers', () => {
-    const refuse = (reason: string) => ({ result: 'refuse', reason });
-    expect(checkSendAccept(st(), ENV(2), AGENT_EVM, 1001)).toEqual(refuse('expired'));
-    expect(checkSendAccept(st([offer(3, AGENT_EVM, 3, H3)]), ENV(2), AGENT_EVM, 0)).toEqual(
-      refuse('superseded'),
-    );
-    expect(checkSendAccept(st(), ENV(1), AGENT_EVM, 0)).toEqual(refuse('own_offer'));
-    expect(checkSendAccept(st(), ENV(9), AGENT_EVM, 0)).toEqual(refuse('unknown_offer'));
-    expect(checkSendAccept(st([], [2]), ENV(2), AGENT_EVM, 0)).toEqual(refuse('locked'));
-    const conflicted = {
-      offers: [offer(1, AGENT_EVM, 1, H1), { ...received, state: 'conflict' as const }],
-      lockedVersions: [],
-    };
-    expect(checkSendAccept(conflicted, ENV(2), AGENT_EVM, 0)).toEqual(refuse('conflicted'));
-    expect(checkSendAccept(null as never, ENV(2), AGENT_EVM, 0)).toEqual(refuse('invalid'));
   });
 });

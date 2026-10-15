@@ -231,11 +231,13 @@ describe('creating a request (04 §3.4.1, 06 §2.5)', () => {
     const terms = {
       termsId: scope.termsId,
       version: 1,
-      parties: [scope.agentId, scope.counterparty.agentId],
+      // D-74: parties in ascending byte order, every key present (`price: null`).
+      parties: [scope.agentId, scope.counterparty.agentId].sort(),
       subject: 'Milestone 3',
       deliverables: [
         { id: 'd1', description: 'Spec', by: scope.counterparty.agentId, plaintextSha256: null },
       ],
+      price: null,
       deadlines: [],
       validUntil: now + 3_600,
       previousTermsHash: null,
