@@ -8,8 +8,6 @@
 // 3. Page: the core's `inboxPage` (port in context.ts) takes the newest matching items, ends the page
 //    before the item that would take the text result above 262 144 bytes (at least one item), marks
 //    the returned inbound items read in the same store transaction, and lists them oldest first.
-//    Until the core read lands (proposed card M1-7h-c) the tool answers "not available yet" and
-//    syncs nothing.
 // 4. Items: every value a sender chose (and every value our own agent wrote) appears only inside the
 //    item's §4 block and under its `untrusted` key, sanitized; the top level carries only ours (IDs,
 //    enums, numbers, hashes, our dates, names under the 06 §2.1 rule). File URLs, file keys and
@@ -20,7 +18,7 @@
 import { canonicalize, encodeUtf8 } from '@agentlink/crypto';
 import { displayRef, renderRef, resolveContact, type ContactRef } from './contacts.js';
 import type { InboxPageQuery, PageFile, PageItem, ToolContext } from './context.js';
-import { fail, invalidArgument, notAvailable, ok, type HandlerOutput } from './result.js';
+import { fail, invalidArgument, ok, type HandlerOutput } from './result.js';
 import { copy, UNTRUSTED_FOOTER } from './strings/index.js';
 import { TOOL_TEXT } from './text.js';
 import {
@@ -242,8 +240,6 @@ export async function inboxHandler(input: unknown, context: ToolContext): Promis
   if ((await client.self()) === undefined) {
     return fail('needs_setup', TOOL_TEXT.noIdentity, TOOL_TEXT.setupNextStep);
   }
-  const inboxPage = client.inboxPage?.bind(client);
-  if (inboxPage === undefined) return notAvailable();
 
   let contactId: string | undefined;
   if (typeof contact === 'string') {
@@ -285,7 +281,7 @@ export async function inboxHandler(input: unknown, context: ToolContext): Promis
     sizeOf: (item) => encodeUtf8(renderOnce(item).block).length + 1,
     maxBytes: INBOX_MAX_TEXT_BYTES - encodeUtf8(UNTRUSTED_FOOTER).length,
   };
-  const page = await inboxPage(query);
+  const page = await client.inboxPage(query);
   if (page.status === 'before_not_found') {
     return fail('not_found', INBOX_TEXT.beforeNotFound, INBOX_TEXT.beforeNotFoundNextStep);
   }

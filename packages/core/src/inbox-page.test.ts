@@ -16,7 +16,7 @@ import { createLogger } from '@agentlink/log';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import { CoreError } from './errors.js';
-import type { InboxPage, InboxPageItem, InboxPageQuery } from './inbox.js';
+import { PAGE_TYPES, type InboxPage, type InboxPageItem, type InboxPageQuery } from './inbox.js';
 import { MemoryStore } from './store/memory-store.js';
 import type { Row } from './store/schema.js';
 import { rowKeyOf } from './store/store.js';
@@ -626,5 +626,61 @@ describe('inbox page: what is returned (06 §2.2 "What is returned"; D-72)', () 
     const log = lines.join('\n');
     expect(log).not.toContain('CANARY-LOG-BODY');
     expect(log).not.toContain(b.id);
+  });
+});
+
+// ---- `before` and `since` (06 §2.2 sentence added by M1-9p-b) -------------------------------------
+
+describe('before names an item in scope regardless of read state and since (M1-9p-b)', () => {
+  it('a read cursor older than since is a valid, empty page, not before_not_found', async () => {
+    const old = await put({ contact: b.id, createdAt: T0, readAt: T0 + 1 });
+    await put({ contact: b.id, createdAt: T0 + 10 });
+    const result = await a.client.inbox.page(query({ before: old, since: T0 + 5 }));
+    expect(result).toEqual({ status: 'ok', items: [], requests: 0 });
+  });
+});
+
+// ---- Status counts match the page (M1-9p-b; IR-M1-7h-c-1) -----------------------------------------
+
+describe('unread counts count exactly what the page can return (M1-9p-b; IR-M1-7h-c-1)', () => {
+  const PROTOCOL = [
+    'proof',
+    'ack',
+    'handshake',
+    'handshake-ack',
+    'approval',
+    'card-update',
+    'revoke',
+  ];
+  const unreadOf = async (contactId: string): Promise<number> =>
+    (await a.client.inbox.counts()).inbox.find((e) => e.contactId === contactId)?.unread ?? 0;
+
+  it('a processed proof or other type the page never returns is not counted unread', async () => {
+    for (const type of PROTOCOL) {
+      await put({ contact: b.id, createdAt: T0, type, payload: text('x', type) });
+    }
+    expect(await unreadOf(b.id)).toBe(0);
+  });
+
+  it('a contact cannot create an unread count the default page never clears', async () => {
+    const shown = await put({ contact: b.id, createdAt: T0 });
+    let t = T0;
+    for (const type of PROTOCOL) {
+      t += 1;
+      await put({ contact: b.id, createdAt: t, type, payload: text('x', type) });
+    }
+    expect(await unreadOf(b.id)).toBe(1);
+    expect(ids(await page({ limit: 100 }))).toEqual([shown]);
+    expect(await unreadOf(b.id)).toBe(0);
+    expect(await page({ limit: 100 })).toEqual([]);
+  });
+
+  it('counts every type the page returns', async () => {
+    let t = T0;
+    for (const type of PAGE_TYPES) {
+      t += 1;
+      await put({ contact: b.id, createdAt: t, type, payload: text('x', type) });
+    }
+    expect(await unreadOf(b.id)).toBe(PAGE_TYPES.length);
   });
 });

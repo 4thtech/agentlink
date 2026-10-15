@@ -6,16 +6,14 @@
 // served by the real MCP server over the SDK's in-memory transport, and called by the SDK client,
 // which validates every `structuredContent` against the tool's `outputSchema`.
 //
-// The core has no inbox page read yet (proposed card M1-7h-c), so production `agentlink_inbox`
-// answers "not available yet" (tested below). For the round trip, bob's tool client adds a test-only
-// `inboxPage` built from what the real `syncInbox` processed: the envelopes, their decryption and
-// their contact metadata are the core's; only the paging and the read marks are the double's.
+// Production wiring end to end (M1-9p-b): bob's tools are the real `agentToolContext`, so
+// `agentlink_inbox` runs the real `syncInbox` and the core page read (`client.inbox.page`, M1-7h-c)
+// with its read marks.
 import {
   AgentLinkClient,
   MemoryStore,
   nostrTransport,
   type ApprovalChannel,
-  type InboxItem,
   type Sealed,
   type StoreCipher,
 } from '@agentlink/core';
@@ -46,7 +44,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { agentToolContext } from '../src/mcp/command.js';
 import { createMcpServer } from '../src/mcp/server.js';
 import type { OpenedAgent } from '../src/runtime/open-agent.js';
-import type { PageItem, ToolClient, ToolContext } from '../src/tools/index.js';
+import type { ToolContext } from '../src/tools/index.js';
 
 // --- doubles ----------------------------------------------------------------------------------------
 
@@ -247,43 +245,6 @@ async function pair(inviter: Agent, invitee: Agent): Promise<void> {
   await invitee.client.syncInbox();
 }
 
-/**
- * Test-only: the inbox page port over what the real `syncInbox` processed (the core read is card
- * M1-7h-c). Items unread until returned once; paging per the port contract.
- */
-function withTestInboxPage(agent: Agent): ToolClient {
-  const base = agentToolContext(agent.opened, silent).client;
-  const seen: InboxItem[] = [];
-  const readIds = new Set<string>();
-  const toPage = (item: InboxItem): PageItem => ({
-    direction: 'in',
-    envelopeId: item.envelopeId,
-    thread: item.thread,
-    type: item.type,
-    createdAt: item.createdAt,
-    replyTo: item.payload.replyTo,
-    files: [],
-    body: item.payload.body as PageItem['body'],
-    from: item.from,
-    read: readIds.has(item.envelopeId),
-  });
-  return {
-    ...base,
-    async syncInbox(budgetMs) {
-      const result = await agent.client.syncInbox({ budgetMs });
-      seen.push(...result.items);
-    },
-    inboxPage(query) {
-      const candidates = seen
-        .map(toPage)
-        .filter((item) => query.includeRead || !readIds.has(item.envelopeId))
-        .slice(-query.limit);
-      for (const item of candidates) readIds.add(item.envelopeId);
-      return Promise.resolve({ status: 'ok', items: candidates, requests: 0 });
-    },
-  };
-}
-
 async function connect(context: ToolContext): Promise<Client> {
   const server = createMcpServer(context, '0.0.0-test');
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
@@ -350,10 +311,7 @@ describe('send and receive through the MCP protocol (M1-9p)', () => {
       expect(JSON.stringify(sent.structured)).not.toContain(part);
     }
 
-    const bobMcp = await connect({
-      ...agentToolContext(bob.opened, silent),
-      client: withTestInboxPage(bob),
-    });
+    const bobMcp = await connect(agentToolContext(bob.opened, silent));
     const read = await call(bobMcp, 'agentlink_inbox', {});
     const messages = read.structured['messages'] as Record<string, unknown>[];
     expect(messages).toHaveLength(1);
@@ -371,9 +329,21 @@ describe('send and receive through the MCP protocol (M1-9p)', () => {
     expect(read.text).not.toContain('\u001b');
     expect(read.structured['summary']).not.toContain('CANARY');
 
-    // Returned once: the default call does not show it again.
+    // Marked read in the store, and the status count is cleared with it.
+    const row = await bob.store.transaction((tx) =>
+      tx.get('envelopes', { envelope_id: sent.structured['envelopeId'] as string }),
+    );
+    expect(row?.read_at).toBe(NOW);
+    expect((await bob.client.inbox.counts()).inbox).toEqual([]);
+
+    // Returned once: the default call does not show it again as unread.
     const again = await call(bobMcp, 'agentlink_inbox', {});
     expect(again.structured['messages']).toEqual([]);
+    // With includeRead it is still there, now read.
+    const history = await call(bobMcp, 'agentlink_inbox', { includeRead: true });
+    expect(history.structured['messages']).toMatchObject([
+      { envelopeId: sent.structured['envelopeId'], read: true },
+    ]);
   });
 
   it('a repeat with the same clientRequestId sends nothing and returns the original result', async () => {
@@ -420,12 +390,15 @@ describe('send and receive through the MCP protocol (M1-9p)', () => {
     expect(outbound).toHaveLength(0);
   });
 
-  it('production agentlink_inbox answers "not available yet" until the core page read lands, and syncs nothing', async () => {
+  it('agentlink_status counts the message until agentlink_inbox has returned it, then not', async () => {
     await call(aliceMcp, 'agentlink_send', { to: 'Bob', text: 'hi' });
     const bobMcp = await connect(agentToolContext(bob.opened, silent));
-    const stored = await bob.store.transaction((tx) => tx.select('envelopes').length);
-    const result = await call(bobMcp, 'agentlink_inbox', {});
-    expect(result.structured).toMatchObject({ status: 'error', code: 'NOT_AVAILABLE' });
-    expect(await bob.store.transaction((tx) => tx.select('envelopes').length)).toBe(stored);
+    await bob.client.syncInbox();
+    const before = await call(bobMcp, 'agentlink_status', {});
+    expect(before.structured).toMatchObject({ unread: 1 });
+    const read = await call(bobMcp, 'agentlink_inbox', {});
+    expect(read.structured['messages']).toHaveLength(1);
+    const after = await call(bobMcp, 'agentlink_status', {});
+    expect(after.structured).toMatchObject({ unread: 0, inbox: [] });
   });
 });
