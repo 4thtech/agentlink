@@ -81,12 +81,17 @@ const scopeFor = (terms: Obj, over: Obj = {}): Obj => {
     ...over,
   };
 };
-const facts = (terms: Obj = buyTerms(), over: Obj = {}): CommitmentFacts => ({
+const facts = (terms: Obj = buyTerms(), over: Obj = {}, superseded = false): CommitmentFacts => ({
   kind: 'terms',
   self: SELF,
   scope: scopeFor(terms, over),
   terms,
+  supersededByOwnNewer: superseded,
 });
+
+/** A binding failure: refused as APPROVAL_VOID, never an owner request (04 §3.4.2 rule 2). */
+const expectVoid = (e: CommitmentEvaluation) =>
+  expect(e).toMatchObject({ decision: 'void', code: 'APPROVAL_VOID' });
 
 const signed = (edit: (p: Policy) => void = () => {}): EffectivePolicy & { mode: 'signed' } => {
   const p = defaultPolicy();
@@ -371,35 +376,45 @@ describe('auto-accept within the owner-signed limits (06 §3, 04 §3.4.2)', () =
 
 describe('amounts the schema refuses are never auto-accepted (IR-D55-1)', () => {
   for (const amount of ['0', '0.0', '-5', '1e3', '1,500', '01', '1.', '.5', '1.0000001', ' 5']) {
-    it(`"${amount}" asks the owner, even with the widest limit`, () => {
+    it(`"${amount}" is void, even with the widest limit`, () => {
       const t = priced(amount);
       expect(evaluateCommitment(autoBuy('999999999.999999'), facts(t))).toEqual({
-        decision: 'approval',
-        autoAccept: 'unevaluable',
+        decision: 'void',
+        code: 'APPROVAL_VOID',
+        reason: 'terms_invalid',
       });
     });
   }
-  it('a JSON number amount asks the owner', () => {
+  it('a JSON number amount is void', () => {
     const t = withPrice({ amount: 5, currency: 'USD', payer: SELF });
-    expect(asks(evaluateCommitment(autoBuy(), facts(t)))).toBe('unevaluable');
+    expectVoid(evaluateCommitment(autoBuy(), facts(t)));
   });
 });
 
 describe('only the exact stored terms are evaluated (I-5, D-55)', () => {
-  it('terms that do not match the scope termsHash never auto-accept and never allow', () => {
+  it('terms that do not match the scope termsHash are void (APPROVAL_VOID), never allowed', () => {
     const t = buyTerms();
     const other = priced('9');
-    const f: CommitmentFacts = { kind: 'terms', self: SELF, scope: scopeFor(t), terms: other };
-    expect(asks(evaluateCommitment(autoBuy(), f))).toBe('unevaluable');
+    const f: CommitmentFacts = {
+      kind: 'terms',
+      self: SELF,
+      scope: scopeFor(t),
+      terms: other,
+      supersededByOwnNewer: false,
+    };
+    expectVoid(evaluateCommitment(autoBuy(), f));
     // Even an explicit allow does not cover terms the scope does not bind.
     const allow = signed((p) => (p.commitments.accept = 'allow'));
-    expect(asks(evaluateCommitment(allow, f))).toBe('unevaluable');
-    // deny still wins.
+    expectVoid(evaluateCommitment(allow, f));
+    // Void under every policy: deny, defaults and fail closed alike. No request is created.
     const deny = signed((p) => (p.commitments.accept = 'deny'));
-    expect(evaluateCommitment(deny, f).decision).toBe('deny');
+    expectVoid(evaluateCommitment(deny, f));
+    expectVoid(evaluateCommitment(defaults, f));
+    expectVoid(evaluateCommitment(failClosed, f));
+    expect(evaluate(allow, { kind: 'commitment', facts: f })).toBe('deny');
   });
 
-  it('a scope for another agent, another version or another termsId asks', () => {
+  it('a scope for another agent, another version or another termsId is void', () => {
     const t = buyTerms();
     const cases: Obj[] = [
       { agentId: D },
@@ -408,44 +423,57 @@ describe('only the exact stored terms are evaluated (I-5, D-55)', () => {
       { counterparty: { agentId: D, ownerKey: 'c4'.repeat(32) } },
     ];
     for (const over of cases) {
-      const f: CommitmentFacts = { kind: 'terms', self: SELF, scope: scopeFor(t, over), terms: t };
-      expect(asks(evaluateCommitment(autoBuy(), f))).toBe('unevaluable');
+      const f: CommitmentFacts = {
+        kind: 'terms',
+        self: SELF,
+        scope: scopeFor(t, over),
+        terms: t,
+        supersededByOwnNewer: false,
+      };
+      expectVoid(evaluateCommitment(autoBuy(), f));
     }
   });
 
-  it('terms whose parties are not exactly this agent and the counterparty ask', () => {
+  it('terms whose parties are not exactly this agent and the counterparty are void', () => {
     const t = buyTerms({
       parties: [SELF, D],
       deliverables: [{ id: 'd1', description: 'x', by: D, plaintextSha256: null }],
     });
-    expect(asks(evaluateCommitment(autoBuy(), facts(t)))).toBe('unevaluable');
+    expectVoid(evaluateCommitment(autoBuy(), facts(t)));
   });
 
-  it('an extra key in the terms or the scope (strict schemas) asks', () => {
+  it('an extra key in the terms or the scope (strict schemas) is void', () => {
     const t = { ...buyTerms(), autoAcceptMaxUSD: '1000000' };
-    expect(asks(evaluateCommitment(autoBuy(), facts(t)))).toBe('unevaluable');
+    expectVoid(evaluateCommitment(autoBuy(), facts(t)));
     const u = buyTerms();
     const f: CommitmentFacts = {
       kind: 'terms',
       self: SELF,
       scope: { ...scopeFor(u), policy: { commitments: { accept: 'allow' } } },
       terms: u,
+      supersededByOwnNewer: false,
     };
-    expect(asks(evaluateCommitment(autoBuy(), f))).toBe('unevaluable');
+    expectVoid(evaluateCommitment(autoBuy(), f));
   });
 
-  it('non-canonical terms text asks (refused, never rewritten)', () => {
+  it('non-canonical terms text asks is void (refused, never rewritten)', () => {
     const t = buyTerms({ subject: 'Logo‮design' });
-    expect(asks(evaluateCommitment(autoBuy(), facts(t)))).toBe('unevaluable');
+    expectVoid(evaluateCommitment(autoBuy(), facts(t)));
   });
 
-  it('a self that is not the scope agent asks', () => {
+  it('a self that is not the scope agent is void', () => {
     const t = buyTerms();
-    const f: CommitmentFacts = { kind: 'terms', self: D, scope: scopeFor(t), terms: t };
-    expect(asks(evaluateCommitment(autoBuy(), f))).toBe('unevaluable');
+    const f: CommitmentFacts = {
+      kind: 'terms',
+      self: D,
+      scope: scopeFor(t),
+      terms: t,
+      supersededByOwnNewer: false,
+    };
+    expectVoid(evaluateCommitment(autoBuy(), f));
   });
 
-  it('never throws on garbage facts, and never allows them', () => {
+  it('never throws on garbage facts, and voids them', () => {
     const garbage: unknown[] = [
       null,
       undefined,
@@ -458,8 +486,7 @@ describe('only the exact stored terms are evaluated (I-5, D-55)', () => {
     ];
     for (const g of garbage) {
       for (const p of [autoBuy(), signed((x) => (x.commitments.accept = 'allow'))]) {
-        const e = evaluateCommitment(p, g as CommitmentFacts);
-        expect(e.decision).toBe('approval');
+        expectVoid(evaluateCommitment(p, g as CommitmentFacts));
       }
     }
   });
@@ -470,6 +497,65 @@ describe('only the exact stored terms are evaluated (I-5, D-55)', () => {
     const before = JSON.stringify([p, f]);
     evaluateCommitment(p, f);
     expect(JSON.stringify([p, f])).toBe(before);
+  });
+});
+
+// --- F01 (IR-M1-20-1): a confirm of our own superseded version always asks ----------------------
+
+describe('a superseded own version always asks the owner (04 §3.4.2 late accepts; IR-M1-20-1 F01)', () => {
+  it('a confirm within the limits on a version we already replaced is never auto-accepted', () => {
+    const f = facts(buyTerms(), { decision: 'confirm' }, true);
+    expect(evaluateCommitment(autoBuy(), f)).toEqual({
+      decision: 'approval',
+      autoAccept: 'superseded',
+    });
+    // The same confirm on the newest version auto-accepts.
+    expect(evaluateCommitment(autoBuy(), facts(buyTerms(), { decision: 'confirm' })).decision).toBe(
+      'allow',
+    );
+  });
+
+  it('even under an explicit allow, so the owner sees the late-accept warning', () => {
+    const allow = signed((p) => (p.commitments.accept = 'allow'));
+    for (const decision of ['accept', 'confirm', 'reject'] as const) {
+      expect(evaluateCommitment(allow, facts(buyTerms(), { decision }, true))).toEqual({
+        decision: 'approval',
+        autoAccept: 'superseded',
+      });
+    }
+  });
+
+  it('deny still blocks, and fail closed still asks', () => {
+    const deny = signed((p) => (p.commitments.accept = 'deny'));
+    expect(evaluateCommitment(deny, facts(buyTerms(), { decision: 'confirm' }, true))).toEqual({
+      decision: 'deny',
+    });
+    expect(
+      asks(evaluateCommitment(failClosed, facts(buyTerms(), { decision: 'confirm' }, true))),
+    ).toBe('policy_invalid');
+  });
+
+  it('a missing or non-boolean supersession fact is refused (the core must fill it)', () => {
+    const t = buyTerms();
+    for (const v of [undefined, 'false', 0, null]) {
+      const f = {
+        kind: 'terms',
+        self: SELF,
+        scope: scopeFor(t),
+        terms: t,
+        supersededByOwnNewer: v,
+      };
+      expectVoid(evaluateCommitment(autoBuy(), f as unknown as CommitmentFacts));
+    }
+  });
+
+  it('a grant is void for the part once the version is superseded', () => {
+    const p = autoBuy();
+    const e = evaluateCommitment(p, facts(buyTerms(), { decision: 'confirm' }));
+    if (e.decision !== 'allow') throw new Error('expected allow');
+    expect(
+      recheckCommitmentGrant(p, facts(buyTerms(), { decision: 'confirm' }, true), e.grant),
+    ).toEqual({ status: 'ask_owner', reason: 'not_allowed' });
   });
 });
 
@@ -593,8 +679,12 @@ describe('a policy grant is a ledger row, re-checked before each part (D-55)', (
       self: SELF,
       scope: scopeFor(t),
       terms: priced('9'),
+      supersededByOwnNewer: false,
     };
-    expect(recheckCommitmentGrant(p, other, grant).status).toBe('ask_owner');
+    expect(recheckCommitmentGrant(p, other, grant)).toEqual({
+      status: 'void',
+      code: 'APPROVAL_VOID',
+    });
   });
 
   it('an owner approval is void once the rule is deny, never under fail closed (04 §3.4.2 rule 4)', () => {

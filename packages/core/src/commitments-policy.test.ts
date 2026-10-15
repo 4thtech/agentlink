@@ -89,6 +89,7 @@ async function setup() {
       kind: 'terms',
       self: SELF,
       terms: t,
+      supersededByOwnNewer: false,
       scope: {
         v: 1,
         kind: 'agentlink/commitment',
@@ -212,7 +213,13 @@ describe('the commitments rule reads only the verified owner-signed policy (I-4)
       ...(f as { scope: Record<string, unknown> }).scope,
       termsHash: termsHash(terms),
     };
-    const g: CommitmentFacts = { kind: 'terms', self: t.client.agentId, scope, terms };
+    const g: CommitmentFacts = {
+      kind: 'terms',
+      self: t.client.agentId,
+      scope,
+      terms,
+      supersededByOwnNewer: false,
+    };
     expect(evaluateCommitment(loaded, g).decision).toBe('approval');
     expect(canonicalize(loaded as never)).not.toContain('1000000');
   });
