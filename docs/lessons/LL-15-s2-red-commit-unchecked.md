@@ -11,4 +11,6 @@
 - Every S2 reviewer brief includes the §3.4 reproduction step, and the report carries the `tests-first reproduced: yes|no` line (`audit-rules.md` §4.2, §4.3).
 - Before merge, the orchestrator checks that the RED commit is on the branch and that the report says `reproduced: yes` (`development-process.md` §5, step 5a). If either is missing, the PR does not merge.
 
+**Deviation accepted.** On 2026-10-15 the owner (Tali, in chat, on the orchestrator's recommendation) accepted the process deviation for #61, #66 and #67: they stay merged without the §3.4 RED commit, and they are not re-reviewed (D-71 (2)). The acceptance covers these three PRs only. The rule above applies to every S2 PR from now on.
+
 **Source.** IR-M1-2e-1 on #69, 2026-10-14. Related: [LL-14](LL-14-red-ci-emails-owner.md).

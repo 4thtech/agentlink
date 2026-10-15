@@ -429,3 +429,113 @@ describe('contact.check verify and store (M1-7c-b)', () => {
     }
   });
 });
+
+// M1-7d ↔ M1-7c-b (IR-M1-7c-b-1 F02 hand-off on the M1-7d card): `contact.check` is one of the
+// owner actions, so OwnerActions.apply routes it to the same verify-and-store path. The refusal
+// codes are the same, the nonce is checked before the op's rule (04 §2.5.1), and the own-revocation
+// refusal applies to it like to every other owner action.
+describe('contact.check through OwnerActions.apply (M1-7d)', () => {
+  const apply = (input: unknown) => a.client.ownerActions.apply(input as object);
+  const refusedWith = (reason: string) => ({
+    status: 'refused',
+    op: 'contact.check',
+    reason,
+    nonceBurnt: false,
+  });
+
+  it('applies a matching check: stored, the nonce recorded, safetyCodeChecked true', async () => {
+    const signed = await signCheck();
+    expect(await apply(signed)).toStrictEqual({ status: 'applied', op: 'contact.check' });
+    expect((await contactRow(a, b.id))?.safety_check).toBe(
+      canonicalize(signed as unknown as JsonValue),
+    );
+    expect(await nonceCount(a)).toBe(1);
+    expect(await checked(a, b.id)).toBe(true);
+  });
+
+  it('applies the exact JSON text too', async () => {
+    const signed = await signCheck();
+    const text = canonicalize(signed as unknown as JsonValue);
+    expect(await a.client.ownerActions.apply(text)).toStrictEqual({
+      status: 'applied',
+      op: 'contact.check',
+    });
+    expect(await checked(a, b.id)).toBe(true);
+  });
+
+  it('refuses with the same codes as applyContactCheck, and stores nothing', async () => {
+    const digest = await digestOf(a, b.id);
+    const good = await signCheck();
+    const cases: Array<[string, unknown]> = [
+      ['digest_mismatch', await signCheck({ pairingDigest: flipHex(digest, 63) })],
+      ['signature_invalid', { body: good.body, sig: flipHex(good.sig, 10) }],
+      ['owner_mismatch', await signCheck({ owner: ownerB })],
+      ['agent_mismatch', await signCheck({ agent: b.id })],
+      ['contact_unknown', await signCheck({ contact: encodeHex0x(randomBytes(20)) })],
+      ['malformed', await signCheck({ contact: `0x${b.id.slice(2).toUpperCase()}` })],
+      ['expired', await signCheck({ issuedAt: clock.t - 700, expiresAt: clock.t - 1 })],
+      [
+        'lifetime_exceeded',
+        await signCheck({ issuedAt: clock.t, expiresAt: clock.t + LIFETIME + 1 }),
+      ],
+      [
+        'issued_in_future',
+        await signCheck({
+          issuedAt: clock.t + CLOCK_SKEW_SECONDS + 1,
+          expiresAt: clock.t + CLOCK_SKEW_SECONDS + 600,
+        }),
+      ],
+    ];
+    for (const [reason, input] of cases) {
+      // A body that fails the strict schema is reported without an op (owner-actions.ts, I-5).
+      const expected =
+        reason === 'malformed' ? { ...refusedWith(reason), op: null } : refusedWith(reason);
+      expect(await apply(input), reason).toStrictEqual(expected);
+      expect(await a.client.contacts.applyContactCheck(input), reason).toStrictEqual({
+        status: 'refused',
+        reason,
+      });
+    }
+    await expectNothingStored();
+  });
+
+  it('refuses a replay by its nonce, before the op rule, even after a re-pair', async () => {
+    const first = await signCheck();
+    expect((await apply(first)).status).toBe('applied');
+    expect(await apply(first)).toStrictEqual(refusedWith('nonce_used'));
+    clock.t += 60;
+    await pairWith(clock, a, b);
+    // The digest now names the old pairing, but the nonce is checked first (04 §2.5.1).
+    expect(await apply(first)).toStrictEqual(refusedWith('nonce_used'));
+    expect(await nonceCount(a)).toBe(1);
+  });
+
+  it('refuses when the stored pair no longer verifies (pairing_unavailable)', async () => {
+    const row = await contactRow(a, b.id);
+    await a.store.transaction((tx) => {
+      const ack = tx.get('envelopes', { envelope_id: row!.handshake_ack_envelope_id! });
+      const envelope = JSON.parse(ack!.envelope_json!) as { sig: string };
+      envelope.sig = flipHex(envelope.sig, 5);
+      tx.update(
+        'envelopes',
+        { envelope_id: ack!.envelope_id },
+        { envelope_json: JSON.stringify(envelope) },
+      );
+    });
+    expect(
+      await apply(await signCheck({ pairingDigest: encodeHex(randomBytes(32)) })),
+    ).toStrictEqual(refusedWith('pairing_unavailable'));
+    expect(await nonceCount(a)).toBe(0);
+  });
+
+  it('refuses every check once the own agent is revoked (identity_revoked)', async () => {
+    const signed = await signCheck();
+    await a.store.transaction((tx) => tx.update('identity', {}, { revoked_at: clock.t }));
+    expect(await apply(signed)).toStrictEqual(refusedWith('identity_revoked'));
+    expect(await a.client.contacts.applyContactCheck(signed)).toStrictEqual({
+      status: 'refused',
+      reason: 'identity_revoked',
+    });
+    await expectNothingStored();
+  });
+});
