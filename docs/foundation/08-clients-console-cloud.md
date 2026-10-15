@@ -99,10 +99,10 @@ Cloud agents can be **autonomous** (act on inbound messages without a harness, e
 
 **Proof-pack links (G-52; decided by the owner in D-71 (6), 15 Oct 2026, on the orchestrator's recommendation).**
 - **Format.** A proof pack (07 §8) shared as a link uses the invite's link format (04 §3.6, D-69): `base64url(deflateRaw(utf8(JSON)))` of the pack, in the URL fragment of the verify page, so it never reaches a server. Compressed bytes are never hashed, signed or compared.
-- **Decoder.** The verify page decodes it in the browser with the same bounded, strict decoder as the invite (04 §3.6): the input bounded before any parsing, inflation in bounded slices with a running output count and a cap, the stream ending exactly at the end of the input, fatal UTF-8, I-JSON and the strict pack schema. One generic capped-inflate function in `@agentlink/core` serves both, with its caps set per payload type.
+- **Decoder.** The verify page decodes it in the browser with the same bounded, strict decoder as the invite (04 §3.6): the input bounded before any parsing, inflation in bounded slices with a running output count and a cap, the stream ending exactly at the end of the input, fatal UTF-8, I-JSON and the strict pack schema. *Derived (proposed; owner confirms at merge):* one generic capped-inflate function in `@agentlink/core` serves both, with its caps set per payload type.
 - **Pack caps.** The pack has its own inflated-size cap, derived from the largest pack the 07 §8 schema allows, and the matching payload-character limit. The exact numbers are set when the M1b proof work starts (proposed until then).
 - **Larger packs are files.** A pack above the link limit is never offered as a link; it is shared as a file (the drop zone, or a download). A pack can carry a disclosed envelope of up to 24 KB of mostly incompressible ciphertext, so such a pack can pass the link limit.
-- **Copy.** Where a pack link is offered, the copy says that a link carrying a disclosed key is itself a disclosure (11 §5).
+- **Copy** (derived; proposed, owner confirms at merge). Where a pack link is offered, the copy says that a link carrying a disclosed key is itself a disclosure (11 §5).
 
 ---
 
