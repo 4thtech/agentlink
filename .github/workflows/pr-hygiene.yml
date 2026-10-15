@@ -82,7 +82,9 @@ jobs:
               { name: 'Invariants touched', re: /^invariants\b/i },
               { name: 'Security class', re: /^security class\b/i },
               { name: 'Tests added', re: /^tests\b/i },
-              { name: 'Docs / spec updated', re: /^docs\b/i },
+              // "Docs impact" is its own section; the lookahead keeps it from matching this one.
+              { name: 'Docs / spec updated', re: /^docs\b(?!\s+impact\b)/i },
+              { name: 'Docs impact', re: /^docs impact\b/i },
               { name: 'Dependencies added', re: /^dependencies\b/i },
               { name: 'Review requirements', re: /^review\b/i },
               { name: 'Open questions', re: /^open questions\b/i },
@@ -110,7 +112,23 @@ jobs:
               if (!match) {
                 problems.push(`Missing section "${name}" (use .github/pull_request_template.md).`);
               } else if (match.lines.join('\n').trim() === '') {
-                problems.push(`Section "${name}" is empty (write "None" or "N/A" if nothing applies).`);
+                problems.push(
+                  name === 'Docs impact'
+                    ? 'Section "Docs impact" is empty (list the docs updated, or write "none: <reason>").'
+                    : `Section "${name}" is empty (write "None" or "N/A" if nothing applies).`,
+                );
+              } else if (name === 'Docs impact') {
+                // List the docs updated, or "none: <reason>". A bare "None", "N/A" or an unfilled
+                // placeholder says nothing about the documentation and is refused.
+                const text = match.lines.join('\n').trim();
+                const bare = /^(none|n\/a|nothing|tbd|todo|-)\.?$/i.test(text);
+                const placeholder = /<(reason|docs?|list)[^>]*>/i.test(text);
+                const noneWithoutReason = /^(none|n\/a)\s*[:\u2013\u2014-]\s*$/i.test(text);
+                if (bare || placeholder || noneWithoutReason) {
+                  problems.push(
+                    'Section "Docs impact": list the docs updated (README, docs-site, knowledge, CHANGELOG, specs), or write "none: <reason>" with a real reason.',
+                  );
+                }
               } else if (name === 'Security class') {
                 const ticked = match.lines.filter((l) => /^\s*[-*+]\s+\[[xX]\]\s*[*_`]*S[012]\b/.test(l));
                 if (ticked.length !== 1) {
