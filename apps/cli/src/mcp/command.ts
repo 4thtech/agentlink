@@ -8,8 +8,13 @@
 // - When the agent is not set up, the server still starts and every tool answers `needs_setup` with
 //   the runtime's fixed copy, so the agent can tell the user what to run.
 // - The handlers get M1-9k's `approvalNextStep` through their context (06 §1: src/tools/ may not
-//   import it). The background loop and relay subscriptions are M1-9r.
+//   import it).
+// - The background loop (M1-9r, loop.ts): when the agent is set up, the server competes for the
+//   agent's publisher lease and, while it holds it, keeps receiving, processing and delivering. On
+//   close the loop stops and releases the lease before the agent closes. `agentlink://inbox`
+//   notifications are optional (06 §6).
 import process from 'node:process';
+import type { Readable, Writable } from 'node:stream';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { createLogger, type Logger } from '@agentlink/log';
@@ -22,6 +27,7 @@ import {
   type OpenedAgent,
 } from '../runtime/index.js';
 import { coreToolClient, type HandlerEnvironment, type ToolContext } from '../tools/index.js';
+import { attachInboxResource, BackgroundLoop, type BackgroundLoopOptions } from './loop.js';
 import { createMcpServer } from './server.js';
 
 export interface McpCommandDeps {
@@ -32,6 +38,11 @@ export interface McpCommandDeps {
   readonly logger?: Logger;
   /** Unix seconds. */
   readonly clock?: () => number;
+  /** Background loop settings (tests: manual timers, short intervals). */
+  readonly loop?: Pick<
+    BackgroundLoopOptions,
+    'timers' | 'leaseIntervalMs' | 'syncIntervalMs' | 'passBudgetMs'
+  >;
 }
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
@@ -67,31 +78,59 @@ export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
         : { needsSetup: { message: opened.message }, logger };
 
     const server = createMcpServer(env, deps.version);
+    const loop =
+      agent === undefined
+        ? undefined
+        : new BackgroundLoop({
+            ...deps.loop,
+            client: agent.client,
+            logger,
+            onInboxChanged: attachInboxResource(server, agent.client.inbox),
+          });
     const closed = new Promise<void>((resolve) => {
       server.onclose = resolve;
     });
     try {
       await server.connect(deps.transport());
       logger.info('mcp server started', { setUp: agent !== undefined });
+      loop?.start();
       await closed;
     } finally {
+      // Stop the passes and release the lease while the store is still open (06 §6).
+      await loop?.stop();
       await agent?.close();
     }
     return EXIT_OK;
   };
 }
 
+/** Where the stdio transport reads, writes and hears shutdown signals. Tests pass their own. */
+export interface StdioSource {
+  readonly stdin: Readable;
+  readonly stdout: Writable;
+  /** Emits `SIGTERM` and `SIGINT` (the process in production). */
+  readonly signals: Pick<NodeJS.EventEmitter, 'once'>;
+}
+
 /**
  * The stdio transport. The SDK's transport does not watch for the end of stdin, so the server is
- * closed here when the client closes the pipe (06 §6: clean shutdown on stdin close).
+ * closed here when the client closes the pipe (06 §6: clean shutdown on stdin close). A harness
+ * that stops the server with SIGTERM or SIGINT gets the same clean shutdown: the loop stops and the
+ * lease is released before the agent closes.
  */
-function stdioTransport(): Transport {
-  const transport = new StdioServerTransport();
+export function stdioTransport(io?: StdioSource): Transport {
+  // Without `io`: the SDK's own process stdin and stdout (the only writer of stdout, see above).
+  const transport =
+    io === undefined ? new StdioServerTransport() : new StdioServerTransport(io.stdin, io.stdout);
+  const stdin = io?.stdin ?? process.stdin;
+  const signals = io?.signals ?? process;
   const close = (): void => {
     transport.close().catch(() => undefined);
   };
-  process.stdin.once('end', close);
-  process.stdin.once('close', close);
+  stdin.once('end', close);
+  stdin.once('close', close);
+  signals.once('SIGTERM', close);
+  signals.once('SIGINT', close);
   return transport;
 }
 
@@ -99,6 +138,6 @@ function stdioTransport(): Transport {
 export const mcpCommand = (version: string): CommandHandler =>
   createMcpCommand({
     openAgent: (options) => openAgent(options),
-    transport: stdioTransport,
+    transport: () => stdioTransport(),
     version,
   });
