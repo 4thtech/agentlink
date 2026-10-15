@@ -553,6 +553,88 @@ describe('agentlink_inbox: the injection suite (06 §4, §9; I-5)', () => {
   });
 });
 
+describe('agentlink_inbox: sender-chosen times never break the inbox (IR-M1-9p-1 F01)', () => {
+  const HOSTILE_TIMES = [
+    Number.MAX_SAFE_INTEGER,
+    8_640_000_000_001,
+    253_402_300_800, // year 10000
+    -1,
+    -Number.MAX_SAFE_INTEGER,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY,
+    1.5,
+  ];
+
+  it('an out-of-range validUntil or expiresAt renders safely: ok, never thrown, never at the top level', async () => {
+    for (const bad of HOSTILE_TIMES) {
+      const terms = { subject: 'Drafts', validUntil: bad };
+      const offer = inbound({
+        type: 'offer',
+        body: null,
+        terms,
+        note: null,
+        termsRef: {
+          termsId: 'VGVybXNJZDEyMw',
+          version: 1,
+          termsHash: 'a'.repeat(64),
+          validUntil: bad,
+        },
+      });
+      const file = inbound({
+        envelopeId: E2,
+        createdAt: T0 + 1,
+        type: 'file',
+        files: [
+          {
+            index: 0,
+            size: 1,
+            plaintextSha256: 'b'.repeat(64),
+            delivery: 'drop',
+            expiresAt: bad,
+            name: 'a.txt',
+            mime: 'text/plain',
+          },
+        ],
+      });
+      const result = await inbox({}, fake({ items: [offer, file] }));
+      expect(result.structured.status, String(bad)).toBe('ok');
+      const [first, second] = messagesOf(result);
+      // Ours only when in range: the reference is left out and the expiry is null.
+      expect(first, String(bad)).not.toHaveProperty('termsRef');
+      expect((second!['files'] as { expiresAt: unknown }[])[0]!.expiresAt, String(bad)).toBeNull();
+      // The sender's value stays inside the untrusted block and under `untrusted`.
+      expect((first!.untrusted['terms'] as { validUntil: unknown }).validUntil).toBe(
+        Number.isFinite(bad) ? bad : null,
+      );
+    }
+  });
+
+  it('a hostile createdAt still gives a valid sentAt and an ok page', async () => {
+    for (const bad of HOSTILE_TIMES) {
+      const result = await inbox({}, fake({ items: [inbound({ createdAt: bad })] }));
+      expect(result.structured.status, String(bad)).toBe('ok');
+      expect(messagesOf(result)[0]!['sentAt']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    }
+  });
+
+  it('sizeOf never throws on a hostile item, so the core page transaction is never rolled back by it', async () => {
+    const client = fake();
+    await inbox({}, client);
+    const [query] = client.queries;
+    for (const bad of HOSTILE_TIMES) {
+      expect(() =>
+        query!.sizeOf(
+          inbound({
+            createdAt: bad,
+            termsRef: { termsId: 'x', version: 1, termsHash: 'a'.repeat(64), validUntil: bad },
+          }),
+        ),
+      ).not.toThrow();
+    }
+  });
+});
+
 describe('agentlink_inbox: the text budget (06 §2.2: 262 144 bytes)', () => {
   it('sizeOf is the item block in UTF-8 bytes plus its separator; the budget leaves room for the footer', async () => {
     const client = fake({ items: [inbound()] });
