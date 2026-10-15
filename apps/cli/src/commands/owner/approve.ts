@@ -113,6 +113,11 @@ async function decideOne(
       return EXIT_FAILED;
     }
     const facts = await cardFacts(agent.client, entry);
+    if (facts.terms === 'problem') {
+      // The terms shown would not be the terms signed (M1-9q): never offered.
+      output.printError(OWNER_TEXT.problem);
+      return EXIT_FAILED;
+    }
     for (const line of cardLines(entry, facts)) output.print(line);
     output.print('');
     // A commitment is decided alone, as here (D-31, 04 §2.5.2): one request, one approval.decide.
@@ -156,6 +161,11 @@ async function reviewList(deps: OwnerCommandDeps, context: CommandContext): Prom
         continue;
       }
       const facts = await cardFacts(agent.client, entry);
+      if (facts.terms === 'problem') {
+        output.print(`${String(number)}. ${OWNER_TEXT.problemListed}`);
+        output.print('');
+        continue;
+      }
       for (const line of cardLines(entry, facts, number)) output.print(line);
       if (entry.commitment) {
         // Listed, never selectable: terms are decided alone (IR-D-68-1, 04 §2.5.2).

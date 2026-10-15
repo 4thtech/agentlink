@@ -2544,7 +2544,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Note (IR-M1-9c-1 F01, 2026-10-15):** core has no public read of a stored approval's own action or of the pending count, so #113 ships the `agentlink_get_approval` handler and the 06 §2.5 mapping against the `ToolClient.approvalState` / `pendingApprovals` port, with a "not available yet" stub in production. The core read is card M1-7e-3 (PR #116). Once it merges, M1-9c-b wires it into `coreToolClient` (`approvalState` → `{check, decidedAt}`, `pendingApprovals` → the count) and adds the end-to-end test.
 
 #### M1-9c-b · MCP server: wiring and follow-ups (new, split from M1-9c)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (touches the approval-read path and the CI bundle check, audit-rules §2.4) · **Phase:** M1a
+- **Status:** in review (the neutral-platform bundle-check CI job, IR-M1-9c-1 F07, is not part of this PR: it needs an owner-reviewed `.github` change and a bundler dependency) · **Size:** M · **Tier:** Opus · **Security:** S2 (touches the approval-read path and the CI bundle check, audit-rules §2.4) · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli, packages/core, .github/workflows (the bundle-check job: sensitive path, owner "merge")
 - **Depends on:** M1-9c (merged), M1-7e-3 (merged)
 - **Spec:** 06 §2.0, §2.1, §4; IR-M1-9c-1; D-76
@@ -2587,7 +2587,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** tests first (RED commit): a processed `proof` or protocol-type row from a contact is not counted unread, and the count clears after the default page; end to end over the MCP protocol client between two real agents, A sends, B's `agentlink_inbox` returns the message inside the untrusted block, marks it read, and a second call does not return it as unread; `agentlink_status` counts it until then and not after.
 
 #### M1-9q · MCP tools: propose and respond to terms (new, split from M1-9c)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#132; declared S2 under audit-rules §2.4: drives commitment approvals and renders the owner's approval card) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`src/tools/{propose-terms,respond-to-terms}.ts` and their two registry entries)
 - **Depends on:** M1-9c, M1-21, M1-20, M1-32; M1-9b for the end-to-end approval
 - **Spec:** 06 §2.2a, §2.5, §3; 04 §3.4, §3.4.2; 11 §6.1, §6.10; D-31, D-32, D-55
@@ -2596,6 +2596,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - `agentlink_respond_to_terms` with `accept` under the default policy → `pending_approval`; the retry with the `approvalId` sends exactly one `accept` (relay spy) and a second retry sends nothing (`APPROVAL_USED`); `terms` passed with `accept` → `INVALID_ARGUMENT`; `agentlink_send` with `type: "accept"` fails schema validation.
   - A canary in an offer's subject, deliverables, note or price never appears in a summary, `nextStep`, error or approval summary.
+- **Note (IR-M1-9q-1 F-2, F-3, 2026-10-15):** two core gaps found here are fixed in the new card M1-32-b, which must land before the M1a gate. F-2: the core terms flow ignores `clientRequestId`, so a repeated propose sends a second offer. F-3: when v1 and its `revises` v2 have the same `createdAt` and arrive in one sync, the receiver drops v2 and leaves v1 pending.
 
 #### M1-9r · MCP server: background loop and relay subscriptions (new, split from M1-9c)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1a

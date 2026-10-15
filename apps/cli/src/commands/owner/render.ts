@@ -2,13 +2,20 @@
 //
 // Layout of one card, in this order:
 // 1. a fixed header line with the approval ID (checked against its exact pattern);
-// 2. the marked untrusted region(s): every argument the agent chose ("From your AI"), and for an
-//    answer to a contact's terms, the terms they sent ("From <contact>"). Every value is sanitized
-//    first and cut after (src/terminal/sanitize.ts), and every line is prefixed `| `;
-// 3. the fixed lines the owner decides on: who, what, cost, expiry, consequence, and "Your AI can't
-//    approve this for you." They come AFTER the regions, so nothing inside a region can stand in
-//    for them (06 §8). Their only inserted values are a contact name under the 06 §2.1 rule (sanitized
-//    to one line again), an exact dollar amount and a UTC date.
+// 2. for an answer to a contact's terms (M1-9q, terms-card.ts): the commitment headline and any
+//    late-accept warning (fixed text, a contact name, numbers and our dates);
+// 3. the marked untrusted region(s): every argument the agent chose ("From your AI"), and for an
+//    answer to a contact's terms, the terms they sent, one field per line ("Proposed by <contact>").
+//    Every value is sanitized first and cut after (src/terminal/sanitize.ts), and every line is
+//    prefixed `| `;
+// 4. the fixed lines the owner decides on: who, what, cost, expiry, for terms the changes, what the
+//    one approval does, the auto-accept note and the fingerprint, then the consequence and "Your AI
+//    can't approve this for you." They come AFTER the regions, so nothing inside a region can stand
+//    in for them (06 §8). Their only inserted values are a contact name under the 06 §2.1 rule
+//    (sanitized to one line again), an exact dollar amount, numbers, ids and UTC dates.
+//
+// A terms request whose stored terms, scope and core card data do not match is a problem
+// (`facts.terms === 'problem'`): approve.ts never offers it.
 //
 // Everything here is derived from the parsed stored action (pending.ts), never from the row's
 // stored summary or any text the agent passed in (IR-M1-8c-1 F-4).
@@ -17,9 +24,10 @@ import { canonicalize, type JsonObject, type JsonValue } from '@agentlink/crypto
 import { isUsdAmount, parseUsd } from '@agentlink/types';
 import { isApprovalId } from '../../approval/next-step.js';
 import { FROM_YOUR_AI, terminalOneLine, untrustedRegion } from '../../terminal/sanitize.js';
-import { copy, formatDate, formatTime, formatUsd } from '../../tools/strings/index.js';
+import { formatDate, formatTime, formatUsd } from '../../tools/strings/index.js';
 import type { PendingRequest } from './pending.js';
 import { OWNER_TEXT } from './strings.js';
+import { termsCard, type TermsCardView } from './terms-card.js';
 
 /** What a tool does, in 11 §5 vocabulary (fixed text, keyed by the schema-checked tool name). */
 const WHAT: Readonly<Record<string, string>> = Object.freeze({
@@ -43,6 +51,11 @@ export interface CardFacts {
   readonly expires: string;
   /** The one-line summary handed to the signing step (fixed text built from the facts above). */
   readonly summary: string;
+  /**
+   * For a commitment answering a contact's terms (M1-9q, 11 §6.10): its card, or `'problem'` when
+   * the stored action, its scope and the core's card data do not match (never offered).
+   */
+  readonly terms?: TermsCardView | 'problem';
 }
 
 const asObject = (value: JsonValue | undefined): JsonObject | undefined =>
@@ -93,7 +106,15 @@ export async function cardFacts(
   const who = await contactLabel(client, request.action);
   const cost = costOf(request.action);
   const summary = terminalOneLine(`${what} · ${who} · ${cost}`);
-  return Object.freeze({ who, what, cost, expires: expiryOf(request.expiresAt), summary });
+  const terms = await termsCard(client, request, who);
+  return Object.freeze({
+    who,
+    what,
+    cost,
+    expires: expiryOf(request.expiresAt),
+    summary,
+    ...(terms === undefined ? {} : { terms }),
+  });
 }
 
 /** The values of an object as region values: a field name line, then the value (06 §8). */
@@ -107,27 +128,6 @@ function fieldValues(object: JsonObject | undefined): unknown[] {
   return out;
 }
 
-/** The terms a contact sent, when this action answers them: their content, not the agent's. */
-function contactTerms(action: JsonObject): JsonObject | undefined {
-  if (action['tool'] !== 'agentlink_respond_to_terms') return undefined;
-  return asObject(asObject(action['context'])?.['terms']);
-}
-
-/** The commitment headline for accepting a contact's terms (11 §6.10), or undefined. */
-function termsHeadline(action: JsonObject, who: string): string | undefined {
-  if (action['tool'] !== 'agentlink_respond_to_terms') return undefined;
-  if (asObject(action['args'])?.['decision'] !== 'accept') return undefined;
-  const scope = asObject(asObject(action['context'])?.['scope']);
-  const version = scope?.['version'];
-  const expiresAt = scope?.['expiresAt'];
-  if (typeof version !== 'number' || typeof expiresAt !== 'number') return undefined;
-  return copy('cli.approve.terms.headline', {
-    contactName: who,
-    version,
-    date: formatDate(new Date(expiresAt * 1000)),
-  });
-}
-
 /**
  * The full card for one request as display lines. `index` numbers it in a batch view. The regions
  * come first and the fixed lines after them (06 §8).
@@ -138,19 +138,26 @@ export function cardLines(request: PendingRequest, facts: CardFacts, index?: num
   const lines: string[] = [
     index === undefined ? `Approval ${id}` : `${String(index)}. Approval ${id}`,
   ];
-  const headline = request.commitment ? termsHeadline(request.action, facts.who) : undefined;
-  if (headline !== undefined) lines.push(terminalOneLine(headline));
+  const terms = facts.terms;
+  if (terms === 'problem') {
+    // Never offered (approve.ts refuses it); shown so `cancel` still says what it is.
+    lines.push(OWNER_TEXT.problemTerms);
+    return lines;
+  }
+  if (terms !== undefined) {
+    lines.push(terms.headline);
+    if (terms.warning !== undefined) lines.push(terms.warning);
+  }
   const args = asObject(request.action['args']);
   lines.push(...untrustedRegion(FROM_YOUR_AI, fieldValues(args)));
-  const terms = contactTerms(request.action);
-  if (terms !== undefined) lines.push(...untrustedRegion(facts.who, fieldValues(terms)));
+  if (terms !== undefined) lines.push(...terms.region);
   lines.push(
     `Who:      ${facts.who}`,
     `What:     ${facts.what}`,
     `Cost:     ${facts.cost}`,
     `Expires:  ${facts.expires}`,
   );
-  if (headline !== undefined) lines.push(copy('cli.approve.terms.commits'));
+  if (terms !== undefined) lines.push(...terms.after);
   lines.push(OWNER_TEXT.consequence, OWNER_TEXT.cannotApprove);
   return lines;
 }

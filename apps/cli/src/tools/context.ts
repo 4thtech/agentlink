@@ -9,16 +9,21 @@ import {
   CoreError,
   evaluate,
   type AgentLinkClient,
-  type ApprovalCheck,
+  type ApprovalState,
   type ApprovalUse,
   type ContactView,
   type CreatedInvite,
   type InboxSender,
   type PendingContact,
   type PolicyDecision,
+  type ProposeTermsInput,
+  type ProposeTermsResult,
+  type RespondToTermsInput,
+  type RespondToTermsResult,
   type SendMessageInput,
   type SendMessageResult,
 } from '@agentlink/core';
+import type { ContactDisplayName } from '@agentlink/types';
 import {
   agentFingerprint,
   decodeHex0x,
@@ -40,13 +45,6 @@ export interface SelfView {
 export interface Counts {
   readonly inbox: readonly { readonly contactId: string; readonly unread: number }[];
   readonly requests: number;
-}
-
-/** What the core's approval check gives for a stored approval's own action (06 §2.5). */
-export interface StoredApprovalState {
-  readonly check: ApprovalCheck;
-  /** The row's `decided_at`, unix seconds, or null. */
-  readonly decidedAt: number | null;
 }
 
 /** A file as an inbox item shows it (06 §2.2 `FileInfo`): never a URL, a file key or inline bytes. */
@@ -165,6 +163,26 @@ export interface InviteTools {
   publish(): Promise<boolean>;
 }
 
+/**
+ * The terms calls of `agentlink_propose_terms` and `agentlink_respond_to_terms` (M1-9q; 06 §2.2a,
+ * D-55). The core (M1-32) fills the version, parties and links, checks the negotiation chain, builds
+ * the commitment scope and decides it (policy grant or one owner request); nothing here sets or
+ * widens an approval (I-4).
+ */
+export interface TermsTools {
+  /** Core `proposeTerms`: `to` is the resolved contact's agent ID. */
+  propose(input: ProposeTermsInput): Promise<ProposeTermsResult>;
+  /** Core `respondToTerms`. */
+  respond(input: RespondToTermsInput): Promise<RespondToTermsResult>;
+  /**
+   * The contact who sent the received `offer` or `accept` named by `envelopeId`, as the 06 §2.1
+   * name rule shows it, or undefined when it is not one. For summaries only: the core decides.
+   */
+  senderOf(
+    envelopeId: string,
+  ): Promise<{ readonly id: string; readonly display: ContactDisplayName } | undefined>;
+}
+
 /** The core surface the handlers use. */
 export interface ToolClient {
   /** The agent's identity, or undefined when it has none yet (needs `agentlink init`). */
@@ -178,16 +196,15 @@ export interface ToolClient {
   /** The backend for files above the inline limit under the current policy (06 §2.1). */
   storageMode(): Promise<'drop' | 'own'>;
   /**
-   * Pending approval requests. Absent until the core read lands (card M1-7e-3, PR #116; wired in
-   * `coreToolClient` by M1-9c-b); until then `agentlink_status` leaves `pendingApprovals` out.
+   * The number of approvals waiting for the owner (core `approvalService.countPending`, M1-7e-3):
+   * undecided, not cancelled, not voided and not lapsed. A display count only.
    */
-  pendingApprovals?(): Promise<number>;
+  pendingApprovals(): Promise<number>;
   /**
-   * The core's approval check for the row's own stored action (06 §2.5), or undefined for an
-   * unknown ID. Absent until the core read lands (card M1-7e-3, PR #116; wired by M1-9c-b);
-   * until then `agentlink_get_approval` answers with the fixed "not available yet" error.
+   * One approval read by ID for its own stored action (core `approvalService.read`, M1-7e-3): the
+   * stored signed objects are re-verified before the row's `status` cache is read. Read-only.
    */
-  approvalState?(approvalId: string): Promise<StoredApprovalState | undefined>;
+  approvalState(approvalId: string): Promise<ApprovalState>;
   /** Core `sendMessage` (M1-7k): policy, envelope, outbox, first publish; idempotent (07 §3.3). */
   send(input: SendMessageInput): Promise<SendMessageResult>;
   /** Core `syncInbox` (M1-7h): fetches, stores and processes envelopes within the budget (06 §6). */
@@ -196,6 +213,8 @@ export interface ToolClient {
   inboxPage(query: InboxPageQuery): Promise<InboxPage>;
   /** Invites and pairing (M1-9o). Absent in a double that does not need them: the tools then answer "not available". */
   readonly invites?: InviteTools;
+  /** Terms (M1-9q). Absent in a double that does not need them: the tools then answer "not available". */
+  readonly terms?: TermsTools;
 }
 
 export interface ToolContext {
@@ -263,12 +282,31 @@ export function coreToolClient(client: AgentLinkClient): ToolClient {
       await client.syncInbox({ budgetMs });
     },
     inboxPage: (query) => client.inbox.page(query),
+    pendingApprovals: () => client.approvalService.countPending(),
+    approvalState: (approvalId) => client.approvalService.read(approvalId),
     invites: coreInviteTools(client),
+    terms: coreTermsTools(client),
     async storageMode() {
       const effective = await client.ownerActions.loadPolicy();
       return effective.mode !== 'fail_closed' && effective.policy.files.storage === 'own'
         ? 'own'
         : 'drop';
+    },
+  });
+}
+
+/** The received envelope types a terms answer can name (06 §2.2a (a) and (b)). */
+const ANSWERABLE: ReadonlySet<string> = new Set(['offer', 'accept']);
+
+function coreTermsTools(client: AgentLinkClient): TermsTools {
+  return Object.freeze<TermsTools>({
+    propose: (input) => client.proposeTerms(input),
+    respond: (input) => client.respondToTerms(input),
+    async senderOf(envelopeId) {
+      // The core's own inbox read: a processed inbound row from a contact, opened in memory only.
+      const [item] = await client.inbox.items([envelopeId]);
+      if (item === undefined || !ANSWERABLE.has(item.type)) return undefined;
+      return { id: item.from.contactId, display: item.from.display };
     },
   });
 }
