@@ -47,6 +47,7 @@ import {
   signedApprovalOpSchema,
   signedPolicySetSchema,
 } from './owner-action.js';
+import { termsSchema } from './terms.js';
 
 const envelopeId = base64url(BYTE_LENGTHS.id);
 
@@ -136,13 +137,14 @@ export const requestBodySchema = z.union([
 ]);
 
 /**
- * offer / accept / reject (04 §3.4). `terms` is a bounded JSON object until M1-21 lands its strict
- * schema and canonical-form rules; `termsHash` binds it (checked by the core, not here). It is
- * never a Record field, so it is bare hex (04 §2.4.1).
+ * offer / accept / reject (04 §3.4). `terms` is the strict, canonical `termsSchema` (M1-21);
+ * `termsHash` binds it: `sha256(JCS(terms))`, recomputed by the core on send and on receipt with
+ * `termsHash` from @agentlink/crypto (nothing here hashes). It is never a Record field, so it is bare
+ * hex (04 §2.4.1).
  */
 const termsBody = <N extends z.ZodType>(note: N) =>
   z.strictObject({
-    terms: jsonObjectSchema,
+    terms: termsSchema,
     termsHash: sha256Hex,
     note,
   });

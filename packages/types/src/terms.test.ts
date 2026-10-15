@@ -38,10 +38,10 @@ import {
   termsInput,
 } from './testing/fixtures.js';
 
-const H1 = hex(32, '01');
-const H2 = hex(32, '02');
-const H3 = hex(32, '03');
-const H4 = hex(32, '04');
+const H1 = hex(32, 'a1');
+const H2 = hex(32, 'b2');
+const H3 = hex(32, 'c3');
+const H4 = hex(32, 'd4');
 const ENV = (n: number) => b64u(16, String.fromCharCode(0x41 + n));
 
 type Obj = Record<string, unknown>;

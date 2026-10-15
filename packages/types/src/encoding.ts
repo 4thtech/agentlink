@@ -300,6 +300,68 @@ export const uint256Decimal = z
     'must be at most 2^256 - 1',
   );
 
+// --- timestamps --------------------------------------------------------------------------------
+
+const UTC_TIMESTAMP = /^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})Z$/;
+
+const daysIn = (year: number, month: number): number =>
+  month === 2
+    ? (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
+      ? 29
+      : 28
+    : [4, 6, 9, 11].includes(month)
+      ? 30
+      : 31;
+
+/**
+ * True for a strict RFC 3339 UTC timestamp with whole seconds, `YYYY-MM-DDTHH:MM:SSZ`: no offset,
+ * no fraction, no leap second, a real calendar date. One spelling per instant.
+ */
+export function isUtcTimestamp(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const m = UTC_TIMESTAMP.exec(value);
+  if (m === null) return false;
+  const [year, month, day, hour, minute, second] = m.slice(1).map(Number) as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ];
+  return (
+    month >= 1 &&
+    month <= 12 &&
+    day >= 1 &&
+    day <= daysIn(year, month) &&
+    hour <= 23 &&
+    minute <= 59 &&
+    second <= 59
+  );
+}
+
+/** Days since 1970-01-01 of a proleptic Gregorian date (H. Hinnant's days_from_civil). */
+function daysFromCivil(year: number, month: number, day: number): number {
+  const y = month <= 2 ? year - 1 : year;
+  const era = Math.floor(y / 400);
+  const yoe = y - era * 400;
+  const doy = Math.floor((153 * (month + (month > 2 ? -3 : 9)) + 2) / 5) + day - 1;
+  const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
+  return era * 146097 + doe - 719468;
+}
+
+/**
+ * Unix seconds of a strict UTC timestamp (`isUtcTimestamp`), or null for any other value. Pure
+ * arithmetic: no Date parsing, so every runtime gives the same answer and no lenient form slips in.
+ */
+export function utcTimestampToUnixSeconds(value: unknown): number | null {
+  if (!isUtcTimestamp(value)) return null;
+  const [year, month, day, hour, minute, second] = (UTC_TIMESTAMP.exec(value) as RegExpExecArray)
+    .slice(1)
+    .map(Number) as [number, number, number, number, number, number];
+  return daysFromCivil(year, month, day) * 86400 + hour * 3600 + minute * 60 + second;
+}
+
 // --- identifiers ---------------------------------------------------------------------------------
 
 /** `apr_` + 16 random bytes as canonical base64url (04 §3.4.1). */

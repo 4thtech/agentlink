@@ -255,6 +255,8 @@ export const BYTE_LENGTHS = freeze({
   inviteId: 16,
   /** Random part of `approvalId` (§3.4.1). */
   approvalId: 16,
+  /** `terms.termsId` (§3.4). */
+  termsId: 16,
   /** Symmetric keys: CEK and `fileKey` (§3.3, §3.4). */
   key: 32,
   /** Invite `secret` (§3.6). */
@@ -328,6 +330,28 @@ export const MAX_MIME_LENGTH = 255;
 export const MAX_URL_LENGTH = 2048;
 /** `note` on offer / accept / reject (04 §3.4). */
 export const MAX_TERMS_NOTE_CODE_POINTS = 1024;
+/**
+ * `terms` size limits (04 §3.4 "size limits follow M1-21"; PROPOSED, owner confirms at merge). One
+ * set serves both `terms` and `TermsInput` (D-55). Lengths are Unicode code points; `amountLength`
+ * is characters of the ASCII amount; `maxBytes` is the UTF-8 size of the compact JSON form of the
+ * whole `terms` object, which leaves room for a note and the rest of a 24 KiB envelope.
+ */
+export const TERMS_LIMITS = freeze({
+  subjectCodePoints: 256,
+  deliverables: 32,
+  deliverableIdCodePoints: 32,
+  descriptionCodePoints: 2048,
+  deadlines: 32,
+  amountLength: 40,
+  maxBytes: 12 * 1024,
+} as const);
+/**
+ * Token symbols allowed as `price.currency` besides ISO 4217 codes (04 §3.4 "allowlisted token
+ * symbols"; PROPOSED, owner confirms at merge): the USD stablecoins of D-46. Matched exactly.
+ */
+export const TERMS_TOKEN_SYMBOLS = freeze(['USDC', 'USDT'] as const);
+/** `TermsInput.validUntil` default: 7 days from now (06 §2.2a). */
+export const TERMS_DEFAULT_VALIDITY_SECONDS = 7 * 24 * 60 * 60;
 /** Free-form JSON (message bodies, placeholders): nesting depth and total node count. */
 export const MAX_JSON_DEPTH = 32;
 export const MAX_JSON_NODES = 4096;
