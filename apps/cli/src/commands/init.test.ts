@@ -310,6 +310,26 @@ describe('confirmation', () => {
     expect(run.created).toBe(1);
   });
 
+  it('in a terminal, names the app in front of each question (IR-M1-9a-1 F07)', async () => {
+    await mkdir(join(home, '.codex'));
+    await mkdir(join(home, '.gemini'));
+    const run = await init([], { terminal: TTY, answers: ['y', 'n'] });
+    const lines = run.out.split('\n');
+    const questions = lines.flatMap((l, i) => (l === copy('cli.init.apply') ? [i] : []));
+    expect(questions).toHaveLength(2);
+    expect(lines[(questions[0] ?? 0) - 1]).toBe(copy('cli.init.changesFor', { appName: 'Codex' }));
+    expect(lines[(questions[1] ?? 0) - 1]).toBe(
+      copy('cli.init.changesFor', { appName: 'Gemini CLI' }),
+    );
+  });
+
+  it('does not write to ~/.claude.json when CLAUDE_CONFIG_DIR moves Claude Code elsewhere (F05)', async () => {
+    await writeFile(join(home, '.claude.json'), CLAUDE_JSON, { mode: 0o600 });
+    const plan = await init([], { terminal: { ...PIPE, env: { CLAUDE_CONFIG_DIR: outside } } });
+    expect(plan.err).toContain("Claude Code's settings");
+    expect(plan.out).not.toContain('--- a/~/.claude.json');
+  });
+
   it('in a terminal, declining everything changes nothing and creates no identity', async () => {
     await mkdir(join(home, '.codex'));
     const run = await init([], { terminal: TTY, answers: ['', 'maybe'] });

@@ -220,4 +220,21 @@ describe('addTomlMcpServer', () => {
     const table = agentlinkTable('npx', ['-y', '@4thtech/agentlink', 'mcp', '--agent', 'work-1']);
     expect(table[2]).toBe('args = ["-y", "@4thtech/agentlink", "mcp", "--agent", "work-1"]');
   });
+
+  // IR-M1-9a-1 F02: a key written with quoting or escapes is the same key.
+  it.each([
+    '[mcp_servers."agentlink"]\ncommand = "old"\n',
+    '[mcp_servers."agent\\u006cink"]\ncommand = "old"\n',
+    '[mcp_servers.\'agentlink\']\ncommand = "old"\n',
+    '[mcp_servers]\n"agent\\x6cink" = { command = "old" }\n',
+  ])('never writes a duplicate table next to an agentlink key written another way (%#)', (text) => {
+    const edit = (() => {
+      try {
+        return addTomlMcpServer(text, TABLE);
+      } catch (error) {
+        return error instanceof HarnessError ? error.code : 'other';
+      }
+    })();
+    expect(edit).not.toMatchObject({ status: 'change' });
+  });
 });

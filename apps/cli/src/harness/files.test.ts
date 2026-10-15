@@ -115,6 +115,18 @@ describe('readConfigFile', () => {
   });
 });
 
+describe('byte order mark and size (IR-M1-9a-1 F03, F04)', () => {
+  it('refuses a file that starts with a byte order mark, so it is never dropped unseen', async () => {
+    await writeFile(join(home, '.claude.json'), '\ufeff{}');
+    expect(await code(readConfigFile(home, ['.claude.json']))).toBe('unsupported_format');
+  });
+
+  it('reports a file over the size cap as too large, not as invalid', async () => {
+    await writeFile(join(home, '.claude.json'), Buffer.alloc(MAX_CONFIG_BYTES + 1, 0x20));
+    expect(await code(readConfigFile(home, ['.claude.json']))).toBe('too_large');
+  });
+});
+
 describe('writeConfigFile', () => {
   it('creates a missing folder (0700) and file, with no backup', async () => {
     const before = await readConfigFile(home, ['.codex', 'config.toml']);
