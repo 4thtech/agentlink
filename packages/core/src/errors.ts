@@ -38,6 +38,8 @@ export type CoreErrorCode =
   | 'payload_invalid'
   | 'thread_invalid'
   | 'envelope_too_large'
+  // Send pipeline and transport (07 §2, §3.2, §4; M1-7k)
+  | 'transport_unavailable'
   // Policy (06 §3; M1-7d)
   | 'policy_context_invalid'
   // Approvals and idempotency (04 §3.4.1, 06 §2.5, 07 §3.3; M1-7e)

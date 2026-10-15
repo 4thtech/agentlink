@@ -86,9 +86,9 @@ areas:
     intro: "Code merged, none of it published."
     components:
       - name: "Constants and the envelope, payload, card and invite schemas"
-        state: in-progress
+        state: done
         prs: [23, 93]
-        summary: "Merged; per-path canonical decoders and the `encodings` vector suite are in review (#93)."
+        summary: "Merged, with per-path canonical decoders, the `encodings` vector suite and the 12 288-byte inline cap."
       - name: "Policy, approval, proof pack and tool-result types"
         state: done
         prs: [31, 36, 71, 72, 76]
@@ -114,9 +114,9 @@ areas:
         prs: [63]
         summary: "Reads each relay for new gift wraps, 48 h back from a per-relay cursor, hands each over once, and returns what it has after 3 s, flagged as partial."
       - name: "Outbox stays inside the sync look-back"
-        state: in-progress
+        state: done
         prs: [87]
-        summary: "The outbox stops republishing outside the sync look-back (M1-5f); in review."
+        summary: "The outbox stops republishing outside the sync look-back (M1-5f)."
   - id: core
     title: "Core (@agentlink/core)"
     intro: "Code merged, not published. Nothing in it is user-runnable yet."
@@ -142,16 +142,20 @@ areas:
         prs: [79]
         summary: "Approvals, batch approvals, cancellations and policy changes apply only with a valid owner signature, once each; a stored policy that no longer verifies makes the agent ask the owner."
       - name: "Approval requests and the requests queue"
-        state: in-progress
+        state: done
         prs: [95]
-        summary: "Approval requests with use-once, requests-queue limits and idempotency (M1-7e); in review."
+        summary: "Approval requests with use-once, requests-queue limits and idempotency (M1-7e). A follow-up for requests from unknown senders (accept, ignore, block) is in review."
       - name: "Held cards need the sender's own owner entry"
-        state: in-progress
+        state: done
         prs: [90]
-        summary: "A held card is accepted only with the sender's own owner entry (G-51); in review."
+        summary: "A held card is accepted only with the sender's own owner entry (G-51)."
+      - name: "Send pipeline"
+        state: in-progress
+        prs: [99]
+        summary: "Sending a message to a paired contact, stored with its delivery rows before anything is published, retried from the outbox, with one publisher per row when several processes share the agent (M1-7k); in review."
       - name: "Inbox sync, delivery acknowledgements, owner card update"
         state: planned
-        summary: "Inbox sync and delivery acknowledgements (M1-7h), owner card update (M1-7j)."
+        summary: "Inbox sync and delivery acknowledgements (M1-7h); the owner card update (M1-7j) follows in M1b."
   - id: node
     title: "Node runtime (@agentlink/node)"
     intro: "Code merged, not published. Nothing in it is user-runnable yet."
@@ -234,7 +238,7 @@ deploy:
     note: "Submitter, faucet and encrypted drop are not built or deployed yet."
 
 # Prose for the README Status block and the docs-site page.
-inProgress: "In review as pull requests: approval requests and the requests queue (M1-7e), the held-card owner entry (G-51), the encodings vectors and the outbox look-back. Next: inbox sync, file encryption, the MCP server and CLI, and the remaining contract work."
+inProgress: "The send pipeline in core (M1-7k) and the terms schema (M1-21), and the decomposition of the MCP server and CLI into cards. Next: inbox sync, the MCP server and CLI, then file encryption and the remaining contract work."
 notYet: "a usable product. The packages are private and nothing is published; only the crypto, types, transport, core, node and logging foundations listed here contain code. **There is nothing to install or run yet.** The design is described throughout and marked \"planned\" where it is not built."
 next: "The rest of the M1a crypto and core layers, then the walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets."
 
@@ -258,7 +262,7 @@ roadmap:
     duration: "~2–3 weeks"
     outcome: "Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals"
     gate: "Two developers' agents (Claude Code and Codex) pair and keep a shared project in sync over AgentLink, and negotiate terms with owner approval."
-    progress: "Crypto foundations, the transport (gift wrap, relays, sync), most of the core (envelopes, pairing, owner-signed actions and policies) and the node keychain, database and relay connection are merged; the approvals queue, inbox sync, MCP server and CLI come next."
+    progress: "Crypto foundations, the transport (gift wrap, relays, sync), most of the core (envelopes, pairing, owner-signed actions and policies) and the node keychain, database and relay connection are merged; the approvals queue and the held-card owner entry are merged too; the send pipeline is in progress, and inbox sync, the MCP server and CLI come next."
   - id: "M1b"
     name: "Files, proof, credits"
     state: planned

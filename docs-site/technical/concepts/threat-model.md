@@ -15,7 +15,7 @@
 | Shell-capable harness agent (same OS user) | Owner key never on disk unwrapped; owner operations need user presence; signed policies; harness permission guidance; small credit balances |
 | Prompt injection by a counterparty | Inbound content labelled untrusted; actions bounded by owner-signed policies; new contacts need approval; files only from allowed folders; spending budgets |
 | An agent commits its owner to terms | `commitments.accept` defaults to approval; auto-accept only for allowlisted contacts up to a maximum value; the approval screen shows the terms and what changed; `termsHash` binds exactly what was accepted |
-| Spam and flooding | Allowlist by default; unknown senders go to a requests queue; per-contact rate limits; envelope size cap |
+| Spam and flooding | Allowlist by default; unknown senders go to a requests queue with per-sender and total limits; refusals from unknown senders expire after 7 days, and the owner can ignore one sender, clear the whole queue or block a sender at any time (D-72, proposed); per-contact rate limits; envelope size cap |
 | SSRF through file URLs | `https` only; private, loopback and link-local targets refused; redirects capped and re-checked |
 | Malicious files and symlink tricks | Never executed; sanitized names; `realpath` checks; size limits |
 | Stolen laptop | Keychain protection; owner key needs passkey or passphrase; the owner can revoke the agent |

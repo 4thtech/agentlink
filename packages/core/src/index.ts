@@ -142,6 +142,28 @@ export {
   type IdempotencyStart,
   type PreparedEffect,
 } from './idempotency.js';
+// M1-7k: the send pipeline, the Transport adapter and the outbox over the Store (07 §2, §3.2, §4).
+export {
+  POLICY_DENIED,
+  SEND_TOOL,
+  USE_TERMS_TOOLS,
+  type SendMessageInput,
+  type SendMessageResult,
+  type SendMessageType,
+} from './send.js';
+export {
+  nostrTransport,
+  type NostrTransportOptions,
+  type Transport,
+  type TransportDeps,
+  type TransportFactory,
+} from './transport.js';
+export {
+  OUTBOX_CLAIM_SECONDS,
+  OutboxService,
+  type OutboxPeer,
+  type OutboxRoute,
+} from './outbox.js';
 export { REQUESTS_FULL, RequestsQueue, queueRefusals, type RequestEntry } from './requests.js';
 export { CoreError, StoreConstraintError, StoreUsageError, type CoreErrorCode } from './errors.js';
 export * from './constants.js';
