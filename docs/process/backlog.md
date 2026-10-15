@@ -2454,6 +2454,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-5, I-7
 - **Scope:** while the server runs: relay subscriptions, the 48 h look-back at start, processing of stored envelopes (handshake completion, acks, card updates) by the loop, the outbox worker; a single active process per agent (the M1-7k lease or lock; the other servers stay idle and take over); optional `agentlink://inbox` resource notifications (the tools work without them); clean shutdown on stdin close.
 - **Acceptance:** an invite accepted while the inviter's server runs completes the pairing without any tool call; two servers on one agent publish each wrap once; the tools work without notifications.
+- **Note (IR-M1-7k-1 Q3, 2026-10-15):** the outbox needs no leader: M1-7k's per-row claim already lets only one process publish each row. For relay subscriptions, use a per-agent lease row with compare-and-set (a random holder ID, a 60 s lease renewed every 20 s, takeover once it lapses), as the idempotency lease does (07 §3.3); this needs a store table and a migration. Do not hold the M1-8b inter-process lock for this: a long-lived holder would block the policy-mark and file-KeyStore critical sections (`store_busy` after 10 s). Receiving is idempotent (seen-set, envelopeHash, one store transaction), so a lapsed or doubled holder only costs extra relay connections.
 
 #### M1-9d · MCP server: file and proof tools
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
