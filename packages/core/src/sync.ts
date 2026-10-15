@@ -8,14 +8,18 @@
 //    steps 3 and 4), stored as `received` with its seen rows in one store transaction. So the
 //    signature of one envelope is verified once: a later copy (another relay, another gift wrap of
 //    the same envelope) is skipped on its seen row before any verification.
-// 2. Rate limit (07 §3.2 `rate_counters`). Each envelope stored as `received` whose verified `from`
-//    is a contact's key (current or superseded) is counted for that contact in one store
-//    transaction; one that would go above `contacts.rateLimitPerContactPerHour` is dropped (its row
-//    deleted, its seen rows kept), so a flood from one contact never fills the `received` cap or
-//    delays another contact. Counted once: only a newly stored envelope is counted.
+// 2. Admission bound (07 §3.2 `rate_counters`, the `received` cap). Each envelope stored as
+//    `received` whose verified `from` is a contact's key (current or superseded) is admitted only
+//    while the contact's counted hour plus its envelopes still waiting as `received` stay within
+//    `contacts.rateLimitPerContactPerHour`; otherwise it is dropped (row deleted, seen rows kept), so
+//    a flood from one contact never fills the `received` cap or delays another contact. Nothing is
+//    counted here.
 // 3. Process (`syncInbox` only): `EnvelopeService.processReceived` (steps 5 to 9, `card-update`
-//    first, held rows; M1-7b, M1-7c), then delivery acks (02 F-23, behind a flag), then the new
-//    inbox items with their wrapper metadata.
+//    first, held rows; M1-7b, M1-7c). The rate counter is incremented there, in the transaction that
+//    stores the contact's envelope, `ok` or `refused` (07 §3.2 "Transaction"; `countRateTx`, the
+//    envelope pipeline's RateLimitHook), so envelopes from a contact's new key that arrive with its
+//    card-update, and held envelopes it releases, are counted too (IR-M1-7h-1 F02). Then delivery
+//    acks (02 F-23, behind a flag), then the new inbox items with their wrapper metadata.
 //
 // `catchUp` (the M1-9 plan finding 3 addendum) runs steps 1 and 2 only and then counts from the
 // store: no handshake, ack, card update, receipt or read mark, and no envelope is opened (06 §2.0:
@@ -130,8 +134,55 @@ export class StoreSyncPersistence implements SyncPersistence {
   }
 }
 
-/** One envelope counted toward its contact's hourly limit, or dropped over it (07 §3.2). */
-function rateTx(
+/** The contact's counted envelopes in the sliding hour; stale buckets are deleted (07 §3.2). */
+function usedTx(tx: StoreTx, contactId: string, now: number): number {
+  const windowStart = now - RATE_WINDOW_SECONDS;
+  tx.delete('rate_counters', { contact_id: contactId, bucket: { lte: windowStart } });
+  return tx
+    .select('rate_counters', { contact_id: contactId, bucket: { gt: windowStart } })
+    .reduce((sum, row) => sum + row.count, 0);
+}
+
+/**
+ * 07 §3.2 rate_counters, at processing: counts one envelope of `contactId` in the caller's
+ * transaction (the one that stores it), or returns false when it would go above `limit`, so the
+ * caller drops it. The envelope pipeline's RateLimitHook (IR-M1-7h-1 F02).
+ */
+export function countRateTx(tx: StoreTx, contactId: string, limit: number, now: number): boolean {
+  if (usedTx(tx, contactId, now) >= limit) return false;
+  const bucket = now - (now % RATE_BUCKET_SECONDS);
+  const current = tx.get('rate_counters', { contact_id: contactId, bucket });
+  if (current === undefined) {
+    tx.insert('rate_counters', { contact_id: contactId, bucket, count: 1 });
+  } else {
+    tx.update('rate_counters', { contact_id: contactId, bucket }, { count: current.count + 1 });
+  }
+  return true;
+}
+
+/** Every Nostr key of a stored contact: the current one and the superseded ones (07 §3). */
+function contactKeysTx(tx: StoreTx, contactId: string): string[] {
+  const row = tx.get('contacts', { contact_id: contactId });
+  if (row === undefined) return [];
+  let listed: unknown;
+  try {
+    listed = JSON.parse(row.nostr_keys);
+  } catch {
+    listed = [];
+  }
+  const keys = Array.isArray(listed)
+    ? listed.filter((k): k is string => typeof k === 'string' && HEX64.test(k))
+    : [];
+  return [...new Set([...keys, row.agent_nostr])];
+}
+
+/**
+ * The admission bound at fetch time (07 §3.2; nothing is counted here): a newly stored `received`
+ * envelope from a contact key is dropped when the contact's counted hour plus its envelopes waiting
+ * as `received` (this one included) go above `limit`. It keeps a flood from one contact out of the
+ * 1 000-row `received` cap, so other contacts are not delayed.
+ */
+function admitTx(
   tx: StoreTx,
   envelopeId: string,
   fromKey: string,
@@ -141,29 +192,20 @@ function rateTx(
   const screen = screenInboundTx(tx, fromKey);
   if (screen.action !== 'continue' || screen.sender.kind === 'unknown') return undefined;
   const contactId = screen.sender.contactId;
-  const windowStart = now - RATE_WINDOW_SECONDS;
-  tx.delete('rate_counters', { contact_id: contactId, bucket: { lte: windowStart } });
-  const used = tx
-    .select('rate_counters', { contact_id: contactId, bucket: { gt: windowStart } })
-    .reduce((sum, row) => sum + row.count, 0);
-  if (used >= limit) {
-    // Dropped: not stored; its seen rows record the outcome (07 §3.2). A row that another process
-    // has already processed is no longer `received`; it was stored, so it is counted instead.
-    const deleted = tx.delete('envelopes', {
-      envelope_id: envelopeId,
-      state: 'received',
-      from_key: fromKey,
-    });
-    if (deleted > 0) return { contactId, dropped: true };
-  }
-  const bucket = now - (now % RATE_BUCKET_SECONDS);
-  const current = tx.get('rate_counters', { contact_id: contactId, bucket });
-  if (current === undefined) {
-    tx.insert('rate_counters', { contact_id: contactId, bucket, count: 1 });
-  } else {
-    tx.update('rate_counters', { contact_id: contactId, bucket }, { count: current.count + 1 });
-  }
-  return { contactId, dropped: false };
+  const waiting = tx.count('envelopes', {
+    state: 'received',
+    direction: 'in',
+    from_key: { in: contactKeysTx(tx, contactId) },
+  });
+  if (usedTx(tx, contactId, now) + waiting <= limit) return { contactId, dropped: false };
+  // Dropped: not stored; its seen rows record the outcome (07 §3.2). A row another process has
+  // already processed is no longer `received` and stays.
+  const deleted = tx.delete('envelopes', {
+    envelope_id: envelopeId,
+    state: 'received',
+    from_key: fromKey,
+  });
+  return { contactId, dropped: deleted > 0 };
 }
 
 /** A counter that cannot be read counts as being at the limit for that contact (07 §3.2). */
@@ -199,6 +241,16 @@ export class SyncService {
     const budgetMs = readBudget(options.budgetMs);
     const fetched = await this.#fetch(budgetMs);
     const reports = await this.#deps.envelopes.processReceived();
+    // Rate-limit drops at processing time (07 §3.2) join the fetch-time ones, by contact.
+    const limited = new Map(fetched.rateLimited.map((r) => [r.contactId, r.dropped]));
+    for (const r of reports) {
+      if (r.outcome === 'dropped' && r.reason === 'rate_limited' && r.contactId !== undefined) {
+        limited.set(r.contactId, (limited.get(r.contactId) ?? 0) + 1);
+      }
+    }
+    const rateLimited = [...limited]
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([contactId, dropped]) => ({ contactId, dropped }));
     const acksSent = await this.#deps.acks.sendFor(reports);
     const newIds = reports
       .filter((r) => r.outcome === 'ok' && r.contactId !== undefined && r.envelopeId !== undefined)
@@ -213,7 +265,7 @@ export class SyncService {
       acks: acksSent,
       partial: fetched.partial,
     });
-    return { ...fetched, items, reports, requests, acksSent };
+    return { ...fetched, rateLimited, items, reports, requests, acksSent };
   }
 
   /**
@@ -323,7 +375,9 @@ export class SyncService {
     const fromKey = item.envelope.from;
     try {
       const now = nowOf(ctx);
-      const rate = await ctx.store.transaction((tx) => rateTx(tx, envelopeId, fromKey, limit, now));
+      const rate = await ctx.store.transaction((tx) =>
+        admitTx(tx, envelopeId, fromKey, limit, now),
+      );
       if (rate?.dropped === true) {
         return { disposition: 'verified', stored: false, rateLimited: rate.contactId };
       }

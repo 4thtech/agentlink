@@ -889,6 +889,9 @@ describe('IR-M1-7h-1 F02: rate limit at processing time', () => {
       payload: await cardUpdatePayload(a),
     });
     await deliverRaw(net, a, b, update.envelope, [RELAYS_B[0] as string]);
+    // The texts are dated after the card-update, so the pass applies it before any of them and none
+    // is held (the held pool keeps at most 100 per owner kid, 07 §3.2, which would evict the rest).
+    clock.t += 1;
     for (let i = 0; i < 300; i += 1) {
       const built = await a.client.envelopes.build({
         to: { contact: b.id },

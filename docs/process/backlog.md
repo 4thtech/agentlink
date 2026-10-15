@@ -2057,6 +2057,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - In one sync pass, a `card-update` is processed before the same contact's envelopes from the new key, whatever their arrival order or `created_at` (04 §3.1.1, step 7).
   - (Catch-up) The M1-9c read-only test passes against this API: a handshake pending in the relay stays unprocessed, and no ack, contact, read mark or receipt results.
 
+#### M1-7h-b · core: revocation follow-ups (new, IR-M1-7h-1 F01, F04; blocks the M1 gate)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/core
+- **Depends on:** M1-7h, M1-7e, M1-32
+- **Spec:** 07 §3.4 (`revoked_agents` "Transaction"), §3.2; 04 §3.4.1, §3.4.2 (void rule 3); 06 §2.1, §6
+- **Invariants:** I-4, I-5
+- **Scope:** M1-7h applies a verified `revoke` (`revoked_agents`, contact status or `identity.revoked_at`, pending outbox rows stopped as `revoked`) and drops any other. Left here: in the same store transaction, void every pending approval and every open commitment part with the revoked agent as counterparty (void rule 3); the activity line for a revoke; `catchUp` counts that leave out `received` rows whose type is not a message once it is known (F04 a); acks staged for the outbox instead of published inside `syncInbox` (F04 b); a KeyStore failure while listing own keys degrades the fetch instead of failing the sync (F04 c).
+- **Acceptance:** after a contact's revoke, an approval pending for an action with that contact is `void` and its commitment parts are void, in the revoke's transaction; a peer's acks do not raise `catchUp` counts; `syncInbox` returns within its budget with 200 acks pending.
+
 #### M1-7j · core: relay changes and the owner card-update (G-24) (new)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (D-73 (5): it serves the owner surfaces and `relays set`, M1-9n; neither J8 nor J9 needs it)
 - **Repo/path:** agentlink · packages/core

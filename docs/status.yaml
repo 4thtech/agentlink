@@ -152,7 +152,7 @@ areas:
       - name: "Inbox sync, delivery acknowledgements, owner card update"
         state: in-progress
         prs: [106]
-        summary: "Inbox sync with a per-contact rate limit, opt-in delivery acknowledgements and a fetch-only catch-up for read-only status (M1-7h); in progress. Revocation envelopes and the owner card update (M1-7j, M1b) follow."
+        summary: "Inbox sync with a per-contact rate limit, opt-in delivery acknowledgements and a fetch-only catch-up for read-only status (M1-7h); in progress. Owner-signed revocations of contacts and of the agent itself are applied; the owner card update (M1-7j, M1b) follows."
   - id: node
     title: "Node runtime (@agentlink/node)"
     intro: "Code merged, not published. Nothing in it is user-runnable yet."

@@ -23,8 +23,11 @@ import { SendService, type SendMessageInput, type SendMessageResult } from './se
 import type { TransportFactory } from './transport.js';
 import { DeliveryAcks } from './acks.js';
 import { InboxService } from './inbox.js';
+import { policyLimits } from './policy-engine.js';
+import { RevocationService } from './revocation.js';
 import {
   SyncService,
+  countRateTx,
   type CatchUpResult,
   type SyncInboxOptions,
   type SyncInboxResult,
@@ -101,9 +104,18 @@ export class AgentLinkClient {
     this.identity = new IdentityService(ctx);
     this.contacts = new ContactBook(ctx);
     this.pairing = new PairingService(ctx, this.identity, this.contacts);
-    this.envelopes = new EnvelopeService(ctx, this.identity, this.contacts, this.pairing);
-    this.approvals = approvals;
     this.ownerActions = new OwnerActions(ctx, this.identity, this.contacts, policyMark);
+    const ownerActions = this.ownerActions;
+    // M1-7h: revoke envelopes are applied or dropped (IR-M1-7h-1 F01), and the per-contact rate
+    // limit is counted where the contact's envelope is stored (07 §3.2; IR-M1-7h-1 F02).
+    this.envelopes = new EnvelopeService(ctx, this.identity, this.contacts, this.pairing, {
+      revocation: new RevocationService(ctx, this.identity, this.contacts),
+      rateLimit: {
+        limit: async () => policyLimits(await ownerActions.loadPolicy()).rateLimitPerContactPerHour,
+        countTx: countRateTx,
+      },
+    });
+    this.approvals = approvals;
     this.idempotency = new IdempotencyService(ctx);
     this.approvalService = new ApprovalService(
       ctx,
