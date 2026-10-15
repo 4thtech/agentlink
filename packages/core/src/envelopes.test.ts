@@ -869,6 +869,167 @@ describe('04 §3.1.1 step 8: own owner entry and the wrap check (I-9, G-46)', ()
   });
 });
 
+describe("04 §3.1.1 step 8: the sender's own owner entry when its card is held (G-51, D-71 (4))", () => {
+  /** The 04 §3.2 entries without the sender's owner (entry 3). */
+  async function withoutSenderOwner(
+    to: TestAgent,
+    from: TestAgent,
+    fromAgentEpoch?: number,
+  ): Promise<CraftEntry[]> {
+    return [
+      { pk: await agentEnc(to) },
+      { pk: await ownerEnc(to.owner) },
+      { pk: await agentEnc(from, fromAgentEpoch) },
+    ];
+  }
+
+  it("a contact's envelope without its owner kid is refused, stored as refused, the contact flagged", async () => {
+    const { a, b } = await world();
+    const spy = captureCeks(a);
+    const env = await craft({
+      signer: await agentSigner(b.keyStore),
+      entries: await withoutSenderOwner(a, b),
+      payload: textPayload('inbound words'),
+      createdAt: clock.t,
+    });
+    const reports = await deliver(a, env);
+    expect(reports).toEqual([
+      {
+        envelopeId: env.id,
+        outcome: 'refused',
+        reason: 'sender_owner_entry_missing',
+        contactId: b.id,
+        flagged: true,
+      },
+    ]);
+    // I-5: a fixed reason code; neither the ciphertext nor the payload is kept or reported.
+    expect(await row(a, env.id)).toMatchObject({
+      state: 'refused',
+      refused_reason: 'sender_owner_entry_missing',
+      contact_id: b.id,
+      from_key: env.from,
+      type: 'text',
+      envelope_json: null,
+      payload_json: null,
+    });
+    expect(JSON.stringify(reports).includes('inbound words')).toBe(false);
+    expect(spy.ceks.every(allZero)).toBe(true);
+    // The same contact's honest envelope (4 entries, 04 §3.2) is accepted.
+    const honest = await b.client.envelopes.build({
+      to: { contact: a.id },
+      payload: textPayload(),
+    });
+    expect(await deliver(a, honest.envelope)).toEqual([
+      { envelopeId: honest.envelope.id, outcome: 'ok', contactId: b.id, flagged: false },
+    ]);
+  });
+
+  it('with neither owner entry the own owner rule reports first, unflagged', async () => {
+    const { a, b } = await world();
+    const arbitrator = (await new MemoryKeyStore(seed(55)).getPublicBundle()).agentEnc;
+    const env = await craft({
+      signer: await agentSigner(b.keyStore),
+      entries: [{ pk: await agentEnc(a) }, { pk: await agentEnc(b) }, { pk: arbitrator }],
+      createdAt: clock.t,
+    });
+    expect(await deliver(a, env)).toEqual([
+      {
+        envelopeId: env.id,
+        outcome: 'refused',
+        reason: 'owner_entry_missing',
+        contactId: b.id,
+        flagged: false,
+      },
+    ]);
+  });
+
+  it('a card-update without the owner kid of the card it carries is refused, and the card is not applied', async () => {
+    const { a, b } = await world();
+    await rotate(b);
+    const env = await craft({
+      signer: await agentSigner(b.keyStore),
+      entries: await withoutSenderOwner(a, b, 1),
+      payload: await cardUpdatePayload(b),
+      createdAt: clock.t,
+    });
+    expect(await deliver(a, env)).toEqual([
+      {
+        envelopeId: env.id,
+        outcome: 'refused',
+        reason: 'sender_owner_entry_missing',
+        contactId: b.id,
+        flagged: true,
+      },
+    ]);
+    expect((await contactRow(a, b.id))?.key_epoch).toBe(0);
+  });
+
+  it('a held envelope without the sender owner kid is refused when its card-update is applied', async () => {
+    const { a, b } = await world();
+    // C (another owner) is A's contact; B's new key copies C's owner kid, so it is held under it.
+    const c = await makeAgent(clock, new MemoryKeyStore(seed(3)), ownerS, 'carol');
+    await pairWith(clock, a, c);
+    await rotate(b);
+    const env = await craft({
+      signer: await agentSigner(b.keyStore),
+      entries: [...(await withoutSenderOwner(a, b, 1)), { pk: await ownerEnc(ownerS) }],
+      createdAt: clock.t,
+    });
+    expect(await deliver(a, env)).toEqual([
+      { envelopeId: env.id, outcome: 'held', flagged: false },
+    ]);
+    expect(await heldRow(a, env.id)).toMatchObject({ owner_kid: kid64(await ownerEnc(ownerS)) });
+    const update = await b.client.envelopes.build({
+      to: { contact: a.id },
+      payload: await cardUpdatePayload(b),
+    });
+    expect(await deliver(a, update.envelope)).toEqual([
+      { envelopeId: update.envelope.id, outcome: 'ok', contactId: b.id, flagged: false },
+      {
+        envelopeId: env.id,
+        outcome: 'refused',
+        reason: 'sender_owner_entry_missing',
+        contactId: b.id,
+        flagged: true,
+      },
+    ]);
+    expect(await heldRow(a, env.id)).toBeUndefined();
+    expect(await row(a, env.id)).toMatchObject({
+      state: 'refused',
+      refused_reason: 'sender_owner_entry_missing',
+    });
+  });
+
+  it('an envelope from an unknown key (no card held) is not refused for this reason', async () => {
+    const { a } = await world();
+    const s = await makeAgent(clock, new MemoryKeyStore(seed(9)), ownerS, 'stranger');
+    const env = await craft({
+      signer: await agentSigner(s.keyStore),
+      entries: await withoutSenderOwner(a, s),
+      createdAt: clock.t,
+    });
+    expect(await deliver(a, env)).toEqual([
+      { envelopeId: env.id, outcome: 'request', flagged: false },
+    ]);
+  });
+
+  it('two agents of one owner: the one owner entry (3 entries) meets both rules', async () => {
+    const a = await makeAgent(clock, new MemoryKeyStore(seed(1)), ownerA, 'alice');
+    const c = await makeAgent(clock, new MemoryKeyStore(seed(3)), ownerA, 'carol');
+    await pairWith(clock, a, c);
+    await pairWith(clock, c, a);
+    const env = await craft({
+      signer: await agentSigner(c.keyStore),
+      entries: await withoutSenderOwner(a, c),
+      createdAt: clock.t,
+    });
+    expect(env.recipients).toHaveLength(3);
+    expect(await deliver(a, env)).toEqual([
+      { envelopeId: env.id, outcome: 'ok', contactId: c.id, flagged: false },
+    ]);
+  });
+});
+
 // --- Step 9 ----------------------------------------------------------------------------------------
 
 describe('04 §3.1.1 step 9: freshness and uniqueness', () => {
