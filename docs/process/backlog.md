@@ -2923,6 +2923,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Deterministic variant green on PRs within 15 minutes; LLM variant pass rate reported per run.
   - Canary scan of all e2e logs and artifacts finds no plaintext or keys.
   - Follow-up from the first LLM dispatch (run 38798822130, test report 5.2): L04 failed because Codex (`gpt-5.4-mini`) called `agentlink_accept_invite` again without `approvalId`. Check that the tool description and skill make the second call with the `approvalId` clear, then re-run the LLM variant; decide whether L04 should retry once or stay a hard failure.
+  - Upgrade Python (3.15) and the vector-generator dependencies (pycryptodome, coincurve, cffi/pyhpke) together, regenerating vectors; S2; Renovate PRs #154 and #156 closed for this.
 
 #### M1-13c · e2e: files, proof and proof of agreement (new, split from M1-13a)
 - **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
