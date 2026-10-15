@@ -16,6 +16,7 @@ import {
   type SecretKind,
   type TypedData,
 } from '@agentlink/crypto';
+import { allowedTypedData, assertAllowedOwnerAction } from './owner-allowlist.js';
 import { NodeKeyStoreError } from './errors.js';
 import { osKeychain } from './keychain.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
@@ -25,7 +26,7 @@ import { assertNoHarnessMarker, ttyOwnerTerminal, type OwnerTerminal } from './o
 export type OwnerSignRequest =
   /** An OwnerAction body (04 §2.5.1), `owner` already set to the owner's Nostr key. */
   | { readonly kind: 'owner-action'; readonly action: JsonObject }
-  /** EIP-712 data signed by the owner EVM key: an agent card `cardSig`, a Registration. */
+  /** EIP-712 data signed by the owner EVM key: only an agent card `cardSig` (owner-allowlist.ts). */
   | { readonly kind: 'typed-data'; readonly typedData: TypedData };
 
 /** The owner's signature. */
@@ -69,19 +70,24 @@ function snapshot(request: unknown): OwnerSignRequest {
     if (typeof action !== 'object' || action === null || Array.isArray(action)) {
       throw invalid('An owner action must be an object.');
     }
-    return Object.freeze({ kind, action: parseJson(canonicalize(action)) as JsonObject });
+    const copy = parseJson(canonicalize(action)) as JsonObject;
+    // M1-8h: only the ops of 04 §2.5.1 (owner-allowlist.ts).
+    assertAllowedOwnerAction(copy);
+    return Object.freeze({ kind, action: copy });
   }
   if (kind === 'typed-data') {
-    if (typeof typedData !== 'object' || typedData === null) {
-      throw invalid('Typed data must be an object.');
-    }
-    try {
-      return Object.freeze({ kind, typedData: structuredClone(typedData) as TypedData });
-    } catch {
-      throw invalid('Typed data must be plain data.');
-    }
+    // M1-8h: only the agent card (04 §2.4); anything else, malformed included, is refused.
+    return Object.freeze({ kind, typedData: allowedTypedData(typedData) });
   }
   throw invalid('The request has an unknown kind.');
+}
+
+/**
+ * Reads an owner operation's request once and checks it against the allowlist (owner-allowlist.ts),
+ * before any terminal, keychain or prompt is touched.
+ */
+export function checkOwnerRequest(request: unknown): OwnerSignRequest {
+  return snapshot(request);
 }
 
 /** The prompt label for the stored secret (11 §5.5 names). */
@@ -187,6 +193,8 @@ export async function performOwnerOperation(
   owner: OwnerPublicKeys,
   item: OwnerOperationItem,
 ): Promise<OwnerSignature> {
+  // M1-8h: an object outside the allowlist is refused first, with fixed text (owner-allowlist.ts).
+  checkOwnerRequest(item);
   assertNoHarnessMarker();
   const terminal = ttyOwnerTerminal();
   const store = await KeychainOwnerKeyStore.open(osKeychain(), owner);
