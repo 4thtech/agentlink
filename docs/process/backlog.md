@@ -2018,7 +2018,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Threat note (draft):** assets: the owner's queue and attention, the agent's context (I-5), the contact set. Entry points: inbound envelopes from unknown keys; the owner's local actions; store rows a same-user process can write (G-1). Abuse cases: (a) a flood of refusals from fresh keys filling the queue for good (F01); (b) a sender-chosen `createdAt` keeping a refused row alive; (c) accept turned into a contact or a send path; (d) a blocked sender still costing an HPKE open per envelope; (e) a forged `from` blocking or unblocking someone else's traffic; (f) an agent accepting its own requests through a tool. Stopped by: the 7-day retention on the local clock and Ignore all; no contact row outside pairing (04 §2.9); the drop after the step 4 signature and before step 5's open; owner surfaces only (I-4). Residual: a same-user process can set `request_accepted_at` or edit `blocked_keys` directly (G-1, D-67); it could already read the request from the store.
 
 #### M1-7e-3 · core: approval read-by-id and pending count
-- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#116) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core, packages/types
 - **Depends on:** M1-7e
 - **Spec:** 06 §2.5 (`agentlink_get_approval`, the M1a local approval channel and its mapping), §2.1 (`agentlink_status.pendingApprovals`); 04 §2.5, §2.5.1; 07 §3 (`approvals`)
