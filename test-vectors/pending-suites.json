@@ -6,21 +6,5 @@
       "phase": "M1a"
     }
   },
-  "cases": {
-    "owner-action": {
-      "card": "M1-7c-b",
-      "phase": "M1a",
-      "ids": [
-        "verify-contact-check",
-        "verify-contact-check-at-expiry",
-        "verify-contact-check-reject-contact-uppercase",
-        "verify-contact-check-reject-digest-mismatch",
-        "verify-contact-check-reject-wrong-signer",
-        "verify-contact-check-reject-expired",
-        "verify-contact-check-reject-lifetime",
-        "verify-contact-check-reject-unknown-contact",
-        "verify-contact-check-reject-stored-ack-tampered"
-      ]
-    }
-  }
+  "cases": {}
 }

@@ -104,12 +104,40 @@ function isRevoked(tx: StoreTx, row: Row<'identity'>): boolean {
   );
 }
 
-/** Reads the identity row and whether it is revoked, in one transaction. */
-function readIdentity(ctx: CoreContext) {
+/**
+ * Reads the own identity row and whether it is revoked, in one transaction. Undefined before init.
+ * With openOwnCard, the one "read and re-verify the own stored card" path that IdentityService,
+ * ContactBook and OwnerActions share (IR-M1-7c-b-1 F03).
+ */
+export function readIdentity(
+  ctx: CoreContext,
+): Promise<{ readonly row: Row<'identity'>; readonly revoked: boolean } | undefined> {
   return ctx.store.transaction((tx) => {
     const row = tx.select('identity')[0];
     return row === undefined ? undefined : { row, revoked: isRevoked(tx, row) };
   });
+}
+
+/**
+ * Opens the own identity row's sealed card and re-verifies it: both card signatures
+ * (parseStoredCard, which throws `store_unreadable` for anything that is not a validly signed card),
+ * `cardAgentSig` present, and the card's agentEvm and keyEpoch equal to the row's. Undefined when the
+ * card no longer matches its row; each caller decides what that means (IR-M1-7c-b-1 F03).
+ */
+export async function openOwnCard(
+  ctx: CoreContext,
+  row: Row<'identity'>,
+): Promise<(StoredCard & { readonly cardAgentSig: string }) | undefined> {
+  const text = await open(ctx, 'identity', 'agent_card_json', [row.agent_id], row.agent_card_json);
+  const stored = parseStoredCard(text);
+  if (
+    stored.cardAgentSig === null ||
+    stored.card.agentEvm !== row.agent_id ||
+    stored.card.keyEpoch !== row.key_epoch
+  ) {
+    return undefined;
+  }
+  return { ...stored, cardAgentSig: stored.cardAgentSig };
 }
 
 export class IdentityService {
@@ -121,19 +149,8 @@ export class IdentityService {
 
   /** Opens and re-verifies the sealed card; a card that no longer verifies is unreadable. */
   async #view(row: Row<'identity'>, revoked: boolean): Promise<IdentityView> {
-    const text = await open(
-      this.#ctx,
-      'identity',
-      'agent_card_json',
-      [row.agent_id],
-      row.agent_card_json,
-    );
-    const stored = parseStoredCard(text);
-    if (
-      stored.cardAgentSig === null ||
-      stored.card.agentEvm !== row.agent_id ||
-      stored.card.keyEpoch !== row.key_epoch
-    ) {
+    const stored = await openOwnCard(this.#ctx, row);
+    if (stored === undefined) {
       throw new CoreError('store_unreadable', 'The stored identity could not be read.');
     }
     return {

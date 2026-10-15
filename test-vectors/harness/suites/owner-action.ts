@@ -4,18 +4,38 @@
 // `verifyJson` run the core's pure verifier against the receiving core described by `context`: its
 // agent address, the card's ownerNostr and the clock, an empty nonce table, the applied policy
 // version (absent = 0) and the pending request(s) an approval names. `outcome` is whether the core
-// accepts the object. The `contact.check` verify cases, whose `context.pairings` needs the pairing
-// recomputation, are pending for M1-7c-b (pending-suites.json `cases`); the core refuses that op.
+// accepts the object. A `verify` case whose signed body is a `contact.check` (selected by its op,
+// not by its id) runs through the core's contact.check verifier, the path OwnerActions.apply routes
+// that op to (M1-7c-b, M1-7d): the object checks, the nonce, then `pairingDigest` against the digest
+// recomputed from the stored signed `handshake` and `handshake-ack` in `context.pairings` (the core's
+// recomputeSafetyCode, 04 §3.6.1 steps 1-5, each message opened with the CEK the vector gives), never
+// a stored digest.
 import { bip340Sign } from '@agentlink/crypto/keystore';
 import {
   ownerActionSigningParts,
+  verifyContactCheck,
   verifyOwnerAction,
   verifyOwnerActionText,
   type ApprovalRequestView,
   type OwnerActionCheckContext,
+  type PairingDigestLookup,
 } from '@agentlink/core';
+import { recomputeSafetyCode } from '@agentlink/core/safety-code';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { SuiteModule } from '../suite';
+
+interface StoredMessage {
+  readonly envelope: unknown;
+  readonly cek: string;
+}
+
+/** A completed pairing as the receiving core stores it (04 §3.6.1). */
+interface StoredPairing {
+  readonly contact: string;
+  readonly contactCard: unknown;
+  readonly handshake: StoredMessage;
+  readonly ack: StoredMessage;
+}
 
 interface Pending {
   readonly approvalId: string;
@@ -30,6 +50,7 @@ interface VectorContext {
   readonly pendingApproval?: Pending;
   readonly pendingApprovals?: readonly Pending[];
   readonly appliedPolicyVersion?: number;
+  readonly pairings?: readonly StoredPairing[];
 }
 
 type OwnerActionInput =
@@ -76,8 +97,37 @@ function checkContext(c: VectorContext): OwnerActionCheckContext {
   };
 }
 
+const isUnavailable = (error: unknown): boolean =>
+  typeof error === 'object' &&
+  error !== null &&
+  (error as { readonly code?: unknown }).code === 'safety_code_unavailable';
+
+/** The receiving core's recomputation for a contact, from the stored pair the context names. */
+function pairingLookup(c: VectorContext) {
+  return async (contact: string): Promise<PairingDigestLookup> => {
+    const stored = (c.pairings ?? []).filter((p) => p.contact === contact);
+    if (stored.length === 0) return { status: 'unknown' };
+    if (stored.length > 1) throw new TypeError('owner-action: more than one pairing per contact');
+    const p = stored[0]!;
+    try {
+      const { pairingDigest } = await recomputeSafetyCode({
+        self: c.agent,
+        contactCard: p.contactCard,
+        handshake: { envelope: p.handshake.envelope, cek: hexToBytes(p.handshake.cek) },
+        ack: { envelope: p.ack.envelope, cek: hexToBytes(p.ack.cek) },
+      });
+      return { status: 'ok', pairingDigest };
+    } catch (error) {
+      if (isUnavailable(error)) return { status: 'unavailable' };
+      throw error;
+    }
+  };
+}
+
+const opOf = (signed: unknown): unknown => (signed as { body?: { op?: unknown } } | null)?.body?.op;
+
 export const ownerAction: SuiteModule = {
-  evaluate(testCase) {
+  async evaluate(testCase) {
     const input = parseInput(testCase.input);
     if (input.op === 'sign') {
       const parts = ownerActionSigningParts(input.body);
@@ -86,18 +136,27 @@ export const ownerAction: SuiteModule = {
         parts.signatureInput,
         hexToBytes(input.auxRand),
       );
-      return Promise.resolve([
+      return [
         { field: 'jcs', actual: parts.jcs },
         { field: 'bodyHash', actual: bytesToHex(parts.bodyHash) },
         { field: 'signatureInput', actual: bytesToHex(parts.signatureInput) },
         { field: 'sig', actual: bytesToHex(sig) },
-      ]);
+      ];
+    }
+    if (input.op === 'verify' && opOf(input.signed) === 'contact.check') {
+      const c = input.context;
+      const verdict = await verifyContactCheck(
+        input.signed,
+        { agent: c.agent, ownerNostr: c.ownerNostr, now: c.now, nonceUsed: () => false },
+        pairingLookup(c),
+      );
+      return [{ field: 'outcome', actual: verdict.ok ? 'accept' : 'reject' }];
     }
     const context = checkContext(input.context);
     const verdict =
       input.op === 'verify'
         ? verifyOwnerAction(input.signed, context)
         : verifyOwnerActionText(input.json, context);
-    return Promise.resolve([{ field: 'outcome', actual: verdict.ok ? 'accept' : 'reject' }]);
+    return [{ field: 'outcome', actual: verdict.ok ? 'accept' : 'reject' }];
   },
 };
