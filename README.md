@@ -54,8 +54,8 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 >   - Relay connection ([#81](https://github.com/4thtech/agentlink/pull/81), [#84](https://github.com/4thtech/agentlink/pull/84)): Connects only to an address that passed the relay address check, refuses redirects and proxies, caps incoming messages; a Docker relay suite runs in CI.
 >   - Policy version record in the keychain ([#86](https://github.com/4thtech/agentlink/pull/86)): Stops an older owner-signed policy from being put back.
 >   - Passphrase-locked key file for headless machines (planned): M1-8f.
-> - **MCP server, CLI and apps:** The CLI runtime is in review; nothing is usable yet.
->   - MCP server and CLI (in progress): `npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising) is in review; the commands and the MCP server follow.
+> - **MCP server, CLI and apps:** The CLI runtime has landed and the owner commands are in review; nothing is usable yet.
+>   - MCP server and CLI (in progress): `npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising) has landed; the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) are in review; the other commands and the MCP server follow.
 >   - Local approval page (planned): A small page on 127.0.0.1 for owner approvals and settings (M1b).
 >   - Owner console, desktop apps, cloud agent (planned): M2.
 > - **OCC v2 contracts (private repo):** Pre-audit. Nothing in AgentLink uses them yet.
