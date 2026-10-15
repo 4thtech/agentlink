@@ -1687,6 +1687,23 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests: a relay that requires AUTH and a REQ for two own keys delivers wraps for both; a first sync on a new relay after `seen` pruning stores nothing twice; junk events on a relay do not move the saved page position; the `envelopeSeen` hint matches core's `seen` rows, or is gone.
   - Existing M1-5c tests stay green; no test is weakened.
 
+#### M1-5f · transport-nostr: outbox stops republishing outside the sync look-back (new, G-49, D-71 (5))
+- **Status:** ready · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b (before M1-GATE)
+- **Repo/path:** agentlink · packages/transport-nostr (outbox); the core/node outbox row writer if it sets give_up_at
+- **Depends on:** M1-5b, M1-5c
+- **Spec:** 07 §3.2 (`outbox` give_up_at), §4.2 (Delivery reliability, Sync), §4.3 (Sent); 04 §3.5; NIP-59; D-71 (5)
+- **Invariants:** I-5
+- **Scope:**
+  - give_up_at = min(created_at + 86 400, wrap_created_at + 172 800 + 300), where wrap_created_at is the `created_at` of the signed event in wrap_json (07 §3.2). The outbox never publishes a wrap after that bound, so every stored copy stays inside the receivers' sync look-back (`lastSync − 48 h − S`).
+  - As today for the stored give_up_at (outbox.ts): the value read back from the store is not trusted; the outbox recomputes the bound from wrap_json and created_at and takes the minimum.
+  - Use the sync constants (`SYNC_LOOKBACK_SECONDS`, `SYNC_SKEW_SECONDS`) rather than new literals, so the two bounds cannot drift apart.
+  - A row that reaches give_up_at without 2 `OK`s is `not_delivered` (reason `timeout`), unchanged.
+- **Acceptance:**
+  - Fake clock: a wrap dated 47 h 50 min back is published at once, is not republished after its bound (about 10 min plus `S`) and goes `not_delivered` (timeout) at that bound; a wrap dated at send time keeps the full 24 h.
+  - A stored give_up_at later than the bound is ignored.
+  - Existing M1-5b and M1-5c tests stay green; no test is weakened.
+  - Revisit in M2 (D-71 (5)); the alternatives are recorded in G-49.
+
 ### Storage (`@agentlink/storage`)
 
 #### M1-6a · storage: adapter interface, inline adapter, S3 adapter
