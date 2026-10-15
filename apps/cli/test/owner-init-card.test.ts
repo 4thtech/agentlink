@@ -59,7 +59,11 @@ class TestCipher implements StoreCipher {
   open(context: SealContext, sealed: Sealed): Promise<string> {
     return Promise.resolve().then(() => {
       const parsed = JSON.parse(decodeUtf8(decodeBase64url(sealed.slice(2)))) as unknown[];
-      if (parsed[0] !== context.table || parsed[1] !== context.column || parsed[2] !== context.rowKey)
+      if (
+        parsed[0] !== context.table ||
+        parsed[1] !== context.column ||
+        parsed[2] !== context.rowKey
+      )
         throw new Error('test cipher: wrong context');
       return parsed[3] as string;
     });
@@ -102,7 +106,10 @@ class RelayNetwork implements RelayConnector {
           const events = (this.stored.get(target.url) ?? []).filter((e) => {
             if (filter.kinds !== undefined && !filter.kinds.includes(e.kind)) return false;
             const wanted = filter['#p'];
-            if (wanted !== undefined && !e.tags.some((t) => t[0] === 'p' && wanted.includes(t[1] ?? '')))
+            if (
+              wanted !== undefined &&
+              !e.tags.some((t) => t[0] === 'p' && wanted.includes(t[1] ?? ''))
+            )
               return false;
             if (filter.since !== undefined && e.created_at < filter.since) return false;
             return filter.until === undefined || e.created_at <= filter.until;
@@ -160,7 +167,10 @@ async function initAgent(name: string, seedByte: number, net: RelayNetwork): Pro
     initOwner: async (options) => {
       agent.setups.push(options);
       if (options.cardOwner !== undefined) {
-        throw new NodeKeyStoreError('owner_exists', "This agent already has an owner. AgentLink won't replace it.");
+        throw new NodeKeyStoreError(
+          'owner_exists',
+          "This agent already has an owner. AgentLink won't replace it.",
+        );
       }
       const owner = new MemoryOwnerKeyStore(new Uint8Array(32).fill(100 + seedByte), presence());
       const ownerKeys = await owner.getPublicKeys();
@@ -213,7 +223,8 @@ describe('owner init issues the first agent card (M1-8h; 04 §2.5)', () => {
     expect(await alice.client.identity.get()).toBeUndefined();
     expect(await alice.run(['owner', 'init'])).toBe(0);
     const view = await alice.client.identity.get();
-    if (view === undefined || alice.owner === undefined) throw new Error('no card after owner init');
+    if (view === undefined || alice.owner === undefined)
+      throw new Error('no card after owner init');
     expect(verifyAgentCard(view.card, view.cardSig, view.cardAgentSig)).toBe(true);
     expect(view.card.agentEvm).toBe(alice.client.agentId);
     expect(view.card.ownerNostr).toBe(encodeHex0x((await alice.owner.getPublicKeys()).ownerNostr));
@@ -235,7 +246,9 @@ describe('owner init issues the first agent card (M1-8h; 04 §2.5)', () => {
     const alice = await initAgent('alice', 1, net);
     const bob = await initAgent('bob', 2, net);
     // Before owner init, an agent cannot invite: it has no card.
-    await expect(alice.client.pairing.createInvite()).rejects.toMatchObject({ code: 'identity_missing' });
+    await expect(alice.client.pairing.createInvite()).rejects.toMatchObject({
+      code: 'identity_missing',
+    });
 
     expect(await alice.run(['owner', 'init'])).toBe(0);
     expect(await bob.run(['owner', 'init'])).toBe(0);

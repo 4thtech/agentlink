@@ -118,7 +118,10 @@ class RelayNetwork implements RelayConnector {
 function matches(filter: Filter, event: NostrEvent): boolean {
   if (filter.kinds !== undefined && !filter.kinds.includes(event.kind)) return false;
   const wanted = filter['#p'];
-  if (wanted !== undefined && !event.tags.some((t) => t[0] === 'p' && wanted.includes(t[1] ?? ''))) {
+  if (
+    wanted !== undefined &&
+    !event.tags.some((t) => t[0] === 'p' && wanted.includes(t[1] ?? ''))
+  ) {
     return false;
   }
   if (filter.since !== undefined && event.created_at < filter.since) return false;
@@ -291,7 +294,10 @@ describe('owner init signs the first agent card (M1-8h; 04 §2.5, §2.4)', () =>
     const alice = await initAgent('alice');
     const run = ownerAtTerminal();
     // Two identical relays: core refuses the list, after the code was shown and stored.
-    const bad = firstCard(alice, 'Alice', ['wss://one.relay-alpha.net', 'wss://one.relay-alpha.net']);
+    const bad = firstCard(alice, 'Alice', [
+      'wss://one.relay-alpha.net',
+      'wss://one.relay-alpha.net',
+    ]);
     const refused = await failure(() =>
       initOwnerWith(
         alice.keychain,
@@ -316,7 +322,10 @@ describe('owner init signs the first agent card (M1-8h; 04 §2.5, §2.4)', () =>
     const alice = await initAgent('alice');
     const bob = await initAgent('bob');
     // Alice's owner init, but the identity service is Bob's: the card would name Bob's keys.
-    const crossed: FirstAgentCard = { ...firstCard(alice, 'Alice', ALPHA), identity: bob.client.identity };
+    const crossed: FirstAgentCard = {
+      ...firstCard(alice, 'Alice', ALPHA),
+      identity: bob.client.identity,
+    };
     const refused = await failure(() => ownerInit(alice, crossed));
     expect(refused.code).toBe('owner_card_failed');
     expect(alice.keychain.items.has(OWNER_ACCOUNT)).toBe(false);
@@ -348,17 +357,30 @@ describe('owner init signs the first agent card (M1-8h; 04 §2.5, §2.4)', () =>
         message,
       });
       const attempts: [string, () => Promise<unknown>][] = [
-        ['owner action', () => owner.signOwnerAction({ v: 1, owner: encodeHex(input.ownerKeys.ownerNostr) })],
+        [
+          'owner action',
+          () => owner.signOwnerAction({ v: 1, owner: encodeHex(input.ownerKeys.ownerNostr) }),
+        ],
         ['envelope', () => owner.signEnvelopeHash(new Uint8Array(32))],
-        ['nostr event', () => owner.signNostr({ kind: 13, created_at: NOW, tags: [], content: '' })],
+        [
+          'nostr event',
+          () => owner.signNostr({ kind: 13, created_at: NOW, tags: [], content: '' }),
+        ],
         ['nip44', () => owner.nip44Encrypt('00'.repeat(32), 'x')],
         ['other agent', () => owner.sign712(typed({ ...card, agentEvm: `0x${'cd'.repeat(20)}` }))],
-        ['other owner', () => owner.sign712(typed({ ...card, ownerNostr: encodeHex0x(new Uint8Array(32).fill(9)) }))],
+        [
+          'other owner',
+          () =>
+            owner.sign712(typed({ ...card, ownerNostr: encodeHex0x(new Uint8Array(32).fill(9)) })),
+        ],
         [
           'other typed data',
           () =>
             owner.sign712({
-              types: { EIP712Domain: [{ name: 'name', type: 'string' }], Note: [{ name: 't', type: 'string' }] },
+              types: {
+                EIP712Domain: [{ name: 'name', type: 'string' }],
+                Note: [{ name: 't', type: 'string' }],
+              },
               primaryType: 'Note',
               domain: { name: 'x' },
               message: { t: 'x' },
@@ -383,7 +405,7 @@ describe('owner init signs the first agent card (M1-8h; 04 §2.5, §2.4)', () =>
       ...firstCard(alice, 'Alice', ALPHA),
       identity: {
         get: () => alice.client.identity.get(),
-        init: (input) => probe(input.owner, input),
+        init: (input: InitIdentityInput) => probe(input.owner, input),
       },
     };
     const refused = await failure(() => ownerInit(alice, card));
@@ -391,6 +413,32 @@ describe('owner init signs the first agent card (M1-8h; 04 §2.5, §2.4)', () =>
     expect(seen).toEqual({ refusals: expect.any(Array) as unknown, signed: 1 });
     expect(seen.refusals).toHaveLength(7);
     expect(alice.keychain.items.has(OWNER_ACCOUNT)).toBe(false);
+  });
+
+  it('keeps the owner key when it cannot tell whether a card was stored', async () => {
+    const alice = await initAgent('alice');
+    let reads = 0;
+    const card: FirstAgentCard = {
+      ...firstCard(alice, 'Alice', ALPHA),
+      identity: {
+        // The first read (before anything) works; the read-back after the card fails.
+        get: () => {
+          reads += 1;
+          return reads === 1
+            ? alice.client.identity.get()
+            : Promise.reject(new Error('store unavailable'));
+        },
+        init: (input: InitIdentityInput) => alice.client.identity.init(input),
+      },
+    };
+    expect(await failure(() => ownerInit(alice, card))).toEqual({
+      code: 'owner_card_failed',
+      message:
+        "Owner setup didn't finish. Run `agentlink doctor` in your own terminal to see what is missing.",
+    });
+    // The card was stored and names this owner, so its key must not be removed.
+    expect(alice.keychain.items.has(OWNER_ACCOUNT)).toBe(true);
+    expect(await alice.client.identity.get()).toBeDefined();
   });
 
   it('the public initOwner refuses to run without the first card to sign', async () => {

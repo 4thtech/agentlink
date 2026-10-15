@@ -366,7 +366,13 @@ describe('an agent without a terminal can never approve (04 §2.5, 06 §8; UX gu
     const codeOf = (e: unknown) => (e instanceof NodeKeyStoreError ? e.code : 'other');
     const a = await deps.decide({ agent: evm(), owner }, [reviewed]).catch(codeOf);
     const b = await deps
-      .signOwnerAction(owner, { kind: 'owner-action', action: { v: 1 }, summary: 'Cancel' })
+      // M1-8h: an allowlisted op, so the request reaches the terminal checks (an op outside the
+      // allowlist is refused even earlier, owner-allowlist.test.ts in @agentlink/node).
+      .signOwnerAction(owner, {
+        kind: 'owner-action',
+        action: { v: 1, op: 'approval.cancel' },
+        summary: 'Cancel',
+      })
       .catch(codeOf);
     const c = await deps
       .initOwner({

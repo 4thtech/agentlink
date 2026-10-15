@@ -185,6 +185,9 @@ areas:
         state: done
         prs: [86]
         summary: "Stops an older owner-signed policy from being put back."
+      - name: "First agent card at owner setup"
+        state: in-progress
+        summary: "`owner init` signs the agent's first card in the same owner step, so a new agent can pair; the owner key signs only the agent card and the defined owner decisions (M1-8h, in review)."
       - name: "Passphrase-locked key file for headless machines"
         state: planned
         summary: "M1-8f."

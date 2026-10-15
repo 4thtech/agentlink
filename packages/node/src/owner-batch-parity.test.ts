@@ -136,9 +136,7 @@ const coreContext = (agent: string, ownerNostrHex: string) => ({
   nonceUsed: () => false,
   approvalRequest: (approvalId: string) => {
     const pending = PENDING.find((p) => p.approvalId === approvalId);
-    return pending === undefined
-      ? undefined
-      : { ...pending, commitment: false, pending: true };
+    return pending === undefined ? undefined : { ...pending, commitment: false, pending: true };
   },
 });
 
@@ -245,9 +243,9 @@ describe('node approval.decideBatch matches the M1-2e vectors byte for byte (M1-
       const verdict = verifyOwnerAction(signed, coreContext(body.agent, ownerHex));
       expect(verdict.ok).toBe(true);
       // The same object for another agent, or with one item dropped, is refused by core.
-      expect(
-        verifyOwnerAction(signed, coreContext(`0x${'cd'.repeat(20)}`, ownerHex)).ok,
-      ).toBe(false);
+      expect(verifyOwnerAction(signed, coreContext(`0x${'cd'.repeat(20)}`, ownerHex)).ok).toBe(
+        false,
+      );
       const params = signed.body['params'] as { items: JsonObject[] };
       const fewer = {
         body: { ...signed.body, params: { items: params.items.slice(1) } },

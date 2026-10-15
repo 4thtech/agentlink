@@ -17,8 +17,8 @@ import {
   type AgentStore,
   type ApprovalContext,
   type KeyStoreBackendKind,
-  type OwnerInitOptions,
   type OwnerInitResult,
+  type OwnerSetupOptions,
   type OwnerOperationItem,
   type OwnerSignature,
   type ReviewedApproval,
@@ -31,6 +31,7 @@ import {
   type RuntimeDeps,
 } from '../../runtime/index.js';
 import { createOutput } from '../../output.js';
+import { PROVISIONAL_CARD_RELAYS } from './card-relays.js';
 
 /** An opened agent with the store and cipher the owner commands read approval rows through. */
 export interface OwnerAgent {
@@ -60,8 +61,11 @@ export interface OwnerCommandDeps {
   open(name: string | undefined): Promise<OpenOwnerAgentResult>;
   /** The agent's recorded KeyStore backend, or undefined when the agent is not set up. */
   backendOf(name: string | undefined): Promise<KeyStoreBackendKind | undefined>;
-  /** `owner init` (M1-8c): prompts at this process's own terminal. */
-  initOwner(options: OwnerInitOptions): Promise<OwnerInitResult>;
+  /**
+   * `owner init` (M1-8c): prompts at this process's own terminal. M1-8h: in the same owner operation
+   * it signs the agent's first card (`options.firstCard`) and stores it through core.
+   */
+  initOwner(options: OwnerSetupOptions): Promise<OwnerInitResult>;
   /**
    * One owner operation over the reviewed items (M1-8c): shows the decisions, asks "Continue?", reads
    * the owner code once at the TTY prompt and signs one `approval.decide` or `approval.decideBatch`.
@@ -73,6 +77,8 @@ export interface OwnerCommandDeps {
   ask(question: string): Promise<string>;
   /** Unix seconds. */
   now(): number;
+  /** M1-8h: the relay list the agent's first card commits to (card-relays.ts). */
+  cardRelays(): readonly string[];
 }
 
 /** Opens an agent through the M1-9k runtime, keeping the store and cipher it opened. */
@@ -142,5 +148,6 @@ export function nodeOwnerDeps(home: string = homedir()): OwnerCommandDeps {
     signOwnerAction: (owner, item) => performOwnerOperation(owner, item),
     ask: askAtTerminal,
     now: () => Math.floor(Date.now() / 1000),
+    cardRelays: () => PROVISIONAL_CARD_RELAYS,
   });
 }

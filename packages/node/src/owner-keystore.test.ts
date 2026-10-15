@@ -495,14 +495,12 @@ describe('owner init on a keychain machine (04 §2.2, D-67)', () => {
       },
     };
     expect(
-      await codeOf(() =>
-        initOwner({ backend: 'keychain', env: { CLAUDECODE: '1' }, firstCard }),
-      ),
+      await codeOf(() => initOwner({ backend: 'keychain', env: { CLAUDECODE: '1' }, firstCard })),
     ).toBe('harness_detected');
     if (!isatty(0) || !isatty(1)) {
-      expect(await codeOf(() => initOwner({ backend: 'keychain', env: CLEAN_ENV, firstCard }))).toBe(
-        'owner_prompt_unavailable',
-      );
+      expect(
+        await codeOf(() => initOwner({ backend: 'keychain', env: CLEAN_ENV, firstCard })),
+      ).toBe('owner_prompt_unavailable');
     }
   });
 });

@@ -8,6 +8,12 @@
 //
 // The opt-in to a chosen owner passphrase is not offered here yet: 06 §8 lists `owner init` with no
 // option, and the opt-in copy lives in M1-8c's flow for the M1b setup page.
+//
+// M1-8h (IR-M1-9b-1 M-3): the same owner operation signs the agent's first card (04 §2.5, "the card
+// signature at owner setup"). The agent stays open while node runs: node checks it has no card yet,
+// signs one card for exactly this agent and the new owner, and stores it through core
+// `identity.init`, so the agent can pair as soon as `owner init` succeeds. The card commits to the
+// agent's local name as its display name and to the card relay list (card-relays.ts).
 import type { OwnerPublicKeys } from '@agentlink/crypto';
 import { decodeHex0x } from '@agentlink/crypto';
 import { EXIT_FAILED, EXIT_OK, type CommandContext } from '../../dispatch.js';
@@ -25,9 +31,10 @@ async function initOne(deps: OwnerCommandDeps, context: CommandContext): Promise
   // The owner the agent card already names, if any: then `owner init` refuses (04 §2.8).
   const opened = await openOne(deps, output, parsed.agent);
   if (!opened.ok) return opened.exit;
-  let cardOwner: OwnerPublicKeys | undefined;
+  const { agent } = opened;
   try {
-    const view = await opened.agent.client.identity.get();
+    let cardOwner: OwnerPublicKeys | undefined;
+    const view = await agent.client.identity.get();
     if (view !== undefined) {
       cardOwner = {
         ownerEvm: decodeHex0x(view.card.ownerEvm),
@@ -35,15 +42,22 @@ async function initOne(deps: OwnerCommandDeps, context: CommandContext): Promise
         ownerEnc: decodeHex0x(view.card.ownerEnc),
       };
     }
+    await deps.initOwner({
+      backend,
+      ...(cardOwner === undefined ? {} : { cardOwner }),
+      // Read for AI-app markers only (04 §2.8), never for a secret.
+      env: terminal.env,
+      // M1-8h: the first card, signed in this same owner operation.
+      firstCard: {
+        agent: agent.client.agentId,
+        name: agent.name,
+        relays: deps.cardRelays(),
+        identity: agent.client.identity,
+      },
+    });
   } finally {
-    await opened.agent.close();
+    await agent.close();
   }
-  await deps.initOwner({
-    backend,
-    ...(cardOwner === undefined ? {} : { cardOwner }),
-    // Read for AI-app markers only (04 §2.8), never for a secret.
-    env: terminal.env,
-  });
   return EXIT_OK;
 }
 

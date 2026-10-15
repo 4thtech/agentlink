@@ -53,6 +53,7 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 >   - Owner code at a prompt ([#67](https://github.com/4thtech/agentlink/pull/67)): The owner's key store unlocked with the owner code or passphrase; batch approval.
 >   - Relay connection ([#81](https://github.com/4thtech/agentlink/pull/81), [#84](https://github.com/4thtech/agentlink/pull/84)): Connects only to an address that passed the relay address check, refuses redirects and proxies, caps incoming messages; a Docker relay suite runs in CI.
 >   - Policy version record in the keychain ([#86](https://github.com/4thtech/agentlink/pull/86)): Stops an older owner-signed policy from being put back.
+>   - First agent card at owner setup (in progress): `owner init` signs the agent's first card in the same owner step, so a new agent can pair; the owner key signs only the agent card and the defined owner decisions (M1-8h, in review).
 >   - Passphrase-locked key file for headless machines (planned): M1-8f.
 > - **MCP server, CLI and apps:** The CLI runtime has landed and the owner commands are in review; nothing is usable yet.
 >   - MCP server and CLI (in progress): `npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising) and `agentlink init` have landed; the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) are in review; the other commands and the MCP server follow.

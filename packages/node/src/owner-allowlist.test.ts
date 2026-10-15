@@ -137,7 +137,10 @@ function refusedTypedData(owner: OwnerPublicKeys): [string, unknown][] {
       'a domain with a verifyingContract',
       { ...good, domain: { ...AGENT_CARD_DOMAIN, verifyingContract: AGENT } },
     ],
-    ['a domain with a salt', { ...good, domain: { ...AGENT_CARD_DOMAIN, salt: '0x' + '00'.repeat(32) } }],
+    [
+      'a domain with a salt',
+      { ...good, domain: { ...AGENT_CARD_DOMAIN, salt: '0x' + '00'.repeat(32) } },
+    ],
     ['another domain name', { ...good, domain: { name: 'OCC Registry', version: '1' } }],
     ['another domain version', { ...good, domain: { name: 'OCC AgentCard', version: '2' } }],
     ['a domain without version', { ...good, domain: { name: 'OCC AgentCard' } }],
@@ -191,15 +194,24 @@ function refusedTypedData(owner: OwnerPublicKeys): [string, unknown][] {
       'an AgentCard type with its fields reordered',
       {
         ...good,
-        types: { ...AGENT_CARD_TYPES, AgentCard: [...(AGENT_CARD_TYPES.AgentCard ?? [])].reverse() },
+        types: {
+          ...AGENT_CARD_TYPES,
+          AgentCard: [...(AGENT_CARD_TYPES.AgentCard ?? [])].reverse(),
+        },
       },
     ],
     ['a card with an extra field', { ...good, message: { ...card, memo: 'x' } }],
     [
       'a card with a field missing',
-      { ...good, message: Object.fromEntries(Object.entries(card).filter(([k]) => k !== 'keyEpoch')) },
+      {
+        ...good,
+        message: Object.fromEntries(Object.entries(card).filter(([k]) => k !== 'keyEpoch')),
+      },
     ],
-    ['a card in checksummed hex', { ...good, message: { ...card, agentEvm: '0x' + 'AB'.repeat(20) } }],
+    [
+      'a card in checksummed hex',
+      { ...good, message: { ...card, agentEvm: '0x' + 'AB'.repeat(20) } },
+    ],
     ['a card with version 2', { ...good, message: { ...card, version: 2 } }],
     ['no message', { types: good['types'], primaryType: 'AgentCard', domain: AGENT_CARD_DOMAIN }],
     ['an extra top-level key', { ...good, note: 'x' }],
@@ -323,7 +335,10 @@ describe('EIP-712 and owner-action allowlist (M1-8h; 04 §2.4, §2.5.1)', () => 
   it('signs each owner-action op of 04 §2.5.1', async () => {
     const { owner, code, store } = await ready();
     const ops: [string, JsonObject][] = [
-      ['approval.decide', { approvalId: 'apr_test', actionDigest: '00'.repeat(32), decision: 'deny' }],
+      [
+        'approval.decide',
+        { approvalId: 'apr_test', actionDigest: '00'.repeat(32), decision: 'deny' },
+      ],
       ['approval.decideBatch', { items: [] }],
       ['approval.cancel', { approvalId: 'apr_test' }],
       ['policy.set', { version: 1, policy: {} }],
