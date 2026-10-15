@@ -4,8 +4,11 @@ import {
   checkCoverage,
   checkPendingCards,
   checkPendingGate,
+  checkPendingCaseShrinks,
   checkPendingShrinks,
   diffSnapshots,
+  pendingCaseEntries,
+  pendingCases,
   pendingSuites,
   REQUIRED_RUNTIMES,
 } from './rules.mjs';
@@ -222,6 +225,144 @@ describe('declared runtimes (IR-M1-1h-1 Q7)', () => {
     );
     expect(checkCoverage(report, nodeOnly)).toEqual([]);
     expect(pendingSuites(report, nodeOnly)).toEqual(new Map([['keystore-file', 'M1-1f']]));
+  });
+});
+
+describe('pending cases of an implemented suite (M1-7d)', () => {
+  /** fullReport plus a pending-case marker for placeholder-sha256 case `b`, which then does not run. */
+  function caseReport(runtimes = REQUIRED_RUNTIMES, status = 'passed') {
+    const report = fullReport();
+    for (const file of report.testResults) {
+      const runtime = file.assertionResults[0].meta.vectors.runtime;
+      if (!runtimes.includes(runtime)) continue;
+      file.assertionResults.splice(2, 1);
+      file.assertionResults.push(
+        assertion(
+          {
+            kind: 'pending-case',
+            runtime,
+            suite: 'placeholder-sha256',
+            caseId: 'b',
+            detail: 'M1-7c-b',
+          },
+          status,
+        ),
+      );
+    }
+    return report;
+  }
+
+  it('accepts a case every runtime reported as pending, and lists it', () => {
+    const report = caseReport();
+    expect(checkCoverage(report, suites)).toEqual([]);
+    expect(pendingCases(report)).toEqual(
+      new Map([['placeholder-sha256', { card: 'M1-7c-b', ids: ['b'] }]]),
+    );
+  });
+
+  it('still requires the case in a runtime without the marker', () => {
+    const report = fullReport();
+    report.testResults[4].assertionResults.splice(2, 1);
+    expect(checkCoverage(report, suites)).toEqual([
+      'workerd: placeholder-sha256: no passing result for b',
+    ]);
+  });
+
+  it('fails closed when the marker failed', () => {
+    const problems = checkCoverage(caseReport(REQUIRED_RUNTIMES, 'failed'), suites);
+    expect(problems).toHaveLength(REQUIRED_RUNTIMES.length);
+    expect(problems[0]).toBe('node: placeholder-sha256: no passing result for b');
+  });
+
+  it('fails a case reported as pending that also ran', () => {
+    const report = caseReport();
+    report.testResults[0].assertionResults.push(
+      assertion({ kind: 'case', runtime: 'node', suite: 'placeholder-sha256', caseId: 'b' }),
+    );
+    expect(checkCoverage(report, suites)).toEqual([
+      'placeholder-sha256: case b reported as pending but also ran',
+    ]);
+  });
+});
+
+describe('checkPendingCaseShrinks (M1-7d)', () => {
+  const entry = (ids, card = 'M1-7c-b') => ({ card, phase: 'M1a', ids });
+  const head = (ids) => ({ cases: new Map([['owner-action', entry(ids)]]) });
+
+  it('accepts cases of a suite that was wholly pending on the base, and a list that shrank', () => {
+    const wholly = {
+      pending: new Map([['owner-action', { card: 'M1-7d', phase: 'M1a' }]]),
+      cases: new Map(),
+      suites: new Set(['owner-action']),
+    };
+    expect(checkPendingCaseShrinks(head(['a', 'b']), wholly)).toEqual([]);
+    const listed = {
+      pending: new Map(),
+      cases: head(['a', 'b']).cases,
+      suites: new Set(['owner-action']),
+    };
+    expect(checkPendingCaseShrinks(head(['a']), listed)).toEqual([]);
+  });
+
+  it('refuses leftover cases that change the phase of the suite that was pending (IR-M1-7d-1 F-3)', () => {
+    const wholly = {
+      pending: new Map([['owner-action', { card: 'M1-7d', phase: 'M1a' }]]),
+      cases: new Map(),
+      suites: new Set(['owner-action']),
+    };
+    const later = {
+      cases: new Map([['owner-action', { card: 'M1-7i', phase: 'M1b', ids: ['a'] }]]),
+    };
+    expect(checkPendingCaseShrinks(later, wholly)).toEqual([
+      'owner-action: pending cases must keep the phase M1a the suite had on the base, not M1b',
+    ]);
+    // Another card of the same phase is fine; its backlog phase is checked by checkPendingCards.
+    expect(checkPendingCaseShrinks(head(['a']), wholly)).toEqual([]);
+  });
+
+  it('rejects a case that ran on the base, and a suite that ran all its cases there', () => {
+    const listed = {
+      pending: new Map(),
+      cases: head(['a']).cases,
+      suites: new Set(['owner-action']),
+    };
+    expect(checkPendingCaseShrinks(head(['a', 'c']), listed)).toEqual([
+      'owner-action: cases c ran on the base; pending cases only shrink',
+    ]);
+    const ran = { pending: new Map(), cases: new Map(), suites: new Set(['owner-action']) };
+    expect(checkPendingCaseShrinks(head(['a']), ran)).toEqual([
+      'owner-action: ran all its cases on the base branch; pending cases only shrink',
+    ]);
+  });
+
+  it('rejects a changed card, a missing card and an empty or duplicate id list', () => {
+    const listed = {
+      pending: new Map(),
+      cases: head(['a']).cases,
+      suites: new Set(['owner-action']),
+    };
+    const moved = { cases: new Map([['owner-action', entry(['a'], 'M1-9z')]]) };
+    expect(checkPendingCaseShrinks(moved, listed)).toEqual([
+      'owner-action: its pending cases changed card or phase from M1-7c-b/M1a; an existing entry can only shrink',
+    ]);
+    const none = { pending: new Map(), cases: new Map(), suites: new Set() };
+    expect(checkPendingCaseShrinks({ cases: new Map([['x', { ids: ['a'] }]]) }, none)).toEqual([
+      'x: a pending-cases entry needs a card (e.g. M1-1a) and a phase (e.g. M1a)',
+    ]);
+    for (const ids of [[], ['a', 'a'], [''], 'a']) {
+      expect(checkPendingCaseShrinks({ cases: new Map([['x', entry(ids)]]) }, none)).toEqual([
+        'x: a pending-cases entry needs a non-empty list of distinct case ids',
+      ]);
+    }
+  });
+
+  it('gates a release on pending cases of the gated phase, by the backlog phase', () => {
+    const cards = new Map([['M1-7c-b', 'M1a']]);
+    expect(
+      checkPendingGate({ pending: pendingCaseEntries(head(['a']).cases) }, ['M1a'], cards),
+    ).toEqual([
+      'owner-action (pending cases) is still pending (M1-7c-b, phase M1a): every M1a suite must be implemented before a release',
+    ]);
   });
 });
 

@@ -38,6 +38,8 @@ export type CoreErrorCode =
   | 'payload_invalid'
   | 'thread_invalid'
   | 'envelope_too_large'
+  // Policy (06 §3; M1-7d)
+  | 'policy_context_invalid'
   // Pairing (04 §3.6, §3.6.1; M1-7c)
   | 'invite_invalid'
   | 'invite_too_large'

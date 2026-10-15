@@ -13,6 +13,7 @@ import { EnvelopeService } from './envelopes.js';
 import type { CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import { IdentityService, finishPendingRotation } from './identity.js';
+import { OwnerActions, type PolicyVersionMark } from './owner-actions.js';
 import { PairingService } from './pairing.js';
 import type { Store, StoreCipher } from './store/store.js';
 
@@ -27,6 +28,11 @@ export interface AgentLinkClientOptions {
   readonly clock?: () => number;
   /** Default: the redacting logger (04 §8 rule 4, I-7). */
   readonly logger?: Logger;
+  /**
+   * The policy-version high-water mark, a KeyStore item (04 §2.5.1; M1-7d). Without it no policy.set
+   * applies and a loaded policy always fails closed (G-6).
+   */
+  readonly policyMark?: PolicyVersionMark;
 }
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
@@ -41,14 +47,22 @@ export class AgentLinkClient {
   /** Invites and pairing (M1-7c; 04 §3.6, §3.6.1). Inbound pairing runs in envelopes.processReceived. */
   readonly pairing: PairingService;
   readonly approvals: ApprovalChannel;
+  /** Owner-signed actions and the signed policy (M1-7d; 04 §2.5.1). Authority is the signature. */
+  readonly ownerActions: OwnerActions;
 
-  private constructor(agentId: string, ctx: CoreContext, approvals: ApprovalChannel) {
+  private constructor(
+    agentId: string,
+    ctx: CoreContext,
+    approvals: ApprovalChannel,
+    policyMark: PolicyVersionMark | undefined,
+  ) {
     this.agentId = agentId;
     this.identity = new IdentityService(ctx);
     this.contacts = new ContactBook(ctx);
     this.pairing = new PairingService(ctx, this.identity, this.contacts);
     this.envelopes = new EnvelopeService(ctx, this.identity, this.contacts, this.pairing);
     this.approvals = approvals;
+    this.ownerActions = new OwnerActions(ctx, this.identity, policyMark);
   }
 
   /**
@@ -95,6 +109,6 @@ export class AgentLinkClient {
       log: options.logger ?? createLogger({ name: 'core' }),
     };
     if (row !== undefined) await finishPendingRotation(ctx);
-    return new AgentLinkClient(bundle.agentId, ctx, approvals);
+    return new AgentLinkClient(bundle.agentId, ctx, approvals, options.policyMark);
   }
 }

@@ -25,7 +25,8 @@ The **bracket seal**: two square brackets (the two parties) holding a diamond (t
 | `icons/tray/windows/` | Notification-area icons for light and dark taskbars, 16–32 | 40 |
 | `icons/tray/linux/` | Symbolic SVGs and PNG 22/24 for dark and light panels | 25 |
 | `icons/ui/` | 21 custom AgentLink UI icons on the 24 px grid: `png/`, `svg-grey/`, `svg-currentcolor/` | 84 |
-| `social/` | Open Graph 1200×630 and GitHub social preview 1280×640 (PNG) | 2 |
+| `logo/jpg/` | Every main logo on its solid background (dark `#0B0C0E` or white), marks at 1024 px and wordmarks and lockups at 1920 px wide, in `mark/`, `wordmark/` and `lockup/` (added 15 Oct 2026, for documents and slides that cannot take a transparent PNG or SVG) | 15 |
+| `social/` | Open Graph 1200×630 and GitHub social preview 1280×640 (PNG and JPG) | 4 |
 | `colors/` | `palette.json`, `colors.md`, palette sheet PNG | 3 |
 
 Tray status variants: `connected` (solid), `approvals` (badge dot), `paused` (hollow seal), `offline` (slash), `update` (arrow). They differ by shape, never colour, because the OS tints tray icons.
@@ -39,9 +40,14 @@ Files follow `agentlink-<asset>-<variant>[-<size>].<ext>`. Exceptions kept as de
 | Item | Why |
 |---|---|
 | `endorsement/4thtech-logo-reference.png` (the 4thTech logo "as supplied, reference only") | It is 4thTech's own trademark artwork, supplied "reference only" by the drop. It is unclear whether it may be committed to this public MIT repo, so it stays out until the owner says. The endorsed lockups (`agentlink-lockup-endorsed-*`) are included because they are AgentLink brand files and carry "by 4thTech" as plain set text (checked: no 4thTech artwork in them). Never redraw the 4thTech hexagon; use the original file from 4thTech |
-| `logo/jpg/` (17 files) and the two `social/*.jpg` | Redundant renderings of the PNGs on a solid background. Re-render from the SVG if needed |
 | Static font weights (`fonts/*.ttf`, `*-Regular/Medium/SemiBold.woff2`, about 1 MB) | Only the two variable WOFF2 files that `tokens.css` references are committed, with the licence: see `../d1/tokens/fonts/` |
 | `.DS_Store` | OS junk |
+
+### Re-export of 15 Oct 2026
+
+The owner exported the same brand folder again. Byte for byte it equals the 14 Oct intake except `logo/jpg/` (now 15 files in `mark/`, `wordmark/` and `lockup/`) and the two `social/*.jpg`, which are now committed (about 1 MB together). Still left out: the static Geist weights (TTF and per-weight WOFF2, about 1.1 MB, OFL 1.1, redistributable; only the variable WOFF2 that `tokens.css` references is committed, in `../d1/tokens/fonts/`) and `endorsement/4thtech-logo-reference.png` (see above).
+
+**Production domain and trademark check: still pending.** The name `AgentLink` and every mark here stay provisional until M1-24 closes and the production domain is chosen; nothing here is final or cleared for registration.
 
 ## Fonts and icon set
 
@@ -51,6 +57,6 @@ Files follow `agentlink-<asset>-<variant>[-<size>].<ext>`. Exceptions kept as de
 
 ## Checks done at intake
 
-SVGs contain no scripts, external references or embedded raster images (scanned). No hidden files, no executables, no keys, tokens or addresses. Sizes are within the README limits (this folder is about 1.2 MB).
+SVGs contain no scripts, external references or embedded raster images (scanned). No hidden files, no executables, no keys, tokens or addresses. Sizes are within the README limits (this folder is about 3.0 MB, 1.0 MB of it the JPG renderings added on 15 Oct 2026).
 
 Nothing private is included: no real personal data, keys or addresses, nothing from docs 01 or 09, no unreleased security details.

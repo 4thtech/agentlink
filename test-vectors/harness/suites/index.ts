@@ -9,6 +9,7 @@ import { inviteLink } from './invite-link';
 import { jcs } from './jcs';
 import { keystoreFile } from './keystore-file';
 import { nip44 } from './nip44';
+import { ownerAction } from './owner-action';
 import { ownerWrap } from './owner-wrap';
 import { pairing } from './pairing';
 import { pairingBodies } from './pairing-bodies';
@@ -33,6 +34,7 @@ export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['jcs', jcs],
   ['keystore-file', keystoreFile],
   ['nip44', nip44],
+  ['owner-action', ownerAction],
   ['owner-wrap', ownerWrap],
   ['pairing', pairing],
   ['pairing-bodies', pairingBodies],

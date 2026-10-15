@@ -1,0 +1,586 @@
+// Applying owner actions and loading the signed policy (04 §2.5.1, §2.5.2; 06 §3 G-6; 07 §3.4).
+//
+// - apply(): verifies a SignedOwnerAction (owner-action.ts) against the own card and the stored
+//   requests, then checks the nonce, records it and applies the effect in ONE store transaction, so
+//   two deliveries of one object apply it once. Everything the transaction writes is prepared
+//   before it (sealed values, recomputed digests); inside it, the rows read before are compared with
+//   what is there now, and a change refuses the object. A batch is applied whole or not at all; a
+//   batch that is authentic and fresh but does not match burns its nonce in the same transaction,
+//   so it can never apply later (04 §2.5.2). A refused single op writes nothing (07 §3.4).
+// - loadPolicy(): the G-6 loader. The stored `policy.set` is re-verified on every load and its
+//   version must equal the KeyStore high-water mark; the defaults are used only while the mark is 0
+//   and no row exists. Anything else fails closed (policy-engine.ts).
+// - checkApproval(): re-verifies the stored decision for one `approvalId` and recomputes the digest
+//   from the current call when the approval is used; `status` is only a cache (04 §2.5.1).
+//
+// I-4: authority comes only from the owner signature over the exact object. This module holds no
+// owner key, takes no presence and has no path that decides, widens or creates an approval or a
+// policy without one. Refusals are returned to the surface that delivered the object (the CLI or
+// the local UI shows them; the console path is M1-7e/M1-7h) and logged as fixed codes (I-5, I-7).
+import { canonicalize, parseJson } from '@agentlink/crypto';
+import {
+  approvalIdSchema,
+  policySchema,
+  signedOwnerActionSchema,
+  type OwnerActionOp,
+  type SignedOwnerAction,
+} from '@agentlink/types';
+import { nowOf, open, seal, type CoreContext } from './context.js';
+import type { IdentityService } from './identity.js';
+import {
+  computeActionDigest,
+  ownerActionHash,
+  parseOwnerActionText,
+  verifyOwnerAction,
+  verifyStoredOwnerAction,
+  type ApprovalRequestView,
+  type ItemRefusalReport,
+  type OwnerActionCheckContext,
+  type OwnerActionRefusal,
+  type OwnerActionVerdict,
+} from './owner-action.js';
+import { POLICY_DEFAULTS_EFFECTIVE, type EffectivePolicy } from './policy-engine.js';
+import { SINGLETON_SLOT, type Row, type Sealed } from './store/schema.js';
+import type { StoreTx } from './store/store.js';
+
+/**
+ * The policy-version high-water mark (04 §2.5.1, §2.2, §2.8): a KeyStore item, not a store row, so
+ * deleting or rolling back the store cannot lower it. Backends implement it next to their KeyStore
+ * (keychain and file, Node); the Durable Object's place is fixed in M2-3a. Contract: `read` returns
+ * the highest applied version (0 when none was ever applied) or throws; `raise` sets the mark to
+ * max(mark, version) under the inter-process lock (06 §6), never lowers it, and returns the new mark.
+ */
+export interface PolicyVersionMark {
+  read(): Promise<number>;
+  raise(version: number): Promise<number>;
+}
+
+export type OwnerActionOutcome =
+  | {
+      readonly status: 'applied';
+      readonly op: OwnerActionOp;
+      /** policy.set: the applied version and whether the KeyStore mark was raised to it. */
+      readonly policyVersion?: number;
+      readonly markRaised?: boolean;
+    }
+  | {
+      readonly status: 'refused';
+      readonly op: string | null;
+      readonly reason: OwnerActionRefusal;
+      /** approval.decideBatch: every item that did not match its pending request. */
+      readonly items?: readonly ItemRefusalReport[];
+      /** True when the refused object's nonce was recorded, so it can never apply later. */
+      readonly nonceBurnt: boolean;
+    };
+
+/** What a stored approval allows when its `approvalId` is presented with a call (04 §2.5.1). */
+export type ApprovalCheck =
+  | { readonly status: 'approved' | 'denied' | 'pending' | 'expired' | 'cancelled' }
+  | {
+      readonly status: 'refused';
+      readonly reason:
+        'approval_unknown' | 'digest_mismatch' | 'decision_invalid' | 'cancel_invalid';
+    };
+
+type Refused = Extract<OwnerActionOutcome, { status: 'refused' }>;
+
+type SelfView =
+  | { readonly agent: string; readonly ownerNostr: string }
+  | { readonly refusal: 'identity_missing' | 'identity_revoked' };
+
+const refused = (
+  op: string | null,
+  reason: OwnerActionRefusal,
+  extra: { items?: readonly ItemRefusalReport[]; nonceBurnt?: boolean } = {},
+): Refused => ({
+  status: 'refused',
+  op,
+  reason,
+  ...(extra.items === undefined ? {} : { items: extra.items }),
+  nonceBurnt: extra.nonceBurnt ?? false,
+});
+
+const fromVerdict = (v: Extract<OwnerActionVerdict, { ok: false }>): Refused =>
+  refused(v.op, v.reason, v.items === undefined ? {} : { items: v.items });
+
+/** A request row as read before the transaction, to compare inside it. */
+interface Snapshot {
+  readonly status: Row<'approvals'>['status'];
+  readonly actionJson: Sealed;
+  readonly expiresAt: number;
+  /** The commitment scope decides whether the row may be a batch item (IR-M1-7d-1 F-5). */
+  readonly scopeJson: string | null;
+}
+
+const unchanged = (row: Row<'approvals'> | undefined, snap: Snapshot): boolean =>
+  row !== undefined &&
+  row.status === snap.status &&
+  row.action_json === snap.actionJson &&
+  row.expires_at === snap.expiresAt &&
+  row.scope_json === snap.scopeJson;
+
+const nonceRow = (signed: SignedOwnerAction, actionHash: string, now: number) => ({
+  nonce: signed.body.nonce,
+  op: signed.body.op,
+  action_hash: actionHash,
+  issued_at: signed.body.issuedAt,
+  expires_at: signed.body.expiresAt,
+  applied_at: now,
+});
+
+/** 07 §3.5: the next applied policy.set starts a fresh ledger when the ledger is broken or gone. */
+function freshLedgerIfBroken(tx: StoreTx, now: number): void {
+  const state = tx.select('budget_state')[0];
+  if (state !== undefined && state.status !== 'broken') return;
+  const fresh = { status: 'ok' as const, newest_t: now, since: now, broken_at: null };
+  if (state !== undefined) {
+    tx.update(
+      'budget_state',
+      { slot: SINGLETON_SLOT },
+      { ...fresh, ledger_epoch: state.ledger_epoch + 1 },
+    );
+    return;
+  }
+  const epochs = tx.select('budget_ledger').map((r) => r.ledger_epoch);
+  tx.insert('budget_state', {
+    slot: SINGLETON_SLOT,
+    ledger_epoch: (epochs.length === 0 ? 0 : Math.max(...epochs)) + 1,
+    ...fresh,
+  });
+}
+
+export class OwnerActions {
+  readonly #ctx: CoreContext;
+  readonly #identity: IdentityService;
+  readonly #mark: PolicyVersionMark | undefined;
+
+  constructor(ctx: CoreContext, identity: IdentityService, mark?: PolicyVersionMark) {
+    this.#ctx = ctx;
+    this.#identity = identity;
+    this.#mark = mark;
+  }
+
+  /** The own agent and its card's owner key, or why owner actions cannot apply. */
+  async #self(): Promise<SelfView> {
+    const view = await this.#identity.get();
+    if (view === undefined) return { refusal: 'identity_missing' };
+    if (view.revoked) return { refusal: 'identity_revoked' };
+    return { agent: view.agentId, ownerNostr: view.card.ownerNostr };
+  }
+
+  #report(outcome: Refused): Refused {
+    // Fixed codes only: never the object, a nonce or any input text (I-5, I-7).
+    this.#ctx.log.warn('owner action refused', {
+      op: outcome.op ?? 'unknown',
+      reason: outcome.reason,
+      nonceBurnt: outcome.nonceBurnt,
+    });
+    return outcome;
+  }
+
+  /**
+   * Verifies and applies one SignedOwnerAction: its exact JSON text, or the object (stored as its
+   * JCS text). Never throws for a refusal: the outcome says why, and is what the owner surface
+   * reports (04 §2.5.1 "Refusals are reported"). Store errors still throw (fail closed).
+   */
+  async apply(input: string | object): Promise<OwnerActionOutcome> {
+    let text: string;
+    let value: unknown;
+    try {
+      text = typeof input === 'string' ? input : canonicalize(input);
+      value = parseOwnerActionText(text);
+    } catch {
+      return this.#report(refused(null, 'malformed'));
+    }
+    const shape = signedOwnerActionSchema.safeParse(value);
+    if (!shape.success) return this.#report(refused(null, 'malformed'));
+    const op = shape.data.body.op;
+
+    const self = await this.#self();
+    if ('refusal' in self) return this.#report(refused(op, self.refusal));
+    const now = nowOf(this.#ctx);
+    const base: OwnerActionCheckContext = { ...self, now };
+
+    switch (op) {
+      case 'approval.decide':
+      case 'approval.decideBatch':
+        return this.#applyDecision(text, value, shape.data, base);
+      case 'approval.cancel':
+        return this.#applyCancel(text, value, base);
+      case 'policy.set':
+        return this.#applyPolicy(text, value, base);
+      case 'agent.revoke':
+      case 'contact.check': {
+        // Verified for the report, applied elsewhere: revocation delivery is M1-7h, the safety-code
+        // check M1-7c-b. Nothing is written here.
+        const verdict = verifyOwnerAction(value, base);
+        if (!verdict.ok && verdict.stage === 'object') return this.#report(fromVerdict(verdict));
+        return this.#report(refused(op, 'unsupported_op'));
+      }
+    }
+  }
+
+  async #nonceUsed(nonce: string): Promise<boolean> {
+    return this.#ctx.store.transaction(
+      (tx) => tx.get('owner_action_nonces', { nonce }) !== undefined,
+    );
+  }
+
+  /** Reads and opens the named requests, recomputing each digest from the stored action. */
+  async #requests(ids: readonly string[]) {
+    const rows = await this.#ctx.store.transaction((tx) =>
+      ids.map((approval_id) => tx.get('approvals', { approval_id })),
+    );
+    const views = new Map<string, ApprovalRequestView>();
+    const snapshots = new Map<string, Snapshot>();
+    for (const row of rows) {
+      if (row === undefined) continue;
+      snapshots.set(row.approval_id, {
+        status: row.status,
+        actionJson: row.action_json,
+        expiresAt: row.expires_at,
+        scopeJson: row.scope_json,
+      });
+      let actionDigest: string;
+      let scoped = false;
+      try {
+        const text = await open(
+          this.#ctx,
+          'approvals',
+          'action_json',
+          [row.approval_id],
+          row.action_json,
+        );
+        const action = parseJson(text) as { context?: { scope?: unknown } } | null;
+        actionDigest = computeActionDigest(action);
+        scoped =
+          typeof action === 'object' && action !== null && action.context?.scope !== undefined;
+      } catch {
+        // An unreadable stored action can never match a signed digest (fail closed).
+        actionDigest = '';
+      }
+      views.set(row.approval_id, {
+        approvalId: row.approval_id,
+        actionDigest,
+        expiresAt: row.expires_at,
+        commitment: row.scope_json !== null || scoped,
+        pending: row.status === 'pending',
+      });
+    }
+    return { views, snapshots };
+  }
+
+  async #applyDecision(
+    text: string,
+    value: unknown,
+    shaped: SignedOwnerAction,
+    base: OwnerActionCheckContext,
+  ): Promise<OwnerActionOutcome> {
+    const body = shaped.body;
+    const ids =
+      body.op === 'approval.decideBatch'
+        ? body.params.items.map((i) => i.approvalId)
+        : body.op === 'approval.decide'
+          ? [body.params.approvalId]
+          : [];
+    const usedBefore = await this.#nonceUsed(body.nonce);
+    const { views, snapshots } = await this.#requests(ids);
+    const verdict = verifyOwnerAction(value, {
+      ...base,
+      nonceUsed: () => usedBefore,
+      approvalRequest: (id) => views.get(id),
+    });
+    if (!verdict.ok && verdict.stage === 'object') return this.#report(fromVerdict(verdict));
+    const isBatch = body.op === 'approval.decideBatch';
+    // A single decision that does not match writes nothing; a batch burns its nonce (04 §2.5.2).
+    if (!verdict.ok && !isBatch) return this.#report(fromVerdict(verdict));
+
+    const signed = verdict.ok ? verdict.signed : (verdict.signed as SignedOwnerAction);
+    const actionHash = verdict.ok ? verdict.actionHash : '';
+    const decisions =
+      signed.body.op === 'approval.decideBatch'
+        ? signed.body.params.items
+        : signed.body.op === 'approval.decide'
+          ? [signed.body.params]
+          : [];
+    const now = base.now;
+    const hash = actionHash === '' ? ownerActionHash(value) : actionHash;
+
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: signed.body.nonce }) !== undefined) {
+        return refused(signed.body.op, 'nonce_used');
+      }
+      const burn = (r: Refused): Refused => {
+        tx.insert('owner_action_nonces', nonceRow(signed, hash, now));
+        return { ...r, nonceBurnt: true };
+      };
+      if (!verdict.ok) return burn(fromVerdict(verdict));
+      // The rows must be exactly what was verified: no decision, edit or expiry in between.
+      const changed = decisions
+        .filter((d) => {
+          const snap = snapshots.get(d.approvalId);
+          return (
+            snap === undefined ||
+            !unchanged(tx.get('approvals', { approval_id: d.approvalId }), snap)
+          );
+        })
+        .map((d) => ({ approvalId: d.approvalId, reason: 'not_pending' as const }));
+      if (changed.length > 0) {
+        const r = refused(signed.body.op, 'store_changed', isBatch ? { items: changed } : {});
+        return isBatch ? burn(r) : r;
+      }
+      tx.insert('owner_action_nonces', nonceRow(signed, hash, now));
+      for (const d of decisions) {
+        const n = tx.update(
+          'approvals',
+          { approval_id: d.approvalId, status: 'pending' },
+          {
+            status: d.decision === 'approve' ? 'approved' : 'denied',
+            signed_decision: text,
+            decided_at: now,
+          },
+        );
+        // Checked above in this transaction; anything else is a store fault (rolls back).
+        if (n !== 1) throw new Error('approval row changed inside the transaction');
+      }
+      return { status: 'applied', op: signed.body.op as OwnerActionOp };
+    });
+    return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  async #applyCancel(
+    text: string,
+    value: unknown,
+    base: OwnerActionCheckContext,
+  ): Promise<OwnerActionOutcome> {
+    const shaped = signedOwnerActionSchema.parse(value);
+    const usedBefore = await this.#nonceUsed(shaped.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) return this.#report(fromVerdict(verdict));
+    const { signed, actionHash } = verdict;
+    if (signed.body.op !== 'approval.cancel')
+      return this.#report(refused(signed.body.op, 'malformed'));
+    const approvalId = signed.body.params.approvalId;
+    const now = base.now;
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: signed.body.nonce }) !== undefined) {
+        return refused('approval.cancel', 'nonce_used');
+      }
+      const row = tx.get('approvals', { approval_id: approvalId });
+      if (row === undefined) return refused('approval.cancel', 'approval_unknown');
+      // A pending request is denied instead (04 §2.5.1; IR-M1-7d-1 F-4): the cancel is its signed
+      // object, so the row can never be approved by a later decision.
+      if (row.status === 'pending') {
+        tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+        tx.update(
+          'approvals',
+          { approval_id: approvalId, status: 'pending' },
+          { status: 'denied', signed_cancel: text, decided_at: now },
+        );
+        return { status: 'applied', op: 'approval.cancel' };
+      }
+      // Otherwise cancel only voids an approved approval; anything else has nothing to void.
+      if (row.status !== 'approved') return refused('approval.cancel', 'not_approved');
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      tx.update(
+        'approvals',
+        { approval_id: approvalId, status: 'approved' },
+        { status: 'cancelled', signed_cancel: text },
+      );
+      // The unused parts of a commitment scope are void (04 §3.4.2; the scope rules are M1-32).
+      tx.update(
+        'commitment_parts',
+        { approval_id: approvalId, state: 'unclaimed' },
+        { state: 'void', void_reason: 'cancelled', updated_at: now },
+      );
+      return { status: 'applied', op: 'approval.cancel' };
+    });
+    return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  async #readMark(): Promise<number | undefined> {
+    if (this.#mark === undefined) return undefined;
+    try {
+      const mark = await this.#mark.read();
+      return Number.isSafeInteger(mark) && mark >= 0 ? mark : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async #applyPolicy(
+    text: string,
+    value: unknown,
+    base: OwnerActionCheckContext,
+  ): Promise<OwnerActionOutcome> {
+    // 07 §3.4 "Apply": the KeyStore mark is read first. Without it the version rule cannot hold.
+    const mark = await this.#readMark();
+    if (mark === undefined) return this.#report(refused('policy.set', 'policy_mark_unavailable'));
+    const shaped = signedOwnerActionSchema.parse(value);
+    const { usedBefore, stored } = await this.#ctx.store.transaction((tx) => ({
+      usedBefore: tx.get('owner_action_nonces', { nonce: shaped.body.nonce }) !== undefined,
+      stored: tx.get('policies', { slot: SINGLETON_SLOT })?.version ?? 0,
+    }));
+    const verdict = verifyOwnerAction(value, {
+      ...base,
+      nonceUsed: () => usedBefore,
+      appliedPolicyVersion: Math.max(mark, stored),
+    });
+    if (!verdict.ok) return this.#report(fromVerdict(verdict));
+    const { signed, actionHash } = verdict;
+    if (signed.body.op !== 'policy.set') return this.#report(refused(signed.body.op, 'malformed'));
+    const version = signed.body.params.version;
+    const key = [SINGLETON_SLOT];
+    const sealedSigned = await seal(this.#ctx, 'policies', 'signed_json', key, text);
+    const sealedHash = await seal(
+      this.#ctx,
+      'policies',
+      'policy_hash',
+      key,
+      computeActionDigest(signed.body.params.policy),
+    );
+    const now = base.now;
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: signed.body.nonce }) !== undefined) {
+        return refused('policy.set', 'nonce_used');
+      }
+      const row = tx.get('policies', { slot: SINGLETON_SLOT });
+      if (row !== undefined && version <= row.version)
+        return refused('policy.set', 'version_not_newer');
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      tx.delete('policies', {});
+      tx.insert('policies', {
+        slot: SINGLETON_SLOT,
+        version,
+        signed_json: sealedSigned,
+        policy_hash: sealedHash,
+        applied_at: now,
+      });
+      freshLedgerIfBroken(tx, now);
+      return { status: 'applied', op: 'policy.set' };
+    });
+    if (outcome.status === 'refused') return this.#report(outcome);
+    // The store commits first, then the mark is raised (07 §3.4, decided at #44). If raising fails,
+    // the stored version and the mark differ and the load fails closed until a newer policy.set.
+    let markRaised: boolean;
+    try {
+      markRaised = (await this.#mark!.raise(version)) >= version;
+    } catch {
+      markRaised = false;
+    }
+    if (!markRaised) {
+      this.#ctx.log.warn('policy version mark not raised', { version });
+    }
+    // Echoing the signed object to the owner channel (04 §2.5.1) needs the transport (M1-7h).
+    return { status: 'applied', op: 'policy.set', policyVersion: version, markRaised };
+  }
+
+  /**
+   * The policy to evaluate with, re-verified now (G-6, 06 §3; 04 §2.5.1). Never the defaults once a
+   * version has been applied or a row exists; a store error is a fail-closed result, not an empty
+   * policy.
+   */
+  async loadPolicy(): Promise<EffectivePolicy> {
+    const failClosed = (problem: Extract<EffectivePolicy, { mode: 'fail_closed' }>['problem']) =>
+      ({ mode: 'fail_closed', problem }) as const;
+    const mark = await this.#readMark();
+    if (mark === undefined) return failClosed('mark_unavailable');
+    let row: Row<'policies'> | undefined;
+    let self: SelfView;
+    try {
+      row = await this.#ctx.store.transaction((tx) => tx.get('policies', { slot: SINGLETON_SLOT }));
+    } catch {
+      return failClosed('unreadable');
+    }
+    if (row === undefined) return mark === 0 ? POLICY_DEFAULTS_EFFECTIVE : failClosed('missing');
+
+    let text: string;
+    let hash: string;
+    try {
+      text = await open(this.#ctx, 'policies', 'signed_json', [SINGLETON_SLOT], row.signed_json);
+      hash = await open(this.#ctx, 'policies', 'policy_hash', [SINGLETON_SLOT], row.policy_hash);
+    } catch {
+      return failClosed('unreadable');
+    }
+    try {
+      self = await this.#self();
+    } catch {
+      return failClosed('identity_unavailable');
+    }
+    if ('refusal' in self) return failClosed('identity_unavailable');
+
+    const verified = verifyStoredOwnerAction(text, self);
+    if (!verified.ok) {
+      switch (verified.reason) {
+        case 'agent_mismatch':
+        case 'owner_mismatch':
+        case 'signature_invalid':
+          return failClosed(verified.reason);
+        default:
+          return failClosed('invalid');
+      }
+    }
+    const { body } = verified.signed;
+    if (body.op !== 'policy.set') return failClosed('invalid');
+    // Belt and braces: the strict schema already checked it as part of the object.
+    if (!policySchema.safeParse(body.params.policy).success) return failClosed('invalid');
+    const version = body.params.version;
+    if (version < mark) return failClosed('rolled_back');
+    if (version !== mark) return failClosed('mark_mismatch');
+    // Columns derived from the signed object are caches; one that disagrees is a tampered row.
+    if (row.version !== version || hash !== computeActionDigest(body.params.policy)) {
+      return failClosed('tampered');
+    }
+    return { mode: 'signed', policy: body.params.policy, version };
+  }
+
+  /**
+   * What the stored approval allows for `approvalId` and this call's action (04 §2.5.1): the stored
+   * decision (an `approval.decide`, or the batch with exactly one item for this ID) and any cancel
+   * are re-verified, and the digest is recomputed from `action`. The `status` column is not read
+   * as authority. Freshness and the nonce are not checked again (they applied once).
+   */
+  async checkApproval(approvalId: string, action: unknown): Promise<ApprovalCheck> {
+    if (!approvalIdSchema.safeParse(approvalId).success) {
+      return { status: 'refused', reason: 'approval_unknown' };
+    }
+    const row = await this.#ctx.store.transaction((tx) =>
+      tx.get('approvals', { approval_id: approvalId }),
+    );
+    if (row === undefined) return { status: 'refused', reason: 'approval_unknown' };
+    const self = await this.#self();
+    if ('refusal' in self) return { status: 'refused', reason: 'decision_invalid' };
+    const now = nowOf(this.#ctx);
+
+    if (row.signed_cancel !== null) {
+      const cancel = verifyStoredOwnerAction(row.signed_cancel, self);
+      const ok =
+        cancel.ok &&
+        cancel.signed.body.op === 'approval.cancel' &&
+        cancel.signed.body.params.approvalId === approvalId;
+      if (!ok) return { status: 'refused', reason: 'cancel_invalid' };
+      // A cancel of a request that was never decided denied it (04 §2.5.1).
+      return row.signed_decision === null ? { status: 'denied' } : { status: 'cancelled' };
+    }
+    if (row.signed_decision === null) {
+      return now > row.expires_at ? { status: 'expired' } : { status: 'pending' };
+    }
+    const decision = verifyStoredOwnerAction(row.signed_decision, self);
+    if (!decision.ok) return { status: 'refused', reason: 'decision_invalid' };
+    const body = decision.signed.body;
+    const items =
+      body.op === 'approval.decide'
+        ? [body.params]
+        : body.op === 'approval.decideBatch'
+          ? body.params.items
+          : [];
+    const mine = items.filter((i) => i.approvalId === approvalId);
+    if (mine.length !== 1) return { status: 'refused', reason: 'decision_invalid' };
+    const item = mine[0]!;
+    if (computeActionDigest(action) !== item.actionDigest) {
+      return { status: 'refused', reason: 'digest_mismatch' };
+    }
+    if (item.decision === 'deny') return { status: 'denied' };
+    return now > row.expires_at ? { status: 'expired' } : { status: 'approved' };
+  }
+}

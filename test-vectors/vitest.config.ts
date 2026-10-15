@@ -48,6 +48,10 @@ const resolve = {
       find: /^@agentlink\/core\/contact-check$/,
       replacement: packageSource('core', 'contact-check.ts'),
     },
+    // The owner-action suite (M1-7d) runs the core's pure verifier from source; core's index needs
+    // only crypto, types and the log package, all three resolved to source here.
+    { find: /^@agentlink\/core$/, replacement: packageSource('core', 'index.ts') },
+    { find: /^@agentlink\/log$/, replacement: packageSource('log', 'index.ts') },
   ],
 };
 
