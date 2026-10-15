@@ -63,19 +63,36 @@ async function loadSigner() {
   return mod.default ?? mod; // the CommonJS build arrives as the default export
 }
 
+// The throwaway key signs the event, is its `p` recipient and answers NIP-42 AUTH, so a relay that
+// gates kind-1059 reads to the authenticated recipient can be tested end to end. It is never
+// printed or saved.
 async function makeEvent() {
-  const { generateSecretKey, getPublicKey, finalizeEvent } = await loadSigner();
-  const sk = generateSecretKey(); // throwaway, never printed or saved
-  const to = getPublicKey(generateSecretKey()); // random recipient: nobody can read this event
-  return finalizeEvent(
+  const signer = await loadSigner();
+  const sk = signer.generateSecretKey();
+  const pk = signer.getPublicKey(sk);
+  const ev = signer.finalizeEvent(
     {
       kind: 1059,
       created_at: Math.floor(Date.now() / 1000) - Math.floor(Math.random() * 3600),
-      tags: [['p', to]],
+      tags: [['p', pk]],
       content: randomBytes(48).toString('base64'),
     },
     sk,
   );
+  const authEvent = (relay, challenge) =>
+    signer.finalizeEvent(
+      {
+        kind: 22242,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ['relay', relay],
+          ['challenge', challenge],
+        ],
+        content: '',
+      },
+      sk,
+    );
+  return { ev, pk, authEvent };
 }
 
 async function fetchNip11(relay) {
@@ -92,7 +109,7 @@ async function fetchNip11(relay) {
 }
 
 // One WebSocket exchange: send frames, resolve with the frames that came back.
-function exchange(relay, frames, until) {
+function exchange(relay, frames, until, react) {
   return new Promise((resolve) => {
     const seen = [];
     let ws;
@@ -120,6 +137,7 @@ function exchange(relay, frames, until) {
       try {
         const frame = JSON.parse(String(m.data));
         seen.push(frame);
+        react?.(frame, (f) => ws.send(JSON.stringify(f)));
         if (until(frame)) done('ok');
       } catch {
         /* ignore non-JSON */
@@ -130,9 +148,48 @@ function exchange(relay, frames, until) {
 
 const short = (v) => String(v ?? '').slice(0, 80);
 
+const isEvent = (f, id) => f[0] === 'EVENT' && f[2]?.id === id;
+
+/**
+ * Reads with the sync's exact filter shape (sync.ts: kinds [1059], "#p", since). With `withAuth`,
+ * answers a NIP-42 AUTH challenge with the throwaway key and asks again.
+ */
+async function readByP(relay, made, withAuth) {
+  const { ev, pk } = made;
+  const filter = { kinds: [1059], '#p': [pk], since: ev.created_at - 60 };
+  const id = randomBytes(4).toString('hex');
+  let authed = false;
+  let authEvent;
+  const res = await exchange(
+    relay,
+    [['REQ', `p${id}`, filter]],
+    // Without AUTH stop at the first answer; with AUTH wait for the answer to the second REQ.
+    (f) => (f[0] === 'EOSE' || f[0] === 'CLOSED') && f[1] === (authed ? `q${id}` : `p${id}`),
+    (f, send) => {
+      if (f[0] === 'AUTH' && withAuth && typeof f[1] === 'string' && !authed) {
+        authed = true;
+        authEvent = made.authEvent(relay, f[1]);
+        send(['AUTH', authEvent]);
+        setTimeout(() => send(['REQ', `q${id}`, filter]), 800);
+      }
+    },
+  );
+  const closed = res.seen.filter((f) => f[0] === 'CLOSED');
+  const authOk = authEvent && res.seen.find((f) => f[0] === 'OK' && f[1] === authEvent.id);
+  return {
+    readByP: res.seen.some((f) => isEvent(f, ev.id)),
+    authChallenge: res.seen.some((f) => f[0] === 'AUTH'),
+    authAttempted: authed,
+    authAccepted: authed ? authOk?.[2] === true : null,
+    authReason: authOk ? short(authOk[3]) : null,
+    note: closed.length > 0 ? short(closed[closed.length - 1][2]) : res.note,
+  };
+}
+
 async function vetRelay(relay) {
   const out = { relay, nip11: await fetchNip11(relay) };
-  const ev = await makeEvent();
+  const made = await makeEvent();
+  const { ev } = made;
   const pub = await exchange(relay, [['EVENT', ev]], (f) => f[0] === 'OK' && f[1] === ev.id);
   const ok = pub.seen.find((f) => f[0] === 'OK' && f[1] === ev.id);
   out.publish = {
@@ -140,7 +197,12 @@ async function vetRelay(relay) {
     reason: ok ? short(ok[3]) : pub.note,
     authChallenge: pub.seen.some((f) => f[0] === 'AUTH'),
   };
-  // Read back by id with no AUTH: a relay that gates kind-1059 reads says so.
+  // The sync's read: by #p since a cursor, without AUTH; then with AUTH if the relay challenged.
+  out.readByP = await readByP(relay, made, false);
+  if (!out.readByP.readByP && out.readByP.authChallenge) {
+    out.readByPAuth = await readByP(relay, made, true);
+  }
+  // By id, for comparison only: the sync never reads by id.
   const sub = 'v' + randomBytes(4).toString('hex');
   const rd = await exchange(
     relay,
@@ -148,8 +210,8 @@ async function vetRelay(relay) {
     (f) => f[0] === 'EOSE' || f[0] === 'CLOSED',
   );
   const closed = rd.seen.find((f) => f[0] === 'CLOSED');
-  out.read = {
-    readBack: rd.seen.some((f) => f[0] === 'EVENT' && f[2]?.id === ev.id),
+  out.readById = {
+    readBack: rd.seen.some((f) => isEvent(f, ev.id)),
     authRequiredForRead:
       rd.seen.some((f) => f[0] === 'AUTH') || /auth/i.test(String(closed?.[2] ?? '')),
     note: closed ? short(closed[2]) : rd.note,

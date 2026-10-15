@@ -24,8 +24,9 @@ The orchestrator or a builder (Sonnet or above) on a machine with network access
 | Check | Pass when | How the script checks it |
 |---|---|---|
 | Kind 1059 accepted | `OK true` for the test wrap | Publishes it and reads the `OK` |
-| Read back | The event comes back by id without AUTH, or the relay says AUTH is needed | `REQ` with `ids`. A relay that accepts but never returns it is a **fail for reads** until shown otherwise with a `#p` filter under AUTH |
-| Message size | NIP-11 `max_message_length` ≥ 90 112 (the largest valid wrap is about 88 KB as an `EVENT` frame; our frame cap is 131 072, 04 §3.1.1). The card's older "≥ 64 KB" is below what a maximum wrap needs | `judgeNip11` on `limitation.max_message_length`; absent is "unknown", test by hand |
+| Read by `#p` (what the sync does) | The wrap comes back for `{kinds:[1059], "#p":[recipient], since}`, the exact shape of `sync.ts`, without AUTH, or after a NIP-42 AUTH the relay accepts (the script answers a challenge with the throwaway key, which is also the `p` recipient) | `REQ` with that filter; on an `AUTH` challenge it signs kind 22242 and asks again. This is the check that decides a relay, because sync never reads by id |
+| Read by id (comparison only) | Informational | `REQ` with `ids`; some relays treat it differently from `#p` |
+| Message size | NIP-11 `max_message_length` ≥ 90 112 bytes. Derivation: the largest valid wrap has a NIP-44 payload of 87 472 characters (04 §3.1.1), so the `EVENT` frame is that plus the event JSON (id, pubkey, sig, tags, kind, keys), about 88 KB; 90 112 is 88 KiB, which holds it with about 2 KB to spare. Our own inbound frame cap is 131 072. The card's older "≥ 64 KB" was below what a maximum wrap needs and is corrected | `judgeNip11` on `limitation.max_message_length`; absent is "unknown", test by hand |
 | Retention | Still present after 7 days (we sync with a 48 h look-back and a 9 day first sync, 07 §4.2, §4.3); 30 days is the longest we rely on | Saved event id, `--recheck` over time |
 | Read auth (NIP-42) | Behaviour known: either open reads, or an `AUTH` challenge that the pool answers (07 §4.2 supports NIP-42) | NIP-11 `supported_nips`, `auth_required`, an `AUTH` frame on publish or read |
 | Uptime | No outage over the observation period | Repeat runs; manual note |
@@ -42,12 +43,14 @@ A relay that fails a check stays out of any new default list; the owner decides 
 
 ## Results
 
-**15 Oct 2026, Node 22, from the builder's machine (single run, one test event per relay).**
+**15 Oct 2026, Node 22, from the builder's machine. One tiny kind-1059 event per relay from a throwaway key (the second run, with the sync's `#p` filter and AUTH attempt).**
 
-| Relay | Accepts 1059 | Read back by id | NIP-11 max message | NIP-42 | Retention |
+| Relay | Accepts 1059 | Read by `#p` + `since` (sync's filter) | Read by id | NIP-11 max message | NIP-42 AUTH |
 |---|---|---|---|---|---|
-| `wss://relay.damus.io` | yes | **no** (accepted, not returned by id; not yet tried with `#p` under AUTH) | 1 000 000 (ok) | not advertised | not measured |
-| `wss://nos.lol` | yes | yes | 131 072 (ok) | not advertised | present at 0 min; longer not measured |
-| `wss://relay.primal.net` | yes | yes | 1 000 000 (ok) | not advertised | present at 0 min; longer not measured |
+| `wss://relay.damus.io` | yes | **no**: `auth-required: requested filter requires authentication` | no | 1 000 000 (ok) | challenge sent; our login refused: `relay needs serviceUrl to be configured before AUTH can work` (tried with and without a trailing slash on the relay URL) |
+| `wss://nos.lol` | yes | yes | yes | 131 072 (ok) | no challenge; open reads |
+| `wss://relay.primal.net` | yes | yes | yes | 1 000 000 (ok) | no challenge; open reads |
 
-Open: damus read-back by `#p`, retention at 10 min, 24 h and 7 days, and uptime are **not yet measured**; M1-18 is not signed off until they are.
+**damus fails the sync read today**: it demands AUTH for a `#p` query, then refuses every login because of its own configuration, so a sync against it returns nothing. Publishing works. This is a relay-side fault that may be fixed; re-run before relying on it. Until then it should not count as one of the 2 acknowledgements a user depends on for reading, so D-75's list needs the owner's decision (replace it, or keep it as a write-only extra).
+
+Not yet measured: retention beyond 0 minutes (use `--recheck` after 10 minutes, 24 hours and 7 days) and uptime. M1-18 is not signed off until the damus decision and retention are done.

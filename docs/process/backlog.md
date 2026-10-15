@@ -2872,7 +2872,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 07 §4.2 (relays, retention); 03 §2; 08 §6
 - **Invariants:** I-3
 - **Scope:**
-  - Evaluate public relays: kind 1059 accepted, NIP-42 AUTH for kind 1059 reads, NIP-11 `max_message_length` ≥ 64 KB, retention, uptime. Choose a default set of 3–5.
+  - Evaluate public relays: kind 1059 accepted, NIP-42 AUTH for kind 1059 reads, NIP-11 `max_message_length` ≥ 90 112 bytes (88 KiB; the largest valid wrap is about 88 KB as an `EVENT` frame, 04 §3.1.1; the earlier 64 KB figure was below a maximum wrap), retention, uptime. Choose a default set of 3–5.
   - Optional (not on the M1 critical path): 4thTech strfry relay, 30-day retention for kind 1059, AUTH-gated reads, no content logging.
 - **Acceptance:**
   - Evaluation table committed with test dates; the default set passes the M1-5b/M1-5c suites.
