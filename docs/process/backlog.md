@@ -2627,6 +2627,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - `agentlink_send` `path` (realpath allowed-folder check; outside or none → `needs_setup` with the local UI link, file never opened) and `notarize`, `agentlink_fetch_file`, `agentlink_notarize`, `agentlink_acknowledge` (`opened` only when the user asked; `accepted`/`rejected` only on records without `terms`, otherwise `USE_RESPOND_TO_TERMS`), the receipt and `notarize` parts of `agentlink_respond_to_terms` and `notarize` on `agentlink_propose_terms` (D-55), `agentlink_get_proof`, `agentlink_export_proof_pack` (to `proofs.exportFolder`; key disclosure needs approval), `agentlink_verify_proof_pack` (file-path argument restricted per G-25); `agentlink_status` `credits`, `agentAddress`, `topUpUrl` and `prices` (USD split `protocolUsd` / `integratorUsd`, G-43), replacing the former `fee_quote` and `get_credits` (D-53).
   - Annotations and `approvalId?` per the 06 §2.0 table; only additive changes to M1a tool schemas.
+  - M1-9e's deny rules (`apps/cli/test/tool-surface.test.ts`) flag some M1b tools (`export` in `agentlink_export_proof_pack`, `path` and `file` arguments on send and fetch_file). Do not loosen the rules: add an explicit per-tool allowlist entry with a justification, and register the six M1b tools against the 06 §2.0 table there.
   - No tool asks for or requires a chain in its default inputs; the chain is picked automatically (M1-26, D-40).
   - (IR-D48-1 F15f) `agentlink_fetch_file` and `agentlink_send` (with `path`) results carry size, hash, name (untrusted) and expiry only: never the drop or presigned URL, the share link, or the file key (shape per `InboundMessage` in M1-9j).
 - **Acceptance:**
@@ -2640,18 +2641,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (IR-D48-1 F15f) A scan of every file-tool result and error in the test run finds no URL from the drop or a connector, and no key material.
 
 #### M1-9e · MCP conformance and tool-surface guard
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli/test, .github/workflows/ci.yml
 - **Depends on:** M1-9c (the registry exists; extended when M1-9d lands). It runs on the frozen nine-tool M1a surface: the "exactly the 15 tools" assertion checks the 06 §2.0 table with the M1b rows marked pending until M1-9d
 - **Spec:** 06 §1 rule 4, §2.0, §9; 04 I-4; 11 §5; D-53
 - **Invariants:** I-4
 - **Scope:**
-  - MCP Inspector (CLI mode) schema validation of all tools in CI. The Inspector CLI is a pinned dev tool and needs a deps-check allowlist row (sensitive path, owner "merge").
+  - MCP SDK client conformance test (real stdio server) validating the schemas of all tools in CI, in place of the MCP Inspector CLI (owner decision 2026-10-15: `@modelcontextprotocol/inspector-cli` failed the dependency-review licence allowlist and is deprecated upstream; no new dependency).
   - Committed tool-surface snapshot (names, input and output schemas, annotations); changes need the owner's "merge" in chat (D-51, D-52).
   - D-53 and D-55 assertions: the snapshot holds exactly the 15 tools of 06 §2.0 (M1b rows pending until M1-9d); `agentlink_send`'s `type` enum has no `offer`, `accept` or `reject`; every name starts with `agentlink_`; the four annotations are set explicitly on every tool and match the 06 §2.0 table; every tool that can return `pending_approval` accepts `approvalId`; after 0.1.0, a removed or renamed tool or a removed or newly required field fails CI unless the PR records a decision-log entry; no tool name, description or argument installs, changes or removes harness hooks or harness configuration.
   - Deny assertions: no tool name, description or argument that changes policy, exports keys, adds storage credentials, decides approvals or reads arbitrary files. Vocabulary lint over summaries and server instructions.
+  - Delivered in review: `apps/cli/test/tool-surface.test.ts` (snapshot `test/fixtures/tool-surface.json`, 06 §2.0 table read from the spec, `auditSurface` rules with bad-fixture self-tests) and `test/mcp-conformance.test.ts` (MCP SDK client over real stdio, in place of the Inspector CLI; owner decision 2026-10-15). **TODO (post-0.1.0):** the "removed or renamed tool or field fails unless a decision-log entry" comparison needs the 0.1.0 surface as a baseline; add it with the 0.1.0 release card.
+  - **Follow-up (IR-M1-9e-1 L2):** the vocabulary lint covers four 11 §5.1 words; the spec-verbatim server instructions (06 §5) say "on-chain proof", which the full list bans. Reconcile 06 §5 wording with 11 §5.1, then widen the lint to the full list (small DOCS card).
 - **Acceptance:**
-  - Adding a fixture tool `set_policy` or an argument `privateKey` fails the check when run locally (local demonstration, output in PR; not pushed); so do a fixture tool without the `agentlink_` prefix and a fixture write tool marked `readOnlyHint: true` (local demonstrations); Inspector validation passes for every tool.
+  - Adding a fixture tool `set_policy` or an argument `privateKey` fails the check when run locally (local demonstration, output in PR; not pushed); so do a fixture tool without the `agentlink_` prefix and a fixture write tool marked `readOnlyHint: true` (local demonstrations); the SDK client conformance test passes for every tool.
 
 #### M1-9f · Claude Desktop one-click extension bundle
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b

@@ -515,7 +515,7 @@ agentlink doctor                         # diagnostics (relays, RPC, keychain or
 
 ## 9. Acceptance tests (MCP)
 
-- MCP Inspector passes schema validation for all tools (inputs and outputs).
+- An MCP SDK client conformance test passes schema validation for all tools (inputs and outputs) against a real stdio server in CI (`apps/cli/test/mcp-conformance.test.ts`). It replaces the MCP Inspector CLI (owner decision 2026-10-15: `@modelcontextprotocol/inspector-cli` failed the dependency-review licence allowlist and is deprecated upstream).
 - Tool surface (D-53): every tool name starts with `agentlink_`; every tool sets all four annotations to the values in §2.0; every tool that can return `pending_approval` accepts `approvalId`; read-only tools send no message or acknowledgement, sign no envelope, receipt or record, add no contact, mark nothing read and write no file, their only effects being stored raw envelopes and relay AUTH (a pending handshake in the store is still unprocessed after `agentlink_status`); no tool installs or changes harness hooks (asserted in CI against the committed tool-surface snapshot).
 - End-to-end: Claude Code instance A ↔ Codex instance B on separate machines: pair, send message, send a 5 MB file with zero storage setup (encrypted drop), notarize, DELIVERED + OPENED receipts, export and verify proof pack.
 - Prompt-injection suite: inbound messages containing tool-like instructions, closing tags, invite links and file paths do not cause any tool call by our code and are always wrapped. `agentlink_status` and `agentlink status --brief` never contain inbound text (canary test); self-declared names appear outside the untrusted block only under the contact-name rule (§2.1, name canary).
