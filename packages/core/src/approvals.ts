@@ -12,11 +12,14 @@
 //   compare-and-set `approved` → `void` inside the caller's effect transaction, so two uses can
 //   never both proceed. A commitment approval is used per part (M1-32), never here.
 // - collect(): what the channel holds is unverified data; only OwnerActions.apply can decide.
+// - read() / countPending() (M1-7e-3): one approval's state for its own stored action, re-verified
+//   (06 §2.5 `agentlink_get_approval`), and the number waiting for the owner (`agentlink_status`).
+//   Read-only; a row that does not verify reads `unknown`, never a state that suggests authority.
 //
 // I-4: nothing here decides, widens or creates an approved approval. The row's `status` only ever
 // takes authority away (`void`, `expired`); it never grants it. I-5: the summary is core-built
 // template text checked like `approval-request.summary`; errors and log lines are fixed text.
-import { canonicalize, encodeBase64url, randomBytes } from '@agentlink/crypto';
+import { canonicalize, encodeBase64url, parseJson, randomBytes } from '@agentlink/crypto';
 import {
   APPROVAL_ID_PREFIX,
   APPROVAL_TTL_SECONDS,
@@ -31,7 +34,7 @@ import {
   type ApprovalFee,
 } from '@agentlink/types';
 import type { ApprovalChannel } from './approval-channel.js';
-import { nowOf, seal, type CoreContext } from './context.js';
+import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import type { IdempotencyRun, IdempotencyService, PreparedEffect } from './idempotency.js';
 import type { IdentityService } from './identity.js';
@@ -85,6 +88,26 @@ export type ApprovalAuthorization =
   | ApprovalRefusal;
 
 export type ApprovalUse = { readonly status: 'used' } | ApprovalRefusal;
+
+/**
+ * One stored approval as read for its own stored action (06 §2.5 `agentlink_get_approval`;
+ * M1-7e-3). Minimal by design: never the owner signature, the decision payload, the action, the
+ * summary or anything sealed (I-4, I-5). `void` is a request withdrawn before any decision;
+ * `used` is an approval that already let its action run once. `unknown` fails closed: `not_found`
+ * for no such ID, `invalid` for a row whose stored action or signed objects do not verify (an
+ * edited row authorises nothing). The MCP mapping to the 06 §2.5 output is M1-9c.
+ */
+export type ApprovalState =
+  | {
+      readonly status:
+        'pending' | 'approved' | 'denied' | 'cancelled' | 'expired' | 'used' | 'void';
+      /** sha256(JCS(action)), recomputed from the stored action. */
+      readonly actionDigest: string;
+      readonly expiresAt: number;
+      /** The row's `decided_at`, unix seconds, once the owner decided or cancelled. */
+      readonly decidedAt?: number;
+    }
+  | { readonly status: 'unknown'; readonly reason: 'not_found' | 'invalid' };
 
 export type CollectOutcome =
   | { readonly status: 'pending' | 'unknown' }
@@ -363,6 +386,59 @@ export class ApprovalService {
       return { status: 'refused', op: named.op, reason: 'other_request', nonceBurnt: false };
     }
     return this.#owner.apply(held.signed);
+  }
+
+  /**
+   * Reads one approval by ID for its own stored action (06 §2.5; M1-7e-3). The sealed action is
+   * opened and parsed under the strict schema, and OwnerActions.readApproval re-verifies the stored
+   * signed objects against its recomputed digest. Read-only: it never applies, claims or changes a
+   * row, and it never asks the channel (no `collect`: a `signed` result would be applied twice).
+   */
+  async read(approvalId: string): Promise<ApprovalState> {
+    const notFound = { status: 'unknown', reason: 'not_found' } as const;
+    const invalid = { status: 'unknown', reason: 'invalid' } as const;
+    if (!approvalIdSchema.safeParse(approvalId).success) return notFound;
+    const row = await this.#ctx.store.transaction((tx) =>
+      tx.get('approvals', { approval_id: approvalId }),
+    );
+    if (row === undefined) return notFound;
+    let action: unknown;
+    try {
+      const text = await open(this.#ctx, 'approvals', 'action_json', [approvalId], row.action_json);
+      action = parseJson(text);
+    } catch {
+      return invalid;
+    }
+    if (!approvalActionSchema.safeParse(action).success) return invalid;
+    const reading = await this.#owner.readApproval(approvalId, action);
+    if (reading.status === 'refused') {
+      return reading.reason === 'approval_unknown' ? notFound : invalid;
+    }
+    // The row read again by readApproval may differ from `row` only in its mutable columns.
+    const decided = reading.status !== 'pending' && reading.status !== 'void';
+    return {
+      status: reading.status,
+      actionDigest: computeActionDigest(action),
+      expiresAt: row.expires_at,
+      ...(decided && row.decided_at !== null ? { decidedAt: row.decided_at } : {}),
+    };
+  }
+
+  /**
+   * The number of approvals waiting for the owner (06 §2.1 `agentlink_status.pendingApprovals`):
+   * undecided, not cancelled, not voided and not lapsed at the current time. A display count only;
+   * it authorises nothing.
+   */
+  async countPending(): Promise<number> {
+    const now = nowOf(this.#ctx);
+    return this.#ctx.store.transaction((tx) =>
+      tx.count('approvals', {
+        status: 'pending',
+        signed_decision: null,
+        signed_cancel: null,
+        expires_at: { gte: now },
+      }),
+    );
   }
 
   /**
