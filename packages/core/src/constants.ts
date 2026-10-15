@@ -4,7 +4,7 @@
 // imported from there and not repeated here.
 
 /** The logical schema version of 07 §3 that this code implements (forward migrations only, §3.7). */
-export const STORE_SCHEMA_VERSION = 2;
+export const STORE_SCHEMA_VERSION = 3;
 
 /** 04 §2.9: `storagePrefix` is 16 random bytes, base64url, generated at init. */
 export const STORAGE_PREFIX_BYTES = 16;
@@ -17,6 +17,18 @@ export const OUTBOX_GIVE_UP_SECONDS = 86_400;
 export const OUTBOX_ROW_RETENTION_SECONDS = 604_800;
 /** outbox: a row is `sent` once this many relays returned `OK` (§4.2). */
 export const OUTBOX_SENT_RELAY_ACKS = 2;
+
+/**
+ * Staged pairing messages (IR-M1-7k-1 F08; M1-7k-b): one still `queued` without outbox rows this
+ * long after its created_at is marked `not_delivered`. Equal to the outbox retry window (24 h), so a
+ * staged message is given as long to get its wraps as a wrap is given to reach two relays.
+ */
+export const STAGED_MAX_AGE_SECONDS = 86_400;
+
+/** publisher_lease: lease_until = now + 60 s (06 §6; D-73; M1-7k-b). */
+export const PUBLISHER_LEASE_SECONDS = 60;
+/** publisher_lease: the holder renews, and a non-holder tries to take it, every 20 s. */
+export const PUBLISHER_LEASE_RENEW_SECONDS = 20;
 
 /** seen: a row is older than 7 days before it may be pruned (and see the cursor bound). */
 export const SEEN_MIN_RETENTION_SECONDS = 604_800;
