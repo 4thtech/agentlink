@@ -45,6 +45,8 @@ import {
 import { createNip11FetcherWith, createRelayConnectorWith } from './relay-io.js';
 
 const execFileAsync = promisify(execFile);
+/** One label value per run: afterAll removes every container of this run, even after a failed start. */
+const RUN_LABEL = `agentlink-test=relay-docker-${process.pid}-${Date.now()}`;
 const required = process.env['AGENTLINK_REQUIRE_DOCKER'] === '1';
 
 /** Relay images, pinned by digest (the PR body records why these two implementations). */
@@ -186,7 +188,7 @@ async function startRelay(
     'create',
     ...(options.platform === undefined ? [] : ['--platform', options.platform]),
     '--label',
-    'agentlink-test=relay-docker',
+    RUN_LABEL,
     '-p',
     `127.0.0.1::${options.containerPort}`,
     options.image,
@@ -364,11 +366,13 @@ describe.skipIf(!required)(
 
     afterAll(async () => {
       for (const relay of Object.values(running)) relay.terminator.close();
-      await Promise.all(
-        Object.values(running).map((relay) =>
-          docker('rm', '-f', relay.container).catch(() => undefined),
-        ),
-      );
+      // Every container of this run, including those of a start that failed half-way (IR-M1-5b-b-1 I-1).
+      const ids = await docker('ps', '-aq', '--filter', `label=${RUN_LABEL}`).catch(() => '');
+      const containers = new Set([
+        ...Object.values(running).map((relay) => relay.container),
+        ...ids.split('\n').filter((id) => id.length > 0),
+      ]);
+      if (containers.size > 0) await docker('rm', '-f', ...containers).catch(() => undefined);
       await keys?.close();
       if (dir !== undefined) rmSync(dir, { recursive: true, force: true });
     }, 120_000);

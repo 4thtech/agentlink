@@ -22,6 +22,7 @@ import {
   CONNECT_TIMEOUT_MS,
   MAX_FRAME_BYTES,
   NIP11_MAX_BYTES,
+  isGloballyRoutable,
   type HostResolver,
   type Nip11Fetcher,
   type RelayConnector,
@@ -63,8 +64,12 @@ function checkedTarget(target: RelayTarget): { address: string; path: string } |
   if (typeof url !== 'string' || typeof host !== 'string' || typeof address !== 'string') {
     return undefined;
   }
-  // Only a plain IPv4 or IPv6 address (no zone id, no name): the pool's check approved exactly it.
-  if (isIP(address) === 0 || address.includes('%')) return undefined;
+  // Only a plain IPv4 or IPv6 address (no zone id, no name) that is globally routable. The pool's
+  // check approved it already; this repeats the check so the connector never dials a private,
+  // loopback, link-local, mapped or NAT64 address whatever its caller passes (IR-M1-5b-b-1 L-3).
+  if (isIP(address) === 0 || address.includes('%') || !isGloballyRoutable(address)) {
+    return undefined;
+  }
   if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) return undefined;
   const match = RELAY_PARTS.exec(url);
   if (match === null) return undefined;

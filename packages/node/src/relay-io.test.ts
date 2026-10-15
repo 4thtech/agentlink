@@ -57,12 +57,27 @@ async function relay(options: Parameters<typeof startTestRelay>[1] = {}): Promis
   return started;
 }
 
+/**
+ * The checked address the tests hand the connector: globally routable, so the connector's own
+ * address check (L-3) accepts it. `route` (the test seam) sends only this address to the local
+ * server on 127.0.0.1 and records every dial, so a test sees whether the connector tried to connect.
+ */
+const PUBLIC_ADDRESS = '93.184.215.20';
+const routed: { address: string; port: number }[] = [];
+const route = (address: string, port: number) => {
+  routed.push({ address, port });
+  return { address: '127.0.0.1', port: address === PUBLIC_ADDRESS ? port : 1 };
+};
+afterEach(() => {
+  routed.length = 0;
+});
+
 function targetFor(port: number, overrides: Partial<RelayTarget> = {}): RelayTarget {
   return {
     url: `wss://${RELAY_HOST}:${port}/`,
     host: RELAY_HOST,
     port,
-    address: '127.0.0.1',
+    address: PUBLIC_ADDRESS,
     ...overrides,
   };
 }
@@ -122,11 +137,12 @@ describe('the connector connects to the checked address only (07 §4.2 step 3)',
         callback: (err: null, addresses: { address: string; family: number }[]) => void,
       ) => callback(null, [{ address: '10.66.0.1', family: 4 }])) as unknown as typeof dns.lookup);
     const connection = observe(
-      createRelayConnectorWith({ ca: certificate.cert }),
+      createRelayConnectorWith({ ca: certificate.cert, route }),
       targetFor(server.port),
     );
     expect(await connection.opened).toBe(true);
     expect(lookup).not.toHaveBeenCalled();
+    expect(routed).toEqual([{ address: PUBLIC_ADDRESS, port: server.port }]);
     expect(server.seen).toHaveLength(1);
     expect(server.seen[0]).toMatchObject({
       kind: 'upgrade',
@@ -142,7 +158,7 @@ describe('the connector connects to the checked address only (07 §4.2 step 3)',
     const server = await relay();
     // The fake name server: the first query (the check) answers the test relay's address, every
     // later one a private address. The pool hands the connector the first answer.
-    const answers = [['127.0.0.1'], ['10.66.0.1'], ['10.66.0.1']];
+    const answers = [[PUBLIC_ADDRESS], ['10.66.0.1'], ['10.66.0.1']];
     const queries: string[] = [];
     const resolver = createHostResolverWith({
       lookup: (host, _options, callback) => {
@@ -155,15 +171,16 @@ describe('the connector connects to the checked address only (07 §4.2 step 3)',
       },
     });
     const checked = await resolver.resolve(RELAY_HOST);
-    expect(checked).toEqual(['127.0.0.1']);
+    expect(checked).toEqual([PUBLIC_ADDRESS]);
     const systemLookup = vi.spyOn(dns, 'lookup');
     const connection = observe(
-      createRelayConnectorWith({ ca: certificate.cert }),
+      createRelayConnectorWith({ ca: certificate.cert, route }),
       targetFor(server.port, { address: checked[0] }),
     );
     expect(await connection.opened).toBe(true);
     expect(queries).toEqual([RELAY_HOST]); // one lookup: the check
     expect(systemLookup).not.toHaveBeenCalled();
+    expect(routed).toEqual([{ address: PUBLIC_ADDRESS, port: server.port }]);
     expect(server.seen[0]?.remoteAddress).toBe('127.0.0.1');
     connection.socket.close();
     await connection.closed;
@@ -172,7 +189,7 @@ describe('the connector connects to the checked address only (07 §4.2 step 3)',
   it('verifies the certificate against the host name, not the address', async () => {
     const server = await relay();
     const connection = observe(
-      createRelayConnectorWith({ ca: certificate.cert }),
+      createRelayConnectorWith({ ca: certificate.cert, route }),
       targetFor(server.port, { host: OTHER_HOST, url: `wss://${OTHER_HOST}:${server.port}/` }),
     );
     expect(await connection.opened).toBe(false);
@@ -181,29 +198,56 @@ describe('the connector connects to the checked address only (07 §4.2 step 3)',
 
   it('refuses a certificate the trust store does not know (no CA given)', async () => {
     const server = await relay();
-    const connection = observe(nodeRelayConnector(), targetFor(server.port));
+    const connection = observe(createRelayConnectorWith({ route }), targetFor(server.port));
     expect(await connection.opened).toBe(false);
     expect(server.seen).toHaveLength(0);
   });
 
   it.each([
-    ['no checked address', { address: undefined }],
-    ['a host name as the address', { address: RELAY_HOST }],
-    ['an address with a zone id', { address: 'fe80::1%lo0' }],
-    ['a ws:// URL', { url: `ws://${RELAY_HOST}:1/` }],
-    ['a URL that names another host than the target', { url: `wss://${OTHER_HOST}/` }],
-  ])('fails closed on %s, without connecting', async (_name, overrides) => {
+    ['no checked address', () => ({ address: undefined })],
+    ['a host name as the address', () => ({ address: RELAY_HOST })],
+    ['a public IPv6 address with a zone id', () => ({ address: '2606:2800:220:1::1%eth0' })],
+    ['a link-local address with a zone id', () => ({ address: 'fe80::1%lo0' })],
+    ['a loopback address', () => ({ address: '127.0.0.1' })],
+    ['a private address', () => ({ address: '10.0.0.1' })],
+    ['the metadata address', () => ({ address: '169.254.169.254' })],
+    ['an IPv4-mapped IPv6 address', () => ({ address: `::ffff:${PUBLIC_ADDRESS}` })],
+    ['a NAT64 address', () => ({ address: '64:ff9b::5db8:d714' })],
+    ['a ws:// URL', (port: number) => ({ url: `ws://${RELAY_HOST}:${port}/` })],
+    [
+      'a URL that names another host than the target (same port)',
+      (port: number) => ({ url: `wss://${OTHER_HOST}:${port}/` }),
+    ],
+    [
+      'a URL with another port than the target',
+      (port: number) => ({ url: `wss://${RELAY_HOST}:${port + 1}/` }),
+    ],
+  ] as [string, (port: number) => Partial<RelayTarget>][])(
+    'fails closed on %s, without dialling',
+    async (_name, overrides) => {
+      const server = await relay();
+      const lookup = vi.spyOn(dns, 'lookup');
+      const connection = observe(
+        createRelayConnectorWith({ ca: certificate.cert, route }),
+        targetFor(server.port, overrides(server.port)),
+      );
+      expect(await connection.opened).toBe(false);
+      await settle();
+      expect(connection.counts()).toEqual({ opens: 0, closes: 1 });
+      expect(routed).toEqual([]);
+      expect(server.seen).toHaveLength(0);
+      expect(lookup).not.toHaveBeenCalled();
+    },
+  );
+
+  it('the production connector refuses a loopback or private address without dialling', async () => {
     const server = await relay();
-    const lookup = vi.spyOn(dns, 'lookup');
-    const connection = observe(
-      createRelayConnectorWith({ ca: certificate.cert }),
-      targetFor(server.port, overrides as Partial<RelayTarget>),
-    );
-    expect(await connection.opened).toBe(false);
+    for (const address of ['127.0.0.1', '10.0.0.1']) {
+      const connection = observe(nodeRelayConnector(), targetFor(server.port, { address }));
+      expect(await connection.opened).toBe(false);
+    }
     await settle();
-    expect(connection.counts()).toEqual({ opens: 0, closes: 1 });
     expect(server.seen).toHaveLength(0);
-    expect(lookup).not.toHaveBeenCalled();
   });
 });
 
@@ -219,11 +263,15 @@ describe('redirects are refused (07 §4.2 step 4)', () => {
       },
     });
     const connection = observe(
-      createRelayConnectorWith({ ca: certificate.cert }),
+      createRelayConnectorWith({ ca: certificate.cert, route }),
       targetFor(server.port),
     );
     expect(await connection.opened).toBe(false);
     await settle();
+    // Following would send the next upgrade over the same pinned connection target again, so the
+    // redirecting server itself would see more than one (IR-M1-5b-b-1 L-1).
+    expect(server.seen).toHaveLength(1);
+    expect(routed).toHaveLength(1);
     expect(target.seen).toHaveLength(0);
     expect(connection.counts()).toEqual({ opens: 0, closes: 1 });
   });
@@ -236,8 +284,10 @@ describe('redirects are refused (07 §4.2 step 4)', () => {
       },
     });
     await expect(
-      createNip11FetcherWith({ ca: certificate.cert }).fetch(targetFor(server.port)),
+      createNip11FetcherWith({ ca: certificate.cert, route }).fetch(targetFor(server.port)),
     ).rejects.toThrow();
+    expect(server.seen).toHaveLength(1);
+    expect(routed).toHaveLength(1);
     expect(target.seen).toHaveLength(0);
   });
 });
@@ -266,12 +316,12 @@ describe('proxy settings are ignored (07 §4.2 step 5)', () => {
         http: (_req, res) => res.writeHead(200).end('{"name":"direct"}'),
       });
       const connection = observe(
-        createRelayConnectorWith({ ca: certificate.cert }),
+        createRelayConnectorWith({ ca: certificate.cert, route }),
         targetFor(server.port),
       );
       expect(await connection.opened).toBe(true);
       expect(
-        await createNip11FetcherWith({ ca: certificate.cert }).fetch(targetFor(server.port)),
+        await createNip11FetcherWith({ ca: certificate.cert, route }).fetch(targetFor(server.port)),
       ).toBe('{"name":"direct"}');
       expect(proxy.connections()).toBe(0);
       expect(server.seen.map((s) => s.kind).sort()).toEqual(['http', 'upgrade']);
@@ -292,7 +342,7 @@ describe('inbound messages are capped at 131 072 bytes in the socket layer (04 �
     const frame = frameOfBytes(MAX_FRAME_BYTES);
     const server = await relay({ onSocket: (ws) => ws.send(frame) });
     const connection = observe(
-      createRelayConnectorWith({ ca: certificate.cert }),
+      createRelayConnectorWith({ ca: certificate.cert, route }),
       targetFor(server.port),
     );
     expect(await connection.opened).toBe(true);
@@ -313,7 +363,7 @@ describe('inbound messages are capped at 131 072 bytes in the socket layer (04 �
       const frame = frameOfBytes(MAX_FRAME_BYTES + 1, char);
       const server = await relay({ onSocket: (ws) => ws.send(frame) });
       const connection = observe(
-        createRelayConnectorWith({ ca: certificate.cert }),
+        createRelayConnectorWith({ ca: certificate.cert, route }),
         targetFor(server.port),
       );
       expect(await connection.opened).toBe(true);
@@ -331,7 +381,7 @@ describe('inbound messages are capped at 131 072 bytes in the socket layer (04 �
       },
     });
     const connection = observe(
-      createRelayConnectorWith({ ca: certificate.cert }),
+      createRelayConnectorWith({ ca: certificate.cert, route }),
       targetFor(server.port),
     );
     expect(await connection.opened).toBe(true);
@@ -342,7 +392,7 @@ describe('inbound messages are capped at 131 072 bytes in the socket layer (04 �
   it('does not negotiate per-message compression', async () => {
     const server = await relay();
     const connection = observe(
-      createRelayConnectorWith({ ca: certificate.cert }),
+      createRelayConnectorWith({ ca: certificate.cert, route }),
       targetFor(server.port),
     );
     expect(await connection.opened).toBe(true);
@@ -359,7 +409,7 @@ describe('inbound messages are capped at 131 072 bytes in the socket layer (04 �
       },
     });
     const connection = observe(
-      createRelayConnectorWith({ ca: certificate.cert }),
+      createRelayConnectorWith({ ca: certificate.cert, route }),
       targetFor(server.port),
     );
     expect(await connection.opened).toBe(true);
@@ -374,7 +424,7 @@ describe('inbound messages are capped at 131 072 bytes in the socket layer (04 �
         setTimeout(() => (ws as unknown as { _socket: { destroy(): void } })._socket.destroy(), 20),
     });
     const connection = observe(
-      createRelayConnectorWith({ ca: certificate.cert }),
+      createRelayConnectorWith({ ca: certificate.cert, route }),
       targetFor(server.port),
     );
     expect(await connection.opened).toBe(true);
@@ -389,7 +439,7 @@ describe('inbound messages are capped at 131 072 bytes in the socket layer (04 �
       onSocket: (ws) => ws.on('message', (data) => received.push(String(data))),
     });
     const connection = observe(
-      createRelayConnectorWith({ ca: certificate.cert }),
+      createRelayConnectorWith({ ca: certificate.cert, route }),
       targetFor(server.port),
     );
     expect(await connection.opened).toBe(true);
@@ -415,7 +465,7 @@ describe('the NIP-11 read (07 §4.2 "Size")', () => {
   it('GETs the relay path with Accept: application/nostr+json, pinned, and returns the body', async () => {
     const server = await relay(nip11('{"limitation":{"max_message_length":4096}}'));
     const lookup = vi.spyOn(dns, 'lookup');
-    const body = await createNip11FetcherWith({ ca: certificate.cert }).fetch(
+    const body = await createNip11FetcherWith({ ca: certificate.cert, route }).fetch(
       targetFor(server.port, { url: `wss://${RELAY_HOST}:${server.port}/nostr` }),
     );
     expect(body).toBe('{"limitation":{"max_message_length":4096}}');
@@ -434,7 +484,7 @@ describe('the NIP-11 read (07 §4.2 "Size")', () => {
 
   it('accepts a body of exactly the cap', async () => {
     const server = await relay(nip11('x'.repeat(NIP11_MAX_BYTES)));
-    const body = await createNip11FetcherWith({ ca: certificate.cert }).fetch(
+    const body = await createNip11FetcherWith({ ca: certificate.cert, route }).fetch(
       targetFor(server.port),
     );
     expect(body).toHaveLength(NIP11_MAX_BYTES);
@@ -443,7 +493,7 @@ describe('the NIP-11 read (07 §4.2 "Size")', () => {
   it('abandons a body one byte over the cap, declared or chunked', async () => {
     const declared = await relay(nip11('x'.repeat(NIP11_MAX_BYTES + 1)));
     await expect(
-      createNip11FetcherWith({ ca: certificate.cert }).fetch(targetFor(declared.port)),
+      createNip11FetcherWith({ ca: certificate.cert, route }).fetch(targetFor(declared.port)),
     ).rejects.toThrow();
     const chunked = await relay({
       http: (_req, res) => {
@@ -454,7 +504,7 @@ describe('the NIP-11 read (07 §4.2 "Size")', () => {
       },
     });
     await expect(
-      createNip11FetcherWith({ ca: certificate.cert }).fetch(targetFor(chunked.port)),
+      createNip11FetcherWith({ ca: certificate.cert, route }).fetch(targetFor(chunked.port)),
     ).rejects.toThrow();
   });
 
@@ -464,7 +514,7 @@ describe('the NIP-11 read (07 §4.2 "Size")', () => {
     const silent = await relay({ http: () => undefined });
     let started = Date.now();
     await expect(
-      createNip11FetcherWith({ ca: certificate.cert, timeoutMs: 300 }).fetch(
+      createNip11FetcherWith({ ca: certificate.cert, route, timeoutMs: 300 }).fetch(
         targetFor(silent.port),
       ),
     ).rejects.toThrow();
@@ -480,7 +530,9 @@ describe('the NIP-11 read (07 §4.2 "Size")', () => {
     });
     started = Date.now();
     await expect(
-      createNip11FetcherWith({ ca: certificate.cert, timeoutMs: 300 }).fetch(targetFor(drip.port)),
+      createNip11FetcherWith({ ca: certificate.cert, route, timeoutMs: 300 }).fetch(
+        targetFor(drip.port),
+      ),
     ).rejects.toThrow();
     expect(Date.now() - started).toBeLessThan(3_000);
     timers.forEach(clearInterval);
@@ -490,7 +542,7 @@ describe('the NIP-11 read (07 §4.2 "Size")', () => {
     const server = await relay({
       http: (_req, res) => res.writeHead(500).end('RELAY-TEXT-CANARY http://169.254.169.254/'),
     });
-    const error = await createNip11FetcherWith({ ca: certificate.cert })
+    const error = await createNip11FetcherWith({ ca: certificate.cert, route })
       .fetch(targetFor(server.port))
       .then(
         () => undefined,
@@ -504,7 +556,7 @@ describe('the NIP-11 read (07 §4.2 "Size")', () => {
 
   it('fails closed without a checked address, a valid certificate or the wss scheme', async () => {
     const server = await relay(nip11('{}'));
-    const fetcher = createNip11FetcherWith({ ca: certificate.cert });
+    const fetcher = createNip11FetcherWith({ ca: certificate.cert, route });
     await expect(fetcher.fetch(targetFor(server.port, { address: undefined }))).rejects.toThrow();
     await expect(fetcher.fetch(targetFor(server.port, { address: RELAY_HOST }))).rejects.toThrow();
     await expect(
@@ -515,7 +567,11 @@ describe('the NIP-11 read (07 §4.2 "Size")', () => {
         targetFor(server.port, { host: OTHER_HOST, url: `wss://${OTHER_HOST}:${server.port}/` }),
       ),
     ).rejects.toThrow();
-    await expect(nodeNip11Fetcher().fetch(targetFor(server.port))).rejects.toThrow();
+    await expect(createNip11FetcherWith({ route }).fetch(targetFor(server.port))).rejects.toThrow();
+    await expect(fetcher.fetch(targetFor(server.port, { address: '127.0.0.1' }))).rejects.toThrow();
+    await expect(
+      nodeNip11Fetcher().fetch(targetFor(server.port, { address: '10.0.0.1' })),
+    ).rejects.toThrow();
     expect(server.seen).toHaveLength(0);
   });
 });
