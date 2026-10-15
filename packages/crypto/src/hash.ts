@@ -20,6 +20,8 @@ export const TAGS = Object.freeze({
   ownerFingerprint: 'agentlink/owner-fingerprint/v1',
   /** 04 §2.9: agent fingerprint over the raw 20-byte agentId (display only). */
   agentFingerprint: 'agentlink/agent-fingerprint/v1',
+  /** 04 §2.9 (D-72): sender code over the 32 raw bytes of an unknown sender's `from` (display only). */
+  senderCode: 'agentlink/sender-code/v1',
   /** 04 §3.6.1: codeCommit = taggedHash(TAGS.safetyCommit, inviteId ‖ nonceA). */
   safetyCommit: 'agentlink/safety-commit/v1',
   /** 04 §3.6.1: pairingDigest = taggedHash(TAGS.safetyCode, T). */

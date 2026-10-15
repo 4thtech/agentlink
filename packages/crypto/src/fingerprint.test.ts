@@ -23,9 +23,7 @@ const OWNER_NOSTR = decodeHex0x(
 const OWNER_ENC = decodeHex0x('0x4fecb0752fb38a3084a09412cf6f00012c0a73893fecccf1e85ced9583415871');
 const AGENT_ID = decodeHex0x('0x6570c98c156b367a207f1589a4400ea5ba50e67a');
 // test-vectors/fingerprint, case sender-code: an unknown sender's envelope `from` (bare hex).
-const SENDER_FROM = decodeHex(
-  '0296b365646245d8a883d850cc44b5152f014f02ee3b29d5a71c3ad6c01a0c35',
-);
+const SENDER_FROM = decodeHex('0296b365646245d8a883d850cc44b5152f014f02ee3b29d5a71c3ad6c01a0c35');
 
 function expectRefused(run: () => unknown): void {
   expect(run).toThrow(CryptoInputError);
@@ -128,9 +126,7 @@ describe('formatFingerprint', () => {
 describe('senderCode (04 §2.9, D-72)', () => {
   it('is the tagged hash over the 32 raw bytes of the from key', () => {
     const digest = senderCode(SENDER_FROM);
-    expect(encodeHex(digest)).toBe(
-      encodeHex(taggedHash('agentlink/sender-code/v1', SENDER_FROM)),
-    );
+    expect(encodeHex(digest)).toBe(encodeHex(taggedHash('agentlink/sender-code/v1', SENDER_FROM)));
     expect(encodeHex(digest)).toBe(
       'aac5623d7d1800ea2a3d64eaf9b1d224dee78859f23323ce42cb2f24d6ff1e79',
     );
