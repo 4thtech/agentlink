@@ -217,28 +217,34 @@ importers:
       '@agentlink/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@agentlink/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
+      '@agentlink/log':
+        specifier: workspace:*
+        version: link:../../packages/log
       '@agentlink/node':
         specifier: workspace:*
         version: link:../../packages/node
+      '@agentlink/types':
+        specifier: workspace:*
+        version: link:../../packages/types
     devDependencies:
       '@agentlink/chain':
         specifier: workspace:*
         version: link:../../packages/chain
-      '@agentlink/crypto':
-        specifier: workspace:*
-        version: link:../../packages/crypto
       '@agentlink/storage':
         specifier: workspace:*
         version: link:../../packages/storage
       '@agentlink/transport-nostr':
         specifier: workspace:*
         version: link:../../packages/transport-nostr
-      '@agentlink/types':
-        specifier: workspace:*
-        version: link:../../packages/types
       '@agentlink/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@types/node':
+        specifier: 22.20.5
+        version: 22.20.5
 
   apps/cloud-agent: {}
 
