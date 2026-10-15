@@ -42,8 +42,7 @@ export async function statusHandler(_input: unknown, context: ToolContext): Prom
     if (contact !== undefined) inbox.push({ contact, unread: entry.unread });
   }
 
-  const pendingApprovals =
-    client.pendingApprovals === undefined ? undefined : await client.pendingApprovals();
+  const pendingApprovals = await client.pendingApprovals();
   const storage = { mode: await client.storageMode() };
 
   logger.info('status', { contacts: contacts.length, unread, requests: counts.requests });
@@ -54,7 +53,7 @@ export async function statusHandler(_input: unknown, context: ToolContext): Prom
     unread,
     inbox,
     requests: counts.requests,
-    ...(pendingApprovals === undefined ? {} : { pendingApprovals }),
+    pendingApprovals,
     storage,
   });
 }

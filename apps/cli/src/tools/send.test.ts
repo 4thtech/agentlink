@@ -87,6 +87,8 @@ function fake(
     catchUp: reject,
     storedCounts: reject,
     storageMode: reject,
+    pendingApprovals: reject,
+    approvalState: reject,
     inboxPage: reject,
     syncInbox: () => {
       calls.push('syncInbox');

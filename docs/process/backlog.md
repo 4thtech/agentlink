@@ -2544,7 +2544,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Note (IR-M1-9c-1 F01, 2026-10-15):** core has no public read of a stored approval's own action or of the pending count, so #113 ships the `agentlink_get_approval` handler and the 06 §2.5 mapping against the `ToolClient.approvalState` / `pendingApprovals` port, with a "not available yet" stub in production. The core read is card M1-7e-3 (PR #116). Once it merges, M1-9c-b wires it into `coreToolClient` (`approvalState` → `{check, decidedAt}`, `pendingApprovals` → the count) and adds the end-to-end test.
 
 #### M1-9c-b · MCP server: wiring and follow-ups (new, split from M1-9c)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (touches the approval-read path and the CI bundle check, audit-rules §2.4) · **Phase:** M1a
+- **Status:** in review (the neutral-platform bundle-check CI job, IR-M1-9c-1 F07, is not part of this PR: it needs an owner-reviewed `.github` change and a bundler dependency) · **Size:** M · **Tier:** Opus · **Security:** S2 (touches the approval-read path and the CI bundle check, audit-rules §2.4) · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli, packages/core, .github/workflows (the bundle-check job: sensitive path, owner "merge")
 - **Depends on:** M1-9c (merged), M1-7e-3 (merged)
 - **Spec:** 06 §2.0, §2.1, §4; IR-M1-9c-1; D-76

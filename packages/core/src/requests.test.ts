@@ -268,10 +268,25 @@ describe('the owner view: count, list and ignore (02 F-65, 11 §5.2)', () => {
     const e2 = await fromStranger(a, s);
     await deliver(a, e2);
     expect(await a.client.requests.count()).toBe(2);
+    const code = formatFingerprint(senderCode(decodeHex(key)), 'short');
     const list = await a.client.requests.list();
     expect(list).toEqual([
-      { envelopeId: e1.id, fromKey: key, type: 'text', createdAt: e1.createdAt, acceptedAt: null },
-      { envelopeId: e2.id, fromKey: key, type: 'text', createdAt: e2.createdAt, acceptedAt: null },
+      {
+        envelopeId: e1.id,
+        fromKey: key,
+        senderCode: code,
+        type: 'text',
+        createdAt: e1.createdAt,
+        acceptedAt: null,
+      },
+      {
+        envelopeId: e2.id,
+        fromKey: key,
+        senderCode: code,
+        type: 'text',
+        createdAt: e2.createdAt,
+        acceptedAt: null,
+      },
     ]);
     expect(JSON.stringify(list)).not.toContain(SECRET);
   });

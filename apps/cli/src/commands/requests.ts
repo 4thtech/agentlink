@@ -10,8 +10,9 @@
 // Output (06 §8, I-5): an unknown sender is never named. The request's content is shown inside the
 // marked untrusted region, every value sanitized and cut; the fixed lines (how to act, the request
 // ID) come after it. The core returns no payload for a request, so the region holds only the
-// envelope type the sender declared. The sender code (04 §2.9) is printed only when the runtime
-// supplies it from the crypto helper (CommandDeps.senderCode, card M1-1-sc).
+// envelope type the sender declared. The sender code (04 §2.9) comes from core
+// (`RequestEntry.senderCode`, M1-9c-b): short, or extended when two unknown senders collide. It is
+// printed only if it has the code's own shape, never anything else as a name.
 import type { RequestEntry, RequestsQueue } from '@agentlink/core';
 import {
   DISPATCH_TEXT,
@@ -37,14 +38,13 @@ const TYPED_ID = /^[A-Za-z0-9_-]{1,64}$/;
 /** A sender key: 64 lowercase hex. */
 const KEY = /^[0-9a-f]{64}$/;
 
-const unknownWho = (deps: CommandDeps, fromKey: string): string => {
-  if (deps.senderCode === undefined) return 'an unknown sender';
-  try {
-    return unknownSenderLabel(deps.senderCode(fromKey));
-  } catch {
-    return 'an unknown sender';
-  }
-};
+/** A sender code: short `2B9E·04D1` or extended `2B9E·04D1·5D0E·88B1` (04 §2.9). */
+const SENDER_CODE = /^[0-9A-F]{4}·[0-9A-F]{4}(?:·[0-9A-F]{4}·[0-9A-F]{4})?$/;
+
+const unknownWho = (entry: RequestEntry): string =>
+  typeof entry.senderCode === 'string' && SENDER_CODE.test(entry.senderCode)
+    ? unknownSenderLabel(entry.senderCode)
+    : 'an unknown sender';
 
 function when(entry: RequestEntry): string | undefined {
   const at = entry.createdAt;
@@ -54,8 +54,8 @@ function when(entry: RequestEntry): string | undefined {
 }
 
 /** One request: the marked region first, then the fixed lines (06 §8). */
-function describeRequest(deps: CommandDeps, entry: RequestEntry, index: number): string[] {
-  const who = unknownWho(deps, entry.fromKey);
+function describeRequest(entry: RequestEntry, index: number): string[] {
+  const who = unknownWho(entry);
   const values: string[] = [`Type: ${entry.type}`];
   const time = when(entry);
   if (time !== undefined) values.push(`Sent: ${time}`);
@@ -87,7 +87,7 @@ async function interactive(
     for (const entry of shown) {
       index += 1;
       context.output.print('');
-      printAll(context, describeRequest(deps, entry, index));
+      printAll(context, describeRequest(entry, index));
       context.output.print(copy('cli.requests.choose'));
       const answer = await prompter.ask();
       if (answer === undefined) break;

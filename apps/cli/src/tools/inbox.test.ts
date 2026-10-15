@@ -163,6 +163,8 @@ function fake(
     catchUp: reject,
     storedCounts: reject,
     storageMode: reject,
+    pendingApprovals: reject,
+    approvalState: reject,
     send: reject,
     contacts: () => {
       calls.push('contacts');
