@@ -865,7 +865,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Done before M1-7d unpends the `owner-action` suite. Regeneration reproduces the files byte for byte, and the vector check passes in every declared runtime.
 
 #### M1-1h-d · Vectors: `check-generators` reports three suites that do not match their generators; encodings follow-ups (new, IR-M1-2a-1 F01, pre-existing)
-- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (`test-vectors/**` path, audit-rules §2.2, §2.4: a changed vector is S2; RED commit applies) · **Phase:** M1a (before M1-23)
+- **Status:** in review (4thtech/agentlink#104) · **Size:** S · **Tier:** Opus · **Security:** S2 (`test-vectors/**` path, audit-rules §2.2, §2.4: a changed vector is S2; RED commit applies) · **Phase:** M1a (before M1-23)
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/
 - **Depends on:** M1-1h
 - **Spec:** 04 §3.6, §3.6.1; `test-vectors/README.md`; `docs/process/audit-rules.md` §3.4
