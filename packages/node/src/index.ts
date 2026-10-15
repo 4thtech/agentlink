@@ -43,3 +43,11 @@ export {
 export { NodeStoreError, type NodeStoreErrorCode } from './store-errors.js';
 export { openAgentStore, type AgentStore, type AgentStoreOptions } from './agent-store.js';
 export type { AgentStoreCipher } from './store-cipher.js';
+// M1-5b-b: the relay I/O of @agentlink/transport-nostr's RelayPool (07 §4.2). The CLI wiring (M1-9a)
+// injects them; their test seams (a CA, a route to a local port, an injected lookup) stay inside.
+export {
+  NIP11_TIMEOUT_MS,
+  nodeHostResolver,
+  nodeNip11Fetcher,
+  nodeRelayConnector,
+} from './relay-io.js';

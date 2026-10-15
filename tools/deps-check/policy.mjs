@@ -43,6 +43,10 @@ export const LIBRARIES = [
     testZones: ['packages/crypto'],
   },
   { group: ['aws4fetch'], zones: ['packages/storage'], via: '@agentlink/storage' },
+  // M1-5b-b: relay sockets are opened only by the Node relay connector, which pins the checked
+  // address, refuses redirects, ignores proxies and caps messages (04 §4, 07 §4.2). Any other zone
+  // goes through the RelayConnector interface of @agentlink/transport-nostr.
+  { group: ['ws', 'ws/*'], zones: ['packages/node'], via: '@agentlink/node (the relay connector)' },
   {
     // Other crypto libraries are not on the 04 §8.1 allowlist: no zone may use them. Adding one is a
     // decision (D-xx) with the owner's approval, then an entry here.
@@ -281,10 +285,17 @@ export const ZONES = {
     'storage',
   ]),
   // M1-8a: `crypto` for the KeyStore interface and its restricted /keystore entry (the backends).
+  // M1-5b-b: `transport-nostr` for the RelayConnector, HostResolver and Nip11Fetcher interfaces that
+  // this package implements, and for the Docker relay suite (RelayPool, OutboxWorker).
   'packages/node': entry(
     '@agentlink/node',
-    ['core', 'log', 'crypto'],
+    ['core', 'log', 'crypto', 'transport-nostr'],
     [
+      {
+        pattern: 'ws',
+        reason:
+          'WebSocket client of the Node relay connector (M1-5b-b, 07 §4.2): pinned createConnection, maxPayload in the socket layer, no redirects; no dependencies, no install script',
+      },
       {
         pattern: 'better-sqlite3',
         reason:
