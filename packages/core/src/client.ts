@@ -75,6 +75,11 @@ export interface AgentLinkClientOptions {
    * answered envelope is recorded. Without it, no record is known.
    */
   readonly records?: RecordLookup;
+  /**
+   * The https origins of the encrypted drop (D-48), so an inbox page shows a received file stored
+   * there as `drop` and any other URL as `own` (06 §2.2 `FileInfo.delivery`). Default: none.
+   */
+  readonly dropOrigins?: readonly string[];
 }
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
@@ -119,6 +124,7 @@ export class AgentLinkClient {
     transport: TransportFactory | undefined,
     deliveryAcks: boolean,
     records: RecordLookup | undefined,
+    dropOrigins: readonly string[],
   ) {
     this.agentId = agentId;
     this.identity = new IdentityService(ctx);
@@ -156,7 +162,7 @@ export class AgentLinkClient {
       idempotency: this.idempotency,
       outbox: this.outbox,
     });
-    this.inbox = new InboxService(ctx, this.contacts, this.requests);
+    this.inbox = new InboxService(ctx, this.contacts, this.requests, { dropOrigins });
     this.terms = new TermsService(ctx, {
       identity: this.identity,
       contacts: this.contacts,
@@ -281,6 +287,7 @@ export class AgentLinkClient {
       options.transport,
       options.deliveryAcks === true,
       options.records,
+      options.dropOrigins ?? [],
     );
   }
 }
