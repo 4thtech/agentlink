@@ -3199,7 +3199,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Property test: across random interleavings of offers, counters, approvals and `proof` envelopes, no scope ever sends more than one `accept` or signs more than one receipt, and nothing runs without an owner-signed approval or a matching grant.
 
 #### M1-32-b · core: terms idempotency and order-independent receive (new, IR-M1-9q-1 F-2, F-3)
-- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (must land before the M1a gate, and before firm offers, M1-9d)
+- **Status:** in review (4thtech/agentlink#134) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (must land before the M1a gate, and before firm offers, M1-9d)
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-32, M1-7e (idempotency)
 - **Spec:** 04 §3.4 (the chain rules, envelopeHash duplicates, signed createdAt only for judging answers); D-74; 06 §1 rule 6, §2.2a; 07 §3.2, §3.3
