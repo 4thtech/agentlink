@@ -46,6 +46,14 @@ vi.mock('@agentlink/crypto', async (importOriginal) => {
   return { ...actual, checkWrap: vi.fn(actual.checkWrap) };
 });
 
+// The held-pool cap test runs against a small cap: 101 real signed envelopes took over 20 s on CI
+// runners. The mechanism is the same for any cap; the real value is asserted separately.
+const TEST_HELD_CAP = 5;
+vi.mock('./constants.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./constants.js')>();
+  return { ...actual, MAX_HELD_PER_OWNER_KID: 5 };
+});
+
 const clock = new FakeClock();
 const ownerA = new MemoryOwnerKeyStore(seed(201), passphrase());
 const ownerB = new MemoryOwnerKeyStore(seed(202), passphrase());
@@ -687,7 +695,12 @@ describe('04 §3.1.1 step 7: arrival order after a key rotation (held envelopes)
     }
   });
 
-  it('caps the held pool at 100 per owner kid, dropping the oldest', async () => {
+  it('keeps the held-pool cap at 100 per owner kid (07 §3.2)', async () => {
+    const actual = await vi.importActual<typeof import('./constants.js')>('./constants.js');
+    expect(actual.MAX_HELD_PER_OWNER_KID).toBe(100);
+  });
+
+  it('caps the held pool per owner kid, dropping the oldest (cap scaled down to 5)', async () => {
     const { a } = await world();
     const s = await makeAgent(clock, new MemoryKeyStore(seed(9)), ownerS, 'stranger');
     const entries = [
@@ -700,7 +713,7 @@ describe('04 §3.1.1 step 7: arrival order after a key rotation (held envelopes)
     const start = clock.t;
     const ids: string[] = [];
     try {
-      for (let i = 0; i < 101; i += 1) {
+      for (let i = 0; i < TEST_HELD_CAP + 1; i += 1) {
         clock.t = start + i;
         const env = await craft({ signer, entries, createdAt: start });
         ids.push(env.id);
@@ -710,9 +723,9 @@ describe('04 §3.1.1 step 7: arrival order after a key rotation (held envelopes)
       clock.t = start;
     }
     const held = await a.store.transaction((tx) => tx.select('held_envelopes'));
-    expect(held).toHaveLength(100);
+    expect(held).toHaveLength(TEST_HELD_CAP);
     expect(held.some((h) => h.envelope_id === ids[0])).toBe(false);
-    expect(held.some((h) => h.envelope_id === ids[100])).toBe(true);
+    expect(held.some((h) => h.envelope_id === ids[TEST_HELD_CAP])).toBe(true);
   });
 });
 
