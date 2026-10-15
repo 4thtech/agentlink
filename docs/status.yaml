@@ -121,6 +121,10 @@ areas:
         state: done
         prs: [87]
         summary: "The outbox stops republishing outside the sync look-back (M1-5f)."
+      - name: "Default relay set"
+        state: done
+        prs: [119]
+        summary: "One shared list of four public relays (nos.lol, relay.primal.net, relay.snort.social, nostr.mom) and an opt-in script and checklist to vet them; the relays are not yet signed off."
   - id: core
     title: "Core (@agentlink/core)"
     intro: "Code merged, not published. Nothing in it is user-runnable yet."
@@ -153,6 +157,10 @@ areas:
         state: done
         prs: [95]
         summary: "Approval requests with use-once, requests-queue limits and idempotency (M1-7e)."
+      - name: "Reading an approval and counting pending ones"
+        state: done
+        prs: [116]
+        summary: "Read one approval's state, re-verified against its stored action, and count approvals waiting for the owner (M1-7e-3)."
       - name: "Requests from unknown senders: accept, ignore, block"
         state: done
         prs: [96, 105]
@@ -193,17 +201,21 @@ areas:
         state: done
         prs: [86]
         summary: "Stops an older owner-signed policy from being put back."
+      - name: "First agent card at owner setup"
+        state: done
+        prs: [118]
+        summary: "`owner init` signs the agent's first card in the same owner step, so a new agent can pair; the owner key signs only the agent card and the defined owner decisions (M1-8h)."
       - name: "Passphrase-locked key file for headless machines"
         state: planned
         summary: "M1-8f."
   - id: apps
     title: "MCP server, CLI and apps"
-    intro: "The CLI runtime, its everyday commands and the owner commands have landed; the MCP server is in review. Nothing is usable end to end yet."
+    intro: "The CLI runtime, its everyday and owner commands, and the MCP server with its read-only, invite and send tools have landed; the terms tools and the background loop follow. Nothing is usable end to end yet."
     components:
       - name: "MCP server and CLI"
         state: in-progress
-        prs: [102, 103, 107, 111, 112, 115]
-        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising), `init`, `invite`, `accept`, `contacts`, `status`, `doctor`, `requests` and the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) have landed, with the in-chat copy sheet; the MCP server is in review (#113)."
+        prs: [102, 103, 107, 111, 112, 113, 115, 125, 127]
+        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising), `init`, `invite`, `accept`, `contacts`, `status`, `doctor`, `requests` and the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) have landed, with the in-chat copy sheet. The MCP server over stdio (the frozen M1a tool list, the untrusted-content wrapper and the read-only status and contacts tools) and the invite, accept, send and inbox tools have landed; the terms tools and the background loop follow."
       - name: "Local approval page"
         state: planned
         summary: "A small page on 127.0.0.1 for owner approvals and settings (M1b)."
@@ -252,7 +264,7 @@ deploy:
     note: "Submitter, faucet and encrypted drop are not built or deployed yet."
 
 # Prose for the README Status block and the docs-site page.
-inProgress: "The MCP server (M1-9c, in review) and the owner-card signing in the node runtime (M1-8h, in review). Next: the approval read API (M1-7e-3), the default relay set (M1-18), the MCP send, inbox and terms tools, then file encryption and the remaining contract work."
+inProgress: "The MCP tools for terms and the MCP background loop (relay subscriptions), the remaining M1a cards (M1-7k-b, M1-9c-b, M1-21-b), and the end-to-end and dogfood work. Next: file encryption and the remaining contract work."
 notYet: "a usable product. The packages are private and nothing is published; only the crypto, types, transport, core, node and logging foundations listed here contain code. **There is nothing to install or run yet.** The design is described throughout and marked \"planned\" where it is not built."
 next: "The rest of the M1a crypto and core layers, then the walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets."
 
@@ -276,7 +288,7 @@ roadmap:
     duration: "~2–3 weeks"
     outcome: "Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals"
     gate: "Two developers' agents (Claude Code and Codex) pair and keep a shared project in sync over AgentLink, and negotiate terms with owner approval."
-    progress: "Crypto foundations, the transport (gift wrap, relays, sync), the core (envelopes, pairing, owner-signed actions and policies, approvals, requests from unknown senders, the send pipeline, inbox sync, the commitments policy), the terms schema, the node keychain, database and relay connection, and the CLI runtime with its everyday and owner commands are merged. The MCP server is in review."
+    progress: "Crypto foundations, the transport (gift wrap, relays, sync), the core (envelopes, pairing, owner-signed actions and policies, approvals, requests from unknown senders, the send pipeline, inbox sync, the commitments policy), the terms schema, the node keychain, database and relay connection, the CLI runtime with its everyday and owner commands, the default relay set and the MCP server with its read-only, invite and send tools are merged. The terms tools and the background loop are next."
   - id: "M1b"
     name: "Files, proof, credits"
     state: planned

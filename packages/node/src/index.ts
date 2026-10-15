@@ -25,7 +25,15 @@ export {
 } from './keychain-keystore.js';
 // M1-8c: owner steps at a TTY prompt (04 §2.2, §2.5, D-67). Only the prompting entry points are
 // exported: no OwnerKeyStore, session, owner item or presence argument is reachable from here.
-export { initOwner, type OwnerInitOptions, type OwnerInitResult } from './owner-init.js';
+export {
+  initOwner,
+  type OwnerInitOptions,
+  type OwnerInitResult,
+  type OwnerSetupOptions,
+} from './owner-init.js';
+// M1-8h: `owner init` signs the agent's first card; the caller passes core's IdentityService. Only
+// types: the restricted session stays inside the package (owner-first-card.ts).
+export type { FirstAgentCard, FirstCardIdentity } from './owner-first-card.js';
 export {
   performOwnerOperation,
   type OwnerOperationItem,

@@ -17,6 +17,7 @@ export {
   type WrapOptions,
   type WrappedEnvelope,
 } from './gift-wrap.js';
+export { DEFAULT_RELAYS } from './default-relays.js';
 export { isGloballyRoutable } from './relay-address.js';
 export type {
   AddressCheck,
