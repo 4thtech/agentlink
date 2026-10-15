@@ -5,7 +5,9 @@
 // Handlers for send, inbox, invites and terms land with M1-9p, M1-9o and M1-9q; until then their
 // tools are registered and answer with the fixed "not available yet" error (06 §1 rule 3).
 import type { McpToolName } from '@agentlink/types';
+import { acceptInviteHandler } from './accept-invite.js';
 import type { HandlerEnvironment, ToolContext } from './context.js';
+import { createInviteHandler } from './create-invite.js';
 import { getApprovalHandler } from './get-approval.js';
 import { matchesSchema } from './input.js';
 import { listContactsHandler } from './list-contacts.js';
@@ -29,8 +31,8 @@ const stub: ToolHandler = () => Promise.resolve(notAvailable());
 /** Every registered tool's handler. Tools whose card has not landed answer "not available yet". */
 export const HANDLERS: Readonly<Partial<Record<McpToolName, ToolHandler>>> = Object.freeze({
   agentlink_status: statusHandler,
-  agentlink_create_invite: stub, // M1-9o
-  agentlink_accept_invite: stub, // M1-9o
+  agentlink_create_invite: createInviteHandler,
+  agentlink_accept_invite: acceptInviteHandler,
   agentlink_list_contacts: listContactsHandler,
   agentlink_send: stub, // M1-9p
   agentlink_propose_terms: stub, // M1-9q
