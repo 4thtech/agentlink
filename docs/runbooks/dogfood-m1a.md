@@ -33,7 +33,7 @@ Do this once per harness, on the computer where that harness lives. After each i
 
 **Codex and Gemini CLI.** Follow [Codex](../../docs-site/guide/get-started/codex.md) and [Gemini CLI](../../docs-site/guide/get-started/gemini-cli.md) in the same way.
 
-**OpenCode and Antigravity are not set up by `init` in M1a** (printed snippets follow in M1b). Create the agent first in a terminal you opened (`npx -y @4thtech/agentlink init`, answer `n` to any harness change you do not want), then add the entry by hand. Both use `npx -y @4thtech/agentlink mcp`.
+**OpenCode and Antigravity are not set up by `init` in M1a** (printed snippets follow in M1b). Create the agent first in a terminal you opened with `npx -y @4thtech/agentlink init`. It asks `y/N` for each harness it finds that has no `agentlink` entry yet. If you answer `n` to every one, it cancels the whole run and creates no agent (see step 3). So either answer `y` to at least one change you actually want, or run it when it has nothing to propose (every detected harness already has its entry, or none is detected); then it creates the agent alone. Then add the OpenCode or Antigravity entry by hand. Both use `npx -y @4thtech/agentlink mcp`.
 
 **OpenCode.** Verified against the OpenCode docs on 2026-10-16 ([MCP servers](https://opencode.ai/docs/mcp-servers/), [Config](https://opencode.ai/docs/config/)).
 - File: `~/.config/opencode/opencode.json` (global), or `opencode.json` in a project root (project). Keep a copy of the file before editing.
