@@ -154,6 +154,55 @@ Rules:
 - Every failure becomes a backlog card (symptom, harness, version, steps), not just a note. Never describe an unfixed vulnerability in public files: use a private advisory and reference it.
 - **Never commit synced project content**, owner codes, links with secrets, message text or approval details. Record only that a step worked and how long it took.
 
+### 9. Automated local dogfood (M1-23)
+
+One computer, one owner (D-78): the orchestrator drives two harnesses headless, Claude Code (`claude -p`, your subscription) as agent `cc-test` and OpenCode (`opencode run`, the model you set in OpenCode) as agent `oc-test`, through steps 5 and 6 above. **You type every owner approval in your own terminal.** The script never approves, never reads the owner code and never calls an owner command; it only prints the command and watches the read-only approval state. The run is observational: a pass means the agent did what the runbook expects, a fail is a finding to card.
+
+**One-time setup** (your own terminal, not inside an AI app):
+
+```bash
+agentlink init --agent cc-test --harness none
+agentlink owner init --agent cc-test              # first agent on this OS user
+agentlink init --agent oc-test --harness none
+agentlink owner add-agent --agent oc-test         # asks for the owner code once
+```
+
+OpenCode needs a model that works with tools: set one in OpenCode, or pass `--oc-model <provider/model>`. Claude Code must be logged in with your subscription; the script gives it no API key.
+
+**Update AgentLink from `main`** (the script uses the `agentlink` on your PATH):
+
+```bash
+git switch main && git pull
+pnpm install && pnpm build
+(cd apps/cli && pnpm link --global)       # once; later pulls need only install and build
+agentlink --version
+```
+
+Building with `pnpm build` is checked (`apps/cli/dist/cli.js` runs). `pnpm link --global` is the standard pnpm way and needs a pnpm global bin folder on your PATH (`pnpm setup`); it was not run for this runbook. Without a global link, pass the built file instead: `--agentlink "node $PWD/apps/cli/dist/cli.js"` (and use the same command for `approve`).
+
+**Run it:**
+
+```bash
+node tools/dogfood/run.mjs --dry-run              # prints the plan, starts nothing
+node tools/dogfood/run.mjs                        # the run
+node tools/dogfood/run.mjs --only P1,P2,P3,P4     # just the pairing
+```
+
+What it does: preflight (`agentlink`, `claude`, `opencode` versions; `agentlink doctor` and `status` for both agents, which covers the card and the relays), then P1 to P4 pairing, M1 to M3 send and reply with the status habit, H1 and H2 hostile message, T1 to T7 offer, counter, accept (J8). Each harness gets its own MCP config pointing at its own agent (Claude Code `--mcp-config` with `--strict-mcp-config`; OpenCode an inline config that also denies shell, edit and web tools). Each step has a time limit (Claude Code also a turn cap), and nothing is retried.
+
+**When it needs you:** at P2 (OpenCode accepting the invite) and T5 (Claude Code accepting the counter-offer) it prints a box:
+
+```text
+Type in your terminal:
+agentlink approve --agent oc-test apr_...
+```
+
+Type that in a terminal you opened yourself, check who and what, enter the owner code. The script notices the decision within seconds and continues. After the wait time (default 15 minutes, `--approval-timeout`) or a denial, the step fails and the steps that depend on it are skipped.
+
+**Results** go to `~/agentlink-dogfood/<timestamp>/` (never inside the repository; `--out` there is refused): per step the prompt, the transcript (`*.transcript.jsonl`) and stderr, the preflight and final `doctor` and `status` output, `results.json` and `results.md` (step, harness, pass or fail, time, notes). The transcripts hold message text: do not commit or share the folder. A scan then looks through it for the values of your credential-like environment variables (names with KEY, TOKEN, SECRET, PASSWORD) and for key and code shapes (`nsec`, `sk-`, private key blocks, the owner-code shape, seeds as hex). It prints only the file and the kind of match, never the value; any finding makes the run exit 1.
+
+Record the result per step 8. Failures become backlog cards (symptom, harness, version, steps). The OpenCode event parser follows OpenCode's documented JSON events and is tolerant: if a step fails with "no tool call was parsed", read its transcript and card the format change.
+
 ## Verify
 - Each pair in step 5 lists the other as a contact on both sides.
 - Step 6 ran at least once per pair, including the hostile message (passed) and one agreed terms, with the log lines pushed.
