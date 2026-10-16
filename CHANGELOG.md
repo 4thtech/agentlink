@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- Docs (2026-10-16): spec 07 §3.2 now states the publisher lease's 120 s lapse rule, the `outbox_staged` table with its 24 h bound and schema version 3 (§3.7), and that the M1-9r loop is the only lease user (one active publisher per agent, the CLI never takes the lease, 30 s polling with partial-pass backoff until live subscriptions, M1-9s); the backlog marks the cards merged on 2026-10-15 as done and adds M1-9c-c (neutral-platform bundle-check CI job); `docs/status.yaml`, the README Status and Roadmap and the generated docs-site and knowledge pages are current.
 - `agentlink_accept_invite` two-step flow (M1-13a follow-up, S2, 06 §2.1): the tool description and the `pending_approval` next step now say plainly to call the tool again with the same `inviteUrl` and the `approvalId`. Called again without the `approvalId`, the tool no longer makes a second request for the same invite: while the owner has not decided it returns the same `approvalId`; once the owner approved, it runs nothing and says which `approvalId` to call again with (`APPROVAL_ID_MISSING`). A bare invite code and the full link now count as the same invite. Denied, used or expired requests still lead to a new request. Core gains `ApprovalService.findOpen`, a read-only lookup of the open request for an identical action.
 
 ### Added

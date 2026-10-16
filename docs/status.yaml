@@ -14,7 +14,7 @@
 # scalars, full-line comments), read by tools/docs-status/yaml.mjs. Pull requests are numbers
 # (4thtech/agentlink) or `contracts#N` (private repo, shown without a link).
 
-updated: "2026-10-15"
+updated: "2026-10-16"
 version: "v0.0.1"
 versionLabel: "M0 Foundations"
 milestone: "M0 Foundations"
@@ -99,8 +99,8 @@ areas:
         summary: "The policy document, approvals including batch approval, pairing bodies, relay lists, `contact.check` params; tested in Node, three browsers and workerd."
       - name: "Terms, TermsInput and termsHash"
         state: done
-        prs: [98, 100, 101]
-        summary: "Merged: the strict `terms` schema with the D-74 canonical form (pinned UCD 15.0.0 characters), `TermsInput` with its JSON Schema and mapping, `termsHash` (in crypto) and the pure negotiation-chain reducer; all 381 `terms` vectors pass in Node, three browsers and workerd. The character table is an interim one (D-77); vendoring the Unicode file with a drift check and a table-hash vector come before the M1a release (M1-21-b)."
+        prs: [98, 100, 101, 147]
+        summary: "Merged: the strict `terms` schema with the D-74 canonical form (pinned UCD 15.0.0 characters), `TermsInput` with its JSON Schema and mapping, `termsHash` (in crypto) and the pure negotiation-chain reducer; all 381 `terms` vectors pass in Node, three browsers and workerd. The Unicode data file is vendored, with a drift check and a table-hash vector; the regenerated table equals the earlier interim one (D-77, M1-21-b)."
   - id: transport
     title: "Transport (@agentlink/transport-nostr)"
     intro: "Code merged, not published."
@@ -171,16 +171,16 @@ areas:
         summary: "A held card is accepted only with the sender's own owner entry (G-51)."
       - name: "Send pipeline"
         state: done
-        prs: [99]
-        summary: "Sending a message to a paired contact, stored with its delivery rows before anything is published, retried from the outbox, with one publisher per row when several processes share the agent (M1-7k). Stale staged rows and the single-subscriber lease follow (M1-7k-b)."
+        prs: [99, 133]
+        summary: "Sending a message to a paired contact, stored with its delivery rows before anything is published, retried from the outbox, with one publisher per row when several processes share the agent (M1-7k). Stale staged pairing messages are bounded at 24 h, and a publisher lease keeps one process per agent on the relay connections (M1-7k-b)."
       - name: "Inbox sync, delivery acknowledgements, owner card update"
         state: done
-        prs: [106]
-        summary: "Inbox sync with a per-contact rate limit, opt-in delivery acknowledgements and a fetch-only catch-up for read-only status (M1-7h). Owner-signed revocations of contacts and of the agent itself are applied; the owner card update (M1-7j, M1b) follows."
+        prs: [106, 130, 131]
+        summary: "Inbox sync with a per-contact rate limit, opt-in delivery acknowledgements and a fetch-only catch-up for read-only status (M1-7h). The inbox page read marks items read, and the unread counts match what the page can return (M1-7h-c, M1-9p-b). Owner-signed revocations of contacts and of the agent itself are applied; the owner card update (M1-7j, M1b) follows."
       - name: "Terms and one approval per agreement"
-        state: in-progress
+        state: done
         prs: [126, 134]
-        summary: "Offers, counters, rejects and accepts with the chain fields filled from the agent's own store; the negotiation rules (no forks, lock after an accept, conflicts and anchored resends) applied on receive; an accept asks the owner once per agreement, or runs within the owner-signed auto-accept limits, and is sent at most once (M1-32, D-55). Repeats under one clientRequestId send nothing, and revisions that arrive out of order are applied in link order (M1-32-b, in review). Receipts and recorded offers follow in M1b."
+        summary: "Offers, counters, rejects and accepts with the chain fields filled from the agent's own store; the negotiation rules (no forks, lock after an accept, conflicts and anchored resends) applied on receive; an accept asks the owner once per agreement, or runs within the owner-signed auto-accept limits, and is sent at most once (M1-32, D-55). Repeats under one clientRequestId send nothing, and revisions that arrive out of order are applied in link order (M1-32-b). Receipts and recorded offers follow in M1b."
   - id: node
     title: "Node runtime (@agentlink/node)"
     intro: "Code merged, not published. Nothing in it is user-runnable yet."
@@ -214,12 +214,20 @@ areas:
         summary: "M1-8f."
   - id: apps
     title: "MCP server, CLI and apps"
-    intro: "The CLI runtime, its everyday and owner commands, and the MCP server with its read-only, invite and send tools have landed; the terms tools and the background loop follow. Nothing is usable end to end yet."
+    intro: "The CLI runtime, its everyday and owner commands, the MCP server with its tools and its background loop, and the agent skill file and quickstart guides have landed. M1a is not released: nothing is published, and nothing is usable end to end for a new user yet."
     components:
       - name: "MCP server and CLI"
         state: in-progress
-        prs: [102, 103, 107, 111, 112, 113, 115, 125, 127, 132]
-        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising), `init`, `invite`, `accept`, `contacts`, `status`, `doctor`, `requests` and the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) have landed, with the in-chat copy sheet. The MCP server over stdio (the frozen M1a tool list, the untrusted-content wrapper and the read-only status and contacts tools) and the invite, accept, send and inbox tools have landed; the terms tools (propose, respond, and the owner's terms approval card in `approve`) are in review; the background loop follows."
+        prs: [102, 103, 107, 111, 112, 113, 115, 125, 127, 131, 132, 135, 142, 143]
+        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising), `init`, `invite`, `accept`, `contacts`, `status`, `doctor`, `requests` and the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) have landed, with the in-chat copy sheet. The MCP server over stdio (the frozen M1a tool list, the untrusted-content wrapper) and its tools have landed: status, contacts, get approval (real approval data, with the sender code of an unknown sender), invite, accept, send, inbox and the terms tools (propose, respond, and the owner's terms approval card in `approve`). A conformance and tool-surface guard test pins the tool list. A background loop in the running MCP server keeps one active publisher per agent through the publisher lease and, every 30 s, syncs the inbox and delivers queued messages, so a pairing completes without a tool call; live relay subscriptions replace the polling in M1b (M1-9s). The MCP server and CLI are not published yet"
+      - name: "Agent skill file and quickstart guides"
+        state: done
+        prs: [151, 152]
+        summary: "The agent skill file and AGENTS.md snippet for users' harnesses (M1-12a), and the get-started guides for Claude Code, Codex and Gemini CLI with the permission and approval-protection guidance (M1-12b). They describe the M1a install, which is not released yet."
+      - name: "End-to-end tests"
+        state: in-progress
+        prs: [155, 163, 165]
+        summary: "A scripted run drives two real `agentlink mcp` processes, pairing and messaging over local relays in CI (M1-13a). A variant with Claude Code and Codex as the two agents runs by manual dispatch only, with no schedule yet; its first runs found and fixed wording and approval-reuse gaps in `accept_invite`. Files, proof and agreements follow (M1-13c)."
       - name: "Local approval page"
         state: planned
         summary: "A small page on 127.0.0.1 for owner approvals and settings (M1b)."
@@ -268,7 +276,7 @@ deploy:
     note: "Submitter, faucet and encrypted drop are not built or deployed yet."
 
 # Prose for the README Status block and the docs-site page.
-inProgress: "The MCP tools for terms and the MCP background loop (relay subscriptions), the remaining M1a cards (M1-7k-b, M1-9c-b, M1-21-b), and the end-to-end and dogfood work. Next: file encryption and the remaining contract work."
+inProgress: "The remaining M1a work: the neutral-platform bundle-check CI job (M1-9c-c), the remaining end-to-end scenarios, the dogfood and the M1a release. Next: file encryption and the remaining contract work."
 notYet: "a usable product. The packages are private and nothing is published; only the crypto, types, transport, core, node and logging foundations listed here contain code. **There is nothing to install or run yet.** The design is described throughout and marked \"planned\" where it is not built."
 next: "The rest of the M1a crypto and core layers, then the walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets."
 
@@ -292,7 +300,7 @@ roadmap:
     duration: "~2–3 weeks"
     outcome: "Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals"
     gate: "Two developers' agents (Claude Code and Codex) pair and keep a shared project in sync over AgentLink, and negotiate terms with owner approval."
-    progress: "Crypto foundations, the transport (gift wrap, relays, sync), the core (envelopes, pairing, owner-signed actions and policies, approvals, requests from unknown senders, the send pipeline, inbox sync, the commitments policy), the terms schema, the node keychain, database and relay connection, the CLI runtime with its everyday and owner commands, the default relay set and the MCP server with its read-only, invite and send tools are merged. The terms tools and the background loop are next."
+    progress: "Crypto foundations, the transport (gift wrap, relays, sync), the core (envelopes, pairing, owner-signed actions and policies, approvals, requests from unknown senders, the send pipeline, inbox sync, the commitments policy), the terms schema, the node keychain, database and relay connection, the CLI runtime with its everyday and owner commands, the default relay set, the MCP server with its tools (read-only, invite, send, inbox, terms) and its background loop, the agent skill file and quickstart guides, and the two-agent end-to-end test (the Claude Code and Codex variant by manual dispatch) are merged. The neutral-platform bundle-check, the remaining end-to-end scenarios, the dogfood and the release are next. M1a is not released."
   - id: "M1b"
     name: "Files, proof, credits"
     state: planned
