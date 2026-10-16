@@ -241,7 +241,7 @@ const WORKER_APP = NO_NODE.filter((name) => name !== 'ui'); // Workers: no React
 const entry = (name, uses, external = []) => ({ name, uses, external });
 
 /**
- * Zone (directory) -> { name, uses, external }.
+ * Zone (directory) -> { name, uses, external, bundles? }.
  * `external` is the runtime-dependency allowlist (`dependencies`, `peerDependencies`,
  * `optionalDependencies`): anything else a package declares fails deps-check. A new entry needs a
  * `reason` that reviewers see in the diff. devDependencies are not runtime and are not allowlisted
@@ -332,9 +332,19 @@ export const ZONES = {
       { pattern: 'react-dom', reason: 'component library (03 §tech stack)' },
     ],
   ),
-  'apps/cli': entry('@4thtech/agentlink', ALL_PACKAGES, [
-    { pattern: '@modelcontextprotocol/sdk', reason: 'MCP stdio server (repo-reference.md, stack)' },
-  ]),
+  // OPS-REL-1 (owner decision 2026-10-16): the only published package. Its workspace packages are
+  // bundled into dist/agentlink.js (devDependencies), so `bundles: true` lets it re-declare their
+  // third-party runtime dependencies with the exact same spec (tools/deps-check bundledRuntimeOf).
+  // Its own source may still not import them (LIBRARIES and the source checks apply as before).
+  'apps/cli': {
+    ...entry('@4thtech/agentlink', ALL_PACKAGES, [
+      {
+        pattern: '@modelcontextprotocol/sdk',
+        reason: 'MCP stdio server (repo-reference.md, stack)',
+      },
+    ]),
+    bundles: true,
+  },
   'apps/console': entry('@agentlink/console', NO_NODE),
   'apps/verify': entry('@agentlink/verify', NO_NODE),
   'apps/invite': entry('@agentlink/invite', NO_NODE),

@@ -174,11 +174,11 @@ OpenCode needs a model that works with tools: set one in OpenCode, or pass `--oc
 ```bash
 git switch main && git pull
 pnpm install && pnpm build
-(cd apps/cli && pnpm link --global)       # once; later pulls need only install and build
+(cd apps/cli && pnpm add -g .)            # once; later pulls usually need only install and build
 agentlink --version
 ```
 
-Building with `pnpm build` is checked (`apps/cli/dist/cli.js` runs). `pnpm link --global` is the standard pnpm way and needs a pnpm global bin folder on your PATH (`pnpm setup`); it was not run for this runbook. Without a global link, pass the built file instead: `--agentlink '["node","'$PWD'/apps/cli/dist/cli.js"]'` (a path with spaces is fine; run `approve` as `node apps/cli/dist/cli.js approve ...`).
+`pnpm build` writes the published bundle `apps/cli/dist/agentlink.js` (the `agentlink` bin, OPS-REL-1) next to the per-file build; both are checked and run. pnpm 12 has no `pnpm link --global`: `pnpm add -g .` in `apps/cli` installs the checkout as the global `agentlink` (run it again if `agentlink --version` shows an old build). Its bin folder must be on your PATH: run `pnpm setup` once, or add `~/Library/pnpm/bin` (macOS; `~/.local/share/pnpm/bin` on Linux) yourself. `npm link` in `apps/cli` works too and uses npm's global bin folder. Neither was run for this runbook. Without a global link, pass the built file instead: `--agentlink '["node","'$PWD'/apps/cli/dist/agentlink.js"]'` (a path with spaces is fine; run `approve` as `node apps/cli/dist/agentlink.js approve ...`). To try exactly what npm will publish, `npm pack` in `apps/cli` and `npm install -g` the tarball (needs the npm registry for the dependencies).
 
 **Run it:**
 

@@ -643,7 +643,8 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - A manual freeze and unfreeze round trip works.
 
 #### OPS-REL-1 · v0.1.0 release blocker: decide which packages publish (new)
-- **Status:** backlog · **Size:** S · **Tier:** Opus (owner decision) · **Security:** S1 (package manifests, release path)
+- **Decision (Tali, chat, 2026-10-16):** v0.1.0 publishes only the CLI, as `@4thtech/agentlink`, with its workspace packages bundled in; every other package stays private. Release-path change, so S2.
+- **Status:** in review (bundled CLI package, deps-check `bundles`, `privatePackages.version: true`) · **Size:** S · **Tier:** Opus (owner decision) · **Security:** S1 (package manifests, release path)
 - **Repo/path:** agentlink · `packages/*/package.json`, `apps/*/package.json`, `.changeset/config.json`, `docs/process/versioning.md`
 - **Depends on:** OPS-CI-2
 - **Spec:** D-25, D-43; `release-and-deployment.md` §4.1; `versioning.md`

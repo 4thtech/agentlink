@@ -1,53 +1,64 @@
 {
   "name": "@4thtech/agentlink",
   "version": "0.0.0",
-  "private": true,
-  "description": "AgentLink command line, MCP server (stdio) and local UI bundle.",
+  "description": "AgentLink: encrypted, provable exchange between AI agents. The agentlink command line and MCP server (stdio).",
   "license": "MIT",
   "type": "module",
+  "homepage": "https://github.com/4thtech/agentlink#readme",
+  "bugs": {
+    "url": "https://github.com/4thtech/agentlink/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/4thtech/agentlink.git",
     "directory": "apps/cli"
   },
+  "keywords": [
+    "agentlink",
+    "mcp",
+    "ai-agents",
+    "encryption"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
-  "sideEffects": false,
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "bin": {
-    "agentlink": "./dist/cli.js"
-  },
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
+    "agentlink": "./dist/agentlink.js"
   },
   "files": [
-    "dist",
-    "!dist/tsconfig.tsbuildinfo"
+    "dist/agentlink.js"
   ],
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && vite build --config bundle.config.mjs",
     "typecheck": "tsc -p tsconfig.test.json",
     "lint": "eslint .",
     "test": "vitest run"
   },
   "dependencies": {
-    "@agentlink/node": "workspace:*",
-    "@agentlink/core": "workspace:*",
-    "@agentlink/types": "workspace:*",
-    "@agentlink/crypto": "workspace:*",
-    "@agentlink/log": "workspace:*",
-    "@modelcontextprotocol/sdk": "1.32.1"
+    "@hpke/core": "1.9.0",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@napi-rs/keyring": "2.1.1",
+    "@noble/ciphers": "2.4.0",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0",
+    "better-sqlite3": "13.0.3",
+    "ws": "8.22.0",
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@types/node": "22.20.5",
     "@agentlink/chain": "workspace:*",
-    "@agentlink/transport-nostr": "workspace:*",
+    "@agentlink/core": "workspace:*",
+    "@agentlink/crypto": "workspace:*",
+    "@agentlink/log": "workspace:*",
+    "@agentlink/node": "workspace:*",
     "@agentlink/storage": "workspace:*",
-    "@agentlink/ui": "workspace:*"
+    "@agentlink/transport-nostr": "workspace:*",
+    "@agentlink/types": "workspace:*",
+    "@agentlink/ui": "workspace:*",
+    "@types/node": "22.20.5"
   }
 }

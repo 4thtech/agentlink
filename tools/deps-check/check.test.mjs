@@ -372,9 +372,12 @@ describe('bundled workspace packages (policy `bundles`, OPS-REL-1)', () => {
     const { problems } = bundledRuntimeOf(
       {
         ...cli,
-        devDependencies: { '@agentlink/node': 'workspace:*', '@agentlink/x': 'workspace:*' },
+        devDependencies: { '@agentlink/node': 'workspace:*', '@agentlink/log': 'workspace:*' },
       },
-      { ...manifests, '@agentlink/x': { name: '@agentlink/x', dependencies: { ws: '8.21.0' } } },
+      {
+        ...manifests,
+        '@agentlink/log': { name: '@agentlink/log', dependencies: { ws: '8.21.0' } },
+      },
     );
     expect(problems).toEqual([expect.stringContaining('ws')]);
   });
