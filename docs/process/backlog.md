@@ -67,7 +67,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 139 (M1a 79, M1b 60, counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| M1 Local beta | 140 (M1a 80, M1b 60, M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
@@ -2123,7 +2123,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** after a contact's revoke, an approval pending for an action with that contact is `void` and its commitment parts are void, in the revoke's transaction; a peer's acks do not raise `catchUp` counts; `syncInbox` returns within its budget with 200 acks pending.
 
 #### M1-7h-c · core: inbox page read with read marking (new, for M1-9p)
-- **Status:** in-progress · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#130, merged 2026-10-15) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7h, M1-7e-2, M1-7k
 - **Spec:** 06 §2.1 (accepted requests), §2.2 (`InboundMessage`, `OutboundMessage`, "Order and paging", "Read state"); 07 §3, §3.2; 04 §3.5; D-70, D-72, D-73
@@ -2174,7 +2174,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A staged handshake from M1-7c is published once and survives a restart (outbox row).
 
 #### M1-7k-b · core: stale staged rows and the publisher lease (new, IR-M1-7k-1 F08)
-- **Status:** in review (4thtech/agentlink#133) · **Size:** M · **Tier:** Opus · **Security:** S2 (outbox and store schema, audit-rules §2.4) · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#133, merged 2026-10-15) · **Size:** M · **Tier:** Opus · **Security:** S2 (outbox and store schema, audit-rules §2.4) · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core, packages/node
 - **Depends on:** M1-7k (merged), M1-8b
 - **Spec:** 07 §3 (outbox, `publisher_lease`), D-73 (single active publisher per agent); M1-9r note (IR-M1-7k-1 Q3)
@@ -2544,7 +2544,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Note (IR-M1-9c-1 F01, 2026-10-15):** core has no public read of a stored approval's own action or of the pending count, so #113 ships the `agentlink_get_approval` handler and the 06 §2.5 mapping against the `ToolClient.approvalState` / `pendingApprovals` port, with a "not available yet" stub in production. The core read is card M1-7e-3 (PR #116). Once it merges, M1-9c-b wires it into `coreToolClient` (`approvalState` → `{check, decidedAt}`, `pendingApprovals` → the count) and adds the end-to-end test.
 
 #### M1-9c-b · MCP server: wiring and follow-ups (new, split from M1-9c)
-- **Status:** in review (the neutral-platform bundle-check CI job, IR-M1-9c-1 F07, is not part of this PR: it needs an owner-reviewed `.github` change and a bundler dependency) · **Size:** M · **Tier:** Opus · **Security:** S2 (touches the approval-read path and the CI bundle check, audit-rules §2.4) · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#135, merged 2026-10-15; the neutral-platform bundle-check CI job, IR-M1-9c-1 F07, moved to M1-9c-c: it needs an owner-reviewed `.github` change and a bundler dependency) · **Size:** M · **Tier:** Opus · **Security:** S2 (touches the approval-read path and the CI bundle check, audit-rules §2.4) · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli, packages/core, .github/workflows (the bundle-check job: sensitive path, owner "merge")
 - **Depends on:** M1-9c (merged), M1-7e-3 (merged)
 - **Spec:** 06 §2.0, §2.1, §4; IR-M1-9c-1; D-76
@@ -2558,6 +2558,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The tools return real approval data; a read-only tool never changes state (the M1-7h catch-up test).
   - `RequestEntry.senderCode` equals the `senderCode` vector value for the fixed key.
   - F06 and F07 each have a test named after the finding; the bundle-check job fails on an injected `jose` import.
+
+#### M1-9c-c · CI: neutral-platform bundle-check job (new, IR-M1-9c-1 F07)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**` sensitive path: merges only on Tali's "merge"; supply-chain surface for the bundler) · **Phase:** M1a
+- **Repo/path:** agentlink · `.github/workflows`, `apps/cli` (the check script)
+- **Depends on:** M1-9c, M1-9c-b (both merged)
+- **Spec:** 06 §2.0; IR-M1-9c-1 F07; D-76
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - A CI job that builds the CLI bundle on a platform-neutral runner (no keychain, no native modules) and checks that the stdio path loads no crypto-capable SDK transitive package (for example `jose`), beside the module-graph guard test of M1-9c.
+  - Left out of M1-9c-b because it needs an owner-reviewed `.github` change and a bundler dependency (justify the dependency in the PR; no `postinstall` script; the repo's existing build tooling first). Add the job to the required checks and the ci-gate (D-52: improve CI, never skip it).
+- **Acceptance:**
+  - The job fails on an injected `jose` import in the stdio path and passes on `main`; it is part of `ci-gate`.
+  - No new runtime dependency in the published `apps/cli` package.
 
 #### M1-9o · MCP tools: invite and accept (new, split from M1-9c)
 - **Status:** done (4thtech/agentlink#125, merged 2026-10-15) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
@@ -2578,7 +2591,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** per-status tests; a canary URL and key in an inbound message appear only inside the wrapper and never in a summary, `nextStep` or error (IR-D48-1 F15f); an idempotent repeat sends nothing (relay spy); `idempotentHint: false` on `agentlink_inbox`.
 
 #### M1-9p-b · MCP inbox on in production; unread counts match the page (new, after M1-9p and M1-7h-c)
-- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (changes packages/core) · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#131, merged 2026-10-15) · **Size:** S · **Tier:** Opus · **Security:** S2 (changes packages/core) · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`src/tools/{context,inbox}.ts`, `src/runtime/open-agent.ts`, `test/send-inbox-mcp.test.ts`), packages/core (`src/inbox.ts`), docs/foundation/06 §2.2
 - **Depends on:** M1-9p (#127), M1-7h-c (#130)
 - **Spec:** 06 §2.0, §2.1 (`agentlink_status`), §2.2 ("Order and paging", "Read state"), §4; IR-M1-7h-c-1
@@ -2587,7 +2600,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** tests first (RED commit): a processed `proof` or protocol-type row from a contact is not counted unread, and the count clears after the default page; end to end over the MCP protocol client between two real agents, A sends, B's `agentlink_inbox` returns the message inside the untrusted block, marks it read, and a second call does not return it as unread; `agentlink_status` counts it until then and not after.
 
 #### M1-9q · MCP tools: propose and respond to terms (new, split from M1-9c)
-- **Status:** in review (4thtech/agentlink#132; declared S2 under audit-rules §2.4: drives commitment approvals and renders the owner's approval card) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#132, merged 2026-10-15; declared S2 under audit-rules §2.4: drives commitment approvals and renders the owner's approval card) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`src/tools/{propose-terms,respond-to-terms}.ts` and their two registry entries)
 - **Depends on:** M1-9c, M1-21, M1-20, M1-32; M1-9b for the end-to-end approval
 - **Spec:** 06 §2.2a, §2.5, §3; 04 §3.4, §3.4.2; 11 §6.1, §6.10; D-31, D-32, D-55
@@ -2599,7 +2612,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Note (IR-M1-9q-1 F-2, F-3, 2026-10-15):** two core gaps found here are fixed in the new card M1-32-b, which must land before the M1a gate. F-2: the core terms flow ignores `clientRequestId`, so a repeated propose sends a second offer. F-3: when v1 and its `revises` v2 have the same `createdAt` and arrive in one sync, the receiver drops v2 and leaves v1 pending.
 
 #### M1-9r · MCP server: background loop and relay subscriptions (new, split from M1-9c)
-- **Status:** in review (4thtech/agentlink#142) · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#142, merged 2026-10-15) · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`src/mcp/loop.ts`)
 - **Depends on:** M1-9c, M1-7h, M1-7k
 - **Spec:** 06 §6; 07 §4.2; D-71 (3)
@@ -2641,7 +2654,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (IR-D48-1 F15f) A scan of every file-tool result and error in the test run finds no URL from the drop or a connector, and no key material.
 
 #### M1-9e · MCP conformance and tool-surface guard
-- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#143, merged 2026-10-15) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli/test, .github/workflows/ci.yml
 - **Depends on:** M1-9c (the registry exists; extended when M1-9d lands). It runs on the frozen nine-tool M1a surface: the "exactly the 15 tools" assertion checks the 06 §2.0 table with the M1b rows marked pending until M1-9d
 - **Spec:** 06 §1 rule 4, §2.0, §9; 04 I-4; 11 §5; D-53
@@ -2858,7 +2871,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Agent instructions, docs, end-to-end
 
 #### M1-12a · skill file and AGENTS.md snippet for users' harnesses
-- **Status:** in review (#151) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#151, merged 2026-10-15) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · skills/agentlink/SKILL.md
 - **Depends on:** M1-9c, M1-9o, M1-9p, M1-9q (the tools it documents; D-73)
 - **Spec:** 06 §3 (`commitments`), §5, §6.1, §7.1; 02 J1, J4, J7, J8, J9, F-62; 11 §5, §6.1; D-31, D-32, D-53
@@ -2884,7 +2897,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Passes the vocabulary lint; contains no instruction to act on inbound content; used unchanged in the M1-13c LLM runs.
 
 #### M1-12b · quickstart and harness permission guidance
-- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#152, merged 2026-10-15) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · docs-site/guide/get-started/, docs-site/technical/reference/harness-configuration.md (published to GitBook through Git Sync, DOCS-PUB)
 - **Depends on:** M1-9a, M1-9b, M1-9l; gap G-1 accepted as a documented M1 residual (D-67)
 - **Spec:** 04 §2.2 (owner code, opt-in passphrase), §2.5 (residual risk; same-user agents, D-67); 06 §7; 02 J1; 10 M1-12; 11 §5
@@ -2912,7 +2925,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Two people new to AgentLink complete J1 from the docs alone (observed, times recorded; install → first message under 5 minutes).
 
 #### M1-13a · e2e: two agents on two harnesses
-- **Status:** in review (4thtech/agentlink#155; IR-M1-13a-1 PASS with changes; LLM variant runs by manual dispatch only, no schedule until the owner sizes the credit; first dispatch on main 2026-10-15: 7 of 13, L04 failed because Codex omitted approvalId; see the test report 5.2) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#155, merged 2026-10-15; follow-ups #163 accept_invite two-step wording and pending-approval reuse, #165 exact-value prompts; IR-M1-13a-1 PASS with changes; the LLM variant runs by manual dispatch only, no schedule until the owner sizes the credit; LLM runs 1 to 5 in the test report; #166 status wording, #171 the harness ignores tool-loading calls in the first-call check, a re-run after #171 is open) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · e2e/, .github/workflows/e2e.yml
 - **Depends on:** M1-9c, M1-9o, M1-9p, M1-12a, M1-1g-c (boundary guards scan e2e/); the e2e runner and credentials are decided in D-73 (9)
 - **Spec:** 10 M1-13; 06 §9; 02 J1, J9
@@ -3087,7 +3100,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Vectors include rejected inputs for every canonical-form rule (an RLO in `subject`, a zero-width space in a deliverable, Cyrillic `ЕUR`, `1500.0000001`, `0`, a due date with an offset instead of `Z`, upper-case hex) and chain cases (a version gap, a pointer to an older version, the same `termsId` from another pair, two envelopes for one version from the same sender, a fork after an accept, concurrent counters from both sides).
 
 #### M1-21-b · terms: vendor the UCD file, drift check and table-hash vector (new, D-77)
-- **Status:** in review (4thtech/agentlink#147; vendored file SHA-256 `fe29a45c…06f9`; regenerated table equals the interim table, no code point differs) · **Size:** S · **Tier:** Opus · **Security:** S2 (the table decides which strings are signed and hashed, `packages/types` and `test-vectors/**`, audit-rules §2.2, §2.4) · **Phase:** M1a (before the M1a release)
+- **Status:** done (4thtech/agentlink#147, merged 2026-10-15; vendored file SHA-256 `fe29a45c…06f9`; regenerated table equals the interim table, no code point differs) · **Size:** S · **Tier:** Opus · **Security:** S2 (the table decides which strings are signed and hashed, `packages/types` and `test-vectors/**`, audit-rules §2.2, §2.4) · **Phase:** M1a (before the M1a release)
 - **Repo/path:** agentlink · packages/types, tools/ (generator and lint check), test-vectors/, tools/vectors/generators/
 - **Depends on:** M1-21 (merged)
 - **Spec:** D-74 (pinned UCD 15.0.0 table, SHA-256, CI drift check), D-77 (interim table); 04 §3.4 ("Canonical-form and chain clarifications")
@@ -3103,7 +3116,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - D-77's interim note is removed from the code comments and the status is updated.
 
 #### M1-22 · e2e: J8 negotiate and agree over Talk (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#169, merged 2026-10-16; the deterministic scenario passes in CI; the LLM steps L13 to L20 have not been run yet, manual dispatch, see the test report) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · e2e/
 - **Depends on:** M1-13a, M1-9b, M1-9c, M1-9q, M1-12a, M1-20, M1-21, M1-32
 - **Spec:** D-31, D-32, D-55; 02 F-22, F-61, F-62, J8; 06 §2.2a, §3 (`commitments`), §4; 04 §2.5, §3.4, §3.4.2
@@ -3112,13 +3125,14 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Deterministic scenario on the M1-13a harness: A calls `agentlink_propose_terms`; B calls `agentlink_respond_to_terms` with `counter`; A's `accept` on B's version → `pending_approval` under the default `commitments` policy → owner approves via the CLI (passphrase through a test TTY) → A retries with the `approvalId` → `accept` delivered; both sides hold the same `termsHash`. A `reject` path.
   - Void and replay (D-55): B sends a newer version while A's approval is pending → A's retry returns `TERMS_SUPERSEDED` and nothing leaves A; a second retry with a used `approvalId` sends nothing.
   - The same with an owner-signed auto-accept limit: inside the limit no approval; outside → approval.
-  - LLM-driven variant (Claude Code ↔ Codex) on a schedule, observational, with the repository-secret API keys of D-73 (9). No on-chain proof here; proof of agreement is M1-13c (M1b).
+  - LLM-driven variant (Claude Code ↔ Codex), manual dispatch only (owner decision 2026-10-15), observational, with the repository-secret API keys of D-73 (9). No on-chain proof here; proof of agreement is M1-13c (M1b).
 - **Acceptance:**
   - Deterministic variant green on PRs; no binding `accept` leaves A without an owner-signed approval or a matching owner-signed limit (asserted on relay traffic); each owner is asked at most once per agreement (approval count).
   - Inbound `terms` reach the harness wrapped as untrusted content (06 §4); canary scan of logs finds no plaintext.
+- **Notes (IR-M1-22-1):** the "nothing leaves" relay check polls every 2 s and only catches publishes within that window; the sent-`accept` store check covers the rest. Not covered yet (cheap follow-up): voiding an approval that is still pending (a newer version arrives before the owner decides); only approved-unused is tested. The `clientRequestId` repeat check waits for M1-32-c.
 
 #### M1-23 · J9 dogfood: Tali's and Denis's agents sync through AgentLink (M1a gate) (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet (setup notes) + Owner (with @denisjazbec) · **Security:** S1 · **Phase:** M1a
+- **Status:** in-progress (the runbook RB-17 `docs/runbooks/dogfood-m1a.md` merged in 4thtech/agentlink#168, 2026-10-16; the dogfood run itself is open) · **Size:** S · **Tier:** Sonnet (setup notes) + Owner (with @denisjazbec) · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** owner's sync file (dogfood log); issues as backlog cards. No synced project content is committed.
 - **Depends on:** to start (D-73 (8)): M1-9p, M1-9r, M1-7k, M1-7h, M1-12a, M1-12b, M1-29 (send and inbox work); to close the gate: all M1a cards except DESIGN-D1 and M1-9g (D-30); in particular M1-13b, M1-19, M1-22, M1-25
 - **Spec:** D-33, D-53; 02 J7, J8, J9; 06 §6.1 (session habit), §7.1 (install prompts, install-and-accept prompt); 10 "Gate M1a"; `docs/process/sync-protocol.md`
@@ -3217,7 +3231,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Specs name one origin for the local UI; a test registers and uses a PRF passkey on that origin, and requests with any other `Host` value are rejected.
 
 #### M1-32 · core: terms flow and one approval per agreement (new, D-55)
-- **Status:** in review (4thtech/agentlink#126) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (the deferred receipt with M1-7g in M1b)
+- **Status:** done (4thtech/agentlink#126, merged 2026-10-15) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (the deferred receipt with M1-7g in M1b)
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7b, M1-7e, M1-20, M1-21 (not M1-7h, so it runs beside M1-7c → M1-7h and stays off the critical path)
 - **Spec:** D-55, D-31, D-32; 04 §3.4, §3.4.2; 07 §2, §2.1, §3 (`approvals`); 06 §2.2a, §2.5, §3
@@ -3237,8 +3251,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Review cases (IR-D55-1): two concurrent retries with one `approvalId` → one `accept` (F06); a second scope for the same envelope voids the pending first, and both approved never yields two accepts (F06); a grant row inserted directly in the store authorises nothing (F10); `cancel` voids a waiting receipt (F11); `note` with `accept` → `INVALID_ARGUMENT` (F03); a counterparty offer whose `previousTermsHash` points to an older version, or a second envelope for an existing version, is refused, and concurrent counters void pending scopes on both versions but never one whose `accept` ran (F04, IR-D55-2 N01); an `accept` of version 3 arriving after version 4 was sent is stored and offered for `confirm` with the warning (F08); the digest computed at creation verifies at run time (F05).
   - Property test: across random interleavings of offers, counters, approvals and `proof` envelopes, no scope ever sends more than one `accept` or signs more than one receipt, and nothing runs without an owner-signed approval or a matching grant.
 
+#### M1-32-c · MCP terms tools: accept and pass `clientRequestId` (new, IR-M1-22-1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Repo/path:** agentlink · apps/cli (`src/tools/{propose-terms,respond-to-terms}.ts`)
+- **Depends on:** M1-9q, M1-32-b
+- **Spec:** 06 §1 rule 6, §2.2a; 07 §3.3
+- **Invariants:** I-4, I-5
+- **Scope:** the terms tools pass `clientRequestId` to the core (honoured since M1-32-b) and map `IDEMPOTENCY_KEY_REUSED` and `in_progress` as `agentlink_send` does; fix the stale comment at `propose-terms.ts:11-12`.
+- **Acceptance:** a repeated propose, counter, reject or accept under one `clientRequestId` sends once and returns the same result; another request under the key is `IDEMPOTENCY_KEY_REUSED`; add the repeat check to the M1-22 e2e.
+
 #### M1-32-b · core: terms idempotency and order-independent receive (new, IR-M1-9q-1 F-2, F-3)
-- **Status:** in review (4thtech/agentlink#134) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (must land before the M1a gate, and before firm offers, M1-9d)
+- **Status:** done (4thtech/agentlink#134, merged 2026-10-15) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (must land before the M1a gate, and before firm offers, M1-9d)
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-32, M1-7e (idempotency)
 - **Spec:** 04 §3.4 (the chain rules, envelopeHash duplicates, signed createdAt only for judging answers); D-74; 06 §1 rule 6, §2.2a; 07 §3.2, §3.3

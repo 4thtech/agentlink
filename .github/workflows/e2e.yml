@@ -93,19 +93,26 @@ jobs:
             keyring_env="$(openssl rand -hex 16 | gnome-keyring-daemon --unlock --components=secrets)"
             eval "$keyring_env"
             export GNOME_KEYRING_CONTROL
-            pnpm --filter @agentlink/e2e exec vitest run test/pair-and-message.test.ts --reporter=default --reporter=json --outputFile.json="$E2E_REPORT"
+            pnpm --filter @agentlink/e2e exec vitest run test/pair-and-message.test.ts test/negotiate-and-agree.test.ts --reporter=default --reporter=json --outputFile.json="$E2E_REPORT"
           ' 2>&1 | tee "$AGENTLINK_E2E_ARTIFACTS/vitest-output.log"
 
-      - name: Check that the scenario ran in full, with no skipped test
+      - name: Check that the scenarios ran in full, with no skipped test
         run: |
           set -euo pipefail
           node -e '
             const r = JSON.parse(require("node:fs").readFileSync(process.env.E2E_REPORT, "utf8"));
-            const f = r.testResults.filter((x) => /pair-and-message\.test\.ts$/.test(x.name));
-            const t = f.length === 1 ? f[0].assertionResults : [];
-            const bad = t.filter((x) => x.status !== "passed");
-            console.log(`pair-and-message.test.ts: ${t.length} tests, ${bad.length} not passed`);
-            if (t.length !== 2 || bad.length > 0) { console.error("::error::the e2e scenario must run 2 tests, all passed"); process.exit(1); }
+            let failed = false;
+            for (const [name, count] of [["pair-and-message", 2], ["negotiate-and-agree", 5]]) {
+              const f = r.testResults.filter((x) => x.name.endsWith(`/${name}.test.ts`));
+              const t = f.length === 1 ? f[0].assertionResults : [];
+              const bad = t.filter((x) => x.status !== "passed");
+              console.log(`${name}.test.ts: ${t.length} tests, ${bad.length} not passed`);
+              if (t.length !== count || bad.length > 0) {
+                console.error(`::error::${name}.test.ts must run ${count} tests, all passed`);
+                failed = true;
+              }
+            }
+            if (failed) process.exit(1);
           '
 
       - name: Canary scan of every log and artifact
@@ -118,9 +125,14 @@ jobs:
         run: |
           set -euo pipefail
           node -e '
-            const r = JSON.parse(require("node:fs").readFileSync(process.env.AGENTLINK_E2E_ARTIFACTS + "/deterministic-results.json", "utf8"));
-            const rows = r.steps.map((s) => `| ${s.step} | ${s.ok ? "pass" : "fail"} | ${(s.ms / 1000).toFixed(1)} s |`);
-            console.log(["### M1-13a deterministic e2e", "", `Total ${(r.totalMs / 1000).toFixed(1)} s`, "", "| Step | Result | Time |", "|---|---|---|", ...rows].join("\n"));
+            const fs = require("node:fs");
+            for (const [file, title] of [["deterministic-results.json", "M1-13a deterministic e2e"], ["j8-results.json", "M1-22 deterministic e2e (J8)"]]) {
+              const path = process.env.AGENTLINK_E2E_ARTIFACTS + "/" + file;
+              if (!fs.existsSync(path)) continue;
+              const r = JSON.parse(fs.readFileSync(path, "utf8"));
+              const rows = r.steps.map((s) => `| ${s.step} | ${s.ok ? "pass" : "fail"} | ${(s.ms / 1000).toFixed(1)} s |`);
+              console.log(["### " + title, "", `Total ${(r.totalMs / 1000).toFixed(1)} s`, "", "| Step | Result | Time |", "|---|---|---|", ...rows, ""].join("\n"));
+            }
           ' >> "$GITHUB_STEP_SUMMARY"
 
       # Uploaded only after a clean canary scan (a failed scenario still uploads its logs).
