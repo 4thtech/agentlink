@@ -330,13 +330,27 @@ describe('confirmation', () => {
     expect(plan.out).not.toContain('--- a/~/.claude.json');
   });
 
-  it('in a terminal, declining everything changes nothing and creates no identity', async () => {
+  // D-78 (06 §7): declining every proposed change writes no harness config but keeps the agent
+  // identity (before M1-9t, declining everything also cancelled the identity).
+  it('in a terminal, declining every harness change writes no config but keeps the identity', async () => {
     await mkdir(join(home, '.codex'));
     const run = await init([], { terminal: TTY, answers: ['', 'maybe'] });
-    expect(run.out).toContain(copy('cli.init.cancelled'));
-    expect(run.created).toBe(0);
+    expect(run.code).toBe(EXIT_OK);
+    expect(run.out).toContain(INIT_TEXT.declinedKept);
+    expect(run.created).toBe(1);
     expect(await exists('.codex', 'config.toml')).toBe(false);
-    expect(await readAgentConfig(home, 'default')).toBeUndefined();
+    expect((await readAgentConfig(home, 'default'))?.config.agentId).toBe(AGENT_ID);
+  });
+
+  it('declining every change never touches an existing identity', async () => {
+    await mkdir(join(home, '.codex'));
+    const first = await init(['--harness', 'none']);
+    await init(['--harness', 'none', '--confirm', codeOf(first)]);
+    const run = await init([], { terminal: TTY, answers: ['n'] });
+    expect(run.created).toBe(0);
+    expect(run.code).toBe(EXIT_OK);
+    expect((await readAgentConfig(home, 'default'))?.config.agentId).toBe(AGENT_ID);
+    expect(await exists('.codex', 'config.toml')).toBe(false);
   });
 
   it('never prints or asks for an owner secret, and points to `owner init`', async () => {
@@ -503,5 +517,210 @@ describe('keychain and agent names', () => {
     const run = await init(['whatever']);
     expect(run.code).toBe(EXIT_USAGE);
     expect(run.err).not.toContain('whatever');
+  });
+});
+
+// D-78 (06 §7): one harness at a time, identity only, OpenCode and Antigravity, `--config`.
+describe('init --harness and --config (M1-9t)', () => {
+  const OPENCODE_ENTRY = {
+    type: 'local',
+    command: ['npx', '-y', '@4thtech/agentlink', 'mcp'],
+    enabled: true,
+  };
+  const ANTIGRAVITY_ENTRY = { command: 'npx', args: ['-y', '@4thtech/agentlink', 'mcp'] };
+  const readAbs = (path: string): Promise<string> => readFile(path, 'utf8');
+  const existsAbs = (path: string): Promise<boolean> =>
+    readFile(path).then(
+      () => true,
+      () => false,
+    );
+
+  it('--harness <id> proposes and writes that harness only', async () => {
+    await mkdir(join(home, '.codex'));
+    await mkdir(join(home, '.gemini'));
+    const plan = await init(['--harness', 'codex']);
+    expect(plan.out).toContain('--- a/~/.codex/config.toml');
+    expect(plan.out).not.toContain('settings.json');
+    expect(plan.out).toContain('agentlink init --harness codex --confirm');
+    const run = await init(['--harness', 'codex', '--confirm', codeOf(plan)]);
+    expect(run.code).toBe(EXIT_OK);
+    expect(await exists('.codex', 'config.toml')).toBe(true);
+    expect(await exists('.gemini', 'settings.json')).toBe(false);
+  });
+
+  it('a code for one harness does not confirm another', async () => {
+    await mkdir(join(home, '.codex'));
+    await mkdir(join(home, '.gemini'));
+    const plan = await init(['--harness', 'codex']);
+    const run = await init(['--harness', 'gemini-cli', '--confirm', codeOf(plan)]);
+    expect(run.code).toBe(EXIT_FAILED);
+    expect(await exists('.gemini', 'settings.json')).toBe(false);
+    expect(run.created).toBe(0);
+  });
+
+  it('--harness none creates the identity only, even with harnesses detected', async () => {
+    await mkdir(join(home, '.codex'));
+    const plan = await init(['--harness', 'none']);
+    expect(plan.out).not.toContain('config.toml');
+    expect(plan.out).toContain(INIT_TEXT.identity);
+    const run = await init(['--harness', 'none', '--confirm', codeOf(plan)]);
+    expect(run.code).toBe(EXIT_OK);
+    expect(run.created).toBe(1);
+    expect(await exists('.codex', 'config.toml')).toBe(false);
+  });
+
+  it('--harness none in a terminal creates the identity without asking about any app', async () => {
+    await mkdir(join(home, '.codex'));
+    const run = await init(['--harness', 'none'], { terminal: TTY });
+    expect(run.asked).toBe(0);
+    expect(run.created).toBe(1);
+    expect(await exists('.codex', 'config.toml')).toBe(false);
+  });
+
+  it('refuses an unknown harness with fixed text', async () => {
+    const run = await init(['--harness', 'vim-ide']);
+    expect(run.code).toBe(EXIT_USAGE);
+    expect(run.err).not.toContain('vim-ide');
+    expect(run.created).toBe(0);
+  });
+
+  it('OpenCode: ~/.config/opencode/opencode.json gets mcp.agentlink, type local, one command array', async () => {
+    const plan = await init(['--harness', 'opencode']);
+    expect(plan.out).toContain('--- a/~/.config/opencode/opencode.json');
+    await init(['--harness', 'opencode', '--confirm', codeOf(plan)]);
+    expect(JSON.parse(await read('.config', 'opencode', 'opencode.json'))).toEqual({
+      mcp: { agentlink: OPENCODE_ENTRY },
+    });
+  });
+
+  it('OpenCode: keeps the other settings and servers of an existing file', async () => {
+    await mkdir(join(home, '.config', 'opencode'), { recursive: true, mode: 0o700 });
+    const before = `${JSON.stringify(
+      { $schema: 'https://opencode.ai/config.json', mcp: { other: { type: 'remote', url: 'x' } } },
+      null,
+      2,
+    )}\n`;
+    await writeFile(join(home, '.config', 'opencode', 'opencode.json'), before, { mode: 0o600 });
+    const plan = await init(['--harness', 'opencode']);
+    await init(['--harness', 'opencode', '--confirm', codeOf(plan)]);
+    expect(JSON.parse(await read('.config', 'opencode', 'opencode.json'))).toEqual({
+      $schema: 'https://opencode.ai/config.json',
+      mcp: { agentlink: OPENCODE_ENTRY, other: { type: 'remote', url: 'x' } },
+    });
+  });
+
+  it('OpenCode: a named agent ends the command array with --agent <name>', async () => {
+    const plan = await init(['--agent', 'open-1', '--harness', 'opencode']);
+    await init(['--agent', 'open-1', '--harness', 'opencode', '--confirm', codeOf(plan)]);
+    const written = JSON.parse(await read('.config', 'opencode', 'opencode.json'));
+    expect(written.mcp.agentlink.command).toEqual([
+      'npx',
+      '-y',
+      '@4thtech/agentlink',
+      'mcp',
+      '--agent',
+      'open-1',
+    ]);
+  });
+
+  it('Antigravity: ~/.gemini/config/mcp_config.json gets mcpServers.agentlink, not the Gemini CLI file', async () => {
+    await mkdir(join(home, '.gemini'), { mode: 0o700 });
+    const plan = await init(['--harness', 'antigravity']);
+    expect(plan.out).toContain('--- a/~/.gemini/config/mcp_config.json');
+    await init(['--harness', 'antigravity', '--confirm', codeOf(plan)]);
+    expect(JSON.parse(await read('.gemini', 'config', 'mcp_config.json'))).toEqual({
+      mcpServers: { agentlink: ANTIGRAVITY_ENTRY },
+    });
+    expect(await exists('.gemini', 'settings.json')).toBe(false);
+  });
+
+  it('detects OpenCode by its config folder when no --harness is given', async () => {
+    await mkdir(join(home, '.config', 'opencode'), { recursive: true, mode: 0o700 });
+    const plan = await init([]);
+    expect(plan.out).toContain('OpenCode');
+  });
+
+  it('--config writes the exact file the owner named for Antigravity', async () => {
+    const target = join(outside, 'mcp_config.json');
+    const plan = await init(['--harness', 'antigravity', '--config', target]);
+    expect(plan.code).toBe(EXIT_OK);
+    const run = await init([
+      '--harness',
+      'antigravity',
+      '--config',
+      target,
+      '--confirm',
+      codeOf(plan),
+    ]);
+    expect(run.code).toBe(EXIT_OK);
+    expect(JSON.parse(await readAbs(target))).toEqual({
+      mcpServers: { agentlink: ANTIGRAVITY_ENTRY },
+    });
+    expect(await exists('.gemini', 'config', 'mcp_config.json')).toBe(false);
+  });
+
+  it('a code for one --config path does not confirm another', async () => {
+    const one = join(outside, 'one.json');
+    const two = join(outside, 'two.json');
+    const plan = await init(['--harness', 'antigravity', '--config', one]);
+    const run = await init([
+      '--harness',
+      'antigravity',
+      '--config',
+      two,
+      '--confirm',
+      codeOf(plan),
+    ]);
+    expect(run.code).toBe(EXIT_FAILED);
+    expect(await existsAbs(two)).toBe(false);
+  });
+
+  it('refuses --config without --harness, or with a harness other than OpenCode or Antigravity', async () => {
+    const target = join(outside, 'x.json');
+    for (const argv of [
+      ['--config', target],
+      ['--harness', 'codex', '--config', target],
+      ['--harness', 'none', '--config', target],
+    ]) {
+      const run = await init(argv);
+      expect(run.code, argv.join(' ')).toBe(EXIT_USAGE);
+      expect(run.err).not.toContain(target);
+    }
+    expect(await existsAbs(target)).toBe(false);
+  });
+
+  it.skipIf(!POSIX)(
+    'refuses a --config file that is a symbolic link, and leaves its target alone',
+    async () => {
+      const real = join(outside, 'real.json');
+      await writeFile(real, '{}\n', { mode: 0o600 });
+      const linked = join(outside, 'linked.json');
+      await symlink(real, linked);
+      const plan = await init(['--harness', 'antigravity', '--config', linked]);
+      expect(plan.code).toBe(EXIT_FAILED);
+      expect(plan.out).not.toContain('--confirm');
+      expect(await readAbs(real)).toBe('{}\n');
+    },
+  );
+
+  it('refuses a --config path under ~/.agentlink or ~/.ssh, or whose folder does not exist', async () => {
+    await mkdir(join(home, '.agentlink'), { recursive: true, mode: 0o700 });
+    await mkdir(join(home, '.ssh'), { recursive: true, mode: 0o700 });
+    for (const target of [
+      join(home, '.agentlink', 'mcp_config.json'),
+      join(home, '.ssh', 'mcp_config.json'),
+      join(outside, 'missing', 'mcp_config.json'),
+    ]) {
+      const plan = await init(['--harness', 'antigravity', '--config', target]);
+      expect(plan.code, target).toBe(EXIT_FAILED);
+      expect(plan.out).not.toContain('--confirm');
+    }
+    expect(await exists('.agentlink', 'mcp_config.json')).toBe(false);
+  });
+
+  it('refuses a --config file that is not a .json file', async () => {
+    const plan = await init(['--harness', 'opencode', '--config', join(outside, 'opencode.toml')]);
+    expect(plan.code).not.toBe(EXIT_OK);
+    expect(plan.out).not.toContain('--confirm');
   });
 });
