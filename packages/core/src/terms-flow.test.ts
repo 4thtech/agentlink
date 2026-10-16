@@ -1951,6 +1951,27 @@ describe('fresh sessions (M1-22): open offers and what an approval is for (06 §
     expect(await page(b, [])).toEqual({ status: 'ok', items: [], requests: 0 });
   });
 
+  it('an offer revised by its sender drops out in favour of the newest version (IR-M1-22-FRESH-1 I-1)', async () => {
+    const { a, b, offer } = await offered();
+    const v2 = ok(
+      await a.client.proposeTerms({
+        to: b.id,
+        terms: input({ subject: 'Website redesign, revised' }),
+        revises: offer.envelopeId,
+      }),
+    );
+    await deliver(a, b);
+    expect(await b.client.terms.openOffers()).toEqual([
+      {
+        envelopeId: v2.envelopeId,
+        contactId: a.id,
+        termsId: offer.termsId,
+        version: 2,
+        validUntil: v2.validUntil,
+      },
+    ]);
+  });
+
   it('an offer stops being open once countered, rejected, accepted or expired', async () => {
     const countered = await offered();
     const counter = ok(

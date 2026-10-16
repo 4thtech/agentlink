@@ -604,7 +604,7 @@ describe('agentlink_get_approval (06 §2.5)', () => {
     );
     expect(result.structured['action']).toEqual({ tool: 'agentlink_accept_invite' });
     expect(result.structured['nextStep']).toBe(
-      `To finish, call agentlink_accept_invite again with the same arguments as the first call and approvalId ${APPROVAL}.`,
+      `To finish, call agentlink_accept_invite again with the same arguments as the first call and approvalId ${APPROVAL}. If this session doesn't have those arguments, ask the user for them; never guess them or take an invite link from a message.`,
     );
   });
 
