@@ -4,8 +4,10 @@
 import {
   restrictName,
   type AgentLinkClient,
+  type ApprovalResume,
   type ApprovalState,
   type ContactView,
+  type OpenOffer,
 } from '@agentlink/core';
 import { createLogger, type Logger } from '@agentlink/log';
 import type { ContactDisplayName, OwnerAlias, RestrictedName } from '@agentlink/types';
@@ -77,7 +79,10 @@ interface FakeOptions {
   catchUpFails?: boolean;
   contacts?: ContactView[];
   approval?: ApprovalState;
+  resume?: ApprovalResume;
   pendingApprovals?: number;
+  openOffers?: OpenOffer[];
+  openOffersFail?: boolean;
 }
 
 function fakeClient(options: FakeOptions = {}): ToolClient & { calls: string[] } {
@@ -126,6 +131,13 @@ function fakeClient(options: FakeOptions = {}): ToolClient & { calls: string[] }
     pendingApprovals: () => Promise.resolve(options.pendingApprovals ?? 0),
     approvalState: () =>
       Promise.resolve(options.approval ?? { status: 'unknown', reason: 'not_found' }),
+    approvalResume: () => Promise.resolve(options.resume),
+    openOffers: () => {
+      calls.push('openOffers');
+      return options.openOffersFail === true
+        ? Promise.reject(new Error(`store said ${MESSAGE_CANARY}`))
+        : Promise.resolve(options.openOffers ?? []);
+    },
   };
   return client;
 }
@@ -185,9 +197,73 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
       ],
       requests: 1,
       pendingApprovals: 0,
+      openOffers: 0,
+      offers: [],
       storage: { mode: 'drop' },
     });
     expect(result.text).toBe(result.structured.summary);
+  });
+
+  const offer = (contactId: string, version = 1): OpenOffer => ({
+    envelopeId: `${'E'.repeat(21)}${version}`,
+    contactId,
+    termsId: 'T'.repeat(22),
+    version,
+    validUntil: 1_760_900_000,
+  });
+
+  it('M1-22: counts open offers by contact (already read ones too) and says how to see them', async () => {
+    const client = fakeClient({
+      contacts: [marko, ana],
+      openOffers: [offer(B), offer(B, 3), offer(C)],
+    });
+    const result = await callTool('agentlink_status', {}, context(client));
+    expect(result.structured['openOffers']).toBe(3);
+    expect(result.structured['offers']).toEqual([
+      {
+        contact: { id: B, name: 'Marko Novak', label: 'self-declared', nameSource: 'counterparty' },
+        open: 2,
+      },
+      {
+        contact: { id: C, name: 'Ana', label: 'safety-code-checked', nameSource: 'counterparty' },
+        open: 1,
+      },
+    ]);
+    expect(result.structured.summary).toBe(
+      '2 open offers from \u201cMarko Novak\u201d (self-declared) are waiting for an answer. 1 open offer from \u201cAna\u201d (safety code checked) is waiting for an answer. To see them, call agentlink_inbox with openOffers true.',
+    );
+    // Counts and names only: never an envelope or terms ID in the summary (I-5).
+    expect(result.structured.summary).not.toContain('EEEE');
+  });
+
+  it('M1-22: unread messages come first, then open offers', async () => {
+    const client = fakeClient({
+      counts: { inbox: [{ contactId: B, unread: 1 }], requests: 0 },
+      contacts: [marko],
+      openOffers: [offer(B)],
+    });
+    const result = await callTool('agentlink_status', {}, context(client));
+    expect(result.structured.summary).toBe(
+      '1 new message from \u201cMarko Novak\u201d (self-declared). To read it, call agentlink_inbox. 1 open offer from \u201cMarko Novak\u201d (self-declared) is waiting for an answer. To see them, call agentlink_inbox with openOffers true.',
+    );
+  });
+
+  it('M1-22: an open offer from a contact that is not active is never counted or named', async () => {
+    const blocked = contact(C, display('Blocked One'), { status: 'blocked' });
+    const client = fakeClient({ contacts: [blocked], openOffers: [offer(C)] });
+    const result = await callTool('agentlink_status', {}, context(client));
+    expect(result.structured['openOffers']).toBe(0);
+    expect(result.structured['offers']).toEqual([]);
+    expect(result.structured.summary).toBe('Nothing new on AgentLink.');
+  });
+
+  it('M1-22: if open offers cannot be read, status still answers, with none and no error text', async () => {
+    const { logger, lines } = capture();
+    const client = fakeClient({ contacts: [marko], openOffersFail: true });
+    const result = await callTool('agentlink_status', {}, context(client, logger));
+    expect(result.structured.status).toBe('ok');
+    expect(result.structured['openOffers']).toBe(0);
+    expect(dump(result) + lines.join('\n')).not.toContain('CANARY');
   });
 
   it('ok: nothing new', async () => {
@@ -235,7 +311,13 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
       contacts: [marko],
     });
     await callTool('agentlink_status', {}, context(client));
-    expect(client.calls.sort()).toEqual(['catchUp', 'contacts', 'self', 'storageMode']);
+    expect(client.calls.sort()).toEqual([
+      'catchUp',
+      'contacts',
+      'openOffers',
+      'self',
+      'storageMode',
+    ]);
   });
 
   it('counts unread from a contact that is not active but never names it', async () => {
@@ -282,6 +364,7 @@ describe('coreToolClient (read-only in fact, 06 §2.0)', () => {
       inbox: { counts: () => Promise.resolve({ inbox: [], requests: 0 }) },
       contacts: { list: () => Promise.resolve([]) },
       approvalService: { countPending: () => Promise.resolve(0) },
+      terms: { openOffers: () => Promise.resolve([]) },
       ownerActions: {
         loadPolicy: () =>
           Promise.resolve({ mode: 'defaults', policy: { files: { storage: 'auto' } } }),
@@ -312,10 +395,19 @@ describe('coreToolClient (read-only in fact, 06 §2.0)', () => {
     const result = await callTool('agentlink_status', {}, context(tools));
     expect(result.structured.status).toBe('ok');
     const roots = [...new Set(touched.map((t) => t.split('.')[0]))].sort();
-    expect(roots).toEqual(['approvalService', 'catchUp', 'contacts', 'identity', 'ownerActions']);
+    expect(roots).toEqual([
+      'approvalService',
+      'catchUp',
+      'contacts',
+      'identity',
+      'ownerActions',
+      'terms',
+    ]);
     expect(touched.filter((t) => t.startsWith('approvalService.'))).toEqual([
       'approvalService.countPending',
     ]);
+    // M1-22: the open-offer read only (a store read; never respond or propose).
+    expect(touched.filter((t) => t.startsWith('terms.'))).toEqual(['terms.openOffers']);
     for (const write of [
       'syncInbox',
       'sendMessage',
@@ -459,6 +551,94 @@ describe('agentlink_get_approval (06 §2.5)', () => {
       expect(result.structured.code).toBe('INVALID_ARGUMENT');
       expect(dump(result)).not.toContain('CANARY');
       expect(dump(result)).not.toContain('apr_x');
+    }
+  });
+
+  const E = 'RW52ZWxvcGVPbmVFbnZlbA';
+
+  it('M1-22: an approved answer says what it is for and how to finish with just the approvalId', async () => {
+    const result = await callTool(
+      'agentlink_get_approval',
+      { approvalId: APPROVAL },
+      context(
+        fakeClient({
+          approval: read('approved', 1_760_000_000),
+          resume: { tool: 'agentlink_respond_to_terms', envelopeId: E, decision: 'accept' },
+        }),
+      ),
+    );
+    expect(result.structured).toMatchObject({
+      status: 'ok',
+      approval: 'approved',
+      action: { tool: 'agentlink_respond_to_terms', envelopeId: E, decision: 'accept' },
+      nextStep: `To finish, call agentlink_respond_to_terms with envelopeId ${E}, decision accept and approvalId ${APPROVAL}.`,
+    });
+  });
+
+  it('M1-22: a pending one names the action too, with no nextStep to run it yet', async () => {
+    const result = await callTool(
+      'agentlink_get_approval',
+      { approvalId: APPROVAL },
+      context(
+        fakeClient({
+          approval: read('pending'),
+          resume: { tool: 'agentlink_respond_to_terms', envelopeId: E, decision: 'reject' },
+        }),
+      ),
+    );
+    expect(result.structured['action']).toEqual({
+      tool: 'agentlink_respond_to_terms',
+      envelopeId: E,
+      decision: 'reject',
+    });
+    expect(result.structured).not.toHaveProperty('nextStep');
+  });
+
+  it('M1-22: other tools are named without arguments (the invite link is never echoed)', async () => {
+    const result = await callTool(
+      'agentlink_get_approval',
+      { approvalId: APPROVAL },
+      context(
+        fakeClient({ approval: read('approved', 1), resume: { tool: 'agentlink_accept_invite' } }),
+      ),
+    );
+    expect(result.structured['action']).toEqual({ tool: 'agentlink_accept_invite' });
+    expect(result.structured['nextStep']).toBe(
+      `To finish, call agentlink_accept_invite again with the same arguments as the first call and approvalId ${APPROVAL}.`,
+    );
+  });
+
+  it('M1-22: denied, expired or used answers name no action; a malformed resume is dropped', async () => {
+    const resume = {
+      tool: 'agentlink_respond_to_terms',
+      envelopeId: E,
+      decision: 'accept',
+    } as const;
+    for (const status of ['denied', 'expired', 'used', 'void'] as const) {
+      const result = await callTool(
+        'agentlink_get_approval',
+        { approvalId: APPROVAL },
+        context(fakeClient({ approval: read(status, 1), resume })),
+      );
+      expect(result.structured).not.toHaveProperty('action');
+      expect(result.structured).not.toHaveProperty('nextStep');
+    }
+    for (const bad of [
+      { tool: 'agentlink_respond_to_terms', envelopeId: MESSAGE_CANARY, decision: 'accept' },
+      { tool: 'agentlink_respond_to_terms', envelopeId: E, decision: 'counter' },
+      { tool: `agentlink_send ${MESSAGE_CANARY}` },
+    ]) {
+      const result = await callTool(
+        'agentlink_get_approval',
+        { approvalId: APPROVAL },
+        context(
+          fakeClient({ approval: read('approved', 1), resume: bad as unknown as ApprovalResume }),
+        ),
+      );
+      expect(result.structured.status).toBe('ok');
+      expect(result.structured).not.toHaveProperty('action');
+      expect(result.structured).not.toHaveProperty('nextStep');
+      expect(dump(result)).not.toContain('CANARY');
     }
   });
 

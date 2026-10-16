@@ -700,6 +700,20 @@ describe('reading one approval by ID (06 §2.5 agentlink_get_approval; M1-7e-3)'
     expect(await t.client.approvalService.read(r.approvalId)).toMatchObject({ status: 'used' });
   });
 
+  it('resumeOf (M1-22) names only the tool of a non-terms action: never its args, which may hold agent-written text', async () => {
+    const t = await setup();
+    const r = await t.request(exportAction('CANARY note from inbound text'));
+    expect(await t.client.approvalService.resumeOf(r.approvalId)).toEqual({
+      tool: 'agentlink_export_proof_pack',
+    });
+    await t.approve(r);
+    expect(await t.client.approvalService.resumeOf(r.approvalId)).toEqual({
+      tool: 'agentlink_export_proof_pack',
+    });
+    await t.client.approvalService.use(r.approvalId, r.action, 'approval');
+    expect(await t.client.approvalService.resumeOf(r.approvalId)).toBeUndefined();
+  });
+
   it('an expired request reads expired, whether it was pending or approved and unused', async () => {
     const t = await setup();
     const pending = await t.request();
