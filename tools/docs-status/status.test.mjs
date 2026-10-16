@@ -152,7 +152,10 @@ describe('run', () => {
   });
 
   it('fails the check when the source changed and a page did not', () => {
-    const source = read(STATUS_FILE).replace('updated: "2026-10-15"', 'updated: "2026-11-01"');
+    const source = read(STATUS_FILE).replace(
+      /updated: "\d{4}-\d{2}-\d{2}"/,
+      'updated: "2026-11-01"',
+    );
     write(STATUS_FILE, source);
     const { problems } = run({ root, check: true });
     expect(problems.join('\n')).toContain('README.md is out of date');
