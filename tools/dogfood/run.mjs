@@ -18,6 +18,7 @@ import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import process from 'node:process';
 import {
+  OPENCODE_DENIED_PERMISSIONS,
   USAGE,
   buildSteps,
   childEnv,
@@ -127,7 +128,7 @@ async function makeHarnesses(options, dir) {
     { mode: 0o600 },
   );
   // OpenCode: an inline config (highest precedence) that points `agentlink` at its own agent and
-  // refuses shell, edit and web tools, so a hostile message cannot use them.
+  // refuses the shell, web and outside-folder tools, so a hostile message cannot use them.
   const ocConfig = JSON.stringify({
     $schema: 'https://opencode.ai/config.json',
     mcp: {
@@ -137,25 +138,12 @@ async function makeHarnesses(options, dir) {
         enabled: true,
       },
     },
-    // Every tool key of OpenCode's permission list (https://opencode.ai/docs/permissions/, "Available
-    // Permissions"), denied, so only the AgentLink MCP tools remain: no file read or search, no
-    // paths outside the project, no shell, no web, no subagents, no skills.
-    permission: Object.fromEntries(
-      [
-        'read',
-        'edit',
-        'glob',
-        'grep',
-        'bash',
-        'task',
-        'skill',
-        'lsp',
-        'question',
-        'webfetch',
-        'websearch',
-        'external_directory',
-      ].map((key) => [key, 'deny']),
-    ),
+    // Denied: the shell, subagents, skills, web access and anything outside the project folder.
+    // `read`, `edit`, `glob` and `grep` stay allowed on purpose: OpenCode's free tier refuses to run
+    // at all ("free tier can only be used from within OpenCode") when the file tools are denied.
+    // The project folder is the empty temp dir `workspace-oc`, and `external_directory` is what
+    // refuses a read of ~/.agentlink (tested on the owner's Mac; step F1 asserts it on every run).
+    permission: Object.fromEntries(OPENCODE_DENIED_PERMISSIONS.map((key) => [key, 'deny'])),
   });
   const ocEnvKeep =
     process.env.OPENROUTER_API_KEY === undefined
