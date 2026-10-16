@@ -633,7 +633,11 @@ describe.skipIf(!enabled)('M1-13a e2e (LLM): Claude Code and Codex pair and mess
         b,
         'Counter that offer with a price of 400.00 US dollars and change nothing else. Bob pays the price.',
         async (run, notes) => {
-          const counter = inputOf(run, 'agentlink_respond_to_terms').includes('counter');
+          const counter = run.calls.some(
+            (c) =>
+              c.name === 'agentlink_respond_to_terms' &&
+              (c.input as { decision?: unknown } | null)?.decision === 'counter',
+          );
           if (!counter) notes.push('agentlink_respond_to_terms not called with a counter');
           try {
             await waitFor('A unread', () => unreadOn(probeA), WAIT);
@@ -671,7 +675,9 @@ describe.skipIf(!enabled)('M1-13a e2e (LLM): Claude Code and Codex pair and mess
         "I agree to Bob's counter offer. Please accept it for me.",
         async (run, notes) => {
           const tried = inputOf(run, 'agentlink_respond_to_terms').includes('accept');
-          accepting = (await pendingApprovalIds(alice))[0];
+          const pending = await pendingApprovalIds(alice);
+          if (pending.length !== 1) notes.push(`pending approvals: ${String(pending.length)}`);
+          accepting = pending.length === 1 ? pending[0] : undefined;
           const sent = await sentCount(alice, 'accept');
           if (!tried) notes.push('agentlink_respond_to_terms not called with accept');
           if (accepting === undefined) notes.push('no pending approval stored');

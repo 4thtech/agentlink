@@ -3112,10 +3112,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Deterministic scenario on the M1-13a harness: A calls `agentlink_propose_terms`; B calls `agentlink_respond_to_terms` with `counter`; A's `accept` on B's version → `pending_approval` under the default `commitments` policy → owner approves via the CLI (passphrase through a test TTY) → A retries with the `approvalId` → `accept` delivered; both sides hold the same `termsHash`. A `reject` path.
   - Void and replay (D-55): B sends a newer version while A's approval is pending → A's retry returns `TERMS_SUPERSEDED` and nothing leaves A; a second retry with a used `approvalId` sends nothing.
   - The same with an owner-signed auto-accept limit: inside the limit no approval; outside → approval.
-  - LLM-driven variant (Claude Code ↔ Codex) on a schedule, observational, with the repository-secret API keys of D-73 (9). No on-chain proof here; proof of agreement is M1-13c (M1b).
+  - LLM-driven variant (Claude Code ↔ Codex), manual dispatch only (owner decision 2026-10-15), observational, with the repository-secret API keys of D-73 (9). No on-chain proof here; proof of agreement is M1-13c (M1b).
 - **Acceptance:**
   - Deterministic variant green on PRs; no binding `accept` leaves A without an owner-signed approval or a matching owner-signed limit (asserted on relay traffic); each owner is asked at most once per agreement (approval count).
   - Inbound `terms` reach the harness wrapped as untrusted content (06 §4); canary scan of logs finds no plaintext.
+- **Notes (IR-M1-22-1):** the "nothing leaves" relay check polls every 2 s and only catches publishes within that window; the sent-`accept` store check covers the rest. Not covered yet (cheap follow-up): voiding an approval that is still pending (a newer version arrives before the owner decides); only approved-unused is tested. The `clientRequestId` repeat check waits for M1-32-c.
 
 #### M1-23 · J9 dogfood: Tali's and Denis's agents sync through AgentLink (M1a gate) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet (setup notes) + Owner (with @denisjazbec) · **Security:** S1 · **Phase:** M1a
@@ -3235,6 +3236,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Fault injection between parts: the resumed run republishes the same signed envelope; no second envelope ID exists.
   - Review cases (IR-D55-1): two concurrent retries with one `approvalId` → one `accept` (F06); a second scope for the same envelope voids the pending first, and both approved never yields two accepts (F06); a grant row inserted directly in the store authorises nothing (F10); `cancel` voids a waiting receipt (F11); `note` with `accept` → `INVALID_ARGUMENT` (F03); a counterparty offer whose `previousTermsHash` points to an older version, or a second envelope for an existing version, is refused, and concurrent counters void pending scopes on both versions but never one whose `accept` ran (F04, IR-D55-2 N01); an `accept` of version 3 arriving after version 4 was sent is stored and offered for `confirm` with the warning (F08); the digest computed at creation verifies at run time (F05).
   - Property test: across random interleavings of offers, counters, approvals and `proof` envelopes, no scope ever sends more than one `accept` or signs more than one receipt, and nothing runs without an owner-signed approval or a matching grant.
+
+#### M1-32-c · MCP terms tools: accept and pass `clientRequestId` (new, IR-M1-22-1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Repo/path:** agentlink · apps/cli (`src/tools/{propose-terms,respond-to-terms}.ts`)
+- **Depends on:** M1-9q, M1-32-b
+- **Spec:** 06 §1 rule 6, §2.2a; 07 §3.3
+- **Invariants:** I-4, I-5
+- **Scope:** the terms tools pass `clientRequestId` to the core (honoured since M1-32-b) and map `IDEMPOTENCY_KEY_REUSED` and `in_progress` as `agentlink_send` does; fix the stale comment at `propose-terms.ts:11-12`.
+- **Acceptance:** a repeated propose, counter, reject or accept under one `clientRequestId` sends once and returns the same result; another request under the key is `IDEMPOTENCY_KEY_REUSED`; add the repeat check to the M1-22 e2e.
 
 #### M1-32-b · core: terms idempotency and order-independent receive (new, IR-M1-9q-1 F-2, F-3)
 - **Status:** in review (4thtech/agentlink#134) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (must land before the M1a gate, and before firm offers, M1-9d)
