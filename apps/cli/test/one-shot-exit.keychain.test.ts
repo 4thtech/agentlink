@@ -5,6 +5,12 @@
 //
 // Opt-in like two-process.keychain.test.ts: it needs the real OS keychain and the network, so it
 // runs only with AGENTLINK_REQUIRE_KEYCHAIN=1 (a missing keychain or build then FAILS the run).
+//
+// Each opt-in run leaves up to three keychain items (service `agentlink`, accounts `<agentId>`,
+// `<agentId>:store-key`, `<agentId>:policy-version`) and publishes
+// a throwaway agent card to the public relays below. Cleanup on a Mac, per account:
+//   security dump-keychain | grep -B8 agentlink   (find the accounts)
+//   security delete-generic-password -s agentlink -a <account>
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { realpath, rm } from 'node:fs/promises';
@@ -27,7 +33,9 @@ const EXIT_WITHIN_MS = 30_000;
 function run(args: string[]): Promise<{ code: number | null; ms: number }> {
   return new Promise((resolve, reject) => {
     const started = Date.now();
-    const child = spawn(process.execPath, [CLI, ...args], { stdio: ['ignore', 'ignore', 'ignore'] });
+    const child = spawn(process.execPath, [CLI, ...args], {
+      stdio: ['ignore', 'ignore', 'ignore'],
+    });
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
       reject(new Error(`agentlink ${args[0] ?? ''} did not exit within ${EXIT_WITHIN_MS} ms`));
@@ -46,34 +54,38 @@ describe.skipIf(!required)('one-shot commands exit promptly (real keychain, real
   let home: string;
 
   beforeAll(async () => {
-    expect(existsSync(CLI), 'build apps/cli first (dist/cli.js)').toBe(true);
-    expect(await probeOsKeychain({ timeoutMs: 10_000 })).toEqual({ ok: true });
+    // Set first, so afterAll removes the folder even when the set-up below fails half way.
     home = await realpath(homedir());
-    const agentId = await createOsKeychainAgent();
-    await writeAgentConfig(home, { v: 1, name, agentId, keyStore: 'keychain' });
-    const code = encodeHex(randomBytes(16));
-    const presence = (): OwnerPresence => ({ kind: 'passphrase', secret: encodeUtf8(code) });
-    const owner = new MemoryOwnerKeyStore(randomBytes(32), presence());
-    const ownerKeys = await owner.getPublicKeys();
-    const opened = await openAgent({ home, agent: name });
-    if (opened.status !== 'ok') throw new Error('not opened');
-    const session = await owner.unlock(presence());
     try {
-      await opened.agent.client.identity.init({
-        owner: session,
-        ownerKeys,
-        name: 'Agent',
-        relays: RELAYS,
-      });
-    } finally {
-      await session.close();
-      await opened.agent.close();
+      expect(existsSync(CLI), 'build apps/cli first (dist/cli.js)').toBe(true);
+      expect(await probeOsKeychain({ timeoutMs: 10_000 })).toEqual({ ok: true });
+      const agentId = await createOsKeychainAgent();
+      await writeAgentConfig(home, { v: 1, name, agentId, keyStore: 'keychain' });
+      const code = encodeHex(randomBytes(16));
+      const presence = (): OwnerPresence => ({ kind: 'passphrase', secret: encodeUtf8(code) });
+      const owner = new MemoryOwnerKeyStore(randomBytes(32), presence());
+      const ownerKeys = await owner.getPublicKeys();
+      const opened = await openAgent({ home, agent: name });
+      if (opened.status !== 'ok') throw new Error('not opened');
+      const session = await owner.unlock(presence());
+      try {
+        await opened.agent.client.identity.init({
+          owner: session,
+          ownerKeys,
+          name: 'Agent',
+          relays: RELAYS,
+        });
+      } finally {
+        await session.close();
+        await opened.agent.close();
+      }
+    } catch (error) {
+      await rm(join(home, '.agentlink', 'agents', name), { recursive: true, force: true });
+      throw error;
     }
   }, 60_000);
   afterAll(async () => {
-    if (home !== undefined) {
-      await rm(join(home, '.agentlink', 'agents', name), { recursive: true, force: true });
-    }
+    await rm(join(home, '.agentlink', 'agents', name), { recursive: true, force: true });
   });
 
   it.each([['doctor'], ['status'], ['contacts'], ['requests']])(

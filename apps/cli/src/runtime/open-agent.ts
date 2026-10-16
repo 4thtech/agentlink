@@ -175,7 +175,11 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
     throw error;
   }
   if (client.agentId !== config.agentId) {
-    client.close();
+    try {
+      client.close();
+    } catch {
+      // closing a dead connection is not an error
+    }
     await agentStore.close().catch(() => undefined);
     await keyStore.close().catch(() => undefined);
     throw new RuntimeError('agent_config_invalid');

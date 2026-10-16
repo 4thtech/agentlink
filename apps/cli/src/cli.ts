@@ -54,7 +54,8 @@ process.exitCode = await dispatch(argv, {
 // One-shot commands close their relay connections and end on their own (M1-9b). This is only the
 // last-resort net: if something still keeps the loop alive 5 s after the command finished, end the
 // process with the command's own exit code. The timer is unref'd, so it never delays a clean exit.
+// It is armed only after the command's dispatch has resolved, so it never cuts a command short.
 // `agentlink mcp` is long-running and is never cut short.
-if (!argv.includes('mcp')) {
+if (argv[0] !== 'mcp') {
   setTimeout(() => process.exit(process.exitCode ?? 0), 5_000).unref();
 }
