@@ -733,7 +733,7 @@ describe.skipIf(!enabled)('M1-13a e2e (LLM): Claude Code and Codex pair and mess
         'L19',
         'A finishes accepting: one accept sent',
         a,
-        `I approved the pending acceptance in my own terminal. Please finish accepting. Use this exact value, character for character.\nApproval ID:\n${String(accepting)}`,
+        `I approved the pending acceptance in my own terminal. Please finish accepting Bob's counter offer. Use these exact values, character for character.\nCounter offer ID:\n${String(ids.counter)}\nApproval ID:\n${String(accepting)}`,
         async (run, notes) => {
           const withId = inputOf(run, 'agentlink_respond_to_terms').includes(String(accepting));
           const sent = await sentCount(alice, 'accept');

@@ -191,6 +191,7 @@ async function world(): Promise<World> {
     },
     // Stands in for @agentlink/node's decideReviewedApprovals: one code entry, one signed object
     // built from exactly the reviewed items, with the digest recomputed from each action.
+    addAgent: () => Promise.reject(new Error('not used')),
     decide: async (context: ApprovalContext, reviewed: readonly ReviewedApproval[]) => {
       w.codeEntries.push({ op: 'decide', reviewed });
       const items = reviewed

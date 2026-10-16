@@ -17,6 +17,8 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'NodeKeyStoreError',
       // M1-8b: the store entry returns the Store and its cipher, never the store key.
       'NodeStoreError',
+      // M1-9t (D-78): `owner add-agent`, a prompting entry point like initOwner.
+      'addAgentToOwner',
       'assertAgentId',
       'createOsKeychainAgent',
       'decideReviewedApprovals',
@@ -49,6 +51,7 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'runOwnerOperation',
       'decideReviewedWith',
       'initOwnerWith',
+      'addAgentWith',
       'ttyOwnerTerminal',
       'openAgentStoreWith',
       'createAgentStoreCipher',
