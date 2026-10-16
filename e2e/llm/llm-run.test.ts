@@ -42,6 +42,7 @@ import {
 import {
   claudeHarness,
   codexHarness,
+  firstSubstantiveCall,
   type Harness,
   type HarnessLimits,
   type HarnessRun,
@@ -439,7 +440,7 @@ describe.skipIf(!enabled)('M1-13a e2e (LLM): Claude Code and Codex pair and mess
         b,
         "Good morning. Let us start today's session.",
         (run, notes) => {
-          const statusFirst = run.calls[0]?.name === 'agentlink_status';
+          const statusFirst = firstSubstantiveCall(run)?.name === 'agentlink_status';
           const noInbox = !called(run, 'agentlink_inbox');
           const noText = !run.finalText.includes(token);
           if (!statusFirst) notes.push('agentlink_status was not the first call');
