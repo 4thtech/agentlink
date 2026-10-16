@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ZONES } from './policy.mjs';
 import {
+  bundledRuntimeOf,
   checkManifest,
   checkSource,
   findCycle,
@@ -324,5 +325,119 @@ describe('listSourceFilesIn', () => {
   it('fails closed when zones nest', () => {
     const a = join(ROOT, 'packages/a');
     expect(() => listSourceFilesIn(ROOT, [a, join(a, 'b')])).toThrow(/nest/);
+  });
+});
+
+// OPS-REL-1: the published CLI bundles the @agentlink/* workspace packages into one file, so it
+// re-declares their third-party runtime dependencies (exact same spec) as its own `dependencies`.
+// Only a zone with `bundles: true` may do that; its own source imports stay checked as before.
+describe('bundled workspace packages (policy `bundles`, OPS-REL-1)', () => {
+  const cli = { name: '@4thtech/agentlink' };
+  const manifests = {
+    '@agentlink/crypto': {
+      name: '@agentlink/crypto',
+      dependencies: { '@noble/hashes': '2.4.0', '@hpke/core': '1.9.0' },
+    },
+    '@agentlink/node': {
+      name: '@agentlink/node',
+      dependencies: { '@agentlink/crypto': 'workspace:*', ws: '8.22.0' },
+      devDependencies: { vitest: '4.1.11' },
+    },
+    '@agentlink/types': { name: '@agentlink/types', dependencies: { zod: '4.6.7' } },
+  };
+  const cliManifest = (dependencies) => ({
+    ...cli,
+    dependencies,
+    devDependencies: { '@agentlink/node': 'workspace:*' },
+  });
+
+  it('only apps/cli bundles', () => {
+    const bundling = Object.entries(ZONES)
+      .filter(([, policy]) => policy.bundles === true)
+      .map(([zone]) => zone);
+    expect(bundling).toEqual(['apps/cli']);
+  });
+
+  it('collects the runtime dependencies of the bundled workspace packages, transitively', () => {
+    const { runtime, problems } = bundledRuntimeOf(cliManifest({}), manifests);
+    expect(problems).toEqual([]);
+    expect(Object.fromEntries(runtime)).toEqual({
+      '@noble/hashes': '2.4.0',
+      '@hpke/core': '1.9.0',
+      ws: '8.22.0',
+    });
+  });
+
+  it('reports two bundled packages that declare one dependency with different specs', () => {
+    const { problems } = bundledRuntimeOf(
+      {
+        ...cli,
+        devDependencies: { '@agentlink/node': 'workspace:*', '@agentlink/x': 'workspace:*' },
+      },
+      { ...manifests, '@agentlink/x': { name: '@agentlink/x', dependencies: { ws: '8.21.0' } } },
+    );
+    expect(problems).toEqual([expect.stringContaining('ws')]);
+  });
+
+  it('accepts a re-declared runtime dependency of a bundled package with the same exact spec', () => {
+    const { runtime } = bundledRuntimeOf(cliManifest({}), manifests);
+    expect(
+      checkManifest(
+        'apps/cli',
+        cliManifest({
+          '@noble/hashes': '2.4.0',
+          ws: '8.22.0',
+          '@modelcontextprotocol/sdk': '1.32.1',
+        }),
+        { bundledRuntime: runtime },
+      ),
+    ).toEqual([]);
+  });
+
+  it('rejects a re-declared dependency whose spec differs from the bundled package', () => {
+    const { runtime } = bundledRuntimeOf(cliManifest({}), manifests);
+    const problems = checkManifest('apps/cli', cliManifest({ '@noble/hashes': '^2.4.0' }), {
+      bundledRuntime: runtime,
+    });
+    expect(problems).toEqual([expect.stringContaining('@noble/* may be imported only in')]);
+  });
+
+  it('rejects a primitive library that no bundled package declares', () => {
+    const { runtime } = bundledRuntimeOf(cliManifest({}), manifests);
+    const problems = checkManifest('apps/cli', cliManifest({ '@noble/curves': '2.4.0' }), {
+      bundledRuntime: runtime,
+    });
+    expect(problems).toEqual([expect.stringContaining('@noble/* may be imported only in')]);
+  });
+
+  it('keeps the library ban for re-declared dependencies in devDependencies', () => {
+    const { runtime } = bundledRuntimeOf(cliManifest({}), manifests);
+    const problems = checkManifest(
+      'apps/cli',
+      { ...cli, devDependencies: { '@noble/hashes': '2.4.0' } },
+      { bundledRuntime: runtime },
+    );
+    expect(problems).toEqual([expect.stringContaining('@noble/* may be imported only in')]);
+  });
+
+  it('rejects a workspace package at runtime in a bundling zone (it is bundled, not installed)', () => {
+    const problems = checkManifest('apps/cli', {
+      ...cli,
+      dependencies: { '@agentlink/core': 'workspace:*' },
+    });
+    expect(problems).toEqual([expect.stringContaining('bundled')]);
+  });
+
+  it('ignores bundledRuntime in a zone that does not bundle', () => {
+    const problems = checkManifest(
+      'packages/core',
+      { name: '@agentlink/core', dependencies: { '@noble/hashes': '2.4.0' } },
+      { bundledRuntime: new Map([['@noble/hashes', '2.4.0']]) },
+    );
+    expect(problems).toEqual([expect.stringContaining('@noble/* may be imported only in')]);
+  });
+
+  it('still refuses a primitive-library import in the bundling zone source', () => {
+    expect(src('apps/cli', `import { sha256 } from '@noble/hashes/sha2.js';`)).toHaveLength(1);
   });
 });

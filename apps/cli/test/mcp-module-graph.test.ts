@@ -2,7 +2,7 @@
 // crypto-capable packages outside the AGENTS.md crypto allowlist (jose, pkce-challenge, express's
 // cookie-signature and etag, hono's JWT and crypto helpers), all for the SDK's HTTP and OAuth
 // transports. None may load on our stdio path. This test runs the real CLI from source in a child
-// process (no build), starts `agentlink mcp`, does `initialize`, `tools/list` and a `tools/call`
+// process, starts `agentlink mcp`, does `initialize`, `tools/list` and a `tools/call`
 // over stdio, closes stdin, and checks every module that was loaded (ESM resolve trace plus the
 // CommonJS require cache):
 //
@@ -11,15 +11,30 @@
 //   transitive packages named above;
 // - every SDK file loaded is in SDK_FILES, an explicit allowlist of SDK subpaths. A new SDK version
 //   that pulls auth or HTTP code into the stdio path fails here until it is reviewed.
+//
+// It runs twice (OPS-REL-1): from source (no build), and against the published bundle
+// dist/agentlink.js (built by `pnpm build`), where the SDK stays an external dependency.
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 
-const cli = fileURLToPath(new URL('../src/cli.ts', import.meta.url));
+/** The two ways the CLI runs: from source, and as the published bundle (OPS-REL-1). */
+const TARGETS = [
+  {
+    label: 'from source',
+    args: ['--experimental-transform-types', '--no-warnings'],
+    entry: fileURLToPath(new URL('../src/cli.ts', import.meta.url)),
+  },
+  {
+    label: 'as the published bundle (dist/agentlink.js)',
+    args: ['--no-warnings'],
+    entry: fileURLToPath(new URL('../dist/agentlink.js', import.meta.url)),
+  },
+] as const;
 const hooks = new URL('./fixtures/module-trace-hooks.mjs', import.meta.url).href;
 const sdkPackage = JSON.parse(
   readFileSync(
@@ -68,11 +83,16 @@ interface RunResult {
   readonly code: number | null;
 }
 
-function runMcp(): Promise<RunResult> {
-  const traceFile = join(home, 'trace.txt');
+function runMcp(target: (typeof TARGETS)[number], traceName: string): Promise<RunResult> {
+  if (!existsSync(target.entry)) {
+    throw new Error(
+      `${target.entry} is missing: run \`pnpm build\` first (CI builds before tests).`,
+    );
+  }
+  const traceFile = join(home, traceName);
   const child = spawn(
     process.execPath,
-    ['--experimental-transform-types', '--no-warnings', '--experimental-loader', hooks, cli, 'mcp'],
+    [...target.args, '--experimental-loader', hooks, target.entry, 'mcp'],
     {
       // An empty home: no agent is set up, so every tool answers needs_setup.
       env: {
@@ -150,35 +170,38 @@ function packageOf(url: string): string | undefined {
   return first?.startsWith('@') === true ? `${first}/${second}` : first;
 }
 
-describe('agentlink mcp loads no SDK HTTP, OAuth or crypto code on the stdio path (IR-M1-9c-1 F02)', () => {
-  let run: RunResult;
+describe.each(TARGETS.map((target, index) => ({ target, index, label: target.label })))(
+  'agentlink mcp $label loads no SDK HTTP, OAuth or crypto code on the stdio path (IR-M1-9c-1 F02)',
+  ({ target, index }) => {
+    let run: RunResult;
 
-  it('starts, answers initialize, tools/list and tools/call over stdio, and exits on stdin close', async () => {
-    run = await runMcp();
-    expect(run.code).toBe(0);
-    const byId = new Map(run.responses.map((r) => [r.id, r.result]));
-    expect(byId.get(1)).toHaveProperty('instructions');
-    expect((byId.get(2)?.['tools'] as unknown[]).length).toBe(9);
-    expect(byId.get(3)?.['structuredContent']).toMatchObject({ status: 'needs_setup' });
-  }, 60_000);
+    it('starts, answers initialize, tools/list and tools/call over stdio, and exits on stdin close', async () => {
+      run = await runMcp(target, `trace-${index}.txt`);
+      expect(run.code).toBe(0);
+      const byId = new Map(run.responses.map((r) => [r.id, r.result]));
+      expect(byId.get(1)).toHaveProperty('instructions');
+      expect((byId.get(2)?.['tools'] as unknown[]).length).toBe(9);
+      expect(byId.get(3)?.['structuredContent']).toMatchObject({ status: 'needs_setup' });
+    }, 60_000);
 
-  it('traced the SDK and the CommonJS loads (the trace works)', () => {
-    expect(run.loaded.some((url) => packageOf(url) === '@modelcontextprotocol/sdk')).toBe(true);
-    // ajv's own files are CommonJS requires: only the NODE_DEBUG trace sees them.
-    expect(run.loaded.some((url) => url.includes('/ajv/dist/compile/'))).toBe(true);
-  });
+    it('traced the SDK and the CommonJS loads (the trace works)', () => {
+      expect(run.loaded.some((url) => packageOf(url) === '@modelcontextprotocol/sdk')).toBe(true);
+      // ajv's own files are CommonJS requires: only the NODE_DEBUG trace sees them.
+      expect(run.loaded.some((url) => url.includes('/ajv/dist/compile/'))).toBe(true);
+    });
 
-  it('loads no banned package', () => {
-    expect(BANNED).toContain('jose');
-    expect(BANNED).toContain('express');
-    const banned = run.loaded.filter((url) => BANNED.includes(packageOf(url) ?? ''));
-    expect(banned).toEqual([]);
-  });
+    it('loads no banned package', () => {
+      expect(BANNED).toContain('jose');
+      expect(BANNED).toContain('express');
+      const banned = run.loaded.filter((url) => BANNED.includes(packageOf(url) ?? ''));
+      expect(banned).toEqual([]);
+    });
 
-  it('loads only allowlisted SDK files', () => {
-    const sdk = run.loaded
-      .filter((url) => packageOf(url) === '@modelcontextprotocol/sdk')
-      .map((url) => decodeURIComponent(url).replace(/\\/g, '/').split('/dist/esm/')[1] ?? url);
-    expect(sdk.filter((file) => !SDK_FILES.includes(file))).toEqual([]);
-  });
-});
+    it('loads only allowlisted SDK files', () => {
+      const sdk = run.loaded
+        .filter((url) => packageOf(url) === '@modelcontextprotocol/sdk')
+        .map((url) => decodeURIComponent(url).replace(/\\/g, '/').split('/dist/esm/')[1] ?? url);
+      expect(sdk.filter((file) => !SDK_FILES.includes(file))).toEqual([]);
+    });
+  },
+);
