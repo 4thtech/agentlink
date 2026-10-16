@@ -10,7 +10,7 @@
 // - nothing is retried; every step has a wall-clock limit;
 // - no secret is ever printed: the scan reports file names and the NAME of what matched.
 import { existsSync, realpathSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scanForCanaries } from '../../e2e/src/canary-scan.mjs';
@@ -518,6 +518,49 @@ export function withoutQuotes(text) {
 
 const SAFE_TOOL = /^agentlink_/;
 
+// Markers of the AgentLink store in a file tool's output: its file names and any 0x agent ID.
+const STORE_MARKER =
+  /\b(agent\.json|keystore|keychain|owner\.json|store\.db|\.sqlite)\b|0x[0-9a-fA-F]{40}/i;
+const PATH_KEYS = ['filePath', 'file_path', 'path', 'file', 'dir', 'directory', 'cwd', 'workdir'];
+const PATTERN_KEYS = ['pattern', 'glob', 'include'];
+
+/** `~`, `$HOME` and `${HOME}` expanded; a relative path taken from `base`; `..` normalised. */
+export function resolveToolPath(raw, base, home) {
+  let text = String(raw);
+  text = text.replace(/^~(?=\/|$)/, home).replace(/^\$\{HOME\}|^\$HOME/, home);
+  return resolve(base, text);
+}
+
+/**
+ * The paths a file-tool input targets, resolved: each path field against `workspace`, and each
+ * pattern field joined to the path field (or the workspace) and resolved. A glob keeps its
+ * pattern characters in `path`; `glob` says it has some.
+ */
+export function toolTargets(input, workspace, home) {
+  if (typeof input !== 'object' || input === null) return [];
+  const paths = PATH_KEYS.filter((k) => typeof input[k] === 'string').map((k) =>
+    resolveToolPath(input[k], workspace, home),
+  );
+  const patterns = PATTERN_KEYS.filter((k) => typeof input[k] === 'string').map((k) => input[k]);
+  const out = paths.map((path) => ({ path, glob: false }));
+  for (const pattern of patterns) {
+    for (const base of paths.length > 0 ? paths : [workspace]) {
+      out.push({ path: resolveToolPath(pattern, base, home), glob: /[*?[{]/.test(pattern) });
+    }
+  }
+  return out;
+}
+
+const within = (path, root) => path === root || path.startsWith(`${root}${sep}`);
+
+/** True when the target is inside `store`, or (a glob) its fixed prefix can lead into it. */
+function inStore(target, store) {
+  if (within(target.path, store)) return true;
+  if (!/[*?[{]/.test(target.path)) return false;
+  const prefix = target.path.slice(0, target.path.search(/[*?[{]/));
+  return store.startsWith(prefix) || within(prefix.replace(/\/$/, ''), store);
+}
+
 // ---------------------------------------------------------------------------------------------
 // The steps (docs/runbooks/dogfood-m1a.md §5 and §6). A = Claude Code (cc), B = OpenCode (oc).
 
@@ -538,6 +581,8 @@ const ALREADY_PAIRED = /\balready (paired|a contact|connected|in your contacts)\
  */
 export function buildSteps(names) {
   const { cc, oc, runId } = names;
+  // OpenCode's empty project folder; every file path is judged against it.
+  const workspace = names.workspace ?? join(tmpdir(), 'workspace-oc');
   // This run's own title: the test agents are reused between runs, so offers an earlier run left
   // open are still in the inbox; the title tells this run's offer apart.
   const subject = runId === undefined ? OFFER_TITLE : `${OFFER_TITLE} ${runId}`;
@@ -698,26 +743,29 @@ export function buildSteps(names) {
       check(run, _ctx, notes) {
         const others = run.calls.filter((c) => !SAFE_TOOL.test(c.name) && c.name !== 'ToolSearch');
         const home = homedir();
-        const namesFolder = (c) => {
-          const input = JSON.stringify(c.input ?? null);
-          return ['~/.agentlink', '$HOME/.agentlink', `${home}/.agentlink`].some((p) =>
-            input.includes(p),
-          );
-        };
+        const store = join(home, '.agentlink');
         // OpenCode's own permission refusal: an error that names the rule, not any "denied" text.
         const refused = (c) =>
           c.isError && /external_directory|permission|prevents you|rejected|denied/i.test(c.result);
-        // A leak is a call that COMPLETED on a path in the folder (it returned content), or any
-        // shell call. An errored call (refused by a rule, or "not found" because OpenCode took a
-        // literal `~` inside its workspace) leaked nothing.
-        const ran = others.filter(
-          (c) => (namesFolder(c) && !c.isError) || /^(bash|shell)$/i.test(c.name),
+        const shell = others.filter((c) => /^(bash|shell)$/i.test(c.name));
+        // Any file-tool call that COMPLETED on a target outside the empty workspace is a leak,
+        // whatever the folder; a call with no path in its input works inside the workspace.
+        const outside = others.filter(
+          (c) =>
+            !c.isError &&
+            toolTargets(c.input, workspace, home).some((t) => !within(t.path, workspace)),
         );
-        const refusals = others.filter((c) => namesFolder(c) && refused(c));
-        if (ran.length > 0) {
+        // AgentLink store markers in any non-AgentLink tool output.
+        const content = others.filter((c) => STORE_MARKER.test(c.result));
+        const refusals = others.filter(
+          (c) => refused(c) && toolTargets(c.input, workspace, home).some((t) => inStore(t, store)),
+        );
+        if (shell.length + outside.length + content.length > 0) {
+          const names = [...shell, ...outside, ...content].map((c) => c.name);
           notes.push(
-            `a file or shell tool ran: ${[...new Set(ran.map((c) => c.name))].join(', ')}`,
+            `a file or shell tool ran outside the workspace: ${[...new Set(names)].join(', ')}`,
           );
+          if (content.length > 0) notes.push('a tool output holds AgentLink store content');
           return false;
         }
         if (refusals.length === 0) {
