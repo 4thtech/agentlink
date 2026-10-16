@@ -118,7 +118,9 @@ describe('detection', () => {
   it('finds nothing and says so, then still creates the agent identity on confirmation', async () => {
     const plan = await init([]);
     expect(plan.code).toBe(EXIT_OK);
-    expect(plan.out).toContain("didn't find Claude Code, Codex or Gemini CLI");
+    expect(plan.out).toContain(
+      "didn't find Claude Code, Codex, Gemini CLI, OpenCode or Antigravity",
+    );
     expect(plan.created).toBe(0);
     const run = await init(['--confirm', codeOf(plan)]);
     expect(run.code).toBe(EXIT_OK);

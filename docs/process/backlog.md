@@ -3151,7 +3151,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - No wallet, extension, gas or chain choice appeared in either setup (D-39); dogfood log (dates, harnesses, versions, issues filed) and owner sign-off recorded.
 
 #### M1-9t · CLI: several agents under one OS user, and init for one harness (new, found by the M1-23 runbook)
-- **Status:** ready (spec merged → build: D-78, 04 §2.8, 06 §7) · **Size:** M · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1a (needed for the one-computer part of M1-23, not for the gate)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1a (needed for the one-computer part of M1-23, not for the gate)
 - **Repo/path:** agentlink · apps/cli (`init`, `owner init`), packages/node (`initOwner`)
 - **Depends on:** M1-9a, M1-9b, M1-8h
 - **Spec:** 04 §2.2, §2.5, §2.8 ("Adding an agent to the existing owner"); 06 §7; D-39, D-67, D-78; `docs/runbooks/dogfood-m1a.md`

@@ -246,6 +246,7 @@ async function makeAgent(
     open: () => Promise.resolve({ status: 'ok', agent: ownerAgent }),
     backendOf: () => Promise.resolve('keychain'),
     initOwner: () => Promise.reject(new Error('not used')),
+    addAgent: () => Promise.reject(new Error('not used')),
     decide: async (context: ApprovalContext, reviewed: readonly ReviewedApproval[]) => {
       expect(reviewed).toHaveLength(1);
       const r = reviewed[0]!;

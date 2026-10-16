@@ -1,22 +1,51 @@
-// The harnesses `init` configures in M1a: Claude Code, Codex and Gemini CLI (06 §7, D-73 (7)).
-// Each is a fixed table entry: where its config lives under the home folder, how to tell it is
-// installed, and how the `agentlink` MCP entry is added. Paths never come from input or from the
-// environment (CODEX_HOME and similar overrides are not followed: a variable the agent can set must
-// not move a write). The entry runs `npx -y @4thtech/agentlink mcp`, as 06 §7 shows for every
-// harness; a non-default agent adds `--agent <name>` (the name is checked against 06 §6 first).
-// Claude Desktop and the printed snippets for Antigravity, Cursor, VS Code, Windsurf and Cline are
-// not part of this card's M1a scope (M1-9a lists them; they follow in M1b).
+// The harnesses `init` configures: Claude Code, Codex and Gemini CLI (06 §7, D-73 (7)), and from
+// M1-9t OpenCode and Antigravity (D-78). Each is a fixed table entry: where its config lives under the
+// home folder, how to tell it is installed, and how the `agentlink` MCP entry is added. Paths never
+// come from the environment (CODEX_HOME and similar overrides are not followed: a variable the agent
+// can set must not move a write). The only path from input is `--config <path>`, for OpenCode and
+// Antigravity only, resolved and checked by resolveConfigTarget under the 06 §7 write rules. The entry
+// runs `npx -y @4thtech/agentlink mcp`, as 06 §7 shows for every harness; a non-default agent adds
+// `--agent <name>` (the name is checked against 06 §6 first). Claude Desktop and the printed snippets
+// for Cursor, VS Code, Windsurf and Cline follow in M1b.
 //
 // Nothing here puts a secret in a config: the entry holds the command and its arguments only.
-import { lstat, stat } from 'node:fs/promises';
-import { delimiter, isAbsolute, join } from 'node:path';
+import { lstat, realpath, stat } from 'node:fs/promises';
+import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { unifiedDiff } from './diff.js';
 import { HarnessError, type HarnessErrorCode } from './errors.js';
 import { readConfigFile, writeConfigFile, type ConfigFile, type FileOptions } from './files.js';
 import { addJsonMcpServer } from './json-config.js';
 import { addTomlMcpServer, agentlinkTable } from './toml-config.js';
 
-export type HarnessId = 'claude-code' | 'codex' | 'gemini-cli';
+export type HarnessId = 'claude-code' | 'codex' | 'gemini-cli' | 'opencode' | 'antigravity';
+
+/** The `--harness` values (06 §7, D-78): one harness id, or `none` for the identity only. */
+export const HARNESS_IDS: readonly HarnessId[] = Object.freeze([
+  'claude-code',
+  'codex',
+  'gemini-cli',
+  'opencode',
+  'antigravity',
+]);
+
+/** The harnesses whose config may be named with `--config <path>` (06 §7, D-78). */
+export const CONFIG_PATH_HARNESSES: readonly HarnessId[] = Object.freeze([
+  'opencode',
+  'antigravity',
+]);
+
+export const isHarnessId = (value: string): value is HarnessId =>
+  (HARNESS_IDS as readonly string[]).includes(value);
+
+/** A config file at a place the owner named with `--config`, already resolved and checked. */
+export interface ConfigTarget {
+  /** The real folder that holds the file (exists). */
+  readonly dir: string;
+  /** The file name (no separator). */
+  readonly name: string;
+  /** How the path is shown: under the home folder as `~/…`. */
+  readonly display: string;
+}
 
 export const PACKAGE_NAME = '@4thtech/agentlink';
 
@@ -28,9 +57,11 @@ export interface HarnessContext extends FileOptions {
   readonly agent?: string;
   /** Unix seconds, for the backup's name. */
   readonly now: number;
+  /** `--config`: the file to use instead of the harness's default (OpenCode and Antigravity only). */
+  readonly config?: ConfigTarget;
 }
 
-interface HarnessDef {
+export interface HarnessDef {
   readonly id: HarnessId;
   /** Fixed display name (never taken from a file). */
   readonly appName: string;
@@ -80,11 +111,91 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
     binary: 'gemini',
     edit: (text, args) => addJsonMcpServer(text, { command: 'npx', args: [...args] }),
   },
+  {
+    // https://opencode.ai/docs/mcp-servers/ (checked 2026-10-16): `mcp.<name>` with `type: "local"`,
+    // `command` as one array (program and arguments) and `enabled`.
+    id: 'opencode',
+    appName: 'OpenCode',
+    parts: ['.config', 'opencode', 'opencode.json'],
+    installedMarks: [['.config', 'opencode']],
+    binary: 'opencode',
+    edit: (text, args) =>
+      addJsonMcpServer(text, { type: 'local', command: ['npx', ...args], enabled: true }, 'mcp'),
+  },
+  {
+    // https://antigravity.google/docs/mcp (checked 2026-10-16): global `~/.gemini/config/mcp_config.json`,
+    // `mcpServers.<name>` with `command` and `args`. Older builds read another file: `--config`.
+    id: 'antigravity',
+    appName: 'Antigravity',
+    parts: ['.gemini', 'config', 'mcp_config.json'],
+    installedMarks: [
+      ['.gemini', 'antigravity'],
+      ['.gemini', 'config', 'mcp_config.json'],
+    ],
+    binary: 'antigravity',
+    edit: (text, args) => addJsonMcpServer(text, { command: 'npx', args: [...args] }),
+  },
 ]);
 
+/** The table entry for a harness id. */
+export function harnessById(id: HarnessId): HarnessDef {
+  const def = HARNESSES.find((h) => h.id === id);
+  if (def === undefined) throw new Error('unknown harness');
+  return def;
+}
+
 /** `~/.codex/config.toml`: how a config path is shown to the user. */
-export function displayPath(def: HarnessDef): string {
-  return `~/${def.parts.join('/')}`;
+export function displayPath(def: HarnessDef, config?: ConfigTarget): string {
+  return config === undefined ? `~/${def.parts.join('/')}` : config.display;
+}
+
+/**
+ * Resolves `--config <path>` under the 06 §7 harness-config write rules (D-78): the folder is
+ * resolved with `realpath` (links in folders followed) and must exist; the file must be a `.json`
+ * file; nothing under `~/.agentlink`, `~/.ssh`, `~/.gnupg` or the keychain folders. The final
+ * component is checked again when it is read and written (no link, a regular file with one name,
+ * O_NOFOLLOW; files.ts), and the write is atomic (a temporary file and a rename in the same folder).
+ * These checks stop accidents and redirection by inbound content or tool arguments; a same-user
+ * process can still swap a folder in between (TOCTOU, G-1). Throws `unsafe_path`.
+ */
+export async function resolveConfigTarget(home: string, typed: string): Promise<ConfigTarget> {
+  if (typed === '' || typed.includes('\0')) throw new HarnessError('unsafe_path');
+  const absolute = resolve(typed);
+  const name = basename(absolute);
+  if (!name.endsWith('.json') || name === '.json') throw new HarnessError('unsafe_path');
+  let dir: string;
+  let homeReal: string;
+  try {
+    dir = await realpath(dirname(absolute));
+    homeReal = await realpath(home);
+  } catch {
+    throw new HarnessError('unsafe_path');
+  }
+  if (
+    !(await stat(dir).then(
+      (info) => info.isDirectory(),
+      () => false,
+    ))
+  ) {
+    throw new HarnessError('unsafe_path');
+  }
+  const forbidden = [
+    ['.agentlink'],
+    ['.ssh'],
+    ['.gnupg'],
+    ['Library', 'Keychains'],
+    ['.local', 'share', 'keyrings'],
+  ].map((parts) => join(homeReal, ...parts));
+  for (const root of forbidden) {
+    if (dir === root || dir.startsWith(`${root}${sep}`)) throw new HarnessError('unsafe_path');
+  }
+  const path = join(dir, name);
+  const inHome = relative(homeReal, path);
+  const display =
+    inHome !== '' && !inHome.startsWith('..') && !isAbsolute(inHome)
+      ? `~/${inHome.split(sep).join('/')}`
+      : path;
+  return Object.freeze({ dir, name, display });
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -146,6 +257,16 @@ export type HarnessPlan =
   /** Refused with a reason (unsafe path, malformed file, form that cannot be edited exactly). */
   | { readonly status: 'blocked'; readonly def: HarnessDef; readonly reason: HarnessErrorCode };
 
+/** The folder and parts of the file to read and write: the default, or the `--config` target. */
+function where(def: HarnessDef, context: HarnessContext): [string, readonly string[]] {
+  const config = context.config;
+  if (config === undefined) return [context.home, def.parts];
+  if (!(CONFIG_PATH_HARNESSES as readonly string[]).includes(def.id)) {
+    throw new HarnessError('unsafe_path');
+  }
+  return [config.dir, [config.name]];
+}
+
 /** Reads the harness's config and works out the exact change, without writing anything. */
 export async function planHarness(def: HarnessDef, context: HarnessContext): Promise<HarnessPlan> {
   // CLAUDE_CONFIG_DIR moves Claude Code's files; a write to ~/.claude.json would report success on a
@@ -154,7 +275,7 @@ export async function planHarness(def: HarnessDef, context: HarnessContext): Pro
     return { status: 'blocked', def, reason: 'unsupported_format' };
   }
   try {
-    const before = await readConfigFile(context.home, def.parts, context);
+    const before = await readConfigFile(...where(def, context), context);
     const edit = def.edit(before.text, mcpArgs(context.agent));
     if (edit.status === 'present') return { status: 'present', def };
     if (edit.status === 'conflict') return { status: 'conflict', def };
@@ -163,7 +284,7 @@ export async function planHarness(def: HarnessDef, context: HarnessContext): Pro
       def,
       before,
       text: edit.text,
-      diff: unifiedDiff(before.text ?? '', edit.text, displayPath(def)),
+      diff: unifiedDiff(before.text ?? '', edit.text, displayPath(def, context.config)),
     };
   } catch (error) {
     if (error instanceof HarnessError) return { status: 'blocked', def, reason: error.code };
@@ -176,5 +297,6 @@ export async function applyHarness(
   plan: Extract<HarnessPlan, { status: 'change' }>,
   context: HarnessContext,
 ): Promise<{ backup: string | undefined }> {
-  return writeConfigFile(context.home, plan.def.parts, plan.before, plan.text, context);
+  const [base, parts] = where(plan.def, context);
+  return writeConfigFile(base, parts, plan.before, plan.text, context);
 }

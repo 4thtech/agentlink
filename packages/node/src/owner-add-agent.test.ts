@@ -366,7 +366,7 @@ describe('owner add-agent: one owner, many local agents (D-78; 04 §2.8)', () =>
     expect(keychain.items.has(OWNER_ACCOUNT)).toBe(true);
   });
 
-  it("an approval decided for one agent is refused by the other agent of the same owner", async () => {
+  it('an approval decided for one agent is refused by the other agent of the same owner', async () => {
     const alice = await initAgent('alice');
     const bob = await initAgent('bob');
     const { owner, code } = await ownerInit(alice);

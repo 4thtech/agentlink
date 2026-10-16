@@ -41,6 +41,17 @@ export const OWNER_TEXT = Object.freeze({
   cancelled: 'OK       Cancelled. Nothing more will be sent or recorded for it.',
   cancelFailed: "Problem  The cancel didn't go through. Nothing was changed.",
 
+  // Owner add-agent (M1-9t, D-78; 04 §2.8).
+  addAgentDone: 'OK       This agent can now pair. Restart the app that runs it.',
+  addAgentNoOwner:
+    "No agent on this computer has a card from an owner yet, so there is no owner to add this agent to. Run `agentlink owner init` yourself, in your own terminal, for your first agent. Don't let your AI run it or see the code it shows.",
+  addAgentUnknown:
+    'AgentLink is not set up for this agent on this machine yet. Run `agentlink init --agent <name>` yourself first, in your own terminal.',
+  addAgentHasCard:
+    'This agent already has a card from an owner. AgentLink never replaces a card. Nothing was changed.',
+  addAgentSeveralOwners:
+    "The agents on this computer name different owners, so AgentLink can't tell which one to use. Nothing was changed. Run `agentlink doctor` in your own terminal.",
+
   // Owner init.
   ownerUnknownAgent:
     'AgentLink is not set up for this agent on this machine yet. Run `agentlink init` yourself, in your own terminal.',

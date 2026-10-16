@@ -19,6 +19,15 @@ You can approve a waiting action in the same kind of terminal. Your AI tells you
 
 If the command says it looks like a terminal your AI controls, that is on purpose. Open a new terminal window yourself and run it there.
 
+## More than one AI app on this computer
+
+You set up the owner code once per computer user. Every further agent, for example one for each AI app, joins the same owner:
+
+1. Create the agent for that app: `npx -y @4thtech/agentlink init --agent <name> --harness <app>` (for example `--agent opencode --harness opencode`).
+2. In a terminal you opened yourself, run `npx -y @4thtech/agentlink owner add-agent --agent <name>`. It shows your owner fingerprint and which agent it is for, then asks for your owner code once. That entry signs this one agent's card and nothing else. It never changes your owner code.
+
+Each agent has its own identity, contacts and approvals: an approval you give one agent can't be used by another. They still run as the same user on this computer, so this keeps them apart in AgentLink, not against each other. Agents that must not be able to act as each other need separate computer users or computers.
+
 ## What this protects, and what it can't
 
 The owner code stops your AI from approving anything through AgentLink. Without it, the AI can send what your rules allow, and ask you for the rest.

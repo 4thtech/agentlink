@@ -1,6 +1,9 @@
-// `agentlink init [--agent <name>] [--confirm <code>]` (M1-9a; 06 §7, 07 §9.1, §9.4; D-39, D-54,
-// D-73 (7)): the agent's identity in the OS keychain and the `agentlink` MCP entry in each detected
-// harness (Claude Code, Codex, Gemini CLI).
+// `agentlink init [--agent <name>] [--harness <id|none>] [--config <path>] [--confirm <code>]` (M1-9a,
+// M1-9t; 06 §7, 07 §9.1, §9.4; D-39, D-54, D-73 (7), D-78): the agent's identity in the OS keychain
+// and the `agentlink` MCP entry in each detected harness (Claude Code, Codex, Gemini CLI, OpenCode,
+// Antigravity), or in the one named with `--harness` (`none`: the identity only). `--config` names the
+// OpenCode or Antigravity config file, checked under the 06 §7 write rules (resolveConfigTarget).
+// Declining every proposed change writes no harness config but keeps the identity (D-78).
 //
 // Nothing is written before the user has seen the exact diff of each config file and agreed:
 //
@@ -31,12 +34,19 @@ import {
   type CommandHandler,
 } from '../dispatch.js';
 import {
+  CONFIG_PATH_HARNESSES,
   HARNESS_MESSAGES,
   HarnessError,
   applyHarness,
   detectHarnesses,
+  displayPath,
+  harnessById,
+  isHarnessId,
   planHarness,
+  resolveConfigTarget,
+  type ConfigTarget,
   type HarnessContext,
+  type HarnessDef,
   type HarnessPlan,
 } from '../harness/index.js';
 import {
@@ -44,6 +54,7 @@ import {
   RUNTIME_MESSAGES,
   RuntimeError,
   isAgentName,
+  listAgentNames,
   readAgentConfig,
   writeAgentConfig,
 } from '../runtime/index.js';
@@ -99,12 +110,19 @@ export const INIT_TEXT = Object.freeze({
   present: 'OK       {appName} is already set up for AgentLink',
   conflict:
     '{appName} already has an entry named agentlink that is different, so AgentLink left it as it is. Nothing was changed there.',
-  rerun: 'Then run: agentlink init{agentFlag} --confirm {code}',
+  rerun: 'Then run: agentlink init{agentFlag}{harnessFlag}{configFlag} --confirm {code}',
   updated: 'OK       {appName} updated. Backup of the old file: {backup}',
   created: 'OK       {appName} set up',
   ownerStep:
     "One step left, and you must do it yourself: run `agentlink owner init` in your own terminal. Don't let your AI run it or see the code it shows. It's what stops any AI, including your own, from approving its own actions.",
-  noAppsHere: "Problem  AgentLink didn't find Claude Code, Codex or Gemini CLI on this computer.",
+  noAppsHere:
+    "Problem  AgentLink didn't find Claude Code, Codex, Gemini CLI, OpenCode or Antigravity on this computer.",
+  // D-78 (06 §7).
+  declinedKept:
+    'No app was changed. Your agent identity is kept. To set up one app later, run: agentlink init --harness <app>',
+  ownerStepAdd:
+    "One step left, and you must do it yourself: run `agentlink owner add-agent --agent {name}` in your own terminal, so this agent gets a card from your owner. Don't let your AI run it or see what you type.",
+  configPlace: '<the same path>',
 });
 
 const CODE_PATTERN = /^[0-9a-f]{4}-?[0-9a-f]{4}$/i;
@@ -112,14 +130,23 @@ const CODE_PATTERN = /^[0-9a-f]{4}-?[0-9a-f]{4}$/i;
 type ChangePlan = Extract<HarnessPlan, { status: 'change' }>;
 
 /** The code that binds `--confirm` to exactly the changes shown. */
+const hashText = (text: string): string => encodeHex(sha256(new TextEncoder().encode(text)));
+
 function confirmationCode(
   name: string,
   createIdentity: boolean,
+  target: string,
+  config: ConfigTarget | undefined,
   changes: readonly ChangePlan[],
 ): string {
+  // The target harness and the `--config` file are bound too, so a code shown for one harness or
+  // file never confirms another (D-78).
   const lines = [
-    `agentlink-init-v1 ${name} ${createIdentity ? 'new' : 'existing'}`,
-    ...changes.map((c) => `${c.def.id} ${encodeHex(sha256(new TextEncoder().encode(c.text)))}`),
+    `agentlink-init-v2 ${name} ${createIdentity ? 'new' : 'existing'} ${target}`,
+    `config ${config === undefined ? '-' : hashText(`${config.dir}\0${config.name}`)}`,
+    ...changes.map(
+      (c) => `${c.def.id} ${hashText(displayPath(c.def, config))} ${hashText(c.text)}`,
+    ),
   ];
   const digest = encodeHex(sha256(new TextEncoder().encode(lines.join('\n'))));
   return `${digest.slice(0, 4)}-${digest.slice(4, 8)}`;
@@ -131,12 +158,14 @@ function printPlan(
   context: CommandContext,
   plans: readonly HarnessPlan[],
   createIdentity: boolean,
+  listApps: boolean,
 ): void {
   const { output } = context;
-  if (plans.length > 0) {
+  // With `--harness <id|none>` the owner chose, and nothing was looked for.
+  if (listApps && plans.length > 0) {
     output.print(copy('cli.init.found', { count: plans.length }));
     for (const plan of plans) output.print(`  ${plan.def.appName}`);
-  } else {
+  } else if (listApps) {
     output.print(INIT_TEXT.noAppsHere);
   }
   if (createIdentity) output.print(INIT_TEXT.identity);
@@ -195,6 +224,30 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
       output.printError(INIT_TEXT.badCode);
       return EXIT_USAGE;
     }
+    // D-78 (06 §7): `--harness <id|none>`; `--config` only with OpenCode or Antigravity. The typed
+    // values are never echoed (I-5).
+    const harnessValue = parsed.values['harness'];
+    const configValue = parsed.values['config'];
+    if (
+      harnessValue !== undefined &&
+      (typeof harnessValue !== 'string' || (harnessValue !== 'none' && !isHarnessId(harnessValue)))
+    ) {
+      output.printError(DISPATCH_TEXT.badArguments);
+      return EXIT_USAGE;
+    }
+    if (
+      configValue !== undefined &&
+      (typeof configValue !== 'string' ||
+        typeof harnessValue !== 'string' ||
+        !(CONFIG_PATH_HARNESSES as readonly string[]).includes(harnessValue))
+    ) {
+      output.printError(DISPATCH_TEXT.badArguments);
+      return EXIT_USAGE;
+    }
+    const chosen: HarnessDef | undefined =
+      typeof harnessValue === 'string' && isHarnessId(harnessValue)
+        ? harnessById(harnessValue)
+        : undefined;
 
     // 07 §9.1, §9.4: no usable keychain is `needs_setup`; nothing is written.
     const selection = selectKeyStoreBackend(await deps.probeKeychain(), { fileOptIn: false });
@@ -203,6 +256,17 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
       output.printError(selection.message);
       if (selection.fix !== undefined) output.printError(selection.fix);
       return EXIT_FAILED;
+    }
+
+    let config: ConfigTarget | undefined;
+    if (typeof configValue === 'string' && chosen !== undefined) {
+      try {
+        config = await resolveConfigTarget(deps.home, configValue);
+      } catch (error) {
+        if (!(error instanceof HarnessError)) throw error;
+        output.printError(withApp(HARNESS_MESSAGES[error.code], chosen.appName));
+        return EXIT_FAILED;
+      }
     }
 
     const existing = await readAgentConfig(
@@ -219,27 +283,39 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
       ...(name === DEFAULT_AGENT_NAME ? {} : { agent: name }),
       now: deps.clock(),
       ...(deps.uid === undefined ? {} : { uid: deps.uid }),
+      ...(config === undefined ? {} : { config }),
     };
-    const detected = await detectHarnesses(harnessContext);
+    let targets: readonly HarnessDef[];
+    if (harnessValue === 'none') targets = [];
+    else if (chosen !== undefined) targets = [chosen];
+    else targets = await detectHarnesses(harnessContext);
+    const listApps = harnessValue === undefined;
     const plans: HarnessPlan[] = [];
-    for (const def of detected) plans.push(await planHarness(def, harnessContext));
+    for (const def of targets) plans.push(await planHarness(def, harnessContext));
     const changes = plans.filter((p): p is ChangePlan => p.status === 'change');
     const blocked = plans.some((p) => p.status === 'blocked');
 
-    const code = confirmationCode(name, needIdentity, changes);
+    const target = typeof harnessValue === 'string' ? harnessValue : '*';
+    const code = confirmationCode(name, needIdentity, target, config, changes);
     const interactive = checkOwnerTerminal(terminal).ok && confirmValue === undefined;
 
     if (!needIdentity && changes.length === 0) {
-      printPlan(context, plans, false);
+      printPlan(context, plans, false, listApps);
       output.print(INIT_TEXT.nothingToDo);
       return blocked ? EXIT_FAILED : EXIT_OK;
     }
 
+    // The one harness the owner named can't be changed safely: stop before any code or write.
+    if (chosen !== undefined && blocked) {
+      printPlan(context, plans, false, listApps);
+      return EXIT_FAILED;
+    }
+
     // Nothing has been written yet. Show everything first (D-39).
-    printPlan(context, plans, needIdentity);
+    printPlan(context, plans, needIdentity, listApps);
 
     let approved: readonly ChangePlan[];
-    let makeIdentity = needIdentity;
+    let declined = false;
     if (interactive) {
       const yes: ChangePlan[] = [];
       for (const change of changes) {
@@ -250,12 +326,9 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
         if (/^\s*y(es)?\s*$/i.test(answer)) yes.push(change);
       }
       approved = yes;
-      // The identity alone is created in a terminal the owner opened, when no app needs a change.
-      makeIdentity = needIdentity && (yes.length > 0 || changes.length === 0);
-      if (yes.length === 0 && changes.length > 0) {
-        output.print(copy('cli.init.cancelled'));
-        return blocked ? EXIT_FAILED : EXIT_OK;
-      }
+      // D-78 (06 §7): declining every app change never removes the identity; it is kept (or created,
+      // as shown above, in a terminal the owner opened).
+      declined = yes.length === 0 && changes.length > 0;
     } else if (confirmValue === undefined) {
       // Run by an agent: show the code and stop. Nothing is written.
       output.print('');
@@ -263,6 +336,9 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
       output.print(
         INIT_TEXT.rerun
           .replace('{agentFlag}', name === DEFAULT_AGENT_NAME ? '' : ` --agent ${name}`)
+          // Fixed values only: the checked harness id, never the typed --config path (I-5).
+          .replace('{harnessFlag}', typeof harnessValue === 'string' ? ` --harness ${target}` : '')
+          .replace('{configFlag}', config === undefined ? '' : ` --config ${INIT_TEXT.configPlace}`)
           .replace('{code}', code),
       );
       return blocked && changes.length === 0 && !needIdentity ? EXIT_FAILED : EXIT_OK;
@@ -276,7 +352,7 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
 
     // Write: identity first (an existing agent is reused), then each confirmed harness.
     let failed = blocked;
-    if (makeIdentity) {
+    if (needIdentity) {
       await createIdentity(deps, name);
       output.print(INIT_TEXT.identityDone);
     }
@@ -303,7 +379,20 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
       output.print(copy('cli.init.done'));
       for (const appName of applied) output.print(copy('cli.init.restart', { appName }));
     }
-    output.print(INIT_TEXT.ownerStep);
+    if (declined) output.print(INIT_TEXT.declinedKept);
+    // D-78: with another agent already on this computer, the owner adds this one to the existing
+    // owner instead of a second `owner init`. Names follow the 06 §6 pattern (nothing to sanitize).
+    let others: string[] = [];
+    try {
+      others = (
+        await listAgentNames(deps.home, deps.uid === undefined ? {} : { uid: deps.uid })
+      ).filter((n) => n !== name && isAgentName(n));
+    } catch {
+      // Only the hint depends on it.
+    }
+    output.print(
+      others.length > 0 ? INIT_TEXT.ownerStepAdd.replace('{name}', name) : INIT_TEXT.ownerStep,
+    );
     return failed ? EXIT_FAILED : EXIT_OK;
   };
 }

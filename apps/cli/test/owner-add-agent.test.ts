@@ -194,7 +194,11 @@ describe('agentlink owner add-agent (M1-9t, D-78)', () => {
   it('runs only at an interactive terminal with no AI-app marker (UX guard)', async () => {
     const m = await machine(['alice', 'bob']);
     const pipe: TerminalContext = { stdinIsTTY: false, stdoutIsTTY: false, env: {} };
-    const marked: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: { CLAUDECODE: '1' } };
+    const marked: TerminalContext = {
+      stdinIsTTY: true,
+      stdoutIsTTY: true,
+      env: { CLAUDECODE: '1' },
+    };
     expect(await m.run(['owner', 'add-agent', '--agent', 'bob'], pipe)).toBe(1);
     expect(await m.run(['owner', 'add-agent', '--agent', 'bob'], marked)).toBe(1);
     expect(m.calls).toHaveLength(0);

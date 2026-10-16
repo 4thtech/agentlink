@@ -73,13 +73,23 @@ const AGENT: Options = { agent: { type: 'string' } };
 export const COMMANDS: readonly CommandSpec[] = Object.freeze([
   {
     name: 'init',
-    usage: ['agentlink init [--agent <name>]'],
+    usage: ['agentlink init [--agent <name>] [--harness <id|none>] [--config <path>]'],
     guard: 'none',
-    options: { ...AGENT, confirm: { type: 'string' } },
+    options: {
+      ...AGENT,
+      confirm: { type: 'string' },
+      // D-78 (06 §7): one harness, or `none` for the identity only; `--config` for OpenCode or
+      // Antigravity only (checked in the handler).
+      harness: { type: 'string' },
+      config: { type: 'string' },
+    },
   },
   {
     name: 'owner',
-    usage: ['agentlink owner init                     †'],
+    usage: [
+      'agentlink owner init                     †',
+      'agentlink owner add-agent --agent <name>   †',
+    ],
     guard: 'owner',
     options: AGENT,
   },
