@@ -1,6 +1,6 @@
 {
   "name": "@agentlink/log",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Redacting structured logger and secret-canary test helper. Zero dependencies.",
   "license": "MIT",

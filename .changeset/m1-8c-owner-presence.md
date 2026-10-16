@@ -1,5 +1,0 @@
----
-'@agentlink/node': minor
----
-
-Add owner presence at a terminal prompt (M1-8c, D-67, D-68). `initOwner` creates the owner key on a keychain machine as the `agentlink`/`owner` keychain item in its locked `ALKO` form, under a generated owner code (or a chosen owner passphrase of at least 12 characters after an explicit opt-in), and never replaces an existing owner. `performOwnerOperation` signs one owner action or one piece of typed data, and `decideReviewedApprovals` signs reviewed approvals as one `approval.decide` or one `approval.decideBatch` (2 to 20 items, commitments never batched). Each asks for the owner code once at an interactive terminal, never from an environment variable, file, argument or pipe, and closes the owner session and wipes the code and the unlocked key when it returns. New error codes on `NodeKeyStoreError`: `owner_missing`, `owner_exists`, `owner_mismatch`, `owner_prompt_unavailable`, `owner_prompt_cancelled`, `owner_secret_refused`, `harness_detected` and `owner_operation_invalid`.

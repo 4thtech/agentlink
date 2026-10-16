@@ -1,6 +1,0 @@
----
-'@agentlink/types': minor
-'@agentlink/crypto': minor
----
-
-Add the `terms` schema of 04 §3.4 with the D-74 canonical form: every key always present (`price: null` when none), `parties` in ascending byte order, the character rule on a pinned UCD 15.0.0 table (`refusedCategory15`; Cc, Cf, Zl, Zp, Co, Cs and Cn refused, and NFC) with the Unicode 15 runtime probe (`isTermsRuntimeSupported`, `UNSUPPORTED_RUNTIME`), the D-74 size limits (`TERMS_LIMITS`), currencies by grammar or `USDC`/`USDT`/`XDAI`, and a checked `note`. `TermsInput` (`termsInputSchema`, `parseTermsInput`, `termsInputJsonSchema`, `termsFromInput`) and the pure negotiation-chain reducer (`receiveTerms`, `recordSentTerms`, `nextTermsLink`, `checkSendAccept`, `negotiationKey`, `EMPTY_NEGOTIATION`). In `@agentlink/crypto`: `termsHash` (sha256 of the JCS form, bare hex) and `verifyTermsHash`. **BREAKING:** `offer`, `accept` and `reject` bodies and the commitment approval context now require strict canonical `terms`, and the terms tools' approval `args.terms` must be a strict `TermsInput`; the body `note` is at most 500 code points of canonical text; `hasControlOrFormat` (summaries, `nextStep`) now uses the UCD 15.0.0 table; `isUtcTimestamp` moved from the proof module to the encodings module (same export name).
