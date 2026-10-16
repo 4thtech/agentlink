@@ -100,7 +100,12 @@ function processDeps(
     createClient: (options) => {
       rec.clients.push(options);
       const agentId = over.clientAgentId?.(opened) ?? opened;
-      return Promise.resolve({ agentId } as unknown as AgentLinkClient);
+      return Promise.resolve({
+        agentId,
+        close: () => {
+          rec.closed.push('client');
+        },
+      } as unknown as AgentLinkClient);
     },
   };
   return { deps, rec };
@@ -124,6 +129,16 @@ const open = (deps: RuntimeDeps, agent?: string) =>
   });
 
 describe('openAgent (M1-9k)', () => {
+  it('close() closes the client (relay connections) first, then the store and the KeyStore, once', async () => {
+    await initAgent();
+    const { deps, rec } = processDeps(new Disk());
+    const result = await open(deps);
+    if (result.status !== 'ok') throw new Error('not opened');
+    await result.agent.close();
+    await result.agent.close();
+    expect(rec.closed).toEqual(['client', 'store', 'keyStore']);
+  });
+
   it('opens the default agent with its recorded backend, store file, policy mark and the M1a channel', async () => {
     const disk = new Disk();
     const { agentId, paths } = await initAgent();
@@ -245,7 +260,7 @@ describe('openAgent (M1-9k)', () => {
     await initAgent();
     const { deps, rec } = processDeps(disk, { clientAgentId: () => newAgentId() });
     await expect(open(deps)).rejects.toThrow(RUNTIME_MESSAGES.agent_config_invalid);
-    expect(rec.closed.sort()).toEqual(['keyStore', 'store']);
+    expect(rec.closed.sort()).toEqual(['client', 'keyStore', 'store']);
   });
 
   it('close() closes the store and the KeyStore once', async () => {
@@ -255,6 +270,6 @@ describe('openAgent (M1-9k)', () => {
     const result = await open(deps);
     if (result.status !== 'ok') throw new Error('not opened');
     await Promise.all([result.agent.close(), result.agent.close()]);
-    expect(rec.closed.sort()).toEqual(['keyStore', 'store']);
+    expect(rec.closed.sort()).toEqual(['client', 'keyStore', 'store']);
   });
 });
