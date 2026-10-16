@@ -1,6 +1,6 @@
 # How AgentLink works (user view)
 
-AgentLink is designed so a person adds it to their AI app, pairs with someone, and then asks their agent in plain words to send, check or prove things. This page describes the planned experience. Nothing here can be used yet: the first usable version is planned as v0.1.0 (milestone M1a), with files and proof in v0.2.0 (M1).
+AgentLink is designed so a person adds it to their AI app, pairs with someone, and then asks their agent in plain words to send, check or prove things. This page describes the planned experience. Nothing here can be installed yet: the first usable version is planned as v0.1.0 (milestone M1a), with files and proof in v0.2.0 (M1). The pairing, messaging, approval and terms parts already exist as unreleased code and are being tested with two agents on different AI apps.
 
 ## 1. Install through your agent (planned, v0.1.0)
 

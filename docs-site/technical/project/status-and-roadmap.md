@@ -9,13 +9,13 @@
 <!-- status-summary:start -->
 **Phase:** M0 Foundations nearly complete, M1a (walking skeleton) in progress (pre-alpha). The repository [README](https://github.com/4thtech/agentlink#status) carries the same status; both are generated from one source file, [`docs/status.yaml`](https://github.com/4thtech/agentlink/blob/main/docs/status.yaml).
 
-**Not yet:** a usable product. The packages are private and nothing is published; only the crypto, types, transport, core, node and logging foundations listed here contain code. **There is nothing to install or run yet.** The design is described throughout and marked "planned" where it is not built.
+**Not yet:** a released product. The packages are private and nothing is published, so **there is nothing to install yet**. The code merged so far (the crypto, types, transport, core and node foundations, the `agentlink` CLI and the MCP server) can be built and tested from source, but no release exists and a new user cannot yet set it up end to end. Files, proof, credits, the owner console and the desktop apps are not built; the design is described throughout and marked "planned" where it is not built.
 
 **Testnet:** OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit; AgentLink does not use them yet. **Mainnet:** After the external audit (M3). Not deployed. **Services:** Submitter, faucet and encrypted drop are not built or deployed yet.
 
-**In progress:** The remaining M1a work: the neutral-platform bundle-check CI job (M1-9c-c), the remaining end-to-end scenarios, the dogfood and the M1a release. Next: file encryption and the remaining contract work.
+**In progress:** The remaining M1a work: the neutral-platform bundle-check CI job (M1-9c-c), several agents of one owner on one computer (M1-9t), the dogfood and the M1a release. Next: file encryption and the remaining contract work.
 
-**Next:** The rest of the M1a crypto and core layers, then the walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets.
+**Next:** Finish the M1a walking skeleton, where two agents on different harnesses pair, talk and negotiate terms (v0.1.0): the dogfood, then the release. Then M1b adds files, proof and credits on testnets.
 
 ### Components
 
@@ -28,6 +28,7 @@ Code that is merged is not necessarily published: nothing is released or install
 | M0 Foundations | Public documentation | Done | [#88](https://github.com/4thtech/agentlink/pull/88) |
 | M0 Foundations | Redacting logger (@agentlink/log) | Done | - |
 | M0 Foundations | Specifications and process | Done | - |
+| M0 Foundations | Dependency updates | Done | [#160](https://github.com/4thtech/agentlink/pull/160) |
 | M0 Foundations | CI follow-ups | In progress | - |
 | Crypto (@agentlink/crypto) | Encodings, hashing, JSON canonicalisation | Done | [#27](https://github.com/4thtech/agentlink/pull/27) |
 | Crypto (@agentlink/crypto) | Key derivation and public identities | Done | [#29](https://github.com/4thtech/agentlink/pull/29) |
@@ -68,7 +69,9 @@ Code that is merged is not necessarily published: nothing is released or install
 | Node runtime (@agentlink/node) | Passphrase-locked key file for headless machines | Planned | - |
 | MCP server, CLI and apps | MCP server and CLI | In progress | [#102](https://github.com/4thtech/agentlink/pull/102), [#103](https://github.com/4thtech/agentlink/pull/103), [#107](https://github.com/4thtech/agentlink/pull/107), [#111](https://github.com/4thtech/agentlink/pull/111), [#112](https://github.com/4thtech/agentlink/pull/112), [#113](https://github.com/4thtech/agentlink/pull/113), [#115](https://github.com/4thtech/agentlink/pull/115), [#125](https://github.com/4thtech/agentlink/pull/125), [#127](https://github.com/4thtech/agentlink/pull/127), [#131](https://github.com/4thtech/agentlink/pull/131), [#132](https://github.com/4thtech/agentlink/pull/132), [#135](https://github.com/4thtech/agentlink/pull/135), [#142](https://github.com/4thtech/agentlink/pull/142), [#143](https://github.com/4thtech/agentlink/pull/143) |
 | MCP server, CLI and apps | Agent skill file and quickstart guides | Done | [#151](https://github.com/4thtech/agentlink/pull/151), [#152](https://github.com/4thtech/agentlink/pull/152) |
-| MCP server, CLI and apps | End-to-end tests | In progress | [#155](https://github.com/4thtech/agentlink/pull/155), [#163](https://github.com/4thtech/agentlink/pull/163), [#165](https://github.com/4thtech/agentlink/pull/165) |
+| MCP server, CLI and apps | End-to-end tests | In progress | [#155](https://github.com/4thtech/agentlink/pull/155), [#163](https://github.com/4thtech/agentlink/pull/163), [#165](https://github.com/4thtech/agentlink/pull/165), [#166](https://github.com/4thtech/agentlink/pull/166), [#169](https://github.com/4thtech/agentlink/pull/169), [#171](https://github.com/4thtech/agentlink/pull/171) |
+| MCP server, CLI and apps | Multi-harness dogfood runbook | Done | [#168](https://github.com/4thtech/agentlink/pull/168) |
+| MCP server, CLI and apps | Several agents of one owner on one computer | Planned | - |
 | MCP server, CLI and apps | Local approval page | Planned | - |
 | MCP server, CLI and apps | Owner console, desktop apps, cloud agent | Planned | - |
 | OCC v2 contracts (private repo) | Notary and fee vault | Done | contracts#4 |

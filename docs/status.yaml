@@ -43,6 +43,10 @@ areas:
       - name: "Specifications and process"
         state: done
         summary: "The specifications (`docs/foundation`), including decisions D-53 to D-59 (D-55: dedicated terms tools, one approval per agreement, decided 14 Oct 2026), the development and audit process and a security policy."
+      - name: "Dependency updates"
+        state: done
+        prs: [160]
+        summary: "Renovate groups all non-runtime dev tooling into one weekly pull request, so tooling updates stop rebasing each other; runtime and security-critical updates stay separate and carry a threat note."
       - name: "CI follow-ups"
         state: in-progress
         summary: "A few CI follow-ups are still open."
@@ -219,15 +223,22 @@ areas:
       - name: "MCP server and CLI"
         state: in-progress
         prs: [102, 103, 107, 111, 112, 113, 115, 125, 127, 131, 132, 135, 142, 143]
-        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising), `init`, `invite`, `accept`, `contacts`, `status`, `doctor`, `requests` and the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) have landed, with the in-chat copy sheet. The MCP server over stdio (the frozen M1a tool list, the untrusted-content wrapper) and its tools have landed: status, contacts, get approval (real approval data, with the sender code of an unknown sender), invite, accept, send, inbox and the terms tools (propose, respond, and the owner's terms approval card in `approve`). A conformance and tool-surface guard test pins the tool list. A background loop in the running MCP server keeps one active publisher per agent through the publisher lease and, every 30 s, syncs the inbox and delivers queued messages, so a pairing completes without a tool call; live relay subscriptions replace the polling in M1b (M1-9s). The MCP server and CLI are not published yet"
+        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising), `init`, `invite`, `accept`, `contacts`, `status`, `doctor`, `requests` and the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) have landed, with the in-chat copy sheet. The MCP server over stdio (the frozen M1a tool list, the untrusted-content wrapper) and its tools have landed: status, contacts, get approval (real approval data, with the sender code of an unknown sender), invite, accept, send, inbox and the terms tools (propose, respond, and the owner's terms approval card in `approve`). A conformance and tool-surface guard test pins the tool list. A background loop in the running MCP server keeps one active publisher per agent through the publisher lease and, every 30 s, syncs the inbox and delivers queued messages, so a pairing completes without a tool call; live relay subscriptions replace the polling in M1b (M1-9s). The MCP server and CLI are not published yet."
       - name: "Agent skill file and quickstart guides"
         state: done
         prs: [151, 152]
         summary: "The agent skill file and AGENTS.md snippet for users' harnesses (M1-12a), and the get-started guides for Claude Code, Codex and Gemini CLI with the permission and approval-protection guidance (M1-12b). They describe the M1a install, which is not released yet."
       - name: "End-to-end tests"
         state: in-progress
-        prs: [155, 163, 165]
-        summary: "A scripted run drives two real `agentlink mcp` processes, pairing and messaging over local relays in CI (M1-13a). A variant with Claude Code and Codex as the two agents runs by manual dispatch only, with no schedule yet; its first runs found and fixed wording and approval-reuse gaps in `accept_invite`. Files, proof and agreements follow (M1-13c)."
+        prs: [155, 163, 165, 166, 169, 171]
+        summary: "A scripted run drives two real `agentlink mcp` processes, pairing and messaging over local relays in CI (M1-13a), and a second scenario has two agents negotiate terms over Talk with one owner approval (propose, counter, accept, the owner-signed auto-accept limit; M1-22). A variant with Claude Code and Codex as the two agents runs by manual dispatch only, with no schedule yet; its first runs found and fixed wording and approval-reuse gaps in `accept_invite` and the status summary. The negotiation steps of the live-agent variant have not run yet. Files, proof and agreements with proof follow (M1-13c)."
+      - name: "Multi-harness dogfood runbook"
+        state: done
+        prs: [168]
+        summary: "A numbered guide for the M1a dogfood across Claude Code, Antigravity and OpenCode, on one or two computers and between Tali and Denis (M1-23, RB-17). The dogfood itself is still to run."
+      - name: "Several agents of one owner on one computer"
+        state: planned
+        summary: "One owner key shared by several local agents, each on its own harness (M1-9t, needed for the one-computer part of the dogfood). The specification is in review; nothing is built yet."
       - name: "Local approval page"
         state: planned
         summary: "A small page on 127.0.0.1 for owner approvals and settings (M1b)."
@@ -276,9 +287,9 @@ deploy:
     note: "Submitter, faucet and encrypted drop are not built or deployed yet."
 
 # Prose for the README Status block and the docs-site page.
-inProgress: "The remaining M1a work: the neutral-platform bundle-check CI job (M1-9c-c), the remaining end-to-end scenarios, the dogfood and the M1a release. Next: file encryption and the remaining contract work."
-notYet: "a usable product. The packages are private and nothing is published; only the crypto, types, transport, core, node and logging foundations listed here contain code. **There is nothing to install or run yet.** The design is described throughout and marked \"planned\" where it is not built."
-next: "The rest of the M1a crypto and core layers, then the walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets."
+inProgress: "The remaining M1a work: the neutral-platform bundle-check CI job (M1-9c-c), several agents of one owner on one computer (M1-9t), the dogfood and the M1a release. Next: file encryption and the remaining contract work."
+notYet: "a released product. The packages are private and nothing is published, so **there is nothing to install yet**. The code merged so far (the crypto, types, transport, core and node foundations, the `agentlink` CLI and the MCP server) can be built and tested from source, but no release exists and a new user cannot yet set it up end to end. Files, proof, credits, the owner console and the desktop apps are not built; the design is described throughout and marked \"planned\" where it is not built."
+next: "Finish the M1a walking skeleton, where two agents on different harnesses pair, talk and negotiate terms (v0.1.0): the dogfood, then the release. Then M1b adds files, proof and credits on testnets."
 
 # Milestones. state: done | in-progress | planned. `gate` is the README wording, `outcome` the
 # docs-site wording, `progress` an optional README note on what is done so far.
@@ -300,7 +311,7 @@ roadmap:
     duration: "~2–3 weeks"
     outcome: "Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals"
     gate: "Two developers' agents (Claude Code and Codex) pair and keep a shared project in sync over AgentLink, and negotiate terms with owner approval."
-    progress: "Crypto foundations, the transport (gift wrap, relays, sync), the core (envelopes, pairing, owner-signed actions and policies, approvals, requests from unknown senders, the send pipeline, inbox sync, the commitments policy), the terms schema, the node keychain, database and relay connection, the CLI runtime with its everyday and owner commands, the default relay set, the MCP server with its tools (read-only, invite, send, inbox, terms) and its background loop, the agent skill file and quickstart guides, and the two-agent end-to-end test (the Claude Code and Codex variant by manual dispatch) are merged. The neutral-platform bundle-check, the remaining end-to-end scenarios, the dogfood and the release are next. M1a is not released."
+    progress: "Crypto foundations, the transport (gift wrap, relays, sync), the core (envelopes, pairing, owner-signed actions and policies, approvals, requests from unknown senders, the send pipeline, inbox sync, the commitments policy), the terms schema, the node keychain, database and relay connection, the CLI runtime with its everyday and owner commands, the default relay set, the MCP server with its tools (read-only, invite, send, inbox, terms) and its background loop, the agent skill file and quickstart guides, the two-agent end-to-end tests (pair and talk, and negotiate terms; the Claude Code and Codex variant by manual dispatch), and the dogfood runbook are merged. The neutral-platform bundle-check, several agents of one owner on one computer, the dogfood and the release are next. M1a is not released."
   - id: "M1b"
     name: "Files, proof, credits"
     state: planned

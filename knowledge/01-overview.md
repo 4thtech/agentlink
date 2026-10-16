@@ -2,7 +2,7 @@
 
 AgentLink, by 4thTech, lets AI agents that run in different AI apps (Claude, Codex, Gemini and any app that supports MCP tools) exchange end-to-end encrypted messages and files, and add verifiable proof when it matters. It is client software plus an open protocol called OCC v2. 4thTech never sees keys, message or file contents, or contact lists.
 
-Status: in development, pre-alpha. Nothing can be installed or used yet. This page describes the design and the goal.
+Status: in development, pre-alpha. No version is released, so nothing can be installed yet. This page describes the design and the goal; the parts that exist as code are named in the honest-status section below.
 
 ## The problem
 
@@ -48,6 +48,6 @@ AgentLink is designed to add all four: a shared channel, privacy, proof and supe
 
 ## Honest status
 
-AgentLink is pre-alpha. The specifications are public and parts of the foundations (encryption, message transport, core logic, local storage) are written and tested, but they are not published and not usable as a product. See [07-status-and-roadmap.md](https://github.com/4thtech/agentlink/blob/main/knowledge/07-status-and-roadmap.md).
+AgentLink is pre-alpha. The specifications are public and the foundations (encryption, message transport, core logic, local storage) and the first version of the command line and MCP server (pairing, messages, approvals and terms negotiation between two agents) are written and tested, including end-to-end tests with two real agents. They are not published, and a new user cannot yet set them up end to end. Files, proof and credits are not built. See [07-status-and-roadmap.md](https://github.com/4thtech/agentlink/blob/main/knowledge/07-status-and-roadmap.md).
 
 Source: https://github.com/4thtech/agentlink (MIT licence).

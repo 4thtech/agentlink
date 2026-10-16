@@ -20,22 +20,22 @@ flowchart LR
 
 ## Packages and apps
 
-| Name | Role | Status (15 Oct 2026) |
+| Name | Role | Status (16 Oct 2026) |
 |---|---|---|
 | `@agentlink/crypto` | Key derivation, HPKE key wrapping, AES-256-GCM, signatures, hashing, key-store interfaces | Merged in the repository, not published; file encryption still to come |
 | `@agentlink/types` | Shared schemas for policies, approvals, proof packs and tool results | Merged, not published |
-| `@agentlink/transport-nostr` | Gift wrap and unwrap, relay pool, delivery outbox, inbox sync | Merged, not published |
-| `@agentlink/core` | Identity, signed agent card, contacts, envelopes, invites and pairing, owner-signed actions and policies | Merged, not published |
+| `@agentlink/transport-nostr` | Gift wrap and unwrap, relay pool, delivery outbox, inbox sync, the default relay set | Merged, not published |
+| `@agentlink/core` | Identity, signed agent card, contacts, envelopes, invites and pairing, owner-signed actions and policies, approvals, the send pipeline, inbox, terms negotiation | Merged, not published |
 | `@agentlink/node` | OS-keychain key store, local SQLite database, relay connection | Merged, not published |
-| MCP server and `agentlink` command line | The tools an AI app calls | Planned (M1a) |
+| MCP server and `agentlink` command line (`apps/cli`) | The tools an AI app calls, and the owner commands typed in a terminal | Merged for M1a (nine tools for status, invites, contacts, send, inbox, terms and approvals), not published; an agent skill file and quickstart guides exist |
 | Storage and chain client | Encrypted drop and own-storage adapters; proof client | Planned (M1b) |
 | Desktop apps, owner console, cloud agent | Native approvals and dashboard; web supervision; always-on agent in the user's own Cloudflare account | Planned (M2) |
 
-None of these is user-runnable yet. Package names may still change before the first release.
+None of these is released, so nothing is user-runnable for a new user yet. Package names may still change before the first release. End-to-end tests drive two real MCP server processes over local relays in CI.
 
 ## MCP server
 
-AI apps talk to AgentLink through one MCP (Model Context Protocol) server that runs locally over standard input and output, or later as a remote endpoint in the user's own cloud account. The set of tools is the same everywhere. No tool can change rules, export keys, add storage credentials or bypass approvals; those are owner-only operations that need the owner's presence and signature. Content from other agents is wrapped as untrusted data in every tool result.
+AI apps talk to AgentLink through one MCP (Model Context Protocol) server that runs locally over standard input and output, or later as a remote endpoint in the user's own cloud account. The set of tools is the same everywhere. No tool can change rules, export keys, add storage credentials or bypass approvals; those are owner-only operations that need the owner's presence and signature. Content from other agents is wrapped as untrusted data in every tool result. While the server runs, a background loop (one active publisher per agent, using a lease in the local store) syncs the inbox and delivers queued messages about every 30 seconds, so pairing completes without a tool call. A committed snapshot of the tool list is checked in CI, so the tool surface cannot change unnoticed.
 
 ## Transport: Nostr
 
@@ -62,4 +62,4 @@ A submitter (sends signed proof records and pays network fees, recovered from th
 
 ## Packagings
 
-Local `npx` package with keys in the OS keychain (M1); desktop apps with OS-biometric approvals (M2); self-hosted cloud agent with a remote MCP endpoint (M2); hosted approval-mode MCP (M4, after design review).
+Local `npx` package with keys in the OS keychain (M1a, in development); desktop apps with OS-biometric approvals (M2); self-hosted cloud agent with a remote MCP endpoint (M2); hosted approval-mode MCP (M4, after design review).
