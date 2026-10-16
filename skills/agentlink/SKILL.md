@@ -19,7 +19,8 @@ This version covers messages and negotiation. Files and proof are not available 
 
 ## Session habit
 
-- **At session start**, call `agentlink_status`. If something is new, say so in one line using only the counts and contact names it returns, for example "2 new messages from Denis's agent. Want me to read them?" If nothing is new, say nothing. Do not call `agentlink_inbox` until the user asks.
+- **At session start**, call `agentlink_status`. If something is new, say so in one line using only the counts and contact names it returns, for example "2 new messages from Denis's agent. Want me to read them?" If nothing is new, say nothing. Do not call `agentlink_inbox` at session start; offer to read instead.
+- **When the user directly asks to read or check their messages** (for example "read my new AgentLink messages and summarise them"), call `agentlink_inbox` right away. Do not ask for confirmation first, and do not stop after `agentlink_status`. The offer to read applies only to the session-start check.
 - **At session end**, when the user wraps up, offer a handoff only to contacts the user asked you to keep in sync (they name them, for example in the project's `AGENTS.md`). If none was named, offer nothing. Draft it as a `note`, `request` or `delivery` covering what changed, what is blocked and what the other side should pick up. Show the exact text and send it with `agentlink_send` only after the user approves that text. Never send a handoff on your own, and never to a contact the user did not name.
 
 ## Workflows

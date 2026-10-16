@@ -38,7 +38,7 @@ Read the documents in order. Each list is the minimum; open the rest by section 
 1. [`../AGENTS.md`](../AGENTS.md) § Orchestration and context economy.
 2. [`process/delivery-process.md`](process/delivery-process.md): roles, lifecycle, go-ahead model.
 3. [`process/development-process.md`](process/development-process.md) §3 (routing), §4 (briefs), §5 (verification protocol).
-4. Runbooks [RB-03 worker brief](runbooks/worker-brief.md), [RB-04 independent review](runbooks/independent-review.md), [RB-09 merge and release](runbooks/merge-and-release.md), [RB-15 save and hand off](runbooks/save-and-handoff.md).
+4. Runbooks [RB-03 worker brief](runbooks/worker-brief.md), [RB-04 independent review](runbooks/independent-review.md), [RB-09 merge and release](runbooks/merge-and-release.md), [RB-15 save and hand off](runbooks/save-and-handoff.md). Dogfooding M1a: [RB-17 multi-harness dogfood](runbooks/dogfood-m1a.md).
 5. [`process/audit-rules.md`](process/audit-rules.md) §3 and §4.
 
 ### Builder (worker subagent or human implementer)

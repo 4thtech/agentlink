@@ -24,6 +24,7 @@ Private procedures (incident response, secret rotation, deploy keys, Safe operat
 | RB-14 | [When a permission or safety check denies an action](permission-denied.md) | Any agent | Any |
 | RB-15 | [Saving context and handing off a session](save-and-handoff.md) | Orchestrator | Opus |
 | RB-16 | [Vetting the default relay set](relay-vetting.md) | Orchestrator or builder | Sonnet or above |
+| RB-17 | [M1a dogfood: agents of several harnesses](dogfood-m1a.md) | Owner (Tali) and Denis, with their agents | Owner |
 
 ## Template
 
