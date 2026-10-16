@@ -116,7 +116,15 @@ describe('the published manifest (@4thtech/agentlink)', () => {
   });
 
   it('publishes publicly with provenance, to the default registry and the plan dist-tag only', () => {
-    expect(manifest.publishConfig).toEqual({ access: 'public', provenance: true });
+    // `directory`: pnpm pack (Changesets) and npm publish take the generated publish directory,
+    // never apps/cli itself (IR-OPS-REL-1-1 M-1). `linkDirectory: false`: the workspace keeps
+    // linking apps/cli.
+    expect(manifest.publishConfig).toEqual({
+      access: 'public',
+      provenance: true,
+      directory: 'dist/package',
+      linkDirectory: false,
+    });
   });
 
   it('lists exactly the bundle in `files` and exports no library entry', () => {
@@ -174,21 +182,78 @@ describe('the bundle (dist/agentlink.js)', () => {
   });
 });
 
-describe('npm pack', () => {
-  it('packs exactly the allowlisted files', () => {
+// IR-OPS-REL-1-1 M-1: what npm receives is the publish directory dist/package/ (written by the
+// build, bundle.config.mjs `stagePackage`). Its package.json is generated: no devDependencies, no
+// scripts and no `@agentlink/*` name (that npm scope belongs to a third party).
+describe('the published tarball (dist/package)', () => {
+  const stageDir = join(packageDir, 'dist', 'package');
+  const packDir = mkdtempSync(join(tmpdir(), 'agentlink-pack-'));
+  afterAll(() => rmSync(packDir, { recursive: true, force: true }));
+
+  function pack(): { files: string[]; manifest: string } {
     readBundle();
-    const result = spawnSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {
-      cwd: packageDir,
-      encoding: 'utf8',
-      shell: process.platform === 'win32',
-      env: { ...process.env, npm_config_loglevel: 'silent' },
-    });
+    expect(existsSync(join(stageDir, 'package.json')), 'run `pnpm build` first').toBe(true);
+    const result = spawnSync(
+      'npm',
+      ['pack', stageDir, '--json', '--ignore-scripts', '--pack-destination', packDir],
+      {
+        cwd: packDir,
+        encoding: 'utf8',
+        shell: process.platform === 'win32',
+        env: { ...process.env, npm_config_loglevel: 'silent' },
+      },
+    );
     expect(result.status, result.stderr).toBe(0);
     const [packed] = JSON.parse(result.stdout) as [
-      { name: string; version: string; files: { path: string }[] },
+      { name: string; filename: string; files: { path: string }[] },
     ];
     expect(packed.name).toBe('@4thtech/agentlink');
-    expect(packed.files.map((file) => file.path).sort()).toEqual(PACKED_FILES);
+    const tarball = join(packDir, packed.filename.split(/[\\/]/).pop()!);
+    const extracted = spawnSync('tar', ['-xzOf', tarball, 'package/package.json'], {
+      encoding: 'utf8',
+    });
+    expect(extracted.status, extracted.stderr).toBe(0);
+    return { files: packed.files.map((file) => file.path).sort(), manifest: extracted.stdout };
+  }
+
+  let packed: { files: string[]; manifest: string };
+
+  it('packs exactly the allowlisted files', () => {
+    packed = pack();
+    expect(packed.files).toEqual(PACKED_FILES);
+  });
+
+  it('ships a generated package.json without workspace names, devDependencies or scripts', () => {
+    expect(packed.manifest).not.toContain('@agentlink/');
+    expect(packed.manifest).not.toContain('workspace:');
+    const published = JSON.parse(packed.manifest) as Manifest;
+    expect(published.devDependencies).toBeUndefined();
+    expect(published.scripts).toBeUndefined();
+    expect(Object.keys(published)).toEqual([
+      'name',
+      'version',
+      'description',
+      'license',
+      'type',
+      'homepage',
+      'bugs',
+      'repository',
+      'keywords',
+      'engines',
+      'publishConfig',
+      'bin',
+      'files',
+      'dependencies',
+    ]);
+    expect(published.publishConfig).toEqual({ access: 'public', provenance: true });
+    expect(published.version).toBe(manifest.version);
+    expect(published.bin).toEqual(manifest.bin);
+    expect(published.files).toEqual(manifest.files);
+    expect(published.dependencies).toEqual(manifest.dependencies);
+  });
+
+  it('ships the same bundle that the tests run', () => {
+    expect(readFileSync(join(stageDir, 'dist', 'agentlink.js'), 'utf8')).toBe(readBundle());
   });
 });
 

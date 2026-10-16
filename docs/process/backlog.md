@@ -656,6 +656,19 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - `changeset status` lists exactly the agreed packages; a PR changing one without a changeset is red.
   - The owner has confirmed the package list in chat.
 
+#### OPS-REL-2 · Rename the internal workspace packages away from the `@agentlink` npm scope (new, IR-OPS-REL-1-1)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (supply chain: package names, manifests, lockfile, deps-check policy, sensitive paths)
+- **Repo/path:** agentlink · `packages/*/package.json`, `apps/*/package.json`, every `@agentlink/*` import, `tools/deps-check/policy.mjs`, `eslint.config.mjs`, `.changeset/config.json`, `.changeset/*.md`, `tsconfig*`, `vitest.config.*`, `.github/workflows/*` filters, docs
+- **Depends on:** OPS-REL-1
+- **Spec:** D-43; `release-and-deployment.md` §4.1; 07 §1 (package map)
+- **Invariants:** I-8 (the crypto allowlist and zones move with the names)
+- **Scope:**
+  - The `@agentlink` npm organisation belongs to a third party (checked 2026-10-16). Our private workspace packages use that scope, so any tool or person that resolves one of those names from the registry (a misconfigured install, a copied snippet, a future published package) would get someone else's code. OPS-REL-1 keeps the names out of the published package; this card removes the confusion surface entirely.
+  - Rename every workspace package to a scope we own or to unscoped private names (for example `@4thtech-internal/*`, owner picks), in one PR, with deps-check, ESLint zones, the Changesets fixed group, CI filters and docs updated together. Specs that name `@agentlink/*` packages (07 §1 and others) change in the same PR.
+- **Acceptance:**
+  - A repository search for `@agentlink/` finds nothing except history (CHANGELOG, decision log); `pnpm lint`, `typecheck`, `test` and the vectors job are green.
+  - deps-check refuses any `@agentlink/*` dependency or import.
+
 #### OPS-CI-3 · pr-hygiene accepts `OPS-<WORD>-<n>` task IDs (new)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/pr-hygiene.yml`, `tools/pr-hygiene.test.mjs`, `.github/pull_request_template.md`

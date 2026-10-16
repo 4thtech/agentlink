@@ -24,7 +24,9 @@
   },
   "publishConfig": {
     "access": "public",
-    "provenance": true
+    "provenance": true,
+    "directory": "dist/package",
+    "linkDirectory": false
   },
   "bin": {
     "agentlink": "./dist/agentlink.js"

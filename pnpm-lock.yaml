@@ -272,6 +272,8 @@ importers:
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
+    linkDirectory: false
+    publishDirectory: dist/package
 
   apps/cloud-agent: {}
 
