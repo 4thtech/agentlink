@@ -3151,16 +3151,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - No wallet, extension, gas or chain choice appeared in either setup (D-39); dogfood log (dates, harnesses, versions, issues filed) and owner sign-off recorded.
 
 #### M1-9t · CLI: several agents under one OS user, and init for one harness (new, found by the M1-23 runbook)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1a (needed for the one-computer part of M1-23, not for the gate)
+- **Status:** ready (spec merged → build: D-78, 04 §2.8, 06 §7) · **Size:** M · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1a (needed for the one-computer part of M1-23, not for the gate)
 - **Repo/path:** agentlink · apps/cli (`init`, `owner init`), packages/node (`initOwner`)
 - **Depends on:** M1-9a, M1-9b, M1-8h
-- **Spec:** 04 §2.2, §2.5, §2.8; 06 §7; D-39, D-67; `docs/runbooks/dogfood-m1a.md`
+- **Spec:** 04 §2.2, §2.5, §2.8 ("Adding an agent to the existing owner"); 06 §7; D-39, D-67, D-78; `docs/runbooks/dogfood-m1a.md`
 - **Invariants:** I-1, I-4
-- **Scope:**
-  - Gap 1: the owner key is one keychain item per OS user (service `agentlink`, account `owner`), and `owner init` refuses when it exists, so a second agent (a second harness) under the same OS user can never get its first card. Decide with the owner and specify how a further local agent gets a card signed by the existing owner (one owner presence, one owner signature for exactly that agent, 04 §2.5), or confirm one OS user per agent as the supported rule.
-  - Gap 2: `init` proposes changes to every detected harness and cannot target one; answering no to all cancels the identity too. Add an explicit target (for example `--harness <id>`, or identity only) and printed snippets for OpenCode and Antigravity (M1-9a lists them for M1b; verify the config formats again at build time).
-  - No new flags before the spec change is agreed.
-- **Acceptance:** spec change first (04/06) and the owner's "merge"; then tests first (RED commit): two agents under one OS user each get a card for the same owner, an agent cannot trigger it, and `init` writes only to the chosen harness.
+- **Scope (spec decided, D-78; owner decision Tali, in chat, 2026-10-16):**
+  - Gap 1 (decided): one owner key per OS user owns many local agents. `agentlink owner init` stays once per OS user and, when an owner key exists, refuses and points to `agentlink owner add-agent --agent <name>` †, which signs exactly one first card for exactly that agent with the existing owner key: one owner presence, TTY only, harness-marker guard, never from MCP; refusals and copy per 04 §2.8. Reuse the restricted first-card session of M1-8h; no new crypto. Do **not** reuse M1-8h's rollback that deletes the owner item when no card is stored: add-agent never writes or deletes the owner item. Logical isolation, not a security boundary (G-1).
+  - Gap 2 (decided): `init --harness <id>` (`claude-code`, `codex`, `gemini-cli`, `opencode`, `antigravity`), `--harness none` for the identity only, declining every change never deletes an identity, OpenCode and Antigravity config writers per 06 §7 (re-verify the formats at build time), `--config <path>` only for OpenCode and Antigravity under the 04 §4 path rules.
+  - Approvals stay per agent (`--agent <name>`, 04 §2.5.2); add the cross-agent refusal test.
+  - Docs: runbook `docs/runbooks/dogfood-m1a.md` §3 (remove the STOP), quickstart pages for the new flags, CHANGELOG, changeset.
+- **Acceptance:** tests first (RED commit): two agents under one OS user each get a card for the same owner, an agent cannot trigger it (no TTY or a harness marker refuses before the owner key is read), an approval for one agent is refused by the other, `init` writes only to the chosen harness, and declining every change keeps the identity.
 
 #### M1-24 · Product name and trademark check before the production domain (D-38) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet prepares search material) · **Security:** S0 · **Phase:** M1b
