@@ -31,6 +31,8 @@ The owner (Tali). Parts B and C work on the web or GitHub mobile; Part A needs a
    npm publish --access public      # enter the 2FA code when asked
    npm logout
    ```
+   *What happened on 2026-10-16 (done by the owner):* npm uses **staged publishing**. The first manual publish created a `0.0.0-stage` holding version, and `0.0.1` appeared a few minutes later; no staged-packages entry was left to approve (the account's staged-packages page was empty; the org has no such page). Wait until `npm view @4thtech-io/agentlink versions` lists `0.0.1` before step 4.
+
    Why a placeholder: publishing the real build by hand would have no provenance, and the release workflow would then find 0.1.0 already there. Version 0.0.1 also gives the automatic rollback something to move `latest` back to. It has no `bin`, so it does nothing if run.
    *Alternative, not recommended:* a granular token limited to the `4thtech-io` scope, used once and revoked. It needs the same manual publish and leaves a secret to revoke; the 2FA path above leaves none.
 4. Configure the trusted publishers (package page → Settings → Trusted Publisher → GitHub Actions). **Do this no more than 2 days before release day (Part C).** Add **two** entries:
@@ -43,6 +45,8 @@ The owner (Tali). Parts B and C work on the web or GitHub mobile; Part A needs a
    | Environment | `npm-next` | `npm-publish` |
    | Allow publish | on | on |
    | Allow npm dist-tag | off | **on** (automatic rollback of `latest`) |
+
+   *State on 2026-10-16:* the owner configured one entry (`4thtech/agentlink`, `release.yml`, environment `npm-publish`, permissions: npm publish, npm stage publish, npm dist-tag). npm shows it as **"Pending validation: publish once before Oct 18, 2026, 13:41 UTC"**. The v0.1.0 release (Part C) must therefore run before then, or the entry must be deleted and re-created (the 2-day rule). The `npm-next` entry can wait until the first prerelease is wanted.
 
    Entry 1 is only needed for later prereleases on `next`. If npm refuses two entries for one workflow file, keep entry 2 (`npm-publish`) and tell the orchestrator. npm does not check entries when you save them; mistakes show up only at publish time.
 5. Same Settings page, Publishing access: "Require two-factor authentication and disallow tokens".
@@ -76,7 +80,8 @@ The owner (Tali). Parts B and C work on the web or GitHub mobile; Part A needs a
     2. `guard`, `select-mode`, then `pack` (build and tarballs, no publish rights).
     3. `publish-latest` **pauses for your approval**: GitHub mobile, or Actions → the run → "Review deployments" → tick `npm-publish` → **Approve and deploy**. It re-checks `DEPLOY_FREEZE` after your click.
     4. It publishes `@4thtech-io/agentlink@0.1.0` over OIDC with provenance, checks that `latest` is 0.1.0 and the provenance attestation exists (`npm audit signatures`), then creates the GitHub Release `v0.1.0` from the CHANGELOG section, and the git tags.
-    5. `smoke-latest` runs `npx -y @4thtech-io/agentlink@0.1.0 --version` on a clean machine. If a check fails, `latest` is moved back to 0.0.1 (the placeholder), `DEPLOY_FREEZE` is set, and the rollback job asks for a second approval click.
+    5. (Staged publishing: the CI publish may land as a staged version that needs your approval on npmjs.com, as the first manual publish briefly did. If `npm view @4thtech-io/agentlink dist-tags` still shows `0.0.1` after the job, look for a staged version on the package page or under your account's staged packages, and approve it; the job's checks wait for it for a few minutes.)
+    6. `smoke-latest` runs `npx -y @4thtech-io/agentlink@0.1.0 --version` on a clean machine. If a check fails, `latest` is moved back to 0.0.1 (the placeholder), `DEPLOY_FREEZE` is set, and the rollback job asks for a second approval click.
 14. Verify yourself:
     ```bash
     npx -y @4thtech-io/agentlink@latest --version     # 0.1.0
