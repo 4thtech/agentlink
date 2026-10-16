@@ -205,12 +205,12 @@ Agents push branches and open PRs as a dedicated machine account, never with you
   3. Repository access: "Only select repositories" → `4thtech/agentlink`.
   4. Repository permissions: **Variables: Read and write** only (Metadata: Read-only is added automatically). Nothing else.
   5. Generate, copy the token once.
-  6. `4thtech/agentlink` → Settings → Environments → `deploy-freeze` (create it if missing: no required reviewer, deployment branches "Selected branches" → `main`) → Environment secrets → Add secret `DEPLOY_FREEZE_TOKEN` → paste. Do not add it as a repository or organisation secret.
+  6. `4thtech/agentlink` → Settings → Environments → `deploy-freeze-2` (create it if missing: no required reviewer, deployment branches "Selected branches" → `main`) → Environment secrets → Add secret `DEPLOY_FREEZE_TOKEN` → paste. Do not add it as a repository or organisation secret.
 - [ ] Round-trip test (acceptance of OPS-CI-2), once after creating or renewing the token:
   1. Actions → "Deploy freeze" → Run workflow → branch `main` → Run. The run is green and warns "DEPLOY_FREEZE is now true".
   2. Check: Settings → Secrets and variables → Actions → Variables shows `DEPLOY_FREEZE` = `true`; a `review-gate` re-run on any open PR is red.
   3. Unfreeze (owner only): set `DEPLOY_FREEZE` to `false` there (or `gh variable set DEPLOY_FREEZE --body false --repo 4thtech/agentlink`), then re-run `review-gate` on the open PRs.
-  4. Note: a token with "Variables: Read and write" could technically also clear the freeze. The workflows only ever set it to `true`; clearing stays a manual owner step, and the token never leaves the `deploy-freeze` environment.
+  4. Note: a token with "Variables: Read and write" could technically also clear the freeze. The workflows only ever set it to `true`; clearing stays a manual owner step, and the token never leaves the `deploy-freeze-2` environment.
   5. If step 1 fails with "not configured", the secret is missing or in the wrong environment; with HTTP 403, the token lacks "Variables: Read and write" or is not approved for `4thtech`.
 
 ### 9. Cloudflare (backlog M0-2g)

@@ -5,7 +5,7 @@
 #   - a one-click freeze on an incident (any agent MAY set the freeze; only the owner clears it).
 #
 # This workflow can only SET the freeze. Clearing it is owner-only and never automated.
-# Runs from `main` only: the environment `deploy-freeze` admits only `main`, and the job refuses
+# Runs from `main` only: the environment `deploy-freeze-2` admits only `main`, and the job refuses
 # any other ref before it asks for the secret. No inputs, no event data in the script.
 name: Deploy freeze
 
@@ -24,7 +24,7 @@ jobs:
     if: github.repository_owner == '4thtech' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    environment: deploy-freeze
+    environment: deploy-freeze-2
     permissions: {}
     steps:
       - name: Set DEPLOY_FREEZE and read it back
@@ -35,7 +35,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${GH_TOKEN:-}" ]; then
-            echo "::error::DEPLOY_FREEZE_TOKEN is not configured in environment deploy-freeze (docs/process/ci-cd.md, owner setup section 8)."
+            echo "::error::DEPLOY_FREEZE_TOKEN is not configured in environment deploy-freeze-2 (docs/process/ci-cd.md, owner setup section 8)."
             exit 1
           fi
           gh variable set DEPLOY_FREEZE --body true --repo "$REPOSITORY"

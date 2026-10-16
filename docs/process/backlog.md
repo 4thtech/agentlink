@@ -526,7 +526,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Invariants:** I-3
 - **Scope:**
   - `production` and `npm-publish`: required reviewer `talirezun`; "Prevent self-review" **off** (merges and runs the owner makes himself happen under his account; agents use the owner's account, D-51); deployment branches limited to `main` and release tags (`npm-publish`: Changesets tags `*@*`); `npm-publish` holds no secrets, `production` holds the production Cloudflare token only.
-  - `staging` and `npm-next` (npm `next` prereleases): no reviewer, deployment branch `main` only; `staging` holds the staging Cloudflare token only. `deploy-freeze`: no reviewer, `main` only, secret `DEPLOY_FREEZE_TOKEN` (M0-19).
+  - `staging` and `npm-next` (npm `next` prereleases): no reviewer, deployment branch `main` only; `staging` holds the staging Cloudflare token only. `deploy-freeze-2` (replaces the empty `deploy-freeze`, which the owner can delete; admin bypass off): no reviewer, `main` only, secret `DEPLOY_FREEZE_TOKEN` (M0-19).
   - Secrets scoped per environment; testnet and production keys never shared.
 - **Acceptance:**
   - A workflow run from a non-`main` ref cannot access any of these environments (demonstrated).
@@ -540,7 +540,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Invariants:** —
 - **Scope:**
   - Repository variable `DEPLOY_FREEZE` (repository level only, never an environment variable) created by the owner; every deploy/publish job checks `vars.DEPLOY_FREEZE != 'true'` first and again after any approval wait; rollback jobs still run.
-  - Agents may set it (stop-the-line) and then disable auto-merge on open PRs; CI sets it after a failed production health check through the `freeze` job (credential `DEPLOY_FREEZE_TOKEN` in environment `deploy-freeze`, created by the owner); only the owner clears it (documented; enforced by process).
+  - Agents may set it (stop-the-line) and then disable auto-merge on open PRs; CI sets it after a failed production health check through the `freeze` job (credential `DEPLOY_FREEZE_TOKEN` in environment `deploy-freeze-2`, created by the owner); only the owner clears it (documented; enforced by process).
 - **Acceptance:**
   - With the variable set, release and deploy workflows exit before any build or credential use (fixture run); `review-gate` is red.
 
@@ -636,7 +636,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:**
   - `release.yml` checks that the CI of the `main` commit it releases is green before it does anything else.
   - Enforce changesets: a PR that changes a published package fails unless `changeset status` passes (D-43).
-  - Deploy-freeze token: the owner creates `DEPLOY_FREEZE_TOKEN` in the environment `deploy-freeze` (owner action, M0-19); the card verifies the `freeze` job works with it.
+  - Deploy-freeze token: the owner creates `DEPLOY_FREEZE_TOKEN` in the environment `deploy-freeze-2` (owner action, M0-19); the card verifies the `freeze` job works with it.
 - **Acceptance:**
   - A release run on a commit with red CI stops at the first job; with green CI it proceeds.
   - A fixture PR that changes a package without a changeset is red; with one it is green.

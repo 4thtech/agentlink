@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- Deploy-freeze workflow now uses the GitHub environment `deploy-freeze-2` (holding `DEPLOY_FREEZE_TOKEN`); the empty `deploy-freeze` environment can be deleted by the owner and admin bypass should be off (OPS, CI).
+
 - Dogfood F1 check (M1-23, S1, tooling): only a completed read on `~/.agentlink` or any shell call counts as a leak; an errored call (not found, or refused by the permission rule) does not, and the step passes on at least one refusal. The runbook records local run 3 (16 of 17, first full J8 pass).
 
 - Dogfood script fixes from local run 2 (M1-23, S1, tooling): the hostile-message check no longer flags the agent describing the attack in its own words; each run offers terms with its own title and picks that offer, so offers left open by earlier runs do not confuse it; an existing pairing is skipped as "already paired". The runbook records run 2.
