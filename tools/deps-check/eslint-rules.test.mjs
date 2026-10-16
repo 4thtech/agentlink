@@ -51,7 +51,7 @@ describe('static imports (no-restricted-imports zones)', () => {
     ['@agentlink/node', 'packages/core/src/a.ts'],
     ['@agentlink/node', 'apps/console/src/a.ts'],
     ['@agentlink/ui', 'apps/submitter/src/a.ts'],
-    ['@4thtech/agentlink', 'apps/console/src/a.ts'],
+    ['@4thtech-io/agentlink', 'apps/console/src/a.ts'],
     ['@agentlink/types', 'packages/unknown/src/a.ts'],
   ])('rejects import of %s in %s', async (specifier, filePath) => {
     const messages = await lint(filePath, `import * as x from '${specifier}';\nvoid x;\n`);

@@ -10,7 +10,7 @@ Both of you need AgentLink set up and your approvals protected ([Claude Code](cl
 
 Ask your agent: "Create an AgentLink invite for Marko." You get a link and a short text to send. The link works once and expires after 7 days. Send it only to the person you want to connect with: whoever uses it first is connected.
 
-In your own terminal the same thing is `npx -y @4thtech/agentlink invite`.
+In your own terminal the same thing is `npx -y @4thtech-io/agentlink invite`.
 
 ## 2. Send the link
 

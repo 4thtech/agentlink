@@ -153,7 +153,7 @@ describe('the exact diff of each harness', () => {
       '+      "command": "npx",',
       '+      "args": [',
       '+        "-y",',
-      '+        "@4thtech/agentlink",',
+      '+        "@4thtech-io/agentlink",',
       '+        "mcp"',
       '+      ],',
       '+      "env": {}',
@@ -172,7 +172,7 @@ describe('the exact diff of each harness', () => {
     expect(written.mcpServers.agentlink).toEqual({
       type: 'stdio',
       command: 'npx',
-      args: ['-y', '@4thtech/agentlink', 'mcp'],
+      args: ['-y', '@4thtech-io/agentlink', 'mcp'],
       env: {},
     });
     expect(written.mcpServers.other).toEqual({ command: 'x', env: { KEY: 'v' } });
@@ -194,7 +194,7 @@ describe('the exact diff of each harness', () => {
     expect(plan.out).not.toContain('"type"');
     await init(['--confirm', codeOf(plan)]);
     expect(JSON.parse(await read('.gemini', 'settings.json'))).toEqual({
-      mcpServers: { agentlink: { command: 'npx', args: ['-y', '@4thtech/agentlink', 'mcp'] } },
+      mcpServers: { agentlink: { command: 'npx', args: ['-y', '@4thtech-io/agentlink', 'mcp'] } },
       theme: 'x',
     });
   });
@@ -213,11 +213,11 @@ describe('the exact diff of each harness', () => {
       '+',
       '+[mcp_servers.agentlink]',
       '+command = "npx"',
-      '+args = ["-y", "@4thtech/agentlink", "mcp"]',
+      '+args = ["-y", "@4thtech-io/agentlink", "mcp"]',
     ]);
     await init(['--confirm', codeOf(plan)]);
     expect(await read('.codex', 'config.toml')).toBe(
-      `${before}\n[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech/agentlink", "mcp"]\n`,
+      `${before}\n[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech-io/agentlink", "mcp"]\n`,
     );
   });
 
@@ -226,7 +226,7 @@ describe('the exact diff of each harness', () => {
     const plan = await init([]);
     await init(['--confirm', codeOf(plan)]);
     expect(await read('.codex', 'config.toml')).toBe(
-      '[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech/agentlink", "mcp"]\n',
+      '[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech-io/agentlink", "mcp"]\n',
     );
     expect(await exists('.codex', 'config.toml')).toBe(true);
   });
@@ -234,7 +234,9 @@ describe('the exact diff of each harness', () => {
   it('a non-default agent adds --agent to the entry, and no secret is ever in a config', async () => {
     await mkdir(join(home, '.codex'));
     const plan = await init(['--agent', 'work-1']);
-    expect(plan.out).toContain('args = ["-y", "@4thtech/agentlink", "mcp", "--agent", "work-1"]');
+    expect(plan.out).toContain(
+      'args = ["-y", "@4thtech-io/agentlink", "mcp", "--agent", "work-1"]',
+    );
     expect(plan.out).toContain('agentlink init --agent work-1 --confirm');
     await init(['--agent', 'work-1', '--confirm', codeOf(plan)]);
     const text = await read('.codex', 'config.toml');
@@ -526,10 +528,10 @@ describe('keychain and agent names', () => {
 describe('init --harness and --config (M1-9t)', () => {
   const OPENCODE_ENTRY = {
     type: 'local',
-    command: ['npx', '-y', '@4thtech/agentlink', 'mcp'],
+    command: ['npx', '-y', '@4thtech-io/agentlink', 'mcp'],
     enabled: true,
   };
-  const ANTIGRAVITY_ENTRY = { command: 'npx', args: ['-y', '@4thtech/agentlink', 'mcp'] };
+  const ANTIGRAVITY_ENTRY = { command: 'npx', args: ['-y', '@4thtech-io/agentlink', 'mcp'] };
   const readAbs = (path: string): Promise<string> => readFile(path, 'utf8');
   const existsAbs = (path: string): Promise<boolean> =>
     readFile(path).then(
@@ -618,7 +620,7 @@ describe('init --harness and --config (M1-9t)', () => {
     expect(written.mcp.agentlink.command).toEqual([
       'npx',
       '-y',
-      '@4thtech/agentlink',
+      '@4thtech-io/agentlink',
       'mcp',
       '--agent',
       'open-1',

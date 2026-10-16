@@ -458,17 +458,17 @@ jobs:
         run: |
           set -euo pipefail
           version_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
-          cli="$(jq -r '.[] | select(.name == "@4thtech/agentlink") | .version' <<< "$PACKAGES")"
+          cli="$(jq -r '.[] | select(.name == "@4thtech-io/agentlink") | .version' <<< "$PACKAGES")"
           if [ -z "$cli" ]; then
-            echo "::notice::@4thtech/agentlink is not part of this release; nothing to smoke-test."
+            echo "::notice::@4thtech-io/agentlink is not part of this release; nothing to smoke-test."
             exit 0
           fi
           [[ "$cli" =~ $version_re ]] || { echo "::error::Unexpected CLI version."; exit 1; }
           cd "$RUNNER_TEMP"
-          out="$(npx -y "@4thtech/agentlink@$cli" --version)"
+          out="$(npx -y "@4thtech-io/agentlink@$cli" --version)"
           case "$out" in
             *"$cli"*) echo "CLI $cli runs." ;;
-            *) echo "::error::@4thtech/agentlink@$cli --version did not print $cli."; exit 1 ;;
+            *) echo "::error::@4thtech-io/agentlink@$cli --version did not print $cli."; exit 1 ;;
           esac
 
   # ---------------------------------------------------------------------------
@@ -588,11 +588,11 @@ jobs:
           version_re='^[0-9]+\.[0-9]+\.[0-9]+$'
           version=""
           while IFS= read -r -d '' manifest; do
-            version="$(jq -r 'select(.name == "@4thtech/agentlink" and .private != true) | .version // empty' "$manifest")"
+            version="$(jq -r 'select(.name == "@4thtech-io/agentlink" and .private != true) | .version // empty' "$manifest")"
             [ -z "$version" ] || break
           done < <(git ls-files -z -- ':(glob)**/package.json')
           if [ -z "$version" ] || ! [[ "$version" =~ $version_re ]]; then
-            echo "::notice::No stable @4thtech/agentlink version in this commit; no GitHub Release is prepared."
+            echo "::notice::No stable @4thtech-io/agentlink version in this commit; no GitHub Release is prepared."
             echo "version=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -712,9 +712,9 @@ jobs:
           set -euo pipefail
           version_re='^[0-9]+\.[0-9]+\.[0-9]+$'
           [[ "$VERSION" =~ $version_re ]] || { echo "::error::Unexpected product version."; exit 1; }
-          published="$(jq -r '.[] | select(.name == "@4thtech/agentlink") | .version' <<< "$PACKAGES")"
+          published="$(jq -r '.[] | select(.name == "@4thtech-io/agentlink") | .version' <<< "$PACKAGES")"
           if [ "$published" != "$VERSION" ]; then
-            echo "::warning::@4thtech/agentlink@$VERSION was not part of this publish; no GitHub Release created."
+            echo "::warning::@4thtech-io/agentlink@$VERSION was not part of this publish; no GitHub Release created."
             exit 0
           fi
           if gh release view "v$VERSION" --repo "$REPOSITORY" > /dev/null 2>&1; then
@@ -755,17 +755,17 @@ jobs:
         run: |
           set -euo pipefail
           version_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
-          cli="$(jq -r '.[] | select(.name == "@4thtech/agentlink") | .version' <<< "$PACKAGES")"
+          cli="$(jq -r '.[] | select(.name == "@4thtech-io/agentlink") | .version' <<< "$PACKAGES")"
           if [ -z "$cli" ]; then
-            echo "::notice::@4thtech/agentlink is not part of this release; nothing to smoke-test."
+            echo "::notice::@4thtech-io/agentlink is not part of this release; nothing to smoke-test."
             exit 0
           fi
           [[ "$cli" =~ $version_re ]] || { echo "::error::Unexpected CLI version."; exit 1; }
           cd "$RUNNER_TEMP"
-          out="$(npx -y "@4thtech/agentlink@$cli" --version)"
+          out="$(npx -y "@4thtech-io/agentlink@$cli" --version)"
           case "$out" in
             *"$cli"*) echo "CLI $cli runs." ;;
-            *) echo "::error::@4thtech/agentlink@$cli --version did not print $cli."; exit 1 ;;
+            *) echo "::error::@4thtech-io/agentlink@$cli --version did not print $cli."; exit 1 ;;
           esac
 
   # One approval click: no unattended job can move `latest`.

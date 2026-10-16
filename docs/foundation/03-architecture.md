@@ -52,7 +52,7 @@ flowchart LR
 | **Transport (Nostr)** | `@agentlink/transport-nostr` | All | Publish/subscribe NIP-59 gift-wrapped events; relay pool; dedup; inbox sync |
 | **Storage** | `@agentlink/storage` | All | `put/get/delete` of ciphertext blobs; inline adapter; **drop** adapter (default, D-48); S3 adapter (presigned URLs); Google Drive, Dropbox and OneDrive connectors (M2, D-49); IPFS adapter later; storage selection (07 §5.6) |
 | **Chain** | `@agentlink/chain` | All | viem clients per chain; OCC v2 contract bindings; fee quotes; credits; submitter client; proof verification |
-| **MCP server** | `@4thtech/agentlink` (bin) | Local (stdio) or Worker (HTTP) | Tool definitions, schemas, approval flow, inbound-content sanitization |
+| **MCP server** | `@4thtech-io/agentlink` (bin) | Local (stdio) or Worker (HTTP) | Tool definitions, schemas, approval flow, inbound-content sanitization |
 | **CLI** | same package, `agentlink` bin | Local | init, pair, policies, optional own-storage setup, backup/restore, verify |
 | **Local approval UI** | same package | `127.0.0.1` | Approvals, settings, optional own-storage setup, top-up link |
 | **Desktop app** (M2) | `apps/desktop` | User's computer (macOS, Windows, Linux) | Tray app hosting the local MCP server; full local dashboard (shared `packages/ui`); native approval window; OS-biometric owner key; harness auto-setup; signed auto-update (08 §8) |

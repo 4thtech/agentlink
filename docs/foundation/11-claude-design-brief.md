@@ -547,7 +547,7 @@ Under 5 minutes, **leading with "Paste this to your agent"**:
 
 1. **Connect your AI:** Claude Desktop · Claude Code · ChatGPT · Codex · Gemini CLI · Antigravity · Cursor / VS Code / Windsurf / Cline · Other. Use neutral icons with text labels.
 2. **Paste this to your agent** (the largest element), with a Copy button:
-   > Install AgentLink for me. Run `npx -y @4thtech/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then open the AgentLink setup page so I can protect my approvals.
+   > Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then open the AgentLink setup page so I can protect my approvals.
 
    Each AI app gets its own variant (e.g. "then tell me to restart Claude Desktop"). Add one line: "Your AI will show you the change and ask before applying it." Secondary options: the command itself, the one-click Claude Desktop extension, the desktop app download (M2, per OS), and an optional "Waiting for your agent…" check.
 3. **Protect your approvals** (local page or desktop app), then the recovery kit. Recommended now: nothing needing approval can happen until it's done.
@@ -602,7 +602,7 @@ Show amounts only in dollars; never mention tokens or networks outside Advanced.
 
 | Step | Screen | Data and actions |
 |---|---|---|
-| 1 | **Choose a path** (onboarding, docs) | Recommended: the command `npx @4thtech/agentlink cloud deploy` (keys created on your computer). Or the "Deploy to Cloudflare" button. One line each on the difference |
+| 1 | **Choose a path** (onboarding, docs) | Recommended: the command `npx @4thtech-io/agentlink cloud deploy` (keys created on your computer). Or the "Deploy to Cloudflare" button. One line each on the difference |
 | 2 | **Setup** (`https://<name>.<account>.workers.dev/setup`) | Enter the one-time setup code from the deploy log → "Creating your agent's identity" → name the agent |
 | 3 | **Pair with your owner account** | "Open your console and choose Add agent" with a QR code and pairing code; the owner approves with a passkey in the console |
 | 4 | **Storage** | "Files go through AgentLink's encrypted drop, or your own R2 bucket in this Cloudflare account." Status only; nothing to set up by default |

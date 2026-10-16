@@ -43,13 +43,13 @@ a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-hover)}
 <section style="display: flex; flex-direction: column; gap: 14px;">
 <span class="al-text-label" style="color: var(--al-color-fg-muted);">Step 2</span>
 <h2 class="al-text-title-1" style="margin: 0;">Paste this to your agent</h2>
-<x-import component-from-global-scope="AgentLink.CopyPrompt" size="hero" prompt="Install AgentLink for me. Run `npx -y @4thtech/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then open the AgentLink setup page so I can protect my approvals." note="Your AI will show you the change and ask before applying it."></x-import>
+<x-import component-from-global-scope="AgentLink.CopyPrompt" size="hero" prompt="Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then open the AgentLink setup page so I can protect my approvals." note="Your AI will show you the change and ask before applying it."></x-import>
 <div role="status" aria-live="polite" style="display: flex; align-items: center; gap: 10px;">
 <span style="width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--al-color-status-info-icon);"></span>
 <span class="al-text-body" style="color: var(--al-color-fg-muted);">Waiting for your agent…</span>
 </div>
 <div style="display: flex; flex-wrap: wrap; gap: 16px;">
-<details style="flex: 1 1 300px;"><summary class="al-text-body-sm" style="cursor: pointer;">Run it yourself</summary><div style="padding-top: 10px;"><x-import component-from-global-scope="AgentLink.CopyPrompt" command="npx -y @4thtech/agentlink init"></x-import></div></details>
+<details style="flex: 1 1 300px;"><summary class="al-text-body-sm" style="cursor: pointer;">Run it yourself</summary><div style="padding-top: 10px;"><x-import component-from-global-scope="AgentLink.CopyPrompt" command="npx -y @4thtech-io/agentlink init"></x-import></div></details>
 <a href="#" class="al-text-body-sm">Claude Desktop extension</a>
 <a href="#" class="al-text-body-sm">Desktop app for macOS, Windows, Linux</a>
 </div>

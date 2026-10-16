@@ -183,7 +183,7 @@ jobs:
       # inside `pnpm test` above; this step repeats them on purpose (about a second).
       - name: MCP tool surface and conformance
         if: needs.detect.outputs.has_test == 'true'
-        run: pnpm --filter @4thtech/agentlink exec vitest run test/tool-surface.test.ts test/mcp-conformance.test.ts
+        run: pnpm --filter @4thtech-io/agentlink exec vitest run test/tool-surface.test.ts test/mcp-conformance.test.ts
 
   vectors:
     name: vectors
@@ -331,7 +331,7 @@ jobs:
       # test run apps/cli's dist/.
       - name: Build the workspace dependencies of @agentlink/node and the CLI
         shell: bash
-        run: pnpm exec turbo run build --filter='@4thtech/agentlink...'
+        run: pnpm exec turbo run build --filter='@4thtech-io/agentlink...'
 
       - name: Run the keychain tests against the real keychain (macOS, Windows)
         if: runner.os != 'Linux'
@@ -339,7 +339,7 @@ jobs:
         run: |
           set -euo pipefail
           pnpm --filter @agentlink/node exec vitest run src/keychain-native.test.ts --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
-          pnpm --filter @4thtech/agentlink exec vitest run test/two-process.keychain.test.ts --reporter=default --reporter=json --outputFile.json="$CLI_KEYCHAIN_REPORT"
+          pnpm --filter @4thtech-io/agentlink exec vitest run test/two-process.keychain.test.ts --reporter=default --reporter=json --outputFile.json="$CLI_KEYCHAIN_REPORT"
 
       # A fresh D-Bus session, then gnome-keyring started with --unlock, which creates and unlocks
       # the default ("login") collection from a throwaway password read on stdin (random per run,
@@ -354,7 +354,7 @@ jobs:
             eval "$keyring_env"
             export GNOME_KEYRING_CONTROL
             pnpm --filter @agentlink/node exec vitest run src/keychain-native.test.ts --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
-            pnpm --filter @4thtech/agentlink exec vitest run test/two-process.keychain.test.ts --reporter=default --reporter=json --outputFile.json="$CLI_KEYCHAIN_REPORT"
+            pnpm --filter @4thtech-io/agentlink exec vitest run test/two-process.keychain.test.ts --reporter=default --reporter=json --outputFile.json="$CLI_KEYCHAIN_REPORT"
           '
 
       # "Runs with no skipped test" (M1-8a-b acceptance): the keychain suite must have run and

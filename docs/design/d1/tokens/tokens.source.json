@@ -969,7 +969,7 @@
       "lineHeight": "20px",
       "fontWeight": 400,
       "letterSpacing": "0em",
-      "sample": "npx -y @4thtech/agentlink init",
+      "sample": "npx -y @4thtech-io/agentlink init",
       "usage": "Commands, IDs, fingerprints, amounts in tables (tabular by construction)."
      },
      {

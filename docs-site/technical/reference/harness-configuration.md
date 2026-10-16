@@ -6,7 +6,7 @@
 
 ## How `agentlink init` configures a harness
 
-`npx -y @4thtech/agentlink init` detects Claude Code, Codex, Gemini CLI, OpenCode and Antigravity, prints the exact diff of each config file, and writes it only after confirmation. `init --harness <id>` (`claude-code`, `codex`, `gemini-cli`, `opencode`, `antigravity`) proposes that one app only, and `init --harness none` creates the agent identity only. Answering no to every proposed change writes no config but keeps the agent identity. In an interactive terminal it asks `y/N` for each file. Run by an agent (no terminal, or a harness marker set), it prints the diff and a one-time confirmation code, writes nothing, and `init --confirm <code>` then writes exactly those changes. The code is a hash of the shown changes, so it stops matching if they change. This is transparency, not a security boundary: an agent with a shell can edit its own harness config anyway ([06 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#7-harness-installation)).
+`npx -y @4thtech-io/agentlink init` detects Claude Code, Codex, Gemini CLI, OpenCode and Antigravity, prints the exact diff of each config file, and writes it only after confirmation. `init --harness <id>` (`claude-code`, `codex`, `gemini-cli`, `opencode`, `antigravity`) proposes that one app only, and `init --harness none` creates the agent identity only. Answering no to every proposed change writes no config but keeps the agent identity. In an interactive terminal it asks `y/N` for each file. Run by an agent (no terminal, or a harness marker set), it prints the diff and a one-time confirmation code, writes nothing, and `init --confirm <code>` then writes exactly those changes. The code is a hash of the shown changes, so it stops matching if they change. This is transparency, not a security boundary: an agent with a shell can edit its own harness config anyway ([06 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#7-harness-installation)).
 
 An existing `agentlink` entry that differs is left alone. Existing config is backed up before it is changed. `init` never writes an owner secret.
 
@@ -18,7 +18,7 @@ Each app's config holds one `agentlink` entry, so each app runs one agent. Give 
 
 ## Configuration by harness
 
-Each harness runs `npx -y @4thtech/agentlink mcp` as a stdio server. A non-default agent adds `--agent <name>` to `args`.
+Each harness runs `npx -y @4thtech-io/agentlink mcp` as a stdio server. A non-default agent adds `--agent <name>` to `args`.
 
 ### Claude Code
 
@@ -30,14 +30,14 @@ User scope, in `~/.claude.json`. Not written by `init` when `CLAUDE_CONFIG_DIR` 
     "agentlink": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@4thtech/agentlink", "mcp"],
+      "args": ["-y", "@4thtech-io/agentlink", "mcp"],
       "env": {}
     }
   }
 }
 ```
 
-Equivalent command: `claude mcp add --transport stdio --scope user agentlink -- npx -y @4thtech/agentlink mcp`.
+Equivalent command: `claude mcp add --transport stdio --scope user agentlink -- npx -y @4thtech-io/agentlink mcp`.
 
 Sources: [Claude Code MCP](https://code.claude.com/docs/en/mcp) (`claude mcp add [options] <name> -- <command> [args...]`, user scope stored in `~/.claude.json`, stdio entry shape).
 
@@ -48,10 +48,10 @@ Sources: [Claude Code MCP](https://code.claude.com/docs/en/mcp) (`claude mcp add
 ```toml
 [mcp_servers.agentlink]
 command = "npx"
-args = ["-y", "@4thtech/agentlink", "mcp"]
+args = ["-y", "@4thtech-io/agentlink", "mcp"]
 ```
 
-Equivalent command: `codex mcp add agentlink -- npx -y @4thtech/agentlink mcp`. `init` writes the file itself, as a diff you confirm, and does not call `codex mcp add`. `CODEX_HOME` is not followed.
+Equivalent command: `codex mcp add agentlink -- npx -y @4thtech-io/agentlink mcp`. `init` writes the file itself, as a diff you confirm, and does not call `codex mcp add`. `CODEX_HOME` is not followed.
 
 Sources: [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) (`codex mcp add <server-name> -- <stdio server-command>`; `[mcp_servers.<server-name>]` with `command` and `args`).
 
@@ -64,7 +64,7 @@ User settings, `~/.gemini/settings.json`:
   "mcpServers": {
     "agentlink": {
       "command": "npx",
-      "args": ["-y", "@4thtech/agentlink", "mcp"]
+      "args": ["-y", "@4thtech-io/agentlink", "mcp"]
     }
   }
 }
@@ -83,7 +83,7 @@ Global config, `~/.config/opencode/opencode.json`, under `mcp` (not `mcpServers`
   "mcp": {
     "agentlink": {
       "type": "local",
-      "command": ["npx", "-y", "@4thtech/agentlink", "mcp"],
+      "command": ["npx", "-y", "@4thtech-io/agentlink", "mcp"],
       "enabled": true
     }
   }
@@ -101,7 +101,7 @@ Global config, `~/.gemini/config/mcp_config.json` (not the Gemini CLI file `~/.g
   "mcpServers": {
     "agentlink": {
       "command": "npx",
-      "args": ["-y", "@4thtech/agentlink", "mcp"]
+      "args": ["-y", "@4thtech-io/agentlink", "mcp"]
     }
   }
 }
@@ -155,7 +155,7 @@ Settings in `~/.claude/settings.json`. Rule syntax: `~/` is your home folder, `/
       "Bash(cmdkey *)",
       "Bash(vaultcmd *)",
       "Edit(~/.npm/_npx/**)",
-      "Edit(//<output of npm root -g>/@4thtech/agentlink/**)",
+      "Edit(//<output of npm root -g>/@4thtech-io/agentlink/**)",
       "Edit(~/.claude/settings.json)",
       "Edit(~/.zshrc)",
       "Edit(~/.zprofile)",
@@ -170,11 +170,11 @@ Settings in `~/.claude/settings.json`. Rule syntax: `~/` is your home folder, `/
       "Bash(agentlink cancel *)",
       "Bash(agentlink owner *)",
       "Bash(agentlink policy *)",
-      "Bash(npx *@4thtech/agentlink owner *)",
-      "Bash(npx *@4thtech/agentlink approve *)",
-      "Bash(npx *@4thtech/agentlink deny *)",
-      "Bash(npx *@4thtech/agentlink cancel *)",
-      "Bash(npx *@4thtech/agentlink policy *)"
+      "Bash(npx *@4thtech-io/agentlink owner *)",
+      "Bash(npx *@4thtech-io/agentlink approve *)",
+      "Bash(npx *@4thtech-io/agentlink deny *)",
+      "Bash(npx *@4thtech-io/agentlink cancel *)",
+      "Bash(npx *@4thtech-io/agentlink policy *)"
     ]
   }
 }
@@ -183,7 +183,7 @@ Settings in `~/.claude/settings.json`. Rule syntax: `~/` is your home folder, `/
 Adjust it to your system:
 
 - Keep the keychain rule for your system (`security` on macOS, `secret-tool` on Linux, `cmdkey` and `vaultcmd` on Windows); the others are harmless.
-- The `Edit(//...)` line is for a global install. Replace the placeholder with the output of `npm root -g`, starting with `//` (for example `//usr/local/lib/node_modules/@4thtech/agentlink/**`).
+- The `Edit(//...)` line is for a global install. Replace the placeholder with the output of `npm root -g`, starting with `//` (for example `//usr/local/lib/node_modules/@4thtech-io/agentlink/**`).
 - Add `Edit(<npm global prefix>/bin/**)` as an absolute path (`npm prefix -g`).
 - On Windows, the npx cache is `Edit(~/AppData/Local/npm-cache/_npx/**)` and the PowerShell profile is `Edit(~/Documents/PowerShell/**)`.
 - A `Bash(...)` rule matches the command text only. Those commands refuse to run from a terminal an AI app controls anyway; the rules add a second guard, not a boundary.
@@ -248,7 +248,7 @@ Prompt for AgentLink tools in the server's table, so every call asks. `prompt` a
 ```toml
 [mcp_servers.agentlink]
 command = "npx"
-args = ["-y", "@4thtech/agentlink", "mcp"]
+args = ["-y", "@4thtech-io/agentlink", "mcp"]
 default_tools_approval_mode = "prompt"
 
 [mcp_servers.agentlink.tools.agentlink_status]

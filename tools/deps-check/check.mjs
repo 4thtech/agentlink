@@ -16,6 +16,10 @@
 //                `workspace:<name>@` alias, a spec that resolves from a path, URL or git host, a
 //                primitive library declared outside its zone, a runtime dependency that is not in
 //                the per-package allowlist, an `imports` map, a dependency cycle (on resolved names).
+//                A zone with `bundles: true` (apps/cli, OPS-REL-1) ships its workspace packages inside
+//                its own bundle: it may re-declare their third-party runtime dependencies with the
+//                exact same spec (bundledRuntimeOf), and it may not declare a workspace package at
+//                runtime. Its source imports are checked as in every other zone.
 //   files      - a test-like file name other than *.test.ts (`.test.mts`, `.spec.ts`, ...): builds
 //                exclude only *.test.ts, so it would be built (IR-M1-1c-G2-1 L-1).
 //   source     - an import (static, dynamic, require, import type) that violates policy.violationFor,
@@ -103,10 +107,57 @@ export function specProblem(spec) {
 // --- Manifest checks ------------------------------------------------------------------------------
 
 /**
- * Problems in one workspace manifest. `zone` is its directory ('packages/crypto'), `manifest` the
- * parsed package.json. Pure: no file access.
+ * The third-party runtime dependencies of the workspace packages that `manifest` depends on (any
+ * field), transitively: what a bundle of them must still install (OPS-REL-1). `manifests` maps
+ * workspace package names to their parsed package.json. Returns { runtime: Map name -> spec,
+ * problems } where a problem is one dependency declared with two different specs. Pure.
  */
-export function checkManifest(zone, manifest) {
+export function bundledRuntimeOf(manifest, manifests) {
+  const runtime = new Map();
+  const problems = [];
+  const seen = new Set();
+  const queue = [];
+  const enqueueWorkspace = (pkg, fields) => {
+    for (const field of fields) {
+      for (const [declared, spec] of Object.entries(pkg[field] ?? {})) {
+        const real = realPackageName(declared, spec);
+        if (workspaceNameOf(real) !== null && !seen.has(real)) {
+          seen.add(real);
+          queue.push(real);
+        }
+      }
+    }
+  };
+  enqueueWorkspace(manifest, ALL_FIELDS);
+  while (queue.length > 0) {
+    const name = queue.shift();
+    const pkg = manifests[name];
+    if (!pkg) continue;
+    enqueueWorkspace(pkg, RUNTIME_FIELDS);
+    for (const field of RUNTIME_FIELDS) {
+      for (const [declared, spec] of Object.entries(pkg[field] ?? {})) {
+        const real = realPackageName(declared, spec);
+        if (workspaceNameOf(real) !== null || real !== declared) continue;
+        const before = runtime.get(real);
+        if (before !== undefined && before !== spec) {
+          problems.push(
+            `${manifest.name}: bundled packages declare ${real} as both ${before} and ${spec}; align them`,
+          );
+          continue;
+        }
+        runtime.set(real, spec);
+      }
+    }
+  }
+  return { runtime, problems };
+}
+
+/**
+ * Problems in one workspace manifest. `zone` is its directory ('packages/crypto'), `manifest` the
+ * parsed package.json. `bundledRuntime` (bundledRuntimeOf) applies only to a zone whose policy has
+ * `bundles: true`. Pure: no file access.
+ */
+export function checkManifest(zone, manifest, { bundledRuntime = new Map() } = {}) {
   const policy = ZONES[zone];
   if (!policy) {
     return [
@@ -125,6 +176,7 @@ export function checkManifest(zone, manifest) {
     );
   }
   const allowed = allowedWorkspaceNames(zone);
+  const bundles = policy.bundles === true;
 
   for (const field of ALL_FIELDS) {
     for (const [declared, spec] of Object.entries(manifest[field] ?? {})) {
@@ -148,6 +200,20 @@ export function checkManifest(zone, manifest) {
         if (!allowed.includes(workspaceName)) {
           problems.push(`${where}${alias}: ${layerMessage(zone, workspaceName)}`);
         }
+        if (bundles && RUNTIME_FIELDS.includes(field)) {
+          problems.push(
+            `${where}: ${zone} its workspace packages are bundled (OPS-REL-1); declare them in devDependencies, not at runtime`,
+          );
+        }
+        continue;
+      }
+      // OPS-REL-1: a bundling zone re-declares a bundled package's runtime dependency, same spec.
+      if (
+        bundles &&
+        RUNTIME_FIELDS.includes(field) &&
+        real === declared &&
+        bundledRuntime.get(real) === spec
+      ) {
         continue;
       }
       const lib = LIBRARIES.find((candidate) => matchesGroup(real, candidate.group));
@@ -526,6 +592,9 @@ export function runChecks(root) {
   );
   const listings = listSourceFilesIn(root, [...zones.map(({ dir }) => dir), ...subtleDirs]);
 
+  // First pass: every manifest, so a bundling zone can see the packages it bundles (OPS-REL-1).
+  const parsed = new Map();
+  const byName = {};
   for (const { zone, dir } of zones) {
     const manifestPath = join(dir, 'package.json');
     let manifest = null;
@@ -538,8 +607,20 @@ export function runChecks(root) {
     } else {
       problems.push(`${zone}: no package.json`);
     }
+    parsed.set(zone, manifest);
+    if (manifest && typeof manifest.name === 'string') byName[manifest.name] = manifest;
+  }
+
+  for (const { zone, dir } of zones) {
+    const manifest = parsed.get(zone);
     if (manifest) {
-      problems.push(...checkManifest(zone, manifest));
+      let bundledRuntime = new Map();
+      if (ZONES[zone]?.bundles === true) {
+        const bundled = bundledRuntimeOf(manifest, byName);
+        problems.push(...bundled.problems);
+        bundledRuntime = bundled.runtime;
+      }
+      problems.push(...checkManifest(zone, manifest, { bundledRuntime }));
       graph[manifest.name ?? zone] = ALL_FIELDS.flatMap((field) =>
         Object.entries(manifest[field] ?? {})
           .map(([name, spec]) => realPackageName(name, spec))

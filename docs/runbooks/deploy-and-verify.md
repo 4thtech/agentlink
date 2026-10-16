@@ -30,7 +30,7 @@ CI deploys; nobody deploys from a workstation. The orchestrator (Opus) verifies.
    - Worker: compare the live version with the version CI recorded. How the live version is read without credentials is defined by M1-10c; until that card lands this step has no command.
    - npm package:
      ```bash
-     npm view @4thtech/agentlink@<version> dist.integrity
+     npm view @4thtech-io/agentlink@<version> dist.integrity
      ```
      compare with the integrity CI recorded for the packed tarball, and check provenance in a clean directory with `npm audit signatures` after installing that exact version.
 4. **One live observation only the new code produces**: a response field, a header, a version string, a smoke-test result. Choose it before the deploy and name it in the PR or release note.

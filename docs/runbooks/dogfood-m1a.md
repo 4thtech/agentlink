@@ -13,7 +13,7 @@ The owner (Tali) and Denis, each with their own agents. The agents may do the in
 - Node.js (current LTS) and `npx`.
 - A system keychain that works (macOS Keychain, Windows Credential Manager, or Linux Secret Service). Without one `init` stops and says so.
 - The harnesses you want: Claude Code, Antigravity, OpenCode. Codex and Gemini CLI also work (`init` knows them).
-- The build to test (a tarball from the CI artifact, or the release once it exists). Where this runbook says `npx -y @4thtech/agentlink`, use the installed `agentlink` command instead if you installed the tarball.
+- The build to test (a tarball from the CI artifact, or the release once it exists). Where this runbook says `npx -y @4thtech-io/agentlink`, use the installed `agentlink` command instead if you installed the tarball.
 - Read [Protect your approvals](../../docs-site/guide/get-started/protect-your-approvals.md) once. It explains the owner code and the same-user risk.
 - Your own sync file open (step 8), to record results.
 
@@ -33,7 +33,7 @@ Do this once per harness, on the computer where that harness lives. After each i
 
 **Codex and Gemini CLI.** Follow [Codex](../../docs-site/guide/get-started/codex.md) and [Gemini CLI](../../docs-site/guide/get-started/gemini-cli.md) in the same way.
 
-**OpenCode and Antigravity** are set up by `init` too (M1-9t): in a terminal you opened, run `npx -y @4thtech/agentlink init --harness opencode` or `--harness antigravity`, read the diff and answer `y`. If Antigravity reads another file than the default (see below), add `--config <that path>`. Answering `n` writes no config but keeps the agent. The hand edits below stay as the fallback and show what `init` writes.
+**OpenCode and Antigravity** are set up by `init` too (M1-9t): in a terminal you opened, run `npx -y @4thtech-io/agentlink init --harness opencode` or `--harness antigravity`, read the diff and answer `y`. If Antigravity reads another file than the default (see below), add `--config <that path>`. Answering `n` writes no config but keeps the agent. The hand edits below stay as the fallback and show what `init` writes.
 
 **OpenCode.** Verified against the OpenCode docs on 2026-10-16 ([MCP servers](https://opencode.ai/docs/mcp-servers/), [Config](https://opencode.ai/docs/config/)).
 - File: `~/.config/opencode/opencode.json` (global), or `opencode.json` in a project root (project). Keep a copy of the file before editing.
@@ -45,7 +45,7 @@ Do this once per harness, on the computer where that harness lives. After each i
   "mcp": {
     "agentlink": {
       "type": "local",
-      "command": ["npx", "-y", "@4thtech/agentlink", "mcp"],
+      "command": ["npx", "-y", "@4thtech-io/agentlink", "mcp"],
       "enabled": true
     }
   }
@@ -63,7 +63,7 @@ Do this once per harness, on the computer where that harness lives. After each i
   "mcpServers": {
     "agentlink": {
       "command": "npx",
-      "args": ["-y", "@4thtech/agentlink", "mcp"]
+      "args": ["-y", "@4thtech-io/agentlink", "mcp"]
     }
   }
 }
@@ -73,19 +73,19 @@ Do this once per harness, on the computer where that harness lives. After each i
 
 For both hand edits, show the diff to the owner before saving and change nothing else in the file.
 
-Check each harness: ask it "What's my AgentLink status?" It should answer with contacts and new messages (none at first). If not, run `npx -y @4thtech/agentlink doctor` in your own terminal.
+Check each harness: ask it "What's my AgentLink status?" It should answer with contacts and new messages (none at first). If not, run `npx -y @4thtech-io/agentlink doctor` in your own terminal.
 
 ### 3. Several agents on ONE computer (D-78, M1-9t)
 
 One owner per OS user, one agent per harness. In a terminal you opened yourself (not inside an AI app):
 
 ```bash
-npx -y @4thtech/agentlink init --agent claude-code --harness claude-code
-npx -y @4thtech/agentlink owner init --agent claude-code          # once per OS user: shows the owner code
-npx -y @4thtech/agentlink init --agent opencode --harness opencode
-npx -y @4thtech/agentlink owner add-agent --agent opencode        # asks for the owner code once
-npx -y @4thtech/agentlink init --agent antigravity --harness antigravity   # add --config <path> if needed
-npx -y @4thtech/agentlink owner add-agent --agent antigravity
+npx -y @4thtech-io/agentlink init --agent claude-code --harness claude-code
+npx -y @4thtech-io/agentlink owner init --agent claude-code          # once per OS user: shows the owner code
+npx -y @4thtech-io/agentlink init --agent opencode --harness opencode
+npx -y @4thtech-io/agentlink owner add-agent --agent opencode        # asks for the owner code once
+npx -y @4thtech-io/agentlink init --agent antigravity --harness antigravity   # add --config <path> if needed
+npx -y @4thtech-io/agentlink owner add-agent --agent antigravity
 ```
 
 - Each `init --agent <name>` creates a separate agent: its own folder and store under `~/.agentlink/agents/<name>/`, its own key in the keychain, and an MCP entry whose arguments end in `--agent <name>`. `--harness` writes only that app's config.
@@ -98,11 +98,11 @@ npx -y @4thtech/agentlink owner add-agent --agent antigravity
 On each computer, in a terminal you opened yourself (not inside an AI app):
 
 ```bash
-npx -y @4thtech/agentlink init                 # only if the agent does not exist yet
-npx -y @4thtech/agentlink owner init           # first agent on this OS user; further agents: owner add-agent (step 3)
+npx -y @4thtech-io/agentlink init                 # only if the agent does not exist yet
+npx -y @4thtech-io/agentlink owner init           # first agent on this OS user; further agents: owner add-agent (step 3)
 ```
 
-Write down the owner code it shows (a password manager is best) and type back the last four characters when asked. Never put the code in a chat. Then `npx -y @4thtech/agentlink doctor` should show no problems.
+Write down the owner code it shows (a password manager is best) and type back the last four characters when asked. Never put the code in a chat. Then `npx -y @4thtech-io/agentlink doctor` should show no problems.
 
 ### 5. Pairing matrix
 
@@ -116,7 +116,7 @@ Pair only these, so every harness pair is covered at least once. "From" creates 
 | P4 | Tali's Claude Code | Denis's Claude Code | two computers |
 
 For each pair:
-1. **Invite.** The inviter tells its agent "Create an AgentLink invite for <name>." (Terminal alternative: `npx -y @4thtech/agentlink invite`.) Send the link over a channel you trust. It works once.
+1. **Invite.** The inviter tells its agent "Create an AgentLink invite for <name>." (Terminal alternative: `npx -y @4thtech-io/agentlink invite`.) Send the link over a channel you trust. It works once.
 2. **Accept.** The other agent is told "Accept this AgentLink invite: <link>." It cannot accept at once: it returns an approval request and the exact command, such as `agentlink approve <approvalId>`.
 3. **Owner approves.** The accepting owner runs that command in their own terminal, checks who and what, and enters the owner code.
 4. **Accept again with the approval.** Tell the agent you approved. It calls accept again with the `approvalId`. (Terminal alternative: `agentlink accept '<link>' --approval <approvalId>`.)
@@ -174,11 +174,11 @@ OpenCode needs a model that works with tools: set one in OpenCode, or pass `--oc
 ```bash
 git switch main && git pull
 pnpm install && pnpm build
-(cd apps/cli && pnpm link --global)       # once; later pulls need only install and build
+(cd apps/cli && pnpm add -g .)            # once; later pulls usually need only install and build
 agentlink --version
 ```
 
-Building with `pnpm build` is checked (`apps/cli/dist/cli.js` runs). `pnpm link --global` is the standard pnpm way and needs a pnpm global bin folder on your PATH (`pnpm setup`); it was not run for this runbook. Without a global link, pass the built file instead: `--agentlink '["node","'$PWD'/apps/cli/dist/cli.js"]'` (a path with spaces is fine; run `approve` as `node apps/cli/dist/cli.js approve ...`).
+`pnpm build` writes the published bundle `apps/cli/dist/agentlink.js` (the `agentlink` bin, OPS-REL-1) next to the per-file build; both are checked and run. pnpm 12 has no `pnpm link --global`: `pnpm add -g .` in `apps/cli` installs the checkout as the global `agentlink` (run it again if `agentlink --version` shows an old build). Its bin folder must be on your PATH: run `pnpm setup` once, or add `~/Library/pnpm/bin` (macOS; `~/.local/share/pnpm/bin` on Linux) yourself. `npm link` in `apps/cli` works too and uses npm's global bin folder. Neither was run for this runbook. Without a global link, pass the built file instead: `--agentlink '["node","'$PWD'/apps/cli/dist/agentlink.js"]'` (a path with spaces is fine; run `approve` as `node apps/cli/dist/agentlink.js approve ...`). To try exactly what npm will publish, `npm pack` in `apps/cli` and `npm install -g` the tarball (needs the npm registry for the dependencies).
 
 **Run it:**
 
@@ -209,7 +209,7 @@ Record the result per step 8. Failures become backlog cards (symptom, harness, v
 - No wallet, extension, gas, seed phrase or chain choice appeared in any setup.
 
 ## If it fails
-- Install problems: `npx -y @4thtech/agentlink doctor` in your own terminal, then record and card it.
+- Install problems: `npx -y @4thtech-io/agentlink doctor` in your own terminal, then record and card it.
 - A harness refuses the config you added: restore your copy of the file from step 2 and record the exact format that failed (this is how we learn whether the Antigravity path or format is wrong).
 - Hostile message obeyed: stop that pair, tell Tali at once, and open a private advisory.
 - Never work around a missing owner step by letting an agent run it ([permission denied](permission-denied.md)).

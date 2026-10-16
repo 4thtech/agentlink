@@ -27,7 +27,7 @@ agentlink/
 │  ├─ node/                      # keychain KeyStore, SQLite Store, local approval server
 │  └─ ui/                        # shared React components (design system)
 ├─ apps/
-│  ├─ cli/                       # @4thtech/agentlink (CLI + MCP stdio + local UI bundle)
+│  ├─ cli/                       # @4thtech-io/agentlink (CLI + MCP stdio + local UI bundle)
 │  ├─ console/                   # owner console PWA
 │  ├─ verify/                    # verify page
 │  ├─ invite/                    # invite landing

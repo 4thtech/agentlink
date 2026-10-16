@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // OPS-CI-2 / D-43: a pull request that changes a published package must carry a changeset.
-// Runs `changeset status --since <base>`, which fails when a non-private workspace package changed
-// since the merge base and no changeset was added. Docs-only changes and private packages pass.
+// Runs `changeset status --since <base>`, which fails when a versioned workspace package changed
+// since the merge base and no changeset was added. Versioned: the published `@4thtech-io/agentlink` and
+// the private `@agentlink/*` libraries bundled into it (`.changeset/config.json`
+// `privatePackages.version: true`, OPS-REL-1). Docs-only changes pass.
 //
 //   node tools/release/check-changesets.mjs --base origin/main
 //

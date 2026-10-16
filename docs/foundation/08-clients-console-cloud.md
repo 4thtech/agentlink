@@ -65,7 +65,7 @@ UX requirements and screen inventory are in `11-claude-design-brief.md`. This do
 
 ### 3.2 Keys
 
-- Preferred: `npx @4thtech/agentlink cloud deploy` generates the agent seed **locally** and sets it with `wrangler secret put AGENT_SEED` in the **user's** account, then deploys. 4thTech never sees it.
+- Preferred: `npx @4thtech-io/agentlink cloud deploy` generates the agent seed **locally** and sets it with `wrangler secret put AGENT_SEED` in the **user's** account, then deploys. 4thTech never sees it.
 - Deploy-button path: first visit to `/setup` (protected by a one-time setup code printed in the deploy logs / set as a secret) generates the seed inside the Worker and stores it in Durable Object storage encrypted with the `SEED_WRAP_KEY` secret. Both stay in the user's account.
 - The owner pairs the cloud agent from the console or CLI (agent card signed by the owner).
 

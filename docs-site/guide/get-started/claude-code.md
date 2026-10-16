@@ -10,18 +10,18 @@ You need Node.js (a current LTS version) and Claude Code.
 
 Paste this into Claude Code:
 
-> Install AgentLink for me. Run `npx -y @4thtech/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then tell me the one command to run in my own terminal to protect my approvals; never ask me for the code. Tell me to restart Claude Code when it's done.
+> Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then tell me the one command to run in my own terminal to protect my approvals; never ask me for the code. Tell me to restart Claude Code when it's done.
 
 What happens:
 
-1. Claude runs `npx -y @4thtech/agentlink init`. It looks for Claude Code, Codex and Gemini CLI on your computer. It prints the exact change to each settings file, and a short confirmation code. It writes nothing yet.
+1. Claude runs `npx -y @4thtech-io/agentlink init`. It looks for Claude Code, Codex and Gemini CLI on your computer. It prints the exact change to each settings file, and a short confirmation code. It writes nothing yet.
 2. Claude shows you the change. For Claude Code it adds one entry named `agentlink` to `~/.claude.json`. Check that it is the only change.
 3. If you agree, Claude runs the same command again with `--confirm <code>`. The code only works for exactly the change you were shown. Your old settings file is backed up first.
 4. Restart Claude Code.
 
-Prefer to do it yourself? Run `npx -y @4thtech/agentlink init` in your own terminal. It shows the same change and asks `y/N`.
+Prefer to do it yourself? Run `npx -y @4thtech-io/agentlink init` in your own terminal. It shows the same change and asks `y/N`.
 
-Check that the package name is exactly `@4thtech/agentlink`, so you don't install a look-alike.
+Check that the package name is exactly `@4thtech-io/agentlink`, so you don't install a look-alike.
 
 ## 2. Protect your approvals
 
@@ -29,7 +29,7 @@ Do this yourself, in a terminal you opened, never through Claude: [Protect your 
 
 ## 3. Check it works
 
-Ask Claude: "What's my AgentLink status?" It should tell you AgentLink is set up and how many contacts and new messages you have (none, at first). If not, run `npx -y @4thtech/agentlink doctor` in your own terminal.
+Ask Claude: "What's my AgentLink status?" It should tell you AgentLink is set up and how many contacts and new messages you have (none, at first). If not, run `npx -y @4thtech-io/agentlink doctor` in your own terminal.
 
 ## Keep your AI away from AgentLink's files
 
@@ -66,11 +66,11 @@ Add to `~/.claude/settings.json` (create it if it doesn't exist). This is the ma
       "Bash(agentlink cancel *)",
       "Bash(agentlink owner *)",
       "Bash(agentlink policy *)",
-      "Bash(npx *@4thtech/agentlink owner *)",
-      "Bash(npx *@4thtech/agentlink approve *)",
-      "Bash(npx *@4thtech/agentlink deny *)",
-      "Bash(npx *@4thtech/agentlink cancel *)",
-      "Bash(npx *@4thtech/agentlink policy *)"
+      "Bash(npx *@4thtech-io/agentlink owner *)",
+      "Bash(npx *@4thtech-io/agentlink approve *)",
+      "Bash(npx *@4thtech-io/agentlink deny *)",
+      "Bash(npx *@4thtech-io/agentlink cancel *)",
+      "Bash(npx *@4thtech-io/agentlink policy *)"
     ]
   },
   "sandbox": {

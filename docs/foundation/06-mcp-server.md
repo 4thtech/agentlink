@@ -1,6 +1,6 @@
 # 06 — MCP Server Specification
 
-**Package:** `@4thtech/agentlink` (npm, public). Binaries: `agentlink` (CLI) with subcommand `agentlink mcp` (stdio server).
+**Package:** `@4thtech-io/agentlink` (npm, public). Binaries: `agentlink` (CLI) with subcommand `agentlink mcp` (stdio server).
 **Worker variant:** `apps/cloud-agent` exposes the same tools over streamable HTTP with OAuth (see 08).
 **SDK:** official TypeScript MCP SDK (stdio and streamable HTTP transports). Tools declare `inputSchema` **and** `outputSchema`; results return `structuredContent` plus a short human-readable text block.
 
@@ -456,12 +456,12 @@ A stdio server runs only while the harness runs, so nothing tells the user that 
 
 | Harness | Configuration |
 |---|---|
-| **Claude Code** | `~/.claude.json` user scope → `mcpServers.agentlink` = `{"type": "stdio", "command": "npx", "args": ["-y", "@4thtech/agentlink", "mcp"], "env": {}}`, written by `init` after the diff is confirmed; equivalent to `claude mcp add --scope user agentlink -- npx -y @4thtech/agentlink mcp` (proposed, owner confirms at merge; IR-M1-9a-1 F05). Not written when `CLAUDE_CONFIG_DIR` is set |
-| **Claude Desktop** | `claude_desktop_config.json` → `{"mcpServers": {"agentlink": {"command": "npx", "args": ["-y", "@4thtech/agentlink", "mcp"]}}}`; also ship a one-click Claude Desktop extension bundle (verify current bundle format at build time) |
-| **Codex (CLI, IDE, ChatGPT desktop Codex)** | `codex mcp add agentlink -- npx -y @4thtech/agentlink mcp` (writes `[mcp_servers.agentlink]` in `~/.codex/config.toml`) |
-| **Gemini CLI** | `~/.gemini/settings.json` → `"mcpServers": {"agentlink": {"command": "npx", "args": ["-y", "@4thtech/agentlink", "mcp"]}}` |
-| **OpenCode** | `~/.config/opencode/opencode.json` (global) → `"mcp": {"agentlink": {"type": "local", "command": ["npx", "-y", "@4thtech/agentlink", "mcp"], "enabled": true}}`; `command` is one array (program and arguments), not a separate `args`. Written by `init --harness opencode` after the diff is confirmed (D-78; verified 2026-10-16 against opencode.ai/docs/mcp-servers; re-verify at build time) |
-| **Antigravity** | `~/.gemini/config/mcp_config.json` (global) → `"mcpServers": {"agentlink": {"command": "npx", "args": ["-y", "@4thtech/agentlink", "mcp"]}}`. Written by `init --harness antigravity` after the diff is confirmed; older builds read `~/.gemini/antigravity/mcp_config.json`, so the owner can name the file with `--config <path>` (D-78; documentation-verified 2026-10-16 against antigravity.google/docs/mcp; re-verify at build time). Not the Gemini CLI file `~/.gemini/settings.json` |
+| **Claude Code** | `~/.claude.json` user scope → `mcpServers.agentlink` = `{"type": "stdio", "command": "npx", "args": ["-y", "@4thtech-io/agentlink", "mcp"], "env": {}}`, written by `init` after the diff is confirmed; equivalent to `claude mcp add --scope user agentlink -- npx -y @4thtech-io/agentlink mcp` (proposed, owner confirms at merge; IR-M1-9a-1 F05). Not written when `CLAUDE_CONFIG_DIR` is set |
+| **Claude Desktop** | `claude_desktop_config.json` → `{"mcpServers": {"agentlink": {"command": "npx", "args": ["-y", "@4thtech-io/agentlink", "mcp"]}}}`; also ship a one-click Claude Desktop extension bundle (verify current bundle format at build time) |
+| **Codex (CLI, IDE, ChatGPT desktop Codex)** | `codex mcp add agentlink -- npx -y @4thtech-io/agentlink mcp` (writes `[mcp_servers.agentlink]` in `~/.codex/config.toml`) |
+| **Gemini CLI** | `~/.gemini/settings.json` → `"mcpServers": {"agentlink": {"command": "npx", "args": ["-y", "@4thtech-io/agentlink", "mcp"]}}` |
+| **OpenCode** | `~/.config/opencode/opencode.json` (global) → `"mcp": {"agentlink": {"type": "local", "command": ["npx", "-y", "@4thtech-io/agentlink", "mcp"], "enabled": true}}`; `command` is one array (program and arguments), not a separate `args`. Written by `init --harness opencode` after the diff is confirmed (D-78; verified 2026-10-16 against opencode.ai/docs/mcp-servers; re-verify at build time) |
+| **Antigravity** | `~/.gemini/config/mcp_config.json` (global) → `"mcpServers": {"agentlink": {"command": "npx", "args": ["-y", "@4thtech-io/agentlink", "mcp"]}}`. Written by `init --harness antigravity` after the diff is confirmed; older builds read `~/.gemini/antigravity/mcp_config.json`, so the owner can name the file with `--config <path>` (D-78; documentation-verified 2026-10-16 against antigravity.google/docs/mcp; re-verify at build time). Not the Gemini CLI file `~/.gemini/settings.json` |
 | **Cursor / VS Code / Windsurf / Cline** | Standard `mcp.json` stdio entry |
 | **ChatGPT (web, developer mode) / claude.ai custom connector** | Remote URL of the user's self-hosted Worker (`https://<name>.<account>.workers.dev/mcp`) with OAuth |
 
@@ -471,15 +471,15 @@ Requirements: Node.js LTS. Note for users: custom MCP servers generally need pai
 
 Each harness gets a short prompt the user pastes to their own agent (F-09). It is published in the docs and in `skills/agentlink/SKILL.md`. Base prompt:
 
-> Install AgentLink for me. Run `npx -y @4thtech/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then open the AgentLink setup page so I can protect my approvals.
+> Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then open the AgentLink setup page so I can protect my approvals.
 
 - Per-harness variants add what that harness needs (e.g. "then tell me to restart Claude Desktop").
 - Remote-only harnesses (ChatGPT web, claude.ai) cannot run commands or reach a local server: their prompt points to the self-host template (F-70) instead.
-- Prompts name the exact package (`@4thtech/agentlink`), so agents do not install look-alikes; the docs link the package's npm provenance. Install prompts contain no secrets; the install-and-accept prompt below contains only the invite link the recipient already holds.
+- Prompts name the exact package (`@4thtech-io/agentlink`), so agents do not install look-alikes; the docs link the package's npm provenance. Install prompts contain no secrets; the install-and-accept prompt below contains only the invite link the recipient already holds.
 
 **Install-and-accept prompt (one link installs and pairs, D-53).** An invite link is also the install path. The inviter's agent returns ready-to-send `shareText` (§2.1); the recipient opens the link, and the invite page (08 §4) shows one prompt to paste into their own agent, built in the browser from the link:
 
-> Install AgentLink for me and accept an invite. If AgentLink is not set up yet, run `npx -y @4thtech/agentlink init`, show me the exact configuration change it proposes, apply it only after I confirm, and open the AgentLink setup page so I can protect my approvals. Then accept this AgentLink invite: {inviteUrl}. If your AgentLink tools only appear after a restart, accept it with `npx -y @4thtech/agentlink accept '{inviteUrl}'` instead.
+> Install AgentLink for me and accept an invite. If AgentLink is not set up yet, run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, apply it only after I confirm, and open the AgentLink setup page so I can protect my approvals. Then accept this AgentLink invite: {inviteUrl}. If your AgentLink tools only appear after a restart, accept it with `npx -y @4thtech-io/agentlink accept '{inviteUrl}'` instead.
 
 M1a variant (no local setup page until M1b): the setup sentence reads "and tell me the one command to run in my own terminal to protect my approvals; never ask me for the passphrase."
 

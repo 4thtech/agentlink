@@ -85,7 +85,7 @@
   "local.firstRun.weaker": "The desktop app protects approvals more strongly.",
   "local.linkExpired": "This link has expired. Open AgentLink again from your AI, or run `agentlink ui`.",
   "onboarding.paste.title": "Paste this to your agent",
-  "onboarding.paste.prompt": "Install AgentLink for me. Run `npx -y @4thtech/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then open the AgentLink setup page so I can protect my approvals.",
+  "onboarding.paste.prompt": "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then open the AgentLink setup page so I can protect my approvals.",
   "onboarding.paste.note": "Your AI will show you the change and ask before applying it.",
   "onboarding.waiting": "Waiting for your agent…",
   "onboarding.success": "Your agent is connected. Try: 'Create an AgentLink invite for a colleague.'",
