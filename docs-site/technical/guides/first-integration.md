@@ -1,6 +1,6 @@
 # Your first integration
 
-> **Status: Planned for v0.2.0 (M1).** This page is an outline; no package is published yet. The `@agentlink/*` libraries first appear with v0.1.0 (M1a), but their API is not stable before 1.0.0.
+> **Status: Planned for v0.2.0 (M1).** This page is an outline; no library package is published on its own yet. The `@agentlink/*` libraries are bundled into the `@4thtech-io/agentlink` CLI from v0.1.0 (M1a), but their API is not stable before 1.0.0.
 
 **Purpose:** a tutorial that takes a developer from an empty project to two programmatic agents that pair, exchange a message and, from v0.2.0, notarize it on a testnet.
 

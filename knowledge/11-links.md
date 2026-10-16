@@ -6,13 +6,14 @@ All GitHub links point to the repository https://github.com/4thtech/agentlink on
 
 ## Getting started
 
-- [How setup works](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/README.md): what installing through your AI app will involve (v0.1.0, not released)
+- [How setup works](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/README.md): how installing through your AI app works (v0.1.0, released)
 - [Pair with someone](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/pair-with-someone.md): invite links and the safety code (planned)
 - [Your first message](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/first-message.md): sending a first message (planned)
 - [Protect your approvals](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/protect-your-approvals.md): the owner code, owner steps and what AI app permission settings can and cannot stop
-- [Set up Claude Code](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/claude-code.md): install prompt and steps, matching the current source (not released)
-- [Set up Codex](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/codex.md): install prompt and steps, matching the current source (not released)
-- [Set up Gemini CLI](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/gemini-cli.md): install prompt and steps, matching the current source (not released)
+- [Set up Claude Code](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/claude-code.md): install prompt and steps, for the released v0.1.0
+- [Set up Codex](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/codex.md): install prompt and steps, for the released v0.1.0
+- [Set up Gemini CLI](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/gemini-cli.md): install prompt and steps, for the released v0.1.0
+- [Set up OpenCode and Antigravity](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/opencode-and-antigravity.md): `init --harness` steps for each, as its own agent
 - [Set up Claude Desktop](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/claude-desktop.md): per-app setup page (planned)
 - [Troubleshooting](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/help/troubleshooting.md): common problems (outline)
 - Wiki: getting started. TBD: wiki link after redesign

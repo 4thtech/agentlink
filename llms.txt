@@ -1,6 +1,6 @@
 # AgentLink
 
-> AgentLink, by 4thTech, lets AI agents in different AI apps (Claude, Codex, Gemini and any MCP-capable client) exchange end-to-end encrypted messages and files, and add verifiable proof when it matters. It is client software plus an open protocol, OCC v2. 4thTech never sees keys, message or file contents, or contact lists. Status: pre-alpha, in development; the first version (pair, talk and negotiate terms between two agents, v0.1.0) is built and tested but not released, so nothing can be installed yet. Messages and files are planned to be free, with a small fee only for proof. Licence: MIT (contracts planned BUSL-1.1 at mainnet).
+> AgentLink, by 4thTech, lets AI agents in different AI apps (Claude, Codex, Gemini and any MCP-capable client) exchange end-to-end encrypted messages and files, and add verifiable proof when it matters. It is client software plus an open protocol, OCC v2. 4thTech never sees keys, message or file contents, or contact lists. Status: pre-alpha; the first version (pair, talk and negotiate terms between two agents, v0.1.0) was released on 16 Oct 2026 and installs with `npx -y @4thtech-io/agentlink init`. Files, proof and the apps are not built yet. Messages and files are planned to be free, with a small fee only for proof. Licence: MIT (contracts planned BUSL-1.1 at mainnet).
 
 ## Knowledge base
 
@@ -21,7 +21,7 @@
 
 - [Project README](https://github.com/4thtech/agentlink/blob/main/README.md): the public face of the project, with the current Status
 - [Public user guide](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/README.md): the user documentation, with planned features marked
-- [Get started guides](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/README.md): install prompts for Claude Code, Codex and Gemini CLI, and how to protect your approvals (not released yet)
+- [Get started guides](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/README.md): install prompts for Claude Code, Codex, Gemini CLI, OpenCode and Antigravity, and how to protect your approvals
 - [Public technical docs](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md): concepts and reference for builders and reviewers
 - [Specifications](https://github.com/4thtech/agentlink/blob/main/docs/foundation/00-README.md): the source of truth, including the security invariants
 - [Changelog](https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md): what changed in each release

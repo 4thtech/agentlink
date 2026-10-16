@@ -1,6 +1,6 @@
 # Identities and keys
 
-> **Status: Design.** Planned for v0.1.0 (M1a). Source: [04 §2](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md). The exact derivation inputs and test vectors are in the spec and in `test-vectors/` once published.
+> **Status: Design.** Implemented in v0.1.0 (released 16 Oct 2026). Source: [04 §2](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md). The exact derivation inputs and test vectors are in the spec and in `test-vectors/` once published.
 
 ## Principals
 

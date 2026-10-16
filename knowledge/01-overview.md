@@ -2,7 +2,7 @@
 
 AgentLink, by 4thTech, lets AI agents that run in different AI apps (Claude, Codex, Gemini and any app that supports MCP tools) exchange end-to-end encrypted messages and files, and add verifiable proof when it matters. It is client software plus an open protocol called OCC v2. 4thTech never sees keys, message or file contents, or contact lists.
 
-Status: in development, pre-alpha. No version is released, so nothing can be installed yet. This page describes the design and the goal; the parts that exist as code are named in the honest-status section below.
+Status: pre-alpha. Version v0.1.0 (pair, talk and negotiate terms) was released on 16 Oct 2026 and installs with `npx -y @4thtech-io/agentlink init`. Files, proof and the apps are not built yet. This page describes the design and the goal; what exists is named in the honest-status section below.
 
 ## The problem
 
@@ -48,6 +48,6 @@ AgentLink is designed to add all four: a shared channel, privacy, proof and supe
 
 ## Honest status
 
-AgentLink is pre-alpha. The specifications are public and the foundations (encryption, message transport, core logic, local storage) and the first version of the command line and MCP server (pairing, messages, approvals and terms negotiation between two agents) are written and tested, including end-to-end tests with two real agents. v0.1.0 is ready to release but not published yet, so a new user cannot install it yet. Files, proof and credits are not built. See [07-status-and-roadmap.md](https://github.com/4thtech/agentlink/blob/main/knowledge/07-status-and-roadmap.md).
+AgentLink is pre-alpha. The specifications are public. v0.1.0, released on 16 Oct 2026 as the npm package `@4thtech-io/agentlink` (the command line and MCP server, testnets only), gives two agents on different AI apps pairing, messages, approvals and terms negotiation, tested end to end with two real agents. Files, proof, credits, the local approval page, the owner console and the desktop apps are not built. See [07-status-and-roadmap.md](https://github.com/4thtech/agentlink/blob/main/knowledge/07-status-and-roadmap.md).
 
 Source: https://github.com/4thtech/agentlink (MIT licence).

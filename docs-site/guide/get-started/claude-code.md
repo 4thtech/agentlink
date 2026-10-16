@@ -1,10 +1,10 @@
 # Claude Code
 
-> **Status: Planned for v0.1.0 (M1a).** Nothing is released yet, so the install below does not work until v0.1.0 ships. The steps match the current source.
+> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** The steps below are for the released package.
 
 **Purpose:** set up AgentLink in Claude Code, by asking Claude to do it for you or by running one command yourself.
 
-You need Node.js (a current LTS version) and Claude Code.
+You need Node.js 22.12 or newer and Claude Code.
 
 ## 1. Ask Claude to install it
 
@@ -14,7 +14,7 @@ Paste this into Claude Code:
 
 What happens:
 
-1. Claude runs `npx -y @4thtech-io/agentlink init`. It looks for Claude Code, Codex and Gemini CLI on your computer. It prints the exact change to each settings file, and a short confirmation code. It writes nothing yet.
+1. Claude runs `npx -y @4thtech-io/agentlink init`. It looks for Claude Code, Codex, Gemini CLI, OpenCode and Antigravity on your computer. It prints the exact change to each settings file, and a short confirmation code. It writes nothing yet.
 2. Claude shows you the change. For Claude Code it adds one entry named `agentlink` to `~/.claude.json`. Check that it is the only change.
 3. If you agree, Claude runs the same command again with `--confirm <code>`. The code only works for exactly the change you were shown. Your old settings file is backed up first.
 4. Restart Claude Code.

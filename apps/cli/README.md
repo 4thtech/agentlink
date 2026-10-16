@@ -12,7 +12,7 @@ Ask your agent to set it up, or run this in your own terminal:
 npx -y @4thtech-io/agentlink init
 ```
 
-`init` finds Claude Code, Codex and Gemini CLI on your computer, shows the exact change to each settings file and writes nothing until you confirm. Check that the package name is exactly `@4thtech-io/agentlink`, so you don't install a look-alike.
+`init` finds Claude Code, Codex, Gemini CLI, OpenCode and Antigravity on your computer, shows the exact change to each settings file and writes nothing until you confirm. Check that the package name is exactly `@4thtech-io/agentlink`, so you don't install a look-alike.
 
 Guides: [Claude Code](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/claude-code.md), [Codex](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/codex.md), [Gemini CLI](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/gemini-cli.md).
 

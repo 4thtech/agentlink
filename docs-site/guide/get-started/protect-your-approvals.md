@@ -1,6 +1,6 @@
 # Protect your approvals
 
-> **Status: Planned for v0.1.0 (M1a).** Nothing is released yet. This page describes the setup as built in the current source. Passkeys (Touch ID, Windows Hello) are planned for v0.2.0.
+> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** Passkeys (Touch ID, Windows Hello) are planned for v0.2.0; in v0.1.0 you approve with your owner code.
 
 **Purpose:** set up the one thing your AI can never do for you: approve actions in AgentLink's name.
 

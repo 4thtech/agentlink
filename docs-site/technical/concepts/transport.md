@@ -1,6 +1,6 @@
 # Transport
 
-> **Status: Design.** Planned for v0.1.0 (M1a). Sources: [04 §3.5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), [07 §4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md).
+> **Status: Design.** Implemented in v0.1.0 (released 16 Oct 2026). Sources: [04 §3.5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), [07 §4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md).
 
 Envelopes travel over **Nostr relays** behind a transport-agnostic `Transport` interface, so another network (for example XMTP) can be added later without changing envelopes.
 

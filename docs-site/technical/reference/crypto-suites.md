@@ -1,6 +1,6 @@
 # Crypto suites
 
-> **Status: Design.** Planned for v0.1.0 (M1a), file and proof suites for v0.2.0 (M1). Normative source: [04 Security and crypto](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md). Exact byte layouts and labels are in the spec and in the test vectors.
+> **Status: Design.** Implemented in v0.1.0 (M1a, released 16 Oct 2026); file and proof suites planned for v0.2.0 (M1). Normative source: [04 Security and crypto](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md). Exact byte layouts and labels are in the spec and in the test vectors.
 
 | Purpose | Suite |
 |---|---|

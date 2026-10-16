@@ -1,6 +1,6 @@
 # Policies
 
-> **Status: Planned for v0.1.0 (M1a)** (contacts, commitments) **and v0.2.0 (M1)** (files, proofs, receipts). This page is an outline. Defaults are specified in [06 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md) and are added here, with their final names, when they ship.
+> **Status: Available since v0.1.0** (contacts, commitments) **and Planned for v0.2.0 (M1)** (files, proofs, receipts). This page is an outline. Defaults are specified in [06 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md) and are added here, with their final names, when they ship.
 
 **Purpose:** the reference for every policy key, its default and what it allows.
 

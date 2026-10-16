@@ -1,6 +1,6 @@
 # Envelopes and encryption
 
-> **Status: Design.** Planned for v0.1.0 (M1a). Source: [04 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md). The spec defines exact byte layouts; this page is a summary.
+> **Status: Design.** Implemented in v0.1.0 (released 16 Oct 2026). Source: [04 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md). The spec defines exact byte layouts; this page is a summary.
 
 An **envelope** is the container for every message and file reference. It is encrypted once with a fresh content key, and that key is wrapped separately for each recipient.
 

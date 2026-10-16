@@ -628,7 +628,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - If the workflow is changed, the secret scan still fails on a planted fake secret (negative control recorded in the PR).
 
 #### OPS-CI-2 · CI audit PR 2: release readiness and the deploy-freeze token (new)
-- **Status:** in review (PR `OPS-CI-2 ci: release readiness and deploy-freeze guard`; the token and the freeze round trip are owner steps, `ci-cd.md` §8) · **Size:** S · **Tier:** Sonnet (owner for the token) · **Security:** S2 (`.github/**` and release path, audit-rules §2.2; owner "merge")
+- **Status:** done (PR #184, 2026-10-16; the token and the freeze round trip were owner steps, `ci-cd.md` §8) · **Size:** S · **Tier:** Sonnet (owner for the token) · **Security:** S2 (`.github/**` and release path, audit-rules §2.2; owner "merge")
 - **Repo/path:** agentlink · .github/workflows/release.yml, .github/workflows/ci.yml, docs/process/ci-cd.md
 - **Depends on:** M0-17; follows CI audit PR 1 (4thtech/agentlink#109)
 - **Spec:** `ci-cd.md` (Release, Deploy freeze); D-25, D-43, D-52
@@ -645,7 +645,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 #### OPS-REL-1 · v0.1.0 release blocker: decide which packages publish (new)
 - **Decision (Tali, chat, 2026-10-16):** v0.1.0 publishes only the CLI, with its workspace packages bundled in; every other package stays private. Release-path change, so S2.
 - **Decision (Tali, chat, 2026-10-16):** the npm org is `4thtech-io` (the `4thtech` scope was not available), so the package is `@4thtech-io/agentlink`; the bin stays `agentlink`, GitHub URLs (`github.com/4thtech/agentlink`) are unchanged. The `@agentlink` npm org belongs to a third party (IR-OPS-REL-1-1; rename carded as OPS-REL-2).
-- **Status:** in review (bundled CLI package, deps-check `bundles`, `privatePackages.version: true`) · **Size:** S · **Tier:** Opus (owner decision) · **Security:** S1 (package manifests, release path)
+- **Status:** done (PR #185, 2026-10-16; v0.1.0 published as `@4thtech-io/agentlink`) · **Size:** S · **Tier:** Opus (owner decision) · **Security:** S1 (package manifests, release path)
 - **Repo/path:** agentlink · `packages/*/package.json`, `apps/*/package.json`, `.changeset/config.json`, `docs/process/versioning.md`
 - **Depends on:** OPS-CI-2
 - **Spec:** D-25, D-43; `release-and-deployment.md` §4.1; `versioning.md`
@@ -690,6 +690,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Invariants:** —
 - **Scope:**
   - The release run for v0.1.0 failed closed because the Changesets "Version packages" PR does not touch the root `CHANGELOG.md`: the `notes` guard found no non-empty `## [0.1.0]` section and a hand-made DOCS PR had to roll `[Unreleased]` into it. Automate that roll (a changesets hook or a CI step on the Version packages PR): move `[Unreleased]` entries into `## [<version>] - <date>`, leave an empty `[Unreleased]`, update the link references.
+- **Also (found on release day):** the step that creates the GitHub Release failed with HTTP 422 because the `## [0.1.0]` section (about 130 KB) is over GitHub's 125,000-character body limit. Fall back to a short note (`docs/releases/<version>.md` if present, else a link to the CHANGELOG section) when the section is too long.
 - **Acceptance:**
   - A Version packages PR contains the rolled root CHANGELOG; the `notes` guard passes without a manual PR (test on a fixture CHANGELOG); an empty `[Unreleased]` is refused or left untouched.
 
@@ -3055,7 +3056,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A symlink inside an allowed folder pointing to `~/.ssh` is refused; Windows path tests run in CI.
 
 #### M1-16 · npm release pipeline activation (new)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
+- **Status:** done for v0.1.0 (the stable `latest` path: #124, #184, #185, #192, #193; v0.1.0 published 2026-10-16 with provenance; the `next` prerelease path was not exercised) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · .github/workflows/release.yml, .changeset/
 - **Depends on:** M0-2d, M0-2e
 - **Spec:** 04 §7 (supply chain); `release-and-deployment.md` §4.1; `ci-cd.md` §4–§5
@@ -3190,7 +3191,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Follow-up (local dogfood run 2, 2026-10-16; card as M1-22 or M1-12a work):** (a) OpenCode's summary of an offer showed raw addresses ("paid by 0xb680…8275 to 0x40a9…9337"). Check whether `agentlink_inbox` and the terms summaries expose address-like strings to the agent, and whether 11 §5 copy should show contact names instead. (b) A duplicate identical offer (same terms sent twice) appears as two open offers; consider a dedupe hint in the inbox or status summary.
 
 #### M1-23 · J9 dogfood: Tali's and Denis's agents sync through AgentLink (M1a gate) (new)
-- **Status:** in-progress (the runbook RB-17 `docs/runbooks/dogfood-m1a.md` merged in 4thtech/agentlink#168, 2026-10-16; the dogfood run itself is open) · **Size:** S · **Tier:** Sonnet (setup notes) + Owner (with @denisjazbec) · **Security:** S1 · **Phase:** M1a
+- **Status:** in-progress (v0.1.0 is released; the runbook RB-17 `docs/runbooks/dogfood-m1a.md` merged in 4thtech/agentlink#168, 2026-10-16; the dogfood run itself is open) · **Size:** S · **Tier:** Sonnet (setup notes) + Owner (with @denisjazbec) · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** owner's sync file (dogfood log); issues as backlog cards. No synced project content is committed.
 - **Depends on:** to start (D-73 (8)): M1-9p, M1-9r, M1-7k, M1-7h, M1-12a, M1-12b, M1-29 (send and inbox work); to close the gate: all M1a cards except DESIGN-D1 and M1-9g (D-30); in particular M1-13b, M1-19, M1-22, M1-25
 - **Spec:** D-33, D-53; 02 J7, J8, J9; 06 §6.1 (session habit), §7.1 (install prompts, install-and-accept prompt); 10 "Gate M1a"; `docs/process/sync-protocol.md`
@@ -3244,7 +3245,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Search results and the go/no-go recorded privately; the name confirmed or changed in the decision log before M2-10 is decided.
 
 #### M1-25 · Agent-assisted install: install prompts per harness (D-39) (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in progress (post-release pass for v0.1.0 done: status hints, get-started pages incl. OpenCode and Antigravity, everyday-use and troubleshooting pages; the negotiation, glossary and FAQ pages remain) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · docs-site/guide/get-started/, skills/agentlink/SKILL.md, apps/cli (`init`)
 - **Depends on:** M1-9a, M1-12a, M1-12b, M1-16
 - **Spec:** D-39, D-53; 06 §7, §7.1 (install prompts, install-and-accept prompt); 02 F-01, F-09, J1, J7; 04 §2.5; 11 §5

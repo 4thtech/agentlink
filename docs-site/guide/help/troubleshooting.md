@@ -1,18 +1,23 @@
 # Troubleshooting
 
-> **Status: Planned for v0.1.0 (M1a).** This page is an outline. It grows with each release, from real problems reported by testers.
+> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** It grows with each release, from real problems reported by testers.
 
 **Purpose:** fix common problems yourself, and know what to include when you ask for help.
 
-## Outline
+## First, run the check
 
-- **Setup:** the AgentLink tools don't appear in my AI app; the installer could not find my AI app; I need to restart.
-- **Pairing:** the invite expired or was already used; the safety codes don't match (stop and check with the other person).
-- **Messages:** a message hasn't arrived yet; my agent says a contact is unknown; messages from someone wait in requests.
-- **Approvals:** the approval link doesn't open; I lost my passkey (use the recovery kit).
-- **Files (M1):** "set up storage" appears for a large file; a download link expired.
-- **Proof and credits (M1):** "needs credits"; a proof is still pending.
-- **Diagnostics:** the built-in check (`agentlink doctor`, planned) and what it reports. It never shows your messages or secrets.
-- **Getting help:** where to ask, and what never to share (your recovery kit, passphrase or recovery code).
+In your own terminal: `npx -y @4thtech-io/agentlink doctor`. It tells you what is set up and what is not, and prints the fix. It never shows your messages or secrets.
 
-**Filled in at:** M1a (v0.1.0), extended at every milestone; backlog cards DOCS-M1a to DOCS-M3.
+## Common problems
+
+- **The AgentLink tools don't appear in my AI app.** Restart the app after setup. Run `doctor`. If `init` could not find your app, name it: `init --harness <app>`.
+- **The invite expired or was already used.** Invites work once and expire after 7 days. Ask for a new one.
+- **The safety codes don't match.** Stop and check with the other person by phone or in person.
+- **A message hasn't arrived.** Messages are checked about every 30 seconds while your AI app is open. Ask your agent to check AgentLink again.
+- **A message from someone is waiting in requests.** They are not a contact yet. Run `agentlink requests` in your terminal.
+- **The approval command says it looks like a terminal my AI controls.** That is on purpose. Open a new terminal window yourself.
+- **Files, proof, credits.** Not available yet (planned for v0.2.0).
+
+## Getting help
+
+Open an [issue](https://github.com/4thtech/agentlink/issues) with the output of `doctor`. Never share your owner code or your private folder.

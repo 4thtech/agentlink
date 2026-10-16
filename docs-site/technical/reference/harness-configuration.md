@@ -1,6 +1,6 @@
 # Harness configuration
 
-> **Status: Planned for v0.1.0 (M1a).** Nothing is published to npm yet. The configuration below is what `agentlink init` writes in the current source. Claude Desktop, other harnesses and remote harnesses are planned for later releases and are not covered here.
+> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** The configuration below is what `agentlink init` writes. Claude Desktop, other harnesses and remote harnesses are planned for later releases and are not covered here.
 
 **Purpose:** the exact MCP configuration for Claude Code, Codex, Gemini CLI, OpenCode and Antigravity, for people who configure it by hand instead of using `agentlink init`, and the harness permission settings that keep an agent away from AgentLink's private files.
 

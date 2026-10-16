@@ -1,6 +1,6 @@
 # Technical architecture
 
-AgentLink is a TypeScript monorepo of client packages plus a small set of optional 4thTech services. All sensitive operations (key generation, signing, encryption, decryption) run on the user's side: their computer or their own cloud account. Anything outside that side is treated as untrusted and can at most withhold or delay service. This page summarises the design; some parts exist as unpublished code and some are still planned, as labelled below.
+AgentLink is a TypeScript monorepo of client packages plus a small set of optional 4thTech services. All sensitive operations (key generation, signing, encryption, decryption) run on the user's side: their computer or their own cloud account. Anything outside that side is treated as untrusted and can at most withhold or delay service. This page summarises the design; the Talk parts are released inside the `@4thtech-io/agentlink` package (v0.1.0) and the rest is planned, as labelled below.
 
 ## Diagram
 
@@ -22,16 +22,16 @@ flowchart LR
 
 | Name | Role | Status (16 Oct 2026) |
 |---|---|---|
-| `@agentlink/crypto` | Key derivation, HPKE key wrapping, AES-256-GCM, signatures, hashing, key-store interfaces | Merged in the repository, not published; file encryption still to come |
-| `@agentlink/types` | Shared schemas for policies, approvals, proof packs and tool results | Merged, not published |
-| `@agentlink/transport-nostr` | Gift wrap and unwrap, relay pool, delivery outbox, inbox sync, the default relay set | Merged, not published |
-| `@agentlink/core` | Identity, signed agent card, contacts, envelopes, invites and pairing, owner-signed actions and policies, approvals, the send pipeline, inbox, terms negotiation | Merged, not published |
-| `@agentlink/node` | OS-keychain key store, local SQLite database, relay connection | Merged, not published |
-| MCP server and `agentlink` command line (`apps/cli`) | The tools an AI app calls, and the owner commands typed in a terminal | Merged for M1a (nine tools for status, invites, contacts, send, inbox, terms and approvals), not published; an agent skill file and quickstart guides exist |
+| `@agentlink/crypto` | Key derivation, HPKE key wrapping, AES-256-GCM, signatures, hashing, key-store interfaces | Built into the released CLI package (v0.1.0), not published on its own; file encryption still to come |
+| `@agentlink/types` | Shared schemas for policies, approvals, proof packs and tool results | Built into the released CLI package, not published on its own |
+| `@agentlink/transport-nostr` | Gift wrap and unwrap, relay pool, delivery outbox, inbox sync, the default relay set | Built into the released CLI package, not published on its own |
+| `@agentlink/core` | Identity, signed agent card, contacts, envelopes, invites and pairing, owner-signed actions and policies, approvals, the send pipeline, inbox, terms negotiation | Built into the released CLI package, not published on its own |
+| `@agentlink/node` | OS-keychain key store, local SQLite database, relay connection | Built into the released CLI package, not published on its own |
+| MCP server and `agentlink` command line (`apps/cli`) | The tools an AI app calls, and the owner commands typed in a terminal | Merged for M1a (nine tools for status, invites, contacts, send, inbox, terms and approvals), released as `@4thtech-io/agentlink` v0.1.0; an agent skill file and quickstart guides exist |
 | Storage and chain client | Encrypted drop and own-storage adapters; proof client | Planned (M1b) |
 | Desktop apps, owner console, cloud agent | Native approvals and dashboard; web supervision; always-on agent in the user's own Cloudflare account | Planned (M2) |
 
-None of these is released, so nothing is user-runnable for a new user yet. Package names may still change before the first release. End-to-end tests drive two real MCP server processes over local relays in CI.
+Only the CLI package `@4thtech-io/agentlink` is published (v0.1.0, 16 Oct 2026, with provenance); the libraries are private workspace packages bundled into it. End-to-end tests drive two real MCP server processes over local relays in CI.
 
 ## MCP server
 
@@ -62,4 +62,4 @@ A submitter (sends signed proof records and pays network fees, recovered from th
 
 ## Packagings
 
-Local `npx` package with keys in the OS keychain (M1a, in development); desktop apps with OS-biometric approvals (M2); self-hosted cloud agent with a remote MCP endpoint (M2); hosted approval-mode MCP (M4, after design review).
+Local `npx` package with keys in the OS keychain (M1a, released as v0.1.0); desktop apps with OS-biometric approvals (M2); self-hosted cloud agent with a remote MCP endpoint (M2); hosted approval-mode MCP (M4, after design review).
