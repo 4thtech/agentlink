@@ -77,7 +77,7 @@ export interface OpenAgentOptions {
   readonly logger?: Logger;
 }
 
-/** An opened agent. `close()` closes the KeyStore and the store, once. */
+/** An opened agent. `close()` closes the relay connections, the store and the KeyStore, once. */
 export interface OpenedAgent {
   readonly name: string;
   readonly agentId: string;
@@ -175,6 +175,7 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
     throw error;
   }
   if (client.agentId !== config.agentId) {
+    client.close();
     await agentStore.close().catch(() => undefined);
     await keyStore.close().catch(() => undefined);
     throw new RuntimeError('agent_config_invalid');
@@ -189,6 +190,12 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
     approvals,
     close: (): Promise<void> => {
       closing ??= (async () => {
+        // Relay connections first: an open socket or its idle timer keeps a one-shot process alive.
+        try {
+          client.close();
+        } catch {
+          // closing a dead connection is not an error
+        }
         await agentStore.close().catch(() => undefined);
         await keyStore.close().catch(() => undefined);
       })();

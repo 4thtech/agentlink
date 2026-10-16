@@ -7,8 +7,8 @@
 // runs only with AGENTLINK_REQUIRE_KEYCHAIN=1 (a missing keychain or build then FAILS the run).
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, realpath, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { realpath, rm } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { encodeHex, encodeUtf8, randomBytes, type OwnerPresence } from '@agentlink/crypto';
@@ -24,13 +24,10 @@ const RELAYS = ['wss://nos.lol', 'wss://relay.primal.net'];
 /** Budget 3 s plus connecting; far below the 5 minute idle close of a pooled connection. */
 const EXIT_WITHIN_MS = 30_000;
 
-function run(home: string, args: string[]): Promise<{ code: number | null; ms: number }> {
+function run(args: string[]): Promise<{ code: number | null; ms: number }> {
   return new Promise((resolve, reject) => {
     const started = Date.now();
-    const child = spawn(process.execPath, [CLI, ...args], {
-      env: { ...process.env, HOME: home, USERPROFILE: home },
-      stdio: ['ignore', 'ignore', 'ignore'],
-    });
+    const child = spawn(process.execPath, [CLI, ...args], { stdio: ['ignore', 'ignore', 'ignore'] });
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
       reject(new Error(`agentlink ${args[0] ?? ''} did not exit within ${EXIT_WITHIN_MS} ms`));
@@ -43,19 +40,22 @@ function run(home: string, args: string[]): Promise<{ code: number | null; ms: n
 }
 
 describe.skipIf(!required)('one-shot commands exit promptly (real keychain, real relays)', () => {
+  // The macOS keychain is found through the real home, so the agent lives under it with a name of
+  // its own; afterAll removes the folder (the keychain items stay, as in the two-process test).
+  const name = `exit-test-${encodeHex(randomBytes(4))}`;
   let home: string;
 
   beforeAll(async () => {
     expect(existsSync(CLI), 'build apps/cli first (dist/cli.js)').toBe(true);
     expect(await probeOsKeychain({ timeoutMs: 10_000 })).toEqual({ ok: true });
-    home = await realpath(await mkdtemp(join(tmpdir(), 'agentlink-exit-')));
+    home = await realpath(homedir());
     const agentId = await createOsKeychainAgent();
-    await writeAgentConfig(home, { v: 1, name: 'default', agentId, keyStore: 'keychain' });
+    await writeAgentConfig(home, { v: 1, name, agentId, keyStore: 'keychain' });
     const code = encodeHex(randomBytes(16));
     const presence = (): OwnerPresence => ({ kind: 'passphrase', secret: encodeUtf8(code) });
     const owner = new MemoryOwnerKeyStore(randomBytes(32), presence());
     const ownerKeys = await owner.getPublicKeys();
-    const opened = await openAgent({ home });
+    const opened = await openAgent({ home, agent: name });
     if (opened.status !== 'ok') throw new Error('not opened');
     const session = await owner.unlock(presence());
     try {
@@ -71,13 +71,15 @@ describe.skipIf(!required)('one-shot commands exit promptly (real keychain, real
     }
   }, 60_000);
   afterAll(async () => {
-    if (home !== undefined) await rm(home, { recursive: true, force: true });
+    if (home !== undefined) {
+      await rm(join(home, '.agentlink', 'agents', name), { recursive: true, force: true });
+    }
   });
 
   it.each([['doctor'], ['status'], ['contacts'], ['requests']])(
     '`agentlink %s` ends by itself within the bound',
     async (command) => {
-      const result = await run(home, [command]);
+      const result = await run([command, '--agent', name]);
       expect(result.ms).toBeLessThan(EXIT_WITHIN_MS);
       expect(result.code).not.toBeNull();
     },

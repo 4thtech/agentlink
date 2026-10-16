@@ -283,6 +283,7 @@ export class OutboxService {
   readonly #identity: IdentityService;
   readonly #contacts: ContactBook;
   readonly #transport: Transport | undefined;
+  #transportClosed = false;
   /** The agent's own relays, the only ones where NIP-42 AUTH may be signed (07 §4.3). */
   #ownRelays: ReadonlySet<string> = new Set();
 
@@ -304,6 +305,13 @@ export class OutboxService {
             mayAuthenticate: (url) => this.#ownRelays.has(url),
             logger: ctx.log,
           });
+  }
+
+  /** Closes the transport's relay connections, if it has any. Idempotent. */
+  closeTransport(): void {
+    if (this.#transportClosed) return;
+    this.#transportClosed = true;
+    this.#transport?.close?.();
   }
 
   /** The transport, or `transport_unavailable` before anything is stored. Internal (send.ts). */

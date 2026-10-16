@@ -249,6 +249,15 @@ export class AgentLinkClient {
   }
 
   /**
+   * Closes the relay connections of this client's transport (idempotent; a no-op without one).
+   * One-shot callers (the CLI commands) call it when they are done so the process can end. It
+   * closes neither the store nor the KeyStore: those belong to whoever opened them.
+   */
+  close(): void {
+    this.outbox.closeTransport();
+  }
+
+  /**
    * Opens a client over a store. Refuses a store of another schema version (07 §3.7: forward
    * migrations only; none exist yet) and a store whose identity belongs to other keys (04 §2.9: a
    * mismatch is an error, never a new identity).

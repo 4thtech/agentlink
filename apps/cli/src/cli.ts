@@ -43,9 +43,18 @@ const dispatch = createDispatcher({
   mcp: mcpCommand(version),
 });
 
-process.exitCode = await dispatch(process.argv.slice(2), {
+const argv = process.argv.slice(2);
+process.exitCode = await dispatch(argv, {
   output: createOutput(),
   // File descriptors 0 and 1: the guards need both stdin and stdout on a terminal (UX guard).
   terminal: { stdinIsTTY: isatty(0), stdoutIsTTY: isatty(1), env: process.env },
   version,
 });
+
+// One-shot commands close their relay connections and end on their own (M1-9b). This is only the
+// last-resort net: if something still keeps the loop alive 5 s after the command finished, end the
+// process with the command's own exit code. The timer is unref'd, so it never delays a clean exit.
+// `agentlink mcp` is long-running and is never cut short.
+if (!argv.includes('mcp')) {
+  setTimeout(() => process.exit(process.exitCode ?? 0), 5_000).unref();
+}

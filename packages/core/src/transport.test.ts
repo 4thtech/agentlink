@@ -66,7 +66,7 @@ describe('nostrTransport (07 §4.1)', () => {
       { id: 'x', pubkey: 'y', created_at: 0, kind: 1059, tags: [], content: '', sig: 'z' },
       ['wss://one.relay-alpha.net'],
     );
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(sockets.length).toBe(1);
     expect(sockets[0]!.closed).toBe(false);
     transport.close?.();

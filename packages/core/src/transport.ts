@@ -62,6 +62,12 @@ export interface Transport {
    * (`transport_unavailable`).
    */
   sync?(options: TransportSyncOptions): Promise<SyncResult>;
+  /**
+   * Closes every relay connection and ends what waits on one. Idempotent. Optional: a transport
+   * that holds nothing open has nothing to close. A one-shot command calls it so the process can
+   * end (an idle pooled connection otherwise keeps the process alive for minutes).
+   */
+  close?(): void;
 }
 
 /** What the core hands a transport factory when it opens a client. */
@@ -121,6 +127,7 @@ export function nostrTransport(options: NostrTransportOptions): TransportFactory
       wrap: (envelope, recipients, keys) =>
         wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
       publish: (event, relays) => pool.publish(event, relays),
+      close: () => pool.close(),
       sync: (sync) =>
         engineFor(sync.persistence).sync({
           relays: sync.relays,
