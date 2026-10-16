@@ -682,6 +682,17 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - A title `OPS-CI-3 ci: ...` passes; `OPS-ci-3`, `OPS-` and `OPS-CI` fail (tests).
 - **Also (found in PR #187):** since OPS-REL-1 (`privatePackages.version: true`) the private tooling packages (`tools`, `e2e`) count as published, so a tooling-only PR fails the `changesets` check without an empty changeset. Exempt private tooling packages from the changeset requirement, or have CI add empty changesets for them; test both cases.
 
+#### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/release.yml` or a Changesets hook, `tools/**`, `docs/process/versioning.md` §5
+- **Depends on:** —
+- **Spec:** `versioning.md` §5; `release-and-deployment.md` §5.1
+- **Invariants:** —
+- **Scope:**
+  - The release run for v0.1.0 failed closed because the Changesets "Version packages" PR does not touch the root `CHANGELOG.md`: the `notes` guard found no non-empty `## [0.1.0]` section and a hand-made DOCS PR had to roll `[Unreleased]` into it. Automate that roll (a changesets hook or a CI step on the Version packages PR): move `[Unreleased]` entries into `## [<version>] - <date>`, leave an empty `[Unreleased]`, update the link references.
+- **Acceptance:**
+  - A Version packages PR contains the rolled root CHANGELOG; the `notes` guard passes without a manual PR (test on a fixture CHANGELOG); an empty `[Unreleased]` is refused or left untouched.
+
 ### Documentation (DOCS) (new)
 
 #### DOCS-RB · Runbooks, lessons and onboarding map (new)
