@@ -680,6 +680,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - `TITLE_RE` allows only `OPS-<n>`, while the backlog has cards such as `OPS-CI-2`; those PRs had to use the `CHORE:` prefix (#109, #184). Accept `OPS-[A-Z]+-[0-9]+` as well; update the error text and the template comment.
 - **Acceptance:**
   - A title `OPS-CI-3 ci: ...` passes; `OPS-ci-3`, `OPS-` and `OPS-CI` fail (tests).
+- **Also (found in PR #187):** since OPS-REL-1 (`privatePackages.version: true`) the private tooling packages (`tools`, `e2e`) count as published, so a tooling-only PR fails the `changesets` check without an empty changeset. Exempt private tooling packages from the changeset requirement, or have CI add empty changesets for them; test both cases.
 
 ### Documentation (DOCS) (new)
 
