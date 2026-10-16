@@ -292,14 +292,15 @@ async function main() {
     log(USAGE);
     return 0;
   }
-  const steps = buildSteps({ cc: options.ccAgent, oc: options.ocAgent });
+  const runId = stamp();
+  const steps = buildSteps({ cc: options.ccAgent, oc: options.ocAgent, runId });
   if (options.dryRun) {
     log(planText(options, steps));
     return 0;
   }
 
   const startedAt = new Date().toISOString();
-  const dir = join(options.out, stamp());
+  const dir = join(options.out, runId);
   await mkdir(dir, { recursive: true, mode: 0o700 });
   log(`Results: ${dir}`);
 
