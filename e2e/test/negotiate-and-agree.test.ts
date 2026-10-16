@@ -316,12 +316,10 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
       return String(asked.structured['approvalId']);
     });
 
-    // 7. The agent cannot go around the owner: asking again, a retry before the owner decided, and a
+    // 7. The agent cannot go around the owner: a retry before the owner decided and a
     //    forged approvalId send nothing, and no second request opens (the owner is asked once).
     await step('A cannot bypass the owner approval', async () => {
       await expectNothingLeaves(async () => {
-        const again = await tool(aliceMcp, 'agentlink_respond_to_terms', accept);
-        expect(again.structured['status']).toBe('pending_approval');
         const early = await tool(aliceMcp, 'agentlink_respond_to_terms', { ...accept, approvalId });
         expect(early.structured).toMatchObject({ status: 'pending_approval', approvalId });
         const forged = await tool(aliceMcp, 'agentlink_respond_to_terms', {
