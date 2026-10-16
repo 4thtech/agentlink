@@ -68,6 +68,11 @@ export interface InboxPageQuery {
   /** False: no outbound items. */
   readonly includeSent: boolean;
   /**
+   * Only these envelopes (M1-22: the open offers, 06 §2.2 `openOffers`), at most `limit` IDs. An
+   * empty list matches nothing. The other filters still apply.
+   */
+  readonly envelopeIds?: readonly string[];
+  /**
    * The bytes an item takes in the caller's text result. The core takes the newest matching items
    * first and stops before the item that would take the sum above `maxBytes`, keeping at least one.
    */
@@ -179,6 +184,14 @@ function checkQuery(q: InboxPageQuery): void {
   if (q.before !== undefined && typeof q.before !== 'string') throw invalid();
   if (q.contactId !== undefined && typeof q.contactId !== 'string') throw invalid();
   if (typeof q.includeRead !== 'boolean' || typeof q.includeSent !== 'boolean') throw invalid();
+  if (
+    q.envelopeIds !== undefined &&
+    (!Array.isArray(q.envelopeIds) ||
+      q.envelopeIds.length > INBOX_PAGE_MAX_LIMIT ||
+      !q.envelopeIds.every((id) => typeof id === 'string'))
+  ) {
+    throw invalid();
+  }
   if (typeof q.sizeOf !== 'function' || !isUint(q.maxBytes) || q.maxBytes < 1) throw invalid();
 }
 
@@ -341,9 +354,14 @@ function selectTx(tx: StoreTx, q: InboxPageQuery): Selection {
       found.set(row.envelope_id, candidate);
     }
   };
-  for (const [category, base] of categories) {
+  const only = q.envelopeIds === undefined ? {} : { envelope_id: { in: [...q.envelopeIds] } };
+  for (const [category, base] of q.envelopeIds?.length === 0 ? [] : categories) {
     const unreadOnly = category !== 'out' && !q.includeRead;
-    const where: Where<'envelopes'> = { ...base, ...(unreadOnly ? { read_at: null } : {}) };
+    const where: Where<'envelopes'> = {
+      ...base,
+      ...only,
+      ...(unreadOnly ? { read_at: null } : {}),
+    };
     const since = q.since === undefined ? {} : { gte: q.since };
     if (before !== undefined) {
       // The rows that tie the cursor's time: the byte comparison in `add` keeps the older ones.

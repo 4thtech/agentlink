@@ -1,7 +1,7 @@
 // M1-9p: `agentlink_inbox` (06 §2.2 `InboundMessage`/`OutboundMessage`, order and paging, read
 // state; §2.1 D-72 accepted requests; §4 wrapper; §6 sync; §9 injection; I-5, I-7, zero access).
 // The handler against a fake core surface whose `inboxPage` follows the port's contract (context.ts).
-import type { ContactView, InboxSender } from '@agentlink/core';
+import type { ContactView, InboxSender, OpenOffer } from '@agentlink/core';
 import { encodeUtf8 } from '@agentlink/crypto';
 import { createLogger, type Logger } from '@agentlink/log';
 import type { ContactDisplayName, RestrictedName } from '@agentlink/types';
@@ -144,6 +144,7 @@ function fake(
     requests?: number;
     page?: 'before_not_found';
     syncFails?: boolean;
+    openOffers?: OpenOffer[];
   } = {},
 ): Fake {
   const calls: string[] = [];
@@ -170,6 +171,10 @@ function fake(
       calls.push('contacts');
       return Promise.resolve([contact(B, 'Marko'), contact(C, 'Ana')]);
     },
+    openOffers: () => {
+      calls.push('openOffers');
+      return Promise.resolve(options.openOffers ?? []);
+    },
     syncInbox: (budgetMs) => {
       calls.push(`syncInbox:${budgetMs}`);
       return options.syncFails === true
@@ -181,7 +186,11 @@ function fake(
       queries.push(query);
       if (options.page === 'before_not_found')
         return Promise.resolve({ status: 'before_not_found' });
-      const newestFirst = [...(options.items ?? [inbound()])].reverse().slice(0, query.limit);
+      const ids = query.envelopeIds;
+      const newestFirst = [...(options.items ?? [inbound()])]
+        .filter((item) => ids === undefined || ids.includes(item.envelopeId))
+        .reverse()
+        .slice(0, query.limit);
       const kept: PageItem[] = [];
       let used = 0;
       for (const item of newestFirst) {
@@ -275,6 +284,55 @@ describe('agentlink_inbox: sync and query (06 §2.2, §6)', () => {
       before: E3,
       limit: 50,
     });
+  });
+
+  const openOffer = (envelopeId: string, contactId = B): OpenOffer => ({
+    envelopeId,
+    contactId,
+    termsId: THREAD,
+    version: 1,
+    validUntil: T0 + 86_400,
+  });
+
+  it('M1-22 openOffers: syncs, then pages exactly the open offers, read ones included, no sent items', async () => {
+    const offer = inbound({ envelopeId: E1, type: 'offer', body: null, read: true });
+    const client = fake({
+      items: [offer, inbound({ envelopeId: E2 })],
+      openOffers: [openOffer(E1)],
+    });
+    const result = await inbox({ openOffers: true, includeSent: true }, client);
+    expect(client.calls).toEqual([
+      'self',
+      `syncInbox:${INBOX_SYNC_BUDGET_MS}`,
+      'openOffers',
+      'inboxPage',
+    ]);
+    expect(client.queries[0]).toMatchObject({
+      envelopeIds: [E1],
+      includeRead: true,
+      includeSent: false,
+    });
+    expect(result.structured.summary).toBe(INBOX_TEXT.someOpenOffers(1));
+    expect(
+      (result.structured['messages'] as { envelopeId: string }[]).map((m) => m.envelopeId),
+    ).toEqual([E1]);
+  });
+
+  it("M1-22 openOffers with a contact: only that contact's open offers reach the page query", async () => {
+    const client = fake({ openOffers: [openOffer(E1, B), openOffer(E2, C)] });
+    await inbox({ openOffers: true, contact: 'marko' }, client);
+    expect(client.queries[0]).toMatchObject({ contactId: B, envelopeIds: [E1] });
+  });
+
+  it('M1-22 openOffers: none open says so, and nothing is read', async () => {
+    const client = fake({ openOffers: [] });
+    const result = await inbox({ openOffers: true }, client);
+    expect(result.structured).toMatchObject({
+      status: 'ok',
+      summary: INBOX_TEXT.noOpenOffers,
+      messages: [],
+    });
+    expect(client.queries[0]).toMatchObject({ envelopeIds: [] });
   });
 
   it('since accepts an RFC 3339 date or date-time and is passed as unix seconds', async () => {

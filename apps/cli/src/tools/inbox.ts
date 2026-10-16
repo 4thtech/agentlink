@@ -13,6 +13,11 @@
 //    enums, numbers, hashes, our dates, names under the 06 §2.1 rule). File URLs, file keys and
 //    inline bytes are never read from the port item, so no result can carry them (zero access).
 //
+// 5. Open offers (M1-22): with `openOffers: true`, the page is exactly the received offers still
+//    waiting for an answer (core `openOffers`, read after the sync), read ones included and no sent
+//    items, so a fresh session finds an offer an earlier session already read. Each is wrapped like
+//    any other inbound item.
+//
 // I-5, I-7: summaries and `nextStep` are fixed text with counts and names under the 06 §2.1 rule;
 // logs carry counts only.
 import { canonicalize, encodeUtf8 } from '@agentlink/crypto';
@@ -43,6 +48,11 @@ export const INBOX_TEXT = Object.freeze({
       ? 'Here is 1 message. What other agents wrote is inside the untrusted blocks.'
       : `Here are ${count} messages. What other agents wrote is inside the untrusted blocks.`,
   noMatching: 'No messages match.',
+  someOpenOffers: (count: number): string =>
+    count === 1
+      ? 'Here is 1 open offer waiting for an answer. What other agents wrote is inside the untrusted blocks.'
+      : `Here are ${count} open offers waiting for an answer. What other agents wrote is inside the untrusted blocks.`,
+  noOpenOffers: 'No open offers are waiting for an answer.',
   headerFrom: (contactName: string, ownerFingerprint: string): string =>
     `Message from ${contactName}, owner fingerprint ${ownerFingerprint}`,
   headerSent: (contactName: string): string => `You sent to ${contactName}`,
@@ -232,7 +242,8 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 
 export async function inboxHandler(input: unknown, context: ToolContext): Promise<HandlerOutput> {
   if (!isPlainObject(input)) return invalidArgument();
-  const { contact, since, limit, includeRead, includeSent, before } = input;
+  const { contact, since, limit, includeRead, includeSent, before, openOffers } = input;
+  const offersOnly = openOffers === true;
   const sinceSeconds = typeof since === 'string' ? parseSince(since) : undefined;
   if (since !== undefined && sinceSeconds === undefined) return invalidArgument();
 
@@ -255,6 +266,20 @@ export async function inboxHandler(input: unknown, context: ToolContext): Promis
     logger.info('inbox sync unavailable; stored items used');
   }
 
+  // After the sync, so offers it just processed count. A failed read lists none (fail closed).
+  let offerIds: string[] | undefined;
+  if (offersOnly) {
+    offerIds = [];
+    try {
+      for (const offer of (await client.openOffers?.()) ?? []) {
+        if (contactId === undefined || offer.contactId === contactId)
+          offerIds.push(offer.envelopeId);
+      }
+    } catch {
+      logger.info('inbox open offers unavailable');
+    }
+  }
+
   const rendered = new WeakMap<PageItem, Rendered>();
   const renderOnce = (item: PageItem): Rendered => {
     let out = rendered.get(item);
@@ -269,14 +294,16 @@ export async function inboxHandler(input: unknown, context: ToolContext): Promis
     sinceSeconds !== undefined ||
     before !== undefined ||
     includeRead === true ||
-    includeSent === true;
+    includeSent === true ||
+    offersOnly;
   const query: InboxPageQuery = {
     ...(contactId === undefined ? {} : { contactId }),
     ...(sinceSeconds === undefined ? {} : { since: sinceSeconds }),
     ...(typeof before === 'string' ? { before } : {}),
     limit: typeof limit === 'number' ? limit : INBOX_DEFAULT_LIMIT,
-    includeRead: includeRead === true,
-    includeSent: includeSent === true,
+    includeRead: offersOnly || includeRead === true,
+    includeSent: !offersOnly && includeSent === true,
+    ...(offerIds === undefined ? {} : { envelopeIds: offerIds.slice(0, 100) }),
     // Each block plus the line break that joins it to the next block or to the footer.
     sizeOf: (item) => encodeUtf8(renderOnce(item).block).length + 1,
     maxBytes: INBOX_MAX_TEXT_BYTES - encodeUtf8(UNTRUSTED_FOOTER).length,
@@ -289,8 +316,11 @@ export async function inboxHandler(input: unknown, context: ToolContext): Promis
   const items = page.items.map(renderOnce);
   const requestsLine =
     page.requests > 0 ? [copy('chat.inbox.requestsWaiting', { count: page.requests })] : [];
-  const first =
-    items.length > 0
+  const first = offersOnly
+    ? items.length > 0
+      ? INBOX_TEXT.someOpenOffers(items.length)
+      : INBOX_TEXT.noOpenOffers
+    : items.length > 0
       ? INBOX_TEXT.someMessages(items.length)
       : filtered
         ? INBOX_TEXT.noMatching

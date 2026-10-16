@@ -9,12 +9,14 @@ import {
   CoreError,
   evaluate,
   type AgentLinkClient,
+  type ApprovalResume,
   type ApprovalState,
   type ApprovalUse,
   type ContactView,
   type CreatedInvite,
   type InboxSender,
   type OpenApproval,
+  type OpenOffer,
   type PendingContact,
   type PolicyDecision,
   type ProposeTermsInput,
@@ -123,6 +125,8 @@ export interface InboxPageQuery {
   readonly includeRead: boolean;
   /** False: no outbound items. */
   readonly includeSent: boolean;
+  /** Only these envelopes (M1-22: the open offers); an empty list matches nothing. */
+  readonly envelopeIds?: readonly string[];
   /**
    * The bytes an item takes in the text result. The core takes the newest matching items first and
    * stops before the item that would take the sum above `maxBytes`, keeping at least one.
@@ -212,6 +216,17 @@ export interface ToolClient {
    * stored signed objects are re-verified before the row's `status` cache is read. Read-only.
    */
   approvalState(approvalId: string): Promise<ApprovalState>;
+  /**
+   * What an open approval is for (core `approvalService.resumeOf`, M1-22): the tool and only its
+   * structured, schema-checked args, while the agent still has something to run. Read-only; it
+   * authorises nothing (I-4). Absent in a double that does not need it.
+   */
+  approvalResume?(approvalId: string): Promise<ApprovalResume | undefined>;
+  /**
+   * Received offers waiting for an answer (core `terms.openOffers`, M1-22): IDs and numbers only,
+   * read from the store (no relay traffic, nothing marked). Absent in a double that does not need it.
+   */
+  openOffers?(): Promise<readonly OpenOffer[]>;
   /** Core `sendMessage` (M1-7k): policy, envelope, outbox, first publish; idempotent (07 §3.3). */
   send(input: SendMessageInput): Promise<SendMessageResult>;
   /** Core `syncInbox` (M1-7h): fetches, stores and processes envelopes within the budget (06 §6). */
@@ -291,6 +306,8 @@ export function coreToolClient(client: AgentLinkClient): ToolClient {
     inboxPage: (query) => client.inbox.page(query),
     pendingApprovals: () => client.approvalService.countPending(),
     approvalState: (approvalId) => client.approvalService.read(approvalId),
+    approvalResume: (approvalId) => client.approvalService.resumeOf(approvalId),
+    openOffers: () => client.terms.openOffers(),
     invites: coreInviteTools(client),
     terms: coreTermsTools(client),
     async storageMode() {

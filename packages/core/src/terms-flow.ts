@@ -270,6 +270,22 @@ type RespondOutcome = TermsResponded | TermsRejected | TermsPending;
 
 export type RespondToTermsResult = RespondOutcome | TermsInProgress | TermsApprovalState;
 
+/**
+ * A received offer that waits for this agent's answer (06 §2.1 `openOffers`, §2.2 `openOffers`;
+ * M1-22): the newest open offer of its negotiation, from an active contact, not locked by an accept,
+ * not rejected by this agent and not past `validUntil`. IDs and numbers only: the terms stay
+ * untrusted content, read through the inbox (I-5).
+ */
+export interface OpenOffer {
+  readonly envelopeId: string;
+  /** The contact's agent ID. */
+  readonly contactId: string;
+  readonly termsId: string;
+  readonly version: number;
+  /** Unix seconds. */
+  readonly validUntil: number;
+}
+
 /** One negotiation as the agent may list it (the terms stay untrusted content, I-5). */
 export interface NegotiationSummary {
   readonly termsId: string;
@@ -1752,6 +1768,55 @@ export class TermsService {
       });
     }
     return out;
+  }
+
+  /**
+   * The received offers waiting for an answer (see `OpenOffer`), across active, paired contacts,
+   * oldest `validUntil` first. Read-only: it rebuilds each contact's negotiations from the store and
+   * changes nothing. A contact whose stored terms do not read is left out (fail closed, counted in
+   * the log only).
+   */
+  async openOffers(): Promise<OpenOffer[]> {
+    const self = (await this.#self()).agentId;
+    const now = nowOf(this.#ctx);
+    const contacts = (await this.#deps.contacts.list()).filter(
+      (c) => c.status === 'active' && c.pairing === 'complete',
+    );
+    const out: OpenOffer[] = [];
+    let unreadable = 0;
+    for (const contact of contacts) {
+      let snapshot: TermsSnapshot;
+      try {
+        snapshot = await loadTermsSnapshot(this.#ctx, self, contact.id);
+      } catch {
+        unreadable += 1;
+        continue;
+      }
+      for (const n of snapshot.negotiations.values()) {
+        const head = newestOffer(n);
+        if (head === undefined || head.direction !== 'in') continue;
+        const version = head.terms.version;
+        if (isLocked(n, version) || now > head.terms.validUntil) continue;
+        const rejected = n.records.some(
+          (r) => r.direction === 'out' && r.type === 'reject' && r.terms.version === version,
+        );
+        if (rejected) continue;
+        out.push({
+          envelopeId: head.envelopeId,
+          contactId: contact.id,
+          termsId: n.termsId,
+          version,
+          validUntil: head.terms.validUntil,
+        });
+      }
+    }
+    if (unreadable > 0)
+      this.#ctx.log.warn('open offers: contacts unreadable', { contacts: unreadable });
+    return out.sort(
+      (x, y) =>
+        x.validUntil - y.validUntil ||
+        (x.envelopeId < y.envelopeId ? -1 : x.envelopeId > y.envelopeId ? 1 : 0),
+    );
   }
 
   /**

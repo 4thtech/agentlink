@@ -1909,3 +1909,162 @@ describe('M1-32-b: proposeTerms and respondToTerms honour clientRequestId (IR-M1
     expect(await a.store.transaction((tx) => tx.select('idempotency', {}))).toHaveLength(0);
   });
 });
+
+describe('fresh sessions (M1-22): open offers and what an approval is for (06 §2.1, §2.2, §2.5)', () => {
+  const page = (agent: Agent, envelopeIds?: readonly string[]) =>
+    agent.client.inbox.page({
+      limit: 20,
+      includeRead: envelopeIds !== undefined,
+      includeSent: false,
+      sizeOf: () => 1,
+      maxBytes: 1_000_000,
+      ...(envelopeIds === undefined ? {} : { envelopeIds }),
+    });
+
+  it('openOffers lists the newest open offer from a contact, even after it was read', async () => {
+    const { a, b, offer } = await offered();
+    const open = [
+      {
+        envelopeId: offer.envelopeId,
+        contactId: a.id,
+        termsId: offer.termsId,
+        version: 1,
+        validUntil: offer.validUntil,
+      },
+    ];
+    expect(await b.client.terms.openOffers()).toEqual(open);
+    // Read once: no longer unread, still open.
+    const first = await page(b);
+    expect(first.status === 'ok' && first.items.map((i) => i.envelopeId)).toEqual([
+      offer.envelopeId,
+    ]);
+    const again = await page(b);
+    expect(again.status === 'ok' && again.items).toEqual([]);
+    expect(await b.client.terms.openOffers()).toEqual(open);
+    // The own offer is not one waiting for an answer.
+    expect(await a.client.terms.openOffers()).toEqual([]);
+    // The inbox page can name it by envelope ID with read items included.
+    const named = await page(b, [offer.envelopeId]);
+    expect(named.status === 'ok' && named.items.map((i) => i.envelopeId)).toEqual([
+      offer.envelopeId,
+    ]);
+    expect(await page(b, [])).toEqual({ status: 'ok', items: [], requests: 0 });
+  });
+
+  it('an offer revised by its sender drops out in favour of the newest version (IR-M1-22-FRESH-1 I-1)', async () => {
+    const { a, b, offer } = await offered();
+    const v2 = ok(
+      await a.client.proposeTerms({
+        to: b.id,
+        terms: input({ subject: 'Website redesign, revised' }),
+        revises: offer.envelopeId,
+      }),
+    );
+    await deliver(a, b);
+    expect(await b.client.terms.openOffers()).toEqual([
+      {
+        envelopeId: v2.envelopeId,
+        contactId: a.id,
+        termsId: offer.termsId,
+        version: 2,
+        validUntil: v2.validUntil,
+      },
+    ]);
+  });
+
+  it('an offer stops being open once countered, rejected, accepted or expired', async () => {
+    const countered = await offered();
+    const counter = ok(
+      await countered.b.client.respondToTerms({
+        envelopeId: countered.offer.envelopeId,
+        decision: 'counter',
+        terms: input({ subject: 'Website redesign v2' }),
+      }),
+    );
+    expect(await countered.b.client.terms.openOffers()).toEqual([]);
+    await deliver(countered.b, countered.a);
+    expect(await countered.a.client.terms.openOffers()).toMatchObject([
+      { envelopeId: counter.envelopeId, contactId: countered.b.id, version: 2 },
+    ]);
+
+    const rejected = await offered();
+    ok(
+      await rejected.b.client.respondToTerms({
+        envelopeId: rejected.offer.envelopeId,
+        decision: 'reject',
+      }),
+    );
+    expect(await rejected.b.client.terms.openOffers()).toEqual([]);
+
+    const accepted = await offered();
+    const p = pending(
+      await accepted.b.client.respondToTerms({
+        envelopeId: accepted.offer.envelopeId,
+        decision: 'accept',
+      }),
+    );
+    // Asking the owner is not an answer yet.
+    expect(await accepted.b.client.terms.openOffers()).toHaveLength(1);
+    await approve(accepted.b, p.approvalId);
+    ok(
+      await accepted.b.client.respondToTerms({
+        envelopeId: accepted.offer.envelopeId,
+        decision: 'accept',
+        approvalId: p.approvalId,
+      }),
+    );
+    expect(await accepted.b.client.terms.openOffers()).toEqual([]);
+
+    const valid = new Date((clock.t + 3_600) * 1000).toISOString().replace('.000Z', 'Z');
+    const expiring = await offered({ validUntil: valid });
+    expect(await expiring.b.client.terms.openOffers()).toHaveLength(1);
+    clock.t += 3_601;
+    expect(await expiring.b.client.terms.openOffers()).toEqual([]);
+  });
+
+  it('resumeOf names the tool and only the structured args of a pending or approved answer', async () => {
+    const { b, offer } = await offered();
+    const p = pending(
+      await b.client.respondToTerms({ envelopeId: offer.envelopeId, decision: 'accept' }),
+    );
+    const resume = {
+      tool: 'agentlink_respond_to_terms',
+      envelopeId: offer.envelopeId,
+      decision: 'accept',
+    };
+    expect(await b.client.approvalService.resumeOf(p.approvalId)).toEqual(resume);
+    await approve(b, p.approvalId);
+    expect(await b.client.approvalService.resumeOf(p.approvalId)).toEqual(resume);
+    ok(
+      await b.client.respondToTerms({
+        envelopeId: offer.envelopeId,
+        decision: 'accept',
+        approvalId: p.approvalId,
+      }),
+    );
+    // Nothing is left for the agent to finish once the accept ran (the receipt runs by itself).
+    expect(await b.client.approvalService.resumeOf(p.approvalId)).toBeUndefined();
+    expect(await b.client.approvalService.resumeOf('apr_AAAAAAAAAAAAAAAAAAAAAA')).toBeUndefined();
+    expect(await b.client.approvalService.resumeOf('not an id')).toBeUndefined();
+  });
+
+  it('resumeOf is undefined for a stored action edited in the store (fail closed)', async () => {
+    const { b, offer } = await offered();
+    const p = pending(
+      await b.client.respondToTerms({ envelopeId: offer.envelopeId, decision: 'accept' }),
+    );
+    await approve(b, p.approvalId);
+    const action = (await storedAction(b, p.approvalId)) as {
+      context: { scope: { createdAt: number } };
+    };
+    action.context.scope.createdAt -= 1;
+    const sealedAction = await b.cipher.seal(
+      { table: 'approvals', column: 'action_json', rowKey: JSON.stringify([p.approvalId]) },
+      canonicalize(action as never),
+    );
+    await b.store.transaction((tx) =>
+      tx.update('approvals', { approval_id: p.approvalId }, { action_json: sealedAction }),
+    );
+    expect(await b.client.approvalService.resumeOf(p.approvalId)).toBeUndefined();
+  });
+});

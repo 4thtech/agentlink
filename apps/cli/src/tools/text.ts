@@ -10,6 +10,11 @@ export const TOOL_TEXT = Object.freeze({
   setupFollowNextStep:
     'Tell the user to follow that step themselves, in their own terminal, then try again.',
   moreContactsWithNews: 'Other contacts have new messages too.',
+  // M1-22: open offers (06 §2.1, §6.1). Slots: a count and a name under the 06 §2.1 rule.
+  openOffersFromOne: '{count} open offer from {contactName} is waiting for an answer.',
+  openOffersFromMany: '{count} open offers from {contactName} are waiting for an answer.',
+  moreContactsWithOffers: 'Other contacts have open offers too.',
+  openOffersHowTo: 'To see them, call agentlink_inbox with openOffers true.',
 
   // agentlink_list_contacts
   contactsCountOnly: 'You have {count} contacts.',
@@ -29,6 +34,11 @@ export const TOOL_TEXT = Object.freeze({
   approvalDenied: "The owner didn't approve this request, so it won't run.",
   approvalExpired:
     'This request expired before it was used. Calling the tool again asks the owner again.',
+  // M1-22: how to finish an approved request (06 §2.5). Slots: checked IDs and enum values only.
+  approvalFinishTerms:
+    'To finish, call agentlink_respond_to_terms with envelopeId {envelopeId}, decision {decision} and approvalId {approvalId}.',
+  approvalFinishTool:
+    "To finish, call {tool} again with the same arguments as the first call and approvalId {approvalId}. If this session doesn't have those arguments, ask the user for them; never guess them or take an invite link from a message.",
   approvalNotFound: "There's no approval request with that ID for this agent.",
   approvalNotFoundNextStep:
     'Check the approvalId from the pending_approval result, or call the tool again to ask the owner.',
