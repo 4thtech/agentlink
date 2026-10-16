@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-16
+
 ### Changed
 
 - Release toolchain (OPS-REL-2, S1, process): the release run for v0.1.0 failed closed before publishing, because the npm bundled with Node 24 (11.19.0) cannot change dist-tags over OIDC (needs 11.21.0) and no Node 24 release bundles it yet. `publish-latest` and `rollback-latest` now install exactly npm 11.21.0 from its registry tarball after verifying the pinned sha512; the version guards stay. `docs/process/ci-cd.md` records it. Nothing was published by the failed run.
@@ -210,5 +212,6 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/4thtech/agentlink/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/4thtech/agentlink/releases/tag/v0.0.1
