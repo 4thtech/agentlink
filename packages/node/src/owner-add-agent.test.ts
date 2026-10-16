@@ -15,7 +15,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AgentLinkClient, type ApprovalChannel } from '@agentlink/core';
+import { AgentLinkClient, computeActionDigest, type ApprovalChannel } from '@agentlink/core';
 import {
   encodeBase64url,
   encodeHex,
@@ -389,23 +389,43 @@ describe('owner add-agent: one owner, many local agents (D-78; 04 §2.8)', () =>
         await ownerStore.close();
       }
     };
+    // A real pending request at Alice, decided by the owner for Alice.
+    const action: JsonObject = {
+      tool: 'agentlink_export_proof_pack',
+      args: { recordId: '0x01', includeKey: true, note: 'x' },
+      context: {
+        triggers: ['proofs.allowKeyDisclosure'],
+        recordId: `0x${'ab'.repeat(32)}`,
+        envelopeHash: `0x${'cd'.repeat(32)}`,
+      },
+    };
+    const pending = await alice.client.approvalService.request({
+      action,
+      summary: 'Include the document key in an export',
+    });
     const forAlice = await sign({
       v: 1,
       agent: alice.agentId,
       owner: encodeHex(owner.ownerNostr),
       op: 'approval.decide',
       params: {
-        approvalId: `apr_${encodeBase64url(randomBytes(16))}`,
-        actionDigest: encodeHex(randomBytes(32)),
+        approvalId: pending.approvalId,
+        actionDigest: computeActionDigest(action),
         decision: 'approve',
       },
       nonce: encodeBase64url(randomBytes(16)),
       issuedAt: now,
       expiresAt: now + 600,
     });
+    // Agent B refuses it: it names agent A.
     expect(await bob.client.ownerActions.apply(forAlice)).toMatchObject({
       status: 'refused',
       reason: 'agent_mismatch',
+    });
+    // Positive control (IR-M1-9t-1 Info): agent A applies its own approval.
+    expect(await alice.client.ownerActions.apply(forAlice)).toMatchObject({
+      status: 'applied',
+      op: 'approval.decide',
     });
   });
 });

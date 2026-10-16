@@ -78,8 +78,12 @@ const COPY = {
     `Your owner fingerprint: ${fingerprint}. Check that it's the one you saw at \`agentlink owner init\`.`,
   agent: (name: string, fingerprint: string): string =>
     `This gives the agent "${name}" (${fingerprint}) a card from your owner key. Your owner code signs this one card and nothing else.`,
-  wrong: "That isn't the owner code for this owner. Try again.",
-  refused: "The owner code wasn't accepted three times. Nothing was changed.",
+  // A wrong code and an owner item that isn't the owner the other agents name get one answer
+  // (04 §2.8: a wrong secret, a damaged item and a foreign owner are not told apart), so the copy
+  // names both causes without saying which (IR-M1-9t-1 Info).
+  wrong: "That owner code wasn't accepted. Check it and try again.",
+  refused:
+    "The owner code wasn't accepted three times. Nothing was changed. If you're sure the code is right, the owner key on this computer may not be the owner your other agents name: run `agentlink doctor` in your own terminal.",
   hasCard:
     'This agent already has a card from an owner. AgentLink never replaces a card. Nothing was changed.',
   noOwner:

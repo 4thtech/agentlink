@@ -179,13 +179,24 @@ export async function resolveConfigTarget(home: string, typed: string): Promise<
   ) {
     throw new HarnessError('unsafe_path');
   }
-  const forbidden = [
+  const roots = [
     ['.agentlink'],
     ['.ssh'],
     ['.gnupg'],
     ['Library', 'Keychains'],
     ['.local', 'share', 'keyrings'],
   ].map((parts) => join(homeReal, ...parts));
+  // Both spellings of each root: as named, and resolved (a root such as ~/.agentlink may itself be
+  // a link to another folder; IR-M1-9t-1 L-1). A root that does not exist is checked as named.
+  const forbidden: string[] = [];
+  for (const root of roots) {
+    forbidden.push(root);
+    try {
+      forbidden.push(await realpath(root));
+    } catch {
+      // Not there: only the named spelling applies.
+    }
+  }
   for (const root of forbidden) {
     if (dir === root || dir.startsWith(`${root}${sep}`)) throw new HarnessError('unsafe_path');
   }

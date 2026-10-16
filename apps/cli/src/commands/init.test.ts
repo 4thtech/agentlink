@@ -720,6 +720,20 @@ describe('init --harness and --config (M1-9t)', () => {
     expect(await exists('.agentlink', 'mcp_config.json')).toBe(false);
   });
 
+  it.skipIf(!POSIX)(
+    'refuses a --config path in the real folder behind a linked ~/.agentlink (IR-M1-9t-1 L-1)',
+    async () => {
+      const real = join(outside, 'agentlink-data');
+      await mkdir(real, { mode: 0o700 });
+      await symlink(real, join(home, '.agentlink'));
+      const target = join(real, 'mcp_config.json');
+      const plan = await init(['--harness', 'antigravity', '--config', target]);
+      expect(plan.code).toBe(EXIT_FAILED);
+      expect(plan.out).not.toContain('--confirm');
+      expect(await existsAbs(target)).toBe(false);
+    },
+  );
+
   it('refuses a --config file that is not a .json file', async () => {
     const plan = await init(['--harness', 'opencode', '--config', join(outside, 'opencode.toml')]);
     expect(plan.code).not.toBe(EXIT_OK);
