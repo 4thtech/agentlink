@@ -1,6 +1,6 @@
 {
   "name": "@agentlink/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "AgentLinkClient, policies, approvals, KeyStore and Store interfaces.",
   "license": "MIT",

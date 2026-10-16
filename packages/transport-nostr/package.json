@@ -1,6 +1,6 @@
 {
   "name": "@agentlink/transport-nostr",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Nostr transport: gift wraps, relay pool, sync.",
   "license": "MIT",
