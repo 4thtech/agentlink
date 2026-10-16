@@ -292,14 +292,15 @@ async function main() {
     log(USAGE);
     return 0;
   }
-  const steps = buildSteps({ cc: options.ccAgent, oc: options.ocAgent });
+  const runId = stamp();
+  const steps = buildSteps({ cc: options.ccAgent, oc: options.ocAgent, runId });
   if (options.dryRun) {
     log(planText(options, steps));
     return 0;
   }
 
   const startedAt = new Date().toISOString();
-  const dir = join(options.out, stamp());
+  const dir = join(options.out, runId);
   await mkdir(dir, { recursive: true, mode: 0o700 });
   log(`Results: ${dir}`);
 
@@ -325,6 +326,11 @@ async function main() {
       now: () => Date.now(),
       log,
       agentOf,
+      // Read-only: the contact list of the first agent, as the owner's CLI prints it.
+      confirmPaired: (agent, other) =>
+        Promise.resolve(agentlinkRun(options, ['contacts', '--agent', agent])).then(
+          (r) => r.ok && r.text.includes(other),
+        ),
       approvalMinutes: options.approvalTimeoutMs / 60_000,
       async run(harness, step, prompt) {
         log(`-> ${step.id} (${harness === 'cc' ? 'Claude Code' : 'OpenCode'}) ${step.title}`);
