@@ -241,6 +241,12 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
   }, 120_000);
 
   it('propose, counter, accept: one owner approval, the same terms hash on both sides, replay sends nothing', async () => {
+    // Approvals the pairing left (Bob's invite acceptance): the count below is for the agreement only.
+    const approvalsBefore = {
+      alice: (await storeRows(alice, 'approvals')).length,
+      bob: (await storeRows(bob, 'approvals')).length,
+    };
+
     // 1. No tool lets the agent decide an approval or change the rules (I-4).
     await step('no MCP tool decides an approval or changes the policy', async () => {
       const names = await aliceMcp.tools();
@@ -387,8 +393,8 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
 
     // 12. Each owner was asked at most once for this agreement: A has one approval row, B none.
     await step('approval count: A one, B none', async () => {
-      expect(await storeRows(alice, 'approvals')).toHaveLength(1);
-      expect(await storeRows(bob, 'approvals')).toHaveLength(0);
+      expect(await storeRows(alice, 'approvals')).toHaveLength(approvalsBefore.alice + 1);
+      expect(await storeRows(bob, 'approvals')).toHaveLength(approvalsBefore.bob);
     });
   }, 900_000);
 
