@@ -141,7 +141,7 @@ describe('run', () => {
   });
 
   it('fails the check when README.md was edited by hand, and fixes it when generating', () => {
-    write('README.md', read('README.md').replace('· **Version:** v0.0.1', '· **Version:** v9.9.9'));
+    write('README.md', read('README.md').replace(/· \*\*Version:\*\* v\d+\.\d+\.\d+/, '· **Version:** v9.9.9'));
     const checked = run({ root, check: true });
     expect(checked.problems.join('\n')).toContain('README.md is out of date');
     expect(read('README.md')).toContain('v9.9.9'); // the check never writes
@@ -181,7 +181,7 @@ describe('run', () => {
   it('fails when the milestone badge disagrees with the source', () => {
     write(
       'README.md',
-      read('README.md').replace('[![Milestone: M0 Foundations]', '[![Milestone: M1a]'),
+      read('README.md').replace(/\[!\[Milestone: [^\]]+\]/, '[![Milestone: M1a]'),
     );
     expect(run({ root, check: true }).problems.join('\n')).toContain('milestone badge says "M1a"');
   });
