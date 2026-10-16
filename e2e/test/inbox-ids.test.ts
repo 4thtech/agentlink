@@ -33,6 +33,13 @@ describe('receivedOfferId', () => {
     expect(receivedOfferId([withMessages([])], 'Alice')).toBeUndefined();
     const two = withMessages([msg({}), msg({ envelopeId: FAKE })]);
     expect(receivedOfferId([two], 'Alice')).toBeUndefined();
+    const other = JSON.stringify({ messages: [msg({ envelopeId: FAKE })] });
+    expect(
+      receivedOfferId([real, other.replace(FAKE, 'FFFFFFFFFFFFFFFFFFFFFF')], 'Alice'),
+    ).toBeUndefined();
+  });
+  it('counts the same offer seen in two inbox calls once', () => {
+    expect(receivedOfferId([real, real], 'Alice')).toBe(FAKE);
   });
   it('rejects an ID that is not 22 base64url characters', () => {
     const short = withMessages([msg({ envelopeId: 'short' })]);

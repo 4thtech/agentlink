@@ -36,5 +36,6 @@ export function receivedOfferId(results: readonly string[], sender: string): str
       }
     }
   }
-  return ids.length === 1 ? ids[0] : undefined;
+  const unique = [...new Set(ids)];
+  return unique.length === 1 ? unique[0] : undefined;
 }
