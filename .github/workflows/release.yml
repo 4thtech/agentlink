@@ -4,6 +4,10 @@
 # Decision D-25; docs/process/release-and-deployment.md §4.1.
 #
 # ---------------------------------------------------------------------------
+# CI-GREEN (OPS-CI-2)
+#   The first job, `ci-green`, waits for this commit's push runs of ci.yml and security.yml and
+#   stops the whole run unless `ci-gate` and `security-gate` succeeded (tools/release/wait-for-ci.mjs).
+#
 # GUARD
 #   This workflow does nothing until the repository is ready: the `guard` job checks for
 #   .changeset/config.json, package.json and pnpm-lock.yaml on main. While any of them is
@@ -95,8 +99,41 @@ env:
   NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
 
 jobs:
+  # OPS-CI-2: nothing happens for a commit whose CI is not green. Waits for the push runs of this
+  # exact commit and requires their gate jobs (`ci-gate` of ci.yml, `security-gate` of
+  # security.yml) to have succeeded. Fails closed: red, cancelled or skipped, no run within 10
+  # minutes, still pending after 45, or an API that keeps failing. After a CI re-run turns green,
+  # re-run this workflow's failed jobs. Reads workflow-run metadata only (`actions: read`).
+  ci-green:
+    name: ci-green
+    if: github.repository_owner == '4thtech'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Wait for this commit's CI and require it green
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node tools/release/wait-for-ci.mjs \
+            --require ci.yml:ci-gate \
+            --require security.yml:security-gate \
+            --timeout-minutes 45 \
+            --interval-seconds 30 \
+            --missing-grace-minutes 10
+
   guard:
     name: guard
+    needs: ci-green
     if: github.repository_owner == '4thtech'
     runs-on: ubuntu-24.04
     timeout-minutes: 5

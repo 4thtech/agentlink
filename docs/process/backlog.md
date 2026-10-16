@@ -628,7 +628,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - If the workflow is changed, the secret scan still fails on a planted fake secret (negative control recorded in the PR).
 
 #### OPS-CI-2 · CI audit PR 2: release readiness and the deploy-freeze token (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet (owner for the token) · **Security:** S2 (`.github/**` and release path, audit-rules §2.2; owner "merge")
+- **Status:** in review (PR `OPS-CI-2 ci: release readiness and deploy-freeze guard`; the token and the freeze round trip are owner steps, `ci-cd.md` §8) · **Size:** S · **Tier:** Sonnet (owner for the token) · **Security:** S2 (`.github/**` and release path, audit-rules §2.2; owner "merge")
 - **Repo/path:** agentlink · .github/workflows/release.yml, .github/workflows/ci.yml, docs/process/ci-cd.md
 - **Depends on:** M0-17; follows CI audit PR 1 (4thtech/agentlink#109)
 - **Spec:** `ci-cd.md` (Release, Deploy freeze); D-25, D-43, D-52
@@ -641,6 +641,30 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - A release run on a commit with red CI stops at the first job; with green CI it proceeds.
   - A fixture PR that changes a package without a changeset is red; with one it is green.
   - A manual freeze and unfreeze round trip works.
+
+#### OPS-REL-1 · v0.1.0 release blocker: decide which packages publish (new)
+- **Status:** backlog · **Size:** S · **Tier:** Opus (owner decision) · **Security:** S1 (package manifests, release path)
+- **Repo/path:** agentlink · `packages/*/package.json`, `apps/*/package.json`, `.changeset/config.json`, `docs/process/versioning.md`
+- **Depends on:** OPS-CI-2
+- **Spec:** D-25, D-43; `release-and-deployment.md` §4.1; `versioning.md`
+- **Invariants:** —
+- **Scope:**
+  - All 16 workspace packages are `"private": true` at `0.0.0` (2026-10-16), so Changesets publishes nothing and the `changesets` CI check has nothing to enforce. Decide with the owner which package(s) publish for v0.1.0 (likely the CLI `@4thtech/agentlink` for `npx`, plus the libraries it needs at runtime unless bundled), their names, and the fixed group.
+  - Drop `private` only on those; correct `publishConfig`, `repository`, `files`; changesets for the first release; the owner's 2FA bootstrap publish and trusted publishers (`ci-cd.md` §5).
+- **Acceptance:**
+  - `changeset status` lists exactly the agreed packages; a PR changing one without a changeset is red.
+  - The owner has confirmed the package list in chat.
+
+#### OPS-CI-3 · pr-hygiene accepts `OPS-<WORD>-<n>` task IDs (new)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/pr-hygiene.yml`, `tools/pr-hygiene.test.mjs`, `.github/pull_request_template.md`
+- **Depends on:** —
+- **Spec:** `ci-cd.md` (Workflows, pr-hygiene)
+- **Invariants:** —
+- **Scope:**
+  - `TITLE_RE` allows only `OPS-<n>`, while the backlog has cards such as `OPS-CI-2`; those PRs had to use the `CHORE:` prefix (#109, #184). Accept `OPS-[A-Z]+-[0-9]+` as well; update the error text and the template comment.
+- **Acceptance:**
+  - A title `OPS-CI-3 ci: ...` passes; `OPS-ci-3`, `OPS-` and `OPS-CI` fail (tests).
 
 ### Documentation (DOCS) (new)
 

@@ -1,0 +1,47 @@
+# Deploy freeze, manual (OPS-CI-2): sets the repository variable DEPLOY_FREEZE to `true` with the
+# same credential and environment the release `freeze` job uses, and reads it back. Two uses:
+#   - the owner's round-trip test of DEPLOY_FREEZE_TOKEN after creating it (run this, see the
+#     freeze take effect, then clear it by hand: release-and-deployment.md §3.1);
+#   - a one-click freeze on an incident (any agent MAY set the freeze; only the owner clears it).
+#
+# This workflow can only SET the freeze. Clearing it is owner-only and never automated.
+# Runs from `main` only: the environment `deploy-freeze` admits only `main`, and the job refuses
+# any other ref before it asks for the secret. No inputs, no event data in the script.
+name: Deploy freeze
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: deploy-freeze
+  cancel-in-progress: false
+
+jobs:
+  freeze:
+    name: freeze
+    if: github.repository_owner == '4thtech' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: deploy-freeze
+    permissions: {}
+    steps:
+      - name: Set DEPLOY_FREEZE and read it back
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.DEPLOY_FREEZE_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::DEPLOY_FREEZE_TOKEN is not configured in environment deploy-freeze (docs/process/ci-cd.md, owner setup section 8)."
+            exit 1
+          fi
+          gh variable set DEPLOY_FREEZE --body true --repo "$REPOSITORY"
+          value="$(gh variable get DEPLOY_FREEZE --repo "$REPOSITORY")"
+          if [ "$value" != "true" ]; then
+            echo "::error::DEPLOY_FREEZE reads back as '$value', not 'true'."
+            exit 1
+          fi
+          echo "::warning::DEPLOY_FREEZE is now true. Publishing, deploys and merges stop until the owner clears it (release-and-deployment.md §3.1)."
