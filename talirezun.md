@@ -1,31 +1,19 @@
 # @talirezun — sync
-**Headline:** M1a: CLI + MCP server, pairing, send/inbox, invites, owner approvals and policies merged; terms tools, inbox wiring, background loop and e2e next
-_Updated 2026-10-15 12:15 UTC · claude-code / claude-opus-5-5 · orchestrator_
+**Headline:** v0.1.0 released on npm as @4thtech-io/agentlink (2026-10-16); M1a complete; M1b and the two-machine M1 gate test next
+_Updated 2026-10-16 16:28 UTC · claude-code / claude-haiku-5-5 · sync update for 2026-10-15/16_
 
 ## Now
-Merged 2026-10-15 (#74–#127, key items):
-- **Specs and decisions:** D-72–D-77; M1-9 decomposition and D-73 (#97); terms canonical form (#100).
-- **Core:** send pipeline and outbox (#99); inbox sync and delivery acks (#106); request accept/block (#105); approvals and use-once (#95, #116); pairing (#78, #80); owner-signed actions and policy engine (#79); commitments policy D-31 (#114); terms schema and termsHash (#101).
-- **CLI:** init and harness detection (#111); owner init, approve, deny, cancel (#115); invite, accept, contacts, status, doctor, requests (#112); runtime and M1a approval channel (#107); copy sheet (#102).
-- **MCP server:** frozen M1a tool surface and read-only tools (#113); invite and send/inbox tools (#125, #127).
-- **Node:** owner init signs first agent card (#118); policy mark (#86); public knowledge base (#88).
-- **CI hardening:** false-red fixes (#109); keychain job runs CLI two-process test (#108); relays-docker job (#84); deterministic dedup test (#117); pinned runner images (#83).
-- **Relays:** default public relay set and vetting script (#119).
+- **2026-10-16:** v0.1.0 released on npm as `@4thtech-io/agentlink`.
+- **M1a complete:** background loop, tool-surface guard, UCD vendoring, J8 e2e, multi-agent per owner, fresh-session fixes, install docs, skill file.
+- **AI e2e passing;** local dogfood Claude Code ↔ OpenCode 16/17.
+- **Release pipeline:** ci-green gate, deploy freeze, merge queue, trusted publishing.
 
 ## In flight
-| PR | Work | Status |
-|---|---|---|
-| #130 | M1-7h-c inbox page read with read marking | open |
-| #126 | M1-32 terms flow, one approval per agreement (D-55) | open |
-| #123 | DOCS: decisions, spec follow-ups, backlog pass | open |
-| #124 | CHORE: version packages | open |
-| #120, #121, #128, #129 | DEPS: dependency updates | open |
+None. No open PRs as of 2026-10-16.
 
 ## Next
-1. M1-9q terms tools; M1-9p-b inbox on.
-2. M1-7k-b / M1-9r background loop.
-3. M1-21-b UCD vendoring.
-4. M1-13a e2e; J9 dogfood.
+1. M1b in a new session (orchestrator).
+2. M1 gate: two-machine test run by Tali (Denis busy).
 
 ## Decisions (still relevant)
 - D-72 request accept/block; D-73 M1-9 owner answers; D-74 terms rules.
