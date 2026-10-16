@@ -16,6 +16,7 @@ const REQUIRE = [
 const run = (id, workflow, overrides = {}) => ({
   id,
   head_sha: SHA,
+  head_branch: 'main',
   event: 'push',
   path: `.github/workflows/${workflow}`,
   status: 'completed',
@@ -184,6 +185,42 @@ describe('checkOnce', () => {
     const result = await checkOnce({ api, repo: REPO, sha: SHA, require: REQUIRE });
     expect(result.state).toBe('pending');
     expect(result.missing).toContain('ci.yml');
+  });
+
+  it('asks only for runs on main', async () => {
+    const { api, seen } = fakeApi(greenRoutes());
+    await checkOnce({ api, repo: REPO, sha: SHA, require: REQUIRE });
+    expect(seen.find((p) => p.startsWith(runsPath('ci.yml')))).toContain('branch=main');
+  });
+
+  it('ignores a newer push run of the same commit on another branch', async () => {
+    const { api } = fakeApi(
+      greenRoutes({
+        [runsPath('ci.yml')]: () => ({
+          workflow_runs: [run(11, 'ci.yml'), run(99, 'ci.yml', { head_branch: 'feature/x' })],
+        }),
+        [jobsPath(99)]: () => ({ jobs: [job('ci-gate (push)', 'completed', 'success')] }),
+      }),
+    );
+    const result = await checkOnce({ api, repo: REPO, sha: SHA, require: REQUIRE });
+    expect(result.state).toBe('green');
+  });
+
+  it('pages through the jobs list to find the gate', async () => {
+    const filler = Array.from({ length: 100 }, (_, i) =>
+      job(`matrix ${i}`, 'completed', 'success'),
+    );
+    const { api, seen } = fakeApi(
+      greenRoutes({
+        [jobsPath(11)]: (n) =>
+          n === 0 ? { jobs: filler } : { jobs: [job('ci-gate', 'completed', 'success')] },
+      }),
+    );
+    const result = await checkOnce({ api, repo: REPO, sha: SHA, require: REQUIRE });
+    expect(result.state).toBe('green');
+    expect(
+      seen.filter((p) => p.startsWith(jobsPath(11))).map((p) => p.match(/[?&]page=(\d+)/)?.[1]),
+    ).toEqual(['1', '2']);
   });
 
   it('judges the newest run when several exist for the commit', async () => {

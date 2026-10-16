@@ -60,6 +60,26 @@ export function parseArgs(argv) {
   return out;
 }
 
+const JOBS_PER_PAGE = 100;
+const MAX_JOB_PAGES = 10;
+
+// Pages through the run's jobs (latest attempt) until the named job is found or the list ends.
+async function findJob({ api, repo, runId, name }) {
+  for (let page = 1; page <= MAX_JOB_PAGES; page += 1) {
+    const query = new URLSearchParams({
+      filter: 'latest',
+      per_page: String(JOBS_PER_PAGE),
+      page: String(page),
+    });
+    const body = await api(`/repos/${repo}/actions/runs/${runId}/jobs?${query}`);
+    const jobs = body?.jobs ?? [];
+    const found = jobs.find((j) => j?.name === name);
+    if (found) return found;
+    if (jobs.length < JOBS_PER_PAGE) return undefined;
+  }
+  throw new Error(`run ${runId} has more than ${MAX_JOB_PAGES * JOBS_PER_PAGE} jobs`);
+}
+
 // One look at every required gate. Returns { state: 'green' | 'red' | 'pending', reasons, missing }.
 export async function checkOnce({ api, repo, sha, require }) {
   const reasons = [];
@@ -68,11 +88,21 @@ export async function checkOnce({ api, repo, sha, require }) {
   let anyPending = false;
 
   for (const { workflow, job } of require) {
-    const query = new URLSearchParams({ head_sha: sha, event: 'push', per_page: '50' });
+    // Only push runs on `main`: pushing a new branch at the same commit starts another push run
+    // whose gate is `ci-gate (push)`, which must neither satisfy nor block the release.
+    const query = new URLSearchParams({
+      head_sha: sha,
+      event: 'push',
+      branch: 'main',
+      per_page: '50',
+    });
     const body = await api(`/repos/${repo}/actions/workflows/${workflow}/runs?${query}`);
     const runs = (body?.workflow_runs ?? []).filter(
       (r) =>
-        r?.head_sha === sha && r?.event === 'push' && r?.path === `.github/workflows/${workflow}`,
+        r?.head_sha === sha &&
+        r?.event === 'push' &&
+        r?.head_branch === 'main' &&
+        r?.path === `.github/workflows/${workflow}`,
     );
     if (runs.length === 0) {
       anyPending = true;
@@ -81,10 +111,7 @@ export async function checkOnce({ api, repo, sha, require }) {
       continue;
     }
     const newest = runs.reduce((a, b) => (Number(b.id) > Number(a.id) ? b : a));
-    const jobsBody = await api(
-      `/repos/${repo}/actions/runs/${newest.id}/jobs?filter=latest&per_page=100`,
-    );
-    const gate = (jobsBody?.jobs ?? []).find((j) => j?.name === job);
+    const gate = await findJob({ api, repo, runId: newest.id, name: job });
 
     if (!gate) {
       if (newest.status === 'completed') {
