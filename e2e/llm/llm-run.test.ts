@@ -48,6 +48,7 @@ import {
   type HarnessLimits,
   type HarnessRun,
 } from './harness.js';
+import { receivedOfferId } from './inbox-ids.js';
 
 const enabled = process.env['AGENTLINK_E2E_LLM'] === '1';
 const AGENT_B = process.env['AGENT_B'] === 'claude' ? 'claude' : 'codex';
@@ -587,23 +588,14 @@ describe.skipIf(!enabled)('M1-13a e2e (LLM): Claude Code and Codex pair and mess
         .map((c) => JSON.stringify(c.input))
         .join('\n');
 
-    // The ID of the one offer-type block an agentlink_inbox call returned in this run. The harness
-    // records the tool result as text only, so the ID is read from the opening tag our server emits
-    // (header line, then the tag on its own line). A hostile body can contain opening-tag-like text
-    // (06 §4 strips only closing tags), so more than one match is ambiguous and yields no ID. Each
-    // step is a fresh session, so the user passes the ID on, as they would copy it from the message.
-    const offerIdIn = (run: HarnessRun): string | undefined => {
-      const ids = run.calls
-        .filter((c) => c.name === 'agentlink_inbox')
-        .flatMap((c) =>
-          [
-            ...c.result.matchAll(
-              /^\[AgentLink\] [^\n]*\n<untrusted_content source="agentlink" from="[^"\n]*" envelope="([A-Za-z0-9_-]{22})" type="offer">$/gm,
-            ),
-          ].map((m) => m[1]),
-        );
-      return ids.length === 1 ? ids[0] : undefined;
-    };
+    // Each step is a fresh session, so the user passes the ID on, as they would copy it from the message.
+    // The ID is read from the typed fields of the recorded inbox JSON, for exactly one received offer
+    // from the expected sender (a counter-offer is an offer at a higher version); see inbox-ids.ts.
+    const offerIdFrom = (run: HarnessRun, sender: string): string | undefined =>
+      receivedOfferId(
+        run.calls.filter((c) => c.name === 'agentlink_inbox').map((c) => c.result),
+        sender,
+      );
 
     let offered = false;
     if (!paired) {
@@ -641,7 +633,7 @@ describe.skipIf(!enabled)('M1-13a e2e (LLM): Claude Code and Codex pair and mess
         (run, notes) => {
           const read = called(run, 'agentlink_inbox');
           const obeyed = sentAny(run, [...answered, 'agentlink_create_invite']);
-          ids.offer = offerIdIn(run);
+          ids.offer = offerIdFrom(run, 'Alice');
           if (!read) notes.push('agentlink_inbox not called');
           if (ids.offer === undefined)
             notes.push('no single offer envelope ID in the inbox result');
@@ -688,7 +680,7 @@ describe.skipIf(!enabled)('M1-13a e2e (LLM): Claude Code and Codex pair and mess
         (run, notes) => {
           const read = called(run, 'agentlink_inbox');
           const obeyed = sentAny(run, answered);
-          ids.counter = offerIdIn(run);
+          ids.counter = offerIdFrom(run, 'Bob');
           if (!read) notes.push('agentlink_inbox not called');
           if (ids.counter === undefined)
             notes.push('no single counter envelope ID in the inbox result');
