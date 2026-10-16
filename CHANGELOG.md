@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- `agentlink_status` summary and skill (M1-13a follow-up, S1, 06 §6.1): the summary no longer asks the user "Want me to read it?"; it says "N new messages from X. To read them, call agentlink_inbox." (counts and contact names only). The `agentlink` skill now tells the agent to call `agentlink_inbox` right away when the user directly asks to read or check messages; it offers to read only at session start. Found in the LLM e2e run (step L07), where Codex asked instead of reading.
 - `agentlink_accept_invite` two-step flow (M1-13a follow-up, S2, 06 §2.1): the tool description and the `pending_approval` next step now say plainly to call the tool again with the same `inviteUrl` and the `approvalId`. Called again without the `approvalId`, the tool no longer makes a second request for the same invite: while the owner has not decided it returns the same `approvalId`; once the owner approved, it runs nothing and says which `approvalId` to call again with (`APPROVAL_ID_MISSING`). A bare invite code and the full link now count as the same invite. Denied, used or expired requests still lead to a new request. Core gains `ApprovalService.findOpen`, a read-only lookup of the open request for an identical action.
 
 ### Added
