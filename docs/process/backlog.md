@@ -3124,12 +3124,25 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The dogfood starts as soon as send and inbox work, before J8 is ready; the J8 negotiation follows when the terms chain lands, and the gate still needs both (D-73 (8)).
   - Install from a tarball built by a CI job and uploaded as a workflow artifact (`pnpm pack` of `apps/cli`; the workflow change is a separate sensitive-path PR) on both machines (Claude Code and Codex) with the agent-assisted install (M1-25), with no npm `next` or `latest` release needed for J9 (D-73 (6)); there is no headless machine in the dogfood (D-73 (4)); harness permission rules from M1-12b applied; owner passphrases set in terminals the agents do not control.
   - Pair the two agents through one invite link (Tali creates it; Denis pastes the invite page's install-and-accept prompt, D-53) and compare safety codes; the J9 session habit from the skill file (M1-12a: status at session start, handoff offer at session end; optional SessionStart hook, M1-29) used in daily work; a J8 negotiation over Talk with owner approval of the binding `accept`.
+  - **Multi-harness addition (owner decision, Tali, 2026-10-16):** the dogfood covers not only Tali and Denis, but also Tali's own Claude Code, Antigravity and OpenCode agents talking to each other, on one computer and across two, each harness its own agent. Runbook: `docs/runbooks/dogfood-m1a.md` (RB-17). Several agents on one computer wait for M1-9t; until then the pairs run across computers. OpenCode and Antigravity MCP entries are added by hand (`init` knows only Claude Code, Codex and Gemini CLI in M1a).
   - No milestone audit at M1a; the per-card S1/S2 reviews are the control.
 - **Acceptance:**
   - No M1a vector suite is pending: `node tools/vectors/check-pending.mjs --gate M1a` passes, and `release.yml` runs the same gate, so no release ships while one is (M1-1h, IR-M1-1h-1 F2).
   - M1a gate: both agents paired and syncing project status through AgentLink; a J8 negotiation completed over Talk without on-chain proof.
   - For at least two weeks the dogfood replaces the **personal handoff** part of the git sync branch for Tali and Denis (their own `<login>.md` handoff notes; `board.md` stays on git, `docs/process/sync-protocol.md`). The dogfood log records, per week, where AgentLink beat git and where it lost (for example missed messages, the session-start check skipped, or content that belonged on the board) (D-53).
   - No wallet, extension, gas or chain choice appeared in either setup (D-39); dogfood log (dates, harnesses, versions, issues filed) and owner sign-off recorded.
+
+#### M1-9t · CLI: several agents under one OS user, and init for one harness (new, found by the M1-23 runbook)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1a (needed for the one-computer part of M1-23, not for the gate)
+- **Repo/path:** agentlink · apps/cli (`init`, `owner init`), packages/node (`initOwner`)
+- **Depends on:** M1-9a, M1-9b, M1-8h
+- **Spec:** 04 §2.2, §2.5, §2.8; 06 §7; D-39, D-67; `docs/runbooks/dogfood-m1a.md`
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - Gap 1: the owner key is one keychain item per OS user (service `agentlink`, account `owner`), and `owner init` refuses when it exists, so a second agent (a second harness) under the same OS user can never get its first card. Decide with the owner and specify how a further local agent gets a card signed by the existing owner (one owner presence, one owner signature for exactly that agent, 04 §2.5), or confirm one OS user per agent as the supported rule.
+  - Gap 2: `init` proposes changes to every detected harness and cannot target one; answering no to all cancels the identity too. Add an explicit target (for example `--harness <id>`, or identity only) and printed snippets for OpenCode and Antigravity (M1-9a lists them for M1b; verify the config formats again at build time).
+  - No new flags before the spec change is agreed.
+- **Acceptance:** spec change first (04/06) and the owner's "merge"; then tests first (RED commit): two agents under one OS user each get a card for the same owner, an agent cannot trigger it, and `init` writes only to the chosen harness.
 
 #### M1-24 · Product name and trademark check before the production domain (D-38) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet prepares search material) · **Security:** S0 · **Phase:** M1b
