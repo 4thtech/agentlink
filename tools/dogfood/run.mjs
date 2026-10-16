@@ -293,14 +293,19 @@ async function main() {
     return 0;
   }
   const runId = stamp();
-  const steps = buildSteps({ cc: options.ccAgent, oc: options.ocAgent, runId });
+  const dir = join(options.out, runId);
+  const steps = buildSteps({
+    cc: options.ccAgent,
+    oc: options.ocAgent,
+    runId,
+    workspace: join(dir, 'workspace-oc'),
+  });
   if (options.dryRun) {
     log(planText(options, steps));
     return 0;
   }
 
   const startedAt = new Date().toISOString();
-  const dir = join(options.out, runId);
   await mkdir(dir, { recursive: true, mode: 0o700 });
   log(`Results: ${dir}`);
 
