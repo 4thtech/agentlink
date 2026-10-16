@@ -84,7 +84,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | `approvals` | approval_id, action_json (`enc`: `args` can hold message text), scope_json (commitments, D-55; immutable after creation, carried in `action.context.scope`, 04 §3.4.2), answers_envelope_id, scope_key (at most one live scope per value, §3.5), source (owner \| policy grant, with the policy hash `enc`), signed_decision (the owner's `SignedOwnerAction`: an `approval.decide`, or the `approval.decideBatch` that covers this row, copied per row and re-verified for this row's `approvalId`, 04 §2.5.2, D-68; re-verified on every use, `status` is only a cache, 04 §2.5.1), signed_cancel (the owner's `approval.cancel`, if any; re-verified on use), parts in `commitment_parts` (§3.5; this replaces the earlier parts_used_json), summary (`enc`: it names the contact), status (pending \| approved \| denied \| expired \| cancelled \| void; an approval other than a commitment becomes `void` in the transaction of its one use, and a status only ever takes authority away, never grants it: proposed, owner confirms at merge, M1-7e), expires_at, created_at, decided_at |
 | `policies` | The current signed policy, one row (§3.4); this replaces the earlier key, value_json, updated_at |
 | `sync_cursors` | relay_url, last_seen |
-| `outbox`, `seen`, `held_envelopes`, `blocked_keys`, `rate_counters`, `publisher_lease` | Delivery (§3.2) |
+| `outbox`, `outbox_staged`, `seen`, `held_envelopes`, `blocked_keys`, `rate_counters`, `publisher_lease` | Delivery (§3.2) |
 | `idempotency` | Tool results by `clientRequestId` (§3.3) |
 | `owner_action_nonces`, `revoked_agents` | Owner authority (§3.4) |
 | `budget_ledger`, `budget_state`, `commitment_parts` | Money and commitments (§3.5) |
@@ -155,6 +155,19 @@ Every mutating call runs: **policy check → (approval) → action → store →
 - **At rest.** relays and acks are `enc` (URLs). wrap_json stays in clear: it is the ciphertext that relays already hold.
 - **Revocation (proposed; owner confirms at merge).** The revoke transaction (§3.4) sets every `pending` row whose recipient_key is a known key of the revoked agent, at any epoch, to `not_delivered` with reason `revoked`. For the own agent it does so for every `pending` row. The activity feed reports it.
 - **On failure.** If the outbox write fails, nothing is published and the call returns `error`, so the sender always holds what it sent. A row that cannot be read is marked `not_delivered` (reason `unreadable`) and reported; it is never sent to relays other than those it lists.
+
+**`outbox_staged`** (M1-7k-b; IR-M1-7k-1 F08; schema version 3): the transient faults of a staged pairing message, meaning a `handshake` or `handshake-ack` envelope that is still `queued` and has no outbox rows yet.
+
+| Column | Type and meaning |
+|---|---|
+| envelope_id | `id`: the staged outbound `envelopes` row; the primary key |
+| failures | `int`: how many transient faults it has had |
+| failed_at | `int`: unix seconds of the last one |
+
+- **Order.** Each delivery pass gives the never-tried staged messages their rows first (oldest first), then the failed ones, least recently failed first. A failure does not use up the pass's batch. So a message whose fault does not clear never blocks a newer one, and failing messages take turns.
+- **Bound (24 h).** A staged message still without rows 24 h after its created_at (`STAGED_MAX_AGE_SECONDS` = 86 400) is marked `not_delivered`, so none stays staged for good. The expiry runs first in each pass and signs nothing, so it also ends the staged messages of an agent that cannot send (revoked, or rotation unfinished).
+- **Lifetime.** A row lives only while its message is staged. It is deleted in the transaction that gives the message its outbox rows, drops it or expires it; the expiry also deletes rows whose message is no longer staged.
+- **At rest.** In clear (an envelope ID and times).
 
 **`seen`**: the seen-set of §4.2.
 
@@ -245,6 +258,8 @@ Every mutating call runs: **policy check → (approval) → action → store →
 - **Take.** In one store transaction a process inserts the row with its holder and lease_until = now + 60, or replaces a row whose lease_until ≤ now with a compare-and-set on the old holder. A process whose take changes no row is not the holder and tries again 20 s later.
 - **Renew.** The holder sets lease_until = now + 60 every 20 s, with a compare-and-set on holder = its own. If that changes no row, it has lost the lease: it closes its subscriptions and stops the loop before doing anything else.
 - **Release.** On clean shutdown the holder deletes the row with a compare-and-set on holder = its own.
+- **Lapse (M1-7k-b; IR-M1-7k-b-1 L-1).** A lease is lapsed when lease_until ≤ now, or when lease_until > now + 120 (two lease periods). No holder writes more than now + 60, so the second case can only come from a clock that has since gone back by more than 60 s. So a holder that crashed just before a backward clock jump cannot keep the lease for the length of the jump: after a crash it lapses within 120 s whatever the clock does. A smaller step back (an NTP correction) changes nothing. A process counts itself as holder only while now < lease_until ≤ now + 120 on the same clock; every process of one agent runs on one machine and reads the same clock (06 §6). After a jump back by more than 60 s and then forward again, an old holder can still believe it holds the lease until its next renewal, which changes no row: at most one renewal interval (20 s). The lease is not authority (below), so this costs relay connections only.
+- **Users (M1-9r).** The MCP server's background loop (`agentlink mcp`; 06 §6) is the only user: one active publisher per agent. Only the holder runs the loop's passes (inbox sync, then outbox delivery). A process that does not hold the lease stays idle and tries again every 20 s; its tools still work, and `agentlink_inbox` and `agentlink_status` run their own short catch-up. CLI commands never start a loop and never take the lease. Until live relay subscriptions land (M1-9s), the holder polls its relays with a repeated catch-up pass every 30 s, sooner after a partial pass (1 s, doubling with each consecutive partial pass up to 30 s, reset by a full pass).
 - **At rest.** In clear (a random ID and a time).
 - **On failure.** A lease that cannot be read or written counts as not held: the process keeps no subscriptions, and its tools still work (06 §6).
 - **Not authority.** The lease decides only who keeps relay connections. Every effect is still idempotent and claimed per row (outbox claim, M1-7k; idempotency lease, §3.3), so two holders at once cost connections, never a second effect.
@@ -435,6 +450,7 @@ The console and the desktop app keep the owner's own store, never an agent's. Th
 - **Compare-and-set** as an update that reports how many rows it changed.
 - **`now` passed in**, and a pruning operation per table with its retention.
 - **Forward migrations only.** A store whose schema version is newer than the code refuses to open (fail closed) and is never downgraded.
+  - Schema version 3 (M1-7k-b) adds `publisher_lease` (§3.2) and `outbox_staged` (§3.2); `STORE_SCHEMA_VERSION` is 3 and the Node store migrates forward from versions 1 and 2.
 - **Core-enforced rules** (IR-M1-7a-1 L-5; proposed, owner confirms at merge). These span rows or tables, so the core enforces them inside its store transactions; a SQLite store may add triggers as a second layer: an envelope ID unique across `envelopes` and `held_envelopes` (§3.2); at most one approved scope with a part still `unclaimed` per scope_key (§3.5); `revoked_agents` never deleted and contact status `revoked` final (§3.4); the contact key rule (§3); and pruning per table with its retention.
 - **Proposed values for the owner to confirm at merge (G-9):** the held-envelope cap and its own pool (§3.2, amends D-62); the requests-queue limits, with refusals shown only to the owner (§3.2); the owner's accept, ignore, ignore all and block, the refused-row retention of 7 days and `blocked_keys` (§3.2, D-72); dropping envelopes over `rateLimitPerContactPerHour` (§3.2); `IDEMPOTENCY_KEY_REUSED` for a reused `clientRequestId` (§3.3); idempotency retention and the execution lease (§3.3); the store committing before the KeyStore policy-version mark (§3.4). G-24 adds: the relay columns of `identity` and `contacts` (§3) and `owner_agents` (§3.6), with the values of §4.3.
 

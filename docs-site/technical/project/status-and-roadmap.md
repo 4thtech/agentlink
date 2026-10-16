@@ -1,7 +1,7 @@
 # Status and roadmap
 
 <!-- status-hint:start -->
-> **Status: Current as of 15 Oct 2026 (M0 Foundations, v0.0.1).** Derived from the [build plan](https://github.com/4thtech/agentlink/blob/main/docs/foundation/10-build-plan.md) and updated at every milestone. Durations are indicative, not commitments.
+> **Status: Current as of 16 Oct 2026 (M0 Foundations, v0.0.1).** Derived from the [build plan](https://github.com/4thtech/agentlink/blob/main/docs/foundation/10-build-plan.md) and updated at every milestone. Durations are indicative, not commitments.
 <!-- status-hint:end -->
 
 ## Where we are
@@ -13,7 +13,7 @@
 
 **Testnet:** OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit; AgentLink does not use them yet. **Mainnet:** After the external audit (M3). Not deployed. **Services:** Submitter, faucet and encrypted drop are not built or deployed yet.
 
-**In progress:** The MCP tools for terms and the MCP background loop (relay subscriptions), the remaining M1a cards (M1-7k-b, M1-9c-b, M1-21-b), and the end-to-end and dogfood work. Next: file encryption and the remaining contract work.
+**In progress:** The remaining M1a work: the neutral-platform bundle-check CI job (M1-9c-c), the remaining end-to-end scenarios, the dogfood and the M1a release. Next: file encryption and the remaining contract work.
 
 **Next:** The rest of the M1a crypto and core layers, then the walking skeleton where two agents on different harnesses pair and talk (v0.1.0); then M1b adds files, proof and credits on testnets.
 
@@ -40,7 +40,7 @@ Code that is merged is not necessarily published: nothing is released or install
 | Crypto (@agentlink/crypto) | File encryption (ALF1) | Planned | - |
 | Shared types (@agentlink/types) | Constants and the envelope, payload, card and invite schemas | Done | [#23](https://github.com/4thtech/agentlink/pull/23), [#93](https://github.com/4thtech/agentlink/pull/93) |
 | Shared types (@agentlink/types) | Policy, approval, proof pack and tool-result types | Done | [#31](https://github.com/4thtech/agentlink/pull/31), [#36](https://github.com/4thtech/agentlink/pull/36), [#71](https://github.com/4thtech/agentlink/pull/71), [#72](https://github.com/4thtech/agentlink/pull/72), [#76](https://github.com/4thtech/agentlink/pull/76) |
-| Shared types (@agentlink/types) | Terms, TermsInput and termsHash | Done | [#98](https://github.com/4thtech/agentlink/pull/98), [#100](https://github.com/4thtech/agentlink/pull/100), [#101](https://github.com/4thtech/agentlink/pull/101) |
+| Shared types (@agentlink/types) | Terms, TermsInput and termsHash | Done | [#98](https://github.com/4thtech/agentlink/pull/98), [#100](https://github.com/4thtech/agentlink/pull/100), [#101](https://github.com/4thtech/agentlink/pull/101), [#147](https://github.com/4thtech/agentlink/pull/147) |
 | Transport (@agentlink/transport-nostr) | Gift wrap and unwrap | Done | [#45](https://github.com/4thtech/agentlink/pull/45) |
 | Transport (@agentlink/transport-nostr) | Relay pool and delivery outbox | Done | [#59](https://github.com/4thtech/agentlink/pull/59) |
 | Transport (@agentlink/transport-nostr) | Sync | Done | [#63](https://github.com/4thtech/agentlink/pull/63) |
@@ -56,9 +56,9 @@ Code that is merged is not necessarily published: nothing is released or install
 | Core (@agentlink/core) | Reading an approval and counting pending ones | Done | [#116](https://github.com/4thtech/agentlink/pull/116) |
 | Core (@agentlink/core) | Requests from unknown senders: accept, ignore, block | Done | [#96](https://github.com/4thtech/agentlink/pull/96), [#105](https://github.com/4thtech/agentlink/pull/105) |
 | Core (@agentlink/core) | Held cards need the sender's own owner entry | Done | [#90](https://github.com/4thtech/agentlink/pull/90) |
-| Core (@agentlink/core) | Send pipeline | Done | [#99](https://github.com/4thtech/agentlink/pull/99) |
-| Core (@agentlink/core) | Inbox sync, delivery acknowledgements, owner card update | Done | [#106](https://github.com/4thtech/agentlink/pull/106) |
-| Core (@agentlink/core) | Terms and one approval per agreement | In progress | [#126](https://github.com/4thtech/agentlink/pull/126), [#134](https://github.com/4thtech/agentlink/pull/134) |
+| Core (@agentlink/core) | Send pipeline | Done | [#99](https://github.com/4thtech/agentlink/pull/99), [#133](https://github.com/4thtech/agentlink/pull/133) |
+| Core (@agentlink/core) | Inbox sync, delivery acknowledgements, owner card update | Done | [#106](https://github.com/4thtech/agentlink/pull/106), [#130](https://github.com/4thtech/agentlink/pull/130), [#131](https://github.com/4thtech/agentlink/pull/131) |
+| Core (@agentlink/core) | Terms and one approval per agreement | Done | [#126](https://github.com/4thtech/agentlink/pull/126), [#134](https://github.com/4thtech/agentlink/pull/134) |
 | Node runtime (@agentlink/node) | Agent key store in the OS keychain | Done | [#54](https://github.com/4thtech/agentlink/pull/54), [#57](https://github.com/4thtech/agentlink/pull/57), [#83](https://github.com/4thtech/agentlink/pull/83) |
 | Node runtime (@agentlink/node) | Local SQLite database | Done | [#60](https://github.com/4thtech/agentlink/pull/60), [#68](https://github.com/4thtech/agentlink/pull/68) |
 | Node runtime (@agentlink/node) | Owner code at a prompt | Done | [#67](https://github.com/4thtech/agentlink/pull/67) |
@@ -66,7 +66,9 @@ Code that is merged is not necessarily published: nothing is released or install
 | Node runtime (@agentlink/node) | Policy version record in the keychain | Done | [#86](https://github.com/4thtech/agentlink/pull/86) |
 | Node runtime (@agentlink/node) | First agent card at owner setup | Done | [#118](https://github.com/4thtech/agentlink/pull/118) |
 | Node runtime (@agentlink/node) | Passphrase-locked key file for headless machines | Planned | - |
-| MCP server, CLI and apps | MCP server and CLI | In progress | [#102](https://github.com/4thtech/agentlink/pull/102), [#103](https://github.com/4thtech/agentlink/pull/103), [#107](https://github.com/4thtech/agentlink/pull/107), [#111](https://github.com/4thtech/agentlink/pull/111), [#112](https://github.com/4thtech/agentlink/pull/112), [#113](https://github.com/4thtech/agentlink/pull/113), [#115](https://github.com/4thtech/agentlink/pull/115), [#125](https://github.com/4thtech/agentlink/pull/125), [#127](https://github.com/4thtech/agentlink/pull/127), [#132](https://github.com/4thtech/agentlink/pull/132) |
+| MCP server, CLI and apps | MCP server and CLI | In progress | [#102](https://github.com/4thtech/agentlink/pull/102), [#103](https://github.com/4thtech/agentlink/pull/103), [#107](https://github.com/4thtech/agentlink/pull/107), [#111](https://github.com/4thtech/agentlink/pull/111), [#112](https://github.com/4thtech/agentlink/pull/112), [#113](https://github.com/4thtech/agentlink/pull/113), [#115](https://github.com/4thtech/agentlink/pull/115), [#125](https://github.com/4thtech/agentlink/pull/125), [#127](https://github.com/4thtech/agentlink/pull/127), [#131](https://github.com/4thtech/agentlink/pull/131), [#132](https://github.com/4thtech/agentlink/pull/132), [#135](https://github.com/4thtech/agentlink/pull/135), [#142](https://github.com/4thtech/agentlink/pull/142), [#143](https://github.com/4thtech/agentlink/pull/143) |
+| MCP server, CLI and apps | Agent skill file and quickstart guides | Done | [#151](https://github.com/4thtech/agentlink/pull/151), [#152](https://github.com/4thtech/agentlink/pull/152) |
+| MCP server, CLI and apps | End-to-end tests | In progress | [#155](https://github.com/4thtech/agentlink/pull/155), [#163](https://github.com/4thtech/agentlink/pull/163), [#165](https://github.com/4thtech/agentlink/pull/165) |
 | MCP server, CLI and apps | Local approval page | Planned | - |
 | MCP server, CLI and apps | Owner console, desktop apps, cloud agent | Planned | - |
 | OCC v2 contracts (private repo) | Notary and fee vault | Done | contracts#4 |
