@@ -46,7 +46,7 @@ exports[`copy catalogue (M1-9g) > chat.session.handoffOffer > renders as designe
 
 exports[`copy catalogue (M1-9g) > chat.session.nothingNew > renders as designed 1`] = `"Nothing new on AgentLink."`;
 
-exports[`copy catalogue (M1-9g) > chat.session.start > renders as designed 1`] = `"2 new messages from Marko. Want me to read them?"`;
+exports[`copy catalogue (M1-9g) > chat.session.start > renders as designed 1`] = `"2 new messages from Marko. To read them, call agentlink_inbox."`;
 
 exports[`copy catalogue (M1-9g) > chat.status.error.network > renders as designed 1`] = `"I couldn't reach the message network. Nothing was sent."`;
 

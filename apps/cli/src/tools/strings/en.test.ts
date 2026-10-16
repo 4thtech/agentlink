@@ -215,10 +215,10 @@ describe('copy catalogue (M1-9g)', () => {
 
   it('pluralizes the session start line (J9)', () => {
     expect(copy('chat.session.start', { count: 1, contactName: 'Denis' })).toBe(
-      '1 new message from Denis. Want me to read it?',
+      '1 new message from Denis. To read it, call agentlink_inbox.',
     );
     expect(copy('chat.session.start', { count: 2, contactName: 'Denis' })).toBe(
-      '2 new messages from Denis. Want me to read them?',
+      '2 new messages from Denis. To read them, call agentlink_inbox.',
     );
   });
 

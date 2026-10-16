@@ -167,7 +167,7 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
     expect(result.structured).toEqual({
       status: 'ok',
       summary:
-        '2 new messages from \u201cMarko Novak\u201d (self-declared). Want me to read them? 1 request from an unknown sender is waiting in your AgentLink app.',
+        '2 new messages from \u201cMarko Novak\u201d (self-declared). To read them, call agentlink_inbox. 1 request from an unknown sender is waiting in your AgentLink app.',
       agent: { name: 'default', id: A, fingerprint: '1111\u00b72222' },
       owner: { fingerprint: '3333\u00b74444' },
       contacts: 2,
