@@ -104,7 +104,14 @@ describe('checkOnce', () => {
     expect(result.reasons.join('\n')).toContain('ci-gate');
   });
 
-  for (const conclusion of ['cancelled', 'skipped', 'timed_out', 'neutral', 'action_required', null]) {
+  for (const conclusion of [
+    'cancelled',
+    'skipped',
+    'timed_out',
+    'neutral',
+    'action_required',
+    null,
+  ]) {
     it(`is red when the gate job ended as ${String(conclusion)}`, async () => {
       const { api } = fakeApi(
         greenRoutes({
@@ -205,7 +212,9 @@ describe('waitForGreen', () => {
     const { api } = fakeApi(
       greenRoutes({
         [jobsPath(11)]: (n) => ({
-          jobs: [n < 3 ? job('ci-gate', 'in_progress', null) : job('ci-gate', 'completed', 'success')],
+          jobs: [
+            n < 3 ? job('ci-gate', 'in_progress', null) : job('ci-gate', 'completed', 'success'),
+          ],
         }),
       }),
     );
@@ -219,7 +228,9 @@ describe('waitForGreen', () => {
     const { api } = fakeApi(
       greenRoutes({
         [jobsPath(11)]: (n) => ({
-          jobs: [n < 1 ? job('ci-gate', 'in_progress', null) : job('ci-gate', 'completed', 'failure')],
+          jobs: [
+            n < 1 ? job('ci-gate', 'in_progress', null) : job('ci-gate', 'completed', 'failure'),
+          ],
         }),
       }),
     );

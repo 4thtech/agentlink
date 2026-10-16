@@ -628,7 +628,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - If the workflow is changed, the secret scan still fails on a planted fake secret (negative control recorded in the PR).
 
 #### OPS-CI-2 · CI audit PR 2: release readiness and the deploy-freeze token (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet (owner for the token) · **Security:** S2 (`.github/**` and release path, audit-rules §2.2; owner "merge")
+- **Status:** in review (PR `OPS-CI-2 ci: release readiness and deploy-freeze guard`; the token and the freeze round trip are owner steps, `ci-cd.md` §8) · **Size:** S · **Tier:** Sonnet (owner for the token) · **Security:** S2 (`.github/**` and release path, audit-rules §2.2; owner "merge")
 - **Repo/path:** agentlink · .github/workflows/release.yml, .github/workflows/ci.yml, docs/process/ci-cd.md
 - **Depends on:** M0-17; follows CI audit PR 1 (4thtech/agentlink#109)
 - **Spec:** `ci-cd.md` (Release, Deploy freeze); D-25, D-43, D-52

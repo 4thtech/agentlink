@@ -112,8 +112,18 @@ describe('checkChangesets on a fixture repository', () => {
   it('skips the bot "Version packages" pull request, and only that one', async () => {
     write('packages/pub/package.json', JSON.stringify({ name: '@fixture/pub', version: '0.0.1' }));
     commit('version packages');
-    const versionPr = { headRef: 'changeset-release/main', author: 'github-actions[bot]', sameRepo: true };
-    const skipped = await checkChangesets({ cwd: dir, base: 'main', changesetBin, log: () => {}, pr: versionPr });
+    const versionPr = {
+      headRef: 'changeset-release/main',
+      author: 'github-actions[bot]',
+      sameRepo: true,
+    };
+    const skipped = await checkChangesets({
+      cwd: dir,
+      base: 'main',
+      changesetBin,
+      log: () => {},
+      pr: versionPr,
+    });
     expect(skipped).toEqual({ ok: true, skipped: true });
     const human = await checkChangesets({
       cwd: dir,
