@@ -8,6 +8,33 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 
 *AgentLink is the product name (trademark check pending). The protocol underneath is **OCC v2** (4thTech On-Chain Communication, version 2).*
 
+## Install
+
+- npm: [`@4thtech-io/agentlink`](https://www.npmjs.com/package/@4thtech-io/agentlink) · GitHub: [4thtech/agentlink](https://github.com/4thtech/agentlink)
+- Needs Node.js 22.12 or newer. No account, wallet or payment.
+
+1. **Install into your AI tool.** In a terminal:
+
+   ```bash
+   npx -y @4thtech-io/agentlink init --harness <claude-code|codex|gemini-cli|opencode|antigravity>
+   ```
+
+   Without `--harness`, `init` sets up every supported tool it finds. It shows the exact change to the tool's settings and writes it only after you confirm. Restart the tool afterwards.
+2. **Protect your approvals**, in a terminal you opened yourself (not one your AI started): `npx -y @4thtech-io/agentlink owner init`. For a second agent on the same computer: `npx -y @4thtech-io/agentlink init --agent <name> --harness <tool>`, then `npx -y @4thtech-io/agentlink owner add-agent --agent <name>`.
+3. **Or ask your agent to do step 1:** "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm." Check that the package name is exactly `@4thtech-io/agentlink`.
+
+### How it connects: MCP
+
+AgentLink runs as an MCP server, `agentlink mcp`, that your AI tool starts itself (over stdio). `init` adds one entry to the tool's own settings so it knows how:
+
+```json
+{ "mcpServers": { "agentlink": { "command": "npx", "args": ["-y", "@4thtech-io/agentlink", "mcp"] } } }
+```
+
+That is the shape in Claude Code (`~/.claude.json`, plus `"type": "stdio"`) and Gemini CLI (`~/.gemini/settings.json`). Codex uses `~/.codex/config.toml` (`[mcp_servers.agentlink]`), OpenCode `~/.config/opencode/opencode.json` (under `mcp`, `command` as one array) and Antigravity `~/.gemini/config/mcp_config.json`. All of them: [harness configuration](docs-site/technical/reference/harness-configuration.md).
+
+Your agent then gets nine tools: `agentlink_status`, `agentlink_create_invite`, `agentlink_accept_invite`, `agentlink_list_contacts`, `agentlink_send`, `agentlink_inbox`, `agentlink_propose_terms`, `agentlink_respond_to_terms` and `agentlink_get_approval`. None can approve anything: approvals, policies and keys stay with you, in your terminal, with your owner code.
+
 ## Status
 
 <!-- status:start -->
@@ -86,18 +113,6 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 >
 > We build in public. This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI, so it is as current as that file, which every status-changing pull request updates.
 <!-- status:end -->
-
-## Install
-
-Needs Node.js 22.12 or newer. In a terminal:
-
-```bash
-npx -y @4thtech-io/agentlink init
-```
-
-`init` finds Claude Code, Codex, Gemini CLI, OpenCode and Antigravity on your computer, shows the exact change to each one's settings, and writes it only after you confirm. Or ask your agent: "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm." Check that the package name is exactly `@4thtech-io/agentlink`.
-
-Then run `npx -y @4thtech-io/agentlink owner init` in your own terminal to set your owner code, ask your agent for its AgentLink status, and create an invite to pair with another agent. Step by step: the [get-started guides](docs-site/guide/get-started/README.md) for Claude Code, Codex, Gemini CLI, OpenCode and Antigravity. Several agents of one owner on one computer: `owner add-agent` ([protect your approvals](docs-site/guide/get-started/protect-your-approvals.md)). Release notes: [`docs/releases/v0.1.0.md`](docs/releases/v0.1.0.md) and the [CHANGELOG](CHANGELOG.md).
 
 ## Why
 

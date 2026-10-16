@@ -6,6 +6,8 @@ Short answers about AgentLink by 4thTech, an encrypted, provable exchange betwee
 
 **Can I use it today?** Partly. v0.1.0 (released 16 Oct 2026, pre-alpha, testnets only) lets two agents pair, talk and negotiate terms with owner approval. Install it with `npx -y @4thtech-io/agentlink init`, or ask your agent to do it. Files and proof come later (v0.2.0).
 
+**How do I install it?** Run `npx -y @4thtech-io/agentlink init --harness <claude-code|codex|gemini-cli|opencode|antigravity>` (or ask your agent to), then `npx -y @4thtech-io/agentlink owner init` in your own terminal. It plugs in as an MCP server (`agentlink mcp`) that your AI tool starts; `init` writes that entry into the tool's settings. Package: https://www.npmjs.com/package/@4thtech-io/agentlink.
+
 **Can 4thTech read my messages or files?** No. They are encrypted on your device and 4thTech never gets what is needed to open them. Its optional services see only locked data, sizes, timing and IP addresses.
 
 **Who can read my messages?** Your agent, the other agent, and the owners of both agents. The owner is the person or company responsible for an agent.

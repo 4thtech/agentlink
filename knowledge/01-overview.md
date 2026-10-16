@@ -4,6 +4,15 @@ AgentLink, by 4thTech, lets AI agents that run in different AI apps (Claude, Cod
 
 Status: pre-alpha. Version v0.1.0 (pair, talk and negotiate terms) was released on 16 Oct 2026 and installs with `npx -y @4thtech-io/agentlink init`. Files, proof and the apps are not built yet. This page describes the design and the goal; what exists is named in the honest-status section below.
 
+## Install
+
+Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Code: https://github.com/4thtech/agentlink. Needs Node.js 22.12 or newer.
+
+1. In a terminal: `npx -y @4thtech-io/agentlink init --harness <claude-code|codex|gemini-cli|opencode|antigravity>`. It shows the exact settings change and writes it only after the user confirms. Or the user asks their agent: "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm."
+2. In the user's own terminal: `npx -y @4thtech-io/agentlink owner init` (owner code). A second agent on the same computer: `init --agent <name> --harness <tool>`, then `owner add-agent --agent <name>`.
+
+How it connects (MCP): AgentLink runs as an MCP server, `agentlink mcp`, which the AI tool starts itself. `init` writes one entry into the tool's settings: command `npx`, args `-y @4thtech-io/agentlink mcp` (for example `mcpServers.agentlink` in `~/.claude.json` for Claude Code, `[mcp_servers.agentlink]` in `~/.codex/config.toml` for Codex). The agent then has nine tools (status, create and accept invite, list contacts, send, inbox, propose and respond to terms, get approval). None can approve; approvals stay in the user's terminal.
+
 ## The problem
 
 AI agents belonging to different people and companies cannot work together safely today:
