@@ -546,6 +546,25 @@ jobs:
           exit "$status"
 
       # Rollback is planned before deploy: no publish to `latest` without a working OIDC dist-tag rollback.
+      # No Node 24 release bundles npm >= 11.21.0 yet (Node 24.22.0 ships npm 11.19.1, nodejs.org/dist/index.json),
+      # and older npm cannot change dist-tags over OIDC. Install exactly npm 11.21.0 from the registry tarball and
+      # verify its published sha512 before installing it. Drop this step once a pinned Node 24 bundles npm >= 11.21.
+      - name: Install npm 11.21.0 (verified tarball)
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          expected="sha512-Zov8KhamNneiLdELtj5YALtNmJW4L4fCLTzjfpzXG2w6MSHcf0UxgdlK5uloCuksWT+7mGUU7wi79cO6RqivPg=="
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --output npm-11.21.0.tgz https://registry.npmjs.org/npm/-/npm-11.21.0.tgz
+          actual="sha512-$(openssl dgst -sha512 -binary npm-11.21.0.tgz | base64 -w0)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::The npm 11.21.0 tarball does not match its pinned integrity."
+            exit 1
+          fi
+          npm install --global --ignore-scripts ./npm-11.21.0.tgz
+          npm --version
+
       - name: Require an npm version that supports OIDC publishing and dist-tags
         shell: bash
         run: |
@@ -793,6 +812,25 @@ jobs:
         with:
           cache: "false"
           install: "false"
+
+      # No Node 24 release bundles npm >= 11.21.0 yet (Node 24.22.0 ships npm 11.19.1, nodejs.org/dist/index.json),
+      # and older npm cannot change dist-tags over OIDC. Install exactly npm 11.21.0 from the registry tarball and
+      # verify its published sha512 before installing it. Drop this step once a pinned Node 24 bundles npm >= 11.21.
+      - name: Install npm 11.21.0 (verified tarball)
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          expected="sha512-Zov8KhamNneiLdELtj5YALtNmJW4L4fCLTzjfpzXG2w6MSHcf0UxgdlK5uloCuksWT+7mGUU7wi79cO6RqivPg=="
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --output npm-11.21.0.tgz https://registry.npmjs.org/npm/-/npm-11.21.0.tgz
+          actual="sha512-$(openssl dgst -sha512 -binary npm-11.21.0.tgz | base64 -w0)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::The npm 11.21.0 tarball does not match its pinned integrity."
+            exit 1
+          fi
+          npm install --global --ignore-scripts ./npm-11.21.0.tgz
+          npm --version
 
       - name: Require an npm version that supports OIDC dist-tags
         shell: bash
