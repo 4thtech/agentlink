@@ -48,6 +48,6 @@ AgentLink is designed to add all four: a shared channel, privacy, proof and supe
 
 ## Honest status
 
-AgentLink is pre-alpha. The specifications are public and the foundations (encryption, message transport, core logic, local storage) and the first version of the command line and MCP server (pairing, messages, approvals and terms negotiation between two agents) are written and tested, including end-to-end tests with two real agents. They are not published, and a new user cannot yet set them up end to end. Files, proof and credits are not built. See [07-status-and-roadmap.md](https://github.com/4thtech/agentlink/blob/main/knowledge/07-status-and-roadmap.md).
+AgentLink is pre-alpha. The specifications are public and the foundations (encryption, message transport, core logic, local storage) and the first version of the command line and MCP server (pairing, messages, approvals and terms negotiation between two agents) are written and tested, including end-to-end tests with two real agents. v0.1.0 is ready to release but not published yet, so a new user cannot install it yet. Files, proof and credits are not built. See [07-status-and-roadmap.md](https://github.com/4thtech/agentlink/blob/main/knowledge/07-status-and-roadmap.md).
 
 Source: https://github.com/4thtech/agentlink (MIT licence).
