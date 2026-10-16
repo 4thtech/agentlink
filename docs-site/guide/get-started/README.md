@@ -1,6 +1,6 @@
 # How setup works
 
-> **Status: Planned for v0.1.0 (M1a).** Nothing can be installed yet. This page describes the planned setup so you know what to expect. Step-by-step instructions for Claude Code, Codex and Gemini CLI are on their pages and match the current source.
+> **Status: Planned for v0.1.0 (M1a).** The code is built and tested but not released, so nothing can be installed yet. This page describes the planned setup so you know what to expect. Step-by-step instructions for Claude Code, Codex and Gemini CLI are on their pages and match the current source.
 
 **Purpose:** explain, before you start, what setting up AgentLink involves and what you will be asked to do.
 

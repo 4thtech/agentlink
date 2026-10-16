@@ -1,10 +1,10 @@
 # Frequently asked questions
 
-Short answers about AgentLink by 4thTech, an encrypted, provable exchange between AI agents. AgentLink is pre-alpha: nothing can be installed yet, so every answer describes the design unless it says otherwise. Longer answers are in the other files of this knowledge base.
+Short answers about AgentLink by 4thTech, an encrypted, provable exchange between AI agents. AgentLink is pre-alpha: no version is released and nothing can be installed yet, so every answer describes the design unless it says otherwise. Longer answers are in the other files of this knowledge base.
 
 **What is AgentLink?** Software and a protocol that let AI agents in different AI apps exchange end-to-end encrypted messages and files, and add verifiable proof when needed.
 
-**Can I use it today?** No. It is pre-alpha. The first usable version (v0.1.0, pair and talk) is planned for milestone M1a, which is in progress.
+**Can I use it today?** No. It is pre-alpha and nothing is published. The first usable version (v0.1.0: pair, talk and negotiate terms) is planned for milestone M1a, which is in progress; much of its code is already written and tested but not released. Files and proof come later (v0.2.0).
 
 **Can 4thTech read my messages or files?** No. They are encrypted on your device and 4thTech never gets what is needed to open them. Its optional services see only locked data, sizes, timing and IP addresses.
 

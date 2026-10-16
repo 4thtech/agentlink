@@ -1,6 +1,6 @@
 # Start here: the documentation map
 
-Where everything lives in the AgentLink repository, what to read first for your role, and how to get productive in a set time. AgentLink is pre-alpha (M0 Foundations): the documents describe the design and the way we build; product code does not exist yet. For the current state, see the Status box in the [root README](../README.md).
+Where everything lives in the AgentLink repository, what to read first for your role, and how to get productive in a set time. AgentLink is pre-alpha (M0 Foundations nearly complete, M1a in progress): the documents describe the design and the way we build; the M1a code (crypto, transport, core, node, the CLI and the MCP server) is merged but not released. For the current state, see the Status box in the [root README](../README.md).
 
 Four kinds of document, four jobs:
 

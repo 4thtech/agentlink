@@ -2925,7 +2925,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Two people new to AgentLink complete J1 from the docs alone (observed, times recorded; install → first message under 5 minutes).
 
 #### M1-13a · e2e: two agents on two harnesses
-- **Status:** done (4thtech/agentlink#155, merged 2026-10-15; follow-ups #163 accept_invite two-step wording and pending-approval reuse, #165 exact-value prompts; IR-M1-13a-1 PASS with changes; the LLM variant runs by manual dispatch only, no schedule until the owner sizes the credit; LLM runs 1 to 3 in the test report) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#155, merged 2026-10-15; follow-ups #163 accept_invite two-step wording and pending-approval reuse, #165 exact-value prompts; IR-M1-13a-1 PASS with changes; the LLM variant runs by manual dispatch only, no schedule until the owner sizes the credit; LLM runs 1 to 5 in the test report; #166 status wording, #171 the harness ignores tool-loading calls in the first-call check, a re-run after #171 is open) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · e2e/, .github/workflows/e2e.yml
 - **Depends on:** M1-9c, M1-9o, M1-9p, M1-12a, M1-1g-c (boundary guards scan e2e/); the e2e runner and credentials are decided in D-73 (9)
 - **Spec:** 10 M1-13; 06 §9; 02 J1, J9
@@ -3116,7 +3116,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - D-77's interim note is removed from the code comments and the status is updated.
 
 #### M1-22 · e2e: J8 negotiate and agree over Talk (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#169, merged 2026-10-16; the deterministic scenario passes in CI; the LLM steps L13 to L20 have not been run yet, manual dispatch, see the test report) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · e2e/
 - **Depends on:** M1-13a, M1-9b, M1-9c, M1-9q, M1-12a, M1-20, M1-21, M1-32
 - **Spec:** D-31, D-32, D-55; 02 F-22, F-61, F-62, J8; 06 §2.2a, §3 (`commitments`), §4; 04 §2.5, §3.4, §3.4.2
@@ -3132,7 +3132,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Notes (IR-M1-22-1):** the "nothing leaves" relay check polls every 2 s and only catches publishes within that window; the sent-`accept` store check covers the rest. Not covered yet (cheap follow-up): voiding an approval that is still pending (a newer version arrives before the owner decides); only approved-unused is tested. The `clientRequestId` repeat check waits for M1-32-c.
 
 #### M1-23 · J9 dogfood: Tali's and Denis's agents sync through AgentLink (M1a gate) (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet (setup notes) + Owner (with @denisjazbec) · **Security:** S1 · **Phase:** M1a
+- **Status:** in-progress (the runbook RB-17 `docs/runbooks/dogfood-m1a.md` merged in 4thtech/agentlink#168, 2026-10-16; the dogfood run itself is open) · **Size:** S · **Tier:** Sonnet (setup notes) + Owner (with @denisjazbec) · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** owner's sync file (dogfood log); issues as backlog cards. No synced project content is committed.
 - **Depends on:** to start (D-73 (8)): M1-9p, M1-9r, M1-7k, M1-7h, M1-12a, M1-12b, M1-29 (send and inbox work); to close the gate: all M1a cards except DESIGN-D1 and M1-9g (D-30); in particular M1-13b, M1-19, M1-22, M1-25
 - **Spec:** D-33, D-53; 02 J7, J8, J9; 06 §6.1 (session habit), §7.1 (install prompts, install-and-accept prompt); 10 "Gate M1a"; `docs/process/sync-protocol.md`

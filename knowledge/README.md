@@ -2,7 +2,7 @@
 
 This folder is the public, compressed knowledge base for AgentLink by 4thTech. It is written for AI assistants (for example the chat on the AgentLink website) and for human readers who want accurate answers fast. Each file stands on its own, so it can be retrieved and read without the others.
 
-Last reviewed: 15 October 2026. Project phase: pre-alpha. Nothing can be installed yet.
+Last reviewed: 16 October 2026. Project phase: pre-alpha. The first usable version (v0.1.0, M1a) is not released, so nothing can be installed from a package registry yet.
 
 ## Why it exists
 
