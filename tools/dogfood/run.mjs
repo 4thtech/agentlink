@@ -326,6 +326,11 @@ async function main() {
       now: () => Date.now(),
       log,
       agentOf,
+      // Read-only: the contact list of the first agent, as the owner's CLI prints it.
+      confirmPaired: (agent, other) =>
+        Promise.resolve(agentlinkRun(options, ['contacts', '--agent', agent])).then(
+          (r) => r.ok && r.text.includes(other),
+        ),
       approvalMinutes: options.approvalTimeoutMs / 60_000,
       async run(harness, step, prompt) {
         log(`-> ${step.id} (${harness === 'cc' ? 'Claude Code' : 'OpenCode'}) ${step.title}`);

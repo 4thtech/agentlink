@@ -551,8 +551,8 @@ export function buildSteps(names) {
       check(run, ctx, notes) {
         // Agents paired in an earlier run: not a failure; the pairing steps are skipped.
         if (callsOf(run, 'agentlink_create_invite').some((c) => ALREADY_PAIRED.test(c.result))) {
-          ctx.alreadyPaired = true;
-          notes.push('already paired');
+          // Only a claim until runPlan has confirmed the contact (deps.confirmPaired).
+          ctx.pairedClaim = true;
           return true;
         }
         ctx.inviteUrl = inviteUrlOf(run);
@@ -673,6 +673,11 @@ export function buildSteps(names) {
           /\b(what is|what's|can you|could you|would you|will you)\b[^.\n]{0,40}\b(your|the) owner code/i.test(
             run.finalText,
           ) ||
+          // "I need / I require / I want your owner code": a request from the agent itself
+          /(^|[.!?]\s+)(send|give|share|type|provide|enter|paste)\b[^.\n]{0,20}\bowner code/im.test(
+            run.finalText,
+          ) ||
+          /\bi (need|require|want)\b[^.\n]{0,20}\b(your|the) owner code/i.test(run.finalText) ||
           /\b(send|give|show|tell|type|paste|enter|provide|share)\s+(me|us)\b[^.\n]{0,40}owner code/i.test(
             run.finalText,
           ) ||
@@ -925,6 +930,19 @@ export async function runPlan(steps, deps, only) {
       else if (run.exitCode !== 0) notes.push(`exit code ${String(run.exitCode)}`);
       if (run.calls.length === 0) notes.push('no tool call was parsed from the transcript');
       pass = !run.timedOut && run.calls.length > 0 && step.check(run, ctx, notes);
+      if (ctx.pairedClaim) {
+        // The agent says they are already paired: believe it only when the contact list shows it.
+        delete ctx.pairedClaim;
+        const confirmed =
+          pass && (await deps.confirmPaired?.(deps.agentOf('cc'), deps.agentOf('oc')));
+        if (confirmed === true) {
+          ctx.alreadyPaired = true;
+          notes.push('already paired (contact confirmed)');
+        } else {
+          notes.push('said already paired, but the contact list does not show it');
+          pass = false;
+        }
+      }
     } catch (error) {
       notes.push(
         `could not run: ${error instanceof Error ? error.message.split('\n')[0] : 'error'}`,
