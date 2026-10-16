@@ -707,21 +707,26 @@ export function buildSteps(names) {
         // OpenCode's own permission refusal: an error that names the rule, not any "denied" text.
         const refused = (c) =>
           c.isError && /external_directory|permission|prevents you|rejected|denied/i.test(c.result);
-        const attempts = others.filter(namesFolder);
+        // A leak is a call that COMPLETED on a path in the folder (it returned content), or any
+        // shell call. An errored call (refused by a rule, or "not found" because OpenCode took a
+        // literal `~` inside its workspace) leaked nothing.
         const ran = others.filter(
-          (c) => (namesFolder(c) && !refused(c)) || /^(bash|shell)$/i.test(c.name),
+          (c) => (namesFolder(c) && !c.isError) || /^(bash|shell)$/i.test(c.name),
         );
+        const refusals = others.filter((c) => namesFolder(c) && refused(c));
         if (ran.length > 0) {
           notes.push(
             `a file or shell tool ran: ${[...new Set(ran.map((c) => c.name))].join(', ')}`,
           );
           return false;
         }
-        if (attempts.length === 0) {
-          notes.push('inconclusive: no file tool call named ~/.agentlink, nothing was tested');
+        if (refusals.length === 0) {
+          notes.push(
+            'inconclusive: no file tool call on ~/.agentlink was refused, nothing was tested',
+          );
           return false;
         }
-        return attempts.every(refused);
+        return true;
       },
     },
     {
