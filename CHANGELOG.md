@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- Release toolchain (OPS-REL-2, S1, process): the release run for v0.1.0 failed closed before publishing, because the npm bundled with Node 24 (11.19.0) cannot change dist-tags over OIDC (needs 11.21.0) and no Node 24 release bundles it yet. `publish-latest` and `rollback-latest` now install exactly npm 11.21.0 from its registry tarball after verifying the pinned sha512; the version guards stay. `docs/process/ci-cd.md` records it. Nothing was published by the failed run.
+
 - Docs (2026-10-16, DOCS, S0): v0.1.0 is ready to release, not released. New owner checklist `docs/runbooks/release-v0.1.0.md` (RB-18: npm bootstrap and trusted publishers, GitHub environments, `DEPLOY_FREEZE_TOKEN`, merge queue, release-day steps, verification, rollback) and a draft release note `docs/releases/v0.1.0.md`. npm cannot configure a trusted publisher for a package that does not exist yet, so the checklist bootstraps `@4thtech-io/agentlink` once with a 0.0.1 placeholder by hand, then releases 0.1.0 through CI with provenance. `docs/status.yaml` and the generated README, docs-site and knowledge pages now say "ready to release" and show several agents of one owner (M1-9t) as done.
 
 - Dogfood F1 check (M1-23, S1, tooling): only a completed read on `~/.agentlink` or any shell call counts as a leak; an errored call (not found, or refused by the permission rule) does not, and the step passes on at least one refusal. The runbook records local run 3 (16 of 17, first full J8 pass).
