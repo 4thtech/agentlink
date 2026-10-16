@@ -4496,7 +4496,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | M0-14 | Add further reviewers when needed |
 | M0-17, M0-18 | (D-25, D-51) Apply the `main` ruleset with auto-merge, the four required checks and code-owner review off (D-51); create the environments `npm-next`, `npm-publish`, `staging`, `production`, `deploy-freeze`, with `talirezun` as required reviewer on `production` (until the owner removes it, D-52) and `npm-publish` (kept, D-52), "Prevent self-review" off, deployment branches `main`/tags only |
 | M0-22 | (D-51, DEFERRED: revisit before M3) Create the GitHub account `4thtech-agent` with 2FA; invite it with write access to the three repos (never a bypass actor, never a code owner); create its fine-grained token (90 days) and enter it yourself in the bot's gh profile; rotate before expiry |
-| M0-19 | Create the repository variable `DEPLOY_FREEZE` and the freeze credential `DEPLOY_FREEZE_TOKEN` (environment `deploy-freeze`); clearing `DEPLOY_FREEZE` is owner-only |
+| M0-19 | Create the repository variable `DEPLOY_FREEZE` and the freeze credential `DEPLOY_FREEZE_TOKEN` (environment `deploy-freeze-2`); clearing `DEPLOY_FREEZE` is owner-only |
 | M0-20 | **DECISION NEEDED:** machine-run AI review in CI with an `ANTHROPIC_API_KEY` secret |
 | M0-1, OPS-L1, OPS-L5 | Unpublish or patch the Encryptor; confirm the PX auth service is offline; sign the confirmations |
 | OPS-L2, OPS-L3 | Withdraw v1 fees to EOAs; create/verify Safes; sign 20 `transferOwnership` calls |

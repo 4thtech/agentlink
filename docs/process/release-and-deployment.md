@@ -246,7 +246,7 @@ The Cloudflare deploy workflow does not exist yet; no app exists yet. This secti
 | 3 | `deploy-staging` | `staging` (no reviewer, `main` only) | `CLOUDFLARE_API_TOKEN` (staging), `CLOUDFLARE_ACCOUNT_ID` | `if: vars.DEPLOY_FREEZE != 'true'`, re-checked at start. Deploys the built artifacts (no build here) with `wrangler deploy --env staging` to `workers.dev`. |
 | 4 | `smoke-staging` | — | none | Workers: `GET /v1/health` per chain; a simulated notarize on testnets; the faucet refuses a mainnet chain ID. Drop: `GET /v1/health`, then a signed upload, download and delete round trip on staging. Sites: served asset hashes equal the manifest; security headers (`audit-rules.md` WEB-1…WEB-6); Playwright fragment-never-sent test. |
 | 5 | `deploy-production` | `production` (`main` and tags; the owner removes the required reviewer at M1b, D-52) | `CLOUDFLARE_API_TOKEN` (production), `CLOUDFLARE_ACCOUNT_ID` | `needs: smoke-staging` green; `if: vars.DEPLOY_FREEZE != 'true'`, re-checked after any approval wait. Records the current Worker version IDs (rollback targets), deploys the **same artifacts** to the Custom Domains, then in the same job: health check (the job-4 checks against the production hostnames, HTTP only; no artifact code runs on the runner); on failure, `wrangler rollback` to the recorded versions and re-check; writes the deploy record draft to the run summary. |
-| 6 | `freeze` | `deploy-freeze` | `DEPLOY_FREEZE_TOKEN` | Sets `DEPLOY_FREEZE` when `deploy-production` failed after deploying. |
+| 6 | `freeze` | `deploy-freeze-2` | `DEPLOY_FREEZE_TOKEN` | Sets `DEPLOY_FREEZE` when `deploy-production` failed after deploying. |
 
 | Topic | Rule |
 |---|---|

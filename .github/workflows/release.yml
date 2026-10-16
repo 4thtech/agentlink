@@ -66,7 +66,7 @@
 #        npm-next       no required reviewer; deployment branches: main only; no secrets.
 #        npm-publish    required reviewer @talirezun, "Prevent self-review" OFF;
 #                       deployment branches: main and tags; no secrets.
-#        deploy-freeze  no required reviewer; deployment branches: main only;
+#        deploy-freeze-2 no required reviewer; deployment branches: main only;
 #                       secret DEPLOY_FREEZE_TOKEN (can write repository variables, nothing else).
 #   2. On npmjs.com, for EVERY published package, two trusted publishers (GitHub Actions,
 #      owner `4thtech`, repository `agentlink`, workflow filename `release.yml`):
@@ -842,7 +842,7 @@ jobs:
       needs.smoke-latest.result == 'failure')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    environment: deploy-freeze
+    environment: deploy-freeze-2
     permissions: {}
     steps:
       - name: Set DEPLOY_FREEZE
