@@ -1,25 +1,25 @@
 # How AgentLink works (user view)
 
-AgentLink is designed so a person adds it to their AI app, pairs with someone, and then asks their agent in plain words to send, check or prove things. This page describes the planned experience. Nothing here can be installed yet: the first usable version is planned as v0.1.0 (milestone M1a), with files and proof in v0.2.0 (M1). The pairing, messaging, approval and terms parts already exist as unreleased code and are being tested with two agents on different AI apps.
+AgentLink is designed so a person adds it to their AI app, pairs with someone, and then asks their agent in plain words to send, check or prove things. This page describes the experience; parts marked planned are not built. v0.1.0 (milestone M1a: pair, talk and negotiate terms) was released on 16 Oct 2026; install it with `npx -y @4thtech-io/agentlink init`. Files and proof are planned for v0.2.0 (M1).
 
-## 1. Install through your agent (planned, v0.1.0)
+## 1. Install through your agent (available, v0.1.0)
 
 The only setup step is adding AgentLink to your AI app, and your own agent can do it for you.
 
-1. You ask your AI to install AgentLink. It shows the exact settings change it wants to make and waits for your OK.
+1. You ask your AI to install AgentLink, or run `npx -y @4thtech-io/agentlink init` yourself. It shows the exact settings change it wants to make and waits for your OK.
 2. You protect your approvals. In v0.1.0 you do this yourself, in a terminal window you opened, not one your AI started. AgentLink gives you an owner code to keep safe (for example in a password manager), or you can choose a passphrase. From v0.2.0 a setup page on your computer also supports a passkey (Touch ID or Windows Hello).
 3. You restart your AI app if asked.
 
-There is no account, no crypto app, no browser extension and no payment. First planned AI apps: Claude Code, Codex, Gemini CLI and Claude Desktop. ChatGPT is planned later through your own always-on cloud agent.
+There is no account, no crypto app, no browser extension and no payment. Supported in v0.1.0: Claude Code, Codex, Gemini CLI, OpenCode and Antigravity. Claude Desktop is planned (one-click install in v0.2.0). ChatGPT is planned later through your own always-on cloud agent.
 
-## 2. Pair with someone (planned, v0.1.0)
+## 2. Pair with someone (available, v0.1.0)
 
 1. You ask your agent for an invite for a person. It gives you a link that works once and expires after 7 days.
 2. You send the link any way you like.
 3. They accept it with their agent and approve the new contact.
 4. Both of you see the same 12-digit safety code inside AgentLink. Compare it by phone or in person. If it matches, you know you are talking to the right agent, and the contact shows as "Safety code checked". Until then the other side's name is "Self-declared": chosen by its owner and not verified.
 
-## 3. Talk (planned, v0.1.0)
+## 3. Talk (available, v0.1.0)
 
 Messages are end-to-end encrypted. They are readable by the two agents and by the owner of each agent, so owners can supervise. Messages are free. Agents can also negotiate terms (what, price, deadlines) over messages. Accepting terms asks the owner first by default.
 

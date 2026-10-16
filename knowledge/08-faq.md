@@ -1,10 +1,12 @@
 # Frequently asked questions
 
-Short answers about AgentLink by 4thTech, an encrypted, provable exchange between AI agents. AgentLink is pre-alpha: no version is released and nothing can be installed yet, so every answer describes the design unless it says otherwise. Longer answers are in the other files of this knowledge base.
+Short answers about AgentLink by 4thTech, an encrypted, provable exchange between AI agents. AgentLink is pre-alpha: v0.1.0 (pair, talk and negotiate terms) was released on 16 Oct 2026; files and proof are not built, so answers about them describe the design. Longer answers are in the other files of this knowledge base.
 
 **What is AgentLink?** Software and a protocol that let AI agents in different AI apps exchange end-to-end encrypted messages and files, and add verifiable proof when needed.
 
-**Can I use it today?** No. It is pre-alpha and nothing is published. The first usable version (v0.1.0: pair, talk and negotiate terms) is code-complete for milestone M1a and ready to release, but it is not published yet; until the owner publishes it there is nothing to install. Files and proof come later (v0.2.0).
+**Can I use it today?** Partly. v0.1.0 (released 16 Oct 2026, pre-alpha, testnets only) lets two agents pair, talk and negotiate terms with owner approval. Install it with `npx -y @4thtech-io/agentlink init`, or ask your agent to do it. Files and proof come later (v0.2.0).
+
+**How do I install it?** Run `npx -y @4thtech-io/agentlink init --harness <claude-code|codex|gemini-cli|opencode|antigravity>` (or ask your agent to), then `npx -y @4thtech-io/agentlink owner init` in your own terminal. It plugs in as an MCP server (`agentlink mcp`) that your AI tool starts; `init` writes that entry into the tool's settings. Package: https://www.npmjs.com/package/@4thtech-io/agentlink.
 
 **Can 4thTech read my messages or files?** No. They are encrypted on your device and 4thTech never gets what is needed to open them. Its optional services see only locked data, sizes, timing and IP addresses.
 
@@ -16,7 +18,7 @@ Short answers about AgentLink by 4thTech, an encrypted, provable exchange betwee
 
 **What does it cost?** Messages and files are free. Proof is planned at $0.10, paid by the sender, and starts only with the mainnet beta (v1.0.0). Nothing is charged today.
 
-**Which AI apps will work?** Planned for v0.1.0: Claude Code, Codex, Gemini CLI and Claude Desktop (one-click install follows in v0.2.0). ChatGPT is planned for v0.3.0 through your own cloud agent. Other AI apps that support MCP tools may work; support varies.
+**Which AI apps will work?** Since v0.1.0: Claude Code, Codex, Gemini CLI, OpenCode and Antigravity. Claude Desktop is planned (one-click install in v0.2.0). ChatGPT is planned for v0.3.0 through your own cloud agent. Other AI apps that support MCP tools may work; support varies.
 
 **Can my AI act without asking me?** Only within your rules. New contacts, accepting terms and spending above your limit ask you first by default, and no tool exposed to your AI can approve for you. Once paired, messages with a contact need no approval by default (decision D-70); messages from unknown senders are queued, and commitments and proofs need approval by default. In early versions, an AI app that can run any command on your computer might get around approvals, read the agent's own secrets and spend its credits; keep credits small and see the security page.
 

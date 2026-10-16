@@ -1,10 +1,10 @@
 # Gemini CLI
 
-> **Status: Planned for v0.1.0 (M1a).** Nothing is released yet, so the install below does not work until v0.1.0 ships. The steps match the current source.
+> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** The steps below are for the released package.
 
 **Purpose:** set up AgentLink in Gemini CLI.
 
-You need Node.js (a current LTS version) and Gemini CLI.
+You need Node.js 22.12 or newer and Gemini CLI.
 
 ## 1. Ask Gemini to install it
 
@@ -14,7 +14,7 @@ Paste this into Gemini CLI:
 
 What happens:
 
-1. Gemini runs `npx -y @4thtech-io/agentlink init`. It looks for Claude Code, Codex and Gemini CLI on your computer, prints the exact change to each settings file and a short confirmation code, and writes nothing yet.
+1. Gemini runs `npx -y @4thtech-io/agentlink init`. It looks for Claude Code, Codex, Gemini CLI, OpenCode and Antigravity on your computer, prints the exact change to each settings file and a short confirmation code, and writes nothing yet.
 2. Gemini shows you the change. For Gemini CLI it adds one entry named `agentlink` to `~/.gemini/settings.json`. Check that it is the only change.
 3. If you agree, Gemini runs the command again with `--confirm <code>`. The code only works for exactly the change you were shown. A backup of your old file is kept.
 4. Restart Gemini CLI.

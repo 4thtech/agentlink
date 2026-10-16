@@ -1,21 +1,18 @@
 # Approvals
 
-> **Status: Planned for v0.1.0 (M1a).** This page is an outline; nothing can be used yet. Passkey approvals are planned for v0.2.0 (M1); in v0.1.0 you approve with your passphrase.
+> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** You approve with your owner code; passkey approvals are planned for v0.2.0 (M1), the owner console and desktop app for M2.
 
 **Purpose:** decide what your agent may do on its own, and approve the rest yourself.
 
-## How approvals are designed to work
+## How approvals work
 
-- **Approvals need you.** AgentLink is designed so that only you can approve, with your passkey (Touch ID, Windows Hello) or your passphrase; your agent can't approve through AgentLink.
+- **Approvals need you.** AgentLink is designed so that only you can approve, with your owner code (passkeys come later); your agent can't approve through AgentLink.
 - **Rules set the limits.** You choose, for example, whether new contacts need approval, which folders files may come from, and how much your agent may spend on proof per day. Your agent can't change these rules through AgentLink.
 - **Accepting terms always asks you first** unless you choose otherwise for specific contacts and amounts.
 - **When something needs approval,** your agent tells you and gives you a link. You see who, what and the cost, then approve or deny. Your agent continues once you approve.
 
-## Outline (filled in at M1a)
+## In practice
 
-- What needs approval by default
-- Approving and denying
-- Changing your rules
-- Passkey approvals (M1), approvals on your phone through the owner console (M2), and the desktop app's approval window (M2)
-
-**Filled in at:** M1a (v0.1.0), backlog card DOCS-M1a; passkey at M1 (DOCS-M1b); console and desktop at M2 (DOCS-M2).
+- A new contact and a binding accept wait for you by default. Your agent tells you the command, for example `agentlink approve <approval ID>`.
+- Run it in a terminal you opened yourself and type your owner code. `agentlink approve` with no ID reviews a list; `agentlink deny <approval ID>` and `agentlink cancel <approval ID>` decline or withdraw. See [Protect your approvals](../get-started/protect-your-approvals.md).
+- Limits live in your policy (`agentlink policy show`); your agent can't change them.

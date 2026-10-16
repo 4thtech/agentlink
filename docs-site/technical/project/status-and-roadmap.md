@@ -1,21 +1,21 @@
 # Status and roadmap
 
 <!-- status-hint:start -->
-> **Status: Current as of 16 Oct 2026 (M0 Foundations, v0.0.1).** Derived from the [build plan](https://github.com/4thtech/agentlink/blob/main/docs/foundation/10-build-plan.md) and updated at every milestone. Durations are indicative, not commitments.
+> **Status: Current as of 16 Oct 2026 (M1a, walking skeleton: pair and talk, v0.1.0).** Derived from the [build plan](https://github.com/4thtech/agentlink/blob/main/docs/foundation/10-build-plan.md) and updated at every milestone. Durations are indicative, not commitments.
 <!-- status-hint:end -->
 
 ## Where we are
 
 <!-- status-summary:start -->
-**Phase:** M0 Foundations nearly complete; M1a (walking skeleton) code-complete, v0.1.0 ready to release, not yet released (pre-alpha). The repository [README](https://github.com/4thtech/agentlink#status) carries the same status; both are generated from one source file, [`docs/status.yaml`](https://github.com/4thtech/agentlink/blob/main/docs/status.yaml).
+**Phase:** M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026 (pre-alpha). The repository [README](https://github.com/4thtech/agentlink#status) carries the same status; both are generated from one source file, [`docs/status.yaml`](https://github.com/4thtech/agentlink/blob/main/docs/status.yaml).
 
-**Not yet:** a released product. v0.1.0 (the `@4thtech-io/agentlink` CLI and MCP server) is ready to release but **not yet published, so there is nothing to install yet**; it is published only after the owner completes the release checklist and approves it. The code merged so far (the crypto, types, transport, core and node foundations, the `agentlink` CLI and the MCP server) can be built and tested from source; once v0.1.0 is published a new user can set it up with `npx -y @4thtech-io/agentlink init`. Files, proof, credits, the owner console and the desktop apps are not built; the design is described throughout and marked "planned" where it is not built.
+**Not yet:** files, proof, credits, live relay subscriptions, the local approval page, the owner console, desktop apps and the cloud agent. They are described throughout and marked "planned" where they are not built. v0.1.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha, testnets only) was released on 16 Oct 2026; install it with `npx -y @4thtech-io/agentlink init`.
 
 **Testnet:** OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit; AgentLink does not use them yet. **Mainnet:** After the external audit (M3). Not deployed. **Services:** Submitter, faucet and encrypted drop are not built or deployed yet.
 
-**In progress:** The remaining M1a work: the neutral-platform bundle-check CI job (M1-9c-c), several agents of one owner on one computer (M1-9t), the two-person dogfood and the v0.1.0 release (ready; the owner does the npm and GitHub setup and the publish approval). Next: file encryption and the remaining contract work.
+**In progress:** The remaining M1a work: the neutral-platform bundle-check CI job (M1-9c-c) and the two-person dogfood against the published v0.1.0 package (M1-23). Next: file encryption and the remaining contract work (M1b).
 
-**Next:** Finish the M1a walking skeleton, where two agents on different harnesses pair, talk and negotiate terms (v0.1.0): the two-person dogfood, then the release (ready). Then M1b adds files, proof and credits on testnets.
+**Next:** Run the two-person dogfood against the published v0.1.0 (the M1a gate), then M1b adds files, proof and credits on testnets.
 
 ### Components
 
@@ -67,7 +67,7 @@ Code that is merged is not necessarily published: nothing is released or install
 | Node runtime (@agentlink/node) | Policy version record in the keychain | Done | [#86](https://github.com/4thtech/agentlink/pull/86) |
 | Node runtime (@agentlink/node) | First agent card at owner setup | Done | [#118](https://github.com/4thtech/agentlink/pull/118) |
 | Node runtime (@agentlink/node) | Passphrase-locked key file for headless machines | Planned | - |
-| MCP server, CLI and apps | MCP server and CLI | In progress | [#102](https://github.com/4thtech/agentlink/pull/102), [#103](https://github.com/4thtech/agentlink/pull/103), [#107](https://github.com/4thtech/agentlink/pull/107), [#111](https://github.com/4thtech/agentlink/pull/111), [#112](https://github.com/4thtech/agentlink/pull/112), [#113](https://github.com/4thtech/agentlink/pull/113), [#115](https://github.com/4thtech/agentlink/pull/115), [#125](https://github.com/4thtech/agentlink/pull/125), [#127](https://github.com/4thtech/agentlink/pull/127), [#131](https://github.com/4thtech/agentlink/pull/131), [#132](https://github.com/4thtech/agentlink/pull/132), [#135](https://github.com/4thtech/agentlink/pull/135), [#142](https://github.com/4thtech/agentlink/pull/142), [#143](https://github.com/4thtech/agentlink/pull/143), [#178](https://github.com/4thtech/agentlink/pull/178), [#183](https://github.com/4thtech/agentlink/pull/183), [#185](https://github.com/4thtech/agentlink/pull/185), [#186](https://github.com/4thtech/agentlink/pull/186) |
+| MCP server, CLI and apps | MCP server and CLI | In progress | [#102](https://github.com/4thtech/agentlink/pull/102), [#103](https://github.com/4thtech/agentlink/pull/103), [#107](https://github.com/4thtech/agentlink/pull/107), [#111](https://github.com/4thtech/agentlink/pull/111), [#112](https://github.com/4thtech/agentlink/pull/112), [#113](https://github.com/4thtech/agentlink/pull/113), [#115](https://github.com/4thtech/agentlink/pull/115), [#124](https://github.com/4thtech/agentlink/pull/124), [#125](https://github.com/4thtech/agentlink/pull/125), [#127](https://github.com/4thtech/agentlink/pull/127), [#131](https://github.com/4thtech/agentlink/pull/131), [#132](https://github.com/4thtech/agentlink/pull/132), [#135](https://github.com/4thtech/agentlink/pull/135), [#142](https://github.com/4thtech/agentlink/pull/142), [#143](https://github.com/4thtech/agentlink/pull/143), [#178](https://github.com/4thtech/agentlink/pull/178), [#183](https://github.com/4thtech/agentlink/pull/183), [#184](https://github.com/4thtech/agentlink/pull/184), [#185](https://github.com/4thtech/agentlink/pull/185), [#186](https://github.com/4thtech/agentlink/pull/186), [#190](https://github.com/4thtech/agentlink/pull/190), [#192](https://github.com/4thtech/agentlink/pull/192), [#193](https://github.com/4thtech/agentlink/pull/193) |
 | MCP server, CLI and apps | Agent skill file and quickstart guides | Done | [#151](https://github.com/4thtech/agentlink/pull/151), [#152](https://github.com/4thtech/agentlink/pull/152) |
 | MCP server, CLI and apps | End-to-end tests | In progress | [#155](https://github.com/4thtech/agentlink/pull/155), [#163](https://github.com/4thtech/agentlink/pull/163), [#165](https://github.com/4thtech/agentlink/pull/165), [#166](https://github.com/4thtech/agentlink/pull/166), [#169](https://github.com/4thtech/agentlink/pull/169), [#171](https://github.com/4thtech/agentlink/pull/171) |
 | MCP server, CLI and apps | Multi-harness dogfood runbook | Done | [#168](https://github.com/4thtech/agentlink/pull/168) |

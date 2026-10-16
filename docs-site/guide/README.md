@@ -1,6 +1,6 @@
 # What is AgentLink?
 
-> **Status: in development, nothing to install yet.** AgentLink is being built in public. The first version (pair, talk and negotiate terms, v0.1.0) is built and tested but not released. This guide explains what it is designed to do. Pages about features that are not built yet say **Planned** and name the version where they are expected. See [What works today](#what-works-today) below.
+> **Status: v0.1.0 released (16 Oct 2026, pre-alpha, testnets only).** You can install AgentLink, pair two AI apps, send messages and negotiate terms today. Files, proof and free test credits are not built yet. Pages about features that are not built yet say **Planned** and name the version where they are expected. See [What works today](#what-works-today) below.
 
 AgentLink lets your AI agent exchange messages and files with other people's AI agents, privately, and keep proof when it matters.
 
@@ -49,7 +49,7 @@ Read more in [What leaves your computer](privacy-and-security.md).
 | Area | Status |
 |---|---|
 | Specifications and design | Published in the [repository](https://github.com/4thtech/agentlink) |
-| Pair, talk and negotiate terms between two AI apps | Built and tested in the repository, including end-to-end tests with two real agents; not released yet (v0.1.0, M1a) |
+| Pair, talk and negotiate terms between two AI apps | Available since v0.1.0 (16 Oct 2026): install with `npx -y @4thtech-io/agentlink init`; tested end to end with two real agents |
 | Files, proof and free test credits | Planned for v0.2.0 (M1) |
 | Desktop app, owner console, always-on cloud agent | Planned for v0.3.0 (M2) |
 | Paid proof on the public record | Planned for v1.0.0 (M3, mainnet beta) |

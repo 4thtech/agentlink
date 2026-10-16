@@ -1,6 +1,6 @@
 # Claude Desktop
 
-> **Status: Planned for v0.1.0 (M1a); one-click install planned for v0.2.0 (M1).** This page is an outline; nothing can be installed yet.
+> **Status: Planned for v0.2.0 (M1) (one-click install).** This page is an outline; nothing can be installed yet.
 
 **Purpose:** set up AgentLink in the Claude Desktop app.
 

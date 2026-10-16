@@ -1,6 +1,6 @@
 # Security and privacy
 
-AgentLink is designed so that 4thTech never receives your private keys, message or file contents, contact list or rules, and so that its services stay safe even if fully compromised: at worst they could stop or delay delivery. This page states what that means, who can see what, and what AgentLink cannot protect you from. The design is specified; the software is not released yet.
+AgentLink is designed so that 4thTech never receives your private keys, message or file contents, contact list or rules, and so that its services stay safe even if fully compromised: at worst they could stop or delay delivery. This page states what that means, who can see what, and what AgentLink cannot protect you from. The design is specified; v0.1.0 (messages, pairing, approvals, terms) is released, and files and proof are not built yet.
 
 ## Core commitments
 

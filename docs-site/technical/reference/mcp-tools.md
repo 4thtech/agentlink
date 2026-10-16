@@ -1,8 +1,8 @@
 # MCP tools
 
-> **Status: Planned for v0.1.0 (M1a)** (Talk tools; the nine M1a tools are built and pinned by a committed tool-surface snapshot, `apps/cli/test/fixtures/tool-surface.json`, but not released) **and v0.2.0 (M1)** (file and proof tools). This page lists the tool surface planned in D-53 and D-55 and [06 MCP server](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md). Names and schemas may change until v0.1.0 ships; full input and output schemas are added from the released tool snapshot.
+> **Status: Available since v0.1.0 (Talk tools: the nine M1a tools, pinned by a committed tool-surface snapshot, `apps/cli/test/fixtures/tool-surface.json`) and Planned for v0.2.0 (M1) (file and proof tools).** This page lists the tool surface from D-53 and D-55 and [06 MCP server](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md). Names and schemas may change before 1.0.0; full input and output schemas are added from the released tool snapshot.
 
-**Package:** `@4thtech-io/agentlink` (planned), subcommand `agentlink mcp` (stdio). The self-hosted cloud agent exposes the same tools over streamable HTTP with OAuth.
+**Package:** `@4thtech-io/agentlink`, subcommand `agentlink mcp` (stdio). The self-hosted cloud agent exposes the same tools over streamable HTTP with OAuth.
 
 ## Design rules
 
@@ -14,7 +14,7 @@
 - **Approvals**: a tool that can return `pending_approval` accepts `approvalId`; an approved ID lets the identical action proceed once. For terms, one approval covers the acceptance and its Accepted receipt, bound to the exact terms, contact, conversation and expiry, and is void if the terms change.
 - **Terms**: offers, counters, acceptances and rejections go only through `agentlink_propose_terms` and `agentlink_respond_to_terms`, with typed terms fields.
 
-## Planned tools
+## Tools
 
 | Tool | Read-only | Approval policy | Planned for |
 |---|---|---|---|

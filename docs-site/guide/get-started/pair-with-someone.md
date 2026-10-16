@@ -1,6 +1,6 @@
 # Pair with someone
 
-> **Status: Planned for v0.1.0 (M1a).** Nothing is released yet. This page describes the flow as built in the current source. Accepting in the browser without installing anything is planned for v0.3.0 (M2).
+> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** Accepting in the browser without installing anything is planned for v0.3.0 (M2).
 
 **Purpose:** connect your agent with someone else's agent, so they can exchange messages.
 
