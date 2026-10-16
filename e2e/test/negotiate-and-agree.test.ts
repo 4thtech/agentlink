@@ -69,6 +69,7 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
   let bobMcp: Mcp;
   let carolMcp: Mcp;
   let daveMcp: Mcp;
+  let toolNames: string[] = [];
 
   // Hostile text the offerers write into the terms and notes (I-5): printable (the terms character
   // rule refuses controls), carries a closing tag and an instruction, and a random token that is a
@@ -220,24 +221,11 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
     bob = await setup('j8-bob', 'Bob', RELAY_HOSTS.slice(2, 4));
     carol = await setup('j8-carol', 'Carol', RELAY_HOSTS.slice(0, 2));
     dave = await setup('j8-dave', 'Dave', RELAY_HOSTS.slice(2, 4));
-    // Dave's owner allows buying from Carol, up to $100 (06 §3 `commitments`), signed with the owner
-    // key. Alice and Bob keep the defaults: every binding accept asks the owner (D-31).
-    await setOwnerPolicy(
-      dave,
-      (policy) => {
-        policy.commitments.autoAcceptContacts = [carol.agentId];
-        policy.commitments.autoAcceptMaxUSD = '100';
-        policy.commitments.autoAcceptDirection = 'buy';
-      },
-      1,
-    );
     await canaries.write();
+    // Two agent processes at a time, as in M1-13a: each polls the keychain every second.
     aliceMcp = await connectMcp(alice, relays.map, openLog(dir, 'j8-alice-mcp.log'));
     bobMcp = await connectMcp(bob, relays.map, openLog(dir, 'j8-bob-mcp.log'));
-    carolMcp = await connectMcp(carol, relays.map, openLog(dir, 'j8-carol-mcp.log'));
-    daveMcp = await connectMcp(dave, relays.map, openLog(dir, 'j8-dave-mcp.log'));
     await pairThroughInvite(aliceMcp, bob, bobMcp);
-    await pairThroughInvite(carolMcp, dave, daveMcp);
   }, 600_000);
 
   afterAll(async () => {
@@ -567,7 +555,25 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
   }, 900_000);
 
   it('the owner-signed auto-accept limit: inside it no approval, outside it the owner is asked', async () => {
-    // Dave may buy from Carol up to $100 (set and signed by his owner before his agent started).
+    // Alice and Bob are done: their processes end before Carol's and Dave's start.
+    toolNames = await aliceMcp.tools();
+    await aliceMcp.close();
+    await bobMcp.close();
+    // Dave's owner allows buying from Carol, up to $100 (06 §3 `commitments`), signed with the owner
+    // key before his agent starts. Alice and Bob kept the defaults: every binding accept asks the
+    // owner (D-31).
+    await setOwnerPolicy(
+      dave,
+      (policy) => {
+        policy.commitments.autoAcceptContacts = [carol.agentId];
+        policy.commitments.autoAcceptMaxUSD = '100';
+        policy.commitments.autoAcceptDirection = 'buy';
+      },
+      1,
+    );
+    carolMcp = await connectMcp(carol, relays.map, openLog(dir, 'j8-carol-mcp.log'));
+    daveMcp = await connectMcp(dave, relays.map, openLog(dir, 'j8-dave-mcp.log'));
+    await pairThroughInvite(carolMcp, dave, daveMcp);
     const inside = await step('C: propose a purchase inside the limit', async () => {
       const sent = await tool(carolMcp, 'agentlink_propose_terms', {
         to: 'Dave',
@@ -662,10 +668,8 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
       const text = `${result.text}\n${JSON.stringify(result.structured)}`;
       for (const part of hostileParts) expect(text).not.toContain(part);
     }
-    // Tool descriptions carry none of it either.
-    for (const mcp of [aliceMcp, bobMcp]) {
-      expect((await mcp.tools()).join('\n')).not.toContain(token);
-    }
+    // The tool list carries none of it either.
+    expect(toolNames.join('\n')).not.toContain(token);
     // Relay audit (I-1, I-2): only gift wraps, no canary.
     const held: string[] = [];
     for (const port of Object.values(relays.map)) held.push(...(await dumpRelay(port)));
@@ -679,7 +683,7 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
     );
     expect(relayScan.findings.map((f) => f.name)).toEqual([]);
 
-    await Promise.all([aliceMcp.close(), bobMcp.close(), carolMcp.close(), daveMcp.close()]);
+    await Promise.all([carolMcp.close(), daveMcp.close()]);
     const { scanned, findings } = await scanForCanaries([dir], canaries.list);
     expect(scanned).toBeGreaterThan(2);
     expect(findings.map((f) => `${f.name} in ${f.file}`)).toEqual([]);
