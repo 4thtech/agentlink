@@ -159,14 +159,14 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
 - **Status:** ready · **Size:** S · **Tier:** Owner (Sonnet prepares) · **Security:** S1
 - **Repo/path:** npm orgs `agentlink`, `4thtech` · agentlink · .github/workflows/release.yml
 - **Depends on:** M0-2a
-- **Spec:** 04 §7 (npm provenance, 2FA); 06 header (`@4thtech/agentlink`); 07 §1; `ci-cd.md` §4–§5
+- **Spec:** 04 §7 (npm provenance, 2FA); 06 header (`@4thtech-io/agentlink`); 07 §1; `ci-cd.md` §4–§5
 - **Invariants:** —
 - **Scope:**
-  - npm org `agentlink`: 2FA required for all members. Check and, if free, claim the `@4thtech` scope for `@4thtech/agentlink`; if unavailable, raise it as a naming item under M0-4.
+  - npm org `agentlink`: 2FA required for all members. The `@4thtech` scope was not available; the owner created the npm org `4thtech-io` and the package is `@4thtech-io/agentlink` (owner decision, 2026-10-16).
   - GitHub Environment `npm-publish` (D-25: required reviewer `talirezun`, "Prevent self-review" off; deployment branches `main` and Changesets tags only; no secrets); created with the other environments in M0-18.
   - Trusted publishing (OIDC) per package once it exists; packages set to "require 2FA and disallow tokens"; no `NPM_TOKEN` anywhere. Confirm whether a trusted publisher can be configured before the first publish; if not, bootstrap the first version manually with 2FA.
 - **Acceptance:**
-  - npm org settings show 2FA required; `@4thtech` scope status recorded (owned / not available).
+  - npm org settings show 2FA required; `4thtech-io` org recorded as the owner of `@4thtech-io/agentlink`.
   - `gh secret list` (repo and org) shows no npm token.
 
 #### M0-2f · occ-v2-contracts private repository bootstrap
@@ -643,14 +643,15 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - A manual freeze and unfreeze round trip works.
 
 #### OPS-REL-1 · v0.1.0 release blocker: decide which packages publish (new)
-- **Decision (Tali, chat, 2026-10-16):** v0.1.0 publishes only the CLI, as `@4thtech/agentlink`, with its workspace packages bundled in; every other package stays private. Release-path change, so S2.
+- **Decision (Tali, chat, 2026-10-16):** v0.1.0 publishes only the CLI, with its workspace packages bundled in; every other package stays private. Release-path change, so S2.
+- **Decision (Tali, chat, 2026-10-16):** the npm org is `4thtech-io` (the `4thtech` scope was not available), so the package is `@4thtech-io/agentlink`; the bin stays `agentlink`, GitHub URLs (`github.com/4thtech/agentlink`) are unchanged. The `@agentlink` npm org belongs to a third party (IR-OPS-REL-1-1; rename carded as OPS-REL-2).
 - **Status:** in review (bundled CLI package, deps-check `bundles`, `privatePackages.version: true`) · **Size:** S · **Tier:** Opus (owner decision) · **Security:** S1 (package manifests, release path)
 - **Repo/path:** agentlink · `packages/*/package.json`, `apps/*/package.json`, `.changeset/config.json`, `docs/process/versioning.md`
 - **Depends on:** OPS-CI-2
 - **Spec:** D-25, D-43; `release-and-deployment.md` §4.1; `versioning.md`
 - **Invariants:** —
 - **Scope:**
-  - All 16 workspace packages are `"private": true` at `0.0.0` (2026-10-16), so Changesets publishes nothing and the `changesets` CI check has nothing to enforce. Decide with the owner which package(s) publish for v0.1.0 (likely the CLI `@4thtech/agentlink` for `npx`, plus the libraries it needs at runtime unless bundled), their names, and the fixed group.
+  - All 16 workspace packages are `"private": true` at `0.0.0` (2026-10-16), so Changesets publishes nothing and the `changesets` CI check has nothing to enforce. Decide with the owner which package(s) publish for v0.1.0 (likely the CLI `@4thtech-io/agentlink` for `npx`, plus the libraries it needs at runtime unless bundled), their names, and the fixed group.
   - Drop `private` only on those; correct `publishConfig`, `repository`, `files`; changesets for the first release; the owner's 2FA bootstrap publish and trusted publishers (`ci-cd.md` §5).
 - **Acceptance:**
   - `changeset status` lists exactly the agreed packages; a PR changing one without a changeset is red.
@@ -2438,7 +2439,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Open (owner):** the card relay list is provisional (`apps/cli/src/commands/owner/card-relays.ts`) until M1-18 picks the release default set; the display name is the local agent name until a name prompt or card update exists (M1-7j, M1b). The OCC v2 `Registration` is not allowlisted; the card that adds a Registration signer widens the allowlist.
 - **Threat note (draft):** asset: the owner EVM and Nostr keys (I-4). Entry points: `performOwnerOperation`, `runOwnerGesture`, `owner init` and the session handed to core. Abuse cases: (a) a caller gets the owner to sign arbitrary EIP-712 (a permit, a registration with attacker fees, a card for an attacker agent); (b) a second signature in the first-card operation; (c) a crossed identity service makes the owner sign another agent's card; (d) a failed card leaves an owner with no card and blocks `owner init`. Stopped by: the allowlist on a JCS copy (what is checked is signed), the one-card session bound to agent and owner, read-back of the stored card and rollback of the owner item. Residual (G-1, D-67): a modified installation can still change what is signed.
 
-### CLI and MCP server (`@4thtech/agentlink`, `apps/cli`)
+### CLI and MCP server (`@4thtech-io/agentlink`, `apps/cli`)
 
 #### M1-9j · spec: InboundMessage shape, M1a approval channel, handler module (new, D-73)
 - **Status:** done (spec in 4thtech/agentlink#103, merged 2026-10-15) · **Size:** S · **Tier:** Opus · **Security:** S2 (approvals, audit-rules §2.4; IR-M1-9j-1 F01) · **Phase:** M1a
@@ -2944,7 +2945,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Per-harness install steps (the agent-assisted install prompts come from M1-25). Codex is configured like the other harnesses: `init` shows the exact diff of the Codex config file and writes it only after confirmation (D-73 (7)).
   - Harness permission settings that deny the agent access to `~/.agentlink`, keychain access through command-line tools (`security` on macOS, `secret-tool` on Linux, `cmdkey` and `vaultcmd` on Windows), the installed AgentLink package directory and the npx cache, plus writes to shell startup files, `~/.npmrc` and user `PATH` directories where the harness allows it (Claude Code permission deny rules, Codex sandbox, Gemini CLI sandbox; syntax verified at build time). The copy says plainly that these rules are guards, not a security boundary (04 §2.5, D-67), and keeps to 11 §5 in the user guide.
-  - **Claude Code examples (D-67, confirmed by the owner in D-68 (3); starting point, verify against the current Claude Code permissions and sandboxing docs at build time).** In `~/.claude/settings.json`, `permissions.deny`: `Read(~/.agentlink/**)`, `Edit(~/.agentlink/**)`; `Bash(security *)` (macOS), `Bash(secret-tool *)` (Linux), `Bash(cmdkey *)`, `Bash(vaultcmd *)` (Windows); `Edit(~/.npm/_npx/**)` (macOS, Linux; on Windows the npx cache under `~/AppData/Local/npm-cache/_npx/**`); `Edit(//<npm root -g>/@4thtech/agentlink/**)` for a global install (absolute paths start with `//`); `Edit(~/.claude/settings.json)`, so the edit tool cannot remove the rules; and, so the agent cannot redirect what the owner's own terminal runs as `agentlink` or `npx` (04 §2.5, D-67), `Edit(~/.zshrc)`, `Edit(~/.zprofile)`, `Edit(~/.bashrc)`, `Edit(~/.bash_profile)`, `Edit(~/.profile)`, `Edit(~/.config/fish/**)`, `Edit(~/.npmrc)`, `Edit(~/.local/bin/**)` and the npm global prefix's `bin` directory (on Windows the PowerShell profile under `~/Documents/PowerShell/**`); the sandbox `denyWrite` covers the same paths for Bash. The copy states that these are guards only. Because Read and Edit rules do not cover every way a shell command or script can open a file, and a Bash rule matches only the command text, also show the sandbox (macOS, Linux, WSL2): `sandbox.enabled` with `sandbox.filesystem.denyRead` for `~/.agentlink` and `denyWrite` for the npx cache and the package directory. Check at build time that the rules do not break the AgentLink MCP server (started by the harness, not through Bash) or an agent-run `init`, and state the order (install first, then add the rules) if they do.
+  - **Claude Code examples (D-67, confirmed by the owner in D-68 (3); starting point, verify against the current Claude Code permissions and sandboxing docs at build time).** In `~/.claude/settings.json`, `permissions.deny`: `Read(~/.agentlink/**)`, `Edit(~/.agentlink/**)`; `Bash(security *)` (macOS), `Bash(secret-tool *)` (Linux), `Bash(cmdkey *)`, `Bash(vaultcmd *)` (Windows); `Edit(~/.npm/_npx/**)` (macOS, Linux; on Windows the npx cache under `~/AppData/Local/npm-cache/_npx/**`); `Edit(//<npm root -g>/@4thtech-io/agentlink/**)` for a global install (absolute paths start with `//`); `Edit(~/.claude/settings.json)`, so the edit tool cannot remove the rules; and, so the agent cannot redirect what the owner's own terminal runs as `agentlink` or `npx` (04 §2.5, D-67), `Edit(~/.zshrc)`, `Edit(~/.zprofile)`, `Edit(~/.bashrc)`, `Edit(~/.bash_profile)`, `Edit(~/.profile)`, `Edit(~/.config/fish/**)`, `Edit(~/.npmrc)`, `Edit(~/.local/bin/**)` and the npm global prefix's `bin` directory (on Windows the PowerShell profile under `~/Documents/PowerShell/**`); the sandbox `denyWrite` covers the same paths for Bash. The copy states that these are guards only. Because Read and Edit rules do not cover every way a shell command or script can open a file, and a Bash rule matches only the command text, also show the sandbox (macOS, Linux, WSL2): `sandbox.enabled` with `sandbox.filesystem.denyRead` for `~/.agentlink` and `denyWrite` for the npx cache and the package directory. Check at build time that the rules do not break the AgentLink MCP server (started by the harness, not through Bash) or an agent-run `init`, and state the order (install first, then add the rules) if they do.
   - Containers, devcontainers, WSL and SSH (D-54, 07 §9; documentation only, there is no headless dogfood for M1a, D-73 (4)): opting in to the file KeyStore; mounting the unlock code as a run-time secret and pointing `AGENTLINK_KEYSTORE_PASSPHRASE_FILE` at it (never in the image, a committed `devcontainer.json` or a committed MCP config); why the environment variable is weaker; disabling core dumps; deny rules for `~/.agentlink/keystore` and the secret file; doing `owner init` personally and never letting the agent see the owner code; owner approvals over SSH or `docker exec -it`.
   - Run owner († ) commands in a terminal the agent does not control; `doctor` for troubleshooting. Local UI, storage and credits sections are M1-12d (M1b).
   - Notes (IR-M1-12b-1): the containers, devcontainer, WSL and SSH section above is deferred with the file KeyStore (D-73 (4)); the page says containers are not supported in v0.1.0. Live per-harness transcripts of the deny rules (acceptance 2): Claude Code met on Linux in E2E run 38866218869 (L12, Read and `cat` of `~/.agentlink` denied; also in earlier runs); Codex and macOS remain pending the owner's decision. Follow-up: `agentlink init --confirm <code>` is parsed but missing from the `--help` usage lines (apps/cli dispatch.ts; for the M1-9a owner or a tiny CLI card).
@@ -3236,7 +3237,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** D-39, D-53; 06 §7, §7.1 (install prompts, install-and-accept prompt); 02 F-01, F-09, J1, J7; 04 §2.5; 11 §5
 - **Invariants:** I-1, I-4
 - **Scope:**
-  - A copy-paste install prompt per harness (Claude Code, Codex, Gemini CLI; printed snippets for the others) in the docs and in `SKILL.md`: the user's own agent runs `npx @4thtech/agentlink init`, which detects the harness, shows the exact config diff and asks for confirmation; the agent relays the diff to the user and confirms only what the user approved.
+  - A copy-paste install prompt per harness (Claude Code, Codex, Gemini CLI; printed snippets for the others) in the docs and in `SKILL.md`: the user's own agent runs `npx @4thtech-io/agentlink init`, which detects the harness, shows the exact config diff and asks for confirmation; the agent relays the diff to the user and confirms only what the user approved.
   - Owner setup stays presence-gated: the user enters the owner passphrase in a terminal the agent does not control (TTY only, M1-8c); the prompt tells the agent to hand the user that one step and never to ask for the passphrase (04 §2.5).
   - Adding the MCP is the only setup step (D-39): no account, wallet, extension, gas or chain choice.
   - The install-and-accept prompt template per harness (D-53, 06 §7.1), used by the invite page (M1-19): it installs if needed, then accepts the invite, falling back to `agentlink accept '<url>'` (single-quoted) when the harness needs a restart before the tools load. M1a variant: owner setup is "tell me the one command to run in my own terminal; never ask me for the passphrase" (no local setup page until M1b).
@@ -4091,7 +4092,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Spec:** 07 §6.1; 06 §3 (`proofs.defaultChain: base`); 03 §7; `release-and-deployment.md` §4.1, §4.6, §5
 - **Invariants:** I-3, I-6
 - **Scope:**
-  - Mainnet chain configs; default chain Base; faucet unreachable from mainnet configs; `@4thtech/agentlink` released to `latest` after the owner's approval click (D-52); console production deploy with published hashes.
+  - Mainnet chain configs; default chain Base; faucet unreachable from mainnet configs; `@4thtech-io/agentlink` released to `latest` after the owner's approval click (D-52); console production deploy with published hashes.
   - Update the README Status and roadmap; never claim unimplemented features.
 - **Acceptance:**
   - J2 completed on mainnet with real credits; deployed console hashes equal the release hashes.
@@ -4484,7 +4485,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 |---|---|
 | M0-2a | Org settings: 2FA required, base permission Read, restrict visibility change/deletion/transfer, disable private forks, limit private-repo write access |
 | M0-2b | Push the bootstrap commit; repository settings; `main`, tag and `sync` rulesets; Actions settings; install Renovate |
-| M0-2e | npm 2FA enforcement; check/claim `@4thtech`; `npm-publish` environment; trusted publishers; first manual publish with 2FA if needed |
+| M0-2e | npm 2FA enforcement; npm org `4thtech-io` (`@4thtech` was not available); `npm-publish` environment; trusted publishers; first manual publish with 2FA if needed |
 | M0-2f | Create `occ-v2-contracts` (private); grant write access to named engineers only |
 | M0-2g | Cloudflare API tokens, custom domains for `agentlink.4thtech.io` hostnames, R2 test bucket and token; **DECISION NEEDED:** move to a 4thTech Cloudflare org account with @denisjazbec |
 | M0-4 | D-11 to counsel; D-14 name; record D-12 = MIT |

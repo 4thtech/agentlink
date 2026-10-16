@@ -12,7 +12,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
-    "@4thtech/agentlink": "workspace:*",
+    "@4thtech-io/agentlink": "workspace:*",
     "@agentlink/core": "workspace:*",
     "@agentlink/crypto": "workspace:*",
     "@agentlink/log": "workspace:*",

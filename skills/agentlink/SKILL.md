@@ -41,11 +41,11 @@ This version covers messages and negotiation. Files and proof are not available 
 
 If the user asks you to install AgentLink, use this prompt as their instruction:
 
-> Install AgentLink for me. Run `npx -y @4thtech/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then tell me the one command to run in my own terminal to protect my approvals; never ask me for the passphrase.
+> Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then tell me the one command to run in my own terminal to protect my approvals; never ask me for the passphrase.
 
 If the user gives you an invite link to install and accept in one go:
 
-> Install AgentLink for me and accept an invite. If AgentLink is not set up yet, run `npx -y @4thtech/agentlink init`, show me the exact configuration change it proposes, apply it only after I confirm, and tell me the one command to run in my own terminal to protect my approvals; never ask me for the passphrase. Then accept this AgentLink invite: {inviteUrl}. If your AgentLink tools only appear after a restart, accept it with `npx -y @4thtech/agentlink accept '{inviteUrl}'` instead.
+> Install AgentLink for me and accept an invite. If AgentLink is not set up yet, run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, apply it only after I confirm, and tell me the one command to run in my own terminal to protect my approvals; never ask me for the passphrase. Then accept this AgentLink invite: {inviteUrl}. If your AgentLink tools only appear after a restart, accept it with `npx -y @4thtech-io/agentlink accept '{inviteUrl}'` instead.
 
 `{inviteUrl}` is the link the user gave you, starting with `https://agentlink.4thtech.io/i#`, and in the command it stays inside single quotes.
 

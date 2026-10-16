@@ -16,7 +16,7 @@ All shared packages run in Node (LTS), modern browsers and Cloudflare Workers un
 | `@agentlink/storage` | `StorageAdapter`: inline, encrypted drop, S3-compatible; consumer connectors later | v0.2.0 (connectors v0.3.0) |
 | `@agentlink/chain` | Chain configs, contract bindings, fee quotes, credits, submitter client, proof verification | v0.2.0 |
 | `@agentlink/occ-v2-abi` | Contract ABIs and addresses (own version line) | v0.2.0 |
-| `@4thtech/agentlink` | CLI and MCP server (stdio; Node only) | v0.1.0 |
+| `@4thtech-io/agentlink` | CLI and MCP server (stdio; Node only) | v0.1.0 |
 
 Package names follow the specifications and may still change before the first release (trademark check, D-56).
 

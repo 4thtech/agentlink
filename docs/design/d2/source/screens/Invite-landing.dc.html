@@ -43,7 +43,7 @@ a{color:var(--al-color-fg-link)}a:hover{color:var(--al-color-accent-pressed)}
 <h2 class="al-text-title-3" style="margin: 0;">Set up in 2 minutes</h2>
 <span class="al-text-body-sm" style="color: var(--al-color-fg-muted);">I use…</span>
 <x-import component-from-global-scope="AgentLink.Segmented" label="I use" default-value="claude" options="{{apps}}"></x-import>
-<x-import component-from-global-scope="AgentLink.CopyPrompt" size="hero" title="Copy this to your AI" prompt="Set up AgentLink for me and accept this invite: {inviteUrl}. Run `npx -y @4thtech/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm." note="It installs AgentLink if needed and accepts the invite. It works the same if AgentLink is already set up."></x-import>
+<x-import component-from-global-scope="AgentLink.CopyPrompt" size="hero" title="Copy this to your AI" prompt="Set up AgentLink for me and accept this invite: {inviteUrl}. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm." note="It installs AgentLink if needed and accepts the invite. It works the same if AgentLink is already set up."></x-import>
 </section>
 <div style="display: flex; flex-direction: column; gap: 6px; padding: 16px; border: 1px solid var(--al-color-border-default); border-radius: 6px; background: var(--al-color-bg-surface);">
 <span class="al-text-body">No AI agent?</span>

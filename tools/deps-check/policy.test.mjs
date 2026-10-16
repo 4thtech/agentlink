@@ -83,7 +83,7 @@ describe('policy data', () => {
     expect(violationFor('packages/core', '@agentlink/node')).toMatch(/layering/);
     expect(violationFor('apps/console', '@agentlink/node')).toMatch(/layering/);
     expect(violationFor('apps/submitter', '@agentlink/ui')).toMatch(/layering/);
-    expect(violationFor('packages/core', '@4thtech/agentlink')).toMatch(/layering/);
+    expect(violationFor('packages/core', '@4thtech-io/agentlink')).toMatch(/layering/);
     expect(violationFor('packages/core', '@agentlink/chain/sub')).toBeNull();
     expect(violationFor(null, '@agentlink/types')).toMatch(/no entry/);
   });

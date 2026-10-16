@@ -337,7 +337,7 @@ export const ZONES = {
   // third-party runtime dependencies with the exact same spec (tools/deps-check bundledRuntimeOf).
   // Its own source may still not import them (LIBRARIES and the source checks apply as before).
   'apps/cli': {
-    ...entry('@4thtech/agentlink', ALL_PACKAGES, [
+    ...entry('@4thtech-io/agentlink', ALL_PACKAGES, [
       {
         pattern: '@modelcontextprotocol/sdk',
         reason: 'MCP stdio server (repo-reference.md, stack)',
@@ -419,7 +419,7 @@ export function isDeepImport(name, specifier) {
   );
 }
 
-/** The npm scopes of the workspace packages (`@agentlink/`, `@4thtech/`). */
+/** The npm scopes of the workspace packages (`@agentlink/`, `@4thtech-io/`). */
 const WORKSPACE_SCOPES = [...new Set(WORKSPACE_NAMES.map((name) => `${name.split('/')[0]}/`))];
 
 /**

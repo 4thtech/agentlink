@@ -1,5 +1,5 @@
 // OPS-REL-1: the package that npm publishes, as users get it (owner decision 2026-10-16: for
-// v0.1.0 only the CLI publishes, as `@4thtech/agentlink`, with the @agentlink/* workspace packages
+// v0.1.0 only the CLI publishes, as `@4thtech-io/agentlink`, with the @agentlink/* workspace packages
 // bundled into one file; they stay private).
 //
 // Checks the manifest, the bundle `dist/agentlink.js` (built by `pnpm build`), the exact file list
@@ -100,9 +100,9 @@ function runBundle(args: string[]): { status: number | null; stdout: string; std
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 
-describe('the published manifest (@4thtech/agentlink)', () => {
+describe('the published manifest (@4thtech-io/agentlink)', () => {
   it('is the public CLI package', () => {
-    expect(manifest.name).toBe('@4thtech/agentlink');
+    expect(manifest.name).toBe('@4thtech-io/agentlink');
     expect(manifest.private).toBeUndefined();
     expect(manifest.license).toBe('MIT');
     expect(manifest.type).toBe('module');
@@ -207,7 +207,7 @@ describe('the published tarball (dist/package)', () => {
     const [packed] = JSON.parse(result.stdout) as [
       { name: string; filename: string; files: { path: string }[] },
     ];
-    expect(packed.name).toBe('@4thtech/agentlink');
+    expect(packed.name).toBe('@4thtech-io/agentlink');
     const tarball = join(packDir, packed.filename.split(/[\\/]/).pop()!);
     const extracted = spawnSync('tar', ['-xzOf', tarball, 'package/package.json'], {
       encoding: 'utf8',

@@ -1,5 +1,5 @@
 ---
-'@4thtech/agentlink': patch
+'@4thtech-io/agentlink': patch
 '@agentlink/core': patch
 ---
 

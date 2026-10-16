@@ -16,7 +16,7 @@ All packages live in the public `agentlink` monorepo (see 09). Every package mus
 | `@agentlink/storage` | types, crypto | `StorageAdapter` interface; `inline`, `drop` (default, D-48) and `s3` adapters (P0); `gdrive`, `dropbox`, `onedrive` connectors (P1, M2, D-49); `ipfs-pinning` (P2); storage selection (§5.6) |
 | `@agentlink/core` | all above | `AgentLinkClient`: identity, contacts, envelopes, threads, files, proofs, policies, approvals; `Store`, `ApprovalChannel` interfaces (the key interfaces are in crypto, G-2) |
 | `@agentlink/node` | core | Node implementations: keychain `KeyStore` and the opt-in passphrase-locked file `KeyStore` for headless machines (§9, D-54), SQLite `Store`, local approval server (Node only) |
-| `@4thtech/agentlink` | node, core | CLI + MCP server (stdio) (Node only). Its tool handlers (`src/tools/`) import no Node built-in, Node global or `@agentlink/node` module and nothing outside `src/tools/` (06 §1), and are moved into a shared package for the cloud agent at M2-3b (06 §1, G-15, D-73 (1)) |
+| `@4thtech-io/agentlink` | node, core | CLI + MCP server (stdio) (Node only). Its tool handlers (`src/tools/`) import no Node built-in, Node global or `@agentlink/node` module and nothing outside `src/tools/` (06 §1), and are moved into a shared package for the cloud agent at M2-3b (06 §1, G-15, D-73 (1)) |
 
 Integrators use `@agentlink/core` directly (with their own `KeyStore`/`Store`) and pass their `appId` to earn integrator fees.
 
@@ -821,7 +821,7 @@ Encodings follow 04 §2.4.1, and a verifier rejects a pack in any other form. `r
 | Interactive prompt (no echo) | CLI in a terminal only | Never on the MCP stdio channel. No CLI argument takes the passphrase |
 
 - **Order.** The file source is tried before the environment variable. If both are set, the server uses the file and `doctor` warns. The server deletes both variables from `process.env` after reading.
-- **Harness config.** The harness passes the path to the MCP server in its MCP config, for example `claude mcp add agentlink -e AGENTLINK_KEYSTORE_PASSPHRASE_FILE=/run/secrets/agentlink -- npx -y @4thtech/agentlink mcp`. The path is not a secret.
+- **Harness config.** The harness passes the path to the MCP server in its MCP config, for example `claude mcp add agentlink -e AGENTLINK_KEYSTORE_PASSPHRASE_FILE=/run/secrets/agentlink -- npx -y @4thtech-io/agentlink mcp`. The path is not a secret.
 - **Async unlock.** The server answers MCP `initialize` first and then runs the KDF asynchronously. Until the unlock finishes, tools return `needs_setup` (reason `keystore_locked`, "unlocking").
 - **No working source.** Every tool returns `needs_setup` (reason `keystore_locked`), and no other tool runs.
 - **Owner passphrase.** No source exists for it. `OwnerKeyStore` reads the owner code only from an interactive prompt or uses a passkey (04 §2.5, §2.8). `AGENTLINK_OWNER_*` variables are ignored, and `doctor` warns if one is set.

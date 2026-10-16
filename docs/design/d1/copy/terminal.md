@@ -5,7 +5,7 @@
 ## init
 
 ```
-$ npx -y @4thtech/agentlink init
+$ npx -y @4thtech-io/agentlink init
 
 AgentLink found 3 AI apps on this computer:
   Claude Code
@@ -15,7 +15,7 @@ AgentLink found 3 AI apps on this computer:
 Changes for Claude Code:
 +   "agentlink": {
 +     "command": "npx",
-+     "args": ["-y", "@4thtech/agentlink"]
++     "args": ["-y", "@4thtech-io/agentlink"]
 +   }
 
 Apply these changes? (y/N)

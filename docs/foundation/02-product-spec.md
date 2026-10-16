@@ -43,7 +43,7 @@ Priority: **P0** = beta must-have · **P1** = beta should-have · **P2** = post-
 
 | ID | Feature | Detail | Priority |
 |---|---|---|---|
-| F-01 | **One-command install** | `npx @4thtech/agentlink init` creates identity, stores keys in OS keychain, prints the harness snippet. Also: one-click Claude Desktop extension bundle. **Agent-assisted:** the user's own agent can run `init` from a documented install prompt (F-09); `init` detects the harness, shows the exact config change and applies it only after the user confirms; owner setup (passkey or passphrase) always happens with the user present (06 §7, D-39) | P0 |
+| F-01 | **One-command install** | `npx @4thtech-io/agentlink init` creates identity, stores keys in OS keychain, prints the harness snippet. Also: one-click Claude Desktop extension bundle. **Agent-assisted:** the user's own agent can run `init` from a documented install prompt (F-09); `init` detects the harness, shows the exact config change and applies it only after the user confirms; owner setup (passkey or passphrase) always happens with the user present (06 §7, D-39) | P0 |
 | F-02 | **Agent identity** | Each agent gets keys (signing, Nostr, encryption) generated locally. Never leaves the device except as an encrypted backup the user controls | P0 |
 | F-03 | **Owner identity** | Owner keys created by `agentlink owner init` with a generated owner code (M1a; an owner passphrase only as an opt-in, D-67), the local UI (localhost passkey or owner code), the desktop app (OS biometrics, M2) or the console (passkey). The owner key is never stored unwrapped on the agent's machine. Owner signs an *agent card* binding agents to the owner | P0 |
 | F-04 | **Recovery kit** | Encrypted backup (passphrase or passkey PRF) exportable as a file and optionally stored as an encrypted Nostr event. Nothing stored by 4thTech | P0 |
@@ -149,7 +149,7 @@ Prices are the planned beta prices (D-45), the same in USD on every chain, paid 
 
 ### J1 — Install and first message (target: under 5 minutes, no payment)
 
-1. User asks their agent to install AgentLink: "Install AgentLink for me", or pastes the install prompt for their harness from the docs (F-09). The agent runs `npx @4thtech/agentlink init`. (Alternatives: the user runs `init` themselves, installs the Claude Desktop extension, or, from M2, the desktop app.)
+1. User asks their agent to install AgentLink: "Install AgentLink for me", or pastes the install prompt for their harness from the docs (F-09). The agent runs `npx @4thtech-io/agentlink init`. (Alternatives: the user runs `init` themselves, installs the Claude Desktop extension, or, from M2, the desktop app.)
 2. `init` creates the agent keys in the OS keychain and asks for a display name. It detects the harness (Claude Code, Claude Desktop, Codex, Gemini CLI…), shows the exact config change and applies it only after the user confirms (06 §7).
 3. `init` opens the local setup page: the user protects approvals with a passkey (Touch ID / Windows Hello) or an owner code (an owner passphrase only as an opt-in), which creates and wraps the owner key (04 §2.2, D-67; in M1a, before the setup page exists, the owner runs `agentlink owner init` personally), and is offered the recovery kit. The user restarts the harness if it needs it.
 4. User says to their agent: "Create an AgentLink invite for Marko." The agent calls `agentlink_create_invite` and returns a link with its expiry, ready-to-send text and the user's own owner fingerprint. There is no safety code yet, because it needs both sides' pairing messages (04 §3.6.1).

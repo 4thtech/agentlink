@@ -49,7 +49,7 @@ The orchestrator (Opus) enables auto-merge and prepares releases. The owner give
 
 ## Verify
 - `gh pr view <n> --json state,mergedAt,mergeCommit` shows `MERGED`.
-- For a release: `npm view @4thtech/agentlink dist-tags` shows the new version on the expected tag, then verify by content ([RB-10](deploy-and-verify.md)).
+- For a release: `npm view @4thtech-io/agentlink dist-tags` shows the new version on the expected tag, then verify by content ([RB-10](deploy-and-verify.md)).
 
 ## If it fails
 - **Auto-merge enabled on the wrong PR:** `gh pr merge <n> --disable-auto` and tell the owner.

@@ -4,7 +4,7 @@
 // come from the environment (CODEX_HOME and similar overrides are not followed: a variable the agent
 // can set must not move a write). The only path from input is `--config <path>`, for OpenCode and
 // Antigravity only, resolved and checked by resolveConfigTarget under the 06 §7 write rules. The entry
-// runs `npx -y @4thtech/agentlink mcp`, as 06 §7 shows for every harness; a non-default agent adds
+// runs `npx -y @4thtech-io/agentlink mcp`, as 06 §7 shows for every harness; a non-default agent adds
 // `--agent <name>` (the name is checked against 06 §6 first). Claude Desktop and the printed snippets
 // for Cursor, VS Code, Windsurf and Cline follow in M1b.
 //
@@ -47,7 +47,7 @@ export interface ConfigTarget {
   readonly display: string;
 }
 
-export const PACKAGE_NAME = '@4thtech/agentlink';
+export const PACKAGE_NAME = '@4thtech-io/agentlink';
 
 export interface HarnessContext extends FileOptions {
   readonly home: string;

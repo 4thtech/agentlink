@@ -13,7 +13,7 @@
       "@agentlink/core",
       "@agentlink/node",
       "@agentlink/ui",
-      "@4thtech/agentlink"
+      "@4thtech-io/agentlink"
     ]
   ],
   "linked": [],

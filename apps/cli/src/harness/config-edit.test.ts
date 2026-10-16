@@ -6,8 +6,8 @@ import { HarnessError } from './errors.js';
 import { addJsonMcpServer } from './json-config.js';
 import { addTomlMcpServer, agentlinkTable, scanToml } from './toml-config.js';
 
-const ENTRY = { command: 'npx', args: ['-y', '@4thtech/agentlink', 'mcp'] };
-const TABLE = agentlinkTable('npx', ['-y', '@4thtech/agentlink', 'mcp']);
+const ENTRY = { command: 'npx', args: ['-y', '@4thtech-io/agentlink', 'mcp'] };
+const TABLE = agentlinkTable('npx', ['-y', '@4thtech-io/agentlink', 'mcp']);
 
 function code(fn: () => unknown): string | undefined {
   try {
@@ -170,7 +170,7 @@ describe('addTomlMcpServer', () => {
     const edit = addTomlMcpServer(undefined, TABLE);
     expect(edit).toEqual({
       status: 'change',
-      text: '[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech/agentlink", "mcp"]\n',
+      text: '[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech-io/agentlink", "mcp"]\n',
     });
   });
 
@@ -180,7 +180,7 @@ describe('addTomlMcpServer', () => {
     if (edit.status !== 'change') throw new Error('expected a change');
     expect(edit.text.startsWith(before)).toBe(true);
     expect(edit.text).toBe(
-      `${before}\n[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech/agentlink", "mcp"]\n`,
+      `${before}\n[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech-io/agentlink", "mcp"]\n`,
     );
   });
 
@@ -191,7 +191,7 @@ describe('addTomlMcpServer', () => {
     ).toBe(true);
     const crlf = addTomlMcpServer('a = 1\r\n', TABLE);
     expect(crlf.status === 'change' && crlf.text).toBe(
-      'a = 1\r\n\r\n[mcp_servers.agentlink]\r\ncommand = "npx"\r\nargs = ["-y", "@4thtech/agentlink", "mcp"]\r\n',
+      'a = 1\r\n\r\n[mcp_servers.agentlink]\r\ncommand = "npx"\r\nargs = ["-y", "@4thtech-io/agentlink", "mcp"]\r\n',
     );
   });
 
@@ -217,8 +217,14 @@ describe('addTomlMcpServer', () => {
   });
 
   it('puts a quoted agent name argument in the table as a TOML string', () => {
-    const table = agentlinkTable('npx', ['-y', '@4thtech/agentlink', 'mcp', '--agent', 'work-1']);
-    expect(table[2]).toBe('args = ["-y", "@4thtech/agentlink", "mcp", "--agent", "work-1"]');
+    const table = agentlinkTable('npx', [
+      '-y',
+      '@4thtech-io/agentlink',
+      'mcp',
+      '--agent',
+      'work-1',
+    ]);
+    expect(table[2]).toBe('args = ["-y", "@4thtech-io/agentlink", "mcp", "--agent", "work-1"]');
   });
 
   // IR-M1-9a-1 F02: a key written with quoting or escapes is the same key.

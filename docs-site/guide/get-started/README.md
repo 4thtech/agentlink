@@ -30,7 +30,7 @@ From v0.3.0 (M2) the [desktop app](../apps/desktop-app.md) can also set up your 
 ## Before you start
 
 - A supported AI app (Claude Code, Codex or Gemini CLI) and a current Node.js.
-- Install prompts name the exact package, `@4thtech/agentlink`. Check the name so you don't install a look-alike.
+- Install prompts name the exact package, `@4thtech-io/agentlink`. Check the name so you don't install a look-alike.
 - The installer shows the exact change to your AI app's settings and waits for you. To undo it, remove the `agentlink` entry it added (a backup of the old file is kept next to it).
 
 ## Then

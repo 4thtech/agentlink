@@ -3,7 +3,7 @@
 // - The committed snapshot `test/fixtures/tool-surface.json` is generated from the real registry
 //   (names, input and output schemas, annotations as the MCP `tools/list` shows them). Any drift
 //   fails here. CHANGING THE SNAPSHOT NEEDS THE OWNER'S "merge" IN CHAT (D-51, D-52). Regenerate
-//   with `UPDATE_TOOL_SURFACE=1 pnpm --filter @4thtech/agentlink exec vitest run test/tool-surface.test.ts`.
+//   with `UPDATE_TOOL_SURFACE=1 pnpm --filter @4thtech-io/agentlink exec vitest run test/tool-surface.test.ts`.
 // - The D-53 and D-55 assertions run against the 06 §2.0 table read from the spec itself, so the
 //   expected values cannot be retyped wrongly here.
 // - `auditSurface` is the one rule set; it runs on the real registry (must be clean) and on bad

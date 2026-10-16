@@ -349,7 +349,7 @@ describe('IR-M0-10-2: symlinks and CommonJS', () => {
     mkdirSync(join(root, 'apps/cli/src'), { recursive: true });
     writeFileSync(
       join(root, 'apps/cli/package.json'),
-      JSON.stringify({ name: '@4thtech/agentlink' }),
+      JSON.stringify({ name: '@4thtech-io/agentlink' }),
     );
     writeFileSync(join(root, 'apps/cli/src/x.cjs'), `exports.a = 1;`);
     expect(runChecks(root).problems).toEqual([
@@ -719,7 +719,7 @@ describe('IR-M1-1g-b-1 L-2: non-canonical workspace specifiers are refused', () 
     '@agentlink/crypto/testing/',
     '@agentlink/crypto/./testing',
     '@agentlink/crypto/x/../testing',
-    '@4thtech/AgentLink',
+    '@4thtech-io/AgentLink',
   ];
 
   it('refuses each form in production and test files of every zone', () => {

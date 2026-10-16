@@ -1,4 +1,4 @@
-// OPS-REL-1: the published `@4thtech/agentlink` is ONE bundled file, dist/agentlink.js (owner
+// OPS-REL-1: the published `@4thtech-io/agentlink` is ONE bundled file, dist/agentlink.js (owner
 // decision 2026-10-16: only the CLI publishes; the @agentlink/* workspace packages stay private and
 // are bundled into it). `pnpm build` runs `tsc -b` first (types, project references, the per-file
 // dist/ that e2e and the workspace use), then this Vite (Rolldown) SSR build.

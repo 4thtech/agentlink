@@ -10,18 +10,18 @@ You need Node.js (a current LTS version) and Codex.
 
 Paste this into Codex:
 
-> Install AgentLink for me. Run `npx -y @4thtech/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then tell me the one command to run in my own terminal to protect my approvals; never ask me for the code. Tell me to restart Codex when it's done.
+> Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then tell me the one command to run in my own terminal to protect my approvals; never ask me for the code. Tell me to restart Codex when it's done.
 
 What happens:
 
-1. Codex runs `npx -y @4thtech/agentlink init`. It looks for Claude Code, Codex and Gemini CLI on your computer, prints the exact change to each settings file and a short confirmation code, and writes nothing yet.
+1. Codex runs `npx -y @4thtech-io/agentlink init`. It looks for Claude Code, Codex and Gemini CLI on your computer, prints the exact change to each settings file and a short confirmation code, and writes nothing yet.
 2. Codex shows you the change. For Codex it adds a short `[mcp_servers.agentlink]` section to the end of `~/.codex/config.toml`. Nothing else in the file changes.
 3. If you agree, Codex runs the command again with `--confirm <code>`. The code only works for exactly the change you were shown. A backup of your old file is kept.
 4. Restart Codex.
 
-Prefer to do it yourself? Run `npx -y @4thtech/agentlink init` in your own terminal. It shows the same change and asks `y/N`. AgentLink writes this file itself rather than through `codex mcp add`, so you see the exact change first.
+Prefer to do it yourself? Run `npx -y @4thtech-io/agentlink init` in your own terminal. It shows the same change and asks `y/N`. AgentLink writes this file itself rather than through `codex mcp add`, so you see the exact change first.
 
-Check that the package name is exactly `@4thtech/agentlink`.
+Check that the package name is exactly `@4thtech-io/agentlink`.
 
 ## 2. Protect your approvals
 
@@ -29,7 +29,7 @@ Do this yourself, in a terminal you opened, never through Codex: [Protect your a
 
 ## 3. Check it works
 
-Ask Codex: "What's my AgentLink status?" If not, run `npx -y @4thtech/agentlink doctor` in your own terminal.
+Ask Codex: "What's my AgentLink status?" If not, run `npx -y @4thtech-io/agentlink doctor` in your own terminal.
 
 ## Keep your AI away from AgentLink's files
 

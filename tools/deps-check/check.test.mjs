@@ -332,7 +332,7 @@ describe('listSourceFilesIn', () => {
 // re-declares their third-party runtime dependencies (exact same spec) as its own `dependencies`.
 // Only a zone with `bundles: true` may do that; its own source imports stay checked as before.
 describe('bundled workspace packages (policy `bundles`, OPS-REL-1)', () => {
-  const cli = { name: '@4thtech/agentlink' };
+  const cli = { name: '@4thtech-io/agentlink' };
   const manifests = {
     '@agentlink/crypto': {
       name: '@agentlink/crypto',
