@@ -20,12 +20,12 @@ The owner (Tali). Parts B and C work on the web or GitHub mobile; Part A needs a
 **What npm says.** A trusted publisher can only be added to a package that already exists on the registry. [`npm trust`](https://docs.npmjs.com/cli/v11/commands/npm-trust) states "The package you're configuring must already exist on the npm registry", and the [trusted publishing page](https://docs.npmjs.com/trusted-publishers) describes no pending-publisher flow (read 2026-10-16). It also says a new trusted-publisher configuration must complete its first successful publish within 2 days or it expires. So the order is: bootstrap once by hand, then configure, then release.
 
 1. npm account and org. Sign in to npmjs.com as the owner of org `4thtech-io`. Turn on 2FA for your account (Account → Two-Factor Authentication, "authorization and writes"). Org `4thtech-io` → Settings → require 2FA for all members.
-2. Check the name is still free: `npm view @4thtech-io/agentlink` must say 404.
+2. Check the name is still free: `npm view @4thtech-io/agentlink` must say 404. Then make a new empty folder (for example `mkdir ~/al-bootstrap && cd ~/al-bootstrap`) for step 3.
 3. **Bootstrap the package once by hand, as a placeholder (version 0.0.1, no real code).** No token is created and nothing is stored. In an empty temporary folder (not the repo), create `package.json` with this content:
    ```json
-   {"name":"@4thtech-io/agentlink","version":"0.0.1","description":"Placeholder; the first real release is 0.1.0.","license":"MIT","repository":{"type":"git","url":"git+https://github.com/4thtech/agentlink.git"},"publishConfig":{"access":"public"}}
+   {"name":"@4thtech-io/agentlink","version":"0.0.1","description":"Placeholder — install 0.1.0 or later","license":"MIT","repository":{"type":"git","url":"git+https://github.com/4thtech/agentlink.git"},"publishConfig":{"access":"public"}}
    ```
-   and a one-line `README.md` ("Placeholder. AgentLink v0.1.0 follows: https://github.com/4thtech/agentlink"). Then:
+   and a `README.md` with exactly one line: `Placeholder. Install AgentLink 0.1.0 or later: https://github.com/4thtech/agentlink`. Then:
    ```bash
    npm login                        # browser, with 2FA
    npm publish --access public      # enter the 2FA code when asked
