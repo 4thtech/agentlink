@@ -9,8 +9,9 @@
 // - prompts give exact values on their own lines, name no tool and end without trailing punctuation;
 // - nothing is retried; every step has a wall-clock limit;
 // - no secret is ever printed: the scan reports file names and the NAME of what matched.
+import { existsSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scanForCanaries } from '../../e2e/src/canary-scan.mjs';
 
@@ -41,7 +42,7 @@ export const USAGE = `usage: node tools/dogfood/run.mjs [options]
   --out <dir>                  results root (default ~/agentlink-dogfood; never inside the repository)
   --cc-agent <name>            Claude Code's AgentLink agent (default cc-test)
   --oc-agent <name>            OpenCode's AgentLink agent (default oc-test)
-  --agentlink <command>        the AgentLink program (default agentlink; or "node /path/apps/cli/dist/cli.js")
+  --agentlink <path|json>      the AgentLink program: a path (spaces fine) or a JSON array like '["node","/path/cli.js"]'
   --claude <bin>               default claude
   --opencode <bin>             default opencode
   --cc-model <model>           optional, passed to claude --model
@@ -49,8 +50,44 @@ export const USAGE = `usage: node tools/dogfood/run.mjs [options]
   --max-turns <n>              Claude Code turn cap per step (default 12)
   --step-timeout <seconds>     wall-clock limit per harness step (default 300)
   --approval-timeout <minutes> how long to wait for you to approve (default 15)
+  --approval-interval <seconds> how often to look for your decision (default 5)
   --only <ids>                 comma-separated step IDs to run (steps that need an earlier one are skipped)
 `;
+
+/** The real path of `path`, also when its last parts do not exist yet (the nearest existing parent is resolved). */
+export function realResolve(path) {
+  let existing = resolve(path);
+  const rest = [];
+  while (!existsSync(existing) && dirname(existing) !== existing) {
+    rest.unshift(basename(existing));
+    existing = dirname(existing);
+  }
+  return join(realpathSync(existing), ...rest);
+}
+
+/**
+ * The AgentLink program as `{ cmd, args }`, never split on whitespace: a plain value is the
+ * executable path (spaces allowed); a JSON array `["node","/a b/cli.js"]` gives the executable and its arguments.
+ */
+export function parseCommand(text) {
+  if (text.trim().startsWith('[')) {
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new Error('--agentlink: the JSON array is not valid');
+    }
+    if (
+      !Array.isArray(parsed) ||
+      parsed.length === 0 ||
+      !parsed.every((s) => typeof s === 'string' && s !== '')
+    ) {
+      throw new Error('--agentlink: give a non-empty JSON array of strings');
+    }
+    return { cmd: parsed[0], args: parsed.slice(1) };
+  }
+  return { cmd: text, args: [] };
+}
 
 /** Parses argv into options; throws an Error with a plain message on a bad one. */
 export function parseArgs(argv) {
@@ -96,6 +133,7 @@ export function parseArgs(argv) {
       }
       case '--agentlink':
         options.agentlinkBin = value(i, arg);
+        parseCommand(options.agentlinkBin);
         i += 1;
         break;
       case '--claude':
@@ -122,6 +160,10 @@ export function parseArgs(argv) {
         options.stepTimeoutMs = number(i, arg, 10) * 1000;
         i += 1;
         break;
+      case '--approval-interval':
+        options.approvalIntervalMs = number(i, arg, 1) * 1000;
+        i += 1;
+        break;
       case '--approval-timeout':
         options.approvalTimeoutMs = number(i, arg, 1) * 60_000;
         i += 1;
@@ -138,7 +180,9 @@ export function parseArgs(argv) {
     }
   }
   if (options.ccAgent === options.ocAgent) throw new Error('the two agents must differ');
-  const rel = relative(REPO_ROOT, options.out);
+  // Symlinks resolved on both sides, so a link into the repository is refused too.
+  options.out = realResolve(options.out);
+  const rel = relative(realResolve(REPO_ROOT), options.out);
   if (rel === '' || (!rel.startsWith('..') && !rel.startsWith(sep))) {
     throw new Error('--out must be outside the repository (transcripts hold message text)');
   }

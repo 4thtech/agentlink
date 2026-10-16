@@ -178,7 +178,7 @@ pnpm install && pnpm build
 agentlink --version
 ```
 
-Building with `pnpm build` is checked (`apps/cli/dist/cli.js` runs). `pnpm link --global` is the standard pnpm way and needs a pnpm global bin folder on your PATH (`pnpm setup`); it was not run for this runbook. Without a global link, pass the built file instead: `--agentlink "node $PWD/apps/cli/dist/cli.js"` (and use the same command for `approve`).
+Building with `pnpm build` is checked (`apps/cli/dist/cli.js` runs). `pnpm link --global` is the standard pnpm way and needs a pnpm global bin folder on your PATH (`pnpm setup`); it was not run for this runbook. Without a global link, pass the built file instead: `--agentlink '["node","'$PWD'/apps/cli/dist/cli.js"]'` (a path with spaces is fine; run `approve` as `node apps/cli/dist/cli.js approve ...`).
 
 **Run it:**
 
@@ -188,7 +188,7 @@ node tools/dogfood/run.mjs                        # the run
 node tools/dogfood/run.mjs --only P1,P2,P3,P4     # just the pairing
 ```
 
-What it does: preflight (`agentlink`, `claude`, `opencode` versions; `agentlink doctor` and `status` for both agents, which covers the card and the relays), then P1 to P4 pairing, M1 to M3 send and reply with the status habit, H1 and H2 hostile message, T1 to T7 offer, counter, accept (J8). Each harness gets its own MCP config pointing at its own agent (Claude Code `--mcp-config` with `--strict-mcp-config`; OpenCode an inline config that also denies shell, edit and web tools). Each step has a time limit (Claude Code also a turn cap), and nothing is retried.
+What it does: preflight (`agentlink`, `claude`, `opencode` versions; `agentlink doctor` and `status` for both agents, which covers the card and the relays), then P1 to P4 pairing, M1 to M3 send and reply with the status habit, H1 and H2 hostile message, T1 to T7 offer, counter, accept (J8). Each harness gets its own MCP config pointing at its own agent (Claude Code `--mcp-config` with `--strict-mcp-config`; OpenCode an inline config that denies every OpenCode tool permission (read, edit, glob, grep, bash, task, skill, lsp, question, webfetch, websearch, external_directory; keys from opencode.ai/docs/permissions), so it can use only the AgentLink tools). Each step has a time limit (Claude Code also a turn cap), and nothing is retried.
 
 **When it needs you:** at P2 (OpenCode accepting the invite) and T5 (Claude Code accepting the counter-offer) it prints a box:
 

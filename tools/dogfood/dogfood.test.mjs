@@ -1,6 +1,6 @@
 // M1-23: unit tests for the local dogfood script (lib.mjs). Fixtures only: no harness is started, no
 // network, no keychain.
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, mkdir, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -16,6 +16,7 @@ import {
   parseApprovalResult,
   parseArgs,
   parseClaude,
+  parseCommand,
   parseOpenCode,
   pendingApprovalId,
   planText,
@@ -513,6 +514,36 @@ describe('arguments and dry run', () => {
     );
     expect(out).toContain('DRY RUN');
     expect(out).toContain('/nonexistent/claude');
+  });
+});
+
+describe('safer options', () => {
+  it('refuses an --out that is a symlink into the repository', async () => {
+    const base = await mkdtemp(join(tmpdir(), 'agentlink-dogfood-link-'));
+    try {
+      await symlink(fileURLToPath(new URL('../../docs', import.meta.url)), join(base, 'link'));
+      expect(() => parseArgs(['--out', join(base, 'link', 'results')])).toThrow(
+        'outside the repository',
+      );
+      expect(parseArgs(['--out', join(base, 'fresh', 'deeper')]).out).toContain('deeper');
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  });
+
+  it('takes --agentlink as a path with spaces or a JSON array, never split on spaces', () => {
+    expect(parseCommand('/Users/a b/bin/agentlink')).toEqual({
+      cmd: '/Users/a b/bin/agentlink',
+      args: [],
+    });
+    expect(parseCommand('["node","/a b/cli.js"]')).toEqual({ cmd: 'node', args: ['/a b/cli.js'] });
+    expect(() => parseCommand('[1]')).toThrow('JSON array');
+    expect(() => parseArgs(['--agentlink', '[oops'])).toThrow('not valid');
+  });
+
+  it('honours the approval interval', () => {
+    expect(parseArgs(['--approval-interval', '2']).approvalIntervalMs).toBe(2000);
+    expect(parseArgs([]).approvalIntervalMs).toBe(5000);
   });
 });
 

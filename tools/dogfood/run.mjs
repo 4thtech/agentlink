@@ -23,6 +23,7 @@ import {
   childEnv,
   parseApprovalResult,
   parseArgs,
+  parseCommand,
   parseClaude,
   parseOpenCode,
   planText,
@@ -37,11 +38,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const stamp = () =>
   new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '').replace('T', '-');
 
-/** `"node /x/cli.js"` -> `{ cmd: 'node', args: ['/x/cli.js'] }`. No shell is ever involved. */
-const splitCommand = (text) => {
-  const [cmd, ...args] = text.trim().split(/\s+/);
-  return { cmd, args };
-};
+/** The AgentLink program as `{ cmd, args }`; never split on whitespace, no shell involved. */
+const splitCommand = parseCommand;
 
 function versionOf(bin, args = ['--version']) {
   const { cmd, args: pre } = splitCommand(bin);
@@ -139,7 +137,25 @@ async function makeHarnesses(options, dir) {
         enabled: true,
       },
     },
-    permission: { bash: 'deny', edit: 'deny', webfetch: 'deny' },
+    // Every tool key of OpenCode's permission list (https://opencode.ai/docs/permissions/, "Available
+    // Permissions"), denied, so only the AgentLink MCP tools remain: no file read or search, no
+    // paths outside the project, no shell, no web, no subagents, no skills.
+    permission: Object.fromEntries(
+      [
+        'read',
+        'edit',
+        'glob',
+        'grep',
+        'bash',
+        'task',
+        'skill',
+        'lsp',
+        'question',
+        'webfetch',
+        'websearch',
+        'external_directory',
+      ].map((key) => [key, 'deny']),
+    ),
   });
   const ocEnvKeep =
     process.env.OPENROUTER_API_KEY === undefined
@@ -336,7 +352,7 @@ async function main() {
           now: () => Date.now(),
           sleep,
           timeoutMs: options.approvalTimeoutMs,
-          intervalMs: 5_000,
+          intervalMs: options.approvalIntervalMs,
         }),
     },
     options.only,
