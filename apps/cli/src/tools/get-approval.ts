@@ -9,8 +9,16 @@
 //   not open, or a stored decision or cancel does not verify) → denied; unknown/not_found →
 //   `not_found`. It fails closed and never reports `signed`. `decidedAt` is the row's `decided_at`,
 //   once decided.
-import type { ApprovalState as CoreApprovalState } from '@agentlink/core';
-import { approvalIdSchema, type ApprovalStatus } from '@agentlink/types';
+//
+// What the approval is for (M1-22): while it reads `pending` or `approved`, `action` names the tool
+// and, for `agentlink_respond_to_terms` with `accept` or `reject`, the answered `envelopeId` and the
+// `decision` (core `resumeOf`: structured, schema-checked values only, never terms, text, paths or
+// links). An approved one adds a fixed `nextStep` that says how to finish, so a fresh session can
+// complete it with only the `approvalId`. Every value is checked again here against its exact
+// pattern or enum before it is used; anything else drops `action` (fail closed). It authorises
+// nothing: the call that names the `approvalId` is checked against the owner-signed digest (I-4).
+import type { ApprovalResume, ApprovalState as CoreApprovalState } from '@agentlink/core';
+import { APPROVAL_TOOL_NAMES, approvalIdSchema, type ApprovalStatus } from '@agentlink/types';
 import { copy } from './strings/index.js';
 import type { ToolContext } from './context.js';
 import { fail, invalidArgument, ok, type HandlerOutput } from './result.js';
@@ -49,6 +57,50 @@ const SUMMARY: Readonly<Record<ApprovalStatus, string>> = {
   expired: TOOL_TEXT.approvalExpired,
 };
 
+/** An envelope ID (04 §2.4.1): 16 bytes, base64url without padding. */
+const ENVELOPE_ID = /^[A-Za-z0-9_-]{22}$/;
+
+type Action =
+  | { tool: 'agentlink_respond_to_terms'; envelopeId: string; decision: 'accept' | 'reject' }
+  | { tool: string };
+
+/** The core's resume, re-checked: only known tool names, IDs and decisions pass. */
+function actionOf(resume: ApprovalResume | undefined): Action | undefined {
+  if (typeof resume !== 'object' || resume === null) return undefined;
+  const { tool } = resume as { tool?: unknown };
+  if (typeof tool !== 'string' || !(APPROVAL_TOOL_NAMES as readonly string[]).includes(tool)) {
+    return undefined;
+  }
+  const { envelopeId, decision } = resume as { envelopeId?: unknown; decision?: unknown };
+  if (envelopeId === undefined && decision === undefined) return { tool };
+  if (
+    tool === 'agentlink_respond_to_terms' &&
+    typeof envelopeId === 'string' &&
+    ENVELOPE_ID.test(envelopeId) &&
+    (decision === 'accept' || decision === 'reject')
+  ) {
+    return { tool, envelopeId, decision };
+  }
+  return undefined;
+}
+
+const fill = (template: string, slots: Readonly<Record<string, string>>): string =>
+  Object.entries(slots).reduce(
+    (text, [key, value]) => text.split(`{${key}}`).join(value),
+    template,
+  );
+
+/** The fixed "how to finish" step for an approved request (checked values only). */
+function finishStep(action: Action, approvalId: string): string {
+  return 'envelopeId' in action
+    ? fill(TOOL_TEXT.approvalFinishTerms, {
+        envelopeId: action.envelopeId,
+        decision: action.decision,
+        approvalId,
+      })
+    : fill(TOOL_TEXT.approvalFinishTool, { tool: action.tool, approvalId });
+}
+
 const rfc3339 = (unixSeconds: number): string =>
   new Date(unixSeconds * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
 
@@ -80,9 +132,23 @@ export async function getApprovalHandler(
       ? rfc3339(state.decidedAt)
       : undefined;
   const summary = mapped.used === true ? copy('chat.commitment.used') : SUMMARY[mapped.approval];
+  const open = mapped.approval === 'pending' || mapped.approval === 'approved';
+  let action: Action | undefined;
+  if (open) {
+    try {
+      action = actionOf(await context.client.approvalResume?.(approvalId));
+    } catch {
+      // The state above still answers; the error text is never logged or returned (I-5).
+      context.logger.info('approval action unavailable');
+    }
+  }
   return ok(summary, {
     approval: mapped.approval,
     ...(decidedAt === undefined ? {} : { decidedAt }),
     ...(mapped.used === true ? { used: true } : {}),
+    ...(action === undefined ? {} : { action }),
+    ...(action !== undefined && mapped.approval === 'approved'
+      ? { nextStep: finishStep(action, approvalId) }
+      : {}),
   });
 }

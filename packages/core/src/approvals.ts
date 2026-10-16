@@ -32,6 +32,7 @@ import {
   formatUsd,
   signedOwnerActionSchema,
   type ApprovalFee,
+  type ApprovalToolName,
 } from '@agentlink/types';
 import type { ApprovalChannel } from './approval-channel.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
@@ -179,6 +180,22 @@ export type ApprovalState =
       readonly decidedAt?: number;
     }
   | { readonly status: 'unknown'; readonly reason: 'not_found' | 'invalid' };
+
+/**
+ * What an open approval is for, so a fresh session can finish it with only the `approvalId`
+ * (06 §2.5 `agentlink_get_approval.action`; M1-22). Only structured, schema-checked values: the tool
+ * name and, for `agentlink_respond_to_terms` with `accept` or `reject` (no `notarize`), the answered
+ * envelope ID and the decision. Never terms, notes, text, paths or links: those can carry inbound or
+ * agent-written text (I-5), and an invite link carries the invite secret. It authorises nothing: the
+ * call that names the `approvalId` is still checked against the owner-signed digest (I-4).
+ */
+export type ApprovalResume =
+  | {
+      readonly tool: 'agentlink_respond_to_terms';
+      readonly envelopeId: string;
+      readonly decision: 'accept' | 'reject';
+    }
+  | { readonly tool: ApprovalToolName };
 
 export type CollectOutcome =
   | { readonly status: 'pending' | 'unknown' }
@@ -501,6 +518,51 @@ export class ApprovalService {
       expiresAt: row.expires_at,
       ...(decided && row.decided_at !== null ? { decidedAt: row.decided_at } : {}),
     };
+  }
+
+  /**
+   * What one approval is for, while the agent still has something to run (06 §2.5; M1-22): the row
+   * reads `pending` or `approved` after the same re-verification as read(), and for a commitment its
+   * answer is not sent yet (an `envelope` part unclaimed or claimed, or, with no `envelope` part, an
+   * unclaimed `receipt` part). Undefined otherwise, and for any row that does not open, parse or
+   * verify (fail closed). Read-only, and it authorises nothing (I-4).
+   */
+  async resumeOf(approvalId: string): Promise<ApprovalResume | undefined> {
+    if (!approvalIdSchema.safeParse(approvalId).success) return undefined;
+    const row = await this.#ctx.store.transaction((tx) =>
+      tx.get('approvals', { approval_id: approvalId }),
+    );
+    if (row === undefined) return undefined;
+    let stored: unknown;
+    try {
+      const text = await open(this.#ctx, 'approvals', 'action_json', [approvalId], row.action_json);
+      stored = parseJson(text);
+    } catch {
+      return undefined;
+    }
+    const parsed = approvalActionSchema.safeParse(stored);
+    if (!parsed.success) return undefined;
+    const reading = await this.#owner.readApproval(approvalId, stored);
+    if (reading.status !== 'pending' && reading.status !== 'approved') return undefined;
+    const action = parsed.data;
+    if (commitmentScopeOf(action) !== undefined) {
+      const parts = await this.#ctx.store.transaction((tx) =>
+        tx.select('commitment_parts', { approval_id: approvalId }),
+      );
+      const envelope = parts.find((p) => p.part === 'envelope');
+      const unrun =
+        envelope !== undefined
+          ? envelope.state === 'unclaimed' || envelope.state === 'claimed'
+          : parts.some((p) => p.part === 'receipt' && p.state === 'unclaimed');
+      if (!unrun) return undefined;
+    }
+    if (action.tool === 'agentlink_respond_to_terms') {
+      const { envelopeId, decision, notarize } = action.args;
+      if ((decision === 'accept' || decision === 'reject') && notarize === false) {
+        return { tool: action.tool, envelopeId, decision };
+      }
+    }
+    return { tool: action.tool };
   }
 
   /**

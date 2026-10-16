@@ -230,7 +230,7 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
       },
     ]);
     expect(result.structured.summary).toBe(
-      '2 open offers from \u201cMarko Novak\u201d (self-declared) are waiting for an answer. 1 open offer from \u201cAna\u201d (safety code checked) is waiting for an answer. To see them, call agentlink_inbox with openOffers true.',
+      '2 open offers from \u201cMarko Novak\u201d (self-declared) are waiting for an answer. 1 open offer from \u201cAna\u201d (safety-code-checked) is waiting for an answer. To see them, call agentlink_inbox with openOffers true.',
     );
     // Counts and names only: never an envelope or terms ID in the summary (I-5).
     expect(result.structured.summary).not.toContain('EEEE');
