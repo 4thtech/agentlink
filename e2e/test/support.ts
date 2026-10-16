@@ -176,6 +176,82 @@ export async function pendingApprovalIds(agent: TestAgent): Promise<string[]> {
   }
 }
 
+/** Rows of one store table of an agent, read the way `pendingApprovalIds` reads (a second reader). */
+export async function storeRows(
+  agent: TestAgent,
+  table: 'envelopes' | 'approvals',
+  where: Record<string, string> = {},
+): Promise<Record<string, unknown>[]> {
+  const deps = nodeOwnerDeps(agent.home);
+  const opened = await deps.open(undefined);
+  if (opened.status !== 'ok') throw new Error(`agent ${agent.label} did not open`);
+  try {
+    const rows = await opened.agent.store.transaction((tx) => tx.select(table, where as never));
+    return rows as unknown as Record<string, unknown>[];
+  } finally {
+    await opened.agent.close();
+  }
+}
+
+/** How many envelopes of `type` the agent has sent (direction `out`), from its own store. */
+export async function sentCount(agent: TestAgent, type: string): Promise<number> {
+  return (await storeRows(agent, 'envelopes', { direction: 'out', type })).length;
+}
+
+/** The part of the policy the scenarios change (06 §3 `commitments`). */
+export interface CommitmentsEdit {
+  commitments: {
+    autoAcceptContacts: string[];
+    autoAcceptMaxUSD: string;
+    autoAcceptDirection: string;
+  };
+}
+
+/**
+ * The owner changes the policy: loads the effective policy, lets `edit` change a copy, signs a
+ * `policy.set` with the test owner key and applies it (the same call `agentlink owner` makes). Call
+ * it before the agent's MCP server starts.
+ */
+export async function setOwnerPolicy(
+  agent: TestAgent,
+  edit: (policy: CommitmentsEdit) => void,
+  version: number,
+): Promise<void> {
+  const deps = nodeOwnerDeps(agent.home);
+  const opened = await deps.open(undefined);
+  if (opened.status !== 'ok') throw new Error(`agent ${agent.label} did not open`);
+  try {
+    const { ownerActions } = opened.agent.client;
+    const loaded = await ownerActions.loadPolicy();
+    if (loaded.mode === 'fail_closed') throw new Error('policy is fail-closed');
+    const policy = structuredClone(loaded.policy) as unknown as CommitmentsEdit;
+    edit(policy);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const keys = await agent.owner.getPublicKeys();
+    const body: JsonObject = {
+      v: 1,
+      agent: agent.agentId,
+      owner: encodeHex(keys.ownerNostr),
+      op: 'policy.set',
+      params: { version, policy: policy as unknown as JsonObject },
+      nonce: encodeBase64url(randomBytes(16)),
+      issuedAt,
+      expiresAt: issuedAt + 600,
+    };
+    const session = await agent.owner.unlock(agent.presence());
+    let sig: string;
+    try {
+      sig = await session.signOwnerAction(body);
+    } finally {
+      await session.close();
+    }
+    const applied = await ownerActions.apply(JSON.stringify({ body, sig }));
+    if (applied.status !== 'applied') throw new Error('the policy was not applied');
+  } finally {
+    await opened.agent.close();
+  }
+}
+
 /**
  * The owner approves one request through the CLI's `agentlink approve <id>` handler; only the TTY
  * owner-code step is the test owner's signature. Returns the handler's exit code (0: applied).

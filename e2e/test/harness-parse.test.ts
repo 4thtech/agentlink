@@ -2,7 +2,7 @@
 // how a step is judged is caught without an API key. The event shapes follow Claude Code's
 // `--output-format stream-json` and `codex exec --json`.
 import { describe, expect, it } from 'vitest';
-import { parseClaude, parseCodex } from '../llm/harness.js';
+import { firstSubstantiveCall, parseClaude, parseCodex } from '../llm/harness.js';
 
 const lines = (...events: unknown[]): string => events.map((e) => JSON.stringify(e)).join('\n');
 
@@ -115,5 +115,41 @@ describe('transcript readers', () => {
       outputTokens: 25,
       turns: 2,
     });
+  });
+
+  it('first-call checks skip harness tool-loading calls (ToolSearch) but nothing else', () => {
+    const use = (id: string, name: string): unknown => ({
+      type: 'assistant',
+      message: { content: [{ type: 'tool_use', id, name, input: {} }] },
+    });
+    const result = (id: string): unknown => ({
+      type: 'user',
+      message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'ok' }] },
+    });
+    const statusFirst = parseClaude(
+      lines(
+        use('a', 'ToolSearch'),
+        result('a'),
+        use('b', 'mcp__agentlink__agentlink_status'),
+        result('b'),
+        use('c', 'mcp__agentlink__agentlink_inbox'),
+        result('c'),
+      ),
+    );
+    expect(statusFirst.calls[0]?.name).toBe('ToolSearch');
+    expect(firstSubstantiveCall(statusFirst)?.name).toBe('agentlink_status');
+
+    const readFirst = parseClaude(
+      lines(
+        use('a', 'ToolSearch'),
+        result('a'),
+        use('b', 'Read'),
+        result('b'),
+        use('c', 'mcp__agentlink__agentlink_status'),
+        result('c'),
+      ),
+    );
+    expect(firstSubstantiveCall(readFirst)?.name).toBe('Read');
+    expect(firstSubstantiveCall({ calls: [] })).toBeUndefined();
   });
 });
