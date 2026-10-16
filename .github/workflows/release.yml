@@ -552,7 +552,7 @@ jobs:
       - name: Install npm 11.21.0 (verified tarball)
         shell: bash
         working-directory: ${{ runner.temp }}
-        run: |
+        run: | # zizmor: ignore[adhoc-packages] tarball pinned by sha512, checked before install
           set -euo pipefail
           expected="sha512-Zov8KhamNneiLdELtj5YALtNmJW4L4fCLTzjfpzXG2w6MSHcf0UxgdlK5uloCuksWT+7mGUU7wi79cO6RqivPg=="
           curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
@@ -819,7 +819,7 @@ jobs:
       - name: Install npm 11.21.0 (verified tarball)
         shell: bash
         working-directory: ${{ runner.temp }}
-        run: |
+        run: | # zizmor: ignore[adhoc-packages] tarball pinned by sha512, checked before install
           set -euo pipefail
           expected="sha512-Zov8KhamNneiLdELtj5YALtNmJW4L4fCLTzjfpzXG2w6MSHcf0UxgdlK5uloCuksWT+7mGUU7wi79cO6RqivPg=="
           curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
