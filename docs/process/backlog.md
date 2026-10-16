@@ -3130,6 +3130,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Deterministic variant green on PRs; no binding `accept` leaves A without an owner-signed approval or a matching owner-signed limit (asserted on relay traffic); each owner is asked at most once per agreement (approval count).
   - Inbound `terms` reach the harness wrapped as untrusted content (06 §4); canary scan of logs finds no plaintext.
 - **Notes (IR-M1-22-1):** the "nothing leaves" relay check polls every 2 s and only catches publishes within that window; the sent-`accept` store check covers the rest. Not covered yet (cheap follow-up): voiding an approval that is still pending (a newer version arrives before the owner decides); only approved-unused is tested. The `clientRequestId` repeat check waits for M1-32-c.
+- **Note (IR-M1-22-L15-1):** 06 §4 wrapping strips only closing tags; a body can contain opening-tag-like text. Assess whether the opening tag should also be neutralised (S2 question).
 
 #### M1-23 · J9 dogfood: Tali's and Denis's agents sync through AgentLink (M1a gate) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet (setup notes) + Owner (with @denisjazbec) · **Security:** S1 · **Phase:** M1a
