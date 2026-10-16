@@ -3154,7 +3154,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - No wallet, extension, gas or chain choice appeared in either setup (D-39); dogfood log (dates, harnesses, versions, issues filed) and owner sign-off recorded.
 
 #### M1-9t · CLI: several agents under one OS user, and init for one harness (new, found by the M1-23 runbook)
-- **Status:** ready (spec merged → build: D-78, 04 §2.8, 06 §7) · **Size:** M · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1a (needed for the one-computer part of M1-23, not for the gate)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1a (needed for the one-computer part of M1-23, not for the gate)
 - **Repo/path:** agentlink · apps/cli (`init`, `owner init`), packages/node (`initOwner`)
 - **Depends on:** M1-9a, M1-9b, M1-8h
 - **Spec:** 04 §2.2, §2.5, §2.8 ("Adding an agent to the existing owner"); 06 §7; D-39, D-67, D-78; `docs/runbooks/dogfood-m1a.md`
@@ -3165,6 +3165,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Approvals stay per agent (`--agent <name>`, 04 §2.5.2); add the cross-agent refusal test.
   - Docs: runbook `docs/runbooks/dogfood-m1a.md` §3 (remove the STOP), quickstart pages for the new flags, CHANGELOG, changeset.
 - **Acceptance:** tests first (RED commit): two agents under one OS user each get a card for the same owner, an agent cannot trigger it (no TTY or a harness marker refuses before the owner key is read), an approval for one agent is refused by the other, `init` writes only to the chosen harness, and declining every change keeps the identity.
+
+#### M1-9u · CLI: add-agent dead end and Gemini CLI detection (new, from IR-M1-9t-1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`owner add-agent`, `doctor`, harness detection)
+- **Depends on:** M1-9t
+- **Spec:** 04 §2.8 ("Adding an agent to the existing owner"); 06 §7; D-78
+- **Invariants:** I-4
+- **Scope:**
+  - (a) An owner item exists on the machine but no local agent has a card naming it (for example after every carded agent was removed): `owner add-agent` cannot learn the owner keys and points to `owner init`, which refuses because an owner exists. Give this case its own fixed message and a `doctor` hint (what is on the machine, what to do), without reading or showing any secret (IR-M1-9t-1 L-2).
+  - (b) Without `--harness`, any `~/.gemini` folder detects Gemini CLI, so an Antigravity user (whose config also lives under `~/.gemini`) is offered a Gemini CLI change. Detect Gemini CLI by the `gemini` binary on `PATH` or `~/.gemini/settings.json` instead (IR-M1-9t-1 L-3).
+- **Acceptance:** tests for both cases; (a) prints the new message and `doctor` names the state; (b) a home with only `~/.gemini/config/mcp_config.json` proposes Antigravity and not Gemini CLI.
 
 #### M1-24 · Product name and trademark check before the production domain (D-38) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet prepares search material) · **Security:** S0 · **Phase:** M1b

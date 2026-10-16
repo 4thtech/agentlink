@@ -114,6 +114,8 @@ const COPY = {
     'On a computer without a system keychain, approvals are protected by a generated owner code only.',
   fileUnavailable:
     "This agent's identity is kept in a passphrase-locked file, which this version of AgentLink can't set up an owner for yet. Update AgentLink.",
+  ownerOnMachine:
+    "An owner is already set up on this computer, so AgentLink won't create another. To give this agent a card from it, run `agentlink owner add-agent --agent <name>` yourself, in your own terminal.",
   ownerExistsCard:
     "This agent already has an owner. AgentLink won't replace it. To use an owner from another device, link it from that device.",
   cardFailed:
@@ -190,10 +192,8 @@ export async function initOwnerWith(
   const existing = await readOwnerItem(keychain, internals.timeoutMs);
   if (existing !== null) {
     wipe(existing);
-    throw new NodeKeyStoreError(
-      'owner_exists',
-      "This agent already has an owner. AgentLink won't replace it. To use an owner from another device, link it from that device.",
-    );
+    // D-78 (04 §2.8): one owner per OS user owns many agents; never a second owner.
+    throw new NodeKeyStoreError('owner_exists', COPY.ownerOnMachine);
   }
 
   let usePassphrase = false;

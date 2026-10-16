@@ -2,13 +2,19 @@
 
 > **Status: Planned for v0.1.0 (M1a).** Nothing is published to npm yet. The configuration below is what `agentlink init` writes in the current source. Claude Desktop, other harnesses and remote harnesses are planned for later releases and are not covered here.
 
-**Purpose:** the exact MCP configuration for Claude Code, Codex and Gemini CLI, for people who configure it by hand instead of using `agentlink init`, and the harness permission settings that keep an agent away from AgentLink's private files.
+**Purpose:** the exact MCP configuration for Claude Code, Codex, Gemini CLI, OpenCode and Antigravity, for people who configure it by hand instead of using `agentlink init`, and the harness permission settings that keep an agent away from AgentLink's private files.
 
 ## How `agentlink init` configures a harness
 
-`npx -y @4thtech/agentlink init` detects Claude Code, Codex and Gemini CLI, prints the exact diff of each config file, and writes it only after confirmation. In an interactive terminal it asks `y/N` for each file. Run by an agent (no terminal, or a harness marker set), it prints the diff and a one-time confirmation code, writes nothing, and `init --confirm <code>` then writes exactly those changes. The code is a hash of the shown changes, so it stops matching if they change. This is transparency, not a security boundary: an agent with a shell can edit its own harness config anyway ([06 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#7-harness-installation)).
+`npx -y @4thtech/agentlink init` detects Claude Code, Codex, Gemini CLI, OpenCode and Antigravity, prints the exact diff of each config file, and writes it only after confirmation. `init --harness <id>` (`claude-code`, `codex`, `gemini-cli`, `opencode`, `antigravity`) proposes that one app only, and `init --harness none` creates the agent identity only. Answering no to every proposed change writes no config but keeps the agent identity. In an interactive terminal it asks `y/N` for each file. Run by an agent (no terminal, or a harness marker set), it prints the diff and a one-time confirmation code, writes nothing, and `init --confirm <code>` then writes exactly those changes. The code is a hash of the shown changes, so it stops matching if they change. This is transparency, not a security boundary: an agent with a shell can edit its own harness config anyway ([06 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#7-harness-installation)).
 
 An existing `agentlink` entry that differs is left alone. Existing config is backed up before it is changed. `init` never writes an owner secret.
+
+`--config <path>` names the config file for OpenCode or Antigravity when it is not in the default place. The folder must exist and is resolved with `realpath`; the file must be a `.json` file and not a link, never under `~/.agentlink`, `~/.ssh` or the keychain folders. It is written like every other config: as a diff you confirm, through a temporary file renamed over the old one, with a backup. These checks stop accidents and misdirected paths; they can't stop a program running as you from swapping a folder in between ([06 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#7-harness-installation)).
+
+### Several agents on one computer
+
+Each app's config holds one `agentlink` entry, so each app runs one agent. Give each app its own agent with `init --agent <name> --harness <id>`; its entry then ends in `--agent <name>`. The owner key is set up once per computer user (`owner init`); every further agent gets its card from it with `agentlink owner add-agent --agent <name>`, run in your own terminal, one owner code entry for exactly that agent ([04 §2.8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), D-78). An approval for one agent is refused by every other. The agents still run as the same user, so this is logical isolation, not a security boundary.
 
 ## Configuration by harness
 
@@ -67,6 +73,41 @@ User settings, `~/.gemini/settings.json`:
 `gemini mcp add [options] <name> <commandOrUrl> [args...]` also exists, but its handling of a leading `-y` in the arguments is not documented, so edit the file (or let `init` do it). Do not set `"trust": true` for this server: it removes every confirmation prompt for its tools.
 
 Sources: [Gemini CLI MCP servers](https://geminicli.com/docs/tools/mcp-server/) (`mcpServers` shape, `gemini mcp add [options] <name> <commandOrUrl> [args...]` with `-s, --scope`, `trust` semantics).
+
+### OpenCode
+
+Global config, `~/.config/opencode/opencode.json`, under `mcp` (not `mcpServers`). `command` is one array, the program and its arguments together; a named agent appends `"--agent", "<name>"` to it.
+
+```json
+{
+  "mcp": {
+    "agentlink": {
+      "type": "local",
+      "command": ["npx", "-y", "@4thtech/agentlink", "mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+Sources: [OpenCode MCP servers](https://opencode.ai/docs/mcp-servers/) (checked 2026-10-16: `mcp.<name>` with `type: "local"`, `command` array, `enabled`).
+
+### Antigravity
+
+Global config, `~/.gemini/config/mcp_config.json` (not the Gemini CLI file `~/.gemini/settings.json`). Older builds read `~/.gemini/antigravity/mcp_config.json`; in the app, "Manage MCP Servers", then "View raw config" opens the file yours reads, and `init --harness antigravity --config <that path>` writes there.
+
+```json
+{
+  "mcpServers": {
+    "agentlink": {
+      "command": "npx",
+      "args": ["-y", "@4thtech/agentlink", "mcp"]
+    }
+  }
+}
+```
+
+Sources: [Antigravity MCP](https://antigravity.google/docs/mcp) (checked 2026-10-16: global `~/.gemini/config/mcp_config.json`, `mcpServers` with `command` and `args`). Documentation-verified; not yet tried in the app.
 
 ## Default message network
 
@@ -250,7 +291,7 @@ The M1 release runs on test networks only, and this is an accepted, documented r
 ## What comes later
 
 - Claude Desktop, and the one-click extension bundle (v0.2.0)
-- Antigravity, Cursor, VS Code, Windsurf, Cline (as tested)
+- Cursor, VS Code, Windsurf, Cline (as tested)
 - Remote harnesses (ChatGPT developer mode, claude.ai custom connectors) through the self-hosted cloud agent (v0.3.0)
 - Optional session-start hooks
 

@@ -3,13 +3,20 @@ export { unifiedDiff } from './diff.js';
 export { HARNESS_MESSAGES, HarnessError, type HarnessErrorCode } from './errors.js';
 export { MAX_CONFIG_BYTES } from './files.js';
 export {
+  CONFIG_PATH_HARNESSES,
   HARNESSES,
+  HARNESS_IDS,
   PACKAGE_NAME,
   applyHarness,
   detectHarnesses,
   displayPath,
+  harnessById,
+  isHarnessId,
   planHarness,
+  resolveConfigTarget,
+  type ConfigTarget,
   type HarnessContext,
+  type HarnessDef,
   type HarnessId,
   type HarnessPlan,
 } from './harnesses.js';

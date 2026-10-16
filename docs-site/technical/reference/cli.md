@@ -8,10 +8,10 @@ Commands that are **owner operations** (policies, approvals, backups, storage cr
 
 ## Outline
 
-- `init` (identity and harness setup, with diff and confirmation)
+- `init [--agent <name>] [--harness <id|none>] [--config <path>]` (identity and harness setup, with diff and confirmation; `--harness` picks one app, `none` creates the identity only; `--config` names the OpenCode or Antigravity config file)
 - `mcp` (the MCP server over stdio, started by your AI app)
 - `status`, `invite`, `accept <url> [--approval <approvalId>]`, `contacts`, `requests`
-- `owner init`, `approve`, `deny`, `cancel` (owner operations, typed in a terminal you opened)
+- `owner init`, `owner add-agent --agent <name>`, `approve`, `deny`, `cancel` (owner operations, typed in a terminal you opened; `owner init` once per computer user, `owner add-agent` for each further agent)
 - `policy` (owner operation, planned)
 - `ui` (local approval and settings UI)
 - `storage connect`, `backup`, `credits`, `verify` (v0.2.0)

@@ -1,5 +1,6 @@
 // Adding the `agentlink` MCP server to a JSON harness config (Claude Code's `~/.claude.json`,
-// Gemini CLI's `~/.gemini/settings.json`; 06 §7). The file is edited only when the edit is exact and
+// Gemini CLI's `~/.gemini/settings.json`, Antigravity's `mcp_config.json` under `mcpServers`, and
+// OpenCode's `opencode.json` under `mcp`; 06 §7, D-78). The file is edited only when the edit is exact and
 // additive: the text must be what `JSON.stringify` would print for its own contents (so nothing the
 // user wrote, such as comments, number forms or ordering, is lost), and the new entry is added as the
 // first key of its object so no existing line changes. Anything else is refused, never rewritten.
@@ -53,11 +54,15 @@ function canonicalForm(
  * The new text of a JSON config with `mcpServers.agentlink` set to `entry`. `text` is undefined when
  * the file does not exist yet (the new file is the entry alone).
  */
-export function addJsonMcpServer(text: string | undefined, entry: Plain): JsonEdit {
+export function addJsonMcpServer(
+  text: string | undefined,
+  entry: Plain,
+  key: 'mcpServers' | 'mcp' = 'mcpServers',
+): JsonEdit {
   if (text === undefined) {
     return {
       status: 'change',
-      text: `${JSON.stringify({ mcpServers: { agentlink: entry } }, null, 2)}\n`,
+      text: `${JSON.stringify({ [key]: { agentlink: entry } }, null, 2)}\n`,
     };
   }
   let parsed: unknown;
@@ -70,10 +75,10 @@ export function addJsonMcpServer(text: string | undefined, entry: Plain): JsonEd
   const form = canonicalForm(text, parsed);
   if (form === undefined) throw new HarnessError('unsupported_format');
 
-  const servers = parsed['mcpServers'];
+  const servers = parsed[key];
   let next: Plain;
   if (servers === undefined) {
-    next = Object.fromEntries([['mcpServers', { agentlink: entry }], ...Object.entries(parsed)]);
+    next = Object.fromEntries([[key, { agentlink: entry }], ...Object.entries(parsed)]);
   } else {
     if (!isPlain(servers)) throw new HarnessError('unsupported_format');
     if (Object.hasOwn(servers, 'agentlink')) {
@@ -81,9 +86,9 @@ export function addJsonMcpServer(text: string | undefined, entry: Plain): JsonEd
     }
     const merged = Object.fromEntries([['agentlink', entry], ...Object.entries(servers)]);
     next = Object.fromEntries(
-      Object.entries(parsed).map(([key, value]): [string, Json] => [
-        key,
-        key === 'mcpServers' ? merged : value,
+      Object.entries(parsed).map(([name, value]): [string, Json] => [
+        name,
+        name === key ? merged : value,
       ]),
     );
   }

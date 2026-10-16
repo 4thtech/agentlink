@@ -21,7 +21,7 @@ The owner (Tali) and Denis, each with their own agents. The agents may do the in
 
 ### 1. Know the limits before you start
 
-- **One computer, one OS user: one agent only (gap, see step 3).** For now, the several-harnesses test runs across several computers (or several OS users), one agent each.
+- **One computer, one OS user, one owner (D-78).** Several agents on one computer share the owner set up there; each further agent joins it with `agentlink owner add-agent` (step 3). Each harness runs one agent.
 - **The same-user risk (D-67), in plain words.** A program that runs as you on your computer can, in principle, change the installed AgentLink program or what your terminal runs, and so capture the owner code the next time you type it. Your AI app is such a program. Permission settings in the harness are guards, not a lock. This is accepted for M1, which runs on test networks only. It is why owner steps go in a terminal you opened yourself.
 - Safety codes are compared by voice or in person, never in a chat with an AI.
 
@@ -33,7 +33,7 @@ Do this once per harness, on the computer where that harness lives. After each i
 
 **Codex and Gemini CLI.** Follow [Codex](../../docs-site/guide/get-started/codex.md) and [Gemini CLI](../../docs-site/guide/get-started/gemini-cli.md) in the same way.
 
-**OpenCode and Antigravity are not set up by `init` in M1a** (printed snippets follow in M1b). Create the agent first in a terminal you opened with `npx -y @4thtech/agentlink init`. It asks `y/N` for each harness it finds that has no `agentlink` entry yet. If you answer `n` to every one, it cancels the whole run and creates no agent (see step 3). So either answer `y` to at least one change you actually want, or run it when it has nothing to propose (every detected harness already has its entry, or none is detected); then it creates the agent alone. Then add the OpenCode or Antigravity entry by hand. Both use `npx -y @4thtech/agentlink mcp`.
+**OpenCode and Antigravity** are set up by `init` too (M1-9t): in a terminal you opened, run `npx -y @4thtech/agentlink init --harness opencode` or `--harness antigravity`, read the diff and answer `y`. If Antigravity reads another file than the default (see below), add `--config <that path>`. Answering `n` writes no config but keeps the agent. The hand edits below stay as the fallback and show what `init` writes.
 
 **OpenCode.** Verified against the OpenCode docs on 2026-10-16 ([MCP servers](https://opencode.ai/docs/mcp-servers/), [Config](https://opencode.ai/docs/config/)).
 - File: `~/.config/opencode/opencode.json` (global), or `opencode.json` in a project root (project). Keep a copy of the file before editing.
@@ -75,17 +75,23 @@ For both hand edits, show the diff to the owner before saving and change nothing
 
 Check each harness: ask it "What's my AgentLink status?" It should answer with contacts and new messages (none at first). If not, run `npx -y @4thtech/agentlink doctor` in your own terminal.
 
-### 3. Several agents on ONE computer: STOP (gap)
+### 3. Several agents on ONE computer (D-78, M1-9t)
 
-What the CLI does today (read in `apps/cli`, `packages/node` and 04 §2.2):
-- Every command and `mcp` accept `--agent <name>` (a name like `claude-code`: lower-case letters, digits and `-`, up to 32). `agentlink init --agent <name>` creates a separate agent: its own folder and store under `~/.agentlink/agents/<name>/`, its own key in the keychain, and an MCP entry whose arguments end in `--agent <name>`. There is no home-directory or environment-variable override.
-- Without `--agent` the agent is called `default`.
+One owner per OS user, one agent per harness. In a terminal you opened yourself (not inside an AI app):
 
-Two things stop a clean several-harnesses-on-one-computer setup:
-1. **One owner per OS user.** The owner key is one keychain item (service `agentlink`, account `owner`) per OS user. `agentlink owner init` never replaces it, so it refuses for the second agent: the second agent can never get its first card and cannot pair. M1a has no command that makes a second agent use the same owner.
-2. **`init` writes to every harness it finds** and has no option to pick one. A harness that already has an `agentlink` entry is left alone, but `init --agent <name>` can also propose changes to other detected harnesses, and answering no to all of them cancels the whole run, identity included.
+```bash
+npx -y @4thtech/agentlink init --agent claude-code --harness claude-code
+npx -y @4thtech/agentlink owner init --agent claude-code          # once per OS user: shows the owner code
+npx -y @4thtech/agentlink init --agent opencode --harness opencode
+npx -y @4thtech/agentlink owner add-agent --agent opencode        # asks for the owner code once
+npx -y @4thtech/agentlink init --agent antigravity --harness antigravity   # add --config <path> if needed
+npx -y @4thtech/agentlink owner add-agent --agent antigravity
+```
 
-So **do not try this section**. It is carded as M1-9t in the backlog. Until it lands, use the two-computer variant (step 7) for every pair, with one agent per computer (or per OS user, which the keychain design allows but nobody has tested).
+- Each `init --agent <name>` creates a separate agent: its own folder and store under `~/.agentlink/agents/<name>/`, its own key in the keychain, and an MCP entry whose arguments end in `--agent <name>`. `--harness` writes only that app's config.
+- `owner add-agent` shows your owner fingerprint and the agent's name and fingerprint, then asks for the owner code once and signs that one agent's card. It never changes the owner code; `owner init` refuses a second owner and points here.
+- Approve per agent: `agentlink approve --agent <name>`, or `agentlink approve <approvalId>` (it finds the agent that holds the ID). An approval for one agent is refused by the others.
+- Record: the agents are kept apart logically, not by a security boundary. They run as the same OS user, so one could read another's key (G-1).
 
 ### 4. Owner setup, per agent
 
@@ -93,7 +99,7 @@ On each computer, in a terminal you opened yourself (not inside an AI app):
 
 ```bash
 npx -y @4thtech/agentlink init                 # only if the agent does not exist yet
-npx -y @4thtech/agentlink owner init
+npx -y @4thtech/agentlink owner init           # first agent on this OS user; further agents: owner add-agent (step 3)
 ```
 
 Write down the owner code it shows (a password manager is best) and type back the last four characters when asked. Never put the code in a chat. Then `npx -y @4thtech/agentlink doctor` should show no problems.

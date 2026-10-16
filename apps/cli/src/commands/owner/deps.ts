@@ -2,7 +2,7 @@
 // script it. Production wires @agentlink/node's owner entry points (M1-8c) and the M1-9k runtime.
 //
 // I-1/I-4: no member of this interface carries an owner secret. The owner code is read by
-// @agentlink/node's own TTY prompt inside `initOwner`, `decide` and `signOwnerAction`, never from an
+// @agentlink/node's own TTY prompt inside `initOwner`, `addAgent`, `decide` and `signOwnerAction`, never from an
 // argument, an environment variable or a pipe (04 §2.5, §2.8; D-67). `ask` reads a visible answer
 // (approve, deny or later; an agent number) and is never used for a secret.
 import { homedir } from 'node:os';
@@ -11,9 +11,12 @@ import { createInterface } from 'node:readline/promises';
 import type { AgentLinkClient, Store, StoreCipher } from '@agentlink/core';
 import type { JsonObject, OwnerPublicKeys } from '@agentlink/crypto';
 import {
+  addAgentToOwner,
   decideReviewedApprovals,
   initOwner,
   performOwnerOperation,
+  type AddAgentOptions,
+  type AddAgentResult,
   type AgentStore,
   type ApprovalContext,
   type KeyStoreBackendKind,
@@ -66,6 +69,11 @@ export interface OwnerCommandDeps {
    * it signs the agent's first card (`options.firstCard`) and stores it through core.
    */
   initOwner(options: OwnerSetupOptions): Promise<OwnerInitResult>;
+  /**
+   * `owner add-agent` (M1-9t, D-78): prompts at this process's own terminal for the existing owner
+   * code once and signs exactly one first card for `options.card.agent`, stored through core.
+   */
+  addAgent(options: AddAgentOptions): Promise<AddAgentResult>;
   /**
    * One owner operation over the reviewed items (M1-8c): shows the decisions, asks "Continue?", reads
    * the owner code once at the TTY prompt and signs one `approval.decide` or `approval.decideBatch`.
@@ -144,6 +152,7 @@ export function nodeOwnerDeps(home: string = homedir()): OwnerCommandDeps {
       return found?.config.keyStore;
     },
     initOwner: (options) => initOwner(options),
+    addAgent: (options) => addAgentToOwner(options),
     decide: (context, reviewed) => decideReviewedApprovals(context, reviewed),
     signOwnerAction: (owner, item) => performOwnerOperation(owner, item),
     ask: askAtTerminal,

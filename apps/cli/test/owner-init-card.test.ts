@@ -188,6 +188,7 @@ async function initAgent(name: string, seedByte: number, net: RelayNetwork): Pro
         await session.close();
       }
     },
+    addAgent: () => Promise.reject(new Error('not used')),
     decide: () => Promise.reject(new Error('not used')),
     signOwnerAction: () => Promise.reject(new Error('not used')),
     ask: () => Promise.resolve(''),

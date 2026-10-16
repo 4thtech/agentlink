@@ -31,6 +31,9 @@ export {
   type OwnerInitResult,
   type OwnerSetupOptions,
 } from './owner-init.js';
+// M1-9t (D-78): `owner add-agent` signs a further agent's first card with the existing owner key, at
+// the same TTY prompt; the owner store and session stay inside the package.
+export { addAgentToOwner, type AddAgentOptions, type AddAgentResult } from './owner-add-agent.js';
 // M1-8h: `owner init` signs the agent's first card; the caller passes core's IdentityService. Only
 // types: the restricted session stays inside the package (owner-first-card.ts).
 export type { FirstAgentCard, FirstCardIdentity } from './owner-first-card.js';
