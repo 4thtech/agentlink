@@ -37,4 +37,26 @@ describe('AgentLinkClient.create', () => {
     const proto = Object.getOwnPropertyNames(AgentLinkClient.prototype);
     expect(proto.some((name) => /unlock|presence|export/i.test(name))).toBe(false);
   });
+
+  it('close() closes the transport once and is safe to call again', async () => {
+    let closed = 0;
+    const client = await AgentLinkClient.create({
+      ...deps(),
+      transport: () => ({
+        wrap: () => Promise.reject(new Error('unused')),
+        publish: () => Promise.reject(new Error('unused')),
+        close: () => {
+          closed += 1;
+        },
+      }),
+    });
+    client.close();
+    client.close();
+    expect(closed).toBe(1);
+  });
+
+  it('close() is a no-op without a transport', async () => {
+    const client = await AgentLinkClient.create(deps());
+    expect(() => client.close()).not.toThrow();
+  });
 });

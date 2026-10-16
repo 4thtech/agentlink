@@ -40,4 +40,39 @@ describe('nostrTransport (07 §4.1)', () => {
     );
     await keys.close();
   });
+
+  it('close() closes every open relay socket and ends a publish that is waiting on one', async () => {
+    const sockets: { closed: boolean }[] = [];
+    const live: RelayConnector = {
+      open(_target, handlers) {
+        const socket = { closed: false };
+        sockets.push(socket);
+        void Promise.resolve().then(() => handlers.onOpen());
+        return {
+          send: () => {},
+          close: () => {
+            socket.closed = true;
+          },
+        };
+      },
+    };
+    const keys = new MemoryKeyStore(seed(2));
+    const transport = nostrTransport({ connector: live, addressCheck: 'platform' })({
+      keys,
+      now: () => 1_800_000_000,
+      mayAuthenticate: () => false,
+    });
+    const waiting = transport.publish(
+      { id: 'x', pubkey: 'y', created_at: 0, kind: 1059, tags: [], content: '', sig: 'z' },
+      ['wss://one.relay-alpha.net'],
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(sockets.length).toBe(1);
+    expect(sockets[0]!.closed).toBe(false);
+    transport.close?.();
+    expect(typeof transport.close).toBe('function');
+    expect(sockets[0]!.closed).toBe(true);
+    await expect(waiting).resolves.toMatchObject({ sent: false });
+    await keys.close();
+  });
 });
