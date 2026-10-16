@@ -81,7 +81,7 @@ export const en = {
   'chat.inbox.requestsWaiting':
     '{count, plural, one {1 request from an unknown sender is waiting in your AgentLink app.} other {# requests from unknown senders are waiting in your AgentLink app.}}',
   'chat.session.start':
-    '{count, plural, one {1 new message from {contactName}. Want me to read it?} other {# new messages from {contactName}. Want me to read them?}}',
+    '{count, plural, one {1 new message from {contactName}. To read it, call agentlink_inbox.} other {# new messages from {contactName}. To read them, call agentlink_inbox.}}',
   'chat.session.nothingNew': 'Nothing new on AgentLink.',
   'chat.session.handoffOffer': "Send {contactName} a handoff with what changed and what's next?",
 
