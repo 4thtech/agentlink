@@ -214,6 +214,21 @@ export function parseClaude(
   return { calls, finalText, costUsd, turns, inputTokens, outputTokens };
 }
 
+/**
+ * Harness-internal tool-loading calls: Claude Code loads deferred MCP tool schemas through its own
+ * `ToolSearch` before the first AgentLink call. They are not part of the agent's behaviour under
+ * test, so first-call checks skip them. An explicit allowlist: any other call still counts.
+ * Codex discovers MCP tools without a tool call, so it has no entry.
+ */
+export const HARNESS_TOOL_LOADING_CALLS: ReadonlySet<string> = new Set(['ToolSearch']);
+
+/** The first call that is not a harness tool-loading call, or undefined when there is none. */
+export function firstSubstantiveCall(run: {
+  readonly calls: readonly ToolCall[];
+}): ToolCall | undefined {
+  return run.calls.find((call) => !HARNESS_TOOL_LOADING_CALLS.has(call.name));
+}
+
 /** Reads `codex exec --json` events (`item.completed` mcp_tool_call / agent_message, `turn.completed`). */
 export function parseCodex(
   transcript: string,
