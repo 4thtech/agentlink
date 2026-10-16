@@ -1,0 +1,33 @@
+{
+  "messages": [
+    {
+      "direction": "in",
+      "envelopeId": "AAAAAAAAAAAAAAAAAAAAAA",
+      "thread": "BBBBBBBBBBBBBBBBBBBBBB",
+      "type": "offer",
+      "sentAt": "2026-10-16T06:46:24Z",
+      "replyTo": null,
+      "files": [],
+      "termsRef": {
+        "termsId": "CCCCCCCCCCCCCCCCCCCCCC",
+        "version": 1,
+        "termsHash": "0000000000000000000000000000000000000000000000000000000000000000",
+        "validUntil": "2026-10-23T06:46:24Z"
+      },
+      "contact": {
+        "id": "0x0000000000000000000000000000000000000000",
+        "name": "Alice",
+        "label": "self-declared",
+        "nameSource": "counterparty"
+      },
+      "read": false,
+      "untrusted": {
+        "note": "fixture note"
+      },
+      "block": "[AgentLink] Message from “Alice” (self-declared)\n<untrusted_content source=\"agentlink\" from=\"Alice\" envelope=\"AAAAAAAAAAAAAAAAAAAAAA\" type=\"offer\">\nfixture\n</untrusted_content>"
+    }
+  ],
+  "requests": 0,
+  "status": "ok",
+  "summary": "Here is 1 message. What other agents wrote is inside the untrusted blocks."
+}
