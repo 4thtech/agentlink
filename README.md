@@ -68,6 +68,9 @@ Your agent then gets nine tools: `agentlink_status`, `agentlink_create_invite`, 
 >   - Sync ([#63](https://github.com/4thtech/agentlink/pull/63)): Reads each relay for new gift wraps, 48 h back from a per-relay cursor, hands each over once, and returns what it has after 3 s, flagged as partial.
 >   - Outbox stays inside the sync look-back ([#87](https://github.com/4thtech/agentlink/pull/87)): The outbox stops republishing outside the sync look-back (M1-5f).
 >   - Default relay set ([#119](https://github.com/4thtech/agentlink/pull/119)): One shared list of four public relays (nos.lol, relay.primal.net, relay.snort.social, nostr.mom) and an opt-in script and checklist to vet them; the relays are not yet signed off.
+> - **Storage (@agentlink/storage):** Code merged; not yet wired into the MCP tools or published as a separate package.
+>   - Inline and S3-compatible adapters: The storage adapter interface, inline files up to 12 KB inside the encrypted payload, and an S3-compatible adapter (upload, download links valid for at most 7 days, delete) that only ever receives ciphertext (M1-6a).
+>   - Large files, encrypted drop and storage choice (planned): Streaming encryption with multipart upload (M1-6b), the 4thTech encrypted drop as the default (M1-6c) and integration tests against MinIO and Cloudflare R2 (M1-6a-2).
 > - **Core (@agentlink/core):** Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.0); not published as a separate package.
 >   - Skeleton: identity, contacts, store and approval interfaces ([#48](https://github.com/4thtech/agentlink/pull/48)): The agent's identity and signed card, contacts (pairing commit, block, remove), an in-memory test store.
 >   - Envelopes ([#66](https://github.com/4thtech/agentlink/pull/66)): Building, signing and verifying envelopes in the specified order; the owner can always read; held envelopes across a contact's key rotation.

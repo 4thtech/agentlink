@@ -129,6 +129,16 @@ areas:
         state: done
         prs: [119]
         summary: "One shared list of four public relays (nos.lol, relay.primal.net, relay.snort.social, nostr.mom) and an opt-in script and checklist to vet them; the relays are not yet signed off."
+  - id: storage
+    title: "Storage (@agentlink/storage)"
+    intro: "Code merged; not yet wired into the MCP tools or published as a separate package."
+    components:
+      - name: "Inline and S3-compatible adapters"
+        state: done
+        summary: "The storage adapter interface, inline files up to 12 KB inside the encrypted payload, and an S3-compatible adapter (upload, download links valid for at most 7 days, delete) that only ever receives ciphertext (M1-6a)."
+      - name: "Large files, encrypted drop and storage choice"
+        state: planned
+        summary: "Streaming encryption with multipart upload (M1-6b), the 4thTech encrypted drop as the default (M1-6c) and integration tests against MinIO and Cloudflare R2 (M1-6a-2)."
   - id: core
     title: "Core (@agentlink/core)"
     intro: "Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.0); not published as a separate package."

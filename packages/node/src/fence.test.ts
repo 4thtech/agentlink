@@ -9,6 +9,8 @@ import * as entry from './index.js';
 describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
   it('exports exactly the opaque entry points', () => {
     expect(Object.keys(entry).sort()).toEqual([
+      // M1-8d: the local approval server's address constant (08 §1).
+      'APPROVAL_SERVER_HOST',
       'KEYCHAIN_SERVICE',
       'LOCAL_APPROVAL_LIFETIME_S',
       'MAX_APPROVAL_BATCH_ITEMS',
@@ -32,6 +34,8 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'performOwnerOperation',
       'probeOsKeychain',
       'selectKeyStoreBackend',
+      // M1-8d: the local approval server entry point (no owner-store or opener seam).
+      'startApprovalServer',
     ]);
   });
 
@@ -60,6 +64,10 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'createRelayConnectorWith',
       'createNip11FetcherWith',
       'createHostResolverWith',
+      // M1-8d: the approval server's test seams (owner store, opener, notifier) stay internal.
+      'startApprovalServerWith',
+      'osBrowserOpener',
+      'osNotifier',
     ]) {
       expect(names).not.toContain(name);
     }

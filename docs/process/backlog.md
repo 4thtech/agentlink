@@ -1839,7 +1839,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Storage (`@agentlink/storage`)
 
 #### M1-6a · storage: adapter interface, inline adapter, S3 adapter
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet · **Security:** S2 (`packages/*`; card said S1) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage
 - **Depends on:** M1-1a, M0-8, M0-2g (R2 test token); gap G-23 resolved
 - **Spec:** 07 §5.1–§5.3; 04 §4 (delivery, expiry); 02 F-30–F-32; D-18
@@ -1851,6 +1851,21 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Integration tests against MinIO (Docker, every PR) and Cloudflare R2 (scheduled job using the bucket-scoped test token): upload, presign, download, delete.
   - Presign beyond 7 days is clamped (test); canary test shows no URL query strings or keys in logs.
+- **Split (orchestrator, 2026-10-17):** M0-2g (R2 test token) is not done, and the MinIO job touches `.github/**`. This card ships the interface and both adapters with unit tests against an in-memory fake endpoint (no network), handled as S2 (`packages/*`). The MinIO and R2 integration tests move to M1-6a-2. The endpoint check is the 04 §4 raw-string grammar; the DNS-level check comes from the SSRF-safe fetch (M1-15) that the caller injects.
+
+#### M1-6a-2 · storage: MinIO and R2 integration tests (new, split from M1-6a)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (sensitive: `.github/**`) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/storage (integration tests), .github/workflows
+- **Depends on:** M1-6a; M0-2g (R2 bucket and bucket-scoped test token) for the R2 job
+- **Spec:** 07 §5.2; 04 §4 (delivery, expiry); `ci-cd.md`; `audit-rules.md` §2 (sensitive paths)
+- **Invariants:** I-2, I-7
+- **Scope:**
+  - MinIO (Docker) integration job on every PR: upload, presign, download through the presigned URL, delete. The S3 adapter accepts only `https` endpoints, so MinIO runs with TLS (a CI-generated certificate) rather than adding an `http` or loopback exception to the adapter.
+  - Scheduled Cloudflare R2 job with the bucket-scoped test token from a GitHub Environment secret; skipped (not failed) on forks.
+  - Neither job prints a presigned URL, object key or credential.
+- **Acceptance:**
+  - Both jobs green with the round trip; the R2 token cannot list or write any other bucket (M0-2g).
+  - The log canary run in CI shows no URL query strings or keys.
 
 #### M1-6b · storage: streaming encryption and multipart upload
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -2392,7 +2407,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The build-plan test above covers a batch: the same-user script, with the same read access, cannot add an item to a batch the owner reviewed or use an item for another call (with M1-9b and M1-7e).
 
 #### M1-8d · node: local approval server
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#207) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node
 - **Depends on:** M1-8c, M1-7e
 - **Spec:** 08 §1; 03 §4.5; 04 §2.5; 06 §2.5
@@ -2909,6 +2924,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Repo/path:** agentlink · apps/cli (local UI bundle)
 - **Depends on:** M1-8d, M1-8e, M1-2e; gap G-32 resolved
 - **Spec:** 08 §1; 11 §6.2 (first run, approval), §6.2.1 (review together); 02 J4; 04 §2.5, §2.5.2 (D-68)
+- **From IR-M1-8d-1 (L-2, L-3):** add a backoff after repeated wrong owner codes at the approval server (today bounded only by one operation at a time and the KDF cost); consider a one-shot token exchange, or rotating the session token on `agentlink ui`, since the `/?t=` link stays valid for the server's lifetime and can persist in browser history.
 - **Invariants:** I-4, I-5
 - **Scope:**
   - First run: create the owner passkey (PRF) on `localhost`, or set the owner passphrase.
