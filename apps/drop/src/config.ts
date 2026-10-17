@@ -20,7 +20,7 @@ export interface Limits {
   readonly keyRequestsPerHour: number;
   /** Drop keys first admitted from one IP (IPv6 /64) in any rolling 24 hours. */
   readonly ipNewKeysPerDay: number;
-  /** Absolute ceiling on signed requests (upload, commit, DELETE) per IP (IPv6 /64) per hour, all
+  /** Absolute ceiling on signed requests (upload, commit, DELETE) per IP (IPv6 /64) in any rolling hour, all
    * keys together. Generous, so a shared NAT is not blocked; an abuse backstop only. */
   readonly ipRequestsPerHour: number;
   /** Abuse reports per IP (IPv6 /64) per hour. */

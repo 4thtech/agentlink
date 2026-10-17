@@ -77,8 +77,8 @@ interface KeyState {
 
 interface IpState {
   readonly role: 'ip';
-  /** Signed requests from this IP this hour (the absolute ceiling). */
-  requests: Window;
+  /** Minute index -> signed requests from this IP that minute (the last 60; the absolute ceiling). */
+  requests: Record<string, number>;
   reports: Window;
   /** Hour index -> fresh keys admitted that hour (the last 24 hours). */
   newKeys: Record<string, number>;
@@ -233,7 +233,7 @@ export class DropState extends DurableObject<Env> {
     return (
       (await this.load<IpState>('ip')) ?? {
         role: 'ip',
-        requests: [0, 0],
+        requests: {},
         reports: [0, 0],
         newKeys: {},
         lastSeen: now,
@@ -249,12 +249,18 @@ export class DropState extends DurableObject<Env> {
   async ipRequest(input: { now: number; limits: Limits }): Promise<{ ok: true } | Refusal> {
     const { now, limits } = input;
     const s = await this.loadIp(now);
-    const hour = Math.floor(now / HOUR);
-    s.requests = tick(s.requests, hour);
-    if (s.requests[1] >= limits.ipRequestsPerHour) {
-      return { ok: false, error: 'rate_limited', retryAfter: (hour + 1) * HOUR - now };
+    // Rolling hour in one-minute buckets: no window edge where twice the ceiling gets through.
+    const minute = Math.floor(now / 60);
+    const recent = sumRecent(s.requests, minute - 59);
+    if (recent >= limits.ipRequestsPerHour) {
+      const oldest = Math.min(...Object.keys(s.requests).map(Number));
+      return {
+        ok: false,
+        error: 'rate_limited',
+        retryAfter: Math.max(1, (oldest + 60) * 60 - now),
+      };
     }
-    s.requests[1] += 1;
+    s.requests[String(minute)] = (s.requests[String(minute)] ?? 0) + 1;
     s.lastSeen = now;
     await this.save(s, now + IP_IDLE);
     return { ok: true };
