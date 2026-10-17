@@ -561,9 +561,9 @@ export async function startApprovalServerWith(
     port,
     address: () => ({ address: APPROVAL_SERVER_HOST, port }),
     approvalUrl,
-    open: (approvalId?: string) => {
-      const path = approvalId === undefined ? '/' : `/approve/${approvalId}`;
-      if (approvalId !== undefined) approvalUrl(approvalId);
+    open: async (approvalId?: string) => {
+      // A malformed ID rejects the returned promise (never a synchronous throw).
+      const path = approvalId === undefined ? '/' : new URL(approvalUrl(approvalId)).pathname;
       return opener(`${origin}${path}?t=${token}`).catch(() => false);
     },
     notifyNewApproval: async (approvalId: string) => {

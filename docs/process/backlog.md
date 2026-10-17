@@ -2881,6 +2881,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Repo/path:** agentlink · apps/cli (local UI bundle)
 - **Depends on:** M1-8d, M1-8e, M1-2e; gap G-32 resolved
 - **Spec:** 08 §1; 11 §6.2 (first run, approval), §6.2.1 (review together); 02 J4; 04 §2.5, §2.5.2 (D-68)
+- **From IR-M1-8d-1 (L-2, L-3):** add a backoff after repeated wrong owner codes at the approval server (today bounded only by one operation at a time and the KDF cost); consider a one-shot token exchange, or rotating the session token on `agentlink ui`, since the `/?t=` link stays valid for the server's lifetime and can persist in browser history.
 - **Invariants:** I-4, I-5
 - **Scope:**
   - First run: create the owner passkey (PRF) on `localhost`, or set the owner passphrase.

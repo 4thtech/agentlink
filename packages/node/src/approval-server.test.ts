@@ -428,6 +428,9 @@ describe('Host and Origin checks (DNS rebinding, cross-site requests)', () => {
       `127.0.0.1:${String(h.port + 1)}`,
       `127.0.0.1.evil.example:${String(h.port)}`,
       `[::1]:${String(h.port)}`,
+      `127.0.0.1.:${String(h.port)}`,
+      `LOCALHOST:${String(h.port)}`,
+      `EVIL.EXAMPLE:${String(h.port)}`,
     ]) {
       const viaToken = await send(h.port, `/?t=${h.token}`, { headers: { Host: host } });
       expect(viaToken.status, host).toBe(403);
@@ -726,6 +729,10 @@ describe('the token and the owner code stay out of files, logs and URLs (08 §1,
     expect(h.notified).toEqual([['AgentLink', 'An approval is waiting for you.']]);
     expect(JSON.stringify(h.notified)).not.toContain('Mallory');
     await expect(h.server.notifyNewApproval('apr_bad')).rejects.toThrow();
+    // open() with a malformed ID rejects; it never throws synchronously and never opens anything.
+    const opening = h.server.open('apr_bad');
+    await expect(opening).rejects.toThrow();
+    expect(h.opened).toHaveLength(1);
   });
 
   it('escapes request text in the page it serves', async () => {

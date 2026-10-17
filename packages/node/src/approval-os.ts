@@ -18,14 +18,21 @@ export type OsNotifier = (lines: readonly [title: string, body: string]) => Prom
 
 const RUN_TIMEOUT_MS = 10_000;
 
-function run(command: string, args: readonly string[]): Promise<boolean> {
+/**
+ * Runs a fixed program. `anyExit`: the program ran, whatever its exit code, counts as success
+ * (Windows `explorer.exe` exits 1 even when it opened the URL).
+ */
+function run(command: string, args: readonly string[], anyExit = false): Promise<boolean> {
   return new Promise((resolve) => {
     try {
       execFile(
         command,
         [...args],
         { timeout: RUN_TIMEOUT_MS, windowsHide: true, shell: false },
-        (error) => resolve(error === null),
+        (error) =>
+          resolve(
+            error === null || (anyExit && typeof error.code === 'number' && error.killed !== true),
+          ),
       );
     } catch {
       resolve(false);
@@ -39,7 +46,7 @@ export const osBrowserOpener: BrowserOpener = (url) => {
     case 'darwin':
       return run('open', [url]);
     case 'win32':
-      return run('explorer.exe', [url]);
+      return run('explorer.exe', [url], true);
     default:
       return run('xdg-open', [url]);
   }
