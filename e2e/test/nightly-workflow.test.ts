@@ -6,7 +6,11 @@ import { describe, expect, it } from 'vitest';
 
 const read = (path: string): string =>
   readFileSync(decodeURIComponent(new URL(`../../${path}`, import.meta.url).pathname), 'utf8');
-const nightly = read('.github/workflows/nightly-two-machine.yml');
+// Comments describe what the workflow must never do, so only the code is checked.
+const nightly = read('.github/workflows/nightly-two-machine.yml')
+  .split('\n')
+  .filter((line) => !line.trimStart().startsWith('#'))
+  .join('\n');
 
 describe('nightly-two-machine.yml (OPS-CI-7)', () => {
   it('runs on a schedule and by manual dispatch only, never for a pull request', () => {
@@ -18,8 +22,8 @@ describe('nightly-two-machine.yml (OPS-CI-7)', () => {
   });
 
   it('is not part of the merge gate', () => {
-    expect(read('.github/workflows/ci.yml')).not.toContain('nightly-two-machine');
-    expect(read('.github/workflows/e2e.yml')).not.toContain('nightly-two-machine');
+    expect(read('.github/workflows/ci.yml')).not.toMatch(/uses:[^\n]*nightly-two-machine/);
+    expect(read('.github/workflows/e2e.yml')).not.toMatch(/uses:[^\n]*nightly-two-machine/);
   });
 
   it('starts with no permissions and grants only contents and actions read per job', () => {

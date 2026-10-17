@@ -1,0 +1,429 @@
+# Nightly two-machine LLM test (OPS-CI-7; owner decision of Tali, 2026-10-17; 04 §2.5, 10 M1-13, D-52).
+#
+# Two real agents on two different runners pair, talk, and agree terms over the REAL default relays
+# (D-75): agent A (Alice, Claude Code, `macos-26`) and agent B (Bob, Claude Code, `ubuntu-24.04`).
+# The steps are the dogfood checks: pairing (J1, J4), status first (J9), message and reply, a hostile
+# line in a note and in an offer that must not be followed (I-5), a refused read of `~/.agentlink`
+# (F1), and an offer, counter and accept with the owner's approval (J8).
+#
+# This workflow replaces the earlier standing rule "the LLM e2e is manual dispatch only" FOR THIS
+# WORKFLOW ONLY: it runs on a schedule and by manual dispatch. `e2e.yml` `e2e-llm` stays manual.
+# It is NOT part of the merge gate: it is not called by `ci.yml`, not in `ci-gate`, never runs for a
+# pull request (no `pull_request_target` anywhere), and a failure never blocks a merge.
+#
+# Cost control: the cheapest model, one run per night, and the run is skipped when `main` has not
+# changed since the last successful run of this workflow (the `gate` job). Per-call and per-run caps
+# are in e2e/llm/nightly-run.test.ts; no retries.
+#
+# Approvals: the owner of each side is the harness-only test owner (e2e/test/support.ts
+# `ownerApprove`: the CLI's own approve handler with the owner-code step replaced by the test owner's
+# signature). No agent and no MCP tool ever approves (I-4, 04 §2.5).
+#
+# The only thing passed between the runners outside AgentLink is the invite. Agent A writes it to a
+# file; the next step masks it, encrypts it (AES-256-CBC, PBKDF2) with a passphrase made from the
+# Anthropic API key, the run ID and the attempt (no new secret), and uploads it as an artifact with a
+# one-day retention. Job B downloads and decrypts it. The invite is never printed, is a canary of the
+# scan, and appears in no uploaded result. Transcripts stay on the runner; only sanitized results
+# (step names, pass or fail, tool names, cost) are uploaded, after a clean canary scan.
+#
+# Security posture (docs/foundation/04 §7): `permissions: {}` at the top and least privilege per job
+# (`actions: read` only where an artifact of this run is read), every action pinned to a full commit
+# SHA, no lifecycle scripts on install, no event data in shell scripts, the harness CLI downloaded as
+# an exact version and checked against a pinned sha512 integrity (no npm install). The API key is an
+# environment secret of `e2e` (deployment branches: main only) and is named only in the steps that
+# need it. A failed run does not open an issue (nothing in the docs allows a workflow to write
+# issues); GitHub's own failure notice for a scheduled run and the run summary tell the owner.
+name: Nightly two-machine
+
+on:
+  schedule:
+    # 03:17 UTC, a quiet hour.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Run even if main has not changed since the last successful run"
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: nightly-two-machine
+  cancel-in-progress: false
+
+env:
+  TURBO_TELEMETRY_DISABLED: "1"
+  DO_NOT_TRACK: "1"
+
+jobs:
+  # Decides whether to run: only on main, and not when main is unchanged since the last success.
+  gate:
+    name: gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - name: Decide whether to run
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "::notice::Runs on main only (ref: $REF)."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$EVENT" = "workflow_dispatch" ] && [ "$FORCE" = "true" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          last="$(gh run list --workflow nightly-two-machine.yml --branch main --status success --limit 1 --json headSha --jq '.[0].headSha // ""')"
+          if [ -n "$last" ] && [ "$last" = "$SHA" ]; then
+            echo "::notice::main is unchanged since the last successful run ($SHA); skipping."
+            echo "### Nightly two-machine test skipped" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "main has not changed since the last successful run." >> "$GITHUB_STEP_SUMMARY"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Agent A (Alice) on macOS: creates the invite, sends the note, offers terms, accepts the counter.
+  agent-a:
+    name: agent-a (macOS)
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: macos-26
+    timeout-minutes: 45
+    environment: e2e
+    permissions:
+      contents: read
+    env:
+      AGENTLINK_E2E_NIGHTLY: "1"
+      AGENTLINK_E2E_REAL_RELAYS: "1"
+      NIGHTLY_ROLE: a
+      # Exact Claude Code version and the sha512 integrity of its darwin-arm64 tarball (npm registry).
+      # The version is the same as in e2e.yml; a bump is a reviewed PR that changes both workflows.
+      CLAUDE_CODE_VERSION: "2.1.296"
+      CLAUDE_CODE_INTEGRITY: "sha512-vqtx3kS3r1hNLMk+N8JMG5J4kcLHIbI3t/NSIdcFQZrRVCFA6NtcxJyn/B+Sf3GxJaFJOCEfoBQXsFo10+Oj9A=="
+      CLAUDE_MODEL: claude-haiku-5-5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # No pnpm store cache in a job that holds secrets (cache poisoning).
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Build the e2e dependencies (the CLI and its packages)
+        run: pnpm exec turbo run build --filter='@agentlink/e2e^...'
+
+      - name: Download and verify Claude Code
+        run: |
+          set -euo pipefail
+          tools="$RUNNER_TEMP/harness-tools"
+          mkdir -p "$tools/claude"
+          curl --fail --silent --show-error --location --proto '=https' --max-time 600 -o "$tools/claude.tgz" "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-${CLAUDE_CODE_VERSION}.tgz"
+          got="sha512-$(openssl dgst -sha512 -binary "$tools/claude.tgz" | openssl base64 -A)"
+          if [ "$got" != "$CLAUDE_CODE_INTEGRITY" ]; then
+            echo "::error::claude: the downloaded tarball does not match the pinned integrity"
+            exit 1
+          fi
+          tar -xzf "$tools/claude.tgz" -C "$tools/claude"
+          rm "$tools/claude.tgz"
+          chmod +x "$tools/claude/package/claude"
+          "$tools/claude/package/claude" --version
+          echo "CLAUDE_BIN=$tools/claude/package/claude" >> "$GITHUB_ENV"
+
+      - name: Choose the artifact, canary and invite paths
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/e2e-artifacts/public"
+          {
+            echo "AGENTLINK_E2E_ARTIFACTS=$RUNNER_TEMP/e2e-artifacts"
+            echo "AGENTLINK_E2E_CANARIES=$RUNNER_TEMP/e2e-canaries.json"
+            echo "NIGHTLY_INVITE_FILE=$RUNNER_TEMP/invite.txt"
+            echo "NIGHTLY_TOKEN=R${GITHUB_RUN_ID}x${GITHUB_RUN_ATTEMPT}"
+          } >> "$GITHUB_ENV"
+
+      # The scenario runs in the background so the next step can hand the invite to job B while the
+      # test keeps going. Its output goes to a file (scanned, then uploaded), not to the job log.
+      - name: Start agent A
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          nohup bash -c 'pnpm --filter @agentlink/e2e exec vitest run llm/nightly-run.test.ts --reporter=default > "$AGENTLINK_E2E_ARTIFACTS/public/vitest-output.log" 2>&1; echo $? > "$RUNNER_TEMP/scenario.exit"' > /dev/null 2>&1 &
+          echo "started"
+
+      # Waits for the invite file, masks it, encrypts it and uploads it for job B.
+      - name: Hand the invite to agent B (masked and encrypted)
+        env:
+          RENDEZVOUS_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          openssl_bin="$(command -v /opt/homebrew/opt/openssl@3/bin/openssl || command -v openssl)"
+          until [ -s "$NIGHTLY_INVITE_FILE" ]; do
+            if [ -f "$RUNNER_TEMP/scenario.exit" ]; then
+              echo "::error::agent A ended before it made an invite"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "::add-mask::$(cat "$NIGHTLY_INVITE_FILE")"
+          mkdir -p "$RUNNER_TEMP/handoff"
+          NIGHTLY_PASS="${RENDEZVOUS_KEY}:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}" \
+            "$openssl_bin" enc -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 -salt -pass env:NIGHTLY_PASS \
+            -in "$NIGHTLY_INVITE_FILE" -out "$RUNNER_TEMP/handoff/invite.enc"
+          echo "The invite is encrypted for agent B."
+
+      - name: Upload the encrypted invite (one day)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nightly-invite
+          path: ${{ runner.temp }}/handoff/invite.enc
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Wait for agent A to finish
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          until [ -f "$RUNNER_TEMP/scenario.exit" ]; do sleep 10; done
+          code="$(cat "$RUNNER_TEMP/scenario.exit")"
+          echo "scenario exit code: $code"
+          echo "SCENARIO_EXIT=$code" >> "$GITHUB_ENV"
+
+      - name: Canary scan of the results (including the API key and the invite)
+        id: scan
+        if: always()
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node e2e/src/canary-scan.mjs --canaries "$AGENTLINK_E2E_CANARIES" --env-secret ANTHROPIC_API_KEY "$AGENTLINK_E2E_ARTIFACTS/public"
+
+      - name: Upload the sanitized results
+        if: always() && steps.scan.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nightly-a-results
+          path: ${{ runner.temp }}/e2e-artifacts/public
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Fail if the scenario failed
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ "${SCENARIO_EXIT:-1}" != "0" ]; then
+            echo "::error::agent A: the scenario did not pass (see the report job)"
+            exit 1
+          fi
+
+  # Agent B (Bob) on Linux: accepts the invite, reads, replies, counters, reads the acceptance.
+  agent-b:
+    name: agent-b (Linux)
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: e2e
+    permissions:
+      actions: read
+      contents: read
+    env:
+      AGENTLINK_E2E_NIGHTLY: "1"
+      AGENTLINK_E2E_REAL_RELAYS: "1"
+      NIGHTLY_ROLE: b
+      CLAUDE_CODE_VERSION: "2.1.296"
+      CLAUDE_CODE_INTEGRITY: "sha512-+m01urgelnI+VJxPaKPEK0wixgq42uZ8PeCaUk5tX/8YoDBvSmC/REVQG2jQfJAr8dxunpjJ600FvLrcj1WWTw=="
+      CLAUDE_MODEL: claude-haiku-5-5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Install gnome-keyring and D-Bus
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 dbus
+
+      # The Claude Code Bash sandbox on Linux needs bubblewrap and socat (as in e2e.yml `e2e-llm`).
+      - name: Install the Claude Code sandbox dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends bubblewrap socat
+          if [ "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || echo 0)" = "1" ]; then
+            printf '%s\n' 'abi <abi/4.0>,' 'include <tunables/global>' '' 'profile bwrap /usr/bin/bwrap flags=(unconfined) {' '  userns,' '  include if exists <local/bwrap>' '}' | sudo tee /etc/apparmor.d/bwrap > /dev/null
+            sudo apparmor_parser -r /etc/apparmor.d/bwrap
+          fi
+
+      - name: Build the e2e dependencies (the CLI and its packages)
+        run: pnpm exec turbo run build --filter='@agentlink/e2e^...'
+
+      - name: Download and verify Claude Code
+        run: |
+          set -euo pipefail
+          tools="$RUNNER_TEMP/harness-tools"
+          mkdir -p "$tools/claude"
+          curl --fail --silent --show-error --location --proto '=https' --max-time 600 -o "$tools/claude.tgz" "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-${CLAUDE_CODE_VERSION}.tgz"
+          got="sha512-$(openssl dgst -sha512 -binary "$tools/claude.tgz" | openssl base64 -A)"
+          if [ "$got" != "$CLAUDE_CODE_INTEGRITY" ]; then
+            echo "::error::claude: the downloaded tarball does not match the pinned integrity"
+            exit 1
+          fi
+          tar -xzf "$tools/claude.tgz" -C "$tools/claude"
+          rm "$tools/claude.tgz"
+          chmod +x "$tools/claude/package/claude"
+          "$tools/claude/package/claude" --version
+          echo "CLAUDE_BIN=$tools/claude/package/claude" >> "$GITHUB_ENV"
+
+      - name: Choose the artifact, canary and invite paths
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/e2e-artifacts/public"
+          {
+            echo "AGENTLINK_E2E_ARTIFACTS=$RUNNER_TEMP/e2e-artifacts"
+            echo "AGENTLINK_E2E_CANARIES=$RUNNER_TEMP/e2e-canaries.json"
+            echo "NIGHTLY_INVITE_FILE=$RUNNER_TEMP/invite.txt"
+            echo "NIGHTLY_TOKEN=R${GITHUB_RUN_ID}x${GITHUB_RUN_ATTEMPT}"
+          } >> "$GITHUB_ENV"
+
+      # Polls this run's artifacts until agent A has uploaded the encrypted invite, then decrypts it
+      # and masks it. Only the GITHUB_TOKEN of this job (actions: read) is used.
+      - name: Fetch the invite from agent A (decrypted and masked)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RENDEZVOUS_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/handoff"
+          deadline=$((SECONDS + 1500))
+          id=""
+          while [ -z "$id" ]; do
+            id="$(gh api "repos/${GH_REPO}/actions/runs/${GITHUB_RUN_ID}/artifacts" --jq '[.artifacts[] | select(.name == "nightly-invite" and (.expired | not))] | first | .id // empty')"
+            if [ -z "$id" ]; then
+              if [ "$SECONDS" -gt "$deadline" ]; then
+                echo "::error::agent A did not hand over an invite in time"
+                exit 1
+              fi
+              sleep 10
+            fi
+          done
+          gh api "repos/${GH_REPO}/actions/artifacts/${id}/zip" > "$RUNNER_TEMP/handoff/invite.zip"
+          unzip -q -o "$RUNNER_TEMP/handoff/invite.zip" -d "$RUNNER_TEMP/handoff"
+          NIGHTLY_PASS="${RENDEZVOUS_KEY}:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}" \
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 -pass env:NIGHTLY_PASS \
+            -in "$RUNNER_TEMP/handoff/invite.enc" -out "$NIGHTLY_INVITE_FILE"
+          chmod 600 "$NIGHTLY_INVITE_FILE"
+          echo "::add-mask::$(cat "$NIGHTLY_INVITE_FILE")"
+          rm -f "$RUNNER_TEMP/handoff/invite.zip" "$RUNNER_TEMP/handoff/invite.enc"
+          echo "The invite is here."
+
+      - name: Run agent B
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          set +e
+          dbus-run-session -- bash -euo pipefail -c '
+            keyring_env="$(openssl rand -hex 16 | gnome-keyring-daemon --unlock --components=secrets)"
+            eval "$keyring_env"
+            export GNOME_KEYRING_CONTROL
+            pnpm --filter @agentlink/e2e exec vitest run llm/nightly-run.test.ts --reporter=default
+          ' > "$AGENTLINK_E2E_ARTIFACTS/public/vitest-output.log" 2>&1
+          echo "SCENARIO_EXIT=$?" >> "$GITHUB_ENV"
+
+      - name: Canary scan of the results (including the API key and the invite)
+        id: scan
+        if: always()
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node e2e/src/canary-scan.mjs --canaries "$AGENTLINK_E2E_CANARIES" --env-secret ANTHROPIC_API_KEY "$AGENTLINK_E2E_ARTIFACTS/public"
+
+      - name: Upload the sanitized results
+        if: always() && steps.scan.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nightly-b-results
+          path: ${{ runner.temp }}/e2e-artifacts/public
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Fail if the scenario failed
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ "${SCENARIO_EXIT:-1}" != "0" ]; then
+            echo "::error::agent B: the scenario did not pass (see the report job)"
+            exit 1
+          fi
+
+  # Joins the two sides into one report in the run summary and sets the run's result.
+  report:
+    name: report
+    needs: [gate, agent-a, agent-b]
+    if: always() && needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+    steps:
+      - name: Write the report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RESULT_A: ${{ needs.agent-a.result }}
+          RESULT_B: ${{ needs.agent-b.result }}
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/report"
+          mkdir -p "$out"
+          {
+            echo "### Nightly two-machine test"
+            echo ""
+            echo "Agent A (macOS): $RESULT_A. Agent B (Linux): $RESULT_B."
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+          for side in a b; do
+            id="$(gh api "repos/${GH_REPO}/actions/runs/${GITHUB_RUN_ID}/artifacts" --jq "[.artifacts[] | select(.name == \"nightly-${side}-results\" and (.expired | not))] | first | .id // empty")"
+            if [ -z "$id" ]; then
+              echo "No results artifact for agent ${side^^}; see that job's log." >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            gh api "repos/${GH_REPO}/actions/artifacts/${id}/zip" > "$out/$side.zip"
+            unzip -q -o "$out/$side.zip" "nightly-${side}.md" -d "$out" || true
+            if [ -f "$out/nightly-${side}.md" ]; then
+              cat "$out/nightly-${side}.md" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+          if [ "$RESULT_A" != "success" ] || [ "$RESULT_B" != "success" ]; then
+            echo "::error::The nightly two-machine test failed (agent A: $RESULT_A, agent B: $RESULT_B). Read the report in the run summary (RB-17)."
+            exit 1
+          fi

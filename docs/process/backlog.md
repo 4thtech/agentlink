@@ -718,6 +718,17 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:**
   - A failing deterministic e2e fails `ci-gate`; a docs-only PR passes with it skipped; no secrets, read-only token, pinned actions unchanged.
 
+#### OPS-CI-7 · Nightly two-machine LLM test (new, owner decision 2026-10-17)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/nightly-two-machine.yml`, `e2e/llm/nightly-run.test.ts`, `e2e/test/support.ts`, `e2e/src/agent-host.mjs`, `docs/process/ci-cd.md`, `docs/runbooks/dogfood-m1a.md`
+- **Depends on:** M1-13a, OPS-CI-6
+- **Spec:** `ci-cd.md`; 04 §2.5
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Tali (2026-10-17) changed the standing rule "LLM e2e is manual dispatch only": the nightly two-machine workflow may run on a schedule and by manual dispatch (the `e2e-llm` job stays manual). Two jobs on different runners (macOS, Linux), real default relays, cheapest model, one run per night, skipped when `main` is unchanged; not in `ci-gate`. The invite travels in a masked, encrypted artifact (1 day); approvals are the CI test owner's; results are sanitized and canary-scanned.
+- **Acceptance:**
+  - Not a required check; no secret, invite or plaintext in any log or artifact; actions pinned; timeout under 45 min; summary with both sides; a failure fails the run.
+
 #### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
 - **Status:** done (4thtech/agentlink#198) · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/release.yml` or a Changesets hook, `tools/**`, `docs/process/versioning.md` §5

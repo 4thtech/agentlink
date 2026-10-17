@@ -378,6 +378,17 @@ For each of your steps the script prints "YOUR TURN" with the exact prompt on it
 
 Record the result per section 8 (harnesses per Mac, versions, which checks each Mac verified, and whether it was one owner or two). Failures become backlog cards.
 
+## Reading the nightly two-machine report
+
+OPS-CI-7: every night (03:17 UTC) and on manual dispatch, `.github/workflows/nightly-two-machine.yml` runs the same checks with two agents on two runners (Alice on macOS, Bob on Linux) over the real default relays. It is not a merge check and it is skipped when `main` has not changed since the last successful run.
+
+- **Where:** Actions, "Nightly two-machine", the latest run, its summary. The `report` job joins both sides into one table per agent: step, what, check (J1, J4, J8, J9, I-5, F1, I-4), result, notes, cost. Artifacts `nightly-a-results` and `nightly-b-results` hold the same as JSON (14 days). Transcripts are never uploaded.
+- **Green:** every step passed on both sides and the cost line is a few cents. Nothing to do.
+- **Red:** read the failed step's notes first. A step marked `skipped` only means an earlier step it depends on failed; fix the first failure. A "never arrived" note on one side with a failure on the other points to the other side. A missing invite points at agent A's first step.
+- **Flake or bug?** Re-run with the `force` input from `main`. The public relays and the model are not deterministic: one red night with a green re-run is a flake to note; the same step red twice is a card (symptom, step ID, harness version, which side). A hostile-line step (I-5), the `~/.agentlink` read (F1) or an owner step failing is never a flake: stop and tell Tali.
+- **Never** approve anything for the test: the approvals are made by the CI test owner inside the harness, not by an agent, and not by you.
+- **Cost:** about $0.10 to $0.30 per night; both sides are capped (see `docs/process/ci-cd.md`). A spending limit on the key is the owner's.
+
 ## Verify
 
 - Each pair in step 5 lists the other as a contact on both sides.
