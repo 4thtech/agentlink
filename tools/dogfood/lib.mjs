@@ -45,6 +45,7 @@ export const OPENCODE_DENIED_PERMISSIONS = Object.freeze([
 const AGENT_NAME = /^[a-z][a-z0-9-]{0,31}$/;
 const APPROVAL_ID = /^apr_[A-Za-z0-9_-]{22}$/;
 const APPROVAL_ID_IN_TEXT = /apr_[A-Za-z0-9_-]{22}/;
+const RUN_ID = /^\d{8}-\d{6}$/;
 const ENVELOPE_ID = /^[A-Za-z0-9_-]{22}$/;
 
 export const USAGE = `usage: node tools/dogfood/run.mjs [options]
@@ -62,7 +63,37 @@ export const USAGE = `usage: node tools/dogfood/run.mjs [options]
   --approval-timeout <minutes> how long to wait for you to approve (default 15)
   --approval-interval <seconds> how often to look for your decision (default 5)
   --only <ids>                 comma-separated step IDs to run (steps that need an earlier one are skipped)
+
+Two Macs (one agent per Mac, M1-23-b); without --role the single-machine run above is unchanged:
+  --role a|b                   a = Claude Code side: creates the invite and prints the command for Mac B
+                               b = OpenCode side: accepts the invite
+  --same-owner                 one person types the approvals on both Macs (default: a different person per Mac)
+  --invite <url>               role b: the invite link Mac A printed (or leave it out and you are asked)
+  --run-id <id>                role b: the run ID Mac A printed (or leave it out and you are asked)
+  --paired                     role b: the two agents are already contacts; skip the pairing
+  --cc-via opencode            role a on a Mac without the claude CLI: run Mac A's side through OpenCode
+  --manual                     you drive the chat yourself (Claude desktop, Antigravity, ...): the script prints
+                               each prompt, waits for Enter, and only checks state through the agentlink CLI
+Use the same --cc-agent and --oc-agent names on both Macs. Approvals are typed on the Mac that owns the agent.
 `;
+
+/** An invite link as a hand-off value: http(s), no whitespace or quote characters, bounded length. */
+export function validInviteUrl(text) {
+  return typeof text === 'string' && /^https?:\/\/[^\s'"<>\\]{1,2000}$/.test(text);
+}
+
+/** The side's own harness: Mac A runs Claude Code ('cc'), Mac B runs OpenCode ('oc'). */
+export const sideOf = (role) => (role === 'a' ? 'cc' : role === 'b' ? 'oc' : undefined);
+
+/** What a person types at a hand-off prompt: 'ok' (done), 'fail', 'skip', or undefined (ask again). */
+export function parseRemoteAnswer(text) {
+  if (text === undefined) return 'fail'; // input closed: never wait forever
+  const t = text.trim().toLowerCase();
+  if (t === '' || t === 'y' || t === 'ok') return 'ok';
+  if (t === 'f' || t === 'fail') return 'fail';
+  if (t === 's' || t === 'skip') return 'skip';
+  return undefined;
+}
 
 /** The real path of `path`, also when its last parts do not exist yet (the nearest existing parent is resolved). */
 export function realResolve(path) {
@@ -107,7 +138,18 @@ export function parseArgs(argv) {
     help: false,
     out: DEFAULT_OUT_ROOT,
     only: undefined,
+    role: undefined,
+    sameOwner: false,
+    invite: undefined,
+    runId: undefined,
+    paired: false,
+    manual: false,
+    ccVia: 'claude',
   };
+  // `--name=value` is the same as `--name value`.
+  argv = argv.flatMap((a) =>
+    /^--[a-z-]+=/.test(a) ? [a.slice(0, a.indexOf('=')), a.slice(a.indexOf('=') + 1)] : [a],
+  );
   const value = (i, name) => {
     const v = argv[i + 1];
     if (v === undefined || v.startsWith('--')) throw new Error(`${name} needs a value`);
@@ -178,6 +220,45 @@ export function parseArgs(argv) {
         options.approvalTimeoutMs = number(i, arg, 1) * 60_000;
         i += 1;
         break;
+      case '--role': {
+        const v = value(i, arg);
+        if (v !== 'a' && v !== 'b') throw new Error('--role must be a or b');
+        options.role = v;
+        i += 1;
+        break;
+      }
+      case '--same-owner':
+        options.sameOwner = true;
+        break;
+      case '--paired':
+        options.paired = true;
+        break;
+      case '--manual':
+        options.manual = true;
+        break;
+      case '--cc-via': {
+        const v = value(i, arg);
+        if (v !== 'claude' && v !== 'opencode')
+          throw new Error('--cc-via must be claude or opencode');
+        options.ccVia = v;
+        i += 1;
+        break;
+      }
+      case '--invite': {
+        const v = value(i, arg);
+        // The value is never echoed: an invite link is a secret.
+        if (!validInviteUrl(v)) throw new Error('--invite is not a valid invite link');
+        options.invite = v;
+        i += 1;
+        break;
+      }
+      case '--run-id': {
+        const v = value(i, arg);
+        if (!RUN_ID.test(v)) throw new Error('--run-id must look like 20261017-101500');
+        options.runId = v;
+        i += 1;
+        break;
+      }
       case '--only':
         options.only = value(i, arg)
           .split(',')
@@ -186,10 +267,35 @@ export function parseArgs(argv) {
         i += 1;
         break;
       default:
-        throw new Error(`unknown option ${String(arg)}`);
+        // Never echo an argument that may hold an invite link.
+        throw new Error(
+          `unknown option ${String(arg).includes('://') ? '<redacted>' : String(arg).slice(0, 40)}`,
+        );
     }
   }
   if (options.ccAgent === options.ocAgent) throw new Error('the two agents must differ');
+  if (options.role === undefined) {
+    for (const [flag, set] of [
+      ['--same-owner', options.sameOwner],
+      ['--invite', options.invite !== undefined],
+      ['--run-id', options.runId !== undefined],
+      ['--paired', options.paired],
+      ['--manual', options.manual],
+    ]) {
+      if (set) throw new Error(`${flag} needs --role`);
+    }
+    if (options.ccVia !== 'claude') throw new Error('--cc-via needs --role a');
+  } else if (options.role === 'b' && options.ccVia !== 'claude') {
+    throw new Error('--cc-via is for --role a (Mac B always uses OpenCode)');
+  } else if (options.role === 'a') {
+    for (const [flag, set] of [
+      ['--invite', options.invite !== undefined],
+      ['--run-id', options.runId !== undefined],
+      ['--paired', options.paired],
+    ]) {
+      if (set) throw new Error(`${flag} is for --role b (Mac A creates the invite and the run ID)`);
+    }
+  }
   // Symlinks resolved on both sides, so a link into the repository is refused too.
   options.out = realResolve(options.out);
   const rel = relative(realResolve(REPO_ROOT), options.out);
@@ -949,16 +1055,83 @@ export function approvalBox(agent, approvalId, minutes) {
  * A step whose `needs` are not in the context is skipped with the reason; nothing is retried.
  */
 export async function runPlan(steps, deps, only) {
-  const ctx = {};
+  const ctx = { ...(deps.initialCtx ?? {}) };
   const results = [];
+  // Two-machine mode: `deps.side` is this Mac's harness ('cc' | 'oc'); the other side's steps are
+  // run by a person on the other Mac and confirmed here with `deps.waitRemote`.
+  const side = deps.side;
   for (const step of steps) {
-    const base = { id: step.id, title: step.title, harness: step.harness };
+    const base = {
+      id: step.id,
+      title: step.title,
+      harness: step.harness,
+      ...(side === undefined ? {} : { local: step.harness === side }),
+    };
     if (only !== undefined && !only.includes(step.id)) {
       results.push({ ...base, outcome: 'skip', notes: ['not selected'], seconds: 0 });
       continue;
     }
     if (ctx.alreadyPaired && step.skipWhenPaired) {
-      results.push({ ...base, outcome: 'skip', notes: ['already paired'], seconds: 0 });
+      results.push({
+        ...base,
+        outcome: 'skip',
+        ...(side === undefined ? {} : { benign: true }),
+        notes: ['already paired'],
+        seconds: 0,
+      });
+      continue;
+    }
+    if (side !== undefined && step.harness !== side) {
+      const meta = STEP_META[step.id] ?? { sets: [] };
+      const skip = (note) =>
+        results.push({ ...base, outcome: 'skip', benign: true, notes: [note], seconds: 0 });
+      if (ctx.alreadyPaired && meta.skipWhenPaired) {
+        skip('already paired');
+      } else if (meta.sets.length > 0 && meta.sets.every((key) => ctx[key])) {
+        skip('given by hand');
+      } else {
+        const answer = await deps.waitRemote(step, { side, approval: step.approval !== undefined });
+        if (answer === 'ok') {
+          for (const key of meta.sets) ctx[key] = true;
+          results.push({
+            ...base,
+            outcome: 'remote',
+            notes: ['done on the other Mac (you confirmed it)'],
+            seconds: 0,
+          });
+        } else if (answer === 'skip') {
+          skip('you skipped it');
+        } else {
+          results.push({
+            ...base,
+            outcome: 'remote-fail',
+            notes: ['you reported that it failed on the other Mac'],
+            seconds: 0,
+          });
+        }
+      }
+      continue;
+    }
+    if (deps.manual) {
+      // A key that is only a `true` marker has no value here: show the placeholder.
+      const known = Object.fromEntries(Object.entries(ctx).filter(([, v]) => v !== true));
+      const prompt = step.prompt({ ...MANUAL_PLACEHOLDERS, ...known });
+      const answer = await deps.manualStep(step, prompt);
+      const done = answer === 'ok';
+      results.push({
+        ...base,
+        outcome: done ? 'manual' : answer === 'skip' ? 'skip' : 'fail',
+        ...(answer === 'skip' ? { benign: true } : {}),
+        notes: [
+          done
+            ? 'you confirmed it (not checked by the script)'
+            : answer === 'unconfirmed'
+              ? 'the contact is not in the list'
+              : 'you reported it did not work',
+        ],
+        seconds: 0,
+      });
+      if (done) for (const key of STEP_META[step.id]?.sets ?? []) ctx[key] = true;
       continue;
     }
     const missing = (ctx.alreadyPaired && step.pairedOk ? [] : step.needs).filter(
@@ -1023,22 +1196,199 @@ export async function runPlan(steps, deps, only) {
       }
     }
     results.push(result);
+    await deps.afterStep?.(step, ctx, result);
   }
   return { results, ctx };
+}
+
+/**
+ * Two-machine mode: what each step hands to the steps after it on the other Mac (`sets`: context keys
+ * that Mac cannot read itself) and whether it is moot when the agents are already paired.
+ */
+export const STEP_META = Object.freeze({
+  P1: { sets: ['inviteUrl'], skipWhenPaired: true },
+  P2: { sets: ['inviteApproval'] },
+  P3: { sets: [] },
+  P4: { sets: ['paired'] },
+  M1: { sets: [] },
+  M2: { sets: [] },
+  M3: { sets: [] },
+  H1: { sets: [] },
+  H2: { sets: [] },
+  F1: { sets: [] },
+  T1: { sets: ['offered'] },
+  T2: { sets: ['offerId'] },
+  T3: { sets: ['countered'] },
+  T4: { sets: ['counterId'] },
+  T5: { sets: ['acceptApproval'] },
+  T6: { sets: ['agreed'] },
+  T7: { sets: [] },
+});
+
+/** In manual mode the prompts show these placeholders for values only the chat knows. */
+const MANUAL_PLACEHOLDERS = Object.freeze({
+  inviteUrl: '<the invite link from Mac A>',
+  inviteApproval: '<the approval ID your agent showed>',
+  offerId: '<the offer ID your agent showed>',
+  counterId: '<the counter-offer ID your agent showed>',
+  acceptApproval: '<the approval ID your agent showed>',
+});
+
+/** The box for one chat step you run by hand: the exact prompt on its own lines. */
+export function manualBox(step, prompt, sameOwner) {
+  return [
+    `YOUR TURN: ${step.id} ${step.title}`,
+    'Paste this into your agent, exactly (between the lines):',
+    '----',
+    prompt,
+    '----',
+    ...(step.approval
+      ? [
+          `It will ask for an owner approval. Type in your own terminal: agentlink approve --agent <name> <approvalId> (${sameOwner ? 'you are the owner on both Macs' : 'you are the owner of this Mac'}). Never give the owner code to the agent.`,
+        ]
+      : []),
+    'Press Enter when it worked, f if it did not, s to skip.',
+  ].join('\n');
+}
+
+/** The M1 checks each step counts towards (02 journeys; I-5 and F1 are safety checks, not journeys). */
+export const STEP_CHECKS = Object.freeze({
+  P1: ['J1'],
+  P2: ['J1', 'J4'],
+  P3: ['J1'],
+  P4: ['J1', 'J9'],
+  M1: ['J1', 'J9'],
+  M2: ['J1', 'J9'],
+  M3: ['J1', 'J9'],
+  H1: ['I-5'],
+  H2: ['I-5'],
+  F1: ['F1'],
+  T1: ['J8'],
+  T2: ['J8'],
+  T3: ['J8'],
+  T4: ['J8'],
+  T5: ['J8', 'J4'],
+  T6: ['J8'],
+  T7: ['J8'],
+});
+
+/** J2, J3 and J5 need files, credits and proof (M1b); this tool does not run them. */
+export const NOT_COVERED =
+  'J2, J3, J5 (files, credits, third-party proof: check by hand once M1b has landed)';
+
+/**
+ * Per check, what this Mac verified and what only the other Mac did: `{ check, here, there, status }`.
+ * `status` is 'verified' (all local steps passed), 'confirmed by you (...)' (some passed only as manual), 'FAILED' (a local step failed or was skipped for
+ * a reason) or 'other Mac only' (no local step). Local steps only count here.
+ */
+export function checkSummary(results) {
+  const byCheck = new Map();
+  for (const r of results) {
+    for (const check of STEP_CHECKS[r.id] ?? []) {
+      const entry = byCheck.get(check) ?? { check, here: [], there: [] };
+      (r.local === false ? entry.there : entry.here).push(r);
+      byCheck.set(check, entry);
+    }
+  }
+  return [...byCheck.values()].map(({ check, here, there }) => ({
+    check,
+    here: here.map((r) => r.id),
+    there: there.map((r) => r.id),
+    status:
+      here.length === 0
+        ? 'other Mac only'
+        : here.every((r) => r.outcome === 'pass' || r.outcome === 'manual' || r.benign === true)
+          ? here.some((r) => r.outcome === 'manual')
+            ? 'confirmed by you (not checked by the script)'
+            : 'verified'
+          : 'FAILED',
+  }));
+}
+
+/** Two-machine exit status: no local failure and no failure reported for the other Mac. */
+export function sideOk(results) {
+  return results.every(
+    (r) =>
+      r.outcome === 'pass' || r.outcome === 'remote' || (r.outcome === 'skip' && r.benign === true),
+  );
+}
+
+/** The box shown on Mac A with the command to run on Mac B. The invite link is a secret: terminal only. */
+export function handoffBox(options, runId, inviteUrl) {
+  const q = (v) => `'${String(v).replace(/'/g, `'\\''`)}'`;
+  const parts = [
+    'node tools/dogfood/run.mjs --role b',
+    `--run-id ${runId}`,
+    `--invite ${q(inviteUrl)}`,
+    `--cc-agent ${options.ccAgent} --oc-agent ${options.ocAgent}`,
+    ...(options.sameOwner ? ['--same-owner'] : []),
+    ...(options.manual ? ['--manual'] : []),
+    ...(options.agentlinkBin !== DEFAULTS.agentlinkBin
+      ? [`--agentlink ${q(options.agentlinkBin)}`]
+      : []),
+    ...(options.opencodeBin !== DEFAULTS.opencodeBin
+      ? [`--opencode ${q(options.opencodeBin)}`]
+      : []),
+    ...(options.ocModel === undefined ? [] : [`--oc-model ${q(options.ocModel)}`]),
+  ];
+  const lines = [
+    'MAC B: run this on the other Mac (copy it by hand; do not paste it into a chat or a file)',
+    '',
+    parts.join(' '),
+    '',
+    'Paths (--agentlink, --opencode) are copied from this Mac: change them if Mac B differs.',
+    'Then answer the prompts here when Mac B shows the step done.',
+  ];
+  return lines.join('\n');
+}
+
+/** The prompt on a Mac while the other Mac runs a step. */
+export function remoteBox(step, { side, approval }, sameOwner) {
+  const other = side === 'cc' ? 'Mac B (OpenCode)' : 'Mac A (Claude Code)';
+  const who = sameOwner ? 'you (same owner)' : 'the owner of that Mac';
+  const lines = [
+    `WAIT FOR THE OTHER MAC: ${step.id} ${step.title}`,
+    `${other} runs this step now.`,
+    ...(approval
+      ? [`It will ask ${who} to type an approval on ${other}; this Mac cannot do that.`]
+      : []),
+    'Press Enter when that Mac shows the step done, f if it failed, s to skip.',
+  ];
+  return lines.join('\n');
 }
 
 // ---------------------------------------------------------------------------------------------
 // Results
 
 export function renderResultsMd(meta, results) {
+  const title =
+    meta.role === undefined
+      ? ''
+      : ` (Mac ${meta.role.toUpperCase()}, ${meta.sameOwner ? 'same owner' : 'two owners'})`;
   const esc = (s) => String(s).replace(/\|/g, '\\|').replace(/\n/g, ' ');
   const rows = results.map(
     (r) =>
-      `| ${r.id} | ${esc(r.title)} | ${r.harness === 'cc' ? 'Claude Code' : 'OpenCode'} | ${r.outcome} | ${String(r.seconds)} s | ${esc(r.notes.join('; '))} |`,
+      `| ${r.id} | ${esc(r.title)} | ${r.harness === 'cc' ? 'Claude Code' : 'OpenCode'}${r.local === false ? ' (other Mac)' : ''} | ${r.outcome} | ${String(r.seconds)} s | ${esc(r.notes.join('; '))} |`,
   );
   const pass = results.filter((r) => r.outcome === 'pass').length;
+  const checks =
+    meta.role === undefined
+      ? []
+      : [
+          '',
+          '## Checks verified on this Mac',
+          '',
+          '| Check | This Mac ran | Other Mac ran | Result |',
+          '|---|---|---|---|',
+          ...checkSummary(results).map(
+            (c) =>
+              `| ${c.check} | ${c.here.join(', ') || '-'} | ${c.there.join(', ') || '-'} | ${c.status} |`,
+          ),
+          '',
+          `Not covered by this tool: ${NOT_COVERED}.`,
+        ];
   return [
-    `# AgentLink local dogfood ${meta.startedAt}`,
+    `# AgentLink ${meta.role === undefined ? 'local ' : ''}dogfood${title} ${meta.startedAt}`,
     '',
     `Agents: ${meta.ccAgent} (Claude Code ${meta.versions.claude}), ${meta.ocAgent} (OpenCode ${meta.versions.opencode}); AgentLink ${meta.versions.agentlink}`,
     `Passed ${String(pass)} of ${String(results.length)}; secret scan: ${meta.scan}`,
@@ -1046,6 +1396,7 @@ export function renderResultsMd(meta, results) {
     '| Step | What | Harness | Result | Time | Notes |',
     '|---|---|---|---|---|---|',
     ...rows,
+    ...checks,
     '',
   ].join('\n');
 }
@@ -1111,6 +1462,13 @@ export function planText(options, steps) {
   const lines = [
     'AgentLink local dogfood: DRY RUN (nothing is started or written)',
     '',
+    ...(options.role === undefined
+      ? []
+      : [
+          `Two-machine run   Mac ${options.role.toUpperCase()} (${options.role === 'a' ? 'Claude Code, creates the invite' : 'OpenCode, accepts the invite'}), ${options.sameOwner ? 'same owner on both Macs' : 'a different owner per Mac'}`,
+          'Steps of the other Mac are marked [other Mac]: you confirm them here by hand.',
+          '',
+        ]),
     `Results folder   ${join(options.out, '<timestamp>')}`,
     `Claude Code      ${options.claudeBin} -p (your subscription), agent ${options.ccAgent}`,
     `OpenCode         ${options.opencodeBin} run (model: ${options.ocModel ?? 'the one set in OpenCode'}), agent ${options.ocAgent}`,
@@ -1123,7 +1481,7 @@ export function planText(options, steps) {
   ];
   for (const s of steps) {
     lines.push(
-      `${s.id.padEnd(3)} ${s.harness === 'cc' ? 'Claude Code' : 'OpenCode   '}  ${s.title}${s.approval ? '   [waits for your approval]' : ''}`,
+      `${s.id.padEnd(3)} ${s.harness === 'cc' ? 'Claude Code' : 'OpenCode   '}  ${s.title}${options.role !== undefined && s.harness !== sideOf(options.role) ? '   [other Mac]' : ''}${s.approval && (options.role === undefined || s.harness === sideOf(options.role)) ? '   [waits for your approval]' : ''}`,
     );
   }
   lines.push(

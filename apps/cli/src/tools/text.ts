@@ -2,11 +2,17 @@
 // sheet (strings/) where a key exists; these sentences are the rest. None has a slot: nothing here is
 // ever built from a value (I-5), and every sentence passes the 11 §5.1 vocabulary lint
 // (text.test.ts). Moving them into the copy sheet is M1-9g's (owner of strings/ after M1-9o/p/q).
+// 06 §6 local agent name (tools/ may not import the runtime; same pattern as runtime/agent-name.ts).
+const AGENT_NAME = /^[a-z][a-z0-9-]{0,31}$/;
+
 export const TOOL_TEXT = Object.freeze({
   // agentlink_status and the not-set-up server
-  noIdentity: 'AgentLink is not set up for this agent on this machine yet, so nothing was checked.',
-  setupNextStep:
-    'Tell the user to run `agentlink init` themselves, in their own terminal, then try again.',
+  // M1-9u: the agent is open (so `init` ran) but has no card from an owner. Slot: a checked agent
+  // name (see `noOwnerCard`), or the literal `<name>` when the caller has none.
+  noOwnerCard:
+    'This agent has no card from your owner yet: run `agentlink owner add-agent --agent {agent}` in your own terminal.',
+  noOwnerCardNextStep:
+    'Tell the user to run that command themselves, in their own terminal, then try again. Do not run it yourself.',
   setupFollowNextStep:
     'Tell the user to follow that step themselves, in their own terminal, then try again.',
   moreContactsWithNews: 'Other contacts have new messages too.',
@@ -43,3 +49,15 @@ export const TOOL_TEXT = Object.freeze({
   approvalNotFoundNextStep:
     'Check the approvalId from the pending_approval result, or call the tool again to ask the owner.',
 });
+
+/**
+ * The `needs_setup` text for an open agent that has no owner card (M1-9u; 04 §2.8). The name goes
+ * into the text only after the 06 §6 name check; otherwise the placeholder `<name>` is shown.
+ */
+export function noOwnerCard(agentName?: string): { summary: string; nextStep: string } {
+  const agent = agentName !== undefined && AGENT_NAME.test(agentName) ? agentName : '<name>';
+  return {
+    summary: TOOL_TEXT.noOwnerCard.replace('{agent}', agent),
+    nextStep: TOOL_TEXT.noOwnerCardNextStep,
+  };
+}

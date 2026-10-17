@@ -1104,6 +1104,46 @@ describe('live subscription', () => {
     expect(liveReqs(s, relay)).toHaveLength(1);
   });
 
+  it('M1-9s: unsubscribe waits for a handler in flight and then writes no cursor and marks nothing', async () => {
+    const s = setup();
+    const [relay] = relayUrls('livestop', 1) as [string];
+    s.net.configure(relay);
+    let release: ((d: SyncDisposition) => void) | undefined;
+    const unsubscribe = s.engine.subscribe({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: (item) => {
+        s.items.push(item);
+        return new Promise<SyncDisposition>((resolve) => {
+          release = resolve;
+        });
+      },
+    });
+    await vi.advanceTimersByTimeAsync(20);
+    expect(s.store.cursors.get(relay)).toBe(NOW);
+    // Past the live cursor interval, so a delivered event would move the cursor.
+    await vi.advanceTimersByTimeAsync(61_000);
+    const fresh = makeWrap(s.recipient, { createdAt: NOW - 60 });
+    s.net.inject(relay, fresh.event);
+    await vi.advanceTimersByTimeAsync(20);
+    expect(ids(s)).toEqual([fresh.event.id]);
+    expect(release).toBeTypeOf('function');
+
+    let done = false;
+    const stopped = unsubscribe().then(() => {
+      done = true;
+    });
+    await vi.advanceTimersByTimeAsync(20);
+    expect(done).toBe(false); // the handler is still running
+    release?.('verified');
+    await vi.advanceTimersByTimeAsync(20);
+    await stopped;
+    expect(done).toBe(true);
+    expect(s.store.cursors.get(relay)).toBe(NOW);
+    expect(s.store.marks).not.toContain(`wrap:${fresh.event.id}`);
+    expect(s.store.has('wrap', fresh.event.id)).toBe(false);
+  });
+
   it('delivers a live duplicate once, and a wrap seen by a sync pass never', async () => {
     const s = setup();
     const [relay] = relayUrls('livedup', 1) as [string];

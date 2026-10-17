@@ -15,7 +15,7 @@ import { copy } from './strings/index.js';
 import { activeContacts, contactRef, renderRef, type ContactRef } from './contacts.js';
 import type { Counts, ToolContext } from './context.js';
 import { fail, ok, type HandlerOutput } from './result.js';
-import { TOOL_TEXT } from './text.js';
+import { TOOL_TEXT, noOwnerCard } from './text.js';
 
 /** 06 §2.1: the catch-up's time budget. */
 export const STATUS_CATCH_UP_BUDGET_MS = 3_000;
@@ -25,7 +25,12 @@ const SUMMARY_CONTACTS = 3;
 export async function statusHandler(_input: unknown, context: ToolContext): Promise<HandlerOutput> {
   const { client, logger } = context;
   const self = await client.self();
-  if (self === undefined) return fail('needs_setup', TOOL_TEXT.noIdentity, TOOL_TEXT.setupNextStep);
+  if (self === undefined)
+    return fail(
+      'needs_setup',
+      noOwnerCard(context.agentName).summary,
+      noOwnerCard(context.agentName).nextStep,
+    );
 
   let counts: Counts;
   try {
