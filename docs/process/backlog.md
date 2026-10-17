@@ -1151,7 +1151,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - M1-1f (follow-up, D-66): owner passphrase minimum. Setting or changing a chosen owner passphrase (kind 2) refuses a candidate with fewer than 12 Unicode code points after NFKC, the same rule as `newKeystoreKek` applies to the agent passphrase. The check runs on `normalizeSecret`'s output, before the KDF (04 §2.8). Tests: 11 code points refused; 12 accepted; a string that NFKC shortens below 12 refused. Unlocking an existing wrap is unaffected.
 
 #### M1-1k · crypto: passkey PRF seed wrapping and recovery code (new, split from M1-1f)
-- **Status:** ready (unblocked by D-82, owner decision 2026-10-17: blob formats `ALKP` and `ALKR` defined in 04 §2.3.1 and §2.3.2) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#228; unblocked by D-82, owner decision 2026-10-17: blob formats `ALKP` and `ALKR` defined in 04 §2.3.1 and §2.3.2) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto, test-vectors/prf-wrap, tools/vectors/
 - **Depends on:** M1-1f, M1-1i; D-82 spec PR merged
 - **Spec:** 04 §2.3, §2.3.1, §2.3.2, §2.8 (`password` kind 1); 08 §2.1
@@ -3513,6 +3513,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Fault injection between parts: the resumed run republishes the same signed envelope; no second envelope ID exists.
   - Review cases (IR-D55-1): two concurrent retries with one `approvalId` → one `accept` (F06); a second scope for the same envelope voids the pending first, and both approved never yields two accepts (F06); a grant row inserted directly in the store authorises nothing (F10); `cancel` voids a waiting receipt (F11); `note` with `accept` → `INVALID_ARGUMENT` (F03); a counterparty offer whose `previousTermsHash` points to an older version, or a second envelope for an existing version, is refused, and concurrent counters void pending scopes on both versions but never one whose `accept` ran (F04, IR-D55-2 N01); an `accept` of version 3 arriving after version 4 was sent is stored and offered for `confirm` with the warning (F08); the digest computed at creation verifies at run time (F05).
   - Property test: across random interleavings of offers, counters, approvals and `proof` envelopes, no scope ever sends more than one `accept` or signs more than one receipt, and nothing runs without an owner-signed approval or a matching grant.
+
+#### M1-32-d · core: one clock read for an approval scope (new, e2e flake on J8)
+- **Status:** in review (2026-10-17) · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (`src/approvals.ts`), apps/cli (`src/tools/terms-common.ts`)
+- **Depends on:** M1-32
+- **Spec:** 04 §3.4.1, §3.4.2 (`scope.createdAt` equals `requestedAt`); 06 §2.2a
+- **Invariants:** I-4, I-5
+- **Scope:** `#commit` built the commitment scope at one clock read and `approvals.request` took `requestedAt` from a second; a second boundary between them failed the `approval-request` schema (`approval_action_invalid` → tool `INTERNAL`), intermittently failing the J8 e2e. The request now starts at the scope's `createdAt` (refused if in the future or more than 60 s old), and the row and its parts are stored at that time. `approval_scope_expired` maps to `TERMS_EXPIRED`. The other `approvals.request` callers (invite accept in the tool and the CLI) carry no scope and read the clock once; `send` and notarize make no owner request today.
+- **Acceptance:** RED commit: a core test whose clock ticks on every read gets `pending_approval` (failed with `approval_action_invalid`), and the approval then sends the accept once; an approvals unit test for a stale and a future scope.
 
 #### M1-32-c · MCP terms tools: accept and pass `clientRequestId` (new, IR-M1-22-1)
 - **Status:** done (4thtech/agentlink#199) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a

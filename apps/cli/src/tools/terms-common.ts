@@ -223,6 +223,9 @@ export function termsCoreError(error: unknown): HandlerOutput | undefined {
       return fail('error', SEND_TEXT.tooLarge, SEND_TEXT.tooLargeNextStep, 'MESSAGE_TOO_LARGE');
     case 'payload_invalid':
       return invalidArgument();
+    // The scope expired while the owner request was being stored (M1-32-d): the terms' refusal.
+    case 'approval_scope_expired':
+      return termsRefusal('TERMS_EXPIRED', true);
     default:
       return undefined;
   }
