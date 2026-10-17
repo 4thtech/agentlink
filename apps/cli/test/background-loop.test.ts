@@ -90,6 +90,13 @@ class RelayNetwork implements RelayConnector {
   readonly stored = new Map<string, NostrEvent[]>();
   /** EVENT frames received, by `relay|event id`. */
   readonly frames = new Map<string, number>();
+  /** Open REQ subscriptions (NIP-01: until CLOSE), which get each new event live (M1-9s). */
+  readonly subs = new Set<{
+    relay: string;
+    subId: string;
+    filter: Filter;
+    push: (frame: unknown) => void;
+  }>();
 
   open(target: RelayTarget, handlers: RelaySocketHandlers): RelaySocket {
     let closed = false;
@@ -97,6 +104,11 @@ class RelayNetwork implements RelayConnector {
       void Promise.resolve().then(() => {
         if (!closed) handlers.onMessage(JSON.stringify(frame));
       });
+    };
+    const drop = (subId?: string): void => {
+      for (const sub of [...this.subs]) {
+        if (sub.push === push && (subId === undefined || sub.subId === subId)) this.subs.delete(sub);
+      }
     };
     void Promise.resolve().then(() => handlers.onOpen());
     return {
@@ -107,21 +119,39 @@ class RelayNetwork implements RelayConnector {
           const key = `${target.url}|${event.id}`;
           this.frames.set(key, (this.frames.get(key) ?? 0) + 1);
           const list = this.stored.get(target.url) ?? [];
-          if (!list.some((e) => e.id === event.id)) list.push(event);
+          const isNew = !list.some((e) => e.id === event.id);
+          if (isNew) list.push(event);
           this.stored.set(target.url, list);
           push(['OK', event.id, true, '']);
+          if (isNew) {
+            for (const sub of [...this.subs]) {
+              if (sub.relay === target.url && matches(sub.filter, event)) {
+                sub.push(['EVENT', sub.subId, event]);
+              }
+            }
+          }
         } else if (frame[0] === 'REQ') {
           const subId = frame[1] as string;
           const filter = frame[2] as Filter;
+          drop(subId);
           const events = (this.stored.get(target.url) ?? []).filter((e) => matches(filter, e));
           for (const e of events.slice(0, filter.limit ?? events.length)) push(['EVENT', subId, e]);
           push(['EOSE', subId]);
+          this.subs.add({ relay: target.url, subId, filter, push });
+        } else if (frame[0] === 'CLOSE') {
+          drop(frame[1] as string);
         }
       },
       close: () => {
         closed = true;
+        drop();
       },
     };
+  }
+
+  /** Live REQs (limit 0) open on `relays`. */
+  liveOn(relays: readonly string[]): number {
+    return [...this.subs].filter((s) => relays.includes(s.relay) && s.filter.limit === 0).length;
   }
 }
 
@@ -382,6 +412,30 @@ describe('background loop: pairing with no tool call (M1-9r)', () => {
     await expect(running).resolves.toBe(0);
     expect(await leaseRows(alice.store)).toEqual([]);
     expect(timers.pending.size).toBe(0);
+  });
+
+  it('M1-9s: with a live subscription, a handshake reaching a relay completes the pairing with no further pass', async () => {
+    const alpha = ['wss://one.relay-alpha.net', 'wss://two.relay-alpha.net'];
+    const timers = new ManualTimers();
+    const { client, running } = await serveAlice(timers);
+    await takeLease(timers);
+    timers.fire(0); // the start-up pass: catch-up, then the live subscription opens
+    await until(() => timers.has(30_000));
+    await until(() => net.liveOn(alpha) === alpha.length);
+
+    await inviteAccepted(alice.client, bob);
+    // No timer is fired: the subscription stores and processes the handshake.
+    await vi.waitFor(async () => expect(await paired(alice.client, bob.client)).toBe(true), {
+      timeout: 15_000,
+      interval: 5,
+    });
+    expect(timers.has(30_000)).toBe(true); // the next pass has not run
+
+    // Shutdown closes the subscription (no live REQ left) and releases the lease.
+    await client.close();
+    await expect(running).resolves.toBe(0);
+    expect(net.liveOn(alpha)).toBe(0);
+    expect(await leaseRows(alice.store)).toEqual([]);
   });
 
   it('with a subscription, a pass that processed something sends resources/updated', async () => {

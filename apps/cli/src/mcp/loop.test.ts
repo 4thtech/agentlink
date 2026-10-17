@@ -10,12 +10,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   attachInboxResource,
   BackgroundLoop,
+  CATCH_UP_INTERVAL_MS,
   INBOX_RESOURCE_URI,
   LEASE_INTERVAL_MS,
   PARTIAL_RETRY_MS,
   SYNC_INTERVAL_MS,
   type LoopClient,
   type LoopLease,
+  type LoopSubscription,
   type LoopTimers,
 } from './loop.js';
 
@@ -344,6 +346,227 @@ describe('background loop (M1-9r)', () => {
     s.sync.mockResolvedValueOnce({ partial: false, stored: 0, reports: [{}] });
     await loop.pass();
     expect(onInboxChanged).toHaveBeenCalledTimes(2);
+    await loop.stop();
+  });
+});
+
+type Processed = (r: { readonly stored: number; readonly reports: readonly unknown[] }) => void;
+
+/** A live subscription double: records close calls; `onProcessed` is the core's callback. */
+class StubSubscription implements LoopSubscription {
+  closed = false;
+  closes = 0;
+  constructor(
+    readonly onProcessed: Processed | undefined,
+    readonly order: string[],
+  ) {}
+  close(): Promise<void> {
+    this.closes += 1;
+    this.closed = true;
+    this.order.push('close');
+    return Promise.resolve();
+  }
+}
+
+interface LiveStub extends Stub {
+  subs: StubSubscription[];
+  subscribe: ReturnType<typeof vi.fn>;
+  order: string[];
+}
+
+function liveStubClient(): LiveStub {
+  const s = stubClient();
+  const order: string[] = [];
+  const subs: StubSubscription[] = [];
+  const subscribe = vi.fn((options?: { onProcessed?: Processed }) => {
+    const sub = new StubSubscription(options?.onProcessed, order);
+    subs.push(sub);
+    order.push('subscribe');
+    return Promise.resolve(sub);
+  });
+  const release = s.lease.release.bind(s.lease);
+  s.lease.release = () => {
+    order.push('release');
+    return release();
+  };
+  return { ...s, subs, subscribe, order, client: { ...s.client, subscribeInbox: subscribe } };
+}
+
+describe('background loop with live subscriptions (M1-9s)', () => {
+  it('the start-up pass catches up, then opens the subscription; later passes deliver without a fetch', async () => {
+    const s = liveStubClient();
+    const timers = new ManualTimers();
+    const loop = new BackgroundLoop({ client: s.client, logger, timers });
+    loop.start();
+    timers.fire(0);
+    await flush();
+    timers.fire(0); // the start-up pass
+    await flush();
+    expect(s.sync).toHaveBeenCalledTimes(1); // the 48 h look-back runs first
+    expect(s.subscribe).toHaveBeenCalledTimes(1);
+    expect(s.deliver).toHaveBeenCalledTimes(1);
+    expect(loop.live).toBe(true);
+    // While live, a pass delivers due outbox rows but does not repeat the catch-up fetch.
+    timers.fire(SYNC_INTERVAL_MS);
+    await flush();
+    expect(s.sync).toHaveBeenCalledTimes(1);
+    expect(s.deliver).toHaveBeenCalledTimes(2);
+    expect(s.subscribe).toHaveBeenCalledTimes(1);
+    await loop.stop();
+  });
+
+  it('a fallback catch-up still runs every CATCH_UP_INTERVAL_MS while live', async () => {
+    const s = liveStubClient();
+    const timers = new ManualTimers();
+    const loop = new BackgroundLoop({ client: s.client, logger, timers });
+    loop.start();
+    timers.fire(0);
+    await flush();
+    timers.fire(0);
+    await flush();
+    const passes = CATCH_UP_INTERVAL_MS / SYNC_INTERVAL_MS;
+    expect(Number.isInteger(passes) && passes > 1).toBe(true);
+    for (let i = 1; i < passes; i += 1) {
+      timers.fire(SYNC_INTERVAL_MS);
+      await flush();
+    }
+    expect(s.sync).toHaveBeenCalledTimes(1);
+    timers.fire(SYNC_INTERVAL_MS);
+    await flush();
+    expect(s.sync).toHaveBeenCalledTimes(2);
+    await loop.stop();
+  });
+
+  it('notifies after the subscription processed something', async () => {
+    const s = liveStubClient();
+    const onInboxChanged = vi.fn();
+    const loop = new BackgroundLoop({
+      client: s.client,
+      logger,
+      timers: new ManualTimers(),
+      onInboxChanged,
+    });
+    loop.start();
+    await loop.leaseStep();
+    await loop.pass();
+    const sub = s.subs[0];
+    expect(sub?.onProcessed).toBeTypeOf('function');
+    sub?.onProcessed?.({ stored: 0, reports: [] });
+    expect(onInboxChanged).not.toHaveBeenCalled();
+    sub?.onProcessed?.({ stored: 1, reports: [{}] });
+    expect(onInboxChanged).toHaveBeenCalledTimes(1);
+    await loop.stop();
+  });
+
+  it('closes the subscription when the lease is lost, and reopens it after a new start-up catch-up', async () => {
+    const s = liveStubClient();
+    const loop = new BackgroundLoop({ client: s.client, logger, timers: new ManualTimers() });
+    loop.start();
+    await loop.leaseStep();
+    await loop.pass();
+    expect(s.subs).toHaveLength(1);
+    s.lease.available = false;
+    await loop.leaseStep();
+    await flush();
+    expect(s.subs[0]?.closes).toBe(1);
+    expect(loop.live).toBe(false);
+    // Regained: the start-up pass (look-back) runs again before a new subscription opens.
+    s.lease.available = true;
+    await loop.leaseStep();
+    await loop.pass();
+    expect(s.sync).toHaveBeenCalledTimes(2);
+    expect(s.subs).toHaveLength(2);
+    expect(s.subs[1]?.closed).toBe(false);
+    await loop.stop();
+    expect(s.subs[1]?.closes).toBe(1);
+  });
+
+  it('stop closes the subscription before it releases the lease', async () => {
+    const s = liveStubClient();
+    const loop = new BackgroundLoop({ client: s.client, logger, timers: new ManualTimers() });
+    loop.start();
+    await loop.leaseStep();
+    await loop.pass();
+    await loop.stop();
+    expect(s.order).toEqual(['subscribe', 'close', 'release']);
+    await loop.stop();
+    expect(s.subs[0]?.closes).toBe(1);
+  });
+
+  it('a subscription that opens after the lease was lost is closed at once', async () => {
+    const s = liveStubClient();
+    let open: (() => void) | undefined;
+    s.subscribe.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          open = () => {
+            const sub = new StubSubscription(undefined, s.order);
+            s.subs.push(sub);
+            resolve(sub);
+          };
+        }),
+    );
+    const loop = new BackgroundLoop({ client: s.client, logger, timers: new ManualTimers() });
+    loop.start();
+    await loop.leaseStep();
+    const pass = loop.pass();
+    await flush();
+    expect(open).toBeTypeOf('function');
+    s.lease.available = false;
+    await loop.leaseStep();
+    open?.();
+    await pass;
+    await flush();
+    expect(s.subs).toHaveLength(1);
+    expect(s.subs[0]?.closes).toBe(1);
+    expect(loop.live).toBe(false);
+    await loop.stop();
+  });
+
+  it('a subscription that cannot open is logged with a fixed code; polling continues and it is tried again', async () => {
+    const s = liveStubClient();
+    s.subscribe.mockRejectedValueOnce(
+      Object.assign(new Error(CANARY), { code: 'transport_unavailable' }),
+    );
+    const timers = new ManualTimers();
+    const loop = new BackgroundLoop({ client: s.client, logger, timers });
+    loop.start();
+    timers.fire(0);
+    await flush();
+    timers.fire(0);
+    await flush();
+    expect(loop.live).toBe(false);
+    expect(s.deliver).toHaveBeenCalledTimes(1);
+    const log = lines.join('\n');
+    expect(log).toContain('live subscription unavailable');
+    expect(log).toContain('transport_unavailable');
+    expect(log).not.toContain('CANARY');
+    expect(log).not.toContain('evil');
+    // The next pass polls (a catch-up) and tries the subscription again.
+    timers.fire(SYNC_INTERVAL_MS);
+    await flush();
+    expect(s.sync).toHaveBeenCalledTimes(2);
+    expect(s.subscribe).toHaveBeenCalledTimes(2);
+    expect(loop.live).toBe(true);
+    await loop.stop();
+  });
+
+  it('a subscription the core closed (client closed) falls back to polling', async () => {
+    const s = liveStubClient();
+    const timers = new ManualTimers();
+    const loop = new BackgroundLoop({ client: s.client, logger, timers });
+    loop.start();
+    timers.fire(0);
+    await flush();
+    timers.fire(0);
+    await flush();
+    const sub = s.subs[0];
+    if (sub !== undefined) sub.closed = true;
+    expect(loop.live).toBe(false);
+    timers.fire(SYNC_INTERVAL_MS);
+    await flush();
+    expect(s.sync).toHaveBeenCalledTimes(2);
+    expect(s.subscribe).toHaveBeenCalledTimes(2);
     await loop.stop();
   });
 });
