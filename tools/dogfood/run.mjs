@@ -27,6 +27,7 @@ import {
   parseRemoteAnswer,
   remoteBox,
   sideOf,
+  ambiguityProblem,
   sideOk,
   validInviteUrl,
   childEnv,
@@ -106,6 +107,22 @@ async function preflight(options, dir) {
           );
         }
       }
+    }
+    // M1-23-c: two contacts with the peer's name make every name in a prompt ambiguous.
+    const pairs =
+      side === 'cc'
+        ? [[options.ccAgent, options.ocAgent]]
+        : side === 'oc'
+          ? [[options.ocAgent, options.ccAgent]]
+          : [
+              [options.ccAgent, options.ocAgent],
+              [options.ocAgent, options.ccAgent],
+            ];
+    for (const [agent, peer] of pairs) {
+      const r = agentlinkRun(options, ['contacts', '--agent', agent]);
+      if (!r.ok) continue;
+      const problem = ambiguityProblem(r.text, agent, peer);
+      if (problem !== undefined) problems.push(problem);
     }
   }
   return { versions, problems };
