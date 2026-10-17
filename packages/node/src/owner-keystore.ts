@@ -677,8 +677,9 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
    * agent card names the owner, so there is no expected owner to check against. The owner keys are
    * taken from the item itself: the seed the owner code (or opted-in passphrase) unwraps derives
    * them, and the returned store expects exactly those keys from then on. The authenticated
-   * decryption under the typed secret is the only check, so the caller MUST show the owner
-   * fingerprint and have the owner confirm it before the session signs anything.
+   * decryption under the typed secret is the only check, so `confirm` (which MUST show the owner
+   * fingerprint and ask the owner) runs before the session is issued; false returns null and
+   * issues nothing. The seed is held only until the answer and wiped either way.
    *
    * `owner_missing` without an item, `owner_mismatch` when it is not 90 bytes, `presence_rejected`
    * for a wrong secret or a damaged item (one answer, 04 §2.8). The presented secret, the blob and
@@ -687,12 +688,13 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
   static async unlockWithoutCard(
     keychain: KeychainBackend,
     presence: OwnerPresence,
+    confirm: (owner: OwnerPublicKeys) => Promise<boolean>,
     options: UnlockOptions & KeychainOwnerKeyStoreOptions = {},
   ): Promise<{
     readonly store: KeychainOwnerKeyStore;
     readonly session: OwnerSession;
     readonly owner: OwnerPublicKeys;
-  }> {
+  } | null> {
     const secret = presenceSecret(presence);
     let blob: Uint8Array | null = null;
     let seed: Uint8Array | undefined;
@@ -719,6 +721,9 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
         throw error;
       }
       const owner = publicKeysOf(seed);
+      // The owner confirms the derived fingerprint before any session exists, so the session's
+      // TTL starts only after the answer (IR-M1-9x-1 L-2). Declining issues nothing.
+      if (!(await confirm(ownerKeysCopy(owner)))) return null;
       const store = new KeychainOwnerKeyStore(keychain, ownerKeysCopy(owner), timeoutMs);
       const session = store.#issue(seed, ttlMs);
       return Object.freeze({ store, session, owner: ownerKeysCopy(owner) });

@@ -3244,6 +3244,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `@agentlink/crypto/keystore` gains `openOwnerSeedWithoutCard` (all other `openOwnerSeed` rules unchanged; `openOwnerSeed` still refuses a missing expected owner).
   - `hasOwnerOnMachine()` (`@agentlink/node`): a store-only check (no secret read, nothing unlocked) whether the owner item exists, for `doctor` and messages (the `doctor` wiring is M1-9u (a)).
 - **Acceptance:** tests first (RED commit): after every agent is removed, add-agent succeeds and names the same owner; a call with an AI-app marker is refused before the owner item is read; declining the fingerprint or three wrong entries writes nothing; no owner code in the output, an error or the result; the existing add-agent path is unchanged.
+- **Notes (IR-M1-9x-1):**
+  - Round 1 fixes: spec 04 §2.8 "No local card names the owner" added (M-1); `owner add-agent` uses a revoked card's owner as the expected owner and refuses, naming them, when an agent can't be read (M-2); a warning before the code prompt (L-1); the owner session starts after the fingerprint answer (L-2).
+  - L-3: `hasOwnerOnMachine` reads the whole wrapped item and has no AI-app guard. It is wired nowhere yet; before M1-9u wires it into `doctor` (or anything an agent can run), switch it to a metadata-only existence check.
+  - L-4: the node test checks output, errors and the result for the owner code; node itself cannot log (ESLint CONSOLE_SYNTAX), indirect logging from dependencies is not captured.
+  - L-5: give the confirmation a real reference: `owner init` should tell the owner to note the owner fingerprint next to the code, and the M1b recovery kit (M1-9h/M1-9i) should print it.
 
 #### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
 - **Status:** in review · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b

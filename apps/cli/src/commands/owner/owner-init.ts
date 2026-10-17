@@ -77,33 +77,52 @@ function cardOwnerKeys(card: {
 
 type FoundOwner =
   | { readonly status: 'one'; readonly owner: OwnerPublicKeys }
+  | { readonly status: 'unreadable'; readonly agents: readonly string[] }
   | { readonly status: 'none' | 'several' };
 
 /**
  * The owner this computer's other agents name (D-78: one owner per OS user). Read from their stored
  * cards (core verified them when they were stored); the owner step then checks that the owner item
  * on this machine unlocks to exactly these keys (04 §2.8 "Expected owner").
+ *
+ * IR-M1-9x-1 M-2: `none` routes to the no-card path (M1-9x), which has no expected owner, so it is
+ * returned only when every other agent was read and none has a card. A revoked card still names the
+ * owner and is used as the expected owner; an agent that can't be opened or read makes the command
+ * refuse and name it, never fall through to the no-card path.
  */
 async function machineOwner(deps: OwnerCommandDeps, except: string): Promise<FoundOwner> {
   const found = new Map<string, OwnerPublicKeys>();
+  const unreadable: string[] = [];
   for (const name of await deps.listAgents()) {
     if (name === except || !isAgentName(name)) continue;
-    const result = await deps.open(name);
-    if (result.status !== 'ok') continue;
+    let result: Awaited<ReturnType<OwnerCommandDeps['open']>>;
+    try {
+      result = await deps.open(name);
+    } catch {
+      unreadable.push(name);
+      continue;
+    }
+    if (result.status !== 'ok') {
+      unreadable.push(name);
+      continue;
+    }
     try {
       const view = await result.agent.client.identity.get();
-      if (view === undefined || view.revoked) continue;
+      if (view === undefined) continue;
       const key = `${view.card.ownerEvm}:${view.card.ownerNostr}:${view.card.ownerEnc}`;
       found.set(key, cardOwnerKeys(view.card));
+    } catch {
+      unreadable.push(name);
     } finally {
       await result.agent.close();
     }
   }
   const owners = [...found.values()];
-  if (owners.length === 0) return { status: 'none' };
+  if (owners.length > 1) return { status: 'several' };
   const [owner] = owners;
-  if (owners.length > 1 || owner === undefined) return { status: 'several' };
-  return { status: 'one', owner };
+  if (owner !== undefined) return { status: 'one', owner };
+  if (unreadable.length > 0) return { status: 'unreadable', agents: unreadable };
+  return { status: 'none' };
 }
 
 /**
@@ -136,6 +155,11 @@ async function addAgentOne(deps: OwnerCommandDeps, context: CommandContext): Pro
   const found = await machineOwner(deps, agent.name).finally(() => agent.close());
   if (found.status === 'several') {
     output.printError(OWNER_TEXT.addAgentSeveralOwners);
+    return EXIT_FAILED;
+  }
+  if (found.status === 'unreadable') {
+    // Agent names are local config names checked by isAgentName, never inbound content (I-5).
+    output.printError(OWNER_TEXT.addAgentUnreadable(found.agents));
     return EXIT_FAILED;
   }
   const again = await openOne(deps, output, name);

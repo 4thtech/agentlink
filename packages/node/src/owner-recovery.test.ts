@@ -215,6 +215,52 @@ describe('owner add-agent with no agent naming the owner (M1-9x; 04 §2.8)', () 
     expect(output).not.toContain(code.replaceAll(' ', ''));
   });
 
+  it('warns against a code from the AI before the code is asked for (IR-M1-9x-1 L-1)', async () => {
+    const alice = await initAgent('alice');
+    const { code } = await ownerInit(alice);
+    await removeAgent(alice);
+    const bob = await initAgent('bob');
+    const run = ownerTyping([code], true);
+    let shownBeforePrompt = '';
+    const terminal: OwnerTerminal = {
+      ...run.terminal,
+      readSecret: (label) => {
+        shownBeforePrompt = run.written.join('\n');
+        return run.terminal.readSecret(label);
+      },
+    };
+    await addAgentWith(keychain, terminal, {
+      backend: 'keychain',
+      env: {},
+      card: firstCard(bob, 'bob'),
+    });
+    expect(shownBeforePrompt).toContain('If your AI gave you a code');
+  });
+
+  it('the session lifetime starts after the fingerprint is confirmed (IR-M1-9x-1 L-2)', async () => {
+    const alice = await initAgent('alice');
+    const { code } = await ownerInit(alice);
+    await removeAgent(alice);
+    const bob = await initAgent('bob');
+    const run = ownerTyping([code], true);
+    // A slow owner: the answer comes after a whole session lifetime has passed.
+    const terminal: OwnerTerminal = {
+      ...run.terminal,
+      confirm: async (question) => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        return run.terminal.confirm(question);
+      },
+    };
+    await addAgentWith(
+      keychain,
+      terminal,
+      { backend: 'keychain', env: {}, card: firstCard(bob, 'bob') },
+      { ttlMs: 50 },
+    );
+    expect(run.questions).toHaveLength(1);
+    expect(await bob.client.identity.get()).toBeDefined();
+  });
+
   it('refuses with an AI-app marker set, before the owner item is read', async () => {
     const alice = await initAgent('alice');
     const { code } = await ownerInit(alice);

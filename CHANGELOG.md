@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Fixed
 
 - `agentlink owner add-agent --agent <name>` (M1-9x, S2): when an owner is set up on this computer but no agent has a card from it (for example after every agent was removed), it no longer dead-ends between `owner init` and `owner add-agent`. Your owner code unlocks the saved owner, you confirm the owner fingerprint, and the agent gets its card. Same rules as before: your own terminal only, refused inside an AI app, the owner key is never changed.
+- Spec 04 §2.8 (M1-9x, S2, proposed, owner confirms at merge): new rule "No local card names the owner" (owner keys derived from the unlocked owner item, fingerprint confirmed before the one card is signed, a consistency check, not authentication); "Expected owner" names this case.
 
 ### Changed
 

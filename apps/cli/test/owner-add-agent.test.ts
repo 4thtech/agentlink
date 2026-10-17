@@ -248,6 +248,65 @@ describe('agentlink owner add-agent (M1-9t, D-78)', () => {
     expect(await m.agents.get('bob')?.client.identity.get()).toBeUndefined();
   });
 
+  // IR-M1-9x-1 M-2: the no-card path (no expected owner) only when every other agent was read.
+  it('uses a revoked card’s owner as the expected owner, never the no-card path', async () => {
+    const m = await machine(['alice', 'bob']);
+    const alice = m.agents.get('alice');
+    if (alice === undefined) throw new Error('setup');
+    const view = await alice.client.identity.get();
+    if (view === undefined) throw new Error('setup');
+    const revokedAlice = {
+      ...alice,
+      client: {
+        identity: { get: () => Promise.resolve({ ...view, revoked: true }) },
+      } as unknown as OwnerAgent['client'],
+    };
+    const deps: OwnerCommandDeps = {
+      ...m.deps,
+      open: (name) =>
+        name === 'alice'
+          ? Promise.resolve({ status: 'ok' as const, agent: revokedAlice })
+          : m.deps.open(name),
+    };
+    const code = await createDispatcher(ownerCommandHandlers(deps))(
+      ['owner', 'add-agent', '--agent', 'bob'],
+      {
+        output: createOutput({ log: () => undefined, error: () => undefined }),
+        terminal: TTY,
+        version: '0.0.0',
+      },
+    );
+    expect(code).toBe(0);
+    expect(m.calls).toHaveLength(1);
+    expect(m.calls[0]?.owner?.ownerNostr).toEqual((await m.owner.getPublicKeys()).ownerNostr);
+  });
+
+  it('refuses and names an agent it could not read, instead of taking the no-card path', async () => {
+    const m = await machine(['alice', 'bob', 'carol']);
+    const deps: OwnerCommandDeps = {
+      ...m.deps,
+      open: (name) =>
+        name === 'alice'
+          ? Promise.resolve({ status: 'needs_setup' as const, message: 'locked' })
+          : name === 'carol'
+            ? Promise.reject(new Error('corrupt store'))
+            : m.deps.open(name),
+    };
+    const err: string[] = [];
+    const code = await createDispatcher(ownerCommandHandlers(deps))(
+      ['owner', 'add-agent', '--agent', 'bob'],
+      {
+        output: createOutput({ log: () => undefined, error: (l) => err.push(l) }),
+        terminal: TTY,
+        version: '0.0.0',
+      },
+    );
+    expect(code).toBe(1);
+    expect(m.calls).toHaveLength(0);
+    expect(err.join('\n')).toContain(OWNER_TEXT.addAgentUnreadable(['alice', 'carol']));
+    expect(await m.agents.get('bob')?.client.identity.get()).toBeUndefined();
+  });
+
   it('refuses an agent that is not set up, and points to init --agent', async () => {
     const m = await machine(['alice']);
     expect(await m.run(['owner', 'add-agent', '--agent', 'carol'])).toBe(1);

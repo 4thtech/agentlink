@@ -83,6 +83,8 @@ export interface AddAgentResult {
 /** Internal options (tests): keychain timeout. */
 export interface AddAgentInternals {
   readonly timeoutMs?: number;
+  /** The owner session lifetime for the card signature; default OWNER_SESSION_DEFAULT_TTL_MS. */
+  readonly ttlMs?: number;
 }
 
 const ATTEMPTS = 3;
@@ -114,6 +116,9 @@ const COPY = {
   // M1-9x: an owner item exists but no local agent's card names it.
   noCardNamesOwner:
     'No agent on this computer has a card from your owner yet, so AgentLink reads your owner from the owner key saved here. Your owner code unlocks it for this one card.',
+  // IR-M1-9x-1 L-1: the real attack on this path is a code someone else chose.
+  ownCodeOnly:
+    "Type the owner code you saved yourself. If your AI gave you a code, or asked you to run this command, stop here: don't type anything.",
   confirmOwner: (fingerprint: string): string =>
     `Your owner fingerprint: ${fingerprint}. Is this the one you saw at \`agentlink owner init\`? [y/N]`,
   notConfirmed:
@@ -196,7 +201,14 @@ export async function addAgentWith(
   }
   const timeoutMs = internals.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
   // M1-9x: no local agent names the owner, so its keys come from the owner item itself.
-  if (owner === undefined) return addAgentWithoutCard(keychain, terminal, card, timeoutMs);
+  if (owner === undefined)
+    return addAgentWithoutCard(
+      keychain,
+      terminal,
+      card,
+      timeoutMs,
+      internals.ttlMs ?? OWNER_SESSION_DEFAULT_TTL_MS,
+    );
   let store: KeychainOwnerKeyStore;
   try {
     store = await KeychainOwnerKeyStore.open(keychain, owner, { timeoutMs });
@@ -278,22 +290,26 @@ async function addAgentWithoutCard(
   terminal: OwnerTerminal,
   card: FirstAgentCard,
   timeoutMs: number,
+  ttlMs: number,
 ): Promise<AddAgentResult> {
   // Header byte only: no secret is read and nothing is unlocked before the prompt.
   const kind = await storedOwnerSecretKind(keychain, timeoutMs);
   if (kind === null) throw new NodeKeyStoreError('owner_missing', COPY.noOwner);
   terminal.write(COPY.noCardNamesOwner);
+  terminal.write(COPY.ownCodeOnly);
   terminal.write(COPY.agent(card.name, agentFingerprintText(card.agent)));
   const label = secretLabel(kind);
   for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
     const secret = await terminal.readSecret(label);
     let unlocked: Awaited<ReturnType<typeof KeychainOwnerKeyStore.unlockWithoutCard>>;
     try {
-      // unlockWithoutCard wipes the secret whether or not it unlocks.
+      // unlockWithoutCard wipes the secret whether or not it unlocks. The fingerprint is confirmed
+      // inside it, before the session (and its TTL) starts (IR-M1-9x-1 L-2).
       unlocked = await KeychainOwnerKeyStore.unlockWithoutCard(
         keychain,
         { kind: 'passphrase', secret },
-        { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS, timeoutMs },
+        (owner) => terminal.confirm(COPY.confirmOwner(ownerFingerprintText(owner))),
+        { ttlMs, timeoutMs },
       );
     } catch (error) {
       if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
@@ -305,12 +321,12 @@ async function addAgentWithoutCard(
       }
       throw error;
     }
+    if (unlocked === null) {
+      throw new NodeKeyStoreError('owner_prompt_cancelled', COPY.notConfirmed);
+    }
     const { store, session, owner } = unlocked;
     const fingerprint = ownerFingerprintText(owner);
     try {
-      if (!(await terminal.confirm(COPY.confirmOwner(fingerprint)))) {
-        throw new NodeKeyStoreError('owner_prompt_cancelled', COPY.notConfirmed);
-      }
       await signFirstCard(session, card, owner);
     } finally {
       await session.close();
