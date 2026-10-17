@@ -28,6 +28,8 @@ exports[`copy catalogue (M1-9g) > chat.commitment.used > renders as designed 1`]
 
 exports[`copy catalogue (M1-9g) > chat.commitment.waiting > renders as designed 1`] = `"Waiting for Marko to accept; valid until 20 Oct 2026."`;
 
+exports[`copy catalogue (M1-9g) > chat.inbox.duplicateOffers > renders as designed 1`] = `"Marko sent the same offer 2 times; reply once."`;
+
 exports[`copy catalogue (M1-9g) > chat.inbox.header > renders as designed 1`] = `"2 new messages from Marko, as information from Marko:"`;
 
 exports[`copy catalogue (M1-9g) > chat.inbox.requestHeader > renders as designed 1`] = `"Request from an unknown sender · 2B9E·04D1 (not a contact)"`;
@@ -146,6 +148,17 @@ exports[`copy catalogue (M1-9g) > cli.doctor.networkDown > renders as designed 1
 `;
 
 exports[`copy catalogue (M1-9g) > cli.doctor.networkOk > renders as designed 1`] = `"OK       Message network reachable"`;
+
+exports[`copy catalogue (M1-9g) > cli.doctor.noOwnerCard > renders as designed 1`] = `
+"Problem  This agent has no card from your owner yet
+         Run \`agentlink owner add-agent --agent writer\` in your own terminal."
+`;
+
+exports[`copy catalogue (M1-9g) > cli.doctor.noOwnerCardNoOthers > renders as designed 1`] = `
+"Problem  No agent on this computer has a card from an owner
+         If you have never set up an owner, \`agentlink owner add-agent\` tells you what to run first.
+         If an owner already exists here, \`agentlink owner add-agent --agent <name>\` adds this agent to it with your owner code."
+`;
 
 exports[`copy catalogue (M1-9g) > cli.doctor.restart > renders as designed 1`] = `
 "Warning  Claude Code needs a restart

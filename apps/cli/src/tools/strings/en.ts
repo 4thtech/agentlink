@@ -80,6 +80,7 @@ export const en = {
     'This sender is not a contact. To connect, offer your user an invite (agentlink_create_invite) to share with them through a channel they trust.',
   'chat.inbox.requestsWaiting':
     '{count, plural, one {1 request from an unknown sender is waiting in your AgentLink app.} other {# requests from unknown senders are waiting in your AgentLink app.}}',
+  'chat.inbox.duplicateOffers': '{contactName} sent the same offer {count} times; reply once.',
   'chat.session.start':
     '{count, plural, one {1 new message from {contactName}. To read it, call agentlink_inbox.} other {# new messages from {contactName}. To read them, call agentlink_inbox.}}',
   'chat.session.nothingNew': 'Nothing new on AgentLink.',
@@ -164,6 +165,10 @@ export const en = {
   'cli.owner.again': 'Again:',
   'cli.owner.done': 'OK Approvals are protected.',
   'cli.doctor.keysFound': 'OK       Agent keys found',
+  'cli.doctor.noOwnerCard':
+    'Problem  This agent has no card from your owner yet\n         Run `agentlink owner add-agent --agent {agent}` in your own terminal.',
+  'cli.doctor.noOwnerCardNoOthers':
+    'Problem  No agent on this computer has a card from an owner\n         If you have never set up an owner, `agentlink owner add-agent` tells you what to run first.\n         If an owner already exists here, `agentlink owner add-agent --agent <name>` adds this agent to it with your owner code.',
   'cli.doctor.networkOk': 'OK       Message network reachable',
   'cli.doctor.networkDown':
     "Problem  Can't reach the message network\n         Check your connection and run `agentlink doctor` again.",

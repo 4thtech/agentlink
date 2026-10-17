@@ -156,6 +156,32 @@ describe('pr-hygiene: the existing rules still hold', () => {
     expect((await check(body(), 'update the docs')).failed).toBe(true);
   });
 
+  it('accepts OPS-<WORD>-<n> task IDs (OPS-CI-3)', async () => {
+    for (const t of ['OPS-CI-3 ci: x', 'OPS-REL-12 release: x', 'OPS-7 x', 'OPS-L2 x']) {
+      expect((await check(body(), t)).failed, t).toBe(false);
+    }
+  });
+
+  it('refuses malformed OPS titles', async () => {
+    for (const t of ['OPS-ci-3 x', 'OPS- x', 'OPS-CI x', 'OPS-CI- x', 'OPS-CI-x x']) {
+      expect((await check(body(), t)).failed, t).toBe(true);
+    }
+  });
+
+  it('keeps the existing accepted prefixes', async () => {
+    for (const t of [
+      'M1-5 x',
+      'M1-9d x',
+      'M2-GATE x',
+      'DESIGN-D3 x',
+      'DOCS: x',
+      'CHORE: x',
+      'DEPS: x',
+    ]) {
+      expect((await check(body(), t)).failed, t).toBe(false);
+    }
+  });
+
   it('keeps the template headings the script requires', () => {
     for (const name of Object.keys(FILLED)) {
       if (name === 'Checklist') continue;

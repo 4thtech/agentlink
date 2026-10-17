@@ -66,11 +66,11 @@ jobs:
             const problems = [];
 
             // 1. Title starts with a task ID (or an allowed prefix).
-            const TITLE_RE = /^(M[0-9]+-([0-9]+[a-z]?|GATE)|OPS-(L?[0-9]+)|DESIGN-D[0-9]+|DOCS|CHORE|DEPS)\b/;
+            const TITLE_RE = /^(M[0-9]+-([0-9]+[a-z]?|GATE)|OPS-(L?[0-9]+|[A-Z]+-[0-9]+)|DESIGN-D[0-9]+|DOCS|CHORE|DEPS)\b/;
             if (!TITLE_RE.test(title)) {
               problems.push(
                 'Title must start with a task ID such as "M1-5 transport-nostr sync" ' +
-                  '(allowed: M<n>-<n>[a-z], OPS-<n>, DOCS, CHORE, DEPS).',
+                  '(allowed: M<n>-<n>[a-z], OPS-<n>, OPS-<WORD>-<n> such as OPS-CI-3, DOCS, CHORE, DEPS).',
               );
             }
 

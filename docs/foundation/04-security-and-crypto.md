@@ -72,10 +72,64 @@ Rationale: harness agents (Claude Code, Codex, Gemini CLI…) can run shell comm
 
 1. On first use, the console generates the owner seed in the browser.
 2. It creates a passkey with the PRF extension. `user.id` = the owner's Nostr public key (32 bytes), so a new device can find the owner after passkey sign-in.
-3. `wrapKey = HKDF-SHA256(ikm = PRF(salt = sha256("agentlink-owner-v1")), salt = "", info = "owner-seed-wrap", L = 32)`; the seed is encrypted with AES-256-GCM and stored in IndexedDB.
-4. **Backup:** the same encrypted blob is published as a Nostr parameterized-replaceable event (`d`-tag `agentlink-owner-backup`) signed by the owner Nostr key. A new device signs in with the synced passkey, reads `user.id`, fetches the blob from relays and decrypts it with PRF.
-5. **Fallback** when PRF is unsupported: a **generated recovery code** (120 bits, shown as 24 base32 characters in groups) wraps the seed (Argon2id, m=64 MiB, t=3, p=1). User-chosen passphrases must not be used for blobs published to public relays, since those can be brute-forced offline.
-6. **Recovery kit:** downloadable file with the encrypted seed, the recovery code (to be printed or stored in a password manager) and instructions. Raw seed export only under "Advanced".
+3. `wrapKey = HKDF-SHA256(ikm = PRF(salt = sha256("agentlink-owner-v1")), salt = "", info = "owner-seed-wrap", L = 32)`; the seed is sealed with AES-256-GCM in the `ALKP` v1 format (§2.3.1, D-82) and stored in IndexedDB.
+4. **Backup:** the same `ALKP` blob is published as a Nostr parameterized-replaceable event (`d`-tag `agentlink-owner-backup`) signed by the owner Nostr key. A new device signs in with the synced passkey, reads `user.id`, fetches the blob from relays and decrypts it with PRF.
+5. **Fallback** when PRF is unsupported: a **generated recovery code** (120 bits, shown as 24 base32 characters in groups) wraps the seed (Argon2id, m=64 MiB, t=3, p=1) in the `ALKR` v1 format (§2.3.2, D-82). User-chosen passphrases must not be used for blobs published to public relays, since those can be brute-forced offline.
+6. **Recovery kit:** downloadable file with the encrypted seed (the `ALKR` blob), the recovery code (to be printed or stored in a password manager) and instructions. Raw seed export only under "Advanced".
+
+#### 2.3.1 Passkey PRF wrap format `ALKP` v1 (D-82)
+
+Used for the owner seed wrapped under a passkey's PRF output: in the console's IndexedDB (step 3), in the relay backup (step 4) and for the localhost passkey of the local agent (§2.2, M1-8e). One blob per passkey; an owner with several passkeys has several `ALKP` blobs for the same seed.
+
+```
+magic       "ALKP"              4 B
+version     u8 = 1
+aead        u8 = 1              AES-256-GCM
+ownerNostr  32 B                x-only owner Nostr public key (= the passkey's user.id, step 2)
+credIdLen   u16be               1..1023
+credId      credIdLen B         WebAuthn credential ID of the passkey whose PRF output made wrapKey
+nonce       12 B                random; new on every write
+ct          ciphertext || 16-byte tag
+```
+
+- **Key.** `wrapKey` as in step 3: the PRF input is the 32-byte `prfSalt = sha256(utf8("agentlink-owner-v1"))`, the PRF output is 32 bytes, and `wrapKey = HKDF-SHA256(ikm = PRF output, salt = "", info = utf8("owner-seed-wrap"), L = 32)`. The PRF output and `wrapKey` are wiped after use. The label is kept as written (M1-1i `prf-wrap` vectors pin it).
+- **AAD = every header byte** from `magic` through `nonce`. A changed owner key, credential ID, nonce or ciphertext, or a truncated blob, fails authentication.
+- **Plaintext** is exactly the owner seed: 32 bytes. The blob is therefore exactly `100 + credIdLen` bytes (`52 + credIdLen` header, 32 seed, 16 tag).
+- **Refused before decryption:** a wrong magic, `version` ≠ 1, `aead` ≠ 1, `credIdLen` of 0 or above 1023, a total length other than `100 + credIdLen`, a PRF output that is not 32 bytes, and, when the caller knows the expected owner (the passkey's `user.id`, the backup event's author or the card's `ownerNostr`), a header `ownerNostr` that differs from it. The caller asks the authenticator with `allowCredentials = [credId]` and refuses an assertion whose credential ID is not `credId`.
+- **Expected owner after decryption.** The seed must derive (§2.1) the owner Nostr key whose x-only public key equals the header `ownerNostr`, compared as bytes. Otherwise the seed is wiped and the blob refused.
+- **Failure** is one generic error with no partial output: a wrong passkey, a tampered blob and a wrong owner look the same to the caller, and no plaintext byte is returned.
+- `credId` and `ownerNostr` are public (the backup is published), so they are not secrets; the blob holds no salt, because the PRF salt is fixed and the PRF output is per credential.
+
+#### 2.3.2 Recovery code wrap format `ALKR` v1 (D-82)
+
+Used for the owner seed wrapped under a generated recovery code: the PRF fallback (step 5) and the recovery kit (step 6). It mirrors `ALKO` (§2.8) with its own magic and label, so a recovery blob, which may be published, never opens as a keychain or `owner.alko` blob, and the reverse.
+
+```
+magic       "ALKR"              4 B
+version     u8 = 1
+secretKind  u8 = 1              generated recovery code; no other value is defined
+kdf         u8 = 1              Argon2id v1.3 (RFC 9106)
+m           u32be               memory in KiB
+t           u8                  iterations
+p           u8                  lanes
+salt        16 B                random; new on create and on every re-wrap
+aead        u8 = 1              AES-256-GCM
+nonce       12 B                random; new on every write
+ct          ciphertext || 16-byte tag
+```
+
+- `kek = HKDF-SHA256(ikm = Argon2id(password(code, 1), salt, m, t, p, L = 32), salt = "", info = utf8("agentlink/v1/owner-recovery-wrap"), L = 32)`. `password` kind 1 is the generated-code rule of §2.8 (the 15 decoded bytes). Argon2id is version 0x13, with no secret value and no associated data.
+- **Defaults** for new blobs: m = 64 MiB (65536 KiB), t = 3, p = 1. The `ALKS` floor and cap (§2.8) are checked on read before the KDF runs.
+- **Generated codes only.** A chosen passphrase never wraps a recovery blob, since the blob may be published to relays (step 5). `secretKind` ≠ 1 is refused before the KDF runs, and the API offers no passphrase input for `ALKR`.
+- **Recovery code:** 15 CSPRNG bytes, exactly 120 bits, encoded as 24 RFC 4648 base32 characters with no bias and shown in six groups of four. Input follows `password` kind 1, so a mistyped character outside the alphabet is refused before the KDF runs and a wrong code fails authentication.
+- **AAD = every header byte** from `magic` through `nonce`.
+- **Plaintext** is exactly the owner seed: 32 bytes. The blob is therefore exactly 90 bytes (42 header, 32 seed, 16 tag). Any other size, a wrong magic, `version` ≠ 1, `kdf` ≠ 1 or `aead` ≠ 1 is refused before the KDF runs.
+- **Expected owner.** When the caller knows the expected owner (the backup event's author, the passkey's `user.id` or the card's `ownerNostr`), the decrypted seed must derive it; otherwise the seed is wiped and the blob refused. Failure is one generic error with no partial output.
+
+**Both formats.**
+- **Versioning.** `version` is 1. A reader refuses any other version before the KDF or decryption runs; a new version needs a spec change, a decision and new vectors. Writers write v1 only.
+- **Type separation.** `ALKP`, `ALKR`, `ALKO` and `ALKS` each refuse the other three magics before any KDF or decryption. A blob whose magic is rewritten to another type still fails, because the magic is in the AAD and each type has its own key derivation. The vectors carry these cross-type cases (M1-1i, `prf-wrap` suite).
+- All of this runs through `@agentlink/crypto` (HKDF and Argon2id from `@noble/hashes`, AES-256-GCM via WebCrypto, as for `ALKS` and `ALKO`); callers never call a primitive.
 
 ### 2.4 Agent card
 
@@ -171,6 +225,7 @@ Owner-only operations: approve/deny, sign an agent's first card (owner setup, ad
 - The agent's core **verifies the owner signature** against the owner key in its agent card before applying the action. Policies are stored as signed documents and re-verified on load, so editing the database directly has no effect.
 - Signing requires user presence: passkey (local UI on `localhost` or console) or owner passphrase (CLI prompt). Here and in I-4, "owner passphrase" covers both owner secrets of §2.2: the generated owner code (the default) and a chosen owner passphrase (opt-in). The local UI holds no reusable bearer token on disk.
 - **One entry of the owner secret, one owner operation; no unlock session.** *Decided (D-68 (1)):* there is no standing unlock session; the owner code or passphrase serves one owner operation and is wiped. *Derived (from D-68 (1); proposed, owner confirms at merge):* on the agent's machine (the CLI, the local UI and, from M2, the desktop app), each entry of the owner code or passphrase, and each passkey gesture, unlocks the owner key for exactly one owner operation: the signatures that the one owner flow confirmed on that screen defines. That is one `SignedOwnerAction` (§2.5.1); or the pairs a flow names, such as a proof approval with "Remember for this contact" and its `policy.set` (06 §3), or a key rotation's `n + 1` card and the epoch advance it authorises (§2.6, §3.1.1); or the card signature at owner setup, or the one first card of an agent added to the existing owner (`owner add-agent`, §2.8, D-78); plus each carrier envelope and seal where one is sent (§3.1.1). The `OwnerSession` is then closed, and the unwrapped seed and the typed secret are wiped (§8 rule 3). No surface keeps an `OwnerSession`, the owner secret or a key derived from it between owner operations, and none offers to remember it for a time, so there is no unlocked state that another process running as the same OS user could use, and a session is never reused for a second confirmation screen. To lower how often the owner enters the secret (D-39), the owner reviews pending approvals as one list and approves them with one entry: **batch approval** (§2.5.2), whose one signature covers exactly the reviewed items. Read sessions on the owner's own device (the console; §3.1.1, "Reading needs presence"; their length is decided in M2-2d) are outside this rule.
+- **Both loopback addresses (D-79).** The local UI is opened as `http://localhost:<port>` and listens on `127.0.0.1` and `::1` with the same port, so no other program can answer at the same address whichever one the browser resolves `localhost` to (08 §1).
 - **Desktop app owner presence (M2, D-36)** is stronger than localhost WebAuthn. Known weakness of the localhost passkey: a WebAuthn RP ID is a host name without port, so a passkey registered for `localhost` can be requested by any page on any localhost port, including one a shell-capable agent starts. Such a page could imitate the approval page and ask for the owner's gesture (the human must still complete the prompt). The desktop app removes this path: owner operations happen in a **native approval window** (not a localhost page), the OS prompt names the signed app, and the keystore releases the owner wrapping key only to that app (§2.2). Residual: on Linux, and wherever the OS falls back to a typed device password, an agent able to inject keystrokes and knowing the secret could complete the prompt; this is settled in the framework security review (08 §8).
 - **Commitments (D-31)** are an approval path, not an owner-only operation. Sending an `accept` and signing an `ACCEPTED` or `REJECTED` receipt are agent actions gated by policy `commitments.accept` (default `approval`, 06 §3): the agent proposes, the owner approves or denies through the normal approval flow above (owner-signed, with presence), and only then does the agent's key send or sign. Auto-accept applies only within owner-signed limits (allowlisted contacts, maximum value). One approval covers one agreement, bound to its exact terms (§3.4.2, D-55).
 - **Residual risk:** an agent with unrestricted shell access as the same OS user could tamper with the AgentLink installation itself or spend the agent's credits by signing records with the agent key. Mitigations: keep credits small; harness permission settings that deny access to `~/.agentlink`, keychain access through command-line tools, the installed AgentLink package and the npx cache (documented in the quickstart, M1-12b); owner revocation; per-agent spending caps in the vault (P2).
@@ -363,7 +418,7 @@ ct          ciphertext || 16-byte tag
 ```
 
 - `kek = HKDF-SHA256(ikm = Argon2id(password(secret, secretKind), salt, m, t, p, L = 32), salt = "", info = utf8("agentlink/v1/keystore-file"), L = 32)`. Argon2id is version 0x13, with no secret value (K) and no associated data (X); `salt` is the 16 header bytes.
-- **`password(secret, secretKind)`** (proposed; owner confirms at merge). The same rule applies to `ALKS`, `ALKO` and the recovery code (§2.3):
+- **`password(secret, secretKind)`** (proposed; owner confirms at merge). The same rule applies to `ALKS`, `ALKO` and the recovery code (`ALKR`, §2.3.2):
   - **Both kinds.** A secret read from a file first loses exactly one trailing `\n` or `\r\n`. Prompt and environment input lose nothing.
   - **Kind 1, generated code.** The steps below run on the input in order:
     1. Refuse any byte outside ASCII.
@@ -387,7 +442,7 @@ ct          ciphertext || 16-byte tag
 - **Chosen passphrase:** follows `password` kind 2 above. The header's `secretKind` tells the reader which rule to apply.
 - All of this runs through `@agentlink/crypto` (Argon2id and HKDF from `@noble/hashes`, AES-256-GCM via WebCrypto or `@noble/ciphers`) and the `KeyStore` interface (§8.1). `@agentlink/node` handles only files and never calls a primitive itself.
 
-**Owner wrap format `ALKO` v1** (proposed; owner confirms at merge). It mirrors `ALKS`. It is used for the owner seed wrapped under an owner code or passphrase, both as the file `owner.alko` and as the keychain value on machines with a keychain (§2.2). The passkey PRF wrap (§2.3, M1-1k) is a different format.
+**Owner wrap format `ALKO` v1** (proposed; owner confirms at merge). It mirrors `ALKS`. It is used for the owner seed wrapped under an owner code or passphrase, both as the file `owner.alko` and as the keychain value on machines with a keychain (§2.2). The passkey PRF wrap is the different format `ALKP` and the recovery code wrap is `ALKR` (§2.3.1, §2.3.2, D-82); neither ever opens as `ALKO`.
 
 ```
 magic       "ALKO"              4 B
@@ -406,7 +461,7 @@ ct          ciphertext || 16-byte tag
 - `kek = HKDF-SHA256(ikm = Argon2id(password(secret, secretKind), salt, m, t, p, L = 32), salt = "", info = utf8("agentlink/v1/owner-passphrase-wrap"), L = 32)`. `password` and the Argon2id settings are as for `ALKS`, and the KDF defaults, floor and cap are the `ALKS` values below.
 - **AAD = every header byte** from `magic` through `nonce`. There is no `agentId`, because one owner can own several agents.
 - **Plaintext** is exactly the owner seed: 32 bytes. The blob is therefore exactly 90 bytes (42 header, 32 seed, 16 tag). Any other size is refused before the KDF runs.
-- **Expected owner.** After decryption, the seed must derive the owner keys named in the card of the agent being served (`ownerNostr` and `ownerEvm`). Otherwise the seed is wiped and the file refused.
+- **Expected owner.** After decryption, the seed must derive the owner keys named in the card of the agent being served (`ownerNostr` and `ownerEvm`), or, in `owner add-agent` with no local card naming an owner, the keys whose fingerprint the owner confirmed (§2.8 "No local card names the owner"). Otherwise the seed is wiped and the file refused.
 - On file-KeyStore machines, `secretKind` must be 1. A kind 2 file is refused there before the KDF runs (below).
 - M1-1h carries `ALKO` v1 vectors for both kinds, plus the cross-type cases: an `ALKO` blob under the `ALKS` label, and the reverse, both fail.
 
@@ -463,6 +518,7 @@ The server derives `kek` and keeps only `kek`, together with the `salt`, `m`, `t
   - **Command.** `agentlink owner add-agent --agent <name>` †, run personally in a terminal the agent does not control, under the same guards as `owner init`: interactive terminal only, harness-marker guard, the owner secret never from an environment variable, file, argument, piped stdin or MCP tool (I-4). No MCP tool can trigger it.
   - **Refusals, before the secret is asked for.** No owner key on the machine (use `agentlink owner init`); the agent does not exist (use `agentlink init --agent <name>`); the agent already has a card (it never replaces a card; a new card is a rotation, §2.6).
   - **What the owner sees first.** The owner fingerprint (11 §5.2), the agent's name and its agent fingerprint (§2.9), so the owner knows which agent the signature is for.
+  - **No local card names the owner (M1-9x; proposed, owner confirms at merge).** When the owner item exists but no agent on this machine has a card naming an owner, there is no expected owner, and the owner fingerprint can't be known before unlocking (the `ALKO` blob holds no public keys). `owner add-agent` then shows the agent's name and agent fingerprint, asks for the owner code once, derives the owner keys from the unwrapped seed, shows the owner fingerprint and signs the one card only after the owner confirms it (default No). The owner session starts after that answer. Declining writes nothing; the seed and secret are wiped. This confirmation is a consistency check, not authentication: a same-user process can plant an owner item under a code it chose (G-1, D-67), which succeeds only if the owner types that code, so the copy tells the owner to type only the code they saved and to stop if their AI gave them one. An agent that can't be read, or a revoked card, never leads to this path: a revoked card's owner is the expected owner, and an unreadable agent makes the command refuse. Tests: with no card naming an owner, declining the fingerprint writes nothing.
   - **One entry, one owner operation (§2.5, D-68 (1)).** The owner types the existing owner code (or opted-in passphrase) once. It unlocks the owner key for exactly one signature: one `AgentCard` (§2.4) naming exactly this agent's keys and this owner, through a restricted owner session that **must** refuse every other signing request (any other typed data, any `SignedOwnerAction`, a second card, a card for another agent or owner), as the session for the card at owner setup does. The session is then closed and the unwrapped seed and the typed secret are wiped (§8 rule 3). Three wrong entries end the command, and nothing is written.
   - **It never touches the owner key.** It never shows, generates, changes or re-wraps the owner code, and never writes the owner item or `owner.alko`. If no card naming this owner is stored at the end, it reports the failure and leaves no partial state; the owner can run it again.
   - **Logical isolation, not a security boundary (D-78).** Each agent keeps its own seed (keychain account `<agentId>`, or its own `.alks` file), store, Nostr identity, policies, policy-version mark, nonces and approvals. Owner actions bind to one agent by `agent` (§2.5.1), so a decision for one agent is refused by every other agent of the same owner. But every agent and every harness runs as the same OS user and can read the other agents' seeds and stores (§2.2 rationale), so one agent can act as another. This is the G-1 residual (§2.5, D-67), unchanged: the owner key gains no new exposure, but each added agent is one more entry of the owner code on this machine. Agents that must not be able to act as each other need separate OS users or separate machines.
@@ -1198,7 +1254,7 @@ The §2.9 values go to other suites: the agent ID to `hkdf-derive`, `cardAgentSi
 
 ## 4. Files
 
-- **Ciphertext object layout:** header `magic "ALF1" (4 B) | version u8 | chunkSize u32be | noncePrefix (8 B)` followed by chunks. Each chunk is AES-256-GCM with nonce `noncePrefix || u32be(chunkIndex)`; the AAD is `u8(isFinal)`, so a missing final chunk is detected (STREAM construction). Default chunk size 1 MiB.
+- **Ciphertext object layout:** header `magic "ALF1" (4 B) | version u8 | chunkSize u32be | noncePrefix (8 B)` followed by chunks. Each chunk is AES-256-GCM with nonce `noncePrefix || u32be(chunkIndex)`; the AAD is `header (17 B) ‖ u8(isFinal)`, where header is the exact 17 bytes above, so a modified header or a missing final chunk fails decryption (STREAM construction; D-80). Default chunk size 1 MiB.
 - **Integrity:** recipient checks `ciphertextSha256` before decrypting and `plaintextSha256` after. Both checks are mandatory. Files inherit G-46's guarantee through them: `fileKey`, `ciphertextSha256` and `plaintextSha256` travel in the payload, which is the same for every party (§3.3), so every party gets the same file bytes or a failure, although ALF1's chunks are not key-committing.
 - **Where ciphertext goes (D-48, D-49):** files ≤ 12 KB travel inline; larger files go to the 4thTech **encrypted drop** by default, or to the user's own storage (S3-compatible; Google Drive, Dropbox or OneDrive from M2), chosen by policy `files.storage` (06 §3, 07 §5.6). Every backend receives only the ALF1 ciphertext. The file key, file name and `plaintextSha256` travel only inside the end-to-end-encrypted envelope (I-2); the backend sees only the ciphertext, its hash and its own download URL, which reaches the recipient only inside the envelope.
 - **Delivery:** a download URL valid until `expiresAt`: an S3 presigned GET, a signed drop URL or a provider share link. **Default and maximum expiry: 7 days** (the SigV4 limit; temporary credentials expire sooner), enforced by the drop and by S3-compatible storage. Consumer connectors (D-49) cannot always enforce link expiry: the sender's agent creates the share link, then deletes the object and revokes the link at expiry or on receipt, per `files.deleteAfter`. That is best effort (it needs the sender's device online); the content stays encrypted. A recipient can request a fresh link with a `request` envelope (`body.kind = "refresh-link"`), which the sender answers when online.

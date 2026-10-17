@@ -242,7 +242,12 @@ export interface SyncEngineOptions {
   readonly dedupCacheEntries?: number;
 }
 
-export type Unsubscribe = () => void;
+/**
+ * Stops a live subscription (CLOSE on each relay, no reconnect). The promise resolves once every
+ * event task still running for it (a handler call, a cursor write) has settled, so a caller can
+ * close its store afterwards (M1-9s). Never rejects.
+ */
+export type Unsubscribe = () => Promise<void>;
 
 /**
  * The earliest `first_seen_at` a seen row must still keep (07 §3.2 "Retention"): rows older than this
@@ -318,6 +323,8 @@ interface Run {
   stopped: boolean;
   stopReason: 'budget' | 'stopped';
   readonly hooks: Set<() => void>;
+  /** Event tasks still running (handler calls, cursor writes), so a stop can wait for them. */
+  readonly tasks: Set<Promise<void>>;
 }
 
 interface RelayOutcome {
@@ -423,7 +430,10 @@ export class SyncEngine {
     const relays = this.checkRelays(options.relays);
     const run = this.newRun(options.identities, options.onEnvelope, true);
     for (const relay of relays) void this.liveLoop(relay, run);
-    return () => this.stop(run, 'stopped');
+    return async () => {
+      this.stop(run, 'stopped');
+      await Promise.allSettled([...run.tasks]);
+    };
   }
 
   // --- setup -----------------------------------------------------------------------------------
@@ -474,6 +484,7 @@ export class SyncEngine {
       stopped: false,
       stopReason: 'stopped',
       hooks: new Set(),
+      tasks: new Set(),
     };
   }
 
@@ -652,6 +663,8 @@ export class SyncEngine {
       run.hooks.add(onStop);
 
       const writeCursor = async (at: number): Promise<void> => {
+        // A stopped live subscription writes nothing more (M1-9s): its store may be closing.
+        if (run.live && run.stopped) return;
         try {
           await this.persistence.setCursor(relay, Math.max(at, cursor ?? 0));
           lastCursorWrite = at;
@@ -662,6 +675,9 @@ export class SyncEngine {
 
       const enqueue = (task: () => Promise<void>): void => {
         chain = chain.then(task).catch(() => undefined);
+        const current = chain;
+        run.tasks.add(current);
+        void current.then(() => run.tasks.delete(current));
       };
 
       /** Runs after every event of the page was handled (it is chained behind them). */
@@ -983,7 +999,8 @@ export class SyncEngine {
       return 'retry';
     }
     const mark = this.persistence.markSeen;
-    if (mark !== undefined) {
+    // A stopped live subscription marks nothing more (M1-9s): its store may be closing.
+    if (mark !== undefined && !(run.live && run.stopped)) {
       const at = this.nowSeconds();
       await this.safeMark('wrap', id, at);
       if (disposition === 'verified') await this.safeMark('envelope', unwrapped.envelope.id, at);
