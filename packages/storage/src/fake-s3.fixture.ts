@@ -45,7 +45,7 @@ export function fakeEndpoint(respond?: Responder): FakeEndpoint {
     const stored = objects.get(path);
     return stored === undefined
       ? new Response(null, { status: 404 })
-      : new Response(stored, { status: 200 });
+      : new Response(new Uint8Array(stored), { status: 200 });
   };
   return { fetch, requests, objects };
 }

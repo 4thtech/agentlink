@@ -136,7 +136,8 @@ describe('S3 adapter: put', () => {
     const text = `${err.message} ${String(err.stack)} ${JSON.stringify(err)}`;
     expect(text).not.toContain(SECRET);
     expect(text).not.toContain('SignatureDoesNotMatch');
-    expect(text).not.toContain('agentlink/');
+    // No object key (the stack holds file paths, so match the key shape, not a bare `agentlink/`).
+    expect(text).not.toMatch(/agentlink\/[A-Za-z0-9_-]{22}\//);
     expect(text).not.toContain(ENDPOINT);
     expect(err.cause).toBeUndefined();
   });

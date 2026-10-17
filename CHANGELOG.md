@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Added
 
+- Storage (M1-6a, S2): `@agentlink/storage` has the `StorageAdapter` interface (07 §5.1), the inline adapter (ciphertext up to 12 288 bytes, base64url in the payload) and the S3-compatible adapter over `aws4fetch`: upload, a presigned download link clamped to 7 days and to the expiry of temporary credentials, and delete. Objects are keyed `agentlink/<storagePrefix>/<random>` with no metadata; credentials come from an injected provider; no credential, link or object key is logged. Not yet wired into the tools; integration tests against MinIO and R2 follow in M1-6a-2.
 - CLI (M1-9w, S1): `agentlink init --harness claude-desktop` sets up the Claude desktop app (macOS and Windows; its own `claude_desktop_config.json`, not Claude Code's file), with the usual diff, confirmation, backup and refusal of malformed files. On Linux it says the app isn't available there.
 
 ### Fixed
