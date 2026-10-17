@@ -1,40 +1,29 @@
 #!/usr/bin/env node
-// OPS-REL-3 / D-43 (docs/process/versioning.md §5, §6): the release workflow's two CHANGELOG jobs.
+// OPS-REL-3 / D-43 (docs/process/versioning.md §5, §6): the release workflow's CHANGELOG roll (the Release-body size check is inline in release.yml, not here: that job holds the OIDC token).
 //
 //   roll   Run by the root script `version-packages` after `changeset version`. For a stable product
 //          version it renames `## [Unreleased]` to `## [<version>] - <date>`, adds a fresh empty
 //          `## [Unreleased]` and updates the compare links. It refuses an empty `[Unreleased]`
 //          (nothing to release is a human decision, not a silent "maintenance release"), and does
-//          nothing for a prerelease.
-//   body   Run by the `notes` step of `publish-latest`. GitHub rejects a Release body over 125,000
-//          characters (HTTP 422), so an over-long section is replaced by a short note that links
-//          `docs/releases/v<version>.md` if it exists, else the CHANGELOG section.
+//          nothing for a prerelease or when this version already has its section (the product
+//          version was not bumped, e.g. only private packages were released).
 //
 //   node tools/release/roll-changelog.mjs roll [--file CHANGELOG.md] [--version X.Y.Z] [--date YYYY-MM-DD]
-//   node tools/release/roll-changelog.mjs body --notes FILE --version X.Y.Z --repo owner/name [--date D]
 //
 // Without --version, `roll` reads the product version from apps/cli/package.json.
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-export const GITHUB_BODY_LIMIT = 125_000;
 const STABLE = /^\d+\.\d+\.\d+$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const isStableVersion = (v) => typeof v === 'string' && STABLE.test(v);
 
-// GitHub heading anchor of `## [<version>] - <date>`.
-export const anchorFor = (version, date) =>
-  `${version} - ${date}`
-    .toLowerCase()
-    .replace(/[^a-z0-9 _-]/g, '')
-    .replace(/ /g, '-');
-
 export function rollChangelog(text, version, date) {
   if (!isStableVersion(version))
     throw new Error(`Only a stable version can be rolled, got "${version}".`);
   if (!DATE.test(date)) throw new Error(`Invalid date "${date}" (want YYYY-MM-DD).`);
-  const lines = text.split('\n');
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
   const start = lines.findIndex((l) => l.startsWith('## [Unreleased]'));
   if (start === -1) throw new Error('CHANGELOG.md has no "## [Unreleased]" section.');
   if (lines.some((l) => l.startsWith(`## [${version}]`))) {
@@ -44,7 +33,10 @@ export function rollChangelog(text, version, date) {
   if (end === -1) end = lines.length;
   const body = lines.slice(start + 1, end);
   const hasContent = body.some((l) => l.trim() !== '' && !/^#{1,6}\s/.test(l));
-  if (!hasContent) throw new Error('"## [Unreleased]" is empty: nothing to release.');
+  if (!hasContent)
+    throw new Error(
+      '"## [Unreleased]" is empty: add an entry under [Unreleased] in CHANGELOG.md before releasing.',
+    );
 
   const prevLine = lines.find((l, i) => i >= end && /^## \[\d+\.\d+\.\d+\]/.test(l));
   const prev = prevLine ? /^## \[([^\]]+)\]/.exec(prevLine)[1] : null;
@@ -80,17 +72,6 @@ export function rollChangelog(text, version, date) {
   return out.join('\n');
 }
 
-export function releaseBody(section, { version, date, repository, hasReleaseNote = false }) {
-  if (section.length <= GITHUB_BODY_LIMIT) return { body: section, fallback: false };
-  const base = `https://github.com/${repository}/blob/v${version}`;
-  const link = hasReleaseNote
-    ? `${base}/docs/releases/v${version}.md`
-    : `${base}/CHANGELOG.md#${anchorFor(version, date ?? '')}`;
-  const what = hasReleaseNote ? 'the release note' : 'the changelog section';
-  const body = `The full notes for v${version} are too long for a GitHub Release body. Read ${what}: ${link}\n`;
-  return { body, fallback: true };
-}
-
 function parseArgs(argv) {
   const [command, ...rest] = argv;
   const opts = {};
@@ -100,16 +81,6 @@ function parseArgs(argv) {
     opts[k.slice(2)] = rest[i + 1];
   }
   return { command, opts };
-}
-
-// The date of `## [<version>] - <date>` in CHANGELOG.md (the anchor of the fallback link needs it).
-function headingDate(version) {
-  if (!existsSync('CHANGELOG.md')) return '';
-  const m = new RegExp(
-    `^## \\[${version.replace(/\./g, '\\.')}\\] - (\\d{4}-\\d{2}-\\d{2})`,
-    'm',
-  ).exec(readFileSync('CHANGELOG.md', 'utf8'));
-  return m ? m[1] : '';
 }
 
 export function runCli(argv) {
@@ -123,31 +94,18 @@ export function runCli(argv) {
       return;
     }
     const date = opts.date ?? new Date().toISOString().slice(0, 10);
-    writeFileSync(file, rollChangelog(readFileSync(file, 'utf8'), version, date));
+    const text = readFileSync(file, 'utf8');
+    if (new RegExp(`^## \\[${version.replace(/\./g, '\\.')}\\]`, 'm').test(text)) {
+      console.log(
+        `::notice::CHANGELOG.md already has [${version}]; the product version was not bumped, nothing rolled.`,
+      );
+      return;
+    }
+    writeFileSync(file, rollChangelog(text, version, date));
     console.log(`Rolled [Unreleased] into [${version}] - ${date}.`);
     return;
   }
-  if (command === 'body') {
-    const { notes, version, repo } = opts;
-    if (!notes || !version || !repo) throw new Error('body needs --notes, --version and --repo.');
-    if (!isStableVersion(version) || !/^[\w.-]+\/[\w.-]+$/.test(repo))
-      throw new Error('Bad --version or --repo.');
-    const section = readFileSync(notes, 'utf8');
-    const { body, fallback } = releaseBody(section, {
-      version,
-      date: opts.date ?? headingDate(version),
-      repository: repo,
-      hasReleaseNote: existsSync(`docs/releases/v${version}.md`),
-    });
-    if (fallback) {
-      writeFileSync(notes, body);
-      console.log(
-        `::warning::Release notes for v${version} are over ${GITHUB_BODY_LIMIT} characters; using a short note with a link.`,
-      );
-    }
-    return;
-  }
-  throw new Error('Usage: roll-changelog.mjs roll|body ...');
+  throw new Error('Usage: roll-changelog.mjs roll ...');
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

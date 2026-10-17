@@ -627,7 +627,24 @@ jobs:
             exit 1
           fi
           # GitHub rejects a Release body over 125,000 characters (HTTP 422): swap in a short note with a link.
-          node tools/release/roll-changelog.mjs body --notes "$notes" --version "$version" --repo "$GITHUB_REPOSITORY"
+          # Inline on purpose: this job holds id-token: write and runs no repository code (OPS-REL-3).
+          # Tested by tools/release/release-body.test.mjs, which runs the block between the BODY-LIMIT markers.
+          # BODY-LIMIT-BEGIN
+          chars="$(LC_ALL=C.UTF-8 wc -m < "$notes" | tr -d '[:space:]')"
+          if [ "$chars" -gt 125000 ]; then
+            base="https://github.com/$GITHUB_REPOSITORY/blob/v$version"
+            if [ -f "docs/releases/v$version.md" ]; then
+              what="the release note"
+              link="$base/docs/releases/v$version.md"
+            else
+              heading_date="$(grep -m1 -oE "^## \\[${version//./\\.}\\] - [0-9]{4}-[0-9]{2}-[0-9]{2}" CHANGELOG.md | sed 's/.* - //')"
+              what="the changelog section"
+              link="$base/CHANGELOG.md#${version//./}---$heading_date"
+            fi
+            printf 'The full notes for v%s are too long for a GitHub Release body. Read %s: %s\n' "$version" "$what" "$link" > "$notes"
+            echo "::warning::Release notes for v$version are over 125000 characters; using a short note with a link."
+          fi
+          # BODY-LIMIT-END
           echo "Release notes for v$version found."
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
