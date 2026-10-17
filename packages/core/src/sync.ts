@@ -21,6 +21,16 @@
 //    card-update, and held envelopes it releases, are counted too (IR-M1-7h-1 F02). Then delivery
 //    acks (02 F-23, behind a flag), then the new inbox items with their wrapper metadata.
 //
+// `subscribeInbox` (M1-9s; 06 §6, 07 §4.1) is the live form for the MCP background loop: the
+// transport's `subscribe` hands each new wrap to the same step 1 and 2 handler as `syncInbox`
+// (seen-set, envelopeHash, one store transaction, admission bound), and each stored envelope then
+// runs step 3 in one serialized processing run (several arrivals coalesce into the next run). It
+// shares the persistence object, so the engine, with `syncInbox` and `catchUp` (dedup when a wrap
+// arrives through both). `close()` ends the transport subscription, waits for handlers and a
+// processing run in flight, and touches the store no more; `closeSubscriptions` (client.close) ends
+// every open one at once. The relays and keys are read when it opens: a change to either (a new
+// own relay list, a key rotation) is picked up by the loop's fallback catch-up and the next open.
+//
 // `catchUp` (the M1-9 plan finding 3 addendum) runs steps 1 and 2 only and then counts from the
 // store: no handshake, ack, card update, receipt or read mark, and no envelope is opened (06 §2.0:
 // `agentlink_status` and `status --brief` are read-only in fact; their only effects are stored raw
@@ -86,6 +96,36 @@ export interface SyncInboxResult extends FetchSummary {
   /** Delivery acks stored for sending in this pass (02 F-23; 0 while the flag is off). */
   readonly acksSent: number;
 }
+
+/** What one processing run of a live subscription did (M1-9s): counts and fixed codes only. */
+export interface InboxProcessed {
+  /** Envelopes stored as `received` by the subscription since the previous run. */
+  readonly stored: number;
+  /** The processing outcomes of this run (fixed codes; 04 §3.1.1). */
+  readonly reports: readonly InboundReport[];
+}
+
+export interface SubscribeInboxOptions {
+  /**
+   * Called after each processing run that follows stored envelopes. A throw is ignored. Never gets
+   * inbound content beyond the reports' validated IDs and fixed codes.
+   */
+  readonly onProcessed?: (result: InboxProcessed) => void;
+}
+
+/** An open live subscription (M1-9s). */
+export interface InboxSubscription {
+  /** True once `close()` was called, or the client closed it. */
+  readonly closed: boolean;
+  /**
+   * Ends the transport subscription (CLOSE on each relay, no reconnect), then waits for a handler
+   * or processing run in flight. Idempotent; never rejects. Call it before the store closes.
+   */
+  close(): Promise<void>;
+}
+
+/** The admission limit of a live subscription is read again at most this often (seconds). */
+const LIVE_LIMIT_REFRESH_SECONDS = 60;
 
 /** The fetch-only catch-up's answer (M1-7h addendum): counts only. */
 export interface CatchUpResult extends InboxCounts {
@@ -224,6 +264,8 @@ export class SyncService {
   readonly #ctx: CoreContext;
   readonly #deps: SyncDeps;
   readonly #persistence: StoreSyncPersistence;
+  /** Open live subscriptions, so client.close() can end them (M1-9s). */
+  readonly #live = new Set<{ end(): void }>();
 
   constructor(ctx: CoreContext, deps: SyncDeps) {
     this.#ctx = ctx;
@@ -277,6 +319,133 @@ export class SyncService {
     const fetched = await this.#fetch(readBudget(options.budgetMs));
     const counts = await this.#deps.inbox.counts();
     return { partial: fetched.partial, ...counts };
+  }
+
+  /**
+   * Opens a live subscription for the background loop (M1-9s; 06 §6, 07 §4.1): each new wrap on
+   * the own relays goes through the same receive path as `syncInbox` (steps 1 and 2), and stored
+   * envelopes are then processed (step 3, delivery acks) in one serialized run at a time. Only the
+   * publisher-lease holder calls it (06 §6, D-73); CLI commands never do.
+   * @throws CoreError `transport_unavailable` without a transport that can subscribe, or when the
+   *   subscription cannot be opened (no own relays, no keys).
+   */
+  async subscribeInbox(options: SubscribeInboxOptions = {}): Promise<InboxSubscription> {
+    const { outbox, ownerActions } = this.#deps;
+    const transport = outbox.requireTransport();
+    if (transport.subscribe === undefined) {
+      throw new CoreError('transport_unavailable', 'Live delivery is not available in this setup.');
+    }
+    const subscribe = transport.subscribe.bind(transport);
+    // The own list (07 §4.3), as for a fetch; routes() marks it as the only list for AUTH.
+    const routes = await outbox.routes(undefined);
+    const relays = [...new Set(routes.flatMap((r) => r.relays))];
+    const identities = await this.#identities();
+    const ctx = this.#ctx;
+    const log = ctx.log;
+
+    let closed = false;
+    let limit: { value: number; at: number } | undefined;
+    const limitNow = async (): Promise<number> => {
+      const now = nowOf(ctx);
+      if (limit === undefined || now - limit.at >= LIVE_LIMIT_REFRESH_SECONDS || now < limit.at) {
+        const value = policyLimits(await ownerActions.loadPolicy()).rateLimitPerContactPerHour;
+        limit = { value, at: now };
+      }
+      return limit.value;
+    };
+
+    // Step 3, one run at a time; arrivals during a run make one more run after it.
+    let stored = 0;
+    let dirty = false;
+    let processing: Promise<void> | undefined;
+    const runProcessing = async (): Promise<void> => {
+      while (dirty && !closed) {
+        dirty = false;
+        const batch = stored;
+        stored = 0;
+        let reports: InboundReport[];
+        try {
+          reports = await this.#deps.envelopes.processReceived();
+          await this.#deps.acks.sendFor(reports);
+        } catch {
+          // Rows stay `received` for the next run or pass (07 §3.2); fixed message only (I-7).
+          log.warn('live processing failed', {});
+          continue;
+        }
+        log.info('live inbox', { stored: batch, processed: reports.length });
+        try {
+          options.onProcessed?.({ stored: batch, reports });
+        } catch {
+          // the caller's notifier changes nothing here
+        }
+      }
+    };
+    const kick = (): void => {
+      dirty = true;
+      if (processing !== undefined || closed) return;
+      processing = runProcessing().finally(() => {
+        processing = undefined;
+        if (dirty && !closed) kick();
+      });
+    };
+
+    const inflight = new Set<Promise<SyncDisposition>>();
+    const onEnvelope = (item: SyncItem): Promise<SyncDisposition> => {
+      // After close nothing touches the store: the wrap is left for the next pass (not marked seen).
+      if (closed) return Promise.resolve('retry');
+      const run = (async (): Promise<SyncDisposition> => {
+        const limitValue = await limitNow();
+        // Closed while the limit was read: leave the wrap for the next pass, store nothing.
+        if (closed) return 'retry';
+        const outcome = await this.#handle(item, limitValue);
+        if (outcome.stored) {
+          stored += 1;
+          kick();
+        }
+        return outcome.disposition;
+      })().catch((): SyncDisposition => 'retry');
+      inflight.add(run);
+      void run.finally(() => inflight.delete(run));
+      return run;
+    };
+
+    let unsubscribe: () => Promise<void> | void;
+    try {
+      unsubscribe = subscribe({ relays, identities, persistence: this.#persistence, onEnvelope });
+    } catch {
+      log.warn('live subscription failed', { relays: relays.length });
+      throw new CoreError('transport_unavailable', 'Live delivery is not available in this setup.');
+    }
+    // The transport's drain: its event tasks (handler calls, cursor writes) still running.
+    let drained: Promise<unknown> = Promise.resolve();
+    const entry = {
+      end: (): void => {
+        if (closed) return;
+        closed = true;
+        this.#live.delete(entry);
+        try {
+          drained = Promise.resolve(unsubscribe()).catch(() => undefined);
+        } catch {
+          // the transport's stop does not throw; nothing more to end here
+        }
+      },
+    };
+    this.#live.add(entry);
+    log.info('live subscription open', { relays: relays.length });
+    return {
+      get closed() {
+        return closed;
+      },
+      close: async (): Promise<void> => {
+        entry.end();
+        await Promise.allSettled([...inflight, processing, drained]);
+      },
+    };
+  }
+
+  /** Ends every open live subscription (client.close; M1-9s). Synchronous; never throws. */
+  closeSubscriptions(): void {
+    for (const entry of [...this.#live]) entry.end();
   }
 
   /** Steps 1 and 2 of the header: fetch, deduplicate, verify once, store, rate-limit. */

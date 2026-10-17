@@ -262,9 +262,30 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
         to: 'Bob',
         terms: offerTerms('500.00'),
         note: `Happy to talk ${hostile}`,
+        clientRequestId: 'j8-offer-1',
       });
       expect(sent.structured).toMatchObject({ status: 'ok', version: 1 });
       expect(sent.structured).not.toHaveProperty('approvalId');
+      // M1-32-c: the same call again returns the same result and sends no second offer; another
+      // request under the key is refused and sends nothing.
+      expect(await sentCount(alice, 'offer')).toBe(1);
+      const repeat = await tool(aliceMcp, 'agentlink_propose_terms', {
+        to: 'Bob',
+        terms: offerTerms('500.00'),
+        note: `Happy to talk ${hostile}`,
+        clientRequestId: 'j8-offer-1',
+      });
+      expect(repeat.structured).toEqual(sent.structured);
+      const reused = await tool(aliceMcp, 'agentlink_propose_terms', {
+        to: 'Bob',
+        terms: offerTerms('501.00'),
+        clientRequestId: 'j8-offer-1',
+      });
+      expect(reused.structured).toMatchObject({
+        status: 'rejected',
+        code: 'IDEMPOTENCY_KEY_REUSED',
+      });
+      expect(await sentCount(alice, 'offer')).toBe(1);
       return sent.structured;
     });
 
@@ -419,9 +440,19 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
         envelopeId: received?.['envelopeId'],
         decision: 'reject',
         note: `Too expensive ${hostile}`,
+        clientRequestId: 'j8-reject-1',
       });
       expect(sent.structured).toMatchObject({ status: 'ok', decision: 'reject', version: 1 });
       expect(sent.structured).not.toHaveProperty('approvalId');
+      expect(await sentCount(bob, 'reject')).toBe(1);
+      // M1-32-c: a repeat under the key sends nothing more and returns the same result.
+      const repeat = await tool(bobMcp, 'agentlink_respond_to_terms', {
+        envelopeId: received?.['envelopeId'],
+        decision: 'reject',
+        note: `Too expensive ${hostile}`,
+        clientRequestId: 'j8-reject-1',
+      });
+      expect(repeat.structured).toEqual(sent.structured);
       expect(await sentCount(bob, 'reject')).toBe(1);
       expect(await storeRows(bob, 'approvals')).toHaveLength(approvalsBefore);
     });
