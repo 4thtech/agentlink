@@ -203,7 +203,7 @@ export function renderKnowledgeIntro(data) {
   const names = open.map(
     (m) => `${m.id} (${m.name.toLowerCase()}) is ${m.stateNote ?? 'in progress'}`,
   );
-  return `AgentLink is pre-alpha, last updated ${longDate(data.updated)}, version ${data.version}. ${names.join(' and ')}. There is nothing to install or run yet, and no package is published. This page mirrors the Status section of the project README, which is generated from the same source file (\`docs/status.yaml\`).`;
+  return `AgentLink is pre-alpha, last updated ${longDate(data.updated)}, version ${data.version}. ${names.join(' and ')}. The released CLI installs with \`npx -y @4thtech-io/agentlink init\`. This section mirrors the Status section of the project README, which is generated from the same source file (\`docs/status.yaml\`).`;
 }
 
 /** Knowledge base: where things stand, one line per area (done, in progress, planned). */
@@ -249,7 +249,7 @@ export function renderKnowledgeMilestones(data) {
 // --- Targets: which file gets which block ----------------------------------------------------------
 
 /**
- * `optional` targets (the knowledge base, which a separate change creates) are skipped when the
+ * `optional` targets (the knowledge overview) are skipped when the
  * file is absent or carries none of the markers; once a file has the markers they are enforced.
  */
 export const TARGETS = [
@@ -266,7 +266,7 @@ export const TARGETS = [
     },
   },
   {
-    file: 'knowledge/07-status-and-roadmap.md',
+    file: 'knowledge/agentlink-overview.md',
     optional: true,
     blocks: {
       'status-intro': renderKnowledgeIntro,
