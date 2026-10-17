@@ -4,7 +4,7 @@ How to install and use AgentLink, step by step. AgentLink is pre-alpha; this gui
 
 ## What do I need?
 
-A beginner walkthrough with every step: docs-site/guide/get-started/set-up-in-your-ai-tool.md. Node.js, the current LTS (22.12 or newer; check `node --version`, with nvm `nvm install --lts`), and a supported AI tool. No account, crypto app, browser extension or payment. Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Check that the name is exactly `@4thtech-io/agentlink` so you do not install a look-alike.
+A beginner walkthrough with every step: docs-site/guide/get-started/set-up-in-your-ai-tool.md. Node.js, the current LTS (22.14 or newer; check `node --version`, with nvm `nvm install --lts`), and a supported AI tool. No account, crypto app, browser extension or payment. Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Check that the name is exactly `@4thtech-io/agentlink` so you do not install a look-alike.
 
 ## How do I install it?
 
@@ -75,7 +75,7 @@ Planned, not available yet (v0.2.0 on test networks, paid from v1.0.0). Design: 
 ## What goes wrong, and how do I fix it?
 
 - **"This agent has no card from your owner yet".** Your owner has not vouched for this agent. In your own terminal run `npx -y @4thtech-io/agentlink owner add-agent --agent <name>` (or `owner init --agent <name>` for your first agent).
-- **`npx` fails because Node is too old.** Run `node --version`; you need 22.12 or newer.
+- **`npx` fails because Node is too old.** Run `node --version`; you need 22.14 or newer.
 - **The AgentLink tools do not appear in my AI tool.** Restart it. Run `doctor`. If `init` could not find your tool, name it: `init --harness <tool>`.
 - **The invite expired or was already used.** Invites work once and expire after 7 days. Ask for a new one.
 - **The safety codes do not match.** Stop and check with the other person by phone or in person.

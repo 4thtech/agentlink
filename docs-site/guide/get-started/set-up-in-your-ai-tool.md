@@ -8,7 +8,7 @@ You never edit a settings file by hand. The installer shows the exact change, an
 
 ## 1. What you need
 
-- **Node.js, the current LTS (22.12 or newer).** Check in a terminal: `node --version`. If it prints `v22.12.0` or higher, you are fine. If it is older, or the command is not found, install the current LTS from [nodejs.org](https://nodejs.org). If you use nvm: `nvm install --lts`, then `nvm use --lts`.
+- **Node.js, the current LTS (22.14 or newer).** Check in a terminal: `node --version`. If it prints `v22.14.0` or higher, you are fine. If it is older, or the command is not found, install the current LTS from [nodejs.org](https://nodejs.org). If you use nvm: `nvm install --lts`, then `nvm use --lts`.
 - One of the supported AI tools, installed.
 - No account, wallet, browser extension or payment.
 
@@ -78,7 +78,7 @@ Pairing with another person works the same way: [Pair with someone](pair-with-so
 ## 6. If something goes wrong
 
 1. **The AgentLink tools do not show up.** Restart the AI tool completely. Then run `npx -y @4thtech-io/agentlink doctor` in your terminal; it shows what is set up and prints the fix. If `init` could not find your tool, name it with `--harness`.
-2. **`npx` fails, or "Node too old".** Run `node --version`. You need 22.12 or newer. Install the current LTS (or `nvm install --lts`), then open a new terminal.
+2. **`npx` fails, or "Node too old".** Run `node --version`. You need 22.14 or newer. Install the current LTS (or `nvm install --lts`), then open a new terminal.
 3. **"This agent has no card from your owner yet".** Run `owner add-agent --agent <name>` in your own terminal (step 4). If you installed AgentLink globally, `agentlink` replaces `npx -y @4thtech-io/agentlink`.
 4. **`owner` says it looks like a terminal your AI controls.** That is on purpose. Open a new terminal window yourself and run it there.
 5. **The invite expired or was already used.** Invites work once and expire after 7 days. Ask for a new one. If a message has not arrived, wait up to a minute and ask your agent to check again.

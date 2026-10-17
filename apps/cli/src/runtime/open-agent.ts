@@ -13,6 +13,7 @@
 // takes no owner presence. Owner commands (M1-9b) take presence themselves, through @agentlink/node.
 // I-7: errors carry fixed text only (RuntimeError, or @agentlink/node's own fixed messages).
 import { homedir } from 'node:os';
+import process from 'node:process';
 import {
   AgentLinkClient,
   nostrTransport,
@@ -21,6 +22,7 @@ import {
 } from '@agentlink/core';
 import type { KeyStore } from '@agentlink/crypto';
 import { createLogger, type Logger } from '@agentlink/log';
+import { cliLogLevel } from './log-level.js';
 import {
   nodeHostResolver,
   nodeNip11Fetcher,
@@ -119,7 +121,7 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
   if (!isAgentName(name)) throw new RuntimeError('agent_name_invalid');
   const deps = options.deps ?? nodeRuntimeDeps;
   const clock = options.clock ?? systemClock;
-  const logger = options.logger ?? createLogger({ name: 'cli' });
+  const logger = options.logger ?? createLogger({ name: 'cli', level: cliLogLevel(process.env) });
 
   const found = await readAgentConfig(options.home ?? homedir(), name);
   if (found === undefined) {
