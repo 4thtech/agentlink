@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Fixed
 
+- CI (OPS-CI-5, S2): a required `path-guard` job runs the Windows and POSIX path-guard tests on macOS and Windows runners and fails if they were skipped or did not run.
+
 - CLI (M1-9w, S1): Gemini CLI is detected by the `gemini` program or `~/.gemini/settings.json`, so a computer with only Antigravity's `~/.gemini/config/mcp_config.json` is offered Antigravity, not Gemini CLI.
 
 ### Changed

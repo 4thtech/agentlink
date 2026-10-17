@@ -682,6 +682,17 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - A title `OPS-CI-3 ci: ...` passes; `OPS-ci-3`, `OPS-` and `OPS-CI` fail (tests).
 - **Also (found in PR #187):** since OPS-REL-1 (`privatePackages.version: true`) the private tooling packages (`tools`, `e2e`) count as published, so a tooling-only PR fails the `changesets` check without an empty changeset. Exempt private tooling packages from the changeset requirement, or have CI add empty changesets for them; test both cases.
 
+#### OPS-CI-5 · Required Windows/macOS path-guard test job (new)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/ci.yml`, `docs/process/ci-cd.md`
+- **Depends on:** M1-15
+- **Spec:** `ci-cd.md` (Workflows, ci); `04` §4
+- **Invariants:** —
+- **Scope:**
+  - The path-guard tests of M1-15 (`packages/node/src/allowed-path.test.ts`) ran only in the non-required `node-os` job. Add a `path-guard` job on `macos-26` and `windows-2025-vs2026` (structure of `keychain`) that runs only that file and is in `ci-gate`'s `needs`.
+- **Acceptance:**
+  - The job fails if the file did not run, ran fewer than 10 tests, or any test was skipped or did not pass (JSON report check).
+
 #### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/release.yml` or a Changesets hook, `tools/**`, `docs/process/versioning.md` §5
