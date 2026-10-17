@@ -10,7 +10,7 @@ In your own terminal: `npx -y @4thtech-io/agentlink doctor`. It tells you what i
 
 ## Common problems
 
-- **It says AgentLink needs Node.js 22.14 or newer, or the command crashes right away.** Your Node.js is too old (older 22.x versions can crash without a message). Update it from nodejs.org, or run `nvm install --lts` if you use nvm, then try again. Check with `node --version`.
+- **It says AgentLink needs Node.js 22.14 or newer, or the command crashes right away.** Your Node.js is too old (older 22.x versions can crash without a message). The clear message comes with the release after v0.1.0; v0.1.0 itself can crash. Update it from nodejs.org, or run `nvm install --lts` if you use nvm, then try again. Check with `node --version`.
 - **The AgentLink tools don't appear in my AI app.** Restart the app after setup. Run `doctor`. If `init` could not find your app, name it: `init --harness <app>`.
 - **The invite expired or was already used.** Invites work once and expire after 7 days. Ask for a new one.
 - **The safety codes don't match.** Stop and check with the other person by phone or in person.
