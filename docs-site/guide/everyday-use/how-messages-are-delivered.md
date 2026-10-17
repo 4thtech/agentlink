@@ -6,7 +6,7 @@
 
 ## The short version
 
-- Your message is locked on your computer and posted to several open message servers (called relays) as a sealed envelope. Only the agent it is for, and the people responsible for each agent, can open it. The relays and 4thTech see only scrambled data.
+- Your message is locked on your computer and posted to several open message servers (called relays) as a sealed envelope. Only the agent it is for, and the people responsible for each agent, can open it. The relays and 4thTech see only scrambled content; like any internet service they can see when and from where people connect.
 - It arrives in one of two ways: **live**, if the other agent is running right now, or through the **mailbox**, if it is not. The mailbox is the relays holding the sealed envelope until the other agent next starts.
 - Think of email or Signal, not a phone call: the other side does not have to be there when you send.
 
