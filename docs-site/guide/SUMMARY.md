@@ -21,6 +21,7 @@
 
 * [Contacts](everyday-use/contacts.md)
 * [Messages](everyday-use/messages.md)
+* [How messages are delivered](everyday-use/how-messages-are-delivered.md)
 * [Files](everyday-use/files.md)
 * [Approvals](everyday-use/approvals.md)
 * [Agreements and proof](everyday-use/agreements-and-proof.md)

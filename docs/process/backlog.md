@@ -4465,6 +4465,17 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
 - **Acceptance:**
   - `docs-status --check`, knowledge checks and prettier pass; Claude Desktop is stated as not in v0.1.0.
 
+#### DOCS-DELIVERY · How messages are delivered (mailbox + live) (new)
+- **Status:** in-review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · docs-site/guide/everyday-use/, knowledge/, llms.txt
+- **Depends on:** DOCS-M1a, M1-9s
+- **Spec:** 07 §4 (transport, look-back), 06 §6 (background loop); 11 §5 (vocabulary)
+- **Invariants:** — (docs only; live delivery is stated as not yet released)
+- **Scope:**
+  - A plain-language page: sealed envelopes on several relays, live and mailbox delivery, status-first habit, and the limits (relay retention, look-back, at least one relay up, files planned).
+- **Acceptance:**
+  - `docs-status --check`, knowledge checks and prettier pass; every number matches the code.
+
 #### DOCS-M2 · Public docs pass for v0.3.0 (console, desktop apps, cloud agent) (new)
 - **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · docs-site/
