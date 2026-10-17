@@ -5,6 +5,7 @@ import type { ContactView, InboxSender, OpenOffer } from '@agentlink/core';
 import { encodeUtf8 } from '@agentlink/crypto';
 import { createLogger, type Logger } from '@agentlink/log';
 import type { ContactDisplayName, RestrictedName } from '@agentlink/types';
+import { Ajv } from 'ajv';
 import { describe, expect, it } from 'vitest';
 import type {
   InboxPage,
@@ -17,6 +18,7 @@ import type {
 } from './context.js';
 import { INBOX_MAX_TEXT_BYTES, INBOX_SYNC_BUDGET_MS, INBOX_TEXT } from './inbox.js';
 import { callTool } from './index.js';
+import { findTool } from './registry.js';
 import type { FinishedResult } from './result.js';
 import { copy, UNTRUSTED_FOOTER } from './strings/index.js';
 
@@ -227,8 +229,21 @@ function context(client: ToolClient, logger: Logger = capture().logger): ToolCon
   };
 }
 
-const inbox = (input: Record<string, unknown>, client: Fake, logger?: Logger) =>
-  callTool('agentlink_inbox', input, context(client, logger));
+/**
+ * The MCP server rejects a result that does not match the tool's output schema, so every result
+ * these tests produce is validated against it too (M1-22-b regression: `termsParties`).
+ */
+function assertMatchesOutputSchema(name: string, structured: unknown): void {
+  const validate = new Ajv({ strict: false }).compile(findTool(name)!.outputSchema);
+  const valid = validate(structured);
+  expect(valid, JSON.stringify(validate.errors)).toBe(true);
+}
+
+const inbox = async (input: Record<string, unknown>, client: Fake, logger?: Logger) => {
+  const result = await callTool('agentlink_inbox', input, context(client, logger));
+  assertMatchesOutputSchema('agentlink_inbox', result.structured);
+  return result;
+};
 
 type Message = Record<string, unknown> & {
   untrusted: Record<string, unknown>;
@@ -336,14 +351,22 @@ describe('agentlink_inbox: sync and query (06 §2.2, §6)', () => {
   });
 
   const D = `0x${'d'.repeat(40)}`;
-  const termsOffer = (envelopeId: string, termsHash: string, terms: Record<string, unknown>) =>
+  const termsOffer = (envelopeId: string, termsKey: string, terms: Record<string, unknown>) =>
     inbound({
       envelopeId,
       type: 'offer',
       body: null,
       terms,
       note: null,
-      termsRef: { termsId: THREAD, version: 1, termsHash, validUntil: T0 + 86_400 },
+      termsRef: {
+        termsId: THREAD,
+        version: 1,
+        termsHash: [...termsKey]
+          .map((c) => c.charCodeAt(0).toString(16))
+          .join('')
+          .padEnd(64, '0'),
+        validUntil: T0 + 86_400,
+      },
     });
   const openOffer22b = (envelopeId: string): OpenOffer => ({
     envelopeId,

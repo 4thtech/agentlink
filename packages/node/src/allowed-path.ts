@@ -158,8 +158,11 @@ export async function resolveAllowedFile(
   return { realPath: resolved, folder: decision.folder, size: info.size };
 }
 
-/** Test seam, never exported from the package entry: runs between the open and the re-check. */
+/** Test seams, never exported from the package entry. */
 export interface OpenAllowedFileSeams {
+  /** Runs between the first check and the open (a swap there is caught by the re-check). */
+  readonly afterCheck?: () => Promise<void> | void;
+  /** Runs between the open and the re-check. */
   readonly afterOpen?: () => Promise<void> | void;
 }
 
@@ -171,7 +174,9 @@ export interface OpenAllowedFileSeams {
  * fails that re-check (with its own code) or changes the device and inode (`changed`). The open
  * uses O_NOFOLLOW (a final symlink is not followed) and O_NONBLOCK (a FIFO or device swapped in
  * cannot block the open). Residual: Windows has neither flag, so there only the re-check and the
- * device and inode match apply; a hard link to a protected file placed inside an allowed folder is
+ * device and inode match apply (Windows also refuses to rename a folder that holds an open file,
+ * so a folder swap can only happen before the open, which the re-check catches); realpath is the
+ * native one, so 8.3 short names (`RUNNER~1`) resolve to their long form on both sides; a hard link to a protected file placed inside an allowed folder is
  * the same inode and is not detected (it needs write access to that folder as the same OS user,
  * 04 §2.5). The caller closes the handle.
  */
@@ -189,6 +194,7 @@ export async function openAllowedFileWith(
   seams: OpenAllowedFileSeams,
 ): Promise<{ readonly file: AllowedFile; readonly handle: FileHandle }> {
   const first = await resolveAllowedFile(requested, options);
+  if (seams.afterCheck !== undefined) await seams.afterCheck();
   const flags = constants as { O_NOFOLLOW?: number; O_NONBLOCK?: number };
   let handle: FileHandle;
   try {

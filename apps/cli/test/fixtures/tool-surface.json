@@ -1206,6 +1206,28 @@
                 "required": ["termsId", "version", "termsHash", "validUntil"],
                 "additionalProperties": false
               },
+              "termsParties": {
+                "type": "object",
+                "properties": {
+                  "parties": {
+                    "type": "array",
+                    "items": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "payer": {
+                    "type": ["string", "null"]
+                  },
+                  "deliverablesBy": {
+                    "type": "array",
+                    "items": {
+                      "type": ["string", "null"]
+                    }
+                  }
+                },
+                "required": ["parties", "payer", "deliverablesBy"],
+                "additionalProperties": false
+              },
               "contact": {
                 "anyOf": [
                   {
