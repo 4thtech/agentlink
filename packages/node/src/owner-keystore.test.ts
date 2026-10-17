@@ -1094,6 +1094,19 @@ describe('the TTY prompt (04 §2.8, 07 §9.2)', () => {
     expect(chunks.every(zeroed)).toBe(true);
   });
 
+  it('readText reads one visible line as UTF-8 text (the display name, M1-8h-b)', async () => {
+    const tty = new FakeTty();
+    const { out, stream } = fakeOut();
+    const terminal = ttyOwnerTerminal({ input: tty, output: stream });
+    if (terminal.readText === undefined) throw new Error('readText missing');
+    const reading = terminal.readText('Name:');
+    await tick();
+    tty.emit('data', Buffer.from('Ana Kovač\r'));
+    expect(await reading).toBe('Ana Kovač');
+    expect(out.join('')).toContain('Ana Kova');
+    expect(tty.rawCalls).toEqual([true, false]);
+  });
+
   it('Ctrl-C cancels', async () => {
     const tty = new FakeTty();
     const terminal = ttyOwnerTerminal({ input: tty, output: fakeOut().stream });

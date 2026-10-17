@@ -215,15 +215,18 @@ export interface StoreOwnerSeedOptions {
  * Wraps `seed` under `secret` in `ALKO` v1 and stores it as the `owner` item (04 §2.2). Never
  * overwrites: an existing item is `owner_exists` (the check and the write are not atomic in the OS
  * keychain API; two concurrent `owner init` runs are a known residual). A kind-2 secret must pass the
- * D-66 length rule. The stored value is read back and compared, and removed again if it differs.
- * `seed` and `secret` are not modified; the kek is wiped.
+ * D-66 length rule. The stored value is read back and compared; if it differs, it is not this run's
+ * item, so it is left alone (IR-M1-8h-1 L2: never delete an item this run did not write) and the
+ * call fails. Returns the stored `ALKO` blob (ciphertext), so a later rollback can check that the
+ * item it removes is still this one (removeOwnerItemIfOurs). `seed` and `secret` are not modified;
+ * the kek is wiped.
  */
 export async function storeOwnerSeed(
   keychain: KeychainBackend,
   seed: Uint8Array,
   secret: { readonly secret: Uint8Array; readonly secretKind: SecretKind },
   options: StoreOwnerSeedOptions = {},
-): Promise<void> {
+): Promise<Uint8Array> {
   const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
   if (secret.secretKind === 2) assertOwnerPassphraseLength(secret.secret);
   const existing = await readOwnerItem(keychain, timeoutMs);
@@ -250,12 +253,41 @@ export async function storeOwnerSeed(
   const same = back !== null && equalBytes(back, blob);
   if (back !== null) wipe(back);
   if (!same) {
-    await guarded(() => keychain.delete(OWNER_ACCOUNT), timeoutMs).catch(() => false);
+    // Whatever is there now is not the item this run wrote (another run's, or none): never deleted.
     throw new NodeKeyStoreError(
       'keychain_failed',
       'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
     );
   }
+  return blob;
+}
+
+/** What removeOwnerItemIfOurs found. */
+export type OwnerItemRemoval = 'removed' | 'absent' | 'other' | 'failed';
+
+/**
+ * IR-M1-8h-1 L2: removes the `owner` item only when it is still exactly `blob`, the item this run
+ * stored. `absent`: there is no item (nothing to remove); `other`: the item is not this run's (for
+ * example a concurrent `owner init`) and is kept; `failed`: the keychain refused the delete. The read
+ * and the delete are not atomic in the OS keychain API (the same residual as storeOwnerSeed).
+ */
+export async function removeOwnerItemIfOurs(
+  keychain: KeychainBackend,
+  blob: Uint8Array,
+  timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+): Promise<OwnerItemRemoval> {
+  let current: Uint8Array | null;
+  try {
+    current = await readOwnerItem(keychain, timeoutMs);
+  } catch {
+    return 'failed';
+  }
+  if (current === null) return 'absent';
+  const ours = equalBytes(current, blob);
+  wipe(current);
+  if (!ours) return 'other';
+  const removed = await guarded(() => keychain.delete(OWNER_ACCOUNT), timeoutMs).catch(() => false);
+  return removed ? 'removed' : 'failed';
 }
 
 // --- Sessions -------------------------------------------------------------------------------------
