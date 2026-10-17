@@ -271,6 +271,71 @@ describe('creating a request (04 §3.4.1, 06 §2.5)', () => {
     });
   });
 
+  it('a commitment request starts at its scope createdAt: a later clock second is fine, a stale or future scope is not (M1-32-d)', async () => {
+    const t = await setup();
+    const createdAt = t.clock.t;
+    const actionAt = (at: number) => {
+      const scope = {
+        v: 1,
+        kind: 'agentlink/commitment',
+        agentId: t.client.agentId,
+        decision: 'offer',
+        counterparty: { agentId: `0x${'11'.repeat(20)}`, ownerKey: hex64() },
+        thread: b64id(),
+        termsId: b64id(),
+        version: 1,
+        termsHash: hex64(),
+        answers: null,
+        notarize: true,
+        maxFeeUsd: '1',
+        createdAt: at,
+        expiresAt: at + 3_600,
+      };
+      const terms = {
+        termsId: scope.termsId,
+        version: 1,
+        parties: [scope.agentId, scope.counterparty.agentId].sort(),
+        subject: 'Milestone 3',
+        deliverables: [
+          { id: 'd1', description: 'Spec', by: scope.counterparty.agentId, plaintextSha256: null },
+        ],
+        price: null,
+        deadlines: [],
+        validUntil: at + 3_600,
+        previousTermsHash: null,
+      };
+      return {
+        tool: 'agentlink_propose_terms',
+        args: {
+          to: scope.counterparty.agentId,
+          terms: { subject: 'Milestone 3', deliverables: [{ description: 'Spec', by: 'them' }] },
+          notarize: true,
+        },
+        context: {
+          triggers: ['commitments.accept'],
+          scope,
+          terms,
+          fee: { token: FEE_TOKEN, amount: '100000', usd: '0.1' },
+        },
+      };
+    };
+    const ask = (action: unknown) =>
+      t.client.approvalService.request({ action, summary: 'Make a firm offer' });
+    // Built one second before the request is stored: the request starts at the scope's createdAt.
+    const built = actionAt(createdAt);
+    t.clock.t = createdAt + 1;
+    const pending = await ask(built);
+    expect(pending.expiresAt).toBe(createdAt + 3_600);
+    const row = await t.row(pending.approvalId);
+    expect(row?.created_at).toBe(createdAt);
+    expect(row?.status).toBe('pending');
+    // A scope from the future, or one older than a core call takes, is refused and stores nothing.
+    for (const at of [t.clock.t + 1, t.clock.t - 61]) {
+      const error = await ask(actionAt(at)).catch((e: unknown) => e);
+      expect((error as CoreError).code).toBe('approval_action_invalid');
+    }
+  });
+
   it('refuses a request when the agent has no identity', async () => {
     const client = await AgentLinkClient.create({
       keyStore: new MemoryKeyStore(seed(3)),
