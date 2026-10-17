@@ -115,9 +115,11 @@ export const INIT_TEXT = Object.freeze({
   created: 'OK       {appName} set up',
   ownerStep:
     "One step left, and you must do it yourself: run `agentlink owner init` in your own terminal. Don't let your AI run it or see the code it shows. It's what stops any AI, including your own, from approving its own actions.",
-  noAppsHere:
-    "Problem  AgentLink didn't find Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode or Antigravity on this computer.",
-  restartDesktop: 'Warning  Quit and reopen the Claude app. AgentLink appears under Connectors.',
+  noAppsHere: "Problem  AgentLink didn't find {apps} on this computer.",
+  appsAll: 'Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode or Antigravity',
+  // No Claude desktop app on Linux, so it is not named there.
+  appsLinux: 'Claude Code, Codex, Gemini CLI, OpenCode or Antigravity',
+  restartDesktop: 'Warning Quit and reopen the Claude app. AgentLink appears under Connectors.',
   // D-78 (06 §7).
   declinedKept:
     'No app was changed. Your agent identity is kept. To set up one app later, run: agentlink init --harness <app>',
@@ -162,6 +164,7 @@ function printPlan(
   plans: readonly HarnessPlan[],
   createIdentity: boolean,
   listApps: boolean,
+  platform: NodeJS.Platform,
 ): void {
   const { output } = context;
   // With `--harness <id|none>` the owner chose, and nothing was looked for.
@@ -169,7 +172,8 @@ function printPlan(
     output.print(copy('cli.init.found', { count: plans.length }));
     for (const plan of plans) output.print(`  ${plan.def.appName}`);
   } else if (listApps) {
-    output.print(INIT_TEXT.noAppsHere);
+    const apps = platform === 'linux' ? INIT_TEXT.appsLinux : INIT_TEXT.appsAll;
+    output.print(INIT_TEXT.noAppsHere.replace('{apps}', apps));
   }
   if (createIdentity) output.print(INIT_TEXT.identity);
   for (const plan of plans) {
@@ -310,19 +314,19 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     const interactive = checkOwnerTerminal(terminal).ok && confirmValue === undefined;
 
     if (!needIdentity && changes.length === 0) {
-      printPlan(context, plans, false, listApps);
+      printPlan(context, plans, false, listApps, deps.platform ?? process.platform);
       output.print(INIT_TEXT.nothingToDo);
       return blocked ? EXIT_FAILED : EXIT_OK;
     }
 
     // The one harness the owner named can't be changed safely: stop before any code or write.
     if (chosen !== undefined && blocked) {
-      printPlan(context, plans, false, listApps);
+      printPlan(context, plans, false, listApps, deps.platform ?? process.platform);
       return EXIT_FAILED;
     }
 
     // Nothing has been written yet. Show everything first (D-39).
-    printPlan(context, plans, needIdentity, listApps);
+    printPlan(context, plans, needIdentity, listApps, deps.platform ?? process.platform);
 
     let approved: readonly ChangePlan[];
     let declined = false;

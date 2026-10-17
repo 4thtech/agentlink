@@ -47,6 +47,7 @@ The Claude desktop app (chat) has its own file, separate from Claude Code's `~/.
 
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json` (`init` uses `~/AppData/Roaming/Claude`; the `APPDATA` variable is not followed)
+- The Microsoft Store build of Claude on Windows, or a redirected `APPDATA`, keeps the file elsewhere. `init` always uses the path above, so Claude may not read what it wrote; add the entry to the file your Claude reads by hand instead.
 - Linux: there is no Claude desktop app, so `init` says so and writes nothing.
 
 ```json

@@ -66,6 +66,7 @@ interface RunOptions {
   readonly terminal?: TerminalContext;
   readonly probe?: KeychainProbe;
   readonly answers?: readonly string[];
+  readonly platform?: NodeJS.Platform;
 }
 
 async function init(argv: readonly string[], options: RunOptions = {}): Promise<Run> {
@@ -86,6 +87,7 @@ async function init(argv: readonly string[], options: RunOptions = {}): Promise<
       return Promise.resolve(answers.shift() ?? '');
     },
     clock: () => NOW,
+    ...(options.platform === undefined ? {} : { platform: options.platform }),
   };
   const dispatch = createDispatcher({ init: createInitHandler(deps) });
   const io: DispatchIO = {
@@ -124,10 +126,13 @@ const CLAUDE_JSON = `${JSON.stringify({ numStartups: 7, mcpServers: { other: { c
 
 describe('detection', () => {
   it('finds nothing and says so, then still creates the agent identity on confirmation', async () => {
-    const plan = await init([]);
+    const plan = await init([], { platform: 'darwin' });
     expect(plan.code).toBe(EXIT_OK);
     expect(plan.out).toContain(
       "didn't find Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode or Antigravity",
+    );
+    expect((await init([], { platform: 'linux' })).out).toContain(
+      "didn't find Claude Code, Codex, Gemini CLI, OpenCode or Antigravity",
     );
     expect(plan.created).toBe(0);
     const run = await init(['--confirm', codeOf(plan)]);
@@ -142,6 +147,111 @@ describe('detection', () => {
     expect(plan.out).toContain(copy('cli.init.found', { count: 1 }));
     expect(plan.out).toContain('Codex');
     expect(plan.out).not.toContain('Gemini CLI');
+  });
+
+  it('Gemini CLI: a home with only ~/.gemini/config/mcp_config.json proposes Antigravity, not Gemini CLI (M1-9w)', async () => {
+    await mkdir(join(home, '.gemini', 'config'), { recursive: true, mode: 0o700 });
+    await writeFile(join(home, '.gemini', 'config', 'mcp_config.json'), '{}\n');
+    const plan = await init([]);
+    expect(plan.out).toContain('Antigravity');
+    expect(plan.out).not.toContain('Gemini CLI');
+    expect(plan.out).toContain(copy('cli.init.found', { count: 1 }));
+  });
+
+  it('Gemini CLI: ~/.gemini/settings.json detects it, and a bare ~/.gemini folder does not', async () => {
+    await mkdir(join(home, '.gemini'), { mode: 0o700 });
+    expect((await init([])).out).not.toContain(copy('cli.init.found', { count: 1 }));
+    await writeFile(join(home, '.gemini', 'settings.json'), '{}\n');
+    expect((await init([])).out).toContain('\n  Gemini CLI');
+  });
+
+  it('Gemini CLI: the gemini binary on PATH detects it', async () => {
+    const plan = await init([], { terminal: { ...PIPE, env: await geminiOnPath() } });
+    expect(plan.out).toContain('\n  Gemini CLI');
+  });
+
+  it('Claude Desktop is detected by its config folder on macOS and Windows, never on Linux', async () => {
+    await mkdir(join(home, 'Library', 'Application Support', 'Claude'), { recursive: true });
+    await mkdir(join(home, 'AppData', 'Roaming', 'Claude'), { recursive: true });
+    expect((await init([], { platform: 'darwin' })).out).toContain('Claude Desktop');
+    expect((await init([], { platform: 'win32' })).out).toContain('Claude Desktop');
+    expect((await init([], { platform: 'linux' })).out).not.toContain('Claude Desktop');
+  });
+});
+
+describe('Claude Desktop (M1-9w)', () => {
+  const MAC = ['Library', 'Application Support', 'Claude', 'claude_desktop_config.json'];
+  const WIN = ['AppData', 'Roaming', 'Claude', 'claude_desktop_config.json'];
+  const ENTRY = { command: 'npx', args: ['-y', '@4thtech-io/agentlink', 'mcp'] };
+  const cases: [NodeJS.Platform, string[], string][] = [
+    ['darwin', MAC, '~/Library/Application Support/Claude/claude_desktop_config.json'],
+    ['win32', WIN, '~/AppData/Roaming/Claude/claude_desktop_config.json'],
+  ];
+
+  for (const [platform, parts, shown] of cases) {
+    it(`${platform}: no config creates the file with only the entry, after confirmation`, async () => {
+      const plan = await init(['--harness', 'claude-desktop'], { platform });
+      expect(plan.code).toBe(EXIT_OK);
+      expect(plan.out).toContain(`--- a/${shown}`);
+      expect(await exists(...parts)).toBe(false);
+      const run = await init(['--harness', 'claude-desktop', '--confirm', codeOf(plan)], {
+        platform,
+      });
+      expect(run.code).toBe(EXIT_OK);
+      expect(JSON.parse(await read(...parts))).toEqual({ mcpServers: { agentlink: ENTRY } });
+      expect(await exists('.claude.json')).toBe(false);
+      expect(run.out).toContain(INIT_TEXT.restartDesktop);
+      expect(run.out).not.toContain(copy('cli.init.restart', { appName: 'Claude Desktop' }));
+      expect(INIT_TEXT.restartDesktop).toContain('Connectors');
+    });
+
+    it(`${platform}: other servers and settings are preserved, with a backup`, async () => {
+      const dir = join(home, ...parts.slice(0, -1));
+      await mkdir(dir, { recursive: true, mode: 0o700 });
+      const before = `${JSON.stringify({ theme: 'x', mcpServers: { other: { command: 'y' } } }, null, 2)}\n`;
+      await writeFile(join(home, ...parts), before);
+      const plan = await init(['--harness', 'claude-desktop'], { platform });
+      expect(plan.out).toContain(`+++ b/${shown}`);
+      await init(['--harness', 'claude-desktop', '--confirm', codeOf(plan)], { platform });
+      expect(JSON.parse(await read(...parts))).toEqual({
+        theme: 'x',
+        mcpServers: { other: { command: 'y' }, agentlink: ENTRY },
+      });
+      const backups = (await readdir(dir)).filter((n) => n !== 'claude_desktop_config.json');
+      expect(backups).toHaveLength(1);
+    });
+
+    it(`${platform}: malformed JSON is reported and never written`, async () => {
+      await mkdir(join(home, ...parts.slice(0, -1)), { recursive: true, mode: 0o700 });
+      await writeFile(join(home, ...parts), '{ not json');
+      const run = await init(['--harness', 'claude-desktop'], { platform });
+      expect(run.code).toBe(EXIT_FAILED);
+      expect(run.err).toContain('Claude Desktop');
+      expect(run.out).not.toContain('--confirm');
+      expect(await read(...parts)).toBe('{ not json');
+    });
+  }
+
+  it('Linux: says Claude Desktop is not available, and writes nothing', async () => {
+    const run = await init(['--harness', 'claude-desktop'], { platform: 'linux' });
+    expect(run.code).toBe(EXIT_FAILED);
+    expect(run.err).toContain("Claude Desktop isn't available on this computer's system");
+    expect(run.created).toBe(0);
+    expect(await names()).toEqual([]);
+  });
+
+  it('a code for Claude Desktop does not confirm Claude Code or another system', async () => {
+    const plan = await init(['--harness', 'claude-desktop'], { platform: 'darwin' });
+    const other = await init(['--harness', 'claude-code', '--confirm', codeOf(plan)], {
+      platform: 'darwin',
+    });
+    expect(other.code).toBe(EXIT_FAILED);
+    expect(await exists(...MAC)).toBe(false);
+    const win = await init(['--harness', 'claude-desktop', '--confirm', codeOf(plan)], {
+      platform: 'win32',
+    });
+    expect(win.code).toBe(EXIT_FAILED);
+    expect(await exists(...WIN)).toBe(false);
   });
 });
 
