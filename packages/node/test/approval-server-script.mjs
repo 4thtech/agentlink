@@ -7,6 +7,7 @@
 // status of each attempt to the job's outFile. The parent checks that none was applied.
 //
 // Usage: node approval-server-script.mjs <job.json>
+import { Buffer } from 'node:buffer';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import process from 'node:process';

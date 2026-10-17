@@ -2364,7 +2364,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The build-plan test above covers a batch: the same-user script, with the same read access, cannot add an item to a batch the owner reviewed or use an item for another call (with M1-9b and M1-7e).
 
 #### M1-8d · node: local approval server
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node
 - **Depends on:** M1-8c, M1-7e
 - **Spec:** 08 §1; 03 §4.5; 04 §2.5; 06 §2.5

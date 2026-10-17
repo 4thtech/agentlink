@@ -656,7 +656,10 @@ describe('owner presence for every decision (04 §2.5, I-4)', () => {
     h.source.add(1);
     const big = await send(h.port, `/api/approvals/${id(1)}/approve`, {
       method: 'POST',
-      headers: { ...headers, 'X-AgentLink-Digest': (await h.source.get(id(1)))?.actionDigest ?? '' },
+      headers: {
+        ...headers,
+        'X-AgentLink-Digest': (await h.source.get(id(1)))?.actionDigest ?? '',
+      },
       body: new Uint8Array(4096).fill(65),
     });
     expect(big.status).toBe(413);
@@ -671,11 +674,13 @@ describe('the token and the owner code stay out of files, logs and URLs (08 §1,
     for (const name of ['log', 'info', 'warn', 'error', 'debug'] as const) {
       vi.spyOn(console, name).mockImplementation(capture);
     }
-    const out = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+    // Captured, not written: the spies swallow whatever the server might print.
+    const { stdout, stderr } = process;
+    const out = vi.spyOn(stdout, 'write').mockImplementation((chunk) => {
       logged.push(String(chunk));
       return true;
     });
-    const err = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+    const err = vi.spyOn(stderr, 'write').mockImplementation((chunk) => {
       logged.push(String(chunk));
       return true;
     });

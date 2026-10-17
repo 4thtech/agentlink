@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Added
+
+- Local approval server (M1-8d, S2, `@agentlink/node`; not wired into the CLI yet, M1-11a): an HTTP server on `127.0.0.1` and a random port with a view-only session token kept in memory (exchanged for an HttpOnly cookie, never written to disk or logged), exact `Host` and `Origin` checks against DNS rebinding, a CSRF token and non-simple requests for decisions, and owner presence (owner code or owner passphrase) for every approve or deny, signed as one `approval.decide` that core verifies. Each approval ID is decided once through it; a fixed OS notification and the `/approve/<id>` route are included. The same-user script test runs against the live server.
+
 ### Changed
 
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.
