@@ -3229,8 +3229,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-4
 - **Scope:**
   - (a) An owner item exists on the machine but no local agent has a card naming it (for example after every carded agent was removed): `owner add-agent` cannot learn the owner keys and points to `owner init`, which refuses because an owner exists. Give this case its own fixed message and a `doctor` hint (what is on the machine, what to do), without reading or showing any secret (IR-M1-9t-1 L-2).
-  - (b) Without `--harness`, any `~/.gemini` folder detects Gemini CLI, so an Antigravity user (whose config also lives under `~/.gemini`) is offered a Gemini CLI change. Detect Gemini CLI by the `gemini` binary on `PATH` or `~/.gemini/settings.json` instead (IR-M1-9t-1 L-3).
-- **Acceptance:** tests for both cases; (a) prints the new message and `doctor` names the state; (b) a home with only `~/.gemini/config/mcp_config.json` proposes Antigravity and not Gemini CLI.
+  - (b) Moved to M1-9w (Gemini CLI detection by the `gemini` binary or `~/.gemini/settings.json`, IR-M1-9t-1 L-3).
+- **Acceptance:** tests for (a): it prints the new message and `doctor` names the state.
+
+#### M1-9w · CLI: Claude Desktop in init, Gemini CLI detection (new, from M1-9a and M1-9u (b))
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`src/harness/**`, `src/commands/init.ts`), docs-site `technical/reference/harness-configuration.md`
+- **Depends on:** M1-9t
+- **Spec:** 06 §7 (harness table, Claude Desktop row); D-39, D-78
+- **Invariants:** I-4
+- **Scope:**
+  - (a) `agentlink init --harness claude-desktop` (and detection without `--harness`) writes the `agentlink` entry to the Claude desktop app's own file, not Claude Code's `~/.claude.json`: macOS `~/Library/Application Support/Claude/claude_desktop_config.json`, Windows `%APPDATA%\Claude\claude_desktop_config.json` (`~/AppData/Roaming/Claude`; `APPDATA` is not followed, like every env value). Linux: a fixed "not available on this system" message, nothing written. Same rules as every harness: other servers kept, exact diff and confirmation, malformed JSON refused, backup; the entry is `command` and `args` (`npx -y @4thtech-io/agentlink mcp`). Restart copy: "Quit and reopen the Claude app. AgentLink appears under Connectors."
+  - (b) Gemini CLI is detected by the `gemini` binary on `PATH` or `~/.gemini/settings.json`, not by any `~/.gemini` folder (IR-M1-9t-1 L-3, moved from M1-9u (b)); a home with only `~/.gemini/config/mcp_config.json` proposes Antigravity.
+- **Acceptance:** fixture-home tests per system (injected platform and home) for no config, other servers present and malformed; detection tests for Claude Desktop and Gemini CLI; the harness docs page has the row.
 
 #### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
 - **Status:** in review · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
