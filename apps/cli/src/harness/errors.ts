@@ -14,7 +14,9 @@ export type HarnessErrorCode =
   /** The file is not the one that was shown (it changed, or a second name appeared). */
   | 'changed'
   /** The write or the backup failed; the original file is untouched. */
-  | 'write_failed';
+  | 'write_failed'
+  /** The app has no version for this system (Claude Desktop on Linux). */
+  | 'unsupported_platform';
 
 export const HARNESS_MESSAGES: Readonly<Record<HarnessErrorCode, string>> = Object.freeze({
   unsafe_path:
@@ -28,6 +30,8 @@ export const HARNESS_MESSAGES: Readonly<Record<HarnessErrorCode, string>> = Obje
   changed:
     "{appName}'s settings changed while AgentLink was working, so nothing was written. Run `agentlink init` again.",
   write_failed: "AgentLink couldn't write {appName}'s settings. Nothing was changed.",
+  unsupported_platform:
+    "{appName} isn't available on this computer's system, so there is nothing for AgentLink to set up. Nothing was changed.",
 });
 
 export class HarnessError extends Error {
