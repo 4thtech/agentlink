@@ -3095,7 +3095,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Cross-cutting M1 (new)
 
 #### M1-15 · Security utilities: SSRF-safe fetch, path guard, filename sanitiser (new)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (branch `m1-15-ssrf-path-guard`) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node (DNS-pinned fetch), packages/core (pure checks)
 - **Depends on:** M0-2d
 - **Spec:** 04 §4 (SSRF, allowed folders, downloads), §7; 06 §2.3
@@ -3107,6 +3107,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Table tests: `http://`, `https://127.0.0.1`, decimal/octal/hex IP forms, `[::ffff:127.0.0.1]`, a hostname resolving to 10.x, DNS that changes between resolution and connect, a redirect chain to the metadata IP, a third redirect.
   - A symlink inside an allowed folder pointing to `~/.ssh` is refused; Windows path tests run in CI.
+- **Delivered in review:** `packages/core/src/fetch-url.ts`, `file-name.ts`, `path-guard.ts` (pure; both path flavours tested on every OS) and `packages/node/src/safe-fetch.ts`, `allowed-path.ts` (realpath, pinned TLS to the checked address, exclusive inbox create). Windows runs the Node tests in CI job `node-os` (junction links, no admin), which is outside `ci-gate`. G-14: only the Node path is built; Workers semantics (raw check + Workers egress) land with M2-3b. Not wired into tools (M1-7f, M1-9d).
 
 #### M1-16 · npm release pipeline activation (new)
 - **Status:** done for v0.1.0 (the stable `latest` path: #124, #184, #185, #192, #193; v0.1.0 published 2026-10-16 with provenance; the `next` prerelease path was not exercised) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
