@@ -13,9 +13,11 @@
 // interpolated into a shell): HEAD_REF, PR_AUTHOR, SAME_REPO.
 
 import { spawnSync } from 'node:child_process';
+import { lstatSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isVersionPackagesPr } from './check-changesets.mjs';
+import { parseFragment } from './roll-changelog.mjs';
 
 const NEEDS_ENTRY = [
   /^apps\/[^/]+\/src\/.+/,
@@ -89,9 +91,22 @@ export async function checkChangelogFragment({ cwd, base, pr, log = console.log 
     ? countUnreleasedAdded(cwd, base)
     : 0;
   const result = evaluateChangelog({ changed, unreleasedAdded, pr });
+  if (!isVersionPackagesPr(pr ?? {})) {
+    for (const c of changed.filter((x) => x.status !== 'D' && FRAGMENT.test(x.path))) {
+      try {
+        const full = join(cwd, c.path);
+        if (lstatSync(full).isSymbolicLink())
+          throw new Error(`${c.path}: a symlink is not allowed.`);
+        parseFragment({ name: c.path, text: readFileSync(full, 'utf8') });
+      } catch (e) {
+        result.errors.push(`Invalid changelog fragment: ${e.message}`);
+        result.ok = false;
+      }
+    }
+  }
   for (const w of result.warnings) log(`::warning file=CHANGELOG.md::${w}`);
   for (const e of result.errors) log(`::error::${e}`);
-  if (result.ok && result.errors.length === 0) log('Changelog entry check passed.');
+  if (result.ok) log('Changelog entry check passed.');
   return result;
 }
 

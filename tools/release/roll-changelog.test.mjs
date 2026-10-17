@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readdirSync, writeFileSync, readFileSync } from
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { isStableVersion, rollChangelog, runCli } from './roll-changelog.mjs';
+import { isStableVersion, parseFragment, rollChangelog, runCli } from './roll-changelog.mjs';
 
 // OPS-REL-3: the Version packages PR rolls CHANGELOG.md [Unreleased] into a version section, and the
 // GitHub Release body falls back to a short note when the section is over GitHub's 125,000-character limit.
@@ -281,5 +281,18 @@ describe('runCli with a fragments directory', () => {
     writeFileSync(file, FIXTURE);
     runCli(args(file, join(d, 'missing')));
     expect(readFileSync(file, 'utf8')).toContain('## [0.2.0] - 2026-11-01');
+  });
+});
+
+// OPS-REL-4 review round: stricter fragment parsing.
+describe('parseFragment strictness', () => {
+  const p = (text) => parseFragment({ name: 'f.md', text });
+  it('rejects link-reference lines and version headings', () => {
+    expect(() => p('### Added\n\n- ok\n[Unreleased]: https://x.y/z\n')).toThrow(/link-reference/);
+    expect(() => p('### Added\n\n- ok\n\n## [0.2.0] - 2026-11-01\n')).toThrow(/version heading/);
+  });
+  it('requires a reason line for section: none', () => {
+    expect(() => p('---\nsection: none\n---\n')).toThrow(/reason/);
+    expect(p('---\nsection: none\n---\n\nRefactor.\n')).toEqual({});
   });
 });
