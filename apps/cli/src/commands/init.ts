@@ -1,6 +1,6 @@
 // `agentlink init [--agent <name>] [--harness <id|none>] [--config <path>] [--confirm <code>]` (M1-9a,
 // M1-9t; 06 §7, 07 §9.1, §9.4; D-39, D-54, D-73 (7), D-78): the agent's identity in the OS keychain
-// and the `agentlink` MCP entry in each detected harness (Claude Code, Codex, Gemini CLI, OpenCode,
+// and the `agentlink` MCP entry in each detected harness (Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode,
 // Antigravity), or in the one named with `--harness` (`none`: the identity only). `--config` names the
 // OpenCode or Antigravity config file, checked under the 06 §7 write rules (resolveConfigTarget).
 // Declining every proposed change writes no harness config but keeps the identity (D-78).
@@ -116,7 +116,8 @@ export const INIT_TEXT = Object.freeze({
   ownerStep:
     "One step left, and you must do it yourself: run `agentlink owner init` in your own terminal. Don't let your AI run it or see the code it shows. It's what stops any AI, including your own, from approving its own actions.",
   noAppsHere:
-    "Problem  AgentLink didn't find Claude Code, Codex, Gemini CLI, OpenCode or Antigravity on this computer.",
+    "Problem  AgentLink didn't find Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode or Antigravity on this computer.",
+  restartDesktop: 'Warning  Quit and reopen the Claude app. AgentLink appears under Connectors.',
   // D-78 (06 §7).
   declinedKept:
     'No app was changed. Your agent identity is kept. To set up one app later, run: agentlink init --harness <app>',
@@ -125,6 +126,7 @@ export const INIT_TEXT = Object.freeze({
   configPlace: '<the same path>',
 });
 
+const DESKTOP_APP_NAME = harnessById('claude-desktop').appName;
 const CODE_PATTERN = /^[0-9a-f]{4}-?[0-9a-f]{4}$/i;
 
 type ChangePlan = Extract<HarnessPlan, { status: 'change' }>;
@@ -138,6 +140,7 @@ function confirmationCode(
   target: string,
   config: ConfigTarget | undefined,
   changes: readonly ChangePlan[],
+  platform: NodeJS.Platform,
 ): string {
   // The target harness and the `--config` file are bound too, so a code shown for one harness or
   // file never confirms another (D-78).
@@ -145,7 +148,7 @@ function confirmationCode(
     `agentlink-init-v2 ${name} ${createIdentity ? 'new' : 'existing'} ${target}`,
     `config ${config === undefined ? '-' : hashText(`${config.dir}\0${config.name}`)}`,
     ...changes.map(
-      (c) => `${c.def.id} ${hashText(displayPath(c.def, config))} ${hashText(c.text)}`,
+      (c) => `${c.def.id} ${hashText(displayPath(c.def, config, platform))} ${hashText(c.text)}`,
     ),
   ];
   const digest = encodeHex(sha256(new TextEncoder().encode(lines.join('\n'))));
@@ -296,7 +299,14 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     const blocked = plans.some((p) => p.status === 'blocked');
 
     const target = typeof harnessValue === 'string' ? harnessValue : '*';
-    const code = confirmationCode(name, needIdentity, target, config, changes);
+    const code = confirmationCode(
+      name,
+      needIdentity,
+      target,
+      config,
+      changes,
+      deps.platform ?? process.platform,
+    );
     const interactive = checkOwnerTerminal(terminal).ok && confirmValue === undefined;
 
     if (!needIdentity && changes.length === 0) {
@@ -377,7 +387,13 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     }
     if (applied.length > 0) {
       output.print(copy('cli.init.done'));
-      for (const appName of applied) output.print(copy('cli.init.restart', { appName }));
+      for (const appName of applied) {
+        output.print(
+          appName === DESKTOP_APP_NAME
+            ? INIT_TEXT.restartDesktop
+            : copy('cli.init.restart', { appName }),
+        );
+      }
     }
     if (declined) output.print(INIT_TEXT.declinedKept);
     // D-78: with another agent already on this computer, the owner adds this one to the existing

@@ -112,6 +112,14 @@ const exists = (...parts: string[]): Promise<boolean> =>
   );
 const names = (): Promise<string[]> => readdir(home);
 
+/** A `gemini` program on a PATH of its own: how Gemini CLI looks installed without a settings file (M1-9w). */
+async function geminiOnPath(): Promise<Record<string, string>> {
+  const bin = join(outside, 'gemini-bin');
+  await mkdir(bin, { recursive: true });
+  await writeFile(join(bin, 'gemini'), '#!/bin/sh\n', { mode: 0o755 });
+  return { PATH: bin };
+}
+
 const CLAUDE_JSON = `${JSON.stringify({ numStartups: 7, mcpServers: { other: { command: 'x', env: { KEY: 'v' } } } }, null, 2)}\n`;
 
 describe('detection', () => {
@@ -119,7 +127,7 @@ describe('detection', () => {
     const plan = await init([]);
     expect(plan.code).toBe(EXIT_OK);
     expect(plan.out).toContain(
-      "didn't find Claude Code, Codex, Gemini CLI, OpenCode or Antigravity",
+      "didn't find Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode or Antigravity",
     );
     expect(plan.created).toBe(0);
     const run = await init(['--confirm', codeOf(plan)]);
@@ -305,8 +313,8 @@ describe('confirmation', () => {
 
   it('in a terminal, asks per harness and writes only what is confirmed', async () => {
     await mkdir(join(home, '.codex'));
-    await mkdir(join(home, '.gemini'));
-    const run = await init([], { terminal: TTY, answers: ['y', 'n'] });
+    const env = await geminiOnPath();
+    const run = await init([], { terminal: { ...TTY, env }, answers: ['y', 'n'] });
     expect(run.asked).toBe(2);
     expect(run.out).toContain(copy('cli.init.apply'));
     expect(await exists('.codex', 'config.toml')).toBe(true);
@@ -316,8 +324,8 @@ describe('confirmation', () => {
 
   it('in a terminal, names the app in front of each question (IR-M1-9a-1 F07)', async () => {
     await mkdir(join(home, '.codex'));
-    await mkdir(join(home, '.gemini'));
-    const run = await init([], { terminal: TTY, answers: ['y', 'n'] });
+    const env = await geminiOnPath();
+    const run = await init([], { terminal: { ...TTY, env }, answers: ['y', 'n'] });
     const lines = run.out.split('\n');
     const questions = lines.flatMap((l, i) => (l === copy('cli.init.apply') ? [i] : []));
     expect(questions).toHaveLength(2);
@@ -371,10 +379,9 @@ describe('an existing agent', () => {
     await mkdir(join(home, '.codex'));
     const first = await init([]);
     await init(['--confirm', codeOf(first)]);
-    await mkdir(join(home, '.gemini'));
-    const second = await init([]);
+    const second = await init([], { terminal: { ...PIPE, env: await geminiOnPath() } });
     expect(second.out).not.toContain(INIT_TEXT.identity);
-    await init(['--confirm', codeOf(second)]);
+    await init(['--confirm', codeOf(second)], { terminal: { ...PIPE, env: await geminiOnPath() } });
     expect((await readAgentConfig(home, 'default'))?.config.agentId).toBe(AGENT_ID);
     expect(await exists('.gemini', 'settings.json')).toBe(true);
   });
@@ -444,9 +451,9 @@ describe('malformed or unusable configs', () => {
 
   it.skipIf(!POSIX)('a symlinked harness folder pointing outside home is refused', async () => {
     await symlink(outside, join(home, '.gemini'));
-    const plan = await init([]);
+    const plan = await init(['--harness', 'gemini-cli']);
     expect(plan.err).toContain("Gemini CLI's settings are in a place AgentLink won't write to");
-    await init(['--confirm', codeOf(plan)]);
+    expect(plan.code).toBe(EXIT_FAILED);
     expect(await readdir(outside)).toEqual([]);
   });
 });

@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Added
+
+- CLI (M1-9w, S1): `agentlink init --harness claude-desktop` sets up the Claude desktop app (macOS and Windows; its own `claude_desktop_config.json`, not Claude Code's file), with the usual diff, confirmation, backup and refusal of malformed files. On Linux it says the app isn't available there.
+
+### Fixed
+
+- CLI (M1-9w, S1): Gemini CLI is detected by the `gemini` program or `~/.gemini/settings.json`, so a computer with only Antigravity's `~/.gemini/config/mcp_config.json` is offered Antigravity, not Gemini CLI.
+
 ### Changed
 
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.

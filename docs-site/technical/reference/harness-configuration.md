@@ -1,12 +1,12 @@
 # Harness configuration
 
-> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** The configuration below is what `agentlink init` writes. Claude Desktop, other harnesses and remote harnesses are planned for later releases and are not covered here.
+> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** The configuration below is what `agentlink init` writes. Other harnesses and remote harnesses are planned for later releases and are not covered here.
 
-**Purpose:** the exact MCP configuration for Claude Code, Codex, Gemini CLI, OpenCode and Antigravity, for people who configure it by hand instead of using `agentlink init`, and the harness permission settings that keep an agent away from AgentLink's private files.
+**Purpose:** the exact MCP configuration for Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode and Antigravity, for people who configure it by hand instead of using `agentlink init`, and the harness permission settings that keep an agent away from AgentLink's private files.
 
 ## How `agentlink init` configures a harness
 
-`npx -y @4thtech-io/agentlink init` detects Claude Code, Codex, Gemini CLI, OpenCode and Antigravity, prints the exact diff of each config file, and writes it only after confirmation. `init --harness <id>` (`claude-code`, `codex`, `gemini-cli`, `opencode`, `antigravity`) proposes that one app only, and `init --harness none` creates the agent identity only. Answering no to every proposed change writes no config but keeps the agent identity. In an interactive terminal it asks `y/N` for each file. Run by an agent (no terminal, or a harness marker set), it prints the diff and a one-time confirmation code, writes nothing, and `init --confirm <code>` then writes exactly those changes. The code is a hash of the shown changes, so it stops matching if they change. This is transparency, not a security boundary: an agent with a shell can edit its own harness config anyway ([06 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#7-harness-installation)).
+`npx -y @4thtech-io/agentlink init` detects Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode and Antigravity, prints the exact diff of each config file, and writes it only after confirmation. `init --harness <id>` (`claude-code`, `claude-desktop`, `codex`, `gemini-cli`, `opencode`, `antigravity`) proposes that one app only, and `init --harness none` creates the agent identity only. Answering no to every proposed change writes no config but keeps the agent identity. In an interactive terminal it asks `y/N` for each file. Run by an agent (no terminal, or a harness marker set), it prints the diff and a one-time confirmation code, writes nothing, and `init --confirm <code>` then writes exactly those changes. The code is a hash of the shown changes, so it stops matching if they change. This is transparency, not a security boundary: an agent with a shell can edit its own harness config anyway ([06 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#7-harness-installation)).
 
 An existing `agentlink` entry that differs is left alone. Existing config is backed up before it is changed. `init` never writes an owner secret.
 
@@ -41,6 +41,29 @@ Equivalent command: `claude mcp add --transport stdio --scope user agentlink -- 
 
 Sources: [Claude Code MCP](https://code.claude.com/docs/en/mcp) (`claude mcp add [options] <name> -- <command> [args...]`, user scope stored in `~/.claude.json`, stdio entry shape).
 
+### Claude Desktop (the Claude app)
+
+The Claude desktop app (chat) has its own file, separate from Claude Code's `~/.claude.json`. Setting up one does not set up the other: run `init --harness claude-code` for Claude Code and `init --harness claude-desktop` for the app.
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json` (`init` uses `~/AppData/Roaming/Claude`; the `APPDATA` variable is not followed)
+- Linux: there is no Claude desktop app, so `init` says so and writes nothing.
+
+```json
+{
+  "mcpServers": {
+    "agentlink": {
+      "command": "npx",
+      "args": ["-y", "@4thtech-io/agentlink", "mcp"]
+    }
+  }
+}
+```
+
+After `init`, quit and reopen the Claude app; AgentLink appears under Connectors. A one-click extension bundle is planned for v0.2.0.
+
+Sources: [06 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#7-harness-installation) (Claude Desktop row). Not yet tried in the app.
+
 ### Codex (CLI, IDE extension, Codex in the ChatGPT desktop app)
 
 `~/.codex/config.toml`:
@@ -57,7 +80,7 @@ Sources: [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) (`co
 
 ### Gemini CLI
 
-User settings, `~/.gemini/settings.json`:
+`init` detects Gemini CLI by the `gemini` program on `PATH` or `~/.gemini/settings.json`; a `~/.gemini` folder alone (Antigravity keeps its config there too) proposes nothing. User settings, `~/.gemini/settings.json`:
 
 ```json
 {
@@ -290,7 +313,7 @@ The M1 release runs on test networks only, and this is an accepted, documented r
 
 ## What comes later
 
-- Claude Desktop, and the one-click extension bundle (v0.2.0)
+- The one-click Claude Desktop extension bundle (v0.2.0)
 - Cursor, VS Code, Windsurf, Cline (as tested)
 - Remote harnesses (ChatGPT developer mode, claude.ai custom connectors) through the self-hosted cloud agent (v0.3.0)
 - Optional session-start hooks
