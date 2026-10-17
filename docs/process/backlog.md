@@ -4369,6 +4369,17 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
 - **Acceptance:**
   - `node tools/docs-status/index.mjs --check`, `check-knowledge-size` and `check-knowledge-links` pass; no true fact is lost; no reference to an old path remains.
 
+#### DOCS-SETUP · Beginner page: set up AgentLink in your AI tool (new)
+- **Status:** in-review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · docs-site/guide/get-started/, knowledge/, README.md, llms.txt
+- **Depends on:** DOCS-M1a
+- **Spec:** 11 §5 (vocabulary); `apps/cli/src/harness/harnesses.ts` (harness ids)
+- **Invariants:** — (docs only; nothing unbuilt is claimed as released)
+- **Scope:**
+  - One page for first-time users: Node check, install line per tool, owner step, test, pairing two own tools, top-5 troubleshooting; linked from README, the get-started index and `llms.txt`; essentials mirrored in the knowledge user guide.
+- **Acceptance:**
+  - `docs-status --check`, knowledge checks and prettier pass; Claude Desktop is stated as not in v0.1.0.
+
 #### DOCS-M2 · Public docs pass for v0.3.0 (console, desktop apps, cloud agent) (new)
 - **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · docs-site/
