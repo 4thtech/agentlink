@@ -8,9 +8,11 @@ import {
   mkdtempSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   statSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -20,6 +22,7 @@ import {
   AllowedPathError,
   createInboxFile,
   openAllowedFile,
+  openAllowedFileWith,
   resolveAllowedFile,
 } from './allowed-path.js';
 
@@ -206,6 +209,40 @@ describe('openAllowedFile', () => {
       await codeOf(openAllowedFile(join(home, 'Work', 'sshdir', 'id_ed25519'), opts(['~/Work']))),
     ).toBe('protected');
   });
+
+  it('refuses a file replaced by another one after the open (IR-M1-15-1 L1)', async () => {
+    const target = join(home, 'Work', 'swap-file.txt');
+    writeFileSync(target, 'checked');
+    const promise = openAllowedFileWith('~/Work/swap-file.txt', opts(['~/Work']), {
+      afterOpen: () => {
+        renameSync(target, join(home, 'Work', 'swap-file.old'));
+        writeFileSync(target, 'other inode');
+      },
+    });
+    expect(await codeOf(promise)).toBe('changed');
+  });
+
+  it('refuses when a folder on the path becomes a link to ~/.ssh after the open (L1)', async () => {
+    const dir = join(home, 'Work', 'swapdir');
+    mkdirSync(dir);
+    writeFileSync(join(dir, 'id_ed25519'), 'decoy');
+    const promise = openAllowedFileWith('~/Work/swapdir/id_ed25519', opts(['~/Work']), {
+      afterOpen: () => {
+        renameSync(dir, join(home, 'Work', 'swapdir-old'));
+        link(join(home, '.ssh'), dir);
+      },
+    });
+    expect(await codeOf(promise)).toBe('protected');
+  });
+
+  it('refuses when the file disappears after the open (L1)', async () => {
+    const target = join(home, 'Work', 'gone.txt');
+    writeFileSync(target, 'x');
+    const promise = openAllowedFileWith('~/Work/gone.txt', opts(['~/Work']), {
+      afterOpen: () => unlinkSync(target),
+    });
+    expect(await codeOf(promise)).toBe('not_found');
+  });
 });
 
 describe('createInboxFile (04 §4 "Downloads")', () => {
@@ -260,5 +297,30 @@ describe('createInboxFile (04 §4 "Downloads")', () => {
     expect(await codeOf(createInboxFile('relative', 'x', { home }))).toBe('inbox_unavailable');
     expect(await codeOf(createInboxFile('~/.agentlink', 'x', { home }))).toBe('protected');
     expect(await codeOf(createInboxFile('~/.ssh', 'x', { home }))).toBe('protected');
+  });
+
+  it('refuses a hidden inbox folder, by name or through a link (IR-M1-15-1 L4)', async () => {
+    mkdirSync(join(home, '.hidden-inbox'));
+    link(join(home, '.hidden-inbox'), join(home, 'VisibleInbox'));
+    link(join(home, 'Inbox'), join(home, '.InboxLink'));
+    expect(await codeOf(createInboxFile('~/.hidden-inbox', 'x', { home }))).toBe('hidden');
+    expect(await codeOf(createInboxFile('~/VisibleInbox', 'x', { home }))).toBe('hidden');
+    expect(await codeOf(createInboxFile('~/.InboxLink', 'x', { home }))).toBe('hidden');
+  });
+
+  it('keeps numbered clash names within 255 bytes (IR-M1-15-1 L4)', async () => {
+    const long = `${'č'.repeat(200)}.pdf`; // 404 bytes before sanitising
+    const names: string[] = [];
+    for (let i = 0; i < 12; i += 1) {
+      const created = await createInboxFile('~/Inbox', long, { home });
+      await created.handle.close();
+      names.push(created.name);
+    }
+    expect(new Set(names).size).toBe(12);
+    for (const name of names) {
+      expect(Buffer.byteLength(name, 'utf8')).toBeLessThanOrEqual(255);
+      expect(name.endsWith('.pdf')).toBe(true);
+    }
+    expect(names[11]).toMatch(/ \(11\)\.pdf$/);
   });
 });

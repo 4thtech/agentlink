@@ -4,9 +4,9 @@
 // `~/.agentlink`, keychain directories) are checked in both their lexical and resolved forms, so a
 // symlinked `~/.ssh` is covered too.
 //
-// Reading: resolveAllowedFile checks; openAllowedFile checks, opens the resolved path without
-// following a final symlink and verifies that the opened file is the checked one (same device and
-// inode, a regular file), so a swap between check and open is refused.
+// Reading: resolveAllowedFile checks; openAllowedFile checks, opens, then checks again and requires
+// the opened file to be the one the second check resolved (same device and inode, a regular file);
+// its comment states the exact guarantee and the Windows residual.
 // Writing: createInboxFile sanitises the untrusted name, resolves the inbox folder, refuses a
 // protected or hidden inbox, and creates a new file exclusively (never overwrites, never follows a
 // symlink), adding ` (1)`, ` (2)`, … on a clash.
@@ -14,6 +14,7 @@
 // Nothing here logs, and no error carries a path or a file name (a tool error is shown to the AI):
 // callers branch on AllowedPathError.code.
 import {
+  MAX_FILE_NAME_BYTES,
   decidePath,
   expandHome,
   parseAbsolutePath,
@@ -157,35 +158,67 @@ export async function resolveAllowedFile(
   return { realPath: resolved, folder: decision.folder, size: info.size };
 }
 
+/** Test seam, never exported from the package entry: runs between the open and the re-check. */
+export interface OpenAllowedFileSeams {
+  readonly afterOpen?: () => Promise<void> | void;
+}
+
 /**
- * resolveAllowedFile, then opens the resolved path read-only without following a final symlink and
- * checks that the opened file is the checked one (device, inode, regular file). The caller closes
- * the handle.
+ * Opens a file that passes resolveAllowedFile, read-only. Guarantee: the returned handle is a
+ * regular file whose device and inode equal those of the path that `requested` resolves to in a
+ * second, full check (realpath on both sides and decidePath again) made AFTER the open. A swap of
+ * the file, or of any directory or link on its path, before or during the open therefore either
+ * fails that re-check (with its own code) or changes the device and inode (`changed`). The open
+ * uses O_NOFOLLOW (a final symlink is not followed) and O_NONBLOCK (a FIFO or device swapped in
+ * cannot block the open). Residual: Windows has neither flag, so there only the re-check and the
+ * device and inode match apply; a hard link to a protected file placed inside an allowed folder is
+ * the same inode and is not detected (it needs write access to that folder as the same OS user,
+ * 04 §2.5). The caller closes the handle.
  */
 export async function openAllowedFile(
   requested: string,
   options: AllowedPathOptions,
 ): Promise<{ readonly file: AllowedFile; readonly handle: FileHandle }> {
-  const file = await resolveAllowedFile(requested, options);
-  const before = await stat(file.realPath).catch(() => undefined);
-  const noFollow = (constants as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0;
+  return openAllowedFileWith(requested, options, {});
+}
+
+/** openAllowedFile with the test seam. */
+export async function openAllowedFileWith(
+  requested: string,
+  options: AllowedPathOptions,
+  seams: OpenAllowedFileSeams,
+): Promise<{ readonly file: AllowedFile; readonly handle: FileHandle }> {
+  const first = await resolveAllowedFile(requested, options);
+  const flags = constants as { O_NOFOLLOW?: number; O_NONBLOCK?: number };
   let handle: FileHandle;
   try {
-    handle = await open(file.realPath, constants.O_RDONLY | noFollow);
+    handle = await open(
+      first.realPath,
+      constants.O_RDONLY | (flags.O_NOFOLLOW ?? 0) | (flags.O_NONBLOCK ?? 0),
+    );
   } catch {
     throw new AllowedPathError('changed');
   }
   try {
-    const after = await handle.stat();
+    const opened = await handle.stat();
+    if (!opened.isFile()) throw new AllowedPathError('changed');
+    if (seams.afterOpen !== undefined) await seams.afterOpen();
+    // The second full check, after the open.
+    const second = await resolveAllowedFile(requested, options);
+    let current: Stats;
+    try {
+      current = await stat(second.realPath);
+    } catch {
+      throw new AllowedPathError('changed');
+    }
     if (
-      before === undefined ||
-      !after.isFile() ||
-      after.dev !== before.dev ||
-      after.ino !== before.ino
+      second.realPath !== first.realPath ||
+      current.dev !== opened.dev ||
+      current.ino !== opened.ino
     ) {
       throw new AllowedPathError('changed');
     }
-    return { file: { ...file, size: after.size }, handle };
+    return { file: { ...second, size: opened.size }, handle };
   } catch (error) {
     await handle.close().catch(() => undefined);
     throw error instanceof AllowedPathError ? error : new AllowedPathError('changed');
@@ -195,18 +228,37 @@ export async function openAllowedFile(
 /** Most ` (n)` suffixes tried before giving up. */
 const MAX_NAME_ATTEMPTS = 100;
 
+/** Cuts `text` to at most `bytes` UTF-8 bytes on a code-point boundary. */
+function truncateUtf8(text: string, bytes: number): string {
+  let out = '';
+  for (const ch of text) {
+    if (Buffer.byteLength(out + ch, 'utf8') > bytes) break;
+    out += ch;
+  }
+  return out;
+}
+
+/**
+ * `name` with ` (n)` before a short extension, the stem shortened so the result stays within
+ * MAX_FILE_NAME_BYTES.
+ */
 function withSuffix(name: string, n: number): string {
   if (n === 0) return name;
   const dot = name.lastIndexOf('.');
-  return dot > 0 ? `${name.slice(0, dot)} (${n})${name.slice(dot)}` : `${name} (${n})`;
+  const hasExt = dot > 0 && name.length - dot <= 16;
+  const stem = hasExt ? name.slice(0, dot) : name;
+  const tail = ` (${n})${hasExt ? name.slice(dot) : ''}`;
+  const room = MAX_FILE_NAME_BYTES - Buffer.byteLength(tail, 'utf8');
+  return `${truncateUtf8(stem, room).replace(/\s+$/u, '')}${tail}`;
 }
 
 /**
  * Creates a new file for a download inside the inbox folder (policy `files.inboxFolder`; 04 §4
  * "Downloads"): the untrusted name is sanitised (core's sanitizeFileName), the inbox folder is
- * resolved and must be an existing folder outside every protected root, and the file is created
- * exclusively (never overwriting) with mode 0600 without following a symlink. The caller writes,
- * closes, and removes the file on an integrity failure.
+ * resolved and must be an existing folder outside every protected root whose own name (as given
+ * or resolved) is not hidden, and the file is created exclusively (never overwriting) with mode
+ * 0600 without following a symlink. A clash adds ` (1)`, ` (2)`, … within the 255-byte name limit.
+ * The caller writes, closes, and removes the file on an integrity failure.
  */
 export async function createInboxFile(
   inboxFolder: string,
@@ -221,6 +273,18 @@ export async function createInboxFile(
   const info = await stat(folder).catch(() => undefined);
   if (info === undefined || !info.isDirectory()) throw new AllowedPathError('inbox_unavailable');
   const roots = await resolvedProtectedRoots(home);
+  // The inbox itself: outside every protected root, and its own name (given or resolved) not
+  // hidden. decidePath checks protected roots first, then the last segment of `requested`.
+  for (const own of [abs, folder]) {
+    const inbox = decidePath({
+      requested: own,
+      resolved: folder,
+      allowedFolders: [folder],
+      protectedRoots: roots,
+      flavor: FLAVOR,
+    });
+    if (!inbox.ok) throw new AllowedPathError(inbox.reason);
+  }
   const base = sanitizeFileName(untrustedName);
   const noFollow = (constants as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0;
   for (let n = 0; n < MAX_NAME_ATTEMPTS; n += 1) {

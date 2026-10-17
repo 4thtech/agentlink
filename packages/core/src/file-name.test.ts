@@ -49,6 +49,24 @@ describe('sanitizeFileName', () => {
     expect(sanitizeFileName(`com${cp(0xb2)}.txt`)).toBe(`_com${cp(0xb2)}.txt`);
   });
 
+  it('prefixes device names followed by spaces before the extension (IR-M1-15-1 L3)', () => {
+    expect(sanitizeFileName('CON .txt')).toBe('_CON .txt');
+    expect(sanitizeFileName('nul .txt')).toBe('_nul .txt');
+    expect(sanitizeFileName('com1   .log')).toBe('_com1   .log');
+    expect(sanitizeFileName('CON')).toBe('_CON');
+    expect(sanitizeFileName('CONTRACT .txt')).toBe('CONTRACT .txt');
+  });
+
+  it('removes line separators, tag characters and variation selectors (IR-M1-15-1 L3)', () => {
+    expect(sanitizeFileName(`a${cp(0x2028)}b${cp(0x2029)}.txt`)).toBe('ab.txt');
+    expect(sanitizeFileName(`x${cp(0xe0041, 0xe0042, 0xe007f)}.txt`)).toBe('x.txt');
+    expect(sanitizeFileName(`y${cp(0xfe0f)}${cp(0xfe00)}${cp(0xe0100)}${cp(0xe01ef)}.txt`)).toBe(
+      'y.txt',
+    );
+    expect(sanitizeFileName(`.${cp(0xe0020)}ssh`)).toBe('ssh');
+    expect(sanitizeFileName(`z${cp(0x180b)}.txt`)).toBe('z.txt');
+  });
+
   it('removes bidi overrides that disguise the extension', () => {
     // "invoice<RLO>fdp.exe" renders as "invoiceexe.pdf"
     expect(sanitizeFileName(`invoice${cp(0x202e)}fdp.exe`)).toBe('invoicefdp.exe');

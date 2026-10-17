@@ -71,6 +71,7 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'createHostResolverWith',
       // M1-15: the safe-fetch test seams stay internal.
       'createSafeFetchWith',
+      'openAllowedFileWith',
     ]) {
       expect(names).not.toContain(name);
     }

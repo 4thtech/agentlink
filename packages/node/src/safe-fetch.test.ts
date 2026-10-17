@@ -168,6 +168,23 @@ describe('safe fetch: pinned connection', () => {
     expect(await codeOf(fetch(url('/obj'), { maxBytes: 100 }))).toBe('network');
   });
 
+  it('refuses a trusted certificate issued for another host name (IR-M1-15-1 L2)', async () => {
+    // The CA is trusted and the socket reaches the server, but the certificate names HOST and
+    // OTHER only. The positive tests above show the check is not made against the dialled
+    // address (127.0.0.1, which the certificate does not name either); this one shows it is made
+    // against the URL's host name.
+    handlers.set('/obj', ok('x'));
+    const wrong = 'wrong.agentlink.test';
+    const fetch = createSafeFetchWith({
+      lookup: lookupFrom({ [wrong]: [PUBLIC_A] }),
+      ca: certificate.cert,
+      route,
+    });
+    expect(await codeOf(fetch(url('/obj', wrong), { maxBytes: 100 }))).toBe('network');
+    expect(routed).toEqual([PUBLIC_A]);
+    expect(seen).toEqual([]);
+  });
+
   it('ignores proxy environment variables (the socket is always our own)', async () => {
     handlers.set('/obj', ok('direct'));
     const saved = { https: process.env.HTTPS_PROXY, all: process.env.ALL_PROXY };
