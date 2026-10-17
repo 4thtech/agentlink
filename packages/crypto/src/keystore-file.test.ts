@@ -24,6 +24,7 @@ import {
   openKeystoreFile,
   openKeystoreFileWithKek,
   openOwnerSeed,
+  openOwnerSeedWithoutCard,
   ownerSecretUnlocks,
   sealKeystoreFile,
   sealOwnerSeed,
@@ -470,6 +471,78 @@ describe('owner secret source and the agent ≠ owner probes', () => {
     expect(
       await ownerSecretUnlocks(blob.subarray(1), { secret: code, source: 'prompt' }, OWNER),
     ).toBe(false);
+  });
+
+  // M1-9x (04 §2.8): no local card names the owner, so there is no expected owner to compare with.
+  // The authenticated decryption under the prompt secret is the only check; every other rule holds.
+  it('openOwnerSeedWithoutCard: opens with the owner secret only, prompt only, same refusals', async () => {
+    const code = generateSecretCode();
+    const kek = await newKeystoreKek(
+      'ALKO',
+      { secret: code, secretKind: 1, source: 'prompt' },
+      FLOOR,
+    );
+    const blob = await sealOwnerSeed(kek, OWNER_SEED, {
+      destination: 'local',
+      fileKeystoreMachine: false,
+    });
+    const seed = await openOwnerSeedWithoutCard(
+      blob,
+      { secret: code, source: 'prompt' },
+      { fileKeystoreMachine: false },
+    );
+    expect(seed).toEqual(OWNER_SEED);
+    // A wrong secret and a tampered blob are the one generic refusal.
+    await refusedWith(
+      () =>
+        openOwnerSeedWithoutCard(
+          blob,
+          { secret: generateSecretCode(), source: 'prompt' },
+          { fileKeystoreMachine: false },
+        ),
+      'open_failed',
+    );
+    const tampered = blob.slice();
+    tampered[tampered.length - 1] = (tampered[tampered.length - 1] ?? 0) ^ 1;
+    await refusedWith(
+      () =>
+        openOwnerSeedWithoutCard(
+          tampered,
+          { secret: code, source: 'prompt' },
+          { fileKeystoreMachine: false },
+        ),
+      'open_failed',
+    );
+    await refusedWith(
+      () =>
+        openOwnerSeedWithoutCard(
+          blob.subarray(1),
+          { secret: code, source: 'prompt' },
+          { fileKeystoreMachine: false },
+        ),
+      'open_failed',
+    );
+    // The owner secret never comes from a file (D-54).
+    await refusedWith(
+      () =>
+        openOwnerSeedWithoutCard(
+          blob,
+          { secret: code, source: 'file' } as unknown as { secret: Uint8Array; source: 'prompt' },
+          { fileKeystoreMachine: false },
+        ),
+      'invalid_argument',
+    );
+    // openOwnerSeed still requires the expected owner: a missing one is refused, never skipped.
+    await refusedWith(
+      () =>
+        openOwnerSeed(
+          blob,
+          { secret: code, source: 'prompt' },
+          null as unknown as typeof OWNER,
+          { fileKeystoreMachine: false },
+        ),
+      'invalid_argument',
+    );
   });
 
   it('keystoreSecretUnlocks: true for the agent file secret, false otherwise', async () => {
