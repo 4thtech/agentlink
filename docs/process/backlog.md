@@ -2612,7 +2612,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - F06 and F07 each have a test named after the finding; the bundle-check job fails on an injected `jose` import.
 
 #### M1-9c-c · CI: neutral-platform bundle-check job (new, IR-M1-9c-1 F07)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**` sensitive path: merges only on Tali's "merge"; supply-chain surface for the bundler) · **Phase:** M1a
+- **Status:** in review (no bundler dependency was needed: the check reuses the repository's Vite for parsing and the neutral bundle) · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**` sensitive path: merges only on Tali's "merge"; supply-chain surface for the bundler) · **Phase:** M1a
 - **Repo/path:** agentlink · `.github/workflows`, `apps/cli` (the check script)
 - **Depends on:** M1-9c, M1-9c-b (both merged)
 - **Spec:** 06 §2.0; IR-M1-9c-1 F07; D-76
