@@ -47,6 +47,8 @@ Code that is merged is not necessarily published: nothing is released or install
 | Transport (@agentlink/transport-nostr) | Sync | Done | [#63](https://github.com/4thtech/agentlink/pull/63) |
 | Transport (@agentlink/transport-nostr) | Outbox stays inside the sync look-back | Done | [#87](https://github.com/4thtech/agentlink/pull/87) |
 | Transport (@agentlink/transport-nostr) | Default relay set | Done | [#119](https://github.com/4thtech/agentlink/pull/119) |
+| Storage (@agentlink/storage) | Inline and S3-compatible adapters | Done | - |
+| Storage (@agentlink/storage) | Large files, encrypted drop and storage choice | Planned | - |
 | Core (@agentlink/core) | Skeleton: identity, contacts, store and approval interfaces | Done | [#48](https://github.com/4thtech/agentlink/pull/48) |
 | Core (@agentlink/core) | Envelopes | Done | [#66](https://github.com/4thtech/agentlink/pull/66) |
 | Core (@agentlink/core) | Invites and pairing | Done | [#78](https://github.com/4thtech/agentlink/pull/78) |
