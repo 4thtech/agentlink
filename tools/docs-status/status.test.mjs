@@ -137,7 +137,7 @@ describe('run', () => {
   it('passes the check when nothing has drifted, and skips an absent knowledge base', () => {
     const result = run({ root, check: true });
     expect(result.problems).toEqual([]);
-    expect(result.skipped.join('\n')).toContain('knowledge/07-status-and-roadmap.md is absent');
+    expect(result.skipped.join('\n')).toContain('knowledge/agentlink-overview.md is absent');
   });
 
   it('fails the check when README.md was edited by hand, and fixes it when generating', () => {
@@ -200,7 +200,7 @@ describe('run', () => {
   });
 
   describe('the knowledge base (created by a separate change)', () => {
-    const KB = 'knowledge/07-status-and-roadmap.md';
+    const KB = 'knowledge/agentlink-overview.md';
     const withMarkers = [
       '# Status and roadmap',
       '<!-- status-intro:start -->\nstale\n<!-- status-intro:end -->',

@@ -15,6 +15,9 @@
 //   this agent and this owner. All or nothing: if no card naming this owner is stored, the new owner
 //   item is removed again, so the owner can simply run `owner init` again. An agent that already has
 //   a card is refused before any code is shown (never replaces an owner or a card).
+// - M1-8h-b (IR-M1-8h-1): the rollback removes the owner item only while it is still exactly the
+//   item this run stored (L2); before the code is shown, the owner is asked for the display name the
+//   card commits to (11 §5; Enter keeps the local agent name).
 import {
   OWNER_SESSION_DEFAULT_TTL_MS,
   encodeHex0x,
@@ -26,8 +29,9 @@ import {
   type OwnerPublicKeys,
 } from '@agentlink/crypto';
 import { generateSecretCode } from '@agentlink/crypto/keystore';
+import { restrictName } from '@agentlink/core';
 import { NodeKeyStoreError } from './errors.js';
-import { KEYCHAIN_CALL_TIMEOUT_MS, guarded } from './keychain-keystore.js';
+import { KEYCHAIN_CALL_TIMEOUT_MS } from './keychain-keystore.js';
 import {
   assertAgentId,
   osKeychain,
@@ -39,14 +43,15 @@ import { FirstCardSession, type FirstAgentCard } from './owner-first-card.js';
 export type { FirstAgentCard } from './owner-first-card.js';
 import {
   KeychainOwnerKeyStore,
-  OWNER_ACCOUNT,
   assertOwnerPassphraseLength,
   newOwnerSeed,
   ownerFingerprintText,
   readOwnerItem,
+  removeOwnerItemIfOurs,
   secretRefused,
   storeOwnerSeed,
 } from './owner-keystore.js';
+import { assertPrintable } from './owner-operation.js';
 import { assertNoHarnessMarker, ttyOwnerTerminal, type OwnerTerminal } from './owner-terminal.js';
 
 export interface OwnerInitOptions {
@@ -124,6 +129,13 @@ const COPY = {
     "Owner setup didn't finish. Run `agentlink doctor` in your own terminal to see what is missing.",
   keychainFailed:
     'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
+  // M1-8h-b: the display-name prompt (11 §5: the name is self-declared, 04 §2.4).
+  nameNote: 'Contacts see this name labelled as self-declared. You can keep the suggested one.',
+  nameQuestion: (suggested: string): string =>
+    `Your agent's name for contacts (press Enter for "${suggested}"):`,
+  nameRefused:
+    'Use up to 32 letters, digits, spaces, dots, apostrophes or hyphens, in one script, without words such as "owner" or "verified".',
+  nameKept: (suggested: string): string => `Keeping "${suggested}" as your agent's name.`,
 } as const;
 
 /** The code as groups of four, for display only (04 §2.8). */
@@ -196,6 +208,9 @@ export async function initOwnerWith(
     throw new NodeKeyStoreError('owner_exists', COPY.ownerOnMachine);
   }
 
+  // M1-8h-b: the display name the first card commits to, asked before any code is shown.
+  const named = first === undefined ? undefined : await withDisplayName(terminal, first);
+
   let usePassphrase = false;
   if (choose) {
     terminal.write(COPY.passphraseNote);
@@ -219,11 +234,16 @@ export async function initOwnerWith(
       await confirmCode(terminal, secret);
       terminal.clearScreen();
     }
-    await storeOwnerSeed(keychain, seed, { secret, secretKind: usePassphrase ? 2 : 1 }, internals);
+    const blob = await storeOwnerSeed(
+      keychain,
+      seed,
+      { secret, secretKind: usePassphrase ? 2 : 1 },
+      internals,
+    );
     const card =
-      first === undefined
+      named === undefined
         ? undefined
-        : await issueFirstCard(keychain, keys, secret, first, internals.timeoutMs);
+        : await issueFirstCard(keychain, keys, secret, named, blob, internals.timeoutMs);
     terminal.write(COPY.done(fingerprint));
     return Object.freeze({
       owner: keys,
@@ -256,13 +276,15 @@ function namesOwner(
  * M1-8h: signs and stores the first card with the owner just stored, unlocked once with `secret`
  * (a copy; `secret` itself is wiped by the caller). Whatever happens, the result is read back from
  * core: a verified card for this agent naming this owner is success; anything else removes the new
- * owner item and is `owner_card_failed` (fixed text; the cause is not echoed, I-5).
+ * owner item, only if it is still `blob` (the item this run stored, IR-M1-8h-1 L2), and is
+ * `owner_card_failed` (fixed text; the cause is not echoed, I-5).
  */
 async function issueFirstCard(
   keychain: KeychainBackend,
   owner: OwnerPublicKeys,
   secret: Uint8Array,
   first: FirstAgentCard,
+  blob: Uint8Array,
   timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
 ): Promise<AgentCard> {
   try {
@@ -299,9 +321,47 @@ async function issueFirstCard(
     throw new NodeKeyStoreError('owner_card_failed', COPY.cardUnknown);
   }
   if (namesOwner(stored, first.agent, owner)) return stored.card;
-  const removed = await guarded(() => keychain.delete(OWNER_ACCOUNT), timeoutMs).catch(() => false);
-  if (!removed) throw new NodeKeyStoreError('keychain_failed', COPY.keychainFailed);
+  // IR-M1-8h-1 L2: remove only the item this run stored; another run's item is never deleted.
+  const removal = await removeOwnerItemIfOurs(keychain, blob, timeoutMs);
+  if (removal === 'failed') throw new NodeKeyStoreError('keychain_failed', COPY.keychainFailed);
+  if (removal === 'other') throw new NodeKeyStoreError('owner_card_failed', COPY.cardUnknown);
   throw new NodeKeyStoreError('owner_card_failed', COPY.cardFailed);
+}
+
+/**
+ * M1-8h-b: a display name the owner typed is used only when it fits the restricted-name rule of
+ * 11 §5.2 (06 §2.1), so contacts can show it: after NFC and trimming, 1 to 32 letters, digits,
+ * spaces, `.`, `'` and `-` (combining marks allowed), and core `restrictName` returns it unchanged
+ * (IR-M1-8h-b-1 L1: no NFKC change, no reserved word, no mixed or look-alike script). Control,
+ * format (bidi) and other characters are refused, never stripped.
+ */
+const DISPLAY_NAME = /^[\p{L}\p{M}\p{N} .'-]{1,32}$/u;
+
+function displayNameAllowed(typed: string): boolean {
+  // The fingerprint argument only shapes the fallback, which never equals an accepted name here.
+  return DISPLAY_NAME.test(typed) && restrictName(typed, '0000·0000') === typed;
+}
+
+/**
+ * M1-8h-b: asks the owner for the agent's display name (self-declared, 04 §2.4), on terminals that
+ * can read a visible line. Enter keeps the name the caller passed (the local agent name); a name
+ * outside the rule is asked again, and after three refusals the caller's name is kept.
+ */
+async function withDisplayName(
+  terminal: OwnerTerminal,
+  first: FirstAgentCard,
+): Promise<FirstAgentCard> {
+  if (terminal.readText === undefined) return first;
+  assertPrintable(first.name, 'The agent name');
+  terminal.write(COPY.nameNote);
+  for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
+    const typed = (await terminal.readText(COPY.nameQuestion(first.name))).normalize('NFC').trim();
+    if (typed === '') return first;
+    if (displayNameAllowed(typed)) return { ...first, name: typed };
+    terminal.write(COPY.nameRefused);
+  }
+  terminal.write(COPY.nameKept(first.name));
+  return first;
 }
 
 async function confirmCode(terminal: OwnerTerminal, code: Uint8Array): Promise<void> {

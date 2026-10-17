@@ -16,7 +16,7 @@ import {
   type SecretKind,
   type TypedData,
 } from '@agentlink/crypto';
-import { allowedTypedData, assertAllowedOwnerAction } from './owner-allowlist.js';
+import { assertAllowedOwnerAction, ownerOperationRefused } from './owner-allowlist.js';
 import { NodeKeyStoreError } from './errors.js';
 import { osKeychain } from './keychain.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
@@ -26,7 +26,11 @@ import { assertNoHarnessMarker, ttyOwnerTerminal, type OwnerTerminal } from './o
 export type OwnerSignRequest =
   /** An OwnerAction body (04 §2.5.1), `owner` already set to the owner's Nostr key. */
   | { readonly kind: 'owner-action'; readonly action: JsonObject }
-  /** EIP-712 data signed by the owner EVM key: only an agent card `cardSig` (owner-allowlist.ts). */
+  /**
+   * EIP-712 data: refused by every owner operation here (M1-8h-b, IR-M1-8h-1 L3). An agent card is
+   * signed only through the bound card sessions (owner-first-card.ts). Kept in the type so a caller
+   * that passes one gets the fixed refusal.
+   */
   | { readonly kind: 'typed-data'; readonly typedData: TypedData };
 
 /** The owner's signature. */
@@ -65,7 +69,7 @@ export function assertPrintable(text: unknown, what: string): asserts text is st
 /** The request, read once and frozen before the owner is asked: what is shown is what is signed. */
 function snapshot(request: unknown): OwnerSignRequest {
   if (typeof request !== 'object' || request === null) throw invalid('The request is malformed.');
-  const { kind, action, typedData } = request as Record<string, unknown>;
+  const { kind, action } = request as Record<string, unknown>;
   if (kind === 'owner-action') {
     if (typeof action !== 'object' || action === null || Array.isArray(action)) {
       throw invalid('An owner action must be an object.');
@@ -76,8 +80,12 @@ function snapshot(request: unknown): OwnerSignRequest {
     return Object.freeze({ kind, action: copy });
   }
   if (kind === 'typed-data') {
-    // M1-8h: only the agent card (04 §2.4); anything else, malformed included, is refused.
-    return Object.freeze({ kind, typedData: allowedTypedData(typedData) });
+    // M1-8h allowed only the agent card here (04 §2.4). M1-8h-b (IR-M1-8h-1 L3): not the card
+    // either, and typed data is refused whatever it holds. This generic operation knows no agent to
+    // bind a card to, so it would sign a card for any agent. Cards are signed only through the bound
+    // sessions of owner init and owner add-agent (owner-first-card.ts, 04 §2.5, §2.8); the task that
+    // adds another card flow (rotation, 04 §2.6) adds its own bound path.
+    throw ownerOperationRefused();
   }
   throw invalid('The request has an unknown kind.');
 }
