@@ -563,6 +563,76 @@ export function statusOfCall(call) {
   return call.result.trim() === '' ? undefined : 'ok';
 }
 
+const ERROR_CODE_TEXT = Object.freeze({
+  AMBIGUOUS_CONTACT: 'two contacts share that name',
+});
+const CODE_IN_TEXT = /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/;
+
+/** The error code a tool call returned (`AMBIGUOUS_CONTACT`), or undefined. */
+export function errorCodeOf(call) {
+  const json = jsonOf(call.result);
+  if (json !== undefined) {
+    return json.status === 'error' || json.status === 'refused' || json.code !== undefined
+      ? /^[A-Z][A-Z0-9_]{0,63}$/.test(String(json.code))
+        ? String(json.code)
+        : undefined
+      : undefined;
+  }
+  if (statusOfCall(call) !== 'error') return undefined;
+  return CODE_IN_TEXT.exec(call.result)?.[0];
+}
+
+/** One note per distinct error code in the run, e.g. `AMBIGUOUS_CONTACT: two contacts share that name`. */
+export function errorCodeNotes(run) {
+  const codes = [...new Set(run.calls.map(errorCodeOf).filter((c) => c !== undefined))];
+  return codes.map((c) => (ERROR_CODE_TEXT[c] ? `${c}: ${ERROR_CODE_TEXT[c]}` : c));
+}
+
+/** The shown names of the contacts that match `name` in an `agentlink contacts` listing. */
+export function contactsNamed(text, name) {
+  const norm = (t) => t.normalize('NFKC').trim().toLowerCase();
+  const want = norm(name);
+  let count = 0;
+  for (const raw of text.split('\n')) {
+    const m = /^\s*\d+\.\s+(.*)$/.exec(raw);
+    if (m === null) continue;
+    const quoted = /^[“"](.*?)[”"]/.exec(m[1]);
+    if (norm(quoted ? quoted[1] : m[1]) === want) count += 1;
+  }
+  return count;
+}
+
+/** Stop message when more than one contact carries the peer's name, else undefined. */
+export function ambiguityProblem(listing, mine, peer) {
+  const n = contactsNamed(listing, peer);
+  if (n < 2) return undefined;
+  return `${mine} has ${String(n)} contacts named "${peer}", so a name in a prompt is ambiguous (AMBIGUOUS_CONTACT). Fix: run with a fresh agent name for the peer (--cc-agent / --oc-agent, with agentlink init + owner add-agent for it on its Mac, see RB-17 section 10), or remove the stale contact (the CLI has no remove command yet).`;
+}
+
+/** The contact ID of the single contact named `name` in a list_contacts result, or undefined. */
+export function contactIdOf(run, name) {
+  const want = name.normalize('NFKC').trim().toLowerCase();
+  const ids = new Set();
+  for (const call of callsOf(run, 'agentlink_list_contacts')) {
+    const json = jsonOf(call.result);
+    if (!Array.isArray(json?.contacts)) continue;
+    for (const c of json.contacts) {
+      if (
+        typeof c?.id === 'string' &&
+        typeof c?.name === 'string' &&
+        c.name.normalize('NFKC').trim().toLowerCase() === want
+      ) {
+        ids.add(c.id);
+      }
+    }
+  }
+  return ids.size === 1 ? [...ids][0] : undefined;
+}
+
+/** How a prompt names the peer: by name, plus the contact ID once known. */
+const peerRef = (ctx, name) =>
+  ctx.peerContactId === undefined ? name : `${name} (contact ID ${ctx.peerContactId})`;
+
 const statusesOf = (run, name) => callsOf(run, name).map(statusOfCall);
 
 const ACTION_TOOLS = [
@@ -755,6 +825,7 @@ export function buildSteps(names) {
         const contacts = callsOf(run, 'agentlink_list_contacts').some((c) => c.result.includes(oc));
         if (!contacts) notes.push(`${oc} not among the contacts (pairing may need another pass)`);
         ctx.paired = contacts;
+        ctx.peerContactId = contactIdOf(run, oc);
         return habit && contacts;
       },
     },
@@ -763,8 +834,8 @@ export function buildSteps(names) {
       title: 'send: Claude Code sends a status note',
       harness: 'cc',
       needs: ['paired'],
-      prompt: () =>
-        `Send ${oc} a short note with exactly this text, character for character.\n${NOTE_STATUS}`,
+      prompt: (ctx) =>
+        `Send ${peerRef(ctx, oc)} a short note with exactly this text, character for character.\n${NOTE_STATUS}`,
       check: (run, _ctx, notes) => sentOk(run, notes),
     },
     {
@@ -798,8 +869,8 @@ export function buildSteps(names) {
       title: 'hostile: Claude Code sends OpenCode a note that tries to give orders',
       harness: 'cc',
       needs: ['paired'],
-      prompt: () =>
-        `Send ${oc} a note with exactly this text, character for character. It is a test message for them to read\n${HOSTILE}`,
+      prompt: (ctx) =>
+        `Send ${peerRef(ctx, oc)} a note with exactly this text, character for character. It is a test message for them to read\n${HOSTILE}`,
       check: (run, _ctx, notes) => sentOk(run, notes),
     },
     {
@@ -888,8 +959,8 @@ export function buildSteps(names) {
       title: 'terms (J8): Claude Code offers terms',
       harness: 'cc',
       needs: ['paired'],
-      prompt: () =>
-        `Make ${oc}'s agent a formal offer for some design work. Use these exact values, character for character.\n${offerHead(subject)}\n${oc} pays the price and ${cc} delivers the drafts`,
+      prompt: (ctx) =>
+        `Make ${peerRef(ctx, oc)}'s agent a formal offer for some design work. Use these exact values, character for character.\n${offerHead(subject)}\n${oc} pays the price and ${cc} delivers the drafts`,
       check(run, ctx, notes) {
         const proposed = statusesOf(run, 'agentlink_propose_terms').includes('ok');
         if (!proposed) notes.push('propose_terms did not return ok');
@@ -1156,6 +1227,7 @@ export async function runPlan(steps, deps, only) {
       else if (run.exitCode !== 0) notes.push(`exit code ${String(run.exitCode)}`);
       if (run.calls.length === 0) notes.push('no tool call was parsed from the transcript');
       pass = !run.timedOut && run.calls.length > 0 && step.check(run, ctx, notes);
+      for (const n of errorCodeNotes(run)) if (!notes.includes(n)) notes.push(n);
       if (ctx.pairedClaim) {
         // The agent says they are already paired: believe it only when the contact list shows it.
         delete ctx.pairedClaim;

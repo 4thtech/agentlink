@@ -258,6 +258,18 @@ git clone https://github.com/4thtech/agentlink.git <path-to-checkout>   # only f
 - Mac A needs the `claude` CLI, logged in with your subscription, **or OpenCode alone** (see "OpenCode only" below). Mac B needs the `opencode` CLI with a model that works with tools (or `--oc-model <provider/model>`). Pin full paths with `--claude <path>` or `--opencode <path>` if you have more than one install.
 - Without a global install, add `--agentlink '["npx","-y","@4thtech-io/agentlink@latest"]'` to the commands below (slower: it starts npx for every call).
 - A system keychain that works (see Preconditions). Use **the same two agent names on both Macs** (the defaults are `cc-test` and `oc-test`).
+- **Use fresh agent names if you have run the single-machine dogfood before.** That run left a second contact named `oc-test` on Mac A's `cc-test`, so a name in a prompt is ambiguous (`AMBIGUOUS_CONTACT`). The script's preflight now stops with this message. Pick new names, create them on their Macs, and pass them on both Macs with `--cc-agent` and `--oc-agent`:
+
+  ```bash
+  # Mac A (example name cc-two)
+  agentlink init --agent cc-two --harness none
+  agentlink owner add-agent --agent cc-two      # first agent on this OS user: owner init
+  # Mac B (example name oc-two)
+  agentlink init --agent oc-two --harness none
+  agentlink owner add-agent --agent oc-two
+  ```
+
+  The CLI has no command to remove a contact yet, so fresh names are the fix.
 
 **One-time setup** (owner presence, so you type it; the script never does):
 
