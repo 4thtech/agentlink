@@ -3351,7 +3351,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `grep` finds none of the 17 pre-D-53 tool names in `docs/` outside the 06 §2.0 consolidation table and contract or SDK function names; the independent S2 review confirms no rule changed.
 
 #### M1-31 · Local UI passkey origin: `localhost` vs `127.0.0.1` (new, IR-D56-1 F12)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#213; D-79, owner decision 2026-10-17: `http://localhost:<port>` on 127.0.0.1 and ::1; the PRF passkey test lands with M1-8e) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/08-clients-console-cloud.md §1, docs/foundation/06-mcp-server.md §2.5 (example URL), apps/cli (local UI server)
 - **Depends on:** — (before M1-8e and M1-11a are implemented)
 - **Spec:** 08 §1; 04 §2.5; 06 §2.5; 11 §6.2.1
