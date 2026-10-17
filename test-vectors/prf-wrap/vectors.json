@@ -1,0 +1,66 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "prf-wrap",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib, cryptography 50.0.2)",
+    "version": "cpython 3.12.13",
+    "script": "tools/vectors/generate_prf_wrap.py"
+  },
+  "cases": [
+    {
+      "id": "prf-salt",
+      "source": "04 \u00a72.3 step 3: the PRF salt is sha256(utf8(\"agentlink-owner-v1\")), 32 bytes",
+      "input": {
+        "op": "prfSalt"
+      },
+      "expected": {
+        "salt": "3e37d81e7653d78821d7f712e079fb5df61bc6b10a913bb3016c422b08c5b601"
+      }
+    },
+    {
+      "id": "wrap-key-1",
+      "source": "04 \u00a72.3 step 3: wrapKey = HKDF-SHA256(ikm = PRF output, salt = \"\", info = \"owner-seed-wrap\", L = 32); a synthetic PRF output",
+      "input": {
+        "op": "wrapKey",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec"
+      },
+      "expected": {
+        "wrapKey": "e6fd23dad331e9d8c0feabb31554fb41a0c79b3033774fe4211a94413f92a241"
+      }
+    },
+    {
+      "id": "wrap-key-2",
+      "source": "04 \u00a72.3 step 3: wrapKey = HKDF-SHA256(ikm = PRF output, salt = \"\", info = \"owner-seed-wrap\", L = 32); another synthetic PRF output (a different wrapKey)",
+      "input": {
+        "op": "wrapKey",
+        "prfOutput": "1cb19d0663b12ae626a7c82942bf08bceca47d855f44b446ecde0629876f89a3"
+      },
+      "expected": {
+        "wrapKey": "ee68a218d1ffe916905b1db92ee7b12e9094aecf040a20780255e1c29256b31f"
+      }
+    },
+    {
+      "id": "wrap-key-zero",
+      "source": "04 \u00a72.3 step 3: wrapKey = HKDF-SHA256(ikm = PRF output, salt = \"\", info = \"owner-seed-wrap\", L = 32); an all-zero PRF output",
+      "input": {
+        "op": "wrapKey",
+        "prfOutput": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "expected": {
+        "wrapKey": "29c70f882445031aa0092ac88557295c447b6c7027eed8d3a4c7c5fa9ca7502a"
+      }
+    },
+    {
+      "id": "wrap-key-ff",
+      "source": "04 \u00a72.3 step 3: wrapKey = HKDF-SHA256(ikm = PRF output, salt = \"\", info = \"owner-seed-wrap\", L = 32); an all-0xff PRF output",
+      "input": {
+        "op": "wrapKey",
+        "prfOutput": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "expected": {
+        "wrapKey": "3c5be174698837a20ff601bb30678a87d6c1bbc9e33b5c7ebff1e61062be2889"
+      }
+    }
+  ]
+}

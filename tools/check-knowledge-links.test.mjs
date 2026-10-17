@@ -9,7 +9,11 @@ import {
   extractLinks,
 } from './check-knowledge-links.mjs';
 
-const present = new Set(['README.md', 'knowledge/agentlink-overview.md', 'docs-site/guide/README.md']);
+const present = new Set([
+  'README.md',
+  'knowledge/agentlink-overview.md',
+  'docs-site/guide/README.md',
+]);
 const exists = (path) => present.has(path);
 const base = 'https://github.com/4thtech/agentlink/blob/main/';
 
