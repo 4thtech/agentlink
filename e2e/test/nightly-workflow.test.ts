@@ -62,6 +62,12 @@ describe('nightly-two-machine.yml (OPS-CI-7)', () => {
     expect(nightly).not.toMatch(/path: \$\{\{ runner\.temp \}\}\/e2e-artifacts\s*$/m);
   });
 
+  it('hands the invite over with authenticated encryption, not openssl enc', () => {
+    expect(nightly).not.toContain('openssl enc');
+    expect(nightly).toContain('e2e/src/rendezvous.mjs encrypt');
+    expect(nightly).toContain('e2e/src/rendezvous.mjs decrypt');
+  });
+
   it('runs the agents on two different runners', () => {
     expect(nightly).toMatch(/runs-on: macos-26/);
     expect(nightly).toMatch(/agent-b:[\s\S]*?runs-on: ubuntu-24\.04/);

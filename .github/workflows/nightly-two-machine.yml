@@ -20,8 +20,8 @@
 # signature). No agent and no MCP tool ever approves (I-4, 04 §2.5).
 #
 # The only thing passed between the runners outside AgentLink is the invite. Agent A writes it to a
-# file; the next step masks it, encrypts it (AES-256-CBC, PBKDF2) with a passphrase made from the
-# Anthropic API key, the run ID and the attempt (no new secret), and uploads it as an artifact with a
+# file; the next step masks it, encrypts it (AES-256-GCM, key from HKDF-SHA256 over the
+# Anthropic API key, salted with the run ID and the attempt; no new secret; e2e/src/rendezvous.mjs), and uploads it as an artifact with a
 # one-day retention. Job B downloads and decrypts it. The invite is never printed, is a canary of the
 # scan, and appears in no uploaded result. Transcripts stay on the runner; only sanitized results
 # (step names, pass or fail, tool names, cost) are uploaded, after a clean canary scan.
@@ -64,7 +64,6 @@ jobs:
     timeout-minutes: 5
     permissions:
       actions: read
-      contents: read
     outputs:
       run: ${{ steps.decide.outputs.run }}
     steps:
@@ -178,7 +177,6 @@ jobs:
         timeout-minutes: 25
         run: |
           set -euo pipefail
-          openssl_bin="$(command -v /opt/homebrew/opt/openssl@3/bin/openssl || command -v openssl)"
           until [ -s "$NIGHTLY_INVITE_FILE" ]; do
             if [ -f "$RUNNER_TEMP/scenario.exit" ]; then
               echo "::error::agent A ended before it made an invite"
@@ -188,9 +186,8 @@ jobs:
           done
           echo "::add-mask::$(cat "$NIGHTLY_INVITE_FILE")"
           mkdir -p "$RUNNER_TEMP/handoff"
-          NIGHTLY_PASS="${RENDEZVOUS_KEY}:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}" \
-            "$openssl_bin" enc -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 -salt -pass env:NIGHTLY_PASS \
-            -in "$NIGHTLY_INVITE_FILE" -out "$RUNNER_TEMP/handoff/invite.enc"
+          RENDEZVOUS_SALT="${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}" \
+            node e2e/src/rendezvous.mjs encrypt "$NIGHTLY_INVITE_FILE" "$RUNNER_TEMP/handoff/invite.enc"
           echo "The invite is encrypted for agent B."
 
       - name: Upload the encrypted invite (one day)
@@ -336,9 +333,8 @@ jobs:
           done
           gh api "repos/${GH_REPO}/actions/artifacts/${id}/zip" > "$RUNNER_TEMP/handoff/invite.zip"
           unzip -q -o "$RUNNER_TEMP/handoff/invite.zip" -d "$RUNNER_TEMP/handoff"
-          NIGHTLY_PASS="${RENDEZVOUS_KEY}:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}" \
-            openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 -pass env:NIGHTLY_PASS \
-            -in "$RUNNER_TEMP/handoff/invite.enc" -out "$NIGHTLY_INVITE_FILE"
+          RENDEZVOUS_SALT="${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}" \
+            node e2e/src/rendezvous.mjs decrypt "$RUNNER_TEMP/handoff/invite.enc" "$NIGHTLY_INVITE_FILE"
           chmod 600 "$NIGHTLY_INVITE_FILE"
           echo "::add-mask::$(cat "$NIGHTLY_INVITE_FILE")"
           rm -f "$RUNNER_TEMP/handoff/invite.zip" "$RUNNER_TEMP/handoff/invite.enc"
