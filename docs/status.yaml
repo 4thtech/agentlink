@@ -70,6 +70,10 @@ areas:
         state: done
         prs: [32]
         summary: "Typed-data hashing and the signed agent card."
+      - name: "EIP-712 proof types"
+        state: in-progress
+        prs: [221]
+        summary: "Record, Receipt and Registration typed data and hashing, the recipient commitment and EIP-3009 deposit authorization typed data; the revoke struct follows."
       - name: "Owner passphrase wrap, pairing proof, safety code"
         state: done
         prs: [37]
