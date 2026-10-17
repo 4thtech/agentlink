@@ -1,0 +1,791 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "eip712-revocation",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib, pycryptodome 3.23.0)",
+    "version": "cpython 3.12.13",
+    "script": "tools/vectors/generate_eip712_revocation.py"
+  },
+  "cases": [
+    {
+      "id": "revocation-basic",
+      "source": "05 \u00a74 Revocation (D-81), signed by ownerEvm; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract = the Registry}; an agent at keyEpoch 0, a random nonce",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "typeHash": "b859726f46497f615e810f84b1c009cc0a4b7739992bed021ecf5fc4e37337bd",
+        "domainSeparator": "8642170d011f9d4cadd7a6e7894dc206a755000f9279173eae98256c22c37b2a",
+        "structHash": "dfdc17f9ae8d9207165e3039dbe69dee354514e4a9e5d621a3e24b0837d7e0b5",
+        "digest": "5af7beb26e00ef831204ea1e569077907146e4a613b25c855240a9ab40230134"
+      }
+    },
+    {
+      "id": "revocation-epoch-3",
+      "source": "05 \u00a74 Revocation (D-81), signed by ownerEvm; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract = the Registry}; the same agent at keyEpoch 3 (the stored epoch after three rotations)",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 3,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "typeHash": "b859726f46497f615e810f84b1c009cc0a4b7739992bed021ecf5fc4e37337bd",
+        "domainSeparator": "8642170d011f9d4cadd7a6e7894dc206a755000f9279173eae98256c22c37b2a",
+        "structHash": "6d6c6d22d49dc4c8c21e9c3b5595d3fc1382ade7750f488aa150965587dc29b3",
+        "digest": "7dc28f7edee7fee1d0bbb02674b1e112c742153f9030a63c30738be54575f34a"
+      }
+    },
+    {
+      "id": "revocation-chiado",
+      "source": "05 \u00a74 Revocation (D-81), signed by ownerEvm; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract = the Registry}; the same Revocation under Gnosis Chiado (another chainId)",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 10200,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "typeHash": "b859726f46497f615e810f84b1c009cc0a4b7739992bed021ecf5fc4e37337bd",
+        "domainSeparator": "458f92dcfec7bb848c86f822270b1f3f077dde4e1aa08530a3582a5fa41da421",
+        "structHash": "dfdc17f9ae8d9207165e3039dbe69dee354514e4a9e5d621a3e24b0837d7e0b5",
+        "digest": "05bd213bcfa45b1848a55391d29c07c973fddcf1460f996135eda546b3673dad"
+      }
+    },
+    {
+      "id": "revocation-other-registry",
+      "source": "05 \u00a74 Revocation (D-81), signed by ownerEvm; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract = the Registry}; the same Revocation under another verifyingContract",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x6db9367e633d62149d78e993d66ce8e0966002bd"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "typeHash": "b859726f46497f615e810f84b1c009cc0a4b7739992bed021ecf5fc4e37337bd",
+        "domainSeparator": "25da4c9f89df6a5a9d1c8792446a4549632c1af52ff74b042d92e672773e78ca",
+        "structHash": "dfdc17f9ae8d9207165e3039dbe69dee354514e4a9e5d621a3e24b0837d7e0b5",
+        "digest": "a2003edb486dc341d14bc41d4138bd1ef6df0a620872bb5bcbeddafffa9491b3"
+      }
+    },
+    {
+      "id": "revocation-other-nonce",
+      "source": "05 \u00a74 Revocation (D-81), signed by ownerEvm; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract = the Registry}; the same agent and epoch with a fresh nonce",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "8131567935595268795125103325778390320371387541800242959027313836562622981430",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "typeHash": "b859726f46497f615e810f84b1c009cc0a4b7739992bed021ecf5fc4e37337bd",
+        "domainSeparator": "8642170d011f9d4cadd7a6e7894dc206a755000f9279173eae98256c22c37b2a",
+        "structHash": "387229b717b231b3c559d8727695441b4d757190455610d29e38400a214d8931",
+        "digest": "4043c060edd5ad1b9ff44ce609084a1208308342ce842df35ff92942c90a9de5"
+      }
+    },
+    {
+      "id": "revocation-zero",
+      "source": "05 \u00a74 Revocation (D-81), signed by ownerEvm; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract = the Registry}; keyEpoch 0, nonce \"0\", deadline 0, agentEvm address(0) (encoding edges)",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x0000000000000000000000000000000000000000",
+          "keyEpoch": 0,
+          "nonce": "0",
+          "deadline": 0
+        }
+      },
+      "expected": {
+        "typeHash": "b859726f46497f615e810f84b1c009cc0a4b7739992bed021ecf5fc4e37337bd",
+        "domainSeparator": "8642170d011f9d4cadd7a6e7894dc206a755000f9279173eae98256c22c37b2a",
+        "structHash": "755facb726b0b57b11df7bacb6eae7a84ca31e5a04cdae0095ccc9b78d310583",
+        "digest": "e6e2a96ce9b7efb46ba9d56e62e194b8481006e6322480c20b3655ed52b0ad5f"
+      }
+    },
+    {
+      "id": "revocation-limits",
+      "source": "05 \u00a74 Revocation (D-81), signed by ownerEvm; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract = the Registry}; agentEvm 0xff\u2026ff, keyEpoch 2^32 - 1, nonce 2^256 - 1, deadline 2^53 - 1",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0xffffffffffffffffffffffffffffffffffffffff",
+          "keyEpoch": 4294967295,
+          "nonce": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+          "deadline": 9007199254740991
+        }
+      },
+      "expected": {
+        "typeHash": "b859726f46497f615e810f84b1c009cc0a4b7739992bed021ecf5fc4e37337bd",
+        "domainSeparator": "8642170d011f9d4cadd7a6e7894dc206a755000f9279173eae98256c22c37b2a",
+        "structHash": "6d4697220fe102cb37d1fced13818d7c467b0a63fefba1747e95be9bc3a231b4",
+        "digest": "d5151a810a7b45d410167a049ded431e9e2c08364fc1c7df1d57f3ea04a5b525"
+      }
+    },
+    {
+      "id": "nonce-shared-registration",
+      "source": "05 \u00a74 Registration (regOwnerSig); OCC v2 chain domain with the Registry as verifyingContract; 05 \u00a74 (D-81): Registration and Revocation nonces are single-use per owner in one usedNonces[ownerEvm][nonce]; one nonce under the two types gives distinct digests: the Registration",
+      "input": {
+        "op": "registration",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "registration": {
+          "cardHash": "0xfb2136a81de2e97782df42c2375e80972b2ff48c214d0d9b2129cee198737b28",
+          "feeToken": "0xaa35377b4b8edc0597e6e68abfdb6a2de5101eba",
+          "maxFee": "1000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "nonce": "6413267642068888702083166292795208620383283084903122980189042702132690731589",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "typeHash": "b814129e86c4b13f9a94e203850797901ab189c287ea19f8f84fba9f88696b2e",
+        "domainSeparator": "8642170d011f9d4cadd7a6e7894dc206a755000f9279173eae98256c22c37b2a",
+        "structHash": "0f9ff4a156e2a065ebcd29dc226a676ea5cea03ef85ea128f8f10eacf7a81dae",
+        "digest": "eb247100948bf4c637952ffa4e24b3a56309d9a06c4ea873067dcbafce0fac6c"
+      }
+    },
+    {
+      "id": "nonce-shared-revocation",
+      "source": "05 \u00a74 Revocation (D-81), signed by ownerEvm; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract = the Registry}; 05 \u00a74 (D-81): Registration and Revocation nonces are single-use per owner in one usedNonces[ownerEvm][nonce]; one nonce under the two types gives distinct digests: the Revocation with the same nonce and deadline",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "6413267642068888702083166292795208620383283084903122980189042702132690731589",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "typeHash": "b859726f46497f615e810f84b1c009cc0a4b7739992bed021ecf5fc4e37337bd",
+        "domainSeparator": "8642170d011f9d4cadd7a6e7894dc206a755000f9279173eae98256c22c37b2a",
+        "structHash": "47ade46dea327bbbf0cfbdf2307b08c1b618da42bf8875f63b4af18f807a6d3a",
+        "digest": "56edce40b55415382c11e867ead647298d32ad2c58ac38e662c56ff7435d4af5"
+      }
+    },
+    {
+      "id": "revocation-reject-agent-checksummed",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): agentEvm in EIP-55 mixed case; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297DfDde7498b0E62F8DB6C8bC15E0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-agent-uppercase",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): agentEvm in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297DFDDE7498B0E62F8DB6C8BC15E0D2C2FDE248",
+          "keyEpoch": 0,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-agent-no-prefix",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): agentEvm without 0x; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-agent-capital-prefix",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): agentEvm with 0X; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0X297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-agent-19-bytes",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): agentEvm of 19 bytes; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde2",
+          "keyEpoch": 0,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-agent-32-bytes",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): agentEvm left-padded to 32 bytes (the ABI word); rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x000000000000000000000000297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-key-epoch-2-pow-32",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): keyEpoch = 2^32 (outside uint32); rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 4294967296,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-key-epoch-negative",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): keyEpoch = -1; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": -1,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-key-epoch-string",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): keyEpoch as a decimal string; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": "0",
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-key-epoch-boolean",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): keyEpoch as false; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": false,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-key-epoch-fraction",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): keyEpoch = 1.5; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 1.5,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-nonce-number",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): nonce as a JSON number; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": 12345,
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-nonce-leading-zero",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): nonce with a leading zero; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "0102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-nonce-sign",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): nonce with a + sign; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "+102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-nonce-negative",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): nonce \"-1\"; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "-1",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-nonce-hex",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): nonce as 0x hex; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "0xe342b4ef18c3c6bbd1ea1ec03a22ef5f44963612b27eb0c6023c5e9ef8672532",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-nonce-2-pow-256",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): nonce = 2^256 (above uint256); rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "115792089237316195423570985008687907853269984665640564039457584007913129639936",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-nonce-empty",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): nonce \"\"; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-nonce-whitespace",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): nonce with a trailing space; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722 ",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-deadline-2-pow-53",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): deadline = 2^53 (uint64 above 2^53 - 1); rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 9007199254740992
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-deadline-negative",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): deadline = -1; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": -1
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-deadline-string",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): deadline as a decimal string; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": "1760003600"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-unknown-field",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): a fifth field ownerEvm; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "keyEpoch": 0,
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600,
+          "ownerEvm": "0x3b1d973b59b848cc985873395f5f9f192e0ea889"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-missing-field",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): keyEpoch missing; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
+          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-reject-registration-shape",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): a Registration message in place of a Revocation; rejected, never normalised",
+      "input": {
+        "op": "revocation",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "revocation": {
+          "cardHash": "0xfb2136a81de2e97782df42c2375e80972b2ff48c214d0d9b2129cee198737b28",
+          "feeToken": "0xaa35377b4b8edc0597e6e68abfdb6a2de5101eba",
+          "maxFee": "1000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "nonce": "6413267642068888702083166292795208620383283084903122980189042702132690731589",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    }
+  ]
+}

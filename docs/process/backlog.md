@@ -992,7 +992,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Every case records generator, version and inputs; regeneration reproduces the files byte for byte; the contracts repo's parity job runs against the pinned commit.
 
 #### M1-1i-b · Independent test vectors: STREAM and revoke (new, split from M1-1i on 2026-10-17)
-- **Status:** backlog (unblocked: G-26 resolved by D-80, G-20 by D-81) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in-progress (vectors in review) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/
 - **Depends on:** M1-1i (G-26 resolved by D-80; G-20 resolved by D-81)
 - **Spec:** 04 §4; 05 §4; `development-process.md` §9.1
@@ -1000,7 +1000,8 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Scope:**
   - Same rules and generators as M1-1h and M1-1i (written by a session that does not implement the TypeScript code).
   - Suite `stream` (pending under M1-1d): STREAM `ALF1` vectors for empty, 1 B, exactly 1 chunk, chunk + 1 and multi-chunk plaintexts, with the AAD `header (17 B) ‖ u8(isFinal)` (04 §4, D-80), plus the tamper rejections of M1-1d.
-  - EIP-712 vectors for the 05 §4 `Revocation` struct (D-81), and the shared `Registration`/`Revocation` nonce cases, in `eip712-proof` (or a new suite if `eip712-proof` is no longer pending).
+  - EIP-712 vectors for the 05 §4 `Revocation` struct (D-81), and the shared `Registration`/`Revocation` nonce cases, in `eip712-proof` (or a new suite if `eip712-proof` is no longer pending). `eip712-proof` is implemented (M1-1j, #221), so they are the new suite `eip712-revocation` (pending under M1-1j). Generators `tools/vectors/generate_stream.py` and `tools/vectors/generate_eip712_revocation.py`.
+  - Open spec points found here (derived in the generators, owner confirms at merge): 04 §4 does not give the ALF1 version byte (taken as 1), whether a plaintext of an exact multiple of `chunkSize` ends with a full final chunk or an extra empty one (taken as the full final chunk; an empty final chunk only for an empty file, otherwise rejected), or a minimum `chunkSize` (the vectors use 16 and 32 B, and 1 MiB once; `chunkSize` 0 is rejected); 04 §2.4.1 lists no `Revocation` paths, so its cases use the 05 §3.1 JSON form (with `keyEpoch` a JSON integer, as in the card) and reject every other form.
 - **Acceptance:**
   - Every case records generator, version and inputs; regeneration reproduces the files byte for byte.
 
@@ -1068,7 +1069,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Web-Streams encrypt/decrypt with bounded memory: header `"ALF1" ‖ u8 version ‖ u32be chunkSize ‖ noncePrefix(8)`; chunk nonce = noncePrefix ‖ u32be(index); AAD = header (17 B) ‖ u8(isFinal) (D-80); default chunk 1 MiB.
   - Incremental SHA-256 of ciphertext and plaintext while streaming; chunk-size bounds and maximum chunk count enforced.
 - **Acceptance:**
-  - M1-1i-b STREAM vectors pass in all runtimes.
+  - M1-1i-b STREAM vectors (suite `stream`) pass in all runtimes: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`.
   - Dropped final chunk, reordered, duplicated or appended chunks, bit flips and header tampering all fail (tests).
   - 1 GiB encrypt + decrypt in Node with RSS growth < 64 MiB (slow-tagged benchmark test).
 
@@ -1096,7 +1097,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - `recordStructHash`; recipient commitment `keccak256(abi.encode(recipientAgentEvm, salt))`.
   - EIP-3009 `ReceiveWithAuthorization` typed data (used in M3-4b); the token's domain is read from chain, never hard-coded.
 - **Acceptance:**
-  - Vector suite `eip712-proof` (M1-1i): its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares; the contracts repo's parity job passes against the same commit (M1-3d). The revoke vectors come from M1-1i-b (D-81).
+  - Vector suite `eip712-proof` (M1-1i): its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares; the contracts repo's parity job passes against the same commit (M1-3d). The revoke vectors come from M1-1i-b (D-81): suite `eip712-revocation`, whose harness module M1-1j registers and removes from `test-vectors/pending-suites.json` in the same way.
 
 #### M1-1f · crypto: owner passphrase wrapping, pairing proof, safety code
 - **Status:** done (4thtech/agentlink#37, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
