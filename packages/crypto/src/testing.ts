@@ -23,6 +23,7 @@ import {
 import { argon2idRaw, type Argon2idParams } from './argon2.js';
 import { bip340PublicKey, bip340Sign } from './bip340.js';
 import { assertBytes, equalBytes } from './bytes.js';
+import { dropAuthEvent, encodeDropAuthorization, type DropAuthRequest } from './drop-auth.js';
 import { decodeHex, encodeHex, encodeUtf8 } from './encoding.js';
 import { signTypedData, type TypedData } from './eip712.js';
 import { CryptoInputError } from './errors.js';
@@ -114,6 +115,19 @@ export {
 // IR-M1-1f-1 L-7: pairingDigest without the commitment check is not public; the `labels` vectors
 // (the same input under both tags) reach it here.
 export { pairingDigest } from './safety-code.js';
+
+/**
+ * M1-27a: a drop request's Authorization header signed with a raw test drop key, for the drop
+ * Worker's Miniflare tests and the `drop-auth` vectors. Production signs through a KeyStore (M1-13c).
+ */
+export function signDropAuthorization(
+  dropSecretKey: Uint8Array,
+  request: DropAuthRequest,
+  createdAt: number,
+): { readonly authorization: string; readonly pubkey: string } {
+  const event = signNostrEvent(dropSecretKey, dropAuthEvent(request, createdAt));
+  return Object.freeze({ authorization: encodeDropAuthorization(event), pubkey: event.pubkey });
+}
 
 /** RFC 9106 Argon2id v1.3 with K and X (empty = none) and any output length from 4 to 1024. */
 export function argon2idWithSecretAndAd(

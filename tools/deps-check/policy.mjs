@@ -128,8 +128,10 @@ export const RESTRICTED_ENTRY_POINTS = [
     // IR-M1-9k-1 F01 (S1, owner-side decision on #107): narrower than a test zone. Only *.test.ts
     // files under these directories may import it, never the package's src/ (production or tests):
     // apps/cli/test holds the two-process keychain test, which needs a test owner identity
-    // (MemoryOwnerKeyStore) beside the real agent KeyStore.
-    testDirs: ['apps/cli/test'],
+    // (MemoryOwnerKeyStore) beside the real agent KeyStore. M1-27a: apps/drop/test holds the drop
+    // Worker's Miniflare tests, which sign drop requests with fixed test keys (signDropAuthorization);
+    // the Worker itself only verifies and never imports the seam.
+    testDirs: ['apps/cli/test', 'apps/drop/test'],
     via: 'the public entry points (the test seam is never built)',
     reason:
       'a fixed nonce, IV or ephemeral key, or an in-memory seed holder, must never reach production code (M1-1c, M1-1f, M1-1g)',

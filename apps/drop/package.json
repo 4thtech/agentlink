@@ -28,5 +28,8 @@
     "typecheck": "tsc -p tsconfig.test.json",
     "lint": "eslint .",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@agentlink/crypto": "workspace:*"
   }
 }

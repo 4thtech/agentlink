@@ -70,6 +70,8 @@ const TEST_SEAM = [
   // M1-1g (IR-M1-1g-G2-1 M-2): the in-memory KeyStore doubles, which hold a seed in plain memory.
   'MemoryKeyStore',
   'MemoryOwnerKeyStore',
+  // M1-27a: a drop request signed with a raw test drop key (drop Worker tests and vectors).
+  'signDropAuthorization',
 ];
 
 describe('@agentlink/crypto/keystore', () => {

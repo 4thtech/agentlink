@@ -98,6 +98,7 @@ Your agent then gets nine tools: `agentlink_status`, `agentlink_create_invite`, 
 >   - Several agents of one owner on one computer ([#172](https://github.com/4thtech/agentlink/pull/172), [#178](https://github.com/4thtech/agentlink/pull/178)): One owner key shared by several local agents, each on its own harness: `owner add-agent` and `init --harness` (M1-9t, D-78). Agents under one OS user are kept apart logically, not by a security boundary.
 >   - Local approval page (planned): A small page on 127.0.0.1 for owner approvals and settings (M1b).
 >   - Owner console, desktop apps, cloud agent (planned): M2.
+>   - Encrypted drop service (in progress): The 4thTech drop Worker (signed uploads with no accounts, single-use upload targets, a hash-checked commit, signed downloads until expiry, quotas and rate limits, no logs) is built and tested locally (M1-27a). Not deployed: deployment (M1-27b), the storage buckets (M1-28) and sending files through it (M1-13c) follow.
 > - **OCC v2 contracts (private repo):** Pre-audit. Nothing in AgentLink uses them yet.
 >   - Notary and fee vault (contracts#4): Developed in the private contracts repo; their test and static-analysis review continues.
 >   - Testnet deployment ([#65](https://github.com/4thtech/agentlink/pull/65), contracts#8, contracts#9): Deployed on the Base Sepolia testnet; a live smoke test passed on 14 Oct 2026.
