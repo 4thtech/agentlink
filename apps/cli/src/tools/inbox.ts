@@ -21,10 +21,18 @@
 // I-5, I-7: summaries and `nextStep` are fixed text with counts and names under the 06 §2.1 rule;
 // logs carry counts only.
 import { canonicalize, encodeUtf8 } from '@agentlink/crypto';
-import { displayRef, renderRef, resolveContact, type ContactRef } from './contacts.js';
+import {
+  activeContacts,
+  contactRef,
+  displayRef,
+  renderRef,
+  resolveContact,
+  type ContactRef,
+} from './contacts.js';
 import type { InboxPageQuery, PageFile, PageItem, ToolContext } from './context.js';
 import { fail, invalidArgument, ok, type HandlerOutput } from './result.js';
 import { copy, UNTRUSTED_FOOTER } from './strings/index.js';
+import { addressLabel } from './terms-common.js';
 import { noOwnerCard } from './text.js';
 import {
   removeInvisible,
@@ -193,6 +201,33 @@ function termsRefOf(item: PageItem): Record<string, unknown> {
   };
 }
 
+/**
+ * Names for the agent addresses in an item's terms (M1-22-b): ours, derived from the terms'
+ * `parties`, `price.payer` and `deliverables[].by` against our own agent and the paired contacts.
+ * Each value is "you", a contact name under the 06 §2.1 rule, "a contact" or null (an address that
+ * is not ours or a contact's, which stays only inside the untrusted block).
+ */
+function rolesOf(
+  terms: Readonly<Record<string, unknown>>,
+  label: (address: unknown) => string | undefined,
+): Record<string, unknown> {
+  const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+  const price = terms['price'];
+  const payer =
+    typeof price === 'object' && price !== null
+      ? (price as Record<string, unknown>)['payer']
+      : undefined;
+  return {
+    parties: arr(terms['parties']).map((a) => label(a) ?? null),
+    payer: payer === undefined ? null : (label(payer) ?? null),
+    deliverablesBy: arr(terms['deliverables']).map((d) =>
+      typeof d === 'object' && d !== null
+        ? (label((d as Record<string, unknown>)['by']) ?? null)
+        : null,
+    ),
+  };
+}
+
 function render(item: PageItem): Rendered {
   const { untrusted, content } = untrustedOf(item);
   const base: Record<string, unknown> = {
@@ -318,6 +353,44 @@ export async function inboxHandler(input: unknown, context: ToolContext): Promis
   }
 
   const items = page.items.map(renderOnce);
+
+  // M1-22-b: names for the addresses in each offer's terms, and a hint for identical open offers.
+  const withTerms = page.items.filter((item) => item.terms !== undefined);
+  let labelOf: (address: unknown) => string | undefined = () => undefined;
+  let byContact = new Map<string, ContactRef>();
+  if (withTerms.length > 0) {
+    const self = await client.self();
+    byContact = new Map(
+      activeContacts(await client.contacts()).map((view) => [view.id, contactRef(view)] as const),
+    );
+    labelOf = (address) =>
+      self === undefined ? undefined : addressLabel(address, self.agentId, byContact);
+  }
+  page.items.forEach((item, index) => {
+    if (item.terms === undefined) return;
+    items[index] = {
+      ...items[index]!,
+      message: { ...items[index]!.message, termsParties: rolesOf(item.terms, labelOf) },
+    };
+  });
+  const duplicateLines: string[] = [];
+  if (offersOnly) {
+    const groups = new Map<string, { contactId: string; count: number }>();
+    for (const item of page.items) {
+      if (item.direction !== 'in' || item.from === null || item.termsRef === undefined) continue;
+      const key = `${item.from.contactId}:${item.termsRef.termsHash}`;
+      const group = groups.get(key);
+      if (group === undefined) groups.set(key, { contactId: item.from.contactId, count: 1 });
+      else group.count += 1;
+    }
+    for (const { contactId: id, count } of groups.values()) {
+      const ref = byContact.get(id);
+      if (count < 2 || ref === undefined) continue;
+      duplicateLines.push(
+        copy('chat.inbox.duplicateOffers', { contactName: renderRef(ref), count }),
+      );
+    }
+  }
   const requestsLine =
     page.requests > 0 ? [copy('chat.inbox.requestsWaiting', { count: page.requests })] : [];
   const first = offersOnly
@@ -329,7 +402,7 @@ export async function inboxHandler(input: unknown, context: ToolContext): Promis
       : filtered
         ? INBOX_TEXT.noMatching
         : copy('chat.session.nothingNew');
-  const summary = [first, ...requestsLine].join(' ');
+  const summary = [first, ...duplicateLines.slice(0, 3), ...requestsLine].join(' ');
   const hasRequest = page.items.some((item) => item.direction === 'in' && item.from === null);
   logger.info('inbox read', { messages: items.length, requests: page.requests });
 

@@ -80,6 +80,7 @@ export const en = {
     'This sender is not a contact. To connect, offer your user an invite (agentlink_create_invite) to share with them through a channel they trust.',
   'chat.inbox.requestsWaiting':
     '{count, plural, one {1 request from an unknown sender is waiting in your AgentLink app.} other {# requests from unknown senders are waiting in your AgentLink app.}}',
+  'chat.inbox.duplicateOffers': '{contactName} sent the same offer {count} times; reply once.',
   'chat.session.start':
     '{count, plural, one {1 new message from {contactName}. To read it, call agentlink_inbox.} other {# new messages from {contactName}. To read them, call agentlink_inbox.}}',
   'chat.session.nothingNew': 'Nothing new on AgentLink.',
