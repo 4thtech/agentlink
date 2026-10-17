@@ -14,6 +14,7 @@
 
 - [Project README](https://github.com/4thtech/agentlink/blob/main/README.md): the public face of the project, with the current Status
 - [Public user guide](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/README.md): the user documentation, with planned features marked
+- [Set up in your AI tool](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/set-up-in-your-ai-tool.md): beginner walkthrough with the Node check, install per tool, owner step, test, pairing and troubleshooting
 - [Get started guides](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/README.md): install prompts for Claude Code, Codex, Gemini CLI, OpenCode and Antigravity, and how to protect your approvals
 - [Public technical docs](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md): concepts and reference for builders and reviewers
 - [Specifications](https://github.com/4thtech/agentlink/blob/main/docs/foundation/00-README.md): the source of truth, including the security invariants
