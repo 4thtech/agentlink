@@ -1443,6 +1443,41 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
                 "maxLength": 64,
                 "type": "string",
               },
+              "termsParties": {
+                "additionalProperties": false,
+                "properties": {
+                  "deliverablesBy": {
+                    "items": {
+                      "type": [
+                        "string",
+                        "null",
+                      ],
+                    },
+                    "type": "array",
+                  },
+                  "parties": {
+                    "items": {
+                      "type": [
+                        "string",
+                        "null",
+                      ],
+                    },
+                    "type": "array",
+                  },
+                  "payer": {
+                    "type": [
+                      "string",
+                      "null",
+                    ],
+                  },
+                },
+                "required": [
+                  "parties",
+                  "payer",
+                  "deliverablesBy",
+                ],
+                "type": "object",
+              },
               "termsRef": {
                 "additionalProperties": false,
                 "properties": {

@@ -228,6 +228,28 @@ describe('decidePath (04 §4)', () => {
       }
     });
 
+    it('refuses an 8.3 short-name path that resolves into a protected root (M1-15-b)', () => {
+      // Typed with short names (RUNNER~1, AGENTL~1); realpath on Windows returns the long form.
+      expect(
+        decidePath(
+          win({
+            requested: 'C:\\Users\\RUNNER~1\\Work\\AGENTL~1\\agent.alko',
+            resolved: 'C:\\Users\\Me\\.agentlink\\agent.alko',
+            allowedFolders: ['C:\\'],
+          }),
+        ),
+      ).toEqual({ ok: false, reason: 'protected' });
+      // Both sides in long form after realpath: an 8.3 allowed folder still matches.
+      expect(
+        decidePath(
+          win({
+            requested: 'C:\\Users\\RUNNER~1\\Work\\a.txt',
+            resolved: 'C:\\Users\\Me\\Work\\a.txt',
+          }),
+        ).ok,
+      ).toBe(true);
+    });
+
     it('refuses another drive, a UNC path and an NTFS stream', () => {
       expect(decidePath(win({ resolved: 'D:\\Users\\Me\\Work\\a.txt' })).ok).toBe(false);
       expect(decidePath(win({ resolved: '\\\\evil\\share\\a.txt' })).ok).toBe(false);

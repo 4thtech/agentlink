@@ -2,8 +2,8 @@
 #
 # Two jobs, one scenario (e2e/):
 #
-# - `e2e-deterministic`: a scripted MCP client in place of the model, on every pull request, on
-#   main and in the merge queue. Local strfry relays in Docker, the real OS keychain (gnome-keyring)
+# - `e2e-deterministic`: a scripted MCP client in place of the model, called by ci.yml (OPS-CI-6) on
+#   every pull request with a code change, on main and in the merge queue, and part of `ci-gate`. Local strfry relays in Docker, the real OS keychain (gnome-keyring)
 #   and SQLite store, the built CLI. No LLM, no secrets, read-only token. Must finish in < 15 min.
 # - `e2e-llm`: agent A is Claude Code (headless, Haiku), agent B is Codex with an OpenRouter model
 #   (or Claude Code too: dispatch input `agent_b`). It runs ONLY on main, by manual dispatch (no
@@ -23,11 +23,9 @@
 name: E2E
 
 on:
-  pull_request:
-    branches-ignore: [sync]
-  push:
-    branches: [main]
-  merge_group:
+  # OPS-CI-6: `e2e-deterministic` is called by ci.yml (pull request, main, merge queue), where it is
+  # part of `ci-gate`; this workflow no longer triggers on those events itself.
+  workflow_call:
   workflow_dispatch:
     inputs:
       agent_b:
@@ -38,9 +36,8 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: e2e-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+# No `concurrency` here: ci.yml's group already supersedes older pull request runs, and a manual
+# dispatch should never be cancelled by another.
 
 env:
   TURBO_TELEMETRY_DISABLED: "1"
@@ -49,7 +46,7 @@ env:
 jobs:
   e2e-deterministic:
     name: e2e-deterministic
-    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'merge_group'
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:

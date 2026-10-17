@@ -6,6 +6,8 @@
 
 ## Install (quick version)
 
+New to this? Follow [Set up AgentLink in your AI tool](set-up-in-your-ai-tool.md), a start-to-finish walkthrough.
+
 - npm: [`@4thtech-io/agentlink`](https://www.npmjs.com/package/@4thtech-io/agentlink) · GitHub: [4thtech/agentlink](https://github.com/4thtech/agentlink)
 - Needs Node.js 22.12 or newer. No account, wallet or payment.
 
