@@ -2,6 +2,9 @@
 // read-only `status`, `doctor` and the argument checks. The pairing round trip against two real
 // cores is test/everyday-commands.test.ts.
 import { CoreError } from '@agentlink/core';
+import { chmod, mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { DISPATCH_TEXT, EXIT_FAILED, EXIT_OK, EXIT_USAGE, createDispatcher } from '../dispatch.js';
 import type { TerminalContext } from '../runtime/guards.js';
@@ -98,6 +101,7 @@ function fakeAgent(parts: Record<string, unknown> = {}): Fake {
       return Promise.reject(new Error('status must not process anything'));
     },
     identity: {
+      get: () => Promise.resolve({ card: {} }),
       signedCard: () => Promise.resolve({ relays: ['wss://one.relay-alpha.net'] }),
       sendState: () => Promise.resolve('ready'),
     },
@@ -490,6 +494,43 @@ describe('status (06 §2.0, D-73)', () => {
 });
 
 describe('doctor (07 §9.4)', () => {
+  const noCard = (): Fake => fakeAgent({ identity: { get: () => Promise.resolve(undefined) } });
+
+  it('names the missing owner card, never suggests init, and stops (M1-9u)', async () => {
+    const result = await harness(noCard()).run(['doctor']);
+    expect(result.code).toBe(EXIT_FAILED);
+    const text = result.out.join('\n');
+    expect(text).toContain('Problem  This agent has no card from your owner yet');
+    expect(text).toContain('`agentlink owner add-agent --agent default`');
+    expect(text).not.toContain('agentlink init');
+    expect(text).not.toContain('OK       Message network');
+    // No other agent on this machine has a card either: the state is named.
+    expect(text).toContain('No agent on this computer has a card from an owner');
+  });
+
+  it('does not add the machine-wide line when another agent has a card (M1-9u)', async () => {
+    const other = fakeAgent();
+    const home = await mkdtemp(join(tmpdir(), 'al-doctor-'));
+    try {
+      await mkdir(join(home, '.agentlink', 'agents', 'second'), { recursive: true });
+      for (const d of ['.agentlink', '.agentlink/agents', '.agentlink/agents/second']) {
+        await chmod(join(home, d), 0o700);
+      }
+      const f = noCard();
+      const result = await harness(f, {
+        home,
+        open: (name) =>
+          Promise.resolve({ status: 'ok', agent: name === 'second' ? other.agent : f.agent }),
+      }).run(['doctor']);
+      expect(result.code).toBe(EXIT_FAILED);
+      const text = result.out.join('\n');
+      expect(text).toContain('add-agent --agent default');
+      expect(text).not.toContain('No agent on this computer');
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
   it('reports each subsystem with a status word and exits 0 when all is well', async () => {
     const result = await harness(fakeAgent()).run(['doctor']);
     expect(result.code).toBe(EXIT_OK);
@@ -505,6 +546,7 @@ describe('doctor (07 §9.4)', () => {
     const f = fakeAgent({
       catchUp: () => Promise.reject(new Error('boom: secret detail')),
       identity: {
+        get: () => Promise.resolve({ card: {} }),
         signedCard: () => Promise.resolve({ relays: [] }),
         sendState: () => Promise.resolve('revoked'),
       },
