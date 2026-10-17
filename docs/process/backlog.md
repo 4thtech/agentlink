@@ -3186,7 +3186,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Follow-up from the third live LLM dispatch (run 38864138908, test report 5.2): J8 reached L18 (counter delivered, one owner approval). L19 failed because its prompt has only the `approvalId`, and `agentlink_respond_to_terms` also needs the counter's `envelopeId`; the fresh session had no way to find it. Harness: add the counter envelope ID to the L19 prompt. Product question: should `agentlink_get_approval` return the pending tool and envelope ID so a fresh session can finish? **In review (2026-10-16, same PR):** yes; `agentlink_get_approval` returns `action` (the tool and, for a terms accept or reject, the `envelopeId` and `decision`; structured values only) and, once approved, a `nextStep` to finish with the `approvalId` alone (06 §2.5). I-4 unchanged.
   - Deterministic variant green on PRs; no binding `accept` leaves A without an owner-signed approval or a matching owner-signed limit (asserted on relay traffic); each owner is asked at most once per agreement (approval count).
   - Inbound `terms` reach the harness wrapped as untrusted content (06 §4); canary scan of logs finds no plaintext.
-- **Notes (IR-M1-22-1):** the "nothing leaves" relay check polls every 2 s and only catches publishes within that window; the sent-`accept` store check covers the rest. Not covered yet (cheap follow-up): voiding an approval that is still pending (a newer version arrives before the owner decides); only approved-unused is tested. The `clientRequestId` repeat check waits for M1-32-c.
+- **Notes (IR-M1-22-1):** the "nothing leaves" relay check polls every 2 s and only catches publishes within that window; the sent-`accept` store check covers the rest. Not covered yet (cheap follow-up): voiding an approval that is still pending (a newer version arrives before the owner decides); only approved-unused is tested. The `clientRequestId` repeat check is in the M1-22 e2e since M1-32-c.
 - **Note (IR-M1-22-L15-1):** resolved by M1-9v (spec only): the code already escapes opening-tag look-alikes as well as closing ones (`apps/cli/src/tools/untrusted.ts`, tested in `untrusted.test.ts`); 06 §4 now says so.
 - **Follow-up (local dogfood run 2, 2026-10-16; card as M1-22 or M1-12a work):** (a) OpenCode's summary of an offer showed raw addresses ("paid by 0xb680…8275 to 0x40a9…9337"). Check whether `agentlink_inbox` and the terms summaries expose address-like strings to the agent, and whether 11 §5 copy should show contact names instead. (b) A duplicate identical offer (same terms sent twice) appears as two open offers; consider a dedupe hint in the inbox or status summary.
 
@@ -3343,7 +3343,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Property test: across random interleavings of offers, counters, approvals and `proof` envelopes, no scope ever sends more than one `accept` or signs more than one receipt, and nothing runs without an owner-signed approval or a matching grant.
 
 #### M1-32-c · MCP terms tools: accept and pass `clientRequestId` (new, IR-M1-22-1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (2026-10-17) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`src/tools/{propose-terms,respond-to-terms}.ts`)
 - **Depends on:** M1-9q, M1-32-b
 - **Spec:** 06 §1 rule 6, §2.2a; 07 §3.3

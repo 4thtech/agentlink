@@ -8,8 +8,9 @@
 //    USE_RESPOND_TO_TERMS) and sends the `offer`. Free and not a commitment; a firm offer
 //    (`notarize`) arrives with M1-9d, so no M1a call returns `pending_approval`.
 //
-// `clientRequestId` is accepted by the frozen schema, but the core terms flow has no idempotency key
-// yet: a repeated call sends a new offer (reported as a gap on the PR; nothing is a commitment).
+// `clientRequestId` goes to the core, which makes the call idempotent (M1-32-b; 06 §1 rule 6,
+// 07 §3.3): a repeat returns the original result and sends nothing; another request under the key is
+// IDEMPOTENCY_KEY_REUSED; a concurrent repeat is IN_PROGRESS, as for agentlink_send.
 //
 // I-5, I-7: the terms, the note and the `to` query are agent-written (steerable) text; none of it
 // reaches a summary, `nextStep`, error or log line.
@@ -30,7 +31,9 @@ import {
   dateOf,
   isoOf,
   nameOf,
+  termsApprovalState,
   termsCoreError,
+  termsInProgress,
   termsRefusal,
 } from './terms-common.js';
 import { TOOL_TEXT } from './text.js';
@@ -41,6 +44,7 @@ interface ProposeInput {
   revises?: string;
   note?: string;
   approvalId?: string;
+  clientRequestId?: string;
 }
 
 export async function proposeTermsHandler(
@@ -50,7 +54,7 @@ export async function proposeTermsHandler(
   const { client, logger } = context;
   const terms = client.terms;
   if (terms === undefined) return notAvailable();
-  const { to, revises, note, approvalId } = input as ProposeInput;
+  const { to, revises, note, approvalId, clientRequestId } = input as ProposeInput;
 
   if ((await client.self()) === undefined) {
     return fail('needs_setup', TOOL_TEXT.noIdentity, TOOL_TEXT.setupNextStep);
@@ -68,6 +72,7 @@ export async function proposeTermsHandler(
     ...(revises === undefined ? {} : { revises }),
     ...(note === undefined ? {} : { note }),
     ...(approvalId === undefined ? {} : { approvalId }),
+    ...(clientRequestId === undefined ? {} : { clientRequestId }),
   };
   let result;
   try {
@@ -96,6 +101,10 @@ export async function proposeTermsHandler(
     case 'pending_approval':
       // A firm offer (M1-9d); unreachable in M1a, handled so the result is never undefined.
       return pendingApproval(context, result.approvalId, TERMS_TEXT.askFirmOffer(nameOf(ref)));
+    case 'in_progress':
+      return termsInProgress();
+    case 'approval_state':
+      return termsApprovalState(context, 'agentlink_propose_terms', result);
     default:
       return internalError();
   }

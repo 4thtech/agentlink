@@ -10,14 +10,22 @@
 // approve: {url}" tail: M1a has no URL (D-73 (3)), and the fixed `nextStep` names the owner's
 // `agentlink approve` command instead (06 §2.5 step 2). Moving these sentences into the copy sheet
 // is M1-9g's (owner of strings/ after M1-9o/p/q).
-import { CoreError, type CommitmentCard, type TermsCode } from '@agentlink/core';
+import {
+  CoreError,
+  type CommitmentCard,
+  type ProposeTermsResult,
+  type TermsCode,
+} from '@agentlink/core';
 import { renderRef, type ContactRef } from './contacts.js';
+import type { ToolContext } from './context.js';
+import { approvalStateOf } from './get-approval.js';
 import { INVITE_TEXT } from './invite-common.js';
 import {
   fail,
   internalError,
   invalidArgument,
   notAvailable,
+  pendingApproval,
   type HandlerOutput,
 } from './result.js';
 import { SEND_TEXT } from './send.js';
@@ -128,12 +136,60 @@ export function termsRefusal(
       return accepting
         ? fail('rejected', copy('chat.status.rejected.rules'), TERMS_TEXT.rulesNextStep, code)
         : fail('rejected', SEND_TEXT.policyDenied, SEND_TEXT.policyDeniedNextStep, code);
+    case 'IDEMPOTENCY_KEY_REUSED':
+      // The same wording and code as agentlink_send (06 §1 rule 6).
+      return fail('rejected', SEND_TEXT.keyReused, SEND_TEXT.keyReusedNextStep, code);
     case 'NOTARIZE_UNAVAILABLE':
       // The M1a schemas have no `notarize`; proofs arrive with M1-9d.
       return notAvailable();
     default:
       // A code this version does not know: fixed text, never undefined (IR-M1-9p-1 F03).
       return internalError();
+  }
+}
+
+/** Another call holds this clientRequestId: nothing more was done (as agentlink_send; 07 §3.3). */
+export const termsInProgress = (): HandlerOutput =>
+  fail('error', SEND_TEXT.inProgress, SEND_TEXT.inProgressNextStep, 'IN_PROGRESS');
+
+/**
+ * A repeat of a call whose kept result was `pending_approval`, after that approval stopped being
+ * pending (07 §3.3 "Stale approvals"): the approval's current state as `agentlink_get_approval`
+ * reports it (06 §2.5), never the stale result. Fixed text only.
+ */
+export function termsApprovalState(
+  context: ToolContext,
+  tool: string,
+  stale: Extract<ProposeTermsResult, { status: 'approval_state' }>,
+): HandlerOutput {
+  const mapped = approvalStateOf(stale.approval);
+  if (mapped === 'not_found') {
+    return fail('not_found', TOOL_TEXT.approvalNotFound, TOOL_TEXT.approvalNotFoundNextStep);
+  }
+  switch (mapped.approval) {
+    case 'pending':
+      return pendingApproval(context, stale.approvalId, TOOL_TEXT.approvalPending);
+    case 'approved':
+      return {
+        result: {
+          status: 'pending_approval',
+          summary: TOOL_TEXT.approvalApproved,
+          approvalId: stale.approvalId,
+          nextStep: TOOL_TEXT.approvalFinishTool
+            .split('{tool}')
+            .join(tool)
+            .split('{approvalId}')
+            .join(stale.approvalId),
+        },
+      };
+    case 'denied':
+      return fail('rejected', TOOL_TEXT.approvalDenied, TERMS_TEXT.approvalVoidNextStep);
+    default:
+      return fail(
+        'rejected',
+        mapped.used === true ? copy('chat.commitment.used') : TOOL_TEXT.approvalExpired,
+        mapped.used === true ? TERMS_TEXT.usedNextStep : TERMS_TEXT.approvalVoidNextStep,
+      );
   }
 }
 
