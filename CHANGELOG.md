@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Added
+
+- Security utilities for files (M1-15, S1, 04 §4, §7; not wired into any tool yet, M1-7f and M1-9d use them): `@agentlink/core` gets the pure checks (`checkFetchUrl` on the raw URL string: `https` only, no numeric host notation in any base, no local or internal names, no user info; `pickPublicAddress`: every resolved address must be globally routable; `decidePath` for both POSIX and Windows paths; `sanitizeFileName`). `@agentlink/node` gets `nodeSafeFetch` (one lookup per hop, connect to the checked address, at most 2 redirects each re-checked, byte cap, one deadline, no proxy; errors never carry the URL), `resolveAllowedFile` / `openAllowedFile` (realpath on both sides; hidden files, `~/.ssh`, `~/.agentlink` and keychain folders always refused, also through links) and `createInboxFile` (sanitised name, exclusive create, never through a link). In Workers (G-14, proposed) the raw URL check applies and the address check relies on Workers egress; that path lands with M2-3b.
+
 ### Changed
 
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.

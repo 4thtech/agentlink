@@ -62,3 +62,23 @@ export {
   nodeNip11Fetcher,
   nodeRelayConnector,
 } from './relay-io.js';
+// M1-15: the SSRF-safe download (DNS-pinned, 04 §4) and the allowed-folder and inbox file guards.
+// The test seams (an injected lookup, a CA, a route to a local port) stay inside.
+export {
+  SAFE_FETCH_TIMEOUT_MS,
+  SafeFetchError,
+  nodeSafeFetch,
+  type SafeFetch,
+  type SafeFetchErrorCode,
+  type SafeFetchOptions,
+  type SafeFetchResult,
+} from './safe-fetch.js';
+export {
+  AllowedPathError,
+  createInboxFile,
+  openAllowedFile,
+  resolveAllowedFile,
+  type AllowedFile,
+  type AllowedPathErrorCode,
+  type AllowedPathOptions,
+} from './allowed-path.js';
