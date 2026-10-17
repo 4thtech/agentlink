@@ -688,6 +688,44 @@ describe('step logic', () => {
       expect(sideOk(results)).toBe(false);
     });
 
+    it('redacts link-like unknown options and accepts the equals form', () => {
+      let message = '';
+      try {
+        parseArgs([...out, 'https://x.test/i#secret']);
+      } catch (error) {
+        message = error.message;
+      }
+      expect(message).toBe('unknown option <redacted>');
+      expect(parseArgs([...out, '--role=b', '--invite=https://x.test/i#a']).invite).toBe(
+        'https://x.test/i#a',
+      );
+      expect(() => parseArgs([...out, '--role', 'b', '--invite=nope'])).toThrow('--invite');
+    });
+
+    it('the hand-off command carries the relevant options and quotes them', () => {
+      const o = parseArgs([
+        ...out,
+        '--role',
+        'a',
+        '--manual',
+        '--agentlink',
+        '["npx","-y","pkg"]',
+        '--opencode',
+        '/a b/opencode',
+        '--oc-model',
+        'opencode/m',
+      ]);
+      const box = handoffBox(o, '20261017-101500', 'https://x.test/i#a');
+      expect(box).toContain('--manual --agentlink \'["npx","-y","pkg"]\'');
+      expect(box).toContain("--opencode '/a b/opencode' --oc-model 'opencode/m'");
+      expect(box).not.toContain('--cc-via');
+    });
+
+    it('labels manual-only checks as confirmed by you', () => {
+      const rows = [{ id: 'T1', outcome: 'manual', local: true }];
+      expect(checkSummary(rows)[0].status).toContain('confirmed by you');
+    });
+
     it('the result text never holds the invite link', () => {
       const meta = {
         startedAt: 't',

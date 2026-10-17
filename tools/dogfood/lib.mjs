@@ -146,6 +146,10 @@ export function parseArgs(argv) {
     manual: false,
     ccVia: 'claude',
   };
+  // `--name=value` is the same as `--name value`.
+  argv = argv.flatMap((a) =>
+    /^--[a-z-]+=/.test(a) ? [a.slice(0, a.indexOf('=')), a.slice(a.indexOf('=') + 1)] : [a],
+  );
   const value = (i, name) => {
     const v = argv[i + 1];
     if (v === undefined || v.startsWith('--')) throw new Error(`${name} needs a value`);
@@ -263,7 +267,10 @@ export function parseArgs(argv) {
         i += 1;
         break;
       default:
-        throw new Error(`unknown option ${String(arg)}`);
+        // Never echo an argument that may hold an invite link.
+        throw new Error(
+          `unknown option ${String(arg).includes('://') ? '<redacted>' : String(arg).slice(0, 40)}`,
+        );
     }
   }
   if (options.ccAgent === options.ocAgent) throw new Error('the two agents must differ');
@@ -1271,7 +1278,7 @@ export const NOT_COVERED =
 
 /**
  * Per check, what this Mac verified and what only the other Mac did: `{ check, here, there, status }`.
- * `status` is 'verified' (all local steps passed), 'FAILED' (a local step failed or was skipped for
+ * `status` is 'verified' (all local steps passed), 'confirmed by you (...)' (some passed only as manual), 'FAILED' (a local step failed or was skipped for
  * a reason) or 'other Mac only' (no local step). Local steps only count here.
  */
 export function checkSummary(results) {
@@ -1291,7 +1298,9 @@ export function checkSummary(results) {
       here.length === 0
         ? 'other Mac only'
         : here.every((r) => r.outcome === 'pass' || r.outcome === 'manual' || r.benign === true)
-          ? 'verified'
+          ? here.some((r) => r.outcome === 'manual')
+            ? 'confirmed by you (not checked by the script)'
+            : 'verified'
           : 'FAILED',
   }));
 }
@@ -1306,18 +1315,28 @@ export function sideOk(results) {
 
 /** The box shown on Mac A with the command to run on Mac B. The invite link is a secret: terminal only. */
 export function handoffBox(options, runId, inviteUrl) {
+  const q = (v) => `'${String(v).replace(/'/g, `'\\''`)}'`;
   const parts = [
     'node tools/dogfood/run.mjs --role b',
     `--run-id ${runId}`,
-    `--invite '${inviteUrl}'`,
+    `--invite ${q(inviteUrl)}`,
     `--cc-agent ${options.ccAgent} --oc-agent ${options.ocAgent}`,
     ...(options.sameOwner ? ['--same-owner'] : []),
+    ...(options.manual ? ['--manual'] : []),
+    ...(options.agentlinkBin !== DEFAULTS.agentlinkBin
+      ? [`--agentlink ${q(options.agentlinkBin)}`]
+      : []),
+    ...(options.opencodeBin !== DEFAULTS.opencodeBin
+      ? [`--opencode ${q(options.opencodeBin)}`]
+      : []),
+    ...(options.ocModel === undefined ? [] : [`--oc-model ${q(options.ocModel)}`]),
   ];
   const lines = [
     'MAC B: run this on the other Mac (copy it by hand; do not paste it into a chat or a file)',
     '',
     parts.join(' '),
     '',
+    'Paths (--agentlink, --opencode) are copied from this Mac: change them if Mac B differs.',
     'Then answer the prompts here when Mac B shows the step done.',
   ];
   return lines.join('\n');
