@@ -33,6 +33,7 @@ const SAMPLES: Record<string, string | number> = {
   senderCode: '2B9E·04D1',
   domain: 'acme.com',
   appName: 'Claude Code',
+  agent: 'writer',
   code: '123456',
   codeName: 'owner code',
   index: 1,

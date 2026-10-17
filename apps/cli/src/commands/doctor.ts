@@ -13,10 +13,29 @@ import {
   DISPATCH_TEXT,
   type CommandHandler,
 } from '../dispatch.js';
-import { readAgentConfig } from '../runtime/agent-dir.js';
+import { listAgentNames, readAgentConfig } from '../runtime/agent-dir.js';
+import { isAgentName } from '../runtime/agent-name.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
 import { copy, renderCopy } from '../tools/strings/index.js';
 import { TEXT, createDeps, fill, fixedErrorText, printAll, type CommandDeps } from './shared.js';
+
+/** True when another local agent on this machine has a stored card (never reads a secret). */
+async function otherAgentHasCard(deps: CommandDeps, except: string): Promise<boolean> {
+  const names = await listAgentNames(deps.home).catch(() => [] as string[]);
+  for (const name of names) {
+    if (name === except || !isAgentName(name)) continue;
+    const other = await deps.open(name).catch(() => undefined);
+    if (other === undefined || other.status !== 'ok') continue;
+    try {
+      if ((await other.agent.client.identity.get().catch(() => undefined)) !== undefined) {
+        return true;
+      }
+    } finally {
+      await other.agent.close();
+    }
+  }
+  return false;
+}
 
 export function createDoctorHandler(deps: CommandDeps = createDeps()): CommandHandler {
   return async (context) => {
@@ -56,6 +75,23 @@ export function createDoctorHandler(deps: CommandDeps = createDeps()): CommandHa
     const { agent } = opened;
     try {
       emit(copy('cli.doctor.keysFound'));
+
+      // M1-9u: the agent exists but no owner card is stored for it. Read from the agent's own store
+      // (no KeyStore secret); the later checks would only fail in confusing ways.
+      const view = await agent.client.identity.get().catch(() => undefined);
+      if (view === undefined) {
+        emit(
+          copy('cli.doctor.noOwnerCard', {
+            agent: isAgentName(agent.name) ? agent.name : '<name>',
+          }),
+          true,
+        );
+        await agent.close();
+        if (!(await otherAgentHasCard(deps, agent.name))) {
+          emit(copy('cli.doctor.noOwnerCardNoOthers'));
+        }
+        return EXIT_FAILED;
+      }
 
       const config = await readAgentConfig(deps.home, agent.name).catch(() => undefined);
       if (config !== undefined) {

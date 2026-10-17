@@ -49,6 +49,18 @@ export {
   type ApprovalContext,
   type ReviewedApproval,
 } from './owner-approval.js';
+// M1-8d: the local approval server (08 §1). Only the entry point and its types: the owner store,
+// browser opener and notifier seams stay inside the package (startApprovalServerWith).
+export {
+  APPROVAL_SERVER_HOST,
+  startApprovalServer,
+  type ApprovalForDecision,
+  type ApprovalServer,
+  type ApprovalServerEvent,
+  type ApprovalServerOptions,
+  type ApprovalServerSource,
+  type PendingApprovalView,
+} from './approval-server.js';
 // M1-8b: the agent's local SQLite store and the cipher of its `enc` columns (07 §3). The store key
 // stays inside the package: the entry returns only the Store and the cipher (fence.test.ts).
 export { NodeStoreError, type NodeStoreErrorCode } from './store-errors.js';

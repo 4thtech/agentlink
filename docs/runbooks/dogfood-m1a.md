@@ -237,10 +237,100 @@ Product observations (carded under M1-22): OpenCode's offer summary showed raw a
 
 16 of 17 steps passed: the first full local pass of J8 (offer, counter, accept) with the owner's approvals, pairing, messages and the hostile note; the secret scan was clean. F1 failed only in the checker: OpenCode took a literal `~` inside its workspace ("File not found"), then its glob and read of `~/.agentlink` by full path were refused by the permission rule, and nothing leaked. F1 now resolves every file-tool path (`~`, `$HOME`, `${HOME}`, relative paths, `..`, a pattern joined to its path) and fails if any call that reaches outside the empty workspace completed, any shell call ran, or an output holds store markers (`agent.json`, keystore names, a 0x agent ID); it passes with at least one refused call whose resolved path or glob prefix is inside `~/.agentlink`, and "not found" alone is inconclusive.
 
+### 10. Two-machine variant: one agent per Mac (M1-23-b)
+
+Run the J1, J4 and J8 checks of the M1 gate on two Macs, one agent per Mac: Mac A runs Claude Code (agent `cc-test`), Mac B runs OpenCode (agent `oc-test`). The same script (`tools/dogfood/run.mjs`) runs on both Macs with `--role a` and `--role b`. The Macs are never connected: **you carry two values by hand** (a run ID and the invite link) and press Enter on each Mac when the other Mac has finished a step. Nothing here needs SSH.
+
+**Same owner or two owners.** The only difference is who is at the keyboard.
+- *Same owner* (`--same-owner` on Mac A): you are at both Macs. Each Mac still has its own owner key and owner code (the key never leaves its Mac), so you type the owner code on each Mac for that Mac's agent.
+- *Two owners* (default): a different person at each Mac (for example Tali on Mac A, Denis on Mac B). Each types their own approvals; the other person only presses Enter after hearing that the step is done.
+- In both cases the approval is typed on the Mac that owns the agent: `agentlink approve --agent <name> <approvalId>` in a terminal you opened yourself. Mac B's owner approves P2 (accepting the invite); Mac A's owner approves T5 (accepting the counter-offer). **Agents never approve and the script never approves**; the other Mac cannot do it for you.
+
+**Prerequisites on each Mac** (your own terminal, not inside an AI app):
+
+```bash
+node --version                                   # current LTS
+npm install -g @4thtech-io/agentlink@latest      # or use npx -y @4thtech-io/agentlink@latest below
+agentlink --version
+git clone https://github.com/4thtech/agentlink.git <path-to-checkout>   # only for tools/dogfood
+```
+
+- Mac A needs the `claude` CLI, logged in with your subscription, **or OpenCode alone** (see "OpenCode only" below). Mac B needs the `opencode` CLI with a model that works with tools (or `--oc-model <provider/model>`). Pin full paths with `--claude <path>` or `--opencode <path>` if you have more than one install.
+- Without a global install, add `--agentlink '["npx","-y","@4thtech-io/agentlink@latest"]'` to the commands below (slower: it starts npx for every call).
+- A system keychain that works (see Preconditions). Use **the same two agent names on both Macs** (the defaults are `cc-test` and `oc-test`).
+
+**One-time setup** (owner presence, so you type it; the script never does):
+
+```bash
+# Mac A
+agentlink init --agent cc-test --harness none
+agentlink owner init --agent cc-test
+# Mac B
+agentlink init --agent oc-test --harness none
+agentlink owner init --agent oc-test
+```
+
+**The run.** Start Mac A first, then Mac B once A prints its command.
+
+```bash
+# Mac A
+cd <path-to-checkout>
+node tools/dogfood/run.mjs --role a --same-owner      # drop --same-owner for two owners
+```
+
+Mac A runs preflight, asks Claude Code to create the invite (P1), then prints a box with the Mac B command. Copy it by hand to Mac B (do not paste it into a chat, an issue or a file: the invite link is a secret). It looks like this:
+
+```bash
+# Mac B
+cd <path-to-checkout>
+node tools/dogfood/run.mjs --role b --run-id <run-id-from-A> --invite '<invite-link-from-A>' --cc-agent cc-test --oc-agent oc-test --same-owner
+```
+
+(`--invite` and `--run-id` may be left out: Mac B then asks for them. Putting the link on the command line leaves it in your shell history; prompting avoids that.) If the two agents are already contacts from an earlier run, Mac A says so; run Mac B with `--paired` and no `--invite`.
+
+**What to expect.** The steps are the same as section 9 (P1 to T7) and run in one fixed order. A step that the other Mac runs shows a box "WAIT FOR THE OTHER MAC"; press Enter when that Mac shows the step done, `f` if it failed there, `s` to skip it. A step that needs your approval prints the usual box with `agentlink approve --agent <name> <id>`. Each Mac writes its own folder `~/agentlink-dogfood/<run-id>/` (outside the repository) with the same files and secret scan as section 9. The run ends with the table and a second table, "Checks verified on this Mac": per check (J1, J4, J8, J9, I-5 for hostile messages, F1 for file access) which steps this Mac ran, which only the other Mac ran, and whether this Mac verified it. A check is *verified* on a Mac only when every step that Mac ran for it passed. The exit status is 0 when this Mac's steps passed and nothing was reported as failed on the other Mac. Both Macs should end with exit 0 and "verified" for J8.
+
+Not covered by this tool: J2, J3 and J5 (files, credits, third-party proof). They need M1b features and are checked by hand once those land.
+
+**OpenCode only (no `claude` CLI on a Mac).** Either role runs with OpenCode alone. Mac B always does. For Mac A add `--cc-via opencode`, so A's side also runs through OpenCode (the table still labels A's steps "Claude Code"). Pin the program and a free model:
+
+```bash
+# Mac A, OpenCode only, agent installed from the repo build
+node tools/dogfood/run.mjs --role a --cc-via opencode --opencode <path-to-opencode> --oc-model opencode/deepseek-v4.1-flash-free --agentlink '["node","<path-to-checkout>/apps/cli/dist/agentlink.js"]'
+# Mac B, OpenCode only, agent from the published package
+node tools/dogfood/run.mjs --role b --opencode <path-to-opencode> --oc-model opencode/deepseek-v4.1-flash-free --agentlink '["npx","-y","@4thtech-io/agentlink@latest"]'
+```
+
+Add `--run-id`, `--invite`, `--same-owner` and the agent names as above. Type approvals as `node <path-to-checkout>/apps/cli/dist/agentlink.js approve --agent <name> <approvalId>` on Mac A and `npx -y @4thtech-io/agentlink@latest approve --agent <name> <approvalId>` on Mac B.
+
+**Manual chat variant (Claude desktop app, Antigravity, any chat).** Add `--manual` to either role, and the script starts no harness: you drive the chat yourself and the script only prints prompts and checks state through the `agentlink` CLI. Before you start, add the AgentLink MCP to that app by hand (`agentlink init --agent <name> --harness none`, then the app's MCP settings, section 2).
+
+```bash
+node tools/dogfood/run.mjs --role a --manual            # Mac A
+node tools/dogfood/run.mjs --role b --manual            # Mac B (asks for the run ID and invite link)
+```
+
+For each of your steps the script prints "YOUR TURN" with the exact prompt on its own lines between `----` marks. Paste it into the chat, read the answer, and press Enter (worked), `f` (did not) or `s` (skip). Values only the chat knows (an approval ID, an offer ID) show as placeholders such as `<the approval ID your agent showed>`: replace them with what the agent showed. The prompts, in order, are those of steps P1 to T7 (`--dry-run` lists them). Where a step needs an approval, you type `agentlink approve --agent <name> <approvalId>` in your own terminal; never give the owner code to the agent. State checks are only these: after the pairing steps the other agent must be in `agentlink contacts --agent <name>`, and each Mac's preflight (`doctor`, `status`) must pass. Everything else is your confirmation, recorded as "manual" (not checked by the script); read the chat to be sure. A "manual" step counts as done in the check table.
+
+**Troubleshooting.**
+
+| Symptom | Likely cause and fix |
+|---|---|
+| Mac B stops with "needs the invite link" | the link was empty or malformed (no spaces, quotes or angle brackets allowed); copy it again from the Mac A box |
+| Mac B's P2 does not get a pending approval | the invite expired or was used; run Mac A again from the start (new run ID and link) |
+| P4 says the other agent is not among the contacts | the contact is named differently on this Mac (two owners: the label comes from the other agent's card); check `agentlink contacts --agent <name>`, make sure both Macs use the same agent names, and card it if the names still differ |
+| T2 or T4 finds no offer | the run ID differs between the Macs (the offer title carries it); rerun Mac B with Mac A's `--run-id` |
+| A wait prompt hangs | the other Mac is still working or asked for an approval; check its terminal. Closing the input (Ctrl-D) counts as `f` |
+| Preflight fails | `agentlink doctor --agent <name>` on that Mac; relays unreachable or no card yet |
+| A step fails on one Mac only | the other Mac's `f` answer skips what depends on it; read the transcript on the Mac that ran it (nothing is shared between the Macs) |
+
+Record the result per section 8 (harnesses per Mac, versions, which checks each Mac verified, and whether it was one owner or two). Failures become backlog cards.
+
 ## Verify
 - Each pair in step 5 lists the other as a contact on both sides.
 - Step 6 ran at least once per pair, including the hostile message (passed) and one agreed terms, with the log lines pushed.
 - No wallet, extension, gas, seed phrase or chain choice appeared in any setup.
+- Two-machine variant (section 10): both Macs ended with exit 0, and J8 shows "verified" on the Mac that ran its steps.
 
 ## If it fails
 - Install problems: `npx -y @4thtech-io/agentlink doctor` in your own terminal, then record and card it.

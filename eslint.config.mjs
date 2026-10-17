@@ -216,14 +216,21 @@ export default tseslint.config(
   },
   {
     // Node-only code gets Node globals: build tooling, config files and tests (which run in Node).
-    // Shared packages get none. The repository scripts under tools/ print to the terminal.
-    files: ['tools/**', '**/*.test.ts', '**/*.config.{ts,mjs}', 'eslint.config.mjs'],
+    // Shared packages get none. The repository scripts under tools/ and the CI check scripts under
+    // apps/cli/scripts/ (never published: `files` names only dist/agentlink.js) print to the terminal.
+    files: [
+      'tools/**',
+      'apps/cli/scripts/**/*.mjs',
+      '**/*.test.ts',
+      '**/*.config.{ts,mjs}',
+      'eslint.config.mjs',
+    ],
     languageOptions: { globals: { ...globals.node } },
   },
   {
     // The console channels and the repository scripts. This turns off ALL no-restricted-syntax
     // selectors for these files, not only CONSOLE_SYNTAX: keep the list to these exact paths.
-    files: ['tools/**', ...CONSOLE_CHANNELS],
+    files: ['tools/**', 'apps/cli/scripts/**/*.mjs', ...CONSOLE_CHANNELS],
     rules: { 'no-console': 'off', 'no-restricted-syntax': 'off' },
   },
 );

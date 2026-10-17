@@ -112,19 +112,42 @@ export {
   type PolicyVersionMark,
 } from './owner-actions.js';
 export {
+  BUDGET_WINDOW_SECONDS,
   FAIL_CLOSED_CONTACTS,
   FAIL_CLOSED_LIMITS,
   POLICY_DEFAULTS_EFFECTIVE,
+  budgetSpentMicros,
   evaluate,
+  evaluateFileSend,
+  evaluateProof,
+  isInsideFolder,
   policyLimits,
+  type BudgetEntryView,
+  type BudgetLedgerView,
   type EffectivePolicy,
+  type FileSendAction,
+  type FileSendEvaluation,
+  type FileSendRefusal,
+  type FileStorage,
   type PolicyAction,
   type PolicyContext,
   type PolicyDecision,
   type PolicyDocument,
   type PolicyLimits,
   type PolicyProblem,
+  type ProofAction,
+  type ProofEvaluation,
+  type ProofTrigger,
 } from './policy-engine.js';
+export {
+  checkAndReserveProof,
+  readBudgetLedger,
+  releaseProofReservation,
+  settleProofCharged,
+  type ProofCheck,
+  type ProofReservation,
+  type ReleaseOutcome,
+} from './budget.js';
 export {
   AUTO_ACCEPT_USD_CURRENCIES,
   checkCommitmentBinding,
@@ -180,7 +203,9 @@ export {
   type Transport,
   type TransportDeps,
   type TransportFactory,
+  type TransportSubscribeOptions,
   type TransportSyncOptions,
+  type TransportUnsubscribe,
 } from './transport.js';
 export {
   OUTBOX_CLAIM_SECONDS,
@@ -225,6 +250,9 @@ export {
   SyncService,
   type CatchUpResult,
   type FetchSummary,
+  type InboxProcessed,
+  type InboxSubscription,
+  type SubscribeInboxOptions,
   type SyncInboxOptions,
   type SyncInboxResult,
 } from './sync.js';
@@ -317,7 +345,6 @@ export { FALLBACK_FILE_NAME, MAX_FILE_NAME_BYTES, sanitizeFileName } from './fil
 export {
   decidePath,
   expandHome,
-  isInsideFolder,
   parseAbsolutePath,
   protectedRoots,
   segmentsBelow,

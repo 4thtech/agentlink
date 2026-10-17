@@ -25,7 +25,7 @@ import { displayRef, renderRef, resolveContact, type ContactRef } from './contac
 import type { InboxPageQuery, PageFile, PageItem, ToolContext } from './context.js';
 import { fail, invalidArgument, ok, type HandlerOutput } from './result.js';
 import { copy, UNTRUSTED_FOOTER } from './strings/index.js';
-import { TOOL_TEXT } from './text.js';
+import { noOwnerCard } from './text.js';
 import {
   removeInvisible,
   sanitizeUntrustedText,
@@ -249,7 +249,11 @@ export async function inboxHandler(input: unknown, context: ToolContext): Promis
 
   const { client, logger } = context;
   if ((await client.self()) === undefined) {
-    return fail('needs_setup', TOOL_TEXT.noIdentity, TOOL_TEXT.setupNextStep);
+    return fail(
+      'needs_setup',
+      noOwnerCard(context.agentName).summary,
+      noOwnerCard(context.agentName).nextStep,
+    );
   }
 
   let contactId: string | undefined;

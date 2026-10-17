@@ -9,6 +9,8 @@ import * as entry from './index.js';
 describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
   it('exports exactly the opaque entry points', () => {
     expect(Object.keys(entry).sort()).toEqual([
+      // M1-8d: the local approval server's address constant (08 §1).
+      'APPROVAL_SERVER_HOST',
       // M1-15: the allowed-folder and inbox file guards (fixed-text errors, no seams).
       'AllowedPathError',
       'KEYCHAIN_SERVICE',
@@ -41,6 +43,8 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'probeOsKeychain',
       'resolveAllowedFile',
       'selectKeyStoreBackend',
+      // M1-8d: the local approval server entry point (no owner-store or opener seam).
+      'startApprovalServer',
     ]);
   });
 
@@ -69,6 +73,10 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'createRelayConnectorWith',
       'createNip11FetcherWith',
       'createHostResolverWith',
+      // M1-8d: the approval server's test seams (owner store, opener, notifier) stay internal.
+      'startApprovalServerWith',
+      'osBrowserOpener',
+      'osNotifier',
       // M1-15: the safe-fetch test seams stay internal.
       'createSafeFetchWith',
       'openAllowedFileWith',
