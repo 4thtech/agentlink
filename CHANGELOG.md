@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- CLI: an agent that has no card from its owner yet is now told so. `agentlink_status`, the other tools and `agentlink doctor` say to run `agentlink owner add-agent --agent <name>` in your own terminal instead of suggesting `init` (M1-9u). `owner add-agent` also explains the case where an owner exists but no agent here is attached to it.
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.
 
 ## [0.1.0] - 2026-10-16

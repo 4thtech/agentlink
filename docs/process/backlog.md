@@ -3209,7 +3209,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - No wallet, extension, gas or chain choice appeared in either setup (D-39); dogfood log (dates, harnesses, versions, issues filed) and owner sign-off recorded.
 
 #### M1-9t · CLI: several agents under one OS user, and init for one harness (new, found by the M1-23 runbook)
-- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1a (needed for the one-computer part of M1-23, not for the gate)
+- **Status:** merged (#178) · **Size:** M · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1a (needed for the one-computer part of M1-23, not for the gate)
 - **Repo/path:** agentlink · apps/cli (`init`, `owner init`), packages/node (`initOwner`)
 - **Depends on:** M1-9a, M1-9b, M1-8h
 - **Spec:** 04 §2.2, §2.5, §2.8 ("Adding an agent to the existing owner"); 06 §7; D-39, D-67, D-78; `docs/runbooks/dogfood-m1a.md`
@@ -3221,16 +3221,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Docs: runbook `docs/runbooks/dogfood-m1a.md` §3 (remove the STOP), quickstart pages for the new flags, CHANGELOG, changeset.
 - **Acceptance:** tests first (RED commit): two agents under one OS user each get a card for the same owner, an agent cannot trigger it (no TTY or a harness marker refuses before the owner key is read), an approval for one agent is refused by the other, `init` writes only to the chosen harness, and declining every change keeps the identity.
 
-#### M1-9u · CLI: add-agent dead end and Gemini CLI detection (new, from IR-M1-9t-1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+#### M1-9u · CLI: add-agent dead end and the missing owner card (new, from IR-M1-9t-1; extended by a live finding)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`owner add-agent`, `doctor`, harness detection)
 - **Depends on:** M1-9t
 - **Spec:** 04 §2.8 ("Adding an agent to the existing owner"); 06 §7; D-78
 - **Invariants:** I-4
 - **Scope:**
   - (a) An owner item exists on the machine but no local agent has a card naming it (for example after every carded agent was removed): `owner add-agent` cannot learn the owner keys and points to `owner init`, which refuses because an owner exists. Give this case its own fixed message and a `doctor` hint (what is on the machine, what to do), without reading or showing any secret (IR-M1-9t-1 L-2).
-  - (b) Without `--harness`, any `~/.gemini` folder detects Gemini CLI, so an Antigravity user (whose config also lives under `~/.gemini`) is offered a Gemini CLI change. Detect Gemini CLI by the `gemini` binary on `PATH` or `~/.gemini/settings.json` instead (IR-M1-9t-1 L-3).
-- **Acceptance:** tests for both cases; (a) prints the new message and `doctor` names the state; (b) a home with only `~/.gemini/config/mcp_config.json` proposes Antigravity and not Gemini CLI.
+  - (b) **Extended (live finding, 2026-10-17):** an agent created with `init` but without an owner card (`owner add-agent` not yet run) made `agentlink_status` say "not set up" and suggest `init`. In that state `agentlink_status`, every other tool answering the no-identity case, and `doctor` now say: this agent has no card from your owner yet, run `agentlink owner add-agent --agent <name>` in your own terminal. Never `init`. The name passes the 06 §6 check before it is inserted. Detected from the agent's own store, no KeyStore secret read. The truly-not-set-up state keeps its text.
+  - **Moved:** the Gemini CLI detection fix (IR-M1-9t-1 L-3: detect by the `gemini` binary on `PATH` or `~/.gemini/settings.json`, not any `~/.gemini` folder) is now card **M1-9w**.
+- **Acceptance:** tests for (a) (new message, `doctor` names the state), (b) (status, other tools and `doctor` in the no-card state; the unchanged not-set-up state).
 
 #### M1-24 · Product name and trademark check before the production domain (D-38) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet prepares search material) · **Security:** S0 · **Phase:** M1b
