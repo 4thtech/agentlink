@@ -11,7 +11,7 @@
 | Envelope payload | AES-256-GCM, 12-byte IV, header bound as additional data |
 | Canonical JSON and hashes | JCS (RFC 8785); SHA-256; Keccak-256 on-chain |
 | Transport | NIP-44 v2 inside NIP-59 seals and gift wraps |
-| Files | AES-256-GCM STREAM (`ALF1`), 1 MiB chunks, final-chunk flag in the additional data |
+| Files | AES-256-GCM STREAM (`ALF1`), 1 MiB chunks, additional data = the 17-byte header plus the final-chunk flag, so header changes and truncation fail decryption |
 | Owner passphrase | Argon2id key wrapping |
 | Passkeys | WebAuthn PRF output to wrap the owner seed |
 | Pairing | HMAC-SHA256 handshake proof; commit-then-reveal safety code (tagged SHA-256 over both cards, the invite ID and a nonce from each side), shown as 12 digits |

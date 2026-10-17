@@ -987,20 +987,20 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Suite `eip712-proof` (pending under M1-1j): EIP-712 type hash, domain separator, struct hash and digest for `Record`, `Receipt` (OCC v2 chain domain) and `Registration` (same domain form, the Registry as `verifyingContract`); the recipient commitment; the 05 §3.1 JSON-form rejections of `Record` and `Receipt`. Hashing only. Generator `tools/vectors/generate_eip712_proof.py`.
   - Suite `prf-wrap` (pending under M1-1k): the PRF salt and `wrapKey` of 04 §2.3 step 3. Generator `tools/vectors/generate_prf_wrap.py`.
   - Not here: STREAM (G-26) and the revoke struct (G-20) are M1-1i-b. The sealed PRF seed blob has no vectors until 04 §2.3 fixes its nonce, AAD and layout (M1-1k).
-  - Open spec points found here (flagged, not decided): 05 §4 calls `cardHash` the "EIP-712 hash of the AgentCard" without saying struct hash or digest, so no case derives it from a card; 04 §2.4.1 lists no `Registration` paths, so its cases use the `Record` form and have no rejections; the `Registration` nonce rules wait for G-20.
+  - Open spec points found here (flagged, not decided): 05 §4 calls `cardHash` the "EIP-712 hash of the AgentCard" without saying struct hash or digest, so no case derives it from a card; 04 §2.4.1 lists no `Registration` paths, so its cases use the `Record` form and have no rejections; the `Registration` nonce rules are now in 05 §4 (D-81); their cases are M1-1i-b.
 - **Acceptance:**
   - Every case records generator, version and inputs; regeneration reproduces the files byte for byte; the contracts repo's parity job runs against the pinned commit.
 
 #### M1-1i-b · Independent test vectors: STREAM and revoke (new, split from M1-1i on 2026-10-17)
-- **Status:** blocked (G-26, G-20) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** backlog (unblocked: G-26 resolved by D-80, G-20 by D-81) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/
-- **Depends on:** M1-1i; gap G-26 resolved (STREAM); gap G-20 resolved (revoke)
+- **Depends on:** M1-1i (G-26 resolved by D-80; G-20 resolved by D-81)
 - **Spec:** 04 §4; 05 §4; `development-process.md` §9.1
 - **Invariants:** I-2, I-6, I-8
 - **Scope:**
   - Same rules and generators as M1-1h and M1-1i (written by a session that does not implement the TypeScript code).
-  - Suite `stream` (pending under M1-1d): STREAM `ALF1` vectors for empty, 1 B, exactly 1 chunk, chunk + 1 and multi-chunk plaintexts, with the AAD that G-26 decides, plus the tamper rejections of M1-1d.
-  - EIP-712 vectors for the revoke struct once G-20 defines it, and any `Registration` nonce cases G-20 adds, in `eip712-proof` (or a new suite if `eip712-proof` is no longer pending).
+  - Suite `stream` (pending under M1-1d): STREAM `ALF1` vectors for empty, 1 B, exactly 1 chunk, chunk + 1 and multi-chunk plaintexts, with the AAD `header (17 B) ‖ u8(isFinal)` (04 §4, D-80), plus the tamper rejections of M1-1d.
+  - EIP-712 vectors for the 05 §4 `Revocation` struct (D-81), and the shared `Registration`/`Revocation` nonce cases, in `eip712-proof` (or a new suite if `eip712-proof` is no longer pending).
 - **Acceptance:**
   - Every case records generator, version and inputs; regeneration reproduces the files byte for byte.
 
@@ -1061,11 +1061,11 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 #### M1-1d · crypto: STREAM file encryption (ALF1)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto
-- **Depends on:** M1-1a, M1-1i-b; gap G-26 resolved
+- **Depends on:** M1-1a, M1-1i-b (G-26 resolved by D-80)
 - **Spec:** 04 §4 (object layout, nonce, AAD, chunk size); 07 §5.2 (streaming); 03 §4.2
 - **Invariants:** I-2
 - **Scope:**
-  - Web-Streams encrypt/decrypt with bounded memory: header `"ALF1" ‖ u8 version ‖ u32be chunkSize ‖ noncePrefix(8)`; chunk nonce = noncePrefix ‖ u32be(index); AAD = u8(isFinal) (plus header binding if G-26 decides so); default chunk 1 MiB.
+  - Web-Streams encrypt/decrypt with bounded memory: header `"ALF1" ‖ u8 version ‖ u32be chunkSize ‖ noncePrefix(8)`; chunk nonce = noncePrefix ‖ u32be(index); AAD = header (17 B) ‖ u8(isFinal) (D-80); default chunk 1 MiB.
   - Incremental SHA-256 of ciphertext and plaintext while streaming; chunk-size bounds and maximum chunk count enforced.
 - **Acceptance:**
   - M1-1i-b STREAM vectors pass in all runtimes.
@@ -1086,17 +1086,17 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - `AgentCard` EIP-712 vectors from M1-1h pass in all runtimes.
 
 #### M1-1j · crypto: EIP-712 proof types and commitment helpers (new, split from M1-1e)
-- **Status:** in-progress (revoke struct deferred until G-20 lands, PR #215 / M1-1i-b) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in-progress (revoke struct defined by D-81, 05 §4; its vectors come from M1-1i-b) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto
 - **Depends on:** M1-1e, M1-1i
 - **Spec:** 04 §5; 05 §3.1, §4, §8
 - **Invariants:** I-6
 - **Scope:**
-  - Typed-data definitions for `Record`, `Receipt` (domain `{name: "OCC", version: "2", chainId, verifyingContract}`), `Registration`; revoke struct after G-20.
+  - Typed-data definitions for `Record`, `Receipt` (domain `{name: "OCC", version: "2", chainId, verifyingContract}`), `Registration`, `Revocation` (05 §4, D-81).
   - `recordStructHash`; recipient commitment `keccak256(abi.encode(recipientAgentEvm, salt))`.
   - EIP-3009 `ReceiveWithAuthorization` typed data (used in M3-4b); the token's domain is read from chain, never hard-coded.
 - **Acceptance:**
-  - Vector suite `eip712-proof` (M1-1i): its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares; the contracts repo's parity job passes against the same commit (M1-3d). The revoke vectors come from M1-1i-b after G-20.
+  - Vector suite `eip712-proof` (M1-1i): its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares; the contracts repo's parity job passes against the same commit (M1-3d). The revoke vectors come from M1-1i-b (D-81).
 
 #### M1-1f · crypto: owner passphrase wrapping, pairing proof, safety code
 - **Status:** done (4thtech/agentlink#37, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -3689,12 +3689,13 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 #### M2-4a · contracts: OCCRegistry
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2
 - **Repo/path:** occ-v2-contracts · src/OCCRegistry.sol
-- **Depends on:** M1-3e, M1-1h (AgentCard vectors), M1-1i (Registration vectors), M1-3j (Chiado M1 stage deployed, D-63); gap G-20 resolved
+- **Depends on:** M1-3e, M1-1h (AgentCard vectors), M1-1i (Registration vectors), M1-3j (Chiado M1 stage deployed, D-63); G-20 resolved by D-81
 - **Spec:** 05 §4, §5, §6, §7; 04 §2.4, §7 (public-card abuse)
 - **Invariants:** I-6
 - **Scope:**
   - `register(card, cardOwnerSig, cardAgentSig, reg, regOwnerSig)`: both card signatures over the chain-agnostic AgentCard domain; `regOwnerSig` over `Registration` in the OCC v2 chain domain authorises fees; `REGISTER` fee charged to `card.ownerEvm` through the vault.
-  - Higher `keyEpoch` from the same owner replaces the entry; `revoke` with an owner signature (struct per G-20); `getAgent`; events.
+  - Higher `keyEpoch` from the same owner replaces the entry; `revoke(Revocation, ownerSig)` with an owner signature; `getAgent`; events.
+  - The private contracts repo must implement the 05 §4 `Revocation` struct and its nonce, epoch and pause rules exactly as specified (D-81).
   - Registered as a vault module; CREATE3 deployment to both testnets via the M1-3g script as stage `m2-registry` of the testnet campaign (05 §9.1, proposed), on each chain after its M1 stage, so the Chiado M1 stage (M1-3j) must exist first (private repo, Free-plan controls apply).
 - **Acceptance:**
   - Registering a public card with an attacker-chosen `appId` and no `regOwnerSig` fails; replayed registration and revoke rejected; ERC-1271 owner works.
@@ -4551,13 +4552,13 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 17. **G-17 (L) EIP-3009 flag location.** 05 §2.2 has no on-chain flag; 05 §2.5 says "flagged in the chain config". *Proposed:* off-chain flag (client + submitter), contract relies on the token call reverting. *Blocks:* M1-3c.
 18. **G-18 (L) GA undefined.** 05 §5 freezes the Notary "at GA"; 10 has no GA milestone. *Blocks:* M4-EPIC.
 19. **G-19 (M) Who pays `REGISTER`.** 05 §4 charges `card.ownerEvm`; there is no owner top-up flow (J3 is for agents) and local owner keys are presence-gated. *Proposed:* allow the agent to pay under the owner's `regOwnerSig`, or add owner credits to the console. *Blocks:* M2-4b.
-20. **G-20 (M) Revocation typed data.** 05 §4 `revoke(agentEvm, nonce, deadline, ownerSig)` has no EIP-712 struct; nonce rules for `Registration` and revoke unspecified. *Blocks:* M1-1i-b (vectors), M2-4a.
+20. **G-20 (M) Revocation typed data.** **RESOLVED (D-81, Tali, in chat, 17 Oct 2026):** 05 §4 `Revocation` struct, owner-signed (EIP-712, OCC v2 chain domain, ERC-1271 accepted); random single-use nonces per owner shared with `Registration` (`usedNonces[ownerEvm][nonce]`); reverts on expiry, reuse or a `keyEpoch` other than the stored one; revoke works while paused. *Was:* 05 §4 `revoke(agentEvm, nonce, deadline, ownerSig)` has no EIP-712 struct; nonce rules for `Registration` and revoke unspecified. *Blocks:* M1-1i-b (vectors), M2-4a.
 21. **G-21 (M) Measuring beta metrics without analytics.** 02 §7 and 10 gates vs 08 §2.3 and zero access. *Proposed:* moderated sessions plus opt-in, local-only timing exported by testers. *Blocks:* M1-GATE, M2-GATE.
 22. **G-22 (M) Owner archive mechanics.** 04 §4; 02 F-33; 06 §3: whose storage credentials, how the file key reaches the owner, who deletes. *Blocks:* M2-9.
 23. **G-23 (M) `agentId` undefined.** Resolved by branch `docs/G-23-G-28-agentid-safety-code` (pending owner; proposed, owner confirms at merge), with G-28: `agentId` is the agent's EVM address (`agentlink/v1/evm`, epoch 0), `0x` + 40 lowercase hex, the same value as card `agentEvm`, owner-action `agent` (D-58), `terms.parties` and the commitment scope, so never a second binding (04 §2.9). Derived from the seed and checked on every seed load (keychain and `ALKS`). Invites and handshakes carry `cardAgentSig`, and a handshake is accepted only from the card's own `agentNostr`, so an owner cannot claim another agent's address and a replayed card completes nothing. One contact per `agentId`; a re-pair needs unchanged owner keys and takes effect only on completion. Object keys use a random per-agent `storagePrefix`, never the address (07 §5.2). Owner and agent fingerprints are tagged hashes, short form `7F3A·19C2`, display only and never an authenticator. *Was:* Used in 04 §2.2 (keychain account), 06 §6, 07 §3, 07 §5.2 (object key). The object-key path also gives every recipient of a presigned URL a stable per-agent identifier. *Proposed:* define `agentId`; use a random per-agent prefix in object keys. Owner actions bind the canonical EVM address, not `agentId` (G-29), and `agentId` must not become a second binding. *Blocks:* M1-6a, M1-7a, M1-8a.
 24. **G-24 (M) Relays for owner copies.** RESOLVED by 4thtech/agentlink#51 (D-65; accepted by Tali, 2026-10-14, at merge, with every value below), in 07 §4.3, with pointers in 04 §3.1.1, §3.4.1, §3.5 and §4, the relay columns in 07 §3 and §3.6, and 08 §2.2. Each gift wrap goes to the relay list of the agent it concerns (the recipient's agent and owner to the recipient's list, the sender's agent and owner to the sender's own list, the union when one owner owns both agents), and an owner surface subscribes with `ownerNostr` on the bootstrap set (the release's default relays plus the owner's own Settings entries) and the lists of all its agents, inside the `OwnerSession`. A list counts only if it hashes to the `relaysHash` of a card whose `cardSig` is the owner's own; the surface learns it by signing the card, from owner copies of the agent's `handshake` or `card-update`, or from the owner link. A new owner-channel `card-update` (amends D-58) tells the owner of every new card, even with no contacts. Own lists hold 2–8 relays (3–5 by default), received lists 1–16 (unchanged); a relay change is a rotation, and the old list stays in use for 30 days. The console keeps at most 32 live connections and syncs the rest in turns. Kinds 10002 and 10050, relay hints and NIP-11 are never sources. Linkability through `ownerNostr` is stated, not removed. After IR-G-24-1 (also accepted at that merge): invite, `handshake` and `handshake-ack` lists must match `relaysHash` and `nameHash` (04 §3.6); `handshake-ack` carries `relays` (amends D-58; M1-2d); lists carried with a card hold 2–16 relays; a relay change is refused while an overlap runs; the owner `card-update` is also sent at `init`, re-published every 24 h during an overlap and every 7 days otherwise, and also published to the release default set; no agent-directory event kind now (a directory, if wanted, goes into the G-36 owner-backup blob); the 15-minute sync turn is a target. New cards M1-2d and M1-7j. The two D-58 amendments (owner-channel `card-update`, `handshake-ack` `relays`) are recorded as D-65 (accepted) in the decision log (00-README). After round 2: a 9-day look-back on a surface's first sync of a relay with no cursor, and a per-agent Advanced opt-out from announcing on the default relays, with its privacy cost stated. *Was:* 04 §3.5; 07 §4.2; 08 §2.2. AgentCard carries only the agent's `relaysHash`; owners have no relay list. *Proposed:* each owner copy goes to the relays of the agent it concerns; the console subscribes to all its agents' relays. *Blocks:* M1-5b, M2-2d.
 25. **G-25 (M) `agentlink_verify_proof_pack {path}`.** 06 §2.4 lets a tool read a caller-chosen file, against 06 §1 rule 4. *Proposed:* `json` only, or `path` restricted to `proofs.exportFolder`/inbox with realpath checks. *Blocks:* M1-9d.
-26. **G-26 (L) STREAM header not authenticated.** 04 §4: AAD is `u8(isFinal)` only; header fields rely on `ciphertextSha256`. *Proposed:* AAD = header ‖ isFinal, decided before vectors freeze. *Blocks:* M1-1d, M1-1i-b.
+26. **G-26 (L) STREAM header not authenticated.** **RESOLVED (D-80, Tali, in chat, 17 Oct 2026):** 04 §4 chunk AAD = `header (17 B) ‖ u8(isFinal)`. *Was:* 04 §4: AAD is `u8(isFinal)` only; header fields rely on `ciphertextSha256`. *Proposed:* AAD = header ‖ isFinal, decided before vectors freeze. *Blocks:* M1-1d, M1-1i-b.
 27. **G-27 (L) Inline file vs envelope size.** 04 §3.5; 02 F-30; 06 §2.3. A 12 KB file, base64-encoded inside an encrypted, base64-encoded payload with four recipient wraps, is already near 24 KB before any text. *Proposed:* "inline only if the final envelope ≤ 24 KB". *Blocks:* M1-7f.
 28. **G-28 (L) Safety-code encoding.** Resolved by branch `docs/G-23-G-28-agentid-safety-code` (pending owner; proposed, owner confirms at merge), with G-23: a commit-then-reveal code (04 §3.6.1). The invite commits to A's nonce, B's handshake adds its nonce, A's ack reveals; `digest = taggedHash("agentlink/safety-code/v1", cardHashA ‖ cardHashB ‖ inviteId ‖ nonceA ‖ nonceB)`, shown as `u64(digest[0..8]) mod 10^12` in three groups of four digits. Keys-only codes can be ground offline: 2^(t/2) per leg if B's card is known in advance, otherwise 2^t, so no short keys-only code is safe. With the commitment, a MITM matches with probability 10^-12 per attempt. Surfaces recompute the code from the signed handshake and ack, never from a stored digest (IR-G2328-1). The code is shown only on owner surfaces, never in MCP results; "checked" needs an owner-signed `contact.check`; it survives a `card-update` and changes on re-pair. Rated L as an encoding gap, but the old construction was also grindable. *Was:* 04 §3.6: the first 40 bits (2^40 ≈ 1.1 × 10^12) do not fit 12 decimal digits, the format 11 §1 and §8 specify. *Blocks:* M1-1f, M1-1h.
 29. **G-29 (M) Owner-operation payload bodies.** Resolved by PR #10 (D-58, confirmed by the owner at merge): one owner-signed object, `SignedOwnerAction` (04 §2.5.1, BIP-340 by the owner Nostr key over a tagged hash, bound to the agent's EVM address, with nonce and expiry), is produced by the local UI, the CLI and the console; `approval`, `policy` and `revoke` envelopes only carry it. Bodies for `approval-request`, `approval`, `policy`, `revoke`, `card-update` and `handshake-ack` in 04 §3.4.1, with receiver rules and the rule that no MCP tool can create them. Lifetimes stay with G-7, policy fail-closed with G-6. *Was:* 04 §3.4 listed these types without body schemas. *Blocks:* M1-2a, M2-2e.
