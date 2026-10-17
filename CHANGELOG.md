@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Added
 
+- Test vectors (M1-1i, S2): two new suites, pending until their code lands. `eip712-proof` (M1-1j) covers EIP-712 hashing of `Record`, `Receipt` and `Registration` under the OCC v2 chain domain, the recipient commitment, and the `Record`/`Receipt` JSON-form rejections. `prf-wrap` (M1-1k) covers the passkey PRF salt and wrap key (04 §2.3). STREAM and revoke vectors wait for G-26 and G-20 (new card M1-1i-b).
 - CLI (M1-9w, S1): `agentlink init --harness claude-desktop` sets up the Claude desktop app (macOS and Windows; its own `claude_desktop_config.json`, not Claude Code's file), with the usual diff, confirmation, backup and refusal of malformed files. On Linux it says the app isn't available there.
 
 ### Fixed
