@@ -6,10 +6,25 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Added
+
+- Dogfood tooling (M1-23-b): `tools/dogfood/run.mjs --role a|b` runs the pairing, messages, owner approvals and the J8 negotiation across two Macs, one agent per Mac, with the invite link and run ID exchanged by hand; `--same-owner` for one person at both Macs. Single-machine mode is unchanged. Runbook RB-17 section 10 has the commands.
+- Test vectors (M1-1i, S2): two new suites, pending until their code lands. `eip712-proof` (M1-1j) covers EIP-712 hashing of `Record`, `Receipt` and `Registration` under the OCC v2 chain domain, the recipient commitment, and the `Record`/`Receipt` JSON-form rejections. `prf-wrap` (M1-1k) covers the passkey PRF salt and wrap key (04 §2.3). STREAM and revoke vectors wait for G-26 and G-20 (new card M1-1i-b).
+- CLI (M1-9w, S1): `agentlink init --harness claude-desktop` sets up the Claude desktop app (macOS and Windows; its own `claude_desktop_config.json`, not Claude Code's file), with the usual diff, confirmation, backup and refusal of malformed files. On Linux it says the app isn't available there.
+
+### Fixed
+
+- CLI (M1-9w, S1): Gemini CLI is detected by the `gemini` program or `~/.gemini/settings.json`, so a computer with only Antigravity's `~/.gemini/config/mcp_config.json` is offered Antigravity, not Gemini CLI.
+
 ### Changed
 
-- CI (OPS-CI-4, S2, process): new `sync-pin` job in `security.yml` (push to `main`, weekly) fails when the secret-scan stub on the `sync` branch is pinned to a commit older than the last change to `secret-scan.yml` or `.gitleaks.toml` on `main`; `sync-protocol.md` and `ci-cd.md` document the re-pin procedure.
+- CI (M1-9c-c, S2, process): new `bundle-check` job in `ci-gate`. It builds the CLI on a runner with no keychain and no native-module build and fails when the published `dist/agentlink.js` imports a crypto-capable MCP SDK transitive package (`jose`, `pkce-challenge`, `cookie-signature`, `etag`, `hono`), an SDK subpath outside the stdio set or an undeclared package, or when `src/tools/` bundled for a neutral (Worker) platform reaches a Node built-in, `@agentlink/node` or the MCP SDK (IR-M1-9c-1 F07, D-76, 06 §1). No new dependency: it reuses the repository's Vite. `docs/process/ci-cd.md` records it.
 
+- Spec (M1-9v, S1, 06 §4): the untrusted-content wrapper spec now says that every opening and closing `untrusted_content` tag inside content is escaped, look-alike forms included, as the code already does. No behaviour change.
+- `agentlink_propose_terms` and `agentlink_respond_to_terms` now pass `clientRequestId` to the core (M1-32-c, S1): a repeated call returns the original result and sends nothing more; a different request under the same key is `IDEMPOTENCY_KEY_REUSED`, a concurrent repeat is `IN_PROGRESS` (as `agentlink_send`), and a repeat whose approval has since been decided reports that approval's state.
+- CLI: an agent that has no card from its owner yet is now told so. `agentlink_status`, the other tools and `agentlink doctor` say to run `agentlink owner add-agent --agent <name>` in your own terminal instead of suggesting `init` (M1-9u). `owner add-agent` also explains the case where an owner exists but no agent here is attached to it.
+- OPS-REL-3: the "Version packages" PR now rolls `CHANGELOG.md` `[Unreleased]` into the version section (`tools/release/roll-changelog.mjs`), and a GitHub Release body over 125,000 characters falls back to a short note with a link.
+- CI (OPS-CI-4, S2, process): new `sync-pin` job in `security.yml` (push to `main`, weekly) fails when the secret-scan stub on the `sync` branch is pinned to a commit older than the last change to `secret-scan.yml` or `.gitleaks.toml` on `main`; `sync-protocol.md` and `ci-cd.md` document the re-pin procedure.
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.
 
 ## [0.1.0] - 2026-10-16

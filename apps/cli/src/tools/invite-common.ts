@@ -5,7 +5,7 @@
 import { CoreError } from '@agentlink/core';
 import { approvalIdSchema } from '@agentlink/types';
 import { fail, type HandlerOutput } from './result.js';
-import { TOOL_TEXT } from './text.js';
+import { noOwnerCard } from './text.js';
 
 export const INVITE_TEXT = Object.freeze({
   createdNext:
@@ -79,7 +79,7 @@ export function inviteFailure(error: unknown): HandlerOutput | undefined {
   if (!(error instanceof CoreError)) return undefined;
   switch (error.code) {
     case 'identity_missing':
-      return fail('needs_setup', TOOL_TEXT.noIdentity, TOOL_TEXT.setupNextStep);
+      return fail('needs_setup', noOwnerCard().summary, noOwnerCard().nextStep);
     case 'identity_revoked':
     case 'rotation_pending':
     case 'key_epoch_mismatch':
