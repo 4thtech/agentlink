@@ -2383,7 +2383,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - 07 text and the vectors agree; independent review; M2-3a lists these vectors as its conformance suite.
 
 #### M1-8h-b · node: owner-card follow-ups (new, IR-M1-8h-1 Lows)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (owner key and card signing, audit-rules §2.4) · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#227; L1 resolved by M1-9x #206) · **Size:** S · **Tier:** Opus · **Security:** S2 (owner key and card signing, audit-rules §2.4) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node, apps/cli
 - **Depends on:** M1-8h (merged)
 - **Spec:** 04 §2.4, §2.5; IR-M1-8h-1

@@ -17,6 +17,11 @@ export interface OwnerTerminal {
   readSecret(label: string): Promise<Uint8Array>;
   /** Asks a visible yes/no question; anything but y or yes is no. */
   confirm(question: string): Promise<boolean>;
+  /**
+   * M1-8h-b: reads one visible line of non-secret text (the display name at `owner init`). Optional:
+   * a terminal without it is never asked, and the caller keeps its default.
+   */
+  readText?(label: string): Promise<string>;
   /** Clears the screen and the scrollback after a generated code was shown (04 §2.8). */
   clearScreen(): void;
 }
@@ -175,6 +180,16 @@ export function ttyOwnerTerminal(streams: TtyStreams = {}): OwnerTerminal {
         const text = new TextDecoder().decode(answer).trim().toLowerCase();
         wipe(answer);
         return text === 'y' || text === 'yes';
+      });
+    },
+    readText(label: string): Promise<string> {
+      return serial(async () => {
+        output.write(`${label} `);
+        const answer = await readLine(input, output, true);
+        // Invalid UTF-8 becomes U+FFFD, which the caller's rule refuses.
+        const text = new TextDecoder().decode(answer);
+        wipe(answer);
+        return text;
       });
     },
     clearScreen(): void {
