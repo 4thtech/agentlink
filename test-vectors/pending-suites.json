@@ -4,10 +4,6 @@
     "eip712-proof": {
       "card": "M1-1j",
       "phase": "M1b"
-    },
-    "prf-wrap": {
-      "card": "M1-1k",
-      "phase": "M1b"
     }
   },
   "cases": {}

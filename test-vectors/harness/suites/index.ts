@@ -15,6 +15,7 @@ import { ownerWrap } from './owner-wrap';
 import { pairing } from './pairing';
 import { pairingBodies } from './pairing-bodies';
 import { placeholderSha256 } from './placeholder-sha256';
+import { prfWrap } from './prf-wrap';
 import { safetyCode } from './safety-code';
 import { safetyCodeRecompute } from './safety-code-recompute';
 import { taggedHashSuite } from './tagged-hash';
@@ -43,6 +44,7 @@ export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['pairing', pairing],
   ['pairing-bodies', pairingBodies],
   ['placeholder-sha256', placeholderSha256],
+  ['prf-wrap', prfWrap],
   ['safety-code', safetyCode],
   ['safety-code-recompute', safetyCodeRecompute],
   ['tagged-hash', taggedHashSuite],
