@@ -30,6 +30,8 @@ import {
   SyncService,
   countRateTx,
   type CatchUpResult,
+  type InboxSubscription,
+  type SubscribeInboxOptions,
   type SyncInboxOptions,
   type SyncInboxResult,
 } from './sync.js';
@@ -205,6 +207,16 @@ export class AgentLinkClient {
   }
 
   /**
+   * A live relay subscription for the MCP background loop (M1-9s; 06 §6, 07 §4.1): new envelopes
+   * on the own relays are stored and processed as they arrive, through the same receive path as
+   * `syncInbox` (dedup by gift-wrap id and envelopeHash, one store transaction, rate limit). Only
+   * the publisher-lease holder opens one; close it on lease loss and before the store closes.
+   */
+  subscribeInbox(options?: SubscribeInboxOptions): Promise<InboxSubscription> {
+    return this.#sync.subscribeInbox(options);
+  }
+
+  /**
    * The fetch-only catch-up for read-only callers (M1-7h addendum, D-73; 06 §2.0): fetches and
    * stores envelopes and counts them by sender. Processes nothing: no handshake, ack, card update,
    * receipt or read mark.
@@ -249,11 +261,13 @@ export class AgentLinkClient {
   }
 
   /**
-   * Closes the relay connections of this client's transport (idempotent; a no-op without one).
+   * Ends any live subscription and closes the relay connections of this client's transport
+   * (idempotent; a no-op without one).
    * One-shot callers (the CLI commands) call it when they are done so the process can end. It
    * closes neither the store nor the KeyStore: those belong to whoever opened them.
    */
   close(): void {
+    this.#sync.closeSubscriptions();
     this.outbox.closeTransport();
   }
 

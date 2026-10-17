@@ -7,7 +7,12 @@
 // nothing; `publish` sends one stored, signed wrap to exactly the relays its row lists (07 §4.3: a
 // wrap never goes to a relay outside its row's list). `sync` joins with M1-7h: one catch-up pass
 // through transport-nostr's SyncEngine (cursor, paging, dedup by gift-wrap id), sharing the pool,
-// over the persistence the core gives it (`sync_cursors`, `seen`). `subscribe` joins later.
+// over the persistence the core gives it (`sync_cursors`, `seen`). `subscribe` (M1-9s) is the live
+// form of `sync` with the same handler shape (07 §4.1): the SyncEngine reads each relay's backlog
+// from its cursor (the 48 h look-back), then keeps a live REQ open, and reconnects a lost relay with
+// a doubling delay (5 s up to 5 min), reading the backlog again from the cursor on each reconnect.
+// `sync` and `subscribe` over one persistence share one engine, so a wrap seen by both at once is
+// opened and handed to the core once (its in-flight and processed caches; the seen-set behind them).
 //
 // The runtime supplies the relay I/O (connector, address check, NIP-11; packages/node for Node,
 // 07 §4.2), so the core opens no socket itself. The core supplies the keys: the agent's KeyStore
@@ -27,6 +32,7 @@ import {
   type SyncPersistence,
   type SyncResult,
   type Timers,
+  type Unsubscribe,
   type WrappedEnvelope,
 } from '@agentlink/transport-nostr';
 
@@ -42,6 +48,20 @@ export interface TransportSyncOptions {
   /** Time budget in milliseconds (06 §6: 3 s by default). */
   readonly budgetMs?: number;
 }
+
+/** A live subscription (07 §4.1 `subscribe`; M1-9s): the same handler shape as `sync`. */
+export interface TransportSubscribeOptions {
+  /** The agent's own relays (07 §4.3), 1 to 64. */
+  readonly relays: readonly string[];
+  /** The agent's own Nostr keys with their epochs: the `#p` of the REQ. */
+  readonly identities: readonly SyncIdentity[];
+  /** The core's `sync_cursors` and `seen` (07 §3.2). The same object as for `sync`. */
+  readonly persistence: SyncPersistence;
+  readonly onEnvelope: EnvelopeHandler;
+}
+
+/** Ends a live subscription: sends CLOSE on each relay and stops its reconnects. Idempotent. */
+export type TransportUnsubscribe = Unsubscribe;
 
 /** The transport as the core's send pipeline and outbox use it (07 §4.1, split as above). */
 export interface Transport {
@@ -62,6 +82,13 @@ export interface Transport {
    * (`transport_unavailable`).
    */
   sync?(options: TransportSyncOptions): Promise<SyncResult>;
+  /**
+   * A live subscription (M1-9s): reads each relay's backlog like `sync`, then hands each new wrap
+   * to `onEnvelope` as it arrives; a lost relay is reconnected with backoff. Optional: without it
+   * the client cannot subscribe (`transport_unavailable`) and callers poll with `sync`.
+   * @throws TransportError for bad arguments (no relays, no keys).
+   */
+  subscribe?(options: TransportSubscribeOptions): TransportUnsubscribe;
   /**
    * Closes every relay connection and ends what waits on one. Idempotent. Optional: a transport
    * that holds nothing open has nothing to close. A one-shot command calls it so the process can
@@ -134,6 +161,12 @@ export function nostrTransport(options: NostrTransportOptions): TransportFactory
           identities: sync.identities,
           onEnvelope: sync.onEnvelope,
           ...(sync.budgetMs === undefined ? {} : { budgetMs: sync.budgetMs }),
+        }),
+      subscribe: (live) =>
+        engineFor(live.persistence).subscribe({
+          relays: live.relays,
+          identities: live.identities,
+          onEnvelope: live.onEnvelope,
         }),
     };
   };

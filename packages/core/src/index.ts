@@ -180,7 +180,9 @@ export {
   type Transport,
   type TransportDeps,
   type TransportFactory,
+  type TransportSubscribeOptions,
   type TransportSyncOptions,
+  type TransportUnsubscribe,
 } from './transport.js';
 export {
   OUTBOX_CLAIM_SECONDS,
@@ -225,6 +227,9 @@ export {
   SyncService,
   type CatchUpResult,
   type FetchSummary,
+  type InboxProcessed,
+  type InboxSubscription,
+  type SubscribeInboxOptions,
   type SyncInboxOptions,
   type SyncInboxResult,
 } from './sync.js';

@@ -228,7 +228,8 @@ const until = (signal: () => boolean | Promise<boolean>): Promise<void> =>
 
 /** Lets queued microtasks and immediate callbacks run. */
 const settle = async (): Promise<void> => {
-  for (let i = 0; i < 5; i += 1) await new Promise((r) => setTimeout(r, 0));
+  const timers = globalThis as unknown as { setTimeout(cb: () => void, ms: number): unknown };
+  for (let i = 0; i < 5; i += 1) await new Promise<void>((r) => timers.setTimeout(r, 0));
 };
 
 /** The live REQs (limit 0) open on `relays`. */
@@ -348,7 +349,8 @@ describe('subscribeInbox (M1-9s; 07 §4.1, §4.2; 06 §6)', () => {
     const base = nostrTransport({ connector: net, addressCheck: 'platform' });
     const noSubscribe: TransportFactory = (deps) => {
       const full: Transport = base(deps);
-      const { subscribe: _omit, ...rest } = full;
+      const rest: Transport = { ...full };
+      delete rest.subscribe;
       return rest;
     };
     const b = await openAgent(2, 'bob', RELAYS_B, net, { transport: noSubscribe });

@@ -2674,7 +2674,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Note (IR-M1-7k-1 Q3, 2026-10-15):** the outbox needs no leader: M1-7k's per-row claim already lets only one process publish each row. For relay subscriptions, use a per-agent lease row with compare-and-set (a random holder ID, a 60 s lease renewed every 20 s, takeover once it lapses), as the idempotency lease does (07 §3.3); this needs a store table and a migration. Do not hold the M1-8b inter-process lock for this: a long-lived holder would block the policy-mark and file-KeyStore critical sections (`store_busy` after 10 s). Receiving is idempotent (seen-set, envelopeHash, one store transaction), so a lapsed or doubled holder only costs extra relay connections.
 
 #### M1-9s · core: live relay subscriptions (Transport.subscribe) for the background loop (new, IR-M1-9r-1 L2)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/core/**`, the receive path) · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/core/**`, the receive path) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core, packages/transport-nostr, apps/cli (`src/mcp/loop.ts`)
 - **Depends on:** M1-9r
 - **Spec:** 06 §6; 07 §4.1 (`subscribe` follows the same handler shape as `sync`), §4.2

@@ -107,7 +107,8 @@ class RelayNetwork implements RelayConnector {
     };
     const drop = (subId?: string): void => {
       for (const sub of [...this.subs]) {
-        if (sub.push === push && (subId === undefined || sub.subId === subId)) this.subs.delete(sub);
+        if (sub.push === push && (subId === undefined || sub.subId === subId))
+          this.subs.delete(sub);
       }
     };
     void Promise.resolve().then(() => handlers.onOpen());
