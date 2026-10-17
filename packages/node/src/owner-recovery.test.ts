@@ -9,7 +9,7 @@
 // SQLite store per agent, the keychain owner store and the core client).
 // - After every agent is removed, add-agent succeeds and the new card names the same owner.
 // - With an AI-app marker set it is refused BEFORE the owner item is read.
-// - No owner code appears in the output or in any log line.
+// - No owner code appears in the output, an error or the result.
 // - Declining the fingerprint, or three wrong entries, writes nothing; the owner item is never
 //   written or removed.
 // - A store-only check tells whether the owner item exists, without unlocking anything.
@@ -18,7 +18,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AgentLinkClient, type ApprovalChannel } from '@agentlink/core';
 import { encodeUtf8, equalBytes, verifyAgentCard, type KeyStore } from '@agentlink/crypto';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';
 import { NodeKeyStoreError } from './errors.js';
 import { addAgentToOwner } from './index.js';
@@ -73,7 +73,6 @@ beforeEach(async () => {
   keychain = new MapKeychain();
 });
 afterEach(async () => {
-  vi.restoreAllMocks();
   for (const agent of opened.splice(0)) {
     await agent.keyStore.close();
     await agent.store.close();
@@ -174,25 +173,6 @@ async function failure(fn: () => Promise<unknown>): Promise<{ code: string; mess
   throw new Error('expected a refusal');
 }
 
-/** Every line any console method or stderr/stdout write received while `fn` ran. */
-async function logged(fn: () => Promise<unknown>): Promise<string> {
-  const lines: string[] = [];
-  const capture = (...args: unknown[]): void => void lines.push(args.map(String).join(' '));
-  for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const) {
-    vi.spyOn(console, method).mockImplementation(capture);
-  }
-  vi.spyOn(process.stderr, 'write').mockImplementation((chunk: unknown) => {
-    lines.push(String(chunk));
-    return true;
-  });
-  try {
-    await fn();
-  } finally {
-    vi.restoreAllMocks();
-  }
-  return lines.join('\n');
-}
-
 describe('owner add-agent with no agent naming the owner (M1-9x; 04 §2.8)', () => {
   it('after every agent is removed, a new agent gets a card naming the same owner', async () => {
     const alice = await initAgent('alice');
@@ -204,17 +184,14 @@ describe('owner add-agent with no agent naming the owner (M1-9x; 04 §2.8)', () 
 
     const bob = await initAgent('bob');
     const run = ownerTyping([code], true);
-    let result: Awaited<ReturnType<typeof addAgentWith>> | undefined;
-    const logs = await logged(async () => {
-      result = await addAgentWith(keychain, run.terminal, {
-        backend: 'keychain',
-        env: {},
-        card: firstCard(bob, 'bob'),
-      });
+    const result = await addAgentWith(keychain, run.terminal, {
+      backend: 'keychain',
+      env: {},
+      card: firstCard(bob, 'bob'),
     });
 
     const b = await bob.client.identity.get();
-    if (b === undefined || result === undefined) throw new Error('missing identity');
+    if (b === undefined) throw new Error('missing identity');
     expect(verifyAgentCard(b.card, b.cardSig, b.cardAgentSig)).toBe(true);
     expect(b.card.agentEvm).toBe(bob.agentId);
     for (const key of ['ownerEvm', 'ownerNostr', 'ownerEnc'] as const) {
@@ -230,13 +207,12 @@ describe('owner add-agent with no agent naming the owner (M1-9x; 04 §2.8)', () 
     expect(ownerItem !== undefined && after !== undefined && equalBytes(after, ownerItem)).toBe(
       true,
     );
-    // No secret in the output or the logs.
-    const output = [...run.written, ...run.questions].join('\n');
+    // No secret in the output or the result. (@agentlink/node has no log channel: ESLint refuses
+    // console and process.stdout/stderr there, eslint.config.mjs CONSOLE_SYNTAX.)
+    const output = [...run.written, ...run.questions, JSON.stringify(result)].join('\n');
     expect(output).toContain('bob');
     expect(output).not.toContain(code);
     expect(output).not.toContain(code.replaceAll(' ', ''));
-    expect(logs).not.toContain(code);
-    expect(logs).not.toContain(code.replaceAll(' ', ''));
   });
 
   it('refuses with an AI-app marker set, before the owner item is read', async () => {

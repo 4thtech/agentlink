@@ -134,10 +134,8 @@ async function addAgentOne(deps: OwnerCommandDeps, context: CommandContext): Pro
   }
   // Closed while the other agents are read, so one process never holds two of them open at once.
   const found = await machineOwner(deps, agent.name).finally(() => agent.close());
-  if (found.status !== 'one') {
-    output.printError(
-      found.status === 'none' ? OWNER_TEXT.addAgentNoOwner : OWNER_TEXT.addAgentSeveralOwners,
-    );
+  if (found.status === 'several') {
+    output.printError(OWNER_TEXT.addAgentSeveralOwners);
     return EXIT_FAILED;
   }
   const again = await openOne(deps, output, name);
@@ -145,7 +143,9 @@ async function addAgentOne(deps: OwnerCommandDeps, context: CommandContext): Pro
   try {
     await deps.addAgent({
       backend,
-      owner: found.owner,
+      // M1-9x: no other agent names an owner, so node takes the owner keys from the owner item
+      // itself (after the owner code), or refuses with `owner init` when there is none.
+      ...(found.status === 'one' ? { owner: found.owner } : {}),
       // Read for AI-app markers only (04 §2.8), never for a secret.
       env: terminal.env,
       card: {

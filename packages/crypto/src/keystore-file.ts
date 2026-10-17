@@ -559,11 +559,17 @@ export function sealOwnerSeed(
   return sealOwnerSeedWithNonceUnsafe(kek, randomBytes(AES_GCM_NONCE_LENGTH), seed, options);
 }
 
+/**
+ * Module-private marker for openOwnerSeedWithoutCard: no card names the owner, so there is no
+ * expected owner to compare with. Never reachable through a caller's `expected` argument.
+ */
+const WITHOUT_CARD: unique symbol = Symbol('openOwnerSeed.withoutCard');
+
 /** openOwnerSeed without the prompt-only rule (shared with ownerSecretUnlocks). */
 async function openOwnerSeedFrom(
   blob: Uint8Array,
   secret: KeystoreUnlockSecret,
-  expected: ExpectedOwner,
+  expected: ExpectedOwner | typeof WITHOUT_CARD,
   options: { readonly fileKeystoreMachine: boolean },
 ): Promise<Uint8Array> {
   assertBytes(blob, 'openOwnerSeed: blob');
@@ -571,12 +577,13 @@ async function openOwnerSeedFrom(
     throw new CryptoInputError('invalid_argument', 'openOwnerSeed: secret must be an object');
   }
   if (
-    typeof expected !== 'object' ||
-    expected === null ||
-    !(expected.ownerEvm instanceof Uint8Array) ||
-    expected.ownerEvm.length !== 20 ||
-    !(expected.ownerNostr instanceof Uint8Array) ||
-    expected.ownerNostr.length !== 32
+    expected !== WITHOUT_CARD &&
+    (typeof expected !== 'object' ||
+      expected === null ||
+      !(expected.ownerEvm instanceof Uint8Array) ||
+      expected.ownerEvm.length !== 20 ||
+      !(expected.ownerNostr instanceof Uint8Array) ||
+      expected.ownerNostr.length !== 32)
   ) {
     throw new CryptoInputError(
       'invalid_argument',
@@ -612,6 +619,11 @@ async function openOwnerSeedFrom(
     const aad = blob.subarray(0, COMMON_HEADER_LENGTH);
     seed = await aes256GcmOpen(kek.kek, header.nonce, blob.subarray(COMMON_HEADER_LENGTH), aad);
     if (seed === undefined || seed.length !== ALKO_SEED_LENGTH) throw openFailed();
+    if (expected === WITHOUT_CARD) {
+      const out = seed;
+      seed = undefined;
+      return out;
+    }
     const evm = derivePublicKey(seed, KEY_LABELS.evm, 0);
     const nostr = derivePublicKey(seed, KEY_LABELS.nostr, 0);
     if (
@@ -654,6 +666,30 @@ export function openOwnerSeed(
     );
   }
   return openOwnerSeedFrom(blob, secret, expected, options);
+}
+
+/**
+ * M1-9x (04 §2.8 "Adding an agent to the existing owner"): openOwnerSeed when no local agent card
+ * names the owner, so there is no expected owner to compare with (for example after every carded
+ * agent was removed). The caller derives the owner keys from the returned seed and has the owner
+ * confirm the owner fingerprint before anything is signed. Every other rule of openOwnerSeed holds:
+ * the secret only from a prompt, the same refusals before the KDF, and one generic `open_failed` for
+ * a wrong secret or a damaged blob. Wipe the returned seed when done.
+ */
+export function openOwnerSeedWithoutCard(
+  blob: Uint8Array,
+  secret: KeystoreUnlockSecret,
+  options: { readonly fileKeystoreMachine: boolean },
+): Promise<Uint8Array> {
+  if (typeof secret !== 'object' || secret === null || secret.source !== 'prompt') {
+    return Promise.reject(
+      new CryptoInputError(
+        'invalid_argument',
+        'openOwnerSeed: the owner secret comes from a prompt',
+      ),
+    );
+  }
+  return openOwnerSeedFrom(blob, secret, WITHOUT_CARD, options);
 }
 
 /**

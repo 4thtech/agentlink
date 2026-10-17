@@ -16,6 +16,11 @@
 // - It never shows, generates, changes or re-wraps the owner code and never writes or deletes the
 //   owner item: unlike `owner init` (M1-8h) there is no rollback that removes the owner item.
 //
+// M1-9x: when an owner item exists but no local agent has a card naming it (every carded agent was
+// removed), the owner keys come from the owner item itself: the owner code unwraps the seed, and the
+// owner confirms the resulting owner fingerprint before the one card is signed. Same guards, same
+// restricted session; `hasOwnerOnMachine` is the store-only check for `doctor` and messages.
+//
 // "Logical isolation, not a security boundary" (D-78): each agent keeps its own seed, store and Nostr
 // identity, and owner actions bind to one agent (04 §2.5.1), but every agent runs as the same OS user
 // (G-1, D-67).
@@ -40,7 +45,13 @@ import {
   type KeychainBackend,
 } from './keychain.js';
 import { FirstCardSession, type FirstAgentCard } from './owner-first-card.js';
-import { KeychainOwnerKeyStore, ownerFingerprintText, ownerKeysCopy } from './owner-keystore.js';
+import {
+  KeychainOwnerKeyStore,
+  ownerFingerprintText,
+  ownerItemPresent,
+  ownerKeysCopy,
+  storedOwnerSecretKind,
+} from './owner-keystore.js';
 import { assertPrintable, secretLabel } from './owner-operation.js';
 import { assertNoHarnessMarker, ttyOwnerTerminal, type OwnerTerminal } from './owner-terminal.js';
 
@@ -50,8 +61,12 @@ export interface AddAgentOptions {
   /**
    * The owner this computer's agents name (from another local agent's card). The stored owner seed
    * must derive exactly these keys, or the entry is refused like a wrong code (04 §2.8).
+   *
+   * M1-9x: omitted when no local agent has a card naming an owner. The owner keys are then taken
+   * from the owner item itself once the owner code unlocked it, and the owner confirms the owner
+   * fingerprint before the card is signed.
    */
-  readonly owner: OwnerPublicKeys;
+  readonly owner?: OwnerPublicKeys;
   /** Checked for AI-app markers; default process.env. Never read for a secret. */
   readonly env?: Readonly<Record<string, string | undefined>>;
   /** The agent being added: its first card is signed for exactly this agent. */
@@ -96,6 +111,15 @@ const COPY = {
     "The agent's card couldn't be signed. Your owner key wasn't changed. Run `agentlink owner add-agent` again.",
   cardUnknown:
     "Adding the agent didn't finish. Your owner key wasn't changed. Run `agentlink doctor` in your own terminal to see what is missing.",
+  // M1-9x: an owner item exists but no local agent's card names it.
+  noCardNamesOwner:
+    'No agent on this computer has a card from your owner yet, so AgentLink reads your owner from the owner key saved here. Your owner code unlocks it for this one card.',
+  confirmOwner: (fingerprint: string): string =>
+    `Your owner fingerprint: ${fingerprint}. Is this the one you saw at \`agentlink owner init\`? [y/N]`,
+  notConfirmed:
+    "Nothing was changed. If that isn't your owner fingerprint, the owner key on this computer isn't yours: don't use it, and run `agentlink doctor` in your own terminal.",
+  refusedWithoutCard:
+    "The owner code wasn't accepted three times. Nothing was changed. Check the code you saved when you ran `agentlink owner init`.",
   done: (name: string, fingerprint: string): string =>
     `OK       The agent "${name}" now has a card from your owner (${fingerprint}).`,
 } as const;
@@ -165,12 +189,14 @@ export async function addAgentWith(
   const { card } = options;
   assertAgentId(card.agent);
   assertPrintable(card.name, 'The agent name');
-  const owner = ownerKeysCopy(options.owner);
+  const owner = options.owner === undefined ? undefined : ownerKeysCopy(options.owner);
   // Never replaces a card (04 §2.8): an agent with a card already has an owner.
   if ((await card.identity.get()) !== undefined) {
     throw new NodeKeyStoreError('owner_exists', COPY.hasCard);
   }
   const timeoutMs = internals.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
+  // M1-9x: no local agent names the owner, so its keys come from the owner item itself.
+  if (owner === undefined) return addAgentWithoutCard(keychain, terminal, card, timeoutMs);
   let store: KeychainOwnerKeyStore;
   try {
     store = await KeychainOwnerKeyStore.open(keychain, owner, { timeoutMs });
@@ -185,22 +211,45 @@ export async function addAgentWith(
     terminal.write(COPY.owner(fingerprint));
     terminal.write(COPY.agent(card.name, agentFingerprintText(card.agent)));
     const inner = await unlockOnce(store, terminal);
-    const session = new FirstCardSession(inner, card.agent, owner);
-    try {
-      await card.identity.init({
-        owner: session,
-        ownerKeys: owner,
-        name: card.name,
-        relays: card.relays,
-      });
-    } catch {
-      // Decided below from what core stored, never from the error (whose text is not shown, I-5).
-    } finally {
-      await session.close();
-    }
+    await signFirstCard(inner, card, owner);
   } finally {
     await store.close();
   }
+  return storedCard(terminal, card, owner, fingerprint);
+}
+
+/**
+ * Signs and stores one first card for `card.agent` naming `owner`, through the restricted
+ * FirstCardSession over `inner`, which is closed afterwards. The outcome is decided by storedCard
+ * from what core stored, never from an error (whose text is not shown, I-5).
+ */
+async function signFirstCard(
+  inner: OwnerSession,
+  card: FirstAgentCard,
+  owner: OwnerPublicKeys,
+): Promise<void> {
+  const session = new FirstCardSession(inner, card.agent, owner);
+  try {
+    await card.identity.init({
+      owner: session,
+      ownerKeys: owner,
+      name: card.name,
+      relays: card.relays,
+    });
+  } catch {
+    // Decided by storedCard from what core stored.
+  } finally {
+    await session.close();
+  }
+}
+
+/** Success only for a verified stored card naming exactly this agent and this owner. */
+async function storedCard(
+  terminal: OwnerTerminal,
+  card: FirstAgentCard,
+  owner: OwnerPublicKeys,
+  fingerprint: string,
+): Promise<AddAgentResult> {
   let stored: Awaited<ReturnType<FirstAgentCard['identity']['get']>>;
   try {
     stored = await card.identity.get();
@@ -213,6 +262,72 @@ export async function addAgentWith(
   }
   terminal.write(COPY.done(card.name, fingerprint));
   return Object.freeze({ card: stored.card, fingerprint });
+}
+
+/**
+ * M1-9x: `owner add-agent` when an owner item exists on this machine but no local agent has a card
+ * naming it (for example after every carded agent was removed). The owner keys come from the owner
+ * item itself: the owner code (or opted-in passphrase), typed once, unwraps the seed, which derives
+ * them. With no card to compare against, the owner then sees the owner fingerprint and must confirm
+ * it before the one card is signed (04 §2.8 "What the owner sees first"; the fingerprint can only be
+ * known once the item is unlocked). Declining, or three wrong entries, writes nothing. The owner item
+ * is never written or removed.
+ */
+async function addAgentWithoutCard(
+  keychain: KeychainBackend,
+  terminal: OwnerTerminal,
+  card: FirstAgentCard,
+  timeoutMs: number,
+): Promise<AddAgentResult> {
+  // Header byte only: no secret is read and nothing is unlocked before the prompt.
+  const kind = await storedOwnerSecretKind(keychain, timeoutMs);
+  if (kind === null) throw new NodeKeyStoreError('owner_missing', COPY.noOwner);
+  terminal.write(COPY.noCardNamesOwner);
+  terminal.write(COPY.agent(card.name, agentFingerprintText(card.agent)));
+  const label = secretLabel(kind);
+  for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
+    const secret = await terminal.readSecret(label);
+    let unlocked: Awaited<ReturnType<typeof KeychainOwnerKeyStore.unlockWithoutCard>>;
+    try {
+      // unlockWithoutCard wipes the secret whether or not it unlocks.
+      unlocked = await KeychainOwnerKeyStore.unlockWithoutCard(
+        keychain,
+        { kind: 'passphrase', secret },
+        { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS, timeoutMs },
+      );
+    } catch (error) {
+      if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
+        if (attempt < ATTEMPTS - 1) terminal.write(COPY.wrong);
+        continue;
+      }
+      if (error instanceof NodeKeyStoreError && error.code === 'owner_missing') {
+        throw new NodeKeyStoreError('owner_missing', COPY.noOwner);
+      }
+      throw error;
+    }
+    const { store, session, owner } = unlocked;
+    const fingerprint = ownerFingerprintText(owner);
+    try {
+      if (!(await terminal.confirm(COPY.confirmOwner(fingerprint)))) {
+        throw new NodeKeyStoreError('owner_prompt_cancelled', COPY.notConfirmed);
+      }
+      await signFirstCard(session, card, owner);
+    } finally {
+      await session.close();
+      await store.close();
+    }
+    return storedCard(terminal, card, owner, fingerprint);
+  }
+  throw new NodeKeyStoreError('owner_secret_refused', COPY.refusedWithoutCard);
+}
+
+/**
+ * M1-9x: a store-only check for `doctor` and messages: true when an owner item exists on this
+ * computer. It reads no secret, asks for nothing and unlocks nothing (the AI-app guard does not
+ * apply: it reveals only whether owner setup was done).
+ */
+export function hasOwnerOnMachine(): Promise<boolean> {
+  return Promise.resolve().then(() => ownerItemPresent(osKeychain()));
 }
 
 /**

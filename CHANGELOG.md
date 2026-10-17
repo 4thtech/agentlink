@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Fixed
+
+- `agentlink owner add-agent --agent <name>` (M1-9x, S2): when an owner is set up on this computer but no agent has a card from it (for example after every agent was removed), it no longer dead-ends between `owner init` and `owner add-agent`. Your owner code unlocks the saved owner, you confirm the owner fingerprint, and the agent gets its card. Same rules as before: your own terminal only, refused inside an AI app, the owner key is never changed.
+
 ### Changed
 
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.

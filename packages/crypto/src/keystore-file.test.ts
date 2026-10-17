@@ -535,12 +535,9 @@ describe('owner secret source and the agent ≠ owner probes', () => {
     // openOwnerSeed still requires the expected owner: a missing one is refused, never skipped.
     await refusedWith(
       () =>
-        openOwnerSeed(
-          blob,
-          { secret: code, source: 'prompt' },
-          null as unknown as typeof OWNER,
-          { fileKeystoreMachine: false },
-        ),
+        openOwnerSeed(blob, { secret: code, source: 'prompt' }, null as unknown as typeof OWNER, {
+          fileKeystoreMachine: false,
+        }),
       'invalid_argument',
     );
   });
