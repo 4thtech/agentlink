@@ -3208,6 +3208,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - For at least two weeks the dogfood replaces the **personal handoff** part of the git sync branch for Tali and Denis (their own `<login>.md` handoff notes; `board.md` stays on git, `docs/process/sync-protocol.md`). The dogfood log records, per week, where AgentLink beat git and where it lost (for example missed messages, the session-start check skipped, or content that belonged on the board) (D-53).
   - No wallet, extension, gas or chain choice appeared in either setup (D-39); dogfood log (dates, harnesses, versions, issues filed) and owner sign-off recorded.
 
+#### M1-23-b · Dogfood: two-machine mode and runbook (new)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`tools/dogfood/**` and a runbook; sensitive path `docs/runbooks/**`: merges only on Tali's "merge") · **Phase:** M1b (after M1-23)
+- **Repo/path:** agentlink · `tools/dogfood/**`, `docs/runbooks/dogfood-m1a.md` (RB-17 section 10)
+- **Depends on:** M1-23 (the single-machine script and RB-17)
+- **Spec:** 10 "Gate M1" (J1, J4, J8 and the no-wallet UX rule, run by hand on two Macs); D-39, D-78; 04 §2.5 (approvals are typed by the owner)
+- **Invariants:** I-1, I-4, I-5
+- **Scope:**
+  - `tools/dogfood/run.mjs --role a|b`: Mac A (Claude Code) creates the invite and prints the exact Mac B command; Mac B (OpenCode) takes the invite by hand (`--invite`, or it asks) and accepts. The invite link and the run ID travel by hand; no SSH, no network between the Macs. Each Mac runs only its own harness and agent, keeps its own results folder, secret scan and pass/fail table, and confirms the other Mac's steps with Enter, `f` (failed) or `s` (skip). The table ends with the checks (J1, J4, J8, J9, I-5, F1) this Mac verified and the ones only the other Mac ran.
+  - `--same-owner` (one person types the approvals on both Macs) or the default of two owners (each types their own); each Mac still has its own owner key and code. Approvals are typed on the Mac that owns the agent (`agentlink approve --agent <name> <id>`); the script never approves, as in single-machine mode.
+  - Single-machine mode is unchanged. `--paired` for Macs whose agents are already contacts. `--cc-via opencode` runs Mac A through OpenCode when the claude CLI is missing; `--manual` has a person drive any chat app (Claude desktop, Antigravity) while the script prints the prompts and checks pairing through the CLI.
+  - RB-17 section 10 "Two-machine variant": prerequisites per Mac, the exact commands for both, what to expect, troubleshooting.
+- **Acceptance:** unit tests for the argument rules, the role split, the hand-off values, the exit status and the per-side summary; the invite link appears only in the Mac A terminal box and the Mac B argument or prompt (not in `results.md` or `results.json`; transcripts and prompt files hold it exactly as in single-machine mode). The agent and owner setup stay manual (owner presence). J2, J3 and J5 (files, credits, proof) are not part of this tool and wait for M1b.
+
 #### M1-9t · CLI: several agents under one OS user, and init for one harness (new, found by the M1-23 runbook)
 - **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1a (needed for the one-computer part of M1-23, not for the gate)
 - **Repo/path:** agentlink · apps/cli (`init`, `owner init`), packages/node (`initOwner`)

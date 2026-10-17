@@ -8,6 +8,14 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   OPENCODE_DENIED_PERMISSIONS,
+  checkSummary,
+  handoffBox,
+  manualBox,
+  parseRemoteAnswer,
+  remoteBox,
+  sideOf,
+  sideOk,
+  validInviteUrl,
   approvalBox,
   buildSteps,
   childEnv,
@@ -472,6 +480,235 @@ describe('step logic', () => {
     expect(md).toContain('| Step | What | Harness | Result | Time | Notes |');
     expect(md.split('\n').filter((l) => /^\| [A-Z]\d /.test(l))).toHaveLength(17);
     expect(md).toContain('Passed 17 of 17');
+  });
+
+  describe('two machines (M1-23-b)', () => {
+    const INVITE = 'https://example.test/i#secret-part';
+    const twoMac = (side, initialCtx, answers = []) => {
+      const asked = [];
+      const d = deps(happy());
+      d.side = side;
+      d.initialCtx = initialCtx;
+      d.waitRemote = (step, info) => {
+        asked.push([step.id, info.approval]);
+        return Promise.resolve(answers.shift() ?? 'ok');
+      };
+      return { d, asked };
+    };
+
+    it('Mac A runs Claude Code steps and waits for B on the OpenCode ones', async () => {
+      const { d, asked } = twoMac('cc', {});
+      const { results } = await runPlan(steps, d);
+      const mine = steps.filter((s) => s.harness === 'cc').map((s) => s.id);
+      expect(results.filter((r) => r.local).map((r) => r.id)).toEqual(mine);
+      expect(results.filter((r) => r.local).every((r) => r.outcome === 'pass')).toBe(true);
+      expect(asked.map(([id]) => id)).toEqual(
+        steps.filter((s) => s.harness === 'oc').map((s) => s.id),
+      );
+      // The wait for B's accept names the approval, the others do not.
+      expect(asked.filter(([, approval]) => approval).map(([id]) => id)).toEqual(['P2']);
+      expect(sideOk(results)).toBe(true);
+    });
+
+    it('Mac B takes the invite by hand and waits for A on the Claude Code steps', async () => {
+      const { d, asked } = twoMac('oc', { inviteUrl: INVITE });
+      const { results } = await runPlan(steps, d);
+      expect(results.find((r) => r.id === 'P1')).toMatchObject({
+        outcome: 'skip',
+        benign: true,
+        notes: ['given by hand'],
+      });
+      expect(asked.map(([id]) => id)).not.toContain('P1');
+      expect(results.filter((r) => r.local).every((r) => r.outcome === 'pass')).toBe(true);
+      expect(results.find((r) => r.id === 'T7').outcome).toBe('pass');
+      expect(sideOk(results)).toBe(true);
+    });
+
+    it('a failure reported for the other Mac skips what depends on it and fails the run', async () => {
+      // Mac A: B's P2 (the accept) failed, so P4 lacks inviteApproval and is skipped.
+      const { d } = twoMac('cc', {}, ['fail']);
+      const { results } = await runPlan(steps, d);
+      expect(results.find((r) => r.id === 'P2').outcome).toBe('remote-fail');
+      expect(results.find((r) => r.id === 'P4')).toMatchObject({ outcome: 'skip' });
+      expect(sideOk(results)).toBe(false);
+    });
+
+    it('a local failure fails the run', async () => {
+      const script = happy();
+      script.M1 = runOf([]);
+      const { d } = twoMac('cc', {});
+      d.run = (h, step) => Promise.resolve(script[step.id] ?? runOf([]));
+      const { results } = await runPlan(steps, d);
+      expect(results.find((r) => r.id === 'M1').outcome).toBe('fail');
+      expect(sideOk(results)).toBe(false);
+    });
+
+    it('already paired: B skips the pairing steps and never waits for A to invite', async () => {
+      const { d, asked } = twoMac('oc', { alreadyPaired: true });
+      const { results } = await runPlan(steps, d);
+      for (const id of ['P1', 'P2', 'P3']) {
+        expect(results.find((r) => r.id === id)).toMatchObject({ outcome: 'skip', benign: true });
+      }
+      expect(asked.map(([id]) => id)).not.toContain('P1');
+    });
+
+    it('single-machine mode is unchanged: no waiting, no local flag', async () => {
+      const d = deps(happy());
+      d.waitRemote = () => Promise.reject(new Error('must not be called'));
+      const { results } = await runPlan(steps, d);
+      expect(results.every((r) => r.outcome === 'pass' && !('local' in r))).toBe(true);
+    });
+
+    it('the summary says which checks each side verified', async () => {
+      const { d } = twoMac('cc', {});
+      const { results } = await runPlan(steps, d);
+      const sum = Object.fromEntries(checkSummary(results).map((c) => [c.check, c]));
+      expect(sum.J8.status).toBe('verified');
+      expect(sum.J8.here).toEqual(['T1', 'T4', 'T5', 'T6']);
+      expect(sum.J8.there).toEqual(['T2', 'T3', 'T7']);
+      expect(sum.J4.here).toEqual(['T5']);
+      expect(sum.J4.there).toEqual(['P2']);
+      expect(sum['I-5'].here).toEqual(['H1']);
+      const meta = {
+        startedAt: 't',
+        ccAgent: 'a',
+        ocAgent: 'b',
+        versions: {},
+        scan: 'clean',
+        role: 'a',
+        sameOwner: true,
+      };
+      expect(renderResultsMd(meta, results)).toContain('Checks verified on this Mac');
+    });
+  });
+
+  describe('two-machine options and hand-off text', () => {
+    const out = ['--out', join(tmpdir(), 'agentlink-dogfood-role-test')];
+    it('parses roles and refuses bad combinations', () => {
+      expect(parseArgs([...out, '--role', 'a', '--same-owner'])).toMatchObject({
+        role: 'a',
+        sameOwner: true,
+      });
+      expect(
+        parseArgs([
+          ...out,
+          '--role',
+          'b',
+          '--invite',
+          'https://x.test/i#a',
+          '--run-id',
+          '20261017-101500',
+        ]),
+      ).toMatchObject({ role: 'b', invite: 'https://x.test/i#a', runId: '20261017-101500' });
+      expect(parseArgs([...out, '--role', 'b', '--paired']).paired).toBe(true);
+      expect(() => parseArgs([...out, '--role', 'c'])).toThrow('a or b');
+      expect(() => parseArgs([...out, '--same-owner'])).toThrow('needs --role');
+      expect(() => parseArgs([...out, '--invite', 'https://x.test/i'])).toThrow('needs --role');
+      expect(() => parseArgs([...out, '--role', 'a', '--invite', 'https://x.test/i'])).toThrow(
+        'role b',
+      );
+      expect(() => parseArgs([...out, '--role', 'b', '--run-id', 'nope'])).toThrow('--run-id');
+    });
+
+    it('never echoes a bad invite link in the error', () => {
+      const bad = 'https://x.test/i#secret value with spaces';
+      let message = '';
+      try {
+        parseArgs([...out, '--role', 'b', '--invite', bad]);
+      } catch (error) {
+        message = error.message;
+      }
+      expect(message).toContain('--invite');
+      expect(message).not.toContain('secret');
+      expect(validInviteUrl('javascript:alert(1)')).toBe(false);
+      expect(validInviteUrl("https://x.test/i'; rm -rf")).toBe(false);
+      expect(validInviteUrl('https://x.test/i#abc')).toBe(true);
+    });
+
+    it('maps roles to harnesses and reads answers; a closed input never waits', () => {
+      expect(sideOf('a')).toBe('cc');
+      expect(sideOf('b')).toBe('oc');
+      expect(sideOf(undefined)).toBeUndefined();
+      expect(parseRemoteAnswer('')).toBe('ok');
+      expect(parseRemoteAnswer(' F ')).toBe('fail');
+      expect(parseRemoteAnswer('s')).toBe('skip');
+      expect(parseRemoteAnswer('maybe')).toBeUndefined();
+      expect(parseRemoteAnswer(undefined)).toBe('fail');
+    });
+
+    it('the hand-off box holds the exact Mac B command and the wait box names the approval', () => {
+      const o = parseArgs([...out, '--role', 'a', '--same-owner']);
+      const box = handoffBox(o, '20261017-101500', 'https://x.test/i#a');
+      expect(box).toContain(
+        "node tools/dogfood/run.mjs --role b --run-id 20261017-101500 --invite 'https://x.test/i#a'",
+      );
+      expect(box).toContain('--same-owner');
+      const wait = remoteBox({ id: 'P2', title: 'accept' }, { side: 'cc', approval: true }, false);
+      expect(wait).toContain('owner of that Mac');
+      expect(wait).toContain('Mac B');
+    });
+
+    it("--dry-run of a role starts nothing and marks the other Mac's steps", () => {
+      const text = execFileSync(process.execPath, [RUN, '--dry-run', ...out, '--role', 'b'], {
+        encoding: 'utf8',
+      });
+      expect(text).toContain('Mac B');
+      expect(text).toMatch(/P1 .*\[other Mac\]/);
+      expect(text.match(/waits for your approval/g)).toHaveLength(1);
+    });
+
+    it('--cc-via and --manual follow the role rules', () => {
+      expect(parseArgs([...out, '--role', 'a', '--cc-via', 'opencode']).ccVia).toBe('opencode');
+      expect(parseArgs([...out, '--role', 'b', '--manual']).manual).toBe(true);
+      expect(() => parseArgs([...out, '--cc-via', 'opencode'])).toThrow('needs --role a');
+      expect(() => parseArgs([...out, '--role', 'b', '--cc-via', 'opencode'])).toThrow('role a');
+      expect(() => parseArgs([...out, '--role', 'a', '--cc-via', 'x'])).toThrow(
+        'claude or opencode',
+      );
+      expect(() => parseArgs([...out, '--manual'])).toThrow('needs --role');
+    });
+
+    it('manual mode prints the exact prompt, never runs a harness, and checks nothing it cannot', async () => {
+      const shown = [];
+      const d = deps({});
+      d.run = () => Promise.reject(new Error('no harness in manual mode'));
+      d.side = 'cc';
+      d.manual = true;
+      d.manualStep = (step, prompt) => {
+        shown.push([step.id, prompt, manualBox(step, prompt, true)]);
+        return Promise.resolve(step.id === 'M1' ? 'unconfirmed' : 'ok');
+      };
+      d.waitRemote = () => Promise.resolve('ok');
+      const { results } = await runPlan(steps, d);
+      expect(shown[0][1]).toBe('Create an AgentLink invite for oc-test');
+      expect(shown.find(([id]) => id === 'T5')[1]).toContain('<the counter-offer ID');
+      expect(shown.find(([id]) => id === 'T5')[2]).toContain('Never give the owner code');
+      expect(results.find((r) => r.id === 'P1').outcome).toBe('manual');
+      expect(results.find((r) => r.id === 'M1').outcome).toBe('fail');
+      expect(sideOk(results)).toBe(false);
+    });
+
+    it('the result text never holds the invite link', () => {
+      const meta = {
+        startedAt: 't',
+        ccAgent: 'a',
+        ocAgent: 'b',
+        versions: {},
+        scan: 'clean',
+        role: 'b',
+        sameOwner: false,
+      };
+      const row = {
+        id: 'P2',
+        title: 'accept',
+        harness: 'oc',
+        outcome: 'pass',
+        notes: [],
+        seconds: 1,
+        local: true,
+      };
+      expect(renderResultsMd(meta, [row])).not.toContain('https://');
+    });
   });
 });
 

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Added
+
+- Dogfood tooling (M1-23-b): `tools/dogfood/run.mjs --role a|b` runs the pairing, messages, owner approvals and the J8 negotiation across two Macs, one agent per Mac, with the invite link and run ID exchanged by hand; `--same-owner` for one person at both Macs. Single-machine mode is unchanged. Runbook RB-17 section 10 has the commands.
+
 ### Changed
 
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.
