@@ -278,6 +278,33 @@ What happens: Mac A checks the ssh login, runs its own preflight, starts Mac B's
 - **Results.** Mac A prints one combined table (each step from the Mac that ran it, with a Mac column) and writes `combined.md` and `combined.json` in its folder; Mac B's folder (path shown in the table) holds its transcripts. Both Macs scan their folder for secrets; any finding makes the run fail. Exit status 0 only when every step passed (or was a benign skip) and both scans are clean.
 - If the two agents are already contacts, Mac A tells Mac B itself: no `--paired` needed.
 
+#### Auto-sync (recommended on macOS, M1-23-e)
+
+macOS gives an ssh session no login keychain (`SecKeychainCopySettings ... User interaction is not allowed`; `agentlink doctor` says "no system keychain"), so `--two-mac` cannot run Mac B's agent over ssh. Auto-sync keeps the no-copying, no-Enter flow but runs **each agent in its own Mac's terminal**; ssh only moves small files.
+
+Use the same one-time ssh key setup as above (Mac A to Mac B, key login). Start **Mac B first**, in a Terminal window on Mac B:
+
+```bash
+node tools/dogfood/run.mjs --role b --auto-sync --cc-agent <mac-a-agent> --oc-agent <mac-b-agent> \
+  [--agentlink '["npx","-y","@4thtech-io/agentlink@latest"]'] [--opencode <path>] [--same-owner]
+```
+
+It runs its preflight, prints "Waiting for Mac A" and its run ID. Then on Mac A, in a Terminal window on Mac A:
+
+```bash
+node tools/dogfood/run.mjs --role a --auto-sync --remote <mac-b-user>@<mac-b-host> \
+  --cc-agent <mac-a-agent> --oc-agent <mac-b-agent> [--same-owner]
+```
+
+Mac A finds Mac B's waiting run over ssh and both sides go on by themselves.
+
+- **What crosses ssh:** only files in `<results folder>/<run>/sync` on Mac B (folder 0700, files 0600): a `waiting` marker, a status file per side, and the invite. Every status line carries a random per-run nonce that Mac B created and Mac A read over the same ssh channel; lines without it are ignored. Status is written by the script from step outcomes, never from model output. Mac A writes the invite link with `cat >` on the ssh standard input (never in argv); Mac B deletes the file as soon as it has read it. No agentlink or keychain call is made over ssh, and no owner code ever crosses it.
+- **Approvals stay human and local.** When a step needs the owner, that Mac prints a box with the exact approve command (`agentlink approve --agent <name> <id>`, or its `npx` form). Open a second Terminal window **on that Mac** and type it, then the owner code. Mac B's owner approves P2; Mac A's owner approves T5. Agents never approve and the script never approves.
+- **Waiting.** Each side polls (every 3 s) with timeouts: Mac B waits up to 30 minutes for Mac A to appear; a step the other Mac does not finish within the step limit counts as failed with its step ID.
+- **Results.** Each Mac prints and saves its own table and scans its folder for secrets. Mac A also fetches Mac B's `results.json` over ssh and prints one combined table (`combined.md`, `combined.json`). Exit status 0 only when every step passed (or is a benign skip) and both scans are clean.
+- `--remote-out <path>` on Mac A if Mac B's results root is not `~/agentlink-dogfood` (Mac B's `--out`).
+- `--two-mac` stays available for non-macOS hosts; its preflight now stops with "macOS blocks the keychain over SSH; use --auto-sync (start role b on Mac B first)" when Mac B's `agentlink doctor` shows the keychain failure.
+
 The manual variant below (`--role a` / `--role b`, copying the link, pressing Enter) is unchanged and still works.
 
 **Same owner or two owners.** The only difference is who is at the keyboard.

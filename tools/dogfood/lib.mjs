@@ -81,6 +81,12 @@ Hands-free (M1-23-d): Mac A runs both Macs, Mac B over ssh (key login; RB-17 sec
   --remote-opencode <path>     OpenCode program on Mac B
   --remote-agentlink <json>    AgentLink program on Mac B, like --agentlink (default agentlink)
   Owner approvals stay yours: the approve command runs in this terminal (ssh -t for Mac B); you type the code.
+  (On macOS ssh cannot use the login keychain; prefer --auto-sync below.)
+Auto-sync (M1-23-e, recommended on macOS): each agent runs in its own Mac's terminal; ssh only moves small files:
+  Mac B first:  --role b --auto-sync     waits for Mac A; coordinates through a folder on Mac B
+  Mac A next:   --role a --auto-sync --remote <ssh-host>   finds Mac B's waiting run; no Enter, no copying
+  --remote-out <path>          Mac B's results root (default ~/agentlink-dogfood, like --out on Mac B)
+  Approvals: each Mac prints the approve command; type it in a second window on THAT Mac.
 Use the same --cc-agent and --oc-agent names on both Macs. Approvals are typed on the Mac that owns the agent.
 `;
 
@@ -158,6 +164,8 @@ export function parseArgs(argv) {
     remoteOpencode: undefined,
     remoteAgentlink: undefined,
     handsFree: false,
+    autoSync: false,
+    remoteOut: undefined,
   };
   // `--name=value` is the same as `--name value`.
   argv = argv.flatMap((a) =>
@@ -249,6 +257,17 @@ export function parseArgs(argv) {
       case '--hands-free':
         options.handsFree = true;
         break;
+      case '--auto-sync':
+        options.autoSync = true;
+        break;
+      case '--remote-out': {
+        const v = value(i, arg);
+        if (!validRemotePath(v))
+          throw new Error('--remote-out has characters that are not allowed');
+        options.remoteOut = v;
+        i += 1;
+        break;
+      }
       case '--remote': {
         const v = value(i, arg);
         if (!validHost(v)) throw new Error('--remote is not a valid ssh host');
@@ -313,6 +332,34 @@ export function parseArgs(argv) {
     }
   }
   if (options.ccAgent === options.ocAgent) throw new Error('the two agents must differ');
+  if (options.autoSync) {
+    // M1-23-e: each Mac runs its own side; role a reaches Mac B's sync folder over ssh.
+    if (options.twoMac || options.handsFree) {
+      throw new Error('--auto-sync cannot be combined with --two-mac or --hands-free');
+    }
+    if (options.role !== 'a' && options.role !== 'b')
+      throw new Error('--auto-sync needs --role a or b');
+    for (const [flag, set] of [
+      ['--manual', options.manual],
+      ['--invite', options.invite !== undefined],
+      ['--run-id', options.runId !== undefined],
+      ['--paired', options.paired],
+      ['--remote-repo', options.remoteRepo !== '~/agentlink'],
+      ['--remote-opencode', options.remoteOpencode !== undefined],
+      ['--remote-agentlink', options.remoteAgentlink !== undefined],
+    ]) {
+      if (set) throw new Error(`${flag} cannot be combined with --auto-sync`);
+    }
+    if (options.role === 'a' && options.remoteHost === undefined)
+      throw new Error('--auto-sync with --role a needs --remote <ssh-host>');
+    if (
+      options.role === 'b' &&
+      (options.remoteHost !== undefined || options.remoteOut !== undefined)
+    )
+      throw new Error('--remote and --remote-out are for --role a (Mac B only waits)');
+  } else if (options.remoteOut !== undefined) {
+    throw new Error('--remote-out needs --auto-sync');
+  }
   if (options.twoMac) {
     // M1-23-d: Mac A drives both Macs; role A runs here, role B over ssh.
     if (options.remoteHost === undefined) throw new Error('--two-mac needs --remote <ssh-host>');
@@ -327,7 +374,7 @@ export function parseArgs(argv) {
       if (set) throw new Error(`${flag} cannot be combined with --two-mac`);
     }
     options.role = 'a';
-  } else {
+  } else if (!options.autoSync) {
     for (const [flag, set] of [
       ['--remote', options.remoteHost !== undefined],
       ['--remote-opencode', options.remoteOpencode !== undefined],
@@ -1621,7 +1668,9 @@ export function planText(options, steps) {
           `Two-machine run   Mac ${options.role.toUpperCase()} (${options.role === 'a' ? 'Claude Code, creates the invite' : 'OpenCode, accepts the invite'}), ${options.sameOwner ? 'same owner on both Macs' : 'a different owner per Mac'}`,
           options.twoMac
             ? `Hands-free: Mac B is ${options.remoteHost} over ssh (key login, BatchMode); steps sync by themselves, the invite goes over stdin only. Approvals run in this terminal: you type the owner code (ssh -t for Mac B).`
-            : 'Steps of the other Mac are marked [other Mac]: you confirm them here by hand.',
+            : options.autoSync
+              ? 'Auto-sync: both agents run in their own Mac terminal; steps sync by themselves through a folder on Mac B (ssh only moves small files, never the owner code). Approvals: type the printed approve command in a second window on the Mac that owns the agent.'
+              : 'Steps of the other Mac are marked [other Mac]: you confirm them here by hand.',
           '',
         ]),
     `Results folder   ${join(options.out, '<timestamp>')}`,
