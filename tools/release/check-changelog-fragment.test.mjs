@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -132,5 +132,50 @@ describe('checkChangelogFragment on a fixture repository', () => {
     );
     commit();
     expect((await run()).ok).toBe(false);
+  });
+});
+
+describe('checkChangelogFragment fragment validation', () => {
+  let dir;
+  const sh = (...args) => execFileSync('git', args, { cwd: dir, stdio: 'pipe' });
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'clfrag2-'));
+    sh('init', '-q', '-b', 'main');
+    sh('config', 'user.email', 't@example.com');
+    sh('config', 'user.name', 't');
+    writeFileSync(join(dir, 'CHANGELOG.md'), '# C\n\n## [Unreleased]\n');
+    writeFileSync(join(dir, 'a.txt'), 'a');
+    sh('add', '-A');
+    sh('commit', '-q', '-m', 'base');
+    sh('checkout', '-q', '-b', 'feature');
+    mkdirSync(join(dir, 'changelog.d'));
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+  const run = async (files) => {
+    for (const [n, c] of Object.entries(files)) writeFileSync(join(dir, 'changelog.d', n), c);
+    sh('add', '-A');
+    sh('commit', '-q', '-m', 'c');
+    return checkChangelogFragment({ cwd: dir, base: 'main', pr: nonPr, log: () => {} });
+  };
+
+  it('fails an empty or malformed added fragment', async () => {
+    const r = await run({ 'a.md': '', 'b.md': '### Nope\n\n- x\n' });
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(' ')).toMatch(/a\.md/);
+    expect(r.errors.join(' ')).toMatch(/b\.md/);
+  });
+  it('fails a none fragment without a reason, passes with one', async () => {
+    expect((await run({ 'n.md': '---\nsection: none\n---\n' })).ok).toBe(false);
+  });
+  it('passes a none fragment with a reason', async () => {
+    expect((await run({ 'm.md': '---\nsection: none\n---\n\nWhy.\n' })).ok).toBe(true);
+  });
+  it('fails a symlinked fragment', async () => {
+    symlinkSync(join(dir, 'a.txt'), join(dir, 'changelog.d', 's.md'));
+    sh('add', '-A');
+    sh('commit', '-q', '-m', 's');
+    const r = await checkChangelogFragment({ cwd: dir, base: 'main', pr: nonPr, log: () => {} });
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(' ')).toMatch(/symlink/);
   });
 });

@@ -30,7 +30,7 @@ Several sections in one file work with headings instead of front matter:
 - Old bug (M1-9x).
 ```
 
-A change that needs no entry (a refactor, a test-only change under a source path) adds a fragment with `section: none` and one line saying why. It records the decision for CI and is dropped at release:
+A change that needs no entry (a refactor, a test-only change under a source path) adds a fragment with `section: none` and one line saying why (required). Link-reference lines (`[x]: url`) and version headings are not allowed in a fragment. It records the decision for CI and is dropped at release:
 
 ```markdown
 ---

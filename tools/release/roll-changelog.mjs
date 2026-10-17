@@ -44,6 +44,7 @@ export function parseFragment({ name, text }) {
     i = close + 1;
   }
   const out = {};
+  let noneReason = 0;
   const check = (sec) => {
     if (sec.toLowerCase() === 'none') return 'none';
     if (!SECTIONS.includes(sec))
@@ -54,8 +55,15 @@ export function parseFragment({ name, text }) {
   for (const l of lines.slice(i)) {
     const h = HEADING.exec(l);
     if (h) {
+      if (/^\[?\d+\.\d+/.test(h[1]) || /^\[Unreleased\]/i.test(h[1]))
+        throw new Error(`${name}: a version heading ("${l.trim()}") is not allowed in a fragment.`);
       current = check(h[1]);
     } else if (l.trim() !== '') {
+      if (/^\s*\[[^\]]+\]:\s/.test(l))
+        throw new Error(
+          `${name}: a link-reference line ("[x]: url") is not allowed in a fragment.`,
+        );
+      if (current === 'none') noneReason += 1;
       if (current === null)
         throw new Error(
           `${name}: no section named (add "section: Added" front matter or a "### Added" heading).`,
@@ -67,6 +75,8 @@ export function parseFragment({ name, text }) {
     throw new Error(
       `${name}: no section named (add "section: Added" front matter or a "### Added" heading).`,
     );
+  if (current === 'none' && noneReason === 0)
+    throw new Error(`${name}: "section: none" needs a one-line reason.`);
   for (const [sec, ls] of Object.entries(out)) {
     if (!ls.some((l) => /^[-*]\s/.test(l)))
       throw new Error(`${name}: section "${sec}" has no bullet line ("- ...").`);
