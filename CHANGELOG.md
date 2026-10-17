@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- CI (M1-9c-c, S2, process): new `bundle-check` job in `ci-gate`. It builds the CLI on a runner with no keychain and no native-module build and fails when the published `dist/agentlink.js` imports a crypto-capable MCP SDK transitive package (`jose`, `pkce-challenge`, `cookie-signature`, `etag`, `hono`), an SDK subpath outside the stdio set or an undeclared package, or when `src/tools/` bundled for a neutral (Worker) platform reaches a Node built-in, `@agentlink/node` or the MCP SDK (IR-M1-9c-1 F07, D-76, 06 §1). No new dependency: it reuses the repository's Vite. `docs/process/ci-cd.md` records it.
+
 - Spec (M1-9v, S1, 06 §4): the untrusted-content wrapper spec now says that every opening and closing `untrusted_content` tag inside content is escaped, look-alike forms included, as the code already does. No behaviour change.
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.
 
