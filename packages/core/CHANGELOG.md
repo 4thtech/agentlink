@@ -1,5 +1,22 @@
 # @agentlink/core
 
+## 0.1.1
+
+### Patch Changes
+
+- 088b5fd: Live relay subscriptions (M1-9s): `Transport.subscribe` and `AgentLinkClient.subscribeInbox` in the core; the MCP server's background loop receives new messages and handshakes as they reach a relay, with a 5-minute fallback catch-up, and closes the subscription on lease loss and on shutdown.
+- 053a2cb: M1-15: SSRF-safe download (DNS-pinned, at most 2 re-checked redirects, byte cap, deadline), allowed-folder path guard with realpath on both sides, and a download file-name sanitiser. Not wired into any tool yet.
+- Updated dependencies [088b5fd]
+- Updated dependencies [af00aaa]
+- Updated dependencies [c4c1f86]
+- Updated dependencies [e768cd1]
+  - @agentlink/transport-nostr@0.1.1
+  - @agentlink/crypto@0.1.1
+  - @agentlink/storage@0.1.1
+  - @agentlink/chain@0.1.1
+  - @agentlink/log@0.1.1
+  - @agentlink/types@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes

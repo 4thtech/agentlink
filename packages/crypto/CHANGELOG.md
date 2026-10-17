@@ -1,5 +1,12 @@
 # @agentlink/crypto
 
+## 0.1.1
+
+### Patch Changes
+
+- af00aaa: OCC v2 proof types (M1-1j): EIP-712 typed data, strict JSON-form parsing and hashing for `Record`, `Receipt` and `Registration`; `recordStructHash`; the recipient commitment; EIP-3009 `ReceiveWithAuthorization` typed data under a caller-supplied token domain.
+- e768cd1: `owner add-agent` recovers an owner with no attached agent: the owner keys come from the saved owner itself after the owner code, and the owner confirms the fingerprint (M1-9x).
+
 ## 0.1.0
 
 ### Minor Changes

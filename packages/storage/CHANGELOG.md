@@ -1,5 +1,15 @@
 # @agentlink/storage
 
+## 0.1.1
+
+### Patch Changes
+
+- c4c1f86: Storage adapters: the `StorageAdapter` interface, the inline adapter (up to 12 288 bytes of ciphertext) and the S3-compatible adapter over `aws4fetch` (upload, presigned download clamped to 7 days and to credential expiry, delete)
+- Updated dependencies [af00aaa]
+- Updated dependencies [e768cd1]
+  - @agentlink/crypto@0.1.1
+  - @agentlink/log@0.1.1
+
 ## 0.1.0
 
 ### Patch Changes
