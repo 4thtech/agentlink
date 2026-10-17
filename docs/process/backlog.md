@@ -3232,6 +3232,14 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Note (IR-M1-22-L15-1):** resolved by M1-9v (spec only): the code already escapes opening-tag look-alikes as well as closing ones (`apps/cli/src/tools/untrusted.ts`, tested in `untrusted.test.ts`); 06 §4 now says so.
 - **Follow-up (local dogfood run 2, 2026-10-16; card as M1-22 or M1-12a work):** (a) OpenCode's summary of an offer showed raw addresses ("paid by 0xb680…8275 to 0x40a9…9337"). Check whether `agentlink_inbox` and the terms summaries expose address-like strings to the agent, and whether 11 §5 copy should show contact names instead. (b) A duplicate identical offer (same terms sent twice) appears as two open offers; consider a dedupe hint in the inbox or status summary.
 
+
+#### M1-22-b · tools: contact names, not raw addresses, in summaries (new; Phase M1b)
+
+- **Class:** S1 · **Owner decision (Tali, 2026-10-17)** · **Follows:** M1-22, local dogfood run 2 notes (a) and (b)
+- **Scope:**
+  - An agent address equal to the user's own agent shows as "you"; equal to a paired contact's agent, as that contact's name under 06 §2.1 (else "a contact"). Unknown addresses stay only in structured or untrusted fields, never in summary text. Done as the `termsParties` field of `agentlink_inbox` offers.
+  - Two or more identical open offers (same contact, same terms hash) add one hint line to the `openOffers` summary; the offers are not merged. `agentlink_status` has no terms hash, so it gets no hint (the hint belongs to the inbox read).
+- **Acceptance:** tests for each; strings snapshot has the new key only; no change to `cli.ts` or the tool registry.
 #### M1-23 · J9 dogfood: Tali's and Denis's agents sync through AgentLink (M1a gate) (new)
 - **Status:** in-progress (v0.1.0 is released; the runbook RB-17 `docs/runbooks/dogfood-m1a.md` merged in 4thtech/agentlink#168, 2026-10-16; the dogfood run itself is open) · **Size:** S · **Tier:** Sonnet (setup notes) + Owner (with @denisjazbec) · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** owner's sync file (dogfood log); issues as backlog cards. No synced project content is committed.
