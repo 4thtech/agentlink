@@ -201,6 +201,15 @@ const message = obj(
       },
       ['termsId', 'version', 'termsHash', 'validUntil'],
     ),
+    // M1-22-b (06 §2.2): ours; names for the agent addresses in the terms.
+    termsParties: obj(
+      {
+        parties: arr({ type: ['string', 'null'] }),
+        payer: { type: ['string', 'null'] },
+        deliverablesBy: arr({ type: ['string', 'null'] }),
+      },
+      ['parties', 'payer', 'deliverablesBy'],
+    ),
     contact: { anyOf: [contactRef, { type: 'null' }] },
     senderCode: str({ maxLength: 32 }),
     read: bool(),
