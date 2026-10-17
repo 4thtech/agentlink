@@ -44,7 +44,7 @@ export const OWNER_TEXT = Object.freeze({
   // Owner add-agent (M1-9t, D-78; 04 §2.8).
   addAgentDone: 'OK       This agent can now pair. Restart the app that runs it.',
   addAgentNoOwner:
-    "No agent on this computer has a card from an owner yet, so there is no owner to add this agent to. Run `agentlink owner init` yourself, in your own terminal, for your first agent. Don't let your AI run it or see the code it shows.",
+    "No agent on this computer has a card from an owner, so AgentLink can't tell which owner to add this agent to. Nothing was changed. If you have never set up an owner, run `agentlink owner init` yourself, in your own terminal, for your first agent, and don't let your AI run it or see the code it shows. If `agentlink owner init` says an owner already exists here, none of this computer's agents is attached to it: run `agentlink doctor` in your own terminal to see the state.",
   addAgentUnknown:
     'AgentLink is not set up for this agent on this machine yet. Run `agentlink init --agent <name>` yourself first, in your own terminal.',
   addAgentHasCard:
