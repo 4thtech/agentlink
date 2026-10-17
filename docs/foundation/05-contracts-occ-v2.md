@@ -221,7 +221,7 @@ struct Registration {
 
 struct Revocation {
     address agentEvm;
-    uint64  keyEpoch;
+    uint32  keyEpoch;      // the stored epoch (04 §2.4 card, §6 AgentRegistered)
     uint256 nonce;
     uint64  deadline;
 }
@@ -236,7 +236,7 @@ function getAgent(address agentEvm) external view returns (AgentEntry memory);
 - **`regOwnerSig`** (EIP-712, OCC v2 chain-specific domain) over `Registration` authorizes the fee parameters. Without it, anyone holding a public card could register it with their own `appId` and drain the owner's credits.
 - Fee: `REGISTER`, charged to `card.ownerEvm`.
 - A higher `keyEpoch` from the same owner replaces the entry (new registration and fee).
-- **Revocation (D-81).** `struct Revocation { address agentEvm; uint64 keyEpoch; uint256 nonce; uint64 deadline; }`, signed by `ownerEvm` (EIP-712, OCC v2 chain domain; ERC-1271 accepted). `Registration` and `Revocation` nonces are random, single-use per owner, tracked in `usedNonces[ownerEvm][nonce]` and shared by both types. Reverts if expired, used, or `keyEpoch` ≠ stored epoch. Revoke works while paused (§5.1).
+- **Revocation (D-81).** `struct Revocation { address agentEvm; uint32 keyEpoch; uint256 nonce; uint64 deadline; }` (`keyEpoch` type aligned to the stored `uint32`), signed by `ownerEvm` (EIP-712, OCC v2 chain domain; ERC-1271 accepted). The signer must equal the stored `ownerEvm` of `agentEvm`, otherwise `InvalidSignature()`. `Registration` and `Revocation` nonces are random, single-use per owner, tracked in `usedNonces[ownerEvm][nonce]` and shared by both types. Reverts if expired (`Expired()`), the nonce is used (`NonceUsed()`), `keyEpoch` ≠ stored epoch (`EpochMismatch()`), the agent is not registered (`AgentNotRegistered()`) or is already revoked (`AlreadyRevoked()`). Revoke works while paused (§5.1).
 - Stores `{ownerEvm, cardHash, keyEpoch, registeredAt, revoked}`; emits full card fields in `AgentRegistered`.
 - ERC-8004 bridge (P2).
 
@@ -395,7 +395,7 @@ Notes:
 
 ## 7. Errors (custom errors only)
 
-`Expired()`, `InvalidSignature()`, `RecordExists()`, `RecordNotFound()`, `ReceiptExists()`, `ConflictingReceipt()`, `NotRecipient()`, `NotSigner()`, `InsufficientCredits(address payer, address token, uint256 needed, uint256 available)`, `FeeAboveMax(uint256 total, uint256 maxTotal)`, `TokenNotAllowed(address token)`, `BelowMinDeposit()`, `NotModule()`, `AppExists()`, `AppInactive()`, `NotIntegrator()`, `FeeAboveCap()`, `EnforcedPause()` (renamed from `Paused()`, which collided with the event `Paused`; proposed, §6), `UpgradesAreFrozen()`, `ZeroAddress()`, `TransferFailed()`, `InvalidCapChange()` (G-3; decided, D-59), `ExpectedPause()` and `MultipleAboveMax()` (proposed; §5.2).
+`Expired()`, `InvalidSignature()`, `NonceUsed()`, `EpochMismatch()`, `AgentNotRegistered()`, `AlreadyRevoked()`, `RecordExists()`, `RecordNotFound()`, `ReceiptExists()`, `ConflictingReceipt()`, `NotRecipient()`, `NotSigner()`, `InsufficientCredits(address payer, address token, uint256 needed, uint256 available)`, `FeeAboveMax(uint256 total, uint256 maxTotal)`, `TokenNotAllowed(address token)`, `BelowMinDeposit()`, `NotModule()`, `AppExists()`, `AppInactive()`, `NotIntegrator()`, `FeeAboveCap()`, `EnforcedPause()` (renamed from `Paused()`, which collided with the event `Paused`; proposed, §6), `UpgradesAreFrozen()`, `ZeroAddress()`, `TransferFailed()`, `InvalidCapChange()` (G-3; decided, D-59), `ExpectedPause()` and `MultipleAboveMax()` (proposed; §5.2).
 
 ---
 
