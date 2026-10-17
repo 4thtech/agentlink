@@ -3111,6 +3111,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A symlink inside an allowed folder pointing to `~/.ssh` is refused; Windows path tests run in CI.
 - **Delivered in review:** `packages/core/src/fetch-url.ts`, `file-name.ts`, `path-guard.ts` (pure; both path flavours tested on every OS) and `packages/node/src/safe-fetch.ts`, `allowed-path.ts` (realpath, pinned TLS to the checked address, exclusive inbox create). Windows runs the Node tests in CI job `node-os` (junction links, no admin), which is outside `ci-gate`. G-14: only the Node path is built; Workers semantics (raw check + Workers egress) land with M2-3b. Not wired into tools (M1-7f, M1-9d).
 
+#### M1-15-b · node: Windows path-guard fixes (8.3 names, symlinks) (new)
+- **Status:** in review (branch `m1-15-b-windows-path-guard`) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/node (allowed-path), packages/core (path-guard tests)
+- **Depends on:** M1-15
+- **Spec:** 04 §4 (Allowed folders, Downloads), §7
+- **Invariants:** I-5
+- **Scope:**
+  - The required Windows `path-guard` job (PR #214) failed 5 of 25 `allowed-path.test.ts` tests and skipped one. Fix them so the job runs green with zero skips, and fix the code where the cause is a product defect.
+- **Acceptance:**
+  - `allowed-path.test.ts` passes on Windows and macOS with no skipped test; the re-check is proven by a folder swap check→open on every OS, and post-open where the OS allows it (POSIX; Windows refuses to rename a folder holding an open file); an 8.3 short-name path that resolves into a protected root is refused (core unit test, win32 semantics on every OS).
+- **Findings (in review):** the five failures were test defects, not product defects. Expectations used the JS `realpathSync` (keeps 8.3 names such as `RUNNER~1`) while the code uses the native realpath (`fs.promises.realpath`, long names), now `realpathSync.native`; the keychain test used macOS `~/Library/Keychains`, which is not a Windows protected root (Windows: `AppData\Roaming\Microsoft\Protect` and siblings), now the platform's own folder; Windows refuses to rename a folder holding an open file, so a new `afterCheck` seam adds the folder swap between check and open on every OS (the open follows the swapped link and the re-check refuses it), and the post-open swap test stays, registered on POSIX only; the FIFO test (no FIFO on Windows) asserts on Windows that a named pipe `\\.\pipe\…` is refused before any open.
+
 #### M1-16 · npm release pipeline activation (new)
 - **Status:** done for v0.1.0 (the stable `latest` path: #124, #184, #185, #192, #193; v0.1.0 published 2026-10-16 with provenance; the `next` prerelease path was not exercised) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · .github/workflows/release.yml, .changeset/
