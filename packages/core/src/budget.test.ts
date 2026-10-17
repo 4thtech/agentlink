@@ -115,6 +115,7 @@ describe('check and reserve (06 §3, 07 §3.5)', () => {
     expect((await reserve(store, proof('1'))).decision).toBe('allow');
     expect((await reserve(store, proof('1'))).decision).toBe('allow');
     expect((await reserve(store, proof('1'))).decision).toBe('allow');
+    expect((await reserve(store, proof('1'))).decision).toBe('allow');
     expect((await reserve(store, proof('0.99'))).decision).toBe('allow');
     expect((await reserve(store, proof('0.02'))).decision).toBe('approval');
     expect((await reserve(store, proof('0.01'))).decision).toBe('allow');
@@ -189,7 +190,7 @@ describe('settle and release (06 §3, 04 §5)', () => {
   it('a failed submission keeps its reservation until the deadline passes with no record', async () => {
     const store = await freshStore();
     const res = reservation({ deadline: NOW + 600 });
-    await reserve(store, proof('5'), { res });
+    await reserve(store, proof('5'), { res, ownerApproved: true });
     const release = (now: number, chainHasRecord: boolean) =>
       store.transaction((tx) =>
         releaseProofReservation(tx, { recordId: res.recordId, now, chainHasRecord }),

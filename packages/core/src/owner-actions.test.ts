@@ -662,7 +662,9 @@ describe('loading the signed policy (G-6, 06 §3)', () => {
     expect(loaded).toEqual({ mode: 'fail_closed', problem });
     // Never the defaults: their `notarize: allow` and `autoDelivered: true` would loosen it, and
     // the stored deny becomes approval, never allow.
-    expect(evaluate(loaded, { kind: 'proof' })).toBe('approval');
+    expect(
+      evaluate(loaded, { kind: 'proof', feeUsd: '0.01', maxFeeUsd: '0.01', counterparty: null }),
+    ).toBe('approval');
     // G-6 owner decision (Tali, 2026-10-15): paired contacts Talk without approval; commitments
     // (D-31) and paid proofs still need the owner.
     expect(
