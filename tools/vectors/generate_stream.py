@@ -9,8 +9,8 @@ reordered chunk or a missing final chunk fails decryption (STREAM construction, 
 is its ciphertext followed by its 16-byte tag. `ciphertextSha256` is SHA-256 over the whole object
 (header included) and `plaintextSha256` over the file bytes (04 §4 Integrity).
 
-Rules 04 §4 leaves implicit, derived here and flagged in the PR (owner confirms at merge):
-- The version byte is 1.
+Rules 04 §4 states as proposed (owner confirms at merge), and this generator follows:
+- The version byte is 0x01; any other value is rejected.
 - Chunking: the plaintext is split into chunks of exactly chunkSize bytes, the last one (the only
   chunk with isFinal = 1) holding the remaining 1..chunkSize bytes. An empty file is one empty
   final chunk, so its object is 17 + 16 = 33 bytes. A plaintext of an exact multiple of chunkSize
@@ -18,9 +18,10 @@ Rules 04 §4 leaves implicit, derived here and flagged in the PR (owner confirms
   is not canonical and is rejected. This agrees with the 04 §3.4 inline cap: 12 255 bytes of file
   content are 12 288 bytes of ALF1 ciphertext (17 + 12 255 + 16) at the default 1 MiB chunk size.
 - A decoder reads chunkSize from the header and splits the body into pieces of chunkSize + 16
-  bytes; the last piece (16..chunkSize + 16 bytes) is the final chunk. chunkSize 0 is rejected.
-  04 §4 sets no minimum chunk size; the vectors use 16 and 32 bytes to reach the boundaries
-  cheaply, and one case uses the default 1 MiB.
+  bytes; the last piece (16..chunkSize + 16 bytes) is the final chunk.
+- Senders use chunkSize 1 MiB; recipients accept 1 <= chunkSize <= 16 MiB and reject any other
+  value before decrypting. The seal cases also use 16 and 32 bytes (through the implementation's
+  test seam) to reach the chunk boundaries cheaply, and 16 MiB once, at the recipients' bound.
 
 `cryptography`'s AES-GCM is cross-checked against the published AES-256 test case 16 of McGrew and
 Viega, "The Galois/Counter Mode of Operation (GCM)" (the NIST GCM submission), before anything is
@@ -44,6 +45,7 @@ FORMAT_VERSION = 1
 HEADER_LEN = 17
 TAG_LEN = 16
 DEFAULT_CHUNK = 1 << 20
+MAX_CHUNK = 16 << 20
 INLINE_CAP = 12255
 SPEC = "04 §4 ALF1 STREAM (D-80): nonce noncePrefix || u32be(index), AAD header (17 B) || u8(isFinal)"
 
@@ -117,8 +119,8 @@ def open_object(file_key, data):
     if head[4] != FORMAT_VERSION:
         raise ValueError("unknown version")
     chunk_size = int.from_bytes(head[5:9], "big")
-    if chunk_size == 0:
-        raise ValueError("chunkSize 0")
+    if not 1 <= chunk_size <= MAX_CHUNK:
+        raise ValueError("chunkSize outside 1..16 MiB")
     prefix = head[9:17]
     body = data[HEADER_LEN:]
     if len(body) == 0:
@@ -212,6 +214,7 @@ def build():
         seal_case("exact-multiple", "3 x chunkSize bytes: three full chunks, the third final, no empty chunk after it", "exact-multiple", small, plain("exact-multiple", 3 * small)),
         seal_case("chunk-index-past-255", "4 200 bytes at chunkSize 16: 263 chunks, so u32be(index) reaches 0x00000106", "index-wide", 16, plain("index-wide", 4200)),
         seal_case("default-chunk-one-byte", "a 1-byte file at the default chunkSize of 1 MiB (header 0x00100000)", "default-small", DEFAULT_CHUNK, plain("default-small", 1)),
+        seal_case("max-chunk-size-one-byte", "a 1-byte file at chunkSize 16 MiB, the largest a recipient accepts (header 0x01000000)", "max-chunk", MAX_CHUNK, plain("max-chunk", 1)),
         seal_case("default-chunk-inline-cap", "the 04 §3.4 inline cap: 12 255 bytes at the default 1 MiB give 12 288 bytes of ciphertext", "inline-cap", DEFAULT_CHUNK, plain("inline-cap", INLINE_CAP)),
     ]
     multi_plain = plain("multi", 100)
@@ -258,6 +261,10 @@ def build():
         seal_chunk(fk("exact-multiple"), prefix_of("exact-multiple"), exact_head, i, c, False)
         for i, c in enumerate(split(plain("exact-multiple", 3 * small), small))
     ) + seal_chunk(fk("exact-multiple"), prefix_of("exact-multiple"), exact_head, 3, b"", True)
+    over = seal(fk("over-max"), prefix_of("over-max"), MAX_CHUNK + 1, plain("over-max", 1))
+    over_head = over[:HEADER_LEN]
+    if v.aes256gcm_decrypt(fk("over-max"), nonce(prefix_of("over-max"), 0), over[HEADER_LEN:], aad(over_head, True)) != plain("over-max", 1):
+        v.fail("the over-maximum chunkSize object does not authenticate on its own")
     empty_obj = seal(fk("empty"), prefix_of("empty"), small, b"")
     empty_head = empty_obj[:HEADER_LEN]
     empty_not_final = empty_head + seal_chunk(fk("empty"), prefix_of("empty"), empty_head, 0, b"", False)
@@ -267,6 +274,7 @@ def build():
         ("header-version", "the version byte changed from 1 to 2", key, good[:4] + v.u8(2) + good[5:]),
         ("header-chunk-size", "chunkSize changed from 32 to 48: the body splits differently and no chunk authenticates", key, good[:5] + v.u32be(48) + good[9:]),
         ("header-chunk-size-zero", "chunkSize 0", key, good[:5] + v.u32be(0) + good[9:]),
+        ("header-chunk-size-over-max", "chunkSize 16 MiB + 1 on an otherwise valid object (its single chunk authenticates): above the recipients' bound", fk("over-max"), over),
         ("header-nonce-prefix", "one bit of the header's noncePrefix flipped (wrong nonce prefix and wrong AAD)", key, flip(good, 9)),
         ("header-short", "only the first 16 header bytes", key, good[:16]),
         ("header-only", "the header without any chunk (missing final chunk)", key, head),
@@ -302,12 +310,12 @@ HEX32 = v.hexn(32)
 SCHEMA = v.case_schema(
     SUITE,
     "ALF1 STREAM file encryption (04 §4, D-80). `seal`: the object (header || chunks, hex) for a "
-    "file key, nonce prefix, chunk size and plaintext, its 17-byte header, and the SHA-256 of the "
+    "file key, nonce prefix, chunk size (1 to 16 MiB) and plaintext, its 17-byte header, and the SHA-256 of the "
     "object and of the plaintext; decrypting the object must return the plaintext. `open`: an "
     "object that must be refused. Byte strings are lowercase hex without 0x.",
     {
         "seal": (
-            {"fileKey": HEX32, "noncePrefix": v.hexn(8), "chunkSize": {"type": "integer", "minimum": 1, "maximum": 4294967295}, "plaintext": v.HEX},
+            {"fileKey": HEX32, "noncePrefix": v.hexn(8), "chunkSize": {"type": "integer", "minimum": 1, "maximum": MAX_CHUNK}, "plaintext": v.HEX},
             [{"header": v.hexn(HEADER_LEN), "ciphertext": v.HEX, "ciphertextSha256": HEX32, "plaintextSha256": HEX32}],
         ),
         "open": ({"fileKey": HEX32, "ciphertext": v.HEX}, [v.REJECT]),

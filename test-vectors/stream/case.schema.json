@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/4thtech/agentlink/test-vectors/stream/case.schema.json",
   "title": "stream case",
-  "description": "ALF1 STREAM file encryption (04 \u00a74, D-80). `seal`: the object (header || chunks, hex) for a file key, nonce prefix, chunk size and plaintext, its 17-byte header, and the SHA-256 of the object and of the plaintext; decrypting the object must return the plaintext. `open`: an object that must be refused. Byte strings are lowercase hex without 0x.",
+  "description": "ALF1 STREAM file encryption (04 \u00a74, D-80). `seal`: the object (header || chunks, hex) for a file key, nonce prefix, chunk size (1 to 16 MiB) and plaintext, its 17-byte header, and the SHA-256 of the object and of the plaintext; decrypting the object must return the plaintext. `open`: an object that must be refused. Byte strings are lowercase hex without 0x.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -54,7 +54,7 @@
             "chunkSize": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 4294967295
+              "maximum": 16777216
             },
             "plaintext": {
               "type": "string",

@@ -145,6 +145,23 @@
       }
     },
     {
+      "id": "max-chunk-size-one-byte",
+      "source": "04 \u00a74 ALF1 STREAM (D-80): nonce noncePrefix || u32be(index), AAD header (17 B) || u8(isFinal); a 1-byte file at chunkSize 16 MiB, the largest a recipient accepts (header 0x01000000)",
+      "input": {
+        "op": "seal",
+        "fileKey": "18d90baefec1c117a38396696d3479a630dfcbcdbeae8c9e5738bdfc8a3d4ce9",
+        "noncePrefix": "680e3482a7a6b09a",
+        "chunkSize": 16777216,
+        "plaintext": "b3"
+      },
+      "expected": {
+        "header": "414c46310101000000680e3482a7a6b09a",
+        "ciphertext": "414c46310101000000680e3482a7a6b09aeb8abfc95a7371df3a38d014b25fa390fe",
+        "ciphertextSha256": "6e0d8e54c2c0e303bdbd44abdeac5e26cf4da15c2772a8202527b75c8c8e9cfb",
+        "plaintextSha256": "65f15821061635e6807f06701bf0a12d8e89dcff88df5968bd0822c9dbb52f1c"
+      }
+    },
+    {
       "id": "default-chunk-inline-cap",
       "source": "04 \u00a74 ALF1 STREAM (D-80): nonce noncePrefix || u32be(index), AAD header (17 B) || u8(isFinal); the 04 \u00a73.4 inline cap: 12 255 bytes at the default 1 MiB give 12 288 bytes of ciphertext",
       "input": {
@@ -238,6 +255,18 @@
         "op": "open",
         "fileKey": "9d35f28902df8c90e8aa5a0abc05a8de0deec11e8e96055b712a06d5087ebc18",
         "ciphertext": "414c4631010000000023a46a094629fdcce53157510e9ff4db2448fd595bc7d60c83cc44aae791cdb1813849f915a71f0e4f063aefc4fa536a987e10e9b901395d2561e1292f62422614f98ce2851c9d7f98691492b27b797fa3c15e3270460419cfd6ec1a0000645be20b4f77f7f07c424426452aa88aadbf2d2905b65fe3524db907d7cd2fc71fc00bd1497032a757c68bd5ef33effd796a7a5404b8426c8c510d35704de180cfdaaa518945c64ca848654d0536"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-header-chunk-size-over-max",
+      "source": "04 \u00a74 ALF1 STREAM (D-80): nonce noncePrefix || u32be(index), AAD header (17 B) || u8(isFinal); chunkSize 16 MiB + 1 on an otherwise valid object (its single chunk authenticates): above the recipients' bound; rejected",
+      "input": {
+        "op": "open",
+        "fileKey": "e49340acb884f94334bbd32bccbde2a5851b8ada5cb82c40310dadd471b0c5d3",
+        "ciphertext": "414c46310101000001a7a51fcce58e16817645b67221fdb40951cfab7d372da33905"
       },
       "expected": {
         "outcome": "reject"
