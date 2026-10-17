@@ -134,4 +134,78 @@ describe('checkChangesets on a fixture repository', () => {
     });
     expect(human.ok).toBe(false);
   });
+
+  // OPS-CI-3: with privatePackages.version the private tooling packages count as versioned, but a
+  // tooling-only change needs no changeset. Library packages still do.
+  describe('with privatePackages.version (OPS-CI-3)', () => {
+    beforeEach(() => {
+      git('switch', '-q', 'main');
+      write(
+        '.changeset/config.json',
+        JSON.stringify({
+          changelog: false,
+          commit: false,
+          fixed: [],
+          linked: [],
+          access: 'public',
+          baseBranch: 'main',
+          updateInternalDependencies: 'patch',
+          ignore: [],
+          privatePackages: { version: true, tag: false },
+        }),
+      );
+      write(
+        'package.json',
+        JSON.stringify({
+          name: 'fixture-root',
+          private: true,
+          workspaces: ['packages/*', 'tools', 'e2e'],
+        }),
+      );
+      write('pnpm-workspace.yaml', 'packages:\n  - packages/*\n  - tools\n  - e2e\n');
+      write(
+        'tools/package.json',
+        JSON.stringify({ name: '@fixture/tools', version: '0.0.0', private: true }),
+      );
+      write(
+        'e2e/package.json',
+        JSON.stringify({ name: '@fixture/e2e', version: '0.0.0', private: true }),
+      );
+      commit('private versioning');
+      git('switch', '-q', '-c', 'feature2');
+    });
+
+    it('is green when only tools/ changes', async () => {
+      write('tools/x.mjs', 'export const t = 1;\n');
+      commit('tools');
+      expect((await check()).ok).toBe(true);
+    });
+
+    it('is green when tools/, e2e/ and docs change', async () => {
+      write('tools/x.mjs', 'export const t = 1;\n');
+      write('e2e/y.mjs', 'export const e = 1;\n');
+      write('docs/a.md', '# edited\n');
+      commit('tooling and docs');
+      expect((await check()).ok).toBe(true);
+    });
+
+    it('is red when a published package changes alongside tools/', async () => {
+      write('tools/x.mjs', 'export const t = 1;\n');
+      write('packages/pub/index.js', 'export const x = 1;\n');
+      commit('mixed');
+      expect((await check()).ok).toBe(false);
+    });
+
+    it('is red when a published package changes alone', async () => {
+      write('packages/pub/index.js', 'export const x = 1;\n');
+      commit('pub');
+      expect((await check()).ok).toBe(false);
+    });
+
+    it('is red when a private library package (not tooling) changes', async () => {
+      write('packages/priv/index.js', 'export const y = 2;\n');
+      commit('priv lib');
+      expect((await check()).ok).toBe(false);
+    });
+  });
 });
