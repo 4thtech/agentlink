@@ -1,7 +1,6 @@
-// The pure policy engine (M1-7d; 07 §2, 06 §3, G-6). Minimal for M1a (D-33): contacts and
-// envelopes, the plain `commitments.accept` rule, and the G-6 fail-closed result. The auto-accept
-// limits are M1-20 and the files, proofs and receipts rules M1-7i; until then those actions never
-// come out `allow` unless a rule says so explicitly here.
+// The pure policy engine (M1-7d; 07 §2, 06 §3, G-6): contacts and envelopes, the plain
+// `commitments.accept` rule, and the G-6 fail-closed result. The auto-accept limits are M1-20
+// (commitments.test.ts); the files and proofs rules in full are M1-7i (policy-files-proofs.test.ts).
 import { POLICY_DEFAULTS, defaultPolicy, type Policy } from '@agentlink/types';
 import { describe, expect, it } from 'vitest';
 import {
@@ -43,6 +42,28 @@ const send = (sizeBytes = 100, contact = A): PolicyAction => ({
   sizeBytes,
 });
 const hour = (n: number): PolicyContext => ({ contactEnvelopesLastHour: n });
+/** A paid proof well within the default limits, with an empty budget ledger (M1-7i). */
+const PROOF: PolicyAction = {
+  kind: 'proof',
+  feeUsd: '0.01',
+  maxFeeUsd: '0.01',
+  counterparty: null,
+};
+const PAID: PolicyContext = {
+  now: 1_800_000_000,
+  ledger: { status: 'ok', epoch: 0, newestT: 0, entries: [] },
+};
+const WORK = '/home/u/Work';
+const FILE_CTX: PolicyContext = {
+  allowedFolderRealpaths: [WORK],
+  ownStorageConfigured: false,
+  dropCanTake: true,
+};
+const sendFile = (sizeBytes: number): PolicyAction => ({
+  kind: 'file.send',
+  sizeBytes,
+  realpath: `${WORK}/a.pdf`,
+});
 /** A commitment without terms (an `accepted` acknowledgement): the plain rule; limits in commitments.test.ts. */
 const ACK: PolicyAction = {
   kind: 'commitment',
@@ -207,12 +228,13 @@ const RULES: readonly Row[] = [
     action: ACK,
     expected: 'approval',
   },
-  // proofs (M1-7i adds the budget rules; a deny always wins)
-  { name: 'proof, defaults', policy: defaults, action: { kind: 'proof' }, expected: 'approval' },
+  // proofs (06 §3 defaults: notarize allow within $1 per action and $5 a day; M1-7i)
+  { name: 'proof, defaults', policy: defaults, action: PROOF, context: PAID, expected: 'allow' },
   {
     name: 'proof, deny',
     policy: signed((p) => (p.proofs.notarize = 'deny')),
-    action: { kind: 'proof' },
+    action: PROOF,
+    context: PAID,
     expected: 'deny',
   },
   // proofs.allowKeyDisclosure
@@ -228,17 +250,26 @@ const RULES: readonly Row[] = [
     action: { kind: 'key.disclose' },
     expected: 'deny',
   },
-  // files (M1-7i): size cap; otherwise the owner decides
+  // files (M1-7i): no folder allowed by default; an allowed folder and the size cap
   {
-    name: 'file 100 MB',
+    name: 'file, defaults: no folder allowed',
     policy: defaults,
-    action: { kind: 'file.send', sizeBytes: 100 * MB },
-    expected: 'approval',
+    action: sendFile(10),
+    context: FILE_CTX,
+    expected: 'deny',
+  },
+  {
+    name: 'file 100 MB in an allowed folder',
+    policy: signed((p) => (p.files.allowedFolders = ['~/Work'])),
+    action: sendFile(100 * MB),
+    context: FILE_CTX,
+    expected: 'allow',
   },
   {
     name: 'file 100 MB + 1',
-    policy: defaults,
-    action: { kind: 'file.send', sizeBytes: 100 * MB + 1 },
+    policy: signed((p) => (p.files.allowedFolders = ['~/Work'])),
+    action: sendFile(100 * MB + 1),
+    context: FILE_CTX,
     expected: 'deny',
   },
   // receipts
@@ -332,17 +363,20 @@ const FAIL_CLOSED: readonly Row[] = [
     expected: 'deny',
   },
   { name: 'commitment', policy: failClosed, action: ACK, expected: 'approval' },
-  { name: 'paid proof', policy: failClosed, action: { kind: 'proof' }, expected: 'approval' },
+  { name: 'paid proof', policy: failClosed, action: PROOF, context: PAID, expected: 'approval' },
   {
-    name: 'file access',
+    // No folder is allowed under fail closed, so nothing is uploaded (06 §3).
+    name: 'file send: no folder',
     policy: failClosed,
-    action: { kind: 'file.send', sizeBytes: 10 },
-    expected: 'approval',
+    action: sendFile(10),
+    context: FILE_CTX,
+    expected: 'deny',
   },
   {
     name: 'file over the default cap',
     policy: failClosed,
-    action: { kind: 'file.send', sizeBytes: 100 * MB + 1 },
+    action: sendFile(100 * MB + 1),
+    context: FILE_CTX,
     expected: 'deny',
   },
   {
@@ -466,6 +500,15 @@ describe('evaluate is deterministic and side-effect free (property)', () => {
             p.envelopes.maxEnvelopeKB = 1 + int(23);
             p.commitments.accept = pick(['allow', 'approval', 'deny'] as const);
             p.proofs.notarize = pick(['allow', 'approval', 'deny'] as const);
+            p.proofs.perActionMaxUSD = pick(['0', '0.5', '1', '2'] as const);
+            p.proofs.dailyBudgetUSD = pick(['0', '1', '5'] as const);
+            p.files.allowedFolders = pick([[], ['~/Work']] as const) as string[];
+            p.files.storage = pick(['auto', 'drop', 'own'] as const);
+            p.contactRules = pick([
+              [],
+              [{ contact: A, proofs: { notarize: 'allow' } }],
+              [{ contact: A, proofs: { perActionMaxUSD: '3' } }],
+            ] as const) as Policy['contactRules'];
             p.receipts.autoDelivered = rand() < 0.5;
             p.receipts.autoOpened = rand() < 0.5;
           }),
@@ -476,12 +519,48 @@ describe('evaluate is deterministic and side-effect free (property)', () => {
         () => fromUnknown(int(30 * KB)),
         () => send(int(30 * KB), pick([A, B, C])),
         () => ACK,
-        () => ({ kind: 'proof' }) as const,
-        () => ({ kind: 'file.send', sizeBytes: int(300 * MB) }) as const,
+        () =>
+          ({
+            kind: 'proof',
+            feeUsd: pick(['0', '0.5', '1', '2.5'] as const),
+            maxFeeUsd: '3',
+            counterparty: pick([null, { contact: A, ruleEligible: rand() < 0.5 }]),
+          }) as const,
+        () =>
+          ({
+            kind: 'file.send',
+            sizeBytes: int(300 * MB),
+            realpath: pick([`${WORK}/a.pdf`, '/etc/passwd']),
+          }) as const,
+        () => ({ kind: 'file.receive', sizeBytes: int(300 * MB) }) as const,
         () => ({ kind: 'key.disclose' }) as const,
         () => ({ kind: 'receipt.auto', receipt: pick(['delivered', 'opened'] as const) }) as const,
       ])();
-      const context = hour(int(4000));
+      const context: PolicyContext = {
+        ...hour(int(4000)),
+        ...FILE_CTX,
+        ownStorageConfigured: rand() < 0.5,
+        dropCanTake: rand() < 0.5,
+        now: PAID.now!,
+        ledger: pick([
+          PAID.ledger!,
+          { status: 'broken' } as const,
+          {
+            status: 'ok',
+            epoch: 1,
+            newestT: PAID.now! - int(90_000),
+            entries: [
+              {
+                t: PAID.now! - int(90_000),
+                ledgerEpoch: 1,
+                state: pick(['reserved', 'charged', 'released'] as const),
+                reservedUsd: '2',
+                chargedUsd: '1',
+              },
+            ],
+          } as const,
+        ]),
+      };
       const before = JSON.stringify([policy, action, context]);
       deepFreeze(policy);
       deepFreeze(action);
