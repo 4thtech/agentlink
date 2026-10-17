@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- Spec (G-26, G-20, S2, D-80, D-81): ALF1 file encryption now binds the 17-byte header into every chunk's AAD (`header ‖ u8(isFinal)`, 04 §4), so a changed header fails decryption. OCCRegistry gets an owner-signed EIP-712 `Revocation` struct with single-use owner nonces shared with `Registration`, an epoch check, and revoke while paused (05 §4). Spec only; no code change.
 - CI (M1-9c-c, S2, process): new `bundle-check` job in `ci-gate`. It builds the CLI on a runner with no keychain and no native-module build and fails when the published `dist/agentlink.js` imports a crypto-capable MCP SDK transitive package (`jose`, `pkce-challenge`, `cookie-signature`, `etag`, `hono`), an SDK subpath outside the stdio set or an undeclared package, or when `src/tools/` bundled for a neutral (Worker) platform reaches a Node built-in, `@agentlink/node` or the MCP SDK (IR-M1-9c-1 F07, D-76, 06 §1). No new dependency: it reuses the repository's Vite. `docs/process/ci-cd.md` records it.
 
 - Spec (M1-9v, S1, 06 §4): the untrusted-content wrapper spec now says that every opening and closing `untrusted_content` tag inside content is escaped, look-alike forms included, as the code already does. No behaviour change.
