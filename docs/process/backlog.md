@@ -693,6 +693,17 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:**
   - Tests: pin parsing, ancestry (older, equal, later, unknown SHA), missing stub passes with a notice. No gitleaks allowlist change, no new action, read-only token.
 
+#### OPS-CI-6 · Deterministic e2e is part of the merge gate (new)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/ci.yml`, `.github/workflows/e2e.yml`, `docs/process/ci-cd.md`
+- **Depends on:** M1-13a
+- **Spec:** `ci-cd.md`
+- **Invariants:** —
+- **Scope:**
+  - PR #219 merged a real regression because `e2e-deterministic` was not a required check. `ci.yml` now calls the job from `e2e.yml` (`workflow_call`) and lists it in `ci-gate`'s `needs`, so it blocks pull requests and the merge queue; docs-only changes skip it; `e2e-llm` stays manual-only.
+- **Acceptance:**
+  - A failing deterministic e2e fails `ci-gate`; a docs-only PR passes with it skipped; no secrets, read-only token, pinned actions unchanged.
+
 #### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
 - **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/release.yml` or a Changesets hook, `tools/**`, `docs/process/versioning.md` §5
