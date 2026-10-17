@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- Local approval page on `http://localhost:<port>` (M1-31, S2, D-79; 08 §1, 04 §2.5, 06 §2.5, 11 §6.2.1; owner decision 2026-10-17): WebAuthn does not accept an IP address as an RP ID, so the page moves from `127.0.0.1` to `localhost` for the passkey (M1-8e). The server listens on `127.0.0.1` and `::1` (IPv6-only) on the same random port and nowhere else; if another program holds `::1` on that port it tries a new one (at most 5), and a machine with no IPv6 loopback gets `127.0.0.1` only. Only `Host: localhost:<port>` and `Origin: http://localhost:<port>` are accepted; `127.0.0.1:<port>` is now refused. The OAuth loopback redirect stays on `127.0.0.1`.
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.
 
 ## [0.1.0] - 2026-10-16

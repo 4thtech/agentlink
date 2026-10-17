@@ -251,7 +251,7 @@ When any tool needs approval it returns:
   "status": "pending_approval",
   "approvalId": "apr_…",
   "summary": "Notarize 'contract-signed.pdf' to Marko's agent for $0.10",
-  "url": "http://127.0.0.1:47321/approve/apr_…",
+  "url": "http://localhost:47321/approve/apr_…",
   "nextStep": "Tell the user approval is needed and share the link. After approval, call the same tool again with approvalId."
 }
 ```
