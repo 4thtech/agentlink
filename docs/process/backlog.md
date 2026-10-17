@@ -672,7 +672,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - deps-check refuses any `@agentlink/*` dependency or import.
 
 #### OPS-CI-3 · pr-hygiene accepts `OPS-<WORD>-<n>` task IDs (new)
-- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
+- **Status:** done (4thtech/agentlink#197) · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/pr-hygiene.yml`, `tools/pr-hygiene.test.mjs`, `.github/pull_request_template.md`
 - **Depends on:** —
 - **Spec:** `ci-cd.md` (Workflows, pr-hygiene)
@@ -685,7 +685,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - Review note (PR #197 review L1, 2026-10-17): tighten the tooling-only path exemption for nested packages.
 
 #### OPS-CI-5 · Required Windows/macOS path-guard test job (new)
-- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
+- **Status:** done (4thtech/agentlink#214) · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/ci.yml`, `docs/process/ci-cd.md`
 - **Depends on:** M1-15
 - **Spec:** `ci-cd.md` (Workflows, ci); `04` §4
@@ -696,7 +696,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - The job fails if the file did not run, ran fewer than 10 tests, or any test was skipped or did not pass (JSON report check).
 
 #### OPS-CI-4 · Guard the sync secret-scan stub pin (new)
-- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
+- **Status:** done (4thtech/agentlink#203) · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `tools/sync-pin-check/**`, `.github/workflows/security.yml`, `docs/process/sync-protocol.md`, `docs/process/ci-cd.md`
 - **Depends on:** —
 - **Spec:** `ci-cd.md` ("The sync branch")
@@ -708,7 +708,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - Review note (IR-OPS-CI-4-1 L1/L2/L3, 2026-10-17): tighten the pin check (reachability from `main`), improve its message and add a subdirectory test.
 
 #### OPS-CI-6 · Deterministic e2e is part of the merge gate (new)
-- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`.github/**` is a sensitive path; owner "merge")
+- **Status:** done (4thtech/agentlink#232) · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`.github/**` is a sensitive path; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/ci.yml`, `.github/workflows/e2e.yml`, `docs/process/ci-cd.md`
 - **Depends on:** M1-13a
 - **Spec:** `ci-cd.md`
@@ -719,7 +719,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - A failing deterministic e2e fails `ci-gate`; a docs-only PR passes with it skipped; no secrets, read-only token, pinned actions unchanged.
 
 #### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
-- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
+- **Status:** done (4thtech/agentlink#198) · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/release.yml` or a Changesets hook, `tools/**`, `docs/process/versioning.md` §5
 - **Depends on:** —
 - **Spec:** `versioning.md` §5; `release-and-deployment.md` §5.1
@@ -732,7 +732,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - Review note (PR #198 review L1/L2, 2026-10-17): the "nothing to release" message is misleading when changesets are pending (say "add an entry under [Unreleased] in CHANGELOG.md, versioning.md section 5"); CRLF input gives mixed line endings.
 
 #### OPS-REL-4 · Changelog fragments in `changelog.d/` (new, owner-approved 2026-10-17)
-- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`, `AGENTS.md`; owner "merge")
+- **Status:** done (4thtech/agentlink#224) · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`, `AGENTS.md`; owner "merge")
 - **Repo/path:** agentlink · `tools/release/**`, `changelog.d/**`, `.github/workflows/ci.yml`, `.github/pull_request_template.md`, `docs/process/{versioning,delivery-process}.md`, `AGENTS.md` (one bullet)
 - **Depends on:** OPS-REL-3
 - **Spec:** `versioning.md` §5
@@ -1005,7 +1005,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - Review note (M1-1h-e (parked, 2026-10-17), 2026-10-17): the Python 3.15 upgrade of the vector generators is parked: `coincurve` has no `cp315` wheel yet. Re-check when it ships (see the Python upgrade item under M1-13a and the closed Renovate PRs #154 and #156).
 
 #### M1-1i · Independent test vectors for the proof-layer suites (new, split from M1-1h)
-- **Status:** in-progress (partial scope, owner-orchestrator decision 2026-10-17: STREAM and revoke moved to M1-1i-b) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in-progress (partial scope, owner-orchestrator decision 2026-10-17: STREAM and revoke moved to M1-1i-b) (partial; #212 merged the eip712-proof and prf-wrap vectors as pending) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/
 - **Depends on:** M1-1h (its generators, rules and pinned packages are merged; its open G-2 follow-up suite `envelope-sig` is unrelated to the proof layer and does not block this card)
 - **Spec:** 04 §2.3, §5; 05 §3.1, §4, §8; `development-process.md` §9.1
@@ -1115,7 +1115,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - `AgentCard` EIP-712 vectors from M1-1h pass in all runtimes.
 
 #### M1-1j · crypto: EIP-712 proof types and commitment helpers (new, split from M1-1e)
-- **Status:** in-progress (revoke struct defined by D-81, 05 §4; its vectors come from M1-1i-b) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in-progress (revoke struct defined by D-81, 05 §4; its vectors come from M1-1i-b) (#221 merged the Record, Receipt and Registration typed data, the recipient commitment and the EIP-3009 typed data; the revoke struct is left) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto
 - **Depends on:** M1-1e, M1-1i
 - **Spec:** 04 §5; 05 §3.1, §4, §8
@@ -1151,7 +1151,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - M1-1f (follow-up, D-66): owner passphrase minimum. Setting or changing a chosen owner passphrase (kind 2) refuses a candidate with fewer than 12 Unicode code points after NFKC, the same rule as `newKeystoreKek` applies to the agent passphrase. The check runs on `normalizeSecret`'s output, before the KDF (04 §2.8). Tests: 11 code points refused; 12 accepted; a string that NFKC shortens below 12 refused. Unlocking an existing wrap is unaffected.
 
 #### M1-1k · crypto: passkey PRF seed wrapping and recovery code (new, split from M1-1f)
-- **Status:** in-progress (4thtech/agentlink#228; unblocked by D-82, owner decision 2026-10-17: blob formats `ALKP` and `ALKR` defined in 04 §2.3.1 and §2.3.2) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#228; unblocked by D-82, owner decision 2026-10-17: blob formats `ALKP` and `ALKR` defined in 04 §2.3.1 and §2.3.2) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto, test-vectors/prf-wrap, tools/vectors/
 - **Depends on:** M1-1f, M1-1i; D-82 spec PR merged
 - **Spec:** 04 §2.3, §2.3.1, §2.3.2, §2.8 (`password` kind 1); 08 §2.1
@@ -1881,7 +1881,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Storage (`@agentlink/storage`)
 
 #### M1-6a · storage: adapter interface, inline adapter, S3 adapter
-- **Status:** in review · **Size:** M · **Tier:** Sonnet · **Security:** S2 (`packages/*`; card said S1) · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#216) · **Size:** M · **Tier:** Sonnet · **Security:** S2 (`packages/*`; card said S1) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage
 - **Depends on:** M1-1a, M0-8, M0-2g (R2 test token); gap G-23 resolved
 - **Spec:** 07 §5.1–§5.3; 04 §4 (delivery, expiry); 02 F-30–F-32; D-18
@@ -2107,7 +2107,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Threat note (draft):** assets: the owner's authority over approvals and policy (I-4) and the policy itself. Entry points: a `SignedOwnerAction` from the CLI, the local UI or an `approval` / `policy` envelope (untrusted bytes until verified, I-5); the stored `policies`, `approvals` and `owner_action_nonces` rows (writable by a same-user process); the KeyStore policy mark. Abuse cases: (a) a forged, re-encoded or cross-op object (envelope-tagged signature, another agent's or another owner's object, a batch read as a decide) is applied; (b) a replay of an applied object within its lifetime, or two concurrent deliveries applying twice; (c) a stale or future-dated object, or a decision that outlives its request; (d) a batch that slips in another agent's, an already-decided, an expired, a mismatched or a commitment item, or is applied in part, or whose refused nonce can be reused later; (e) a policy row edited, deleted or rolled back in the store, or the mark deleted, falling back to looser defaults (G-6); (f) a stored approval reused for another action after its row was edited. Stopped by: strict parsing (I-JSON, integers only) and the strict schemas, which reject instead of normalising; the owner-action tag over sha256(JCS(body)) with `op` and `params` inside; the `agent` and `owner` binding against the own card; G-7 skew, expiry and `L(op)` with `now` passed in; nonce check, record and effects in one store transaction, with a refused batch's nonce burnt in that transaction; the digest recomputed from the stored request; re-verification on every load and use; fail closed when the mark is above 0 or unknown. Residual: a same-user process that rolls back both the store and the KeyStore mark, or deletes nonce rows, can replay or roll back within the G-1 residual (04 §2.5, D-67); a modified installation can have a different object signed (G-1).
 
 #### M1-7i · core: policy rules for files, proofs and receipts (new, split from M1-7d)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#217) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7d, M1-20; gap G-7 resolved
 - **Spec:** 06 §3; 07 §2; 02 F-61–F-63
@@ -2418,7 +2418,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - 07 text and the vectors agree; independent review; M2-3a lists these vectors as its conformance suite.
 
 #### M1-8h-b · node: owner-card follow-ups (new, IR-M1-8h-1 Lows)
-- **Status:** in review (4thtech/agentlink#227; L1 resolved by M1-9x #206) · **Size:** S · **Tier:** Opus · **Security:** S2 (owner key and card signing, audit-rules §2.4) · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#227) · **Size:** S · **Tier:** Opus · **Security:** S2 (owner key and card signing, audit-rules §2.4) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node, apps/cli
 - **Depends on:** M1-8h (merged)
 - **Spec:** 04 §2.4, §2.5; IR-M1-8h-1
@@ -2455,7 +2455,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The build-plan test above covers a batch: the same-user script, with the same read access, cannot add an item to a batch the owner reviewed or use an item for another call (with M1-9b and M1-7e).
 
 #### M1-8d · node: local approval server
-- **Status:** in review (4thtech/agentlink#207) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#207; the localhost approval page server is #225, M1-31) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node
 - **Depends on:** M1-8c, M1-7e
 - **Spec:** 08 §1; 03 §4.5; 04 §2.5; 06 §2.5
@@ -2705,7 +2705,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - F06 and F07 each have a test named after the finding; the bundle-check job fails on an injected `jose` import.
 
 #### M1-9c-c · CI: neutral-platform bundle-check job (new, IR-M1-9c-1 F07)
-- **Status:** in review (no bundler dependency was needed: the check reuses the repository's Vite for parsing and the neutral bundle) · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**` sensitive path: merges only on Tali's "merge"; supply-chain surface for the bundler) · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#205) · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**` sensitive path: merges only on Tali's "merge"; supply-chain surface for the bundler) · **Phase:** M1a
 - **Repo/path:** agentlink · `.github/workflows`, `apps/cli` (the check script)
 - **Depends on:** M1-9c, M1-9c-b (both merged)
 - **Spec:** 06 §2.0; IR-M1-9c-1 F07; D-76
@@ -2768,7 +2768,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Note (IR-M1-7k-1 Q3, 2026-10-15):** the outbox needs no leader: M1-7k's per-row claim already lets only one process publish each row. For relay subscriptions, use a per-agent lease row with compare-and-set (a random holder ID, a 60 s lease renewed every 20 s, takeover once it lapses), as the idempotency lease does (07 §3.3); this needs a store table and a migration. Do not hold the M1-8b inter-process lock for this: a long-lived holder would block the policy-mark and file-KeyStore critical sections (`store_busy` after 10 s). Receiving is idempotent (seen-set, envelopeHash, one store transaction), so a lapsed or doubled holder only costs extra relay connections.
 
 #### M1-9s · core: live relay subscriptions (Transport.subscribe) for the background loop (new, IR-M1-9r-1 L2)
-- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/core/**`, the receive path) · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#204) · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/core/**`, the receive path) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core, packages/transport-nostr, apps/cli (`src/mcp/loop.ts`)
 - **Depends on:** M1-9r
 - **Spec:** 06 §6; 07 §4.1 (`subscribe` follows the same handler shape as `sync`), §4.2
@@ -3144,7 +3144,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Cross-cutting M1 (new)
 
 #### M1-15 · Security utilities: SSRF-safe fetch, path guard, filename sanitiser (new)
-- **Status:** in review (branch `m1-15-ssrf-path-guard`) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#208) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node (DNS-pinned fetch), packages/core (pure checks)
 - **Depends on:** M0-2d
 - **Spec:** 04 §4 (SSRF, allowed folders, downloads), §7; 06 §2.3
@@ -3159,7 +3159,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Delivered in review:** `packages/core/src/fetch-url.ts`, `file-name.ts`, `path-guard.ts` (pure; both path flavours tested on every OS) and `packages/node/src/safe-fetch.ts`, `allowed-path.ts` (realpath, pinned TLS to the checked address, exclusive inbox create). Windows runs the Node tests in CI job `node-os` (junction links, no admin), which is outside `ci-gate`. G-14: only the Node path is built; Workers semantics (raw check + Workers egress) land with M2-3b. Not wired into tools (M1-7f, M1-9d).
 
 #### M1-15-b · node: Windows path-guard fixes (8.3 names, symlinks) (new)
-- **Status:** in review (branch `m1-15-b-windows-path-guard`) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#229) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node (allowed-path), packages/core (path-guard tests)
 - **Depends on:** M1-15
 - **Spec:** 04 §4 (Allowed folders, Downloads), §7
@@ -3308,6 +3308,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-22-b · tools: contact names, not raw addresses, in summaries (new; Phase M1b)
 
+- **Status:** done (4thtech/agentlink#219; the `termsParties` output-schema fix is #231) · **Phase:** M1b
 - **Class:** S1 · **Owner decision (Tali, 2026-10-17)** · **Follows:** M1-22, local dogfood run 2 notes (a) and (b)
 - **Scope:**
   - An agent address equal to the user's own agent shows as "you"; equal to a paired contact's agent, as that contact's name under 06 §2.1 (else "a contact"). Unknown addresses stay only in structured or untrusted fields, never in summary text. Done as the `termsParties` field of `agentlink_inbox` offers.
@@ -3332,7 +3333,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - No wallet, extension, gas or chain choice appeared in either setup (D-39); dogfood log (dates, harnesses, versions, issues filed) and owner sign-off recorded.
 
 #### M1-23-b · Dogfood: two-machine mode and runbook (new)
-- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`tools/dogfood/**` and a runbook; sensitive path `docs/runbooks/**`: merges only on Tali's "merge") · **Phase:** M1b (after M1-23)
+- **Status:** done (4thtech/agentlink#202) · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`tools/dogfood/**` and a runbook; sensitive path `docs/runbooks/**`: merges only on Tali's "merge") · **Phase:** M1b (after M1-23)
 - **Repo/path:** agentlink · `tools/dogfood/**`, `docs/runbooks/dogfood-m1a.md` (RB-17 section 10)
 - **Depends on:** M1-23 (the single-machine script and RB-17)
 - **Spec:** 10 "Gate M1" (J1, J4, J8 and the no-wallet UX rule, run by hand on two Macs); D-39, D-78; 04 §2.5 (approvals are typed by the owner)
@@ -3359,7 +3360,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** tests first (RED commit): two agents under one OS user each get a card for the same owner, an agent cannot trigger it (no TTY or a harness marker refuses before the owner key is read), an approval for one agent is refused by the other, `init` writes only to the chosen harness, and declining every change keeps the identity.
 
 #### M1-9u · CLI: add-agent dead end and the missing owner card (new, from IR-M1-9t-1; extended by a live finding)
-- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#201) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`owner add-agent`, `doctor`, harness detection)
 - **Depends on:** M1-9t
 - **Spec:** 04 §2.8 ("Adding an agent to the existing owner"); 06 §7; D-78
@@ -3373,7 +3374,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-9x-1 L-3, 2026-10-17): use a metadata-only existence check for `hasOwnerOnMachine` before it is wired into doctor.
 
 #### M1-9w · CLI: Claude Desktop in init, Gemini CLI detection (new, from M1-9a and M1-9u (b))
-- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#200) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`src/harness/**`, `src/commands/init.ts`), docs-site `technical/reference/harness-configuration.md`
 - **Depends on:** M1-9t
 - **Spec:** 06 §7 (harness table, Claude Desktop row); D-39, D-78
@@ -3385,7 +3386,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (PR #200 review L1/L3, 2026-10-17): Windows Store (MSIX) Claude Desktop keeps its config under `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude` (a redirected `APPDATA` differs too), so init would write a file the app ignores: add a doctor or docs hint. On Linux the "didn't find ..." line names Claude Desktop, which cannot exist there.
 
 #### M1-9x · node: recover an owner with no attached agent (new, from the review of PR #201)
-- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#206) · **Size:** S · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node (`owner-add-agent.ts`, `owner-keystore.ts`), packages/crypto (`openOwnerSeedWithoutCard`), apps/cli (`owner add-agent`)
 - **Depends on:** M1-9t
 - **Spec:** 04 §2.5, §2.8 ("Adding an agent to the existing owner", "Expected owner"); 07 §9.4; D-78
@@ -3403,7 +3404,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - L-5: give the confirmation a real reference: `owner init` should tell the owner to note the owner fingerprint next to the code, and the M1b recovery kit (M1-9h/M1-9i) should print it.
 
 #### M1-9y · cli: require Node 22.14+ with a clear message; quiet info logs (new, live finding 2026-10-17)
-- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#235) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`cli.ts`, `node-check.ts`, `runtime/log-level.ts`), docs-site get-started and troubleshooting, README
 - **Depends on:** M1-9k
 - **Spec:** 11 §5 (copy)
@@ -3414,7 +3415,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** tests with an injected version; default level hides info lines, `AGENTLINK_LOG` shows them; docs prerequisites and troubleshooting name 22.14.
 
 #### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
-- **Status:** in review · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#196) · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/06-mcp-server.md §4
 - **Depends on:** M1-9c (the wrapper)
 - **Spec:** 06 §4; 04 §4 (untrusted content)
@@ -3481,7 +3482,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `grep` finds none of the 17 pre-D-53 tool names in `docs/` outside the 06 §2.0 consolidation table and contract or SDK function names; the independent S2 review confirms no rule changed.
 
 #### M1-31 · Local UI passkey origin: `localhost` vs `127.0.0.1` (new, IR-D56-1 F12)
-- **Status:** done (4thtech/agentlink#213; D-79, owner decision 2026-10-17: `http://localhost:<port>` on 127.0.0.1 and ::1; the PRF passkey test lands with M1-8e) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#213, #225 (approval page on localhost); D-79, owner decision 2026-10-17: `http://localhost:<port>` on 127.0.0.1 and ::1; the PRF passkey test lands with M1-8e) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/08-clients-console-cloud.md §1, docs/foundation/06-mcp-server.md §2.5 (example URL), apps/cli (local UI server)
 - **Depends on:** — (before M1-8e and M1-11a are implemented)
 - **Spec:** 08 §1; 04 §2.5; 06 §2.5; 11 §6.2.1
@@ -3514,7 +3515,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Property test: across random interleavings of offers, counters, approvals and `proof` envelopes, no scope ever sends more than one `accept` or signs more than one receipt, and nothing runs without an owner-signed approval or a matching grant.
 
 #### M1-32-d · core: one clock read for an approval scope (new, e2e flake on J8)
-- **Status:** in review (2026-10-17) · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#238) · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (`src/approvals.ts`), apps/cli (`src/tools/terms-common.ts`)
 - **Depends on:** M1-32
 - **Spec:** 04 §3.4.1, §3.4.2 (`scope.createdAt` equals `requestedAt`); 06 §2.2a
@@ -3523,7 +3524,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** RED commit: a core test whose clock ticks on every read gets `pending_approval` (failed with `approval_action_invalid`), and the approval then sends the accept once; an approvals unit test for a stale and a future scope.
 
 #### M1-32-c · MCP terms tools: accept and pass `clientRequestId` (new, IR-M1-22-1)
-- **Status:** in review (2026-10-17) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#199) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`src/tools/{propose-terms,respond-to-terms}.ts`)
 - **Depends on:** M1-9q, M1-32-b
 - **Spec:** 06 §1 rule 6, §2.2a; 07 §3.3
@@ -4443,7 +4444,7 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
   - As DOCS-M1a, for v0.2.0; testnet contract addresses on the Contracts page equal `@agentlink/occ-v2-abi`.
 
 #### DOCS-KNOW · Consolidate `knowledge/` into an overview and a user guide (new)
-- **Status:** in-review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#210) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · knowledge/, llms.txt, tools/
 - **Depends on:** DOCS-M1a
 - **Spec:** `knowledge/README.md` (maintenance rule); 11 §5 (vocabulary); the pattern of The Curator's `llm-docs/` (few self-contained files, headings as visitor questions)
@@ -4455,7 +4456,7 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
   - `node tools/docs-status/index.mjs --check`, `check-knowledge-size` and `check-knowledge-links` pass; no true fact is lost; no reference to an old path remains.
 
 #### DOCS-SETUP · Beginner page: set up AgentLink in your AI tool (new)
-- **Status:** in-review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#234) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · docs-site/guide/get-started/, knowledge/, README.md, llms.txt
 - **Depends on:** DOCS-M1a
 - **Spec:** 11 §5 (vocabulary); `apps/cli/src/harness/harnesses.ts` (harness ids)
