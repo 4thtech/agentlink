@@ -58,8 +58,7 @@ import {
   renderCombinedMd,
   sealLine,
   sshArgs,
-  sshCheckArgs,
-  sshSetupHelp,
+  sshPreflight,
   wireOutcome,
 } from './remote.mjs';
 
@@ -528,13 +527,9 @@ async function main() {
       return 1;
     }
     // Key login only (BatchMode): a password prompt would hang the run.
-    const r = spawnSync('ssh', sshCheckArgs(options.remoteHost), {
-      encoding: 'utf8',
-      timeout: 30_000,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    if (r.error || r.status !== 0) {
-      console.error(`PREFLIGHT: ${sshSetupHelp(options.remoteHost)}`);
+    const check = sshPreflight(options.remoteHost);
+    if (!check.ok) {
+      console.error(`PREFLIGHT: ${check.help}`);
       console.error('Nothing was started.');
       return 1;
     }

@@ -21,6 +21,7 @@ import {
   renderCombinedMd,
   shq,
   sshArgs,
+  sshPreflight,
   sshSetupHelp,
   wireOutcome,
 } from './remote.mjs';
@@ -331,6 +332,26 @@ cat >> "${dir}/stdin.log"
     expect(stdin).toContain(INVITE);
     expect(argv).not.toContain('SECRETINVITETOKEN');
     expect(r.stdout + r.stderr).not.toContain('SECRETINVITETOKEN');
+  });
+
+  it('a failing key login stops before anything starts and prints the setup steps', () => {
+    const calls = [];
+    const fake = (_cmd, args, spawnOpts) => {
+      calls.push(args);
+      return spawnSync(join(dir, 'ssh'), args, {
+        ...spawnOpts,
+        env: { ...process.env, FAKE_SSH_FAIL: '1' },
+      });
+    };
+    const r = sshPreflight('mini.local', fake);
+    expect(r.ok).toBe(false);
+    expect(r.help).toMatch(/Remote Login/);
+    expect(r.help).toMatch(/ssh-copy-id mini.local/);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain('BatchMode=yes');
+    expect(sshPreflight('mini.local', (_c, a, o) => spawnSync(join(dir, 'ssh'), a, o))).toEqual({
+      ok: true,
+    });
   });
 
   it('--two-mac refuses to run without a terminal or inside an AI app', () => {

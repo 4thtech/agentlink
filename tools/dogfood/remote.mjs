@@ -7,6 +7,7 @@
 // `@@AL `: B -> A on B's stdout, A -> B on B's stdin. Nothing secret is ever on a command line:
 // the invite link goes over B's stdin only. Owner approvals are never part of the protocol; A runs
 // the approve command with a real terminal and the person types the owner code there.
+import { spawnSync } from 'node:child_process';
 import { validInviteUrl } from './lib.mjs';
 
 export const PROTOCOL_PREFIX = '@@AL ';
@@ -296,6 +297,19 @@ export function approveInvocation(options, where, agent, approvalId, parse) {
 
 /** The ssh reachability check, and what to do when it fails. */
 export const sshCheckArgs = (host) => sshArgs(host, 'true');
+
+/**
+ * Key-login check (BatchMode: a password prompt would hang the run). `run` is injectable for tests.
+ * Returns { ok: true } or { ok: false, help } with the exact setup steps.
+ */
+export function sshPreflight(host, run = spawnSync) {
+  const r = run('ssh', sshCheckArgs(host), {
+    encoding: 'utf8',
+    timeout: 30_000,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  return r.error || r.status !== 0 ? { ok: false, help: sshSetupHelp(host) } : { ok: true };
+}
 
 export function sshSetupHelp(host) {
   return [
