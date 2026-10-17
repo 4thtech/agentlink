@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/4thtech/agentlink/test-vectors/prf-wrap/case.schema.json",
   "title": "prf-wrap case",
-  "description": "Passkey PRF wrap key (04 \u00a72.3). `prfSalt`: the 32-byte PRF salt sha256(\"agentlink-owner-v1\"). `wrapKey`: HKDF-SHA256 of a 32-byte PRF output with an empty salt and info \"owner-seed-wrap\", 32 bytes. Hex without 0x.",
+  "description": "Passkey PRF wrap (04 \u00a72.3) and owner seed blobs (04 \u00a72.3.1 ALKP v1, \u00a72.3.2 ALKR v1; D-82). `prfSalt`: the 32-byte PRF salt sha256(\"agentlink-owner-v1\"). `wrapKey`: HKDF-SHA256 of a 32-byte PRF output with an empty salt and info \"owner-seed-wrap\", 32 bytes. `sealPasskey` / `sealRecovery`: the whole blob for a fixed nonce (and salt). `openPasskey` / `openRecovery`: the seed, or `outcome: reject`; an empty `expectedOwnerNostr` means the caller knows no expected owner. `passkeyHeader`: the public header fields of an ALKP blob. Hex without 0x; codes as text.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -88,6 +88,301 @@
               "pattern": "^[0-9a-f]{64}$"
             }
           }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "prfOutput",
+            "seed",
+            "credentialId",
+            "nonce"
+          ],
+          "properties": {
+            "op": {
+              "const": "sealPasskey"
+            },
+            "prfOutput": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "seed": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "credentialId": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "nonce": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{24}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "blob"
+          ],
+          "properties": {
+            "blob": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "blob",
+            "prfOutput",
+            "expectedOwnerNostr"
+          ],
+          "properties": {
+            "op": {
+              "const": "openPasskey"
+            },
+            "blob": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "prfOutput": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "expectedOwnerNostr": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "seed"
+              ],
+              "properties": {
+                "seed": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "blob"
+          ],
+          "properties": {
+            "op": {
+              "const": "passkeyHeader"
+            },
+            "blob": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ownerNostr",
+                "credentialId"
+              ],
+              "properties": {
+                "ownerNostr": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "credentialId": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "code",
+            "seed",
+            "salt",
+            "nonce",
+            "memoryKiB",
+            "iterations",
+            "parallelism"
+          ],
+          "properties": {
+            "op": {
+              "const": "sealRecovery"
+            },
+            "code": {
+              "type": "string"
+            },
+            "seed": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "salt": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "nonce": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{24}$"
+            },
+            "memoryKiB": {
+              "type": "integer"
+            },
+            "iterations": {
+              "type": "integer"
+            },
+            "parallelism": {
+              "type": "integer"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "blob"
+          ],
+          "properties": {
+            "blob": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "blob",
+            "code",
+            "source",
+            "expectedOwnerNostr"
+          ],
+          "properties": {
+            "op": {
+              "const": "openRecovery"
+            },
+            "blob": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "code": {
+              "type": "string"
+            },
+            "source": {
+              "enum": [
+                "prompt",
+                "file"
+              ]
+            },
+            "expectedOwnerNostr": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "seed"
+              ],
+              "properties": {
+                "seed": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
         }
       }
     }
