@@ -135,6 +135,57 @@ describe('bundle-check (M1-9c-c, IR-M1-9c-1 F07)', () => {
       expect(req.code).toBe(1);
       expect(req.stderr).toContain('require(');
     });
+
+    // IR-M1-9c-c-1 L1: only the built-ins the bundle uses today pass.
+    it.each(['node:module', 'node:vm', 'node:child_process', 'node:worker_threads', 'node:crypto'])(
+      'fails on the built-in %s (outside the bundle allowlist)',
+      (name) => {
+        const run = checkInjected(`builtin-${name.replace(/\W/g, '-')}`, `import "${name}";`);
+        expect(run.code).toBe(1);
+        expect(run.stderr).toContain(`"${name}"`);
+        expect(run.stderr).toContain('built-in outside the bundle allowlist');
+      },
+    );
+
+    // IR-M1-9c-c-1 L1: require-equivalents that load a module without an import.
+    it.each([
+      ['createRequire', 'const cr = createRequire; cr(import.meta.url)("jose");', 'createRequire'],
+      ['globalThis.require', 'const j = globalThis.require("jose");', 'require'],
+      ['module.require', 'const j = module.require("jose");', 'require'],
+      ['computed require', 'const j = globalThis["req" + "uire"]("jose");', 'globalThis['],
+      ['getBuiltinModule', 'const m = process.getBuiltinModule("module");', 'getBuiltinModule'],
+      ['import.meta.resolve', 'const u = import.meta.resolve("jose");', 'import.meta.resolve'],
+    ])('fails on loader access: %s', (name, line, needle) => {
+      const run = checkInjected(`loader-${name.replace(/\W/g, '-')}`, line);
+      expect(run.code).toBe(1);
+      expect(run.stderr).toContain('loader access');
+      expect(run.stderr).toContain(needle);
+    });
+  });
+
+  describe('the neutral bundle output (IR-M1-9c-c-1 L2)', () => {
+    it.each([
+      ['non-literal import()', 'export const load = (n: string) => import(n);\n', 'import('],
+      [
+        'getBuiltinModule',
+        "export const m = (globalThis as any).process.getBuiltinModule('fs');\n",
+        'getBuiltinModule',
+      ],
+      [
+        'computed require',
+        "export const r = (globalThis as any)['req' + 'uire'];\n",
+        'globalThis[',
+      ],
+    ])(
+      'fails on %s in the output chunk',
+      (name, source, needle) => {
+        const run = checkToolsEntry(`out-${name.replace(/\W/g, '-')}`, source);
+        expect(run.code).toBe(1);
+        expect(run.stderr).toContain('neutral bundle output');
+        expect(run.stderr).toContain(needle);
+      },
+      60_000,
+    );
   });
 
   describe('src/tools/ bundled for the neutral (Worker) platform (06 §1, IR-M1-9j-1 F04)', () => {
