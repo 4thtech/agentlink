@@ -16,6 +16,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import process from 'node:process';
 import { createInterface } from 'node:readline';
 import {
@@ -42,6 +43,21 @@ import {
   scanResults,
   waitForApproval,
 } from './lib.mjs';
+import {
+  approvalNotice,
+  approveInvocation,
+  combineResults,
+  combinedOk,
+  encodeLine,
+  makeInbox,
+  parseLine,
+  remoteRunCommand,
+  renderCombinedMd,
+  sshArgs,
+  sshCheckArgs,
+  sshSetupHelp,
+  wireOutcome,
+} from './remote.mjs';
 
 const log = (text) => console.log(text);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -364,6 +380,66 @@ async function listFiles(dir) {
   return out;
 }
 
+/** One protocol line to stdout (Mac B, hands-free). */
+const emit = (kind, ...fields) => process.stdout.write(`${encodeLine(kind, ...fields)}\n`);
+
+/** Feeds lines from a readable into the inbox; other lines go to `other`. */
+function pumpLines(readable, inbox, other) {
+  const rl = createInterface({ input: readable });
+  rl.on('line', (line) => {
+    const message = parseLine(line);
+    if (message !== undefined) inbox.push(message);
+    else if (line.startsWith('@@AL ')) other('(ignored a malformed protocol line)');
+    else other(line);
+  });
+  return rl;
+}
+
+/** Starts role B on Mac B over ssh. The invite link goes over its stdin, never its arguments. */
+function startRemote(options, runId, inbox) {
+  const child = spawn('ssh', sshArgs(options.remoteHost, remoteRunCommand(options, runId)), {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: process.env,
+  });
+  child.stdin.on('error', () => {});
+  pumpLines(child.stdout, inbox, (line) => log(`[Mac B] ${line}`));
+  createInterface({ input: child.stderr }).on('line', (line) => console.error(`[Mac B] ${line}`));
+  child.on('error', () => inbox.end());
+  child.on('close', () => inbox.end());
+  process.on('exit', () => child.kill());
+  return {
+    send(kind, ...fields) {
+      if (child.stdin.writable) child.stdin.write(`${encodeLine(kind, ...fields)}\n`);
+    },
+    async stop() {
+      child.stdin.end();
+      await Promise.race([new Promise((r) => child.once('close', r)), delay(5_000)]);
+      child.kill();
+    },
+  };
+}
+
+/**
+ * Runs the approve command with this terminal (stdio inherited; ssh -t for Mac B), so the owner
+ * types the code themself. The script passes no code, captures nothing, and adds no harness
+ * variable: the AI-app guard of `approve` sees this terminal's own environment.
+ */
+function runApprove(options, where, agent, approvalId) {
+  const inv = approveInvocation(options, where, agent, approvalId, splitCommand);
+  return new Promise((resolve) => {
+    const child = spawn(inv.cmd, inv.args, { stdio: inv.stdio, env: process.env });
+    const timer = setTimeout(() => child.kill(), options.approvalTimeoutMs);
+    child.on('error', () => {
+      clearTimeout(timer);
+      resolve(-1);
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolve(code ?? -1);
+    });
+  });
+}
+
 async function main() {
   let options;
   try {
@@ -378,9 +454,14 @@ async function main() {
   }
   const side = sideOf(options.role);
   const asker = makeAsker();
+  const hf = options.handsFree;
+  const tm = options.twoMac;
+  const inbox = makeInbox();
+  const hfLines = hf ? pumpLines(process.stdin, inbox, () => {}) : undefined;
+  hfLines?.on('close', () => inbox.end());
   // Mac B uses Mac A's run ID, so both sides name this run's offer the same way.
   let runId = options.role === 'b' ? options.runId : stamp();
-  if (runId === undefined && !options.dryRun) {
+  if (runId === undefined && !options.dryRun && !hf) {
     runId = await askUntil(asker, 'Run ID printed on Mac A (like 20261017-101500): ', (v) =>
       v !== undefined && /^\d{8}-\d{6}$/.test(v.trim()) ? v.trim() : undefined,
     );
@@ -394,6 +475,7 @@ async function main() {
   let invite = options.invite;
   if (
     options.role === 'b' &&
+    !hf &&
     !options.paired &&
     pairing &&
     invite === undefined &&
@@ -419,6 +501,19 @@ async function main() {
     return 0;
   }
 
+  if (tm) {
+    // Key login only (BatchMode): a password prompt would hang the run.
+    const r = spawnSync('ssh', sshCheckArgs(options.remoteHost), {
+      encoding: 'utf8',
+      timeout: 30_000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    if (r.error || r.status !== 0) {
+      console.error(`PREFLIGHT: ${sshSetupHelp(options.remoteHost)}`);
+      console.error('Nothing was started.');
+      return 1;
+    }
+  }
   const startedAt = new Date().toISOString();
   await mkdir(dir, { recursive: true, mode: 0o700 });
   log(`Results: ${dir}`);
@@ -433,9 +528,38 @@ async function main() {
     return 1;
   }
 
+  let remote;
+  let handsPaired = false;
+  if (tm) {
+    remote = startRemote(options, runId, inbox);
+    log(`Starting Mac B on ${options.remoteHost} (run ID ${runId})...`);
+    const ready = await inbox.take((m) => m.kind === 'READY', 180_000);
+    if (ready === 'timeout' || ready === 'ended') {
+      console.error(
+        `Mac B did not become ready (${ready === 'ended' ? 'it stopped; see the [Mac B] lines above' : 'timed out'}). Nothing was started.`,
+      );
+      await remote.stop();
+      return 1;
+    }
+  }
+  if (hf) {
+    emit('READY');
+    if (pairing) {
+      const got = await inbox.take(
+        (m) => m.kind === 'INVITE' || m.kind === 'PAIRED' || m.kind === 'ABORT',
+        options.stepTimeoutMs + 120_000,
+      );
+      if (got === 'timeout' || got === 'ended' || got.kind === 'ABORT') {
+        console.error('Mac A did not send the invite (its pairing step failed or it stopped).');
+        return 1;
+      }
+      if (got.kind === 'INVITE') invite = got.url;
+      else handsPaired = true;
+    }
+  }
   const initialCtx = {};
   if (invite !== undefined) initialCtx.inviteUrl = invite;
-  if (options.role === 'b' && options.paired) {
+  if (options.role === 'b' && (options.paired || handsPaired)) {
     const r = agentlinkRun(options, ['contacts', '--agent', options.ocAgent]);
     if (!r.ok || !r.text.includes(options.ccAgent)) {
       console.error(
@@ -449,7 +573,7 @@ async function main() {
     log(
       `Mac ${options.role.toUpperCase()}: ${options.sameOwner ? 'same owner on both Macs' : 'a different owner per Mac'}. Approvals are typed on the Mac that owns the agent; agents never approve.`,
     );
-    if (options.role === 'a') log(`Run ID for Mac B: ${runId}`);
+    if (options.role === 'a' && !tm) log(`Run ID for Mac B: ${runId}`);
   }
 
   const harnesses = await makeHarnesses(options, dir);
@@ -458,11 +582,19 @@ async function main() {
     oc: approvalPoller(options, options.ocAgent),
   };
   const agentOf = (h) => (h === 'cc' ? options.ccAgent : options.ocAgent);
+  const maxWait = (step) =>
+    options.stepTimeoutMs + 120_000 + (step.approval ? options.approvalTimeoutMs : 0);
   const { results } = await runPlan(
     steps,
     {
       now: () => Date.now(),
       log,
+      quietApproval: tm || hf,
+      onResult(result) {
+        if (result.local !== true) return;
+        if (tm) remote.send('STEP', result.id, wireOutcome(result.outcome));
+        if (hf) emit('STEP', result.id, wireOutcome(result.outcome));
+      },
       agentOf,
       // Read-only: the contact list of the first agent, as the owner's CLI prints it.
       confirmPaired: (agent, other) =>
@@ -486,11 +618,45 @@ async function main() {
         return 'ok';
       },
       async waitRemote(step, info) {
-        log(`\n${remoteBox(step, info, options.sameOwner)}`);
-        return askUntil(asker, '> ', parseRemoteAnswer);
+        if (!tm && !hf) {
+          log(`\n${remoteBox(step, info, options.sameOwner)}`);
+          return askUntil(asker, '> ', parseRemoteAnswer);
+        }
+        // Hands-free: wait for the other Mac's status line for this step; no Enter.
+        log(`... waiting for the other Mac: ${step.id} ${step.title}`);
+        for (;;) {
+          const m = await inbox.take(
+            (x) =>
+              x.kind === 'ABORT' ||
+              (tm && x.kind === 'APPROVAL') ||
+              (x.kind === 'STEP' && x.id === step.id),
+            maxWait(step),
+          );
+          if (m === 'timeout' || m === 'ended' || m.kind === 'ABORT') {
+            log(
+              `The other Mac ${m === 'timeout' ? `did not finish ${step.id} in time` : 'stopped'}; counting ${step.id} as failed.`,
+            );
+            return 'fail';
+          }
+          if (m.kind === 'APPROVAL') {
+            // Mac B's owner approval: typed here, in this terminal, over ssh -t.
+            log(`\n${approvalNotice('remote', options.remoteHost, m.agent, m.approvalId)}`);
+            await runApprove(options, 'remote', m.agent, m.approvalId);
+            continue;
+          }
+          return m.outcome === 'ok' ? 'ok' : m.outcome === 'skip' ? 'skip' : 'fail';
+        }
       },
       afterStep(step, ctx, result) {
         // Mac A hands the invite to Mac B by hand: printed once, to the terminal only.
+        if (tm && step.id === 'P1') {
+          // The invite goes to Mac B over the ssh stdin only: never printed, logged or in argv.
+          if (result.outcome !== 'pass') remote.send('ABORT');
+          else if (ctx.alreadyPaired) remote.send('PAIRED');
+          else if (validInviteUrl(ctx.inviteUrl)) remote.send('INVITE', ctx.inviteUrl);
+          else remote.send('ABORT');
+          return;
+        }
         if (options.role !== 'a' || step.id !== 'P1' || result.outcome !== 'pass') return;
         if (ctx.alreadyPaired) {
           log('\nThe agents are already paired. On Mac B add --paired and no --invite.');
@@ -502,19 +668,30 @@ async function main() {
       async run(harness, step, prompt) {
         log(`-> ${step.id} (${harness === 'cc' ? 'Claude Code' : 'OpenCode'}) ${step.title}`);
         const run = await harnesses[harness](step, prompt);
-        await writeFile(join(dir, `${step.id}.${harness}.prompt.txt`), `${prompt}\n`, {
+        // The invite link is a secret: it is not kept in the prompt file.
+        const shown = invite === undefined ? prompt : prompt.split(invite).join('<invite link>');
+        await writeFile(join(dir, `${step.id}.${harness}.prompt.txt`), `${shown}\n`, {
           mode: 0o600,
         });
         return run;
       },
-      waitApproval: (harness, approvalId) =>
-        waitForApproval({
+      async waitApproval(harness, approvalId) {
+        if (hf) emit('APPROVAL', harness, agentOf(harness), approvalId);
+        let timeoutMs = options.approvalTimeoutMs;
+        if (tm) {
+          // Mac A's own approval: the approve command runs in this terminal; you type the code.
+          log(`\n${approvalNotice('local', '', agentOf(harness), approvalId)}`);
+          await runApprove(options, 'local', agentOf(harness), approvalId);
+          timeoutMs = 30_000; // then just read the decision back
+        }
+        return waitForApproval({
           poll: () => pollers[harness].state(approvalId),
           now: () => Date.now(),
           sleep,
-          timeoutMs: options.approvalTimeoutMs,
+          timeoutMs,
           intervalMs: options.approvalIntervalMs,
-        }),
+        });
+      },
     },
     options.only,
   );
@@ -562,6 +739,59 @@ async function main() {
     console.error(`SECRET SCAN: "${f.name}" found in ${f.file}. Do not share this folder.`);
   }
   log(`Saved to ${dir}`);
+  if (hf) {
+    emit(
+      'FINAL',
+      JSON.stringify({
+        results,
+        findings: scan.findings,
+        versions: pre.versions,
+        scan: scanText,
+        dir,
+      }),
+    );
+    hfLines?.close();
+    process.stdin.pause();
+  }
+  if (tm) {
+    // One combined table: each step from the Mac that ran it, plus both secret scans.
+    const f = await inbox.take((m) => m.kind === 'FINAL', 180_000);
+    await remote.stop();
+    const bFinal = typeof f === 'object' ? f.final : undefined;
+    if (bFinal === undefined)
+      console.error('Mac B did not send its results; counting the run as failed.');
+    const rows = combineResults(
+      steps.map((x) => x.id),
+      results,
+      bFinal?.results ?? [],
+    );
+    const combinedMeta = {
+      startedAt,
+      ccAgent: options.ccAgent,
+      ocAgent: options.ocAgent,
+      host: options.remoteHost,
+      dirA: dir,
+      dirB: bFinal?.dir,
+      scanA: scanText,
+      scanB: bFinal?.scan ?? 'no result',
+      versionsA: pre.versions,
+      versionsB: bFinal?.versions,
+    };
+    const combined = renderCombinedMd(combinedMeta, rows);
+    await writeFile(join(dir, 'combined.md'), combined, { mode: 0o600 });
+    await writeFile(
+      join(dir, 'combined.json'),
+      `${JSON.stringify({ meta: combinedMeta, rows, findingsB: bFinal?.findings ?? [] }, null, 2)}\n`,
+      { mode: 0o600 },
+    );
+    log(`\n${combined}`);
+    for (const x of bFinal?.findings ?? []) {
+      console.error(
+        `SECRET SCAN (Mac B): "${x.name}" found in ${x.file}. Do not share that folder.`,
+      );
+    }
+    return combinedOk(rows, scan.findings, bFinal) ? 0 : 1;
+  }
   const allPass = side === undefined ? results.every((r) => r.outcome === 'pass') : sideOk(results);
   return allPass && scan.findings.length === 0 ? 0 : 1;
 }

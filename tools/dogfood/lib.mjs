@@ -13,6 +13,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validHost, validRemotePath } from './remote.mjs';
 import { scanForCanaries } from '../../e2e/src/canary-scan.mjs';
 
 export const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -74,6 +75,12 @@ Two Macs (one agent per Mac, M1-23-b); without --role the single-machine run abo
   --cc-via opencode            role a on a Mac without the claude CLI: run Mac A's side through OpenCode
   --manual                     you drive the chat yourself (Claude desktop, Antigravity, ...): the script prints
                                each prompt, waits for Enter, and only checks state through the agentlink CLI
+Hands-free (M1-23-d): Mac A runs both Macs, Mac B over ssh (key login; RB-17 section 10):
+  --two-mac --remote <host>    run role A here and role B on <host>; no copying, no Enter between steps
+  --remote-repo <path>         AgentLink checkout on Mac B (default ~/agentlink)
+  --remote-opencode <path>     OpenCode program on Mac B
+  --remote-agentlink <json>    AgentLink program on Mac B, like --agentlink (default agentlink)
+  Owner approvals stay yours: the approve command runs in this terminal (ssh -t for Mac B); you type the code.
 Use the same --cc-agent and --oc-agent names on both Macs. Approvals are typed on the Mac that owns the agent.
 `;
 
@@ -145,6 +152,12 @@ export function parseArgs(argv) {
     paired: false,
     manual: false,
     ccVia: 'claude',
+    twoMac: false,
+    remoteHost: undefined,
+    remoteRepo: '~/agentlink',
+    remoteOpencode: undefined,
+    remoteAgentlink: undefined,
+    handsFree: false,
   };
   // `--name=value` is the same as `--name value`.
   argv = argv.flatMap((a) =>
@@ -230,6 +243,32 @@ export function parseArgs(argv) {
       case '--same-owner':
         options.sameOwner = true;
         break;
+      case '--two-mac':
+        options.twoMac = true;
+        break;
+      case '--hands-free':
+        options.handsFree = true;
+        break;
+      case '--remote': {
+        const v = value(i, arg);
+        if (!validHost(v)) throw new Error('--remote is not a valid ssh host');
+        options.remoteHost = v;
+        i += 1;
+        break;
+      }
+      case '--remote-repo':
+      case '--remote-opencode': {
+        const v = value(i, arg);
+        if (!validRemotePath(v)) throw new Error(`${arg} has characters that are not allowed`);
+        options[arg === '--remote-repo' ? 'remoteRepo' : 'remoteOpencode'] = v;
+        i += 1;
+        break;
+      }
+      case '--remote-agentlink':
+        options.remoteAgentlink = value(i, arg);
+        parseCommand(options.remoteAgentlink);
+        i += 1;
+        break;
       case '--paired':
         options.paired = true;
         break;
@@ -274,6 +313,38 @@ export function parseArgs(argv) {
     }
   }
   if (options.ccAgent === options.ocAgent) throw new Error('the two agents must differ');
+  if (options.twoMac) {
+    // M1-23-d: Mac A drives both Macs; role A runs here, role B over ssh.
+    if (options.remoteHost === undefined) throw new Error('--two-mac needs --remote <ssh-host>');
+    for (const [flag, set] of [
+      ['--role', options.role !== undefined],
+      ['--manual', options.manual],
+      ['--invite', options.invite !== undefined],
+      ['--run-id', options.runId !== undefined],
+      ['--paired', options.paired],
+      ['--hands-free', options.handsFree],
+    ]) {
+      if (set) throw new Error(`${flag} cannot be combined with --two-mac`);
+    }
+    options.role = 'a';
+  } else {
+    for (const [flag, set] of [
+      ['--remote', options.remoteHost !== undefined],
+      ['--remote-opencode', options.remoteOpencode !== undefined],
+      ['--remote-agentlink', options.remoteAgentlink !== undefined],
+      ['--remote-repo', options.remoteRepo !== '~/agentlink'],
+    ]) {
+      if (set) throw new Error(`${flag} needs --two-mac`);
+    }
+  }
+  if (options.handsFree) {
+    if (options.role !== 'b')
+      throw new Error('--hands-free is for --role b (started by --two-mac)');
+    if (options.runId === undefined) throw new Error('--hands-free needs --run-id');
+    if (options.invite !== undefined || options.paired || options.manual) {
+      throw new Error('--hands-free gets the invite over stdin: no --invite, --paired or --manual');
+    }
+  }
   if (options.role === undefined) {
     for (const [flag, set] of [
       ['--same-owner', options.sameOwner],
@@ -1128,6 +1199,14 @@ export function approvalBox(agent, approvalId, minutes) {
 export async function runPlan(steps, deps, only) {
   const ctx = { ...(deps.initialCtx ?? {}) };
   const results = [];
+  if (deps.onResult !== undefined) {
+    // Hands-free: every result is announced to the other Mac as soon as it exists.
+    const push = results.push.bind(results);
+    results.push = (...items) => {
+      for (const item of items) deps.onResult(item);
+      return push(...items);
+    };
+  }
   // Two-machine mode: `deps.side` is this Mac's harness ('cc' | 'oc'); the other side's steps are
   // run by a person on the other Mac and confirmed here with `deps.waitRemote`.
   const side = deps.side;
@@ -1259,7 +1338,9 @@ export async function runPlan(steps, deps, only) {
     };
     if (pass && step.approval) {
       const id = ctx[step.approval.key];
-      deps.log(approvalBox(deps.agentOf(step.approval.agent), id, deps.approvalMinutes));
+      if (!deps.quietApproval) {
+        deps.log(approvalBox(deps.agentOf(step.approval.agent), id, deps.approvalMinutes));
+      }
       const decision = await deps.waitApproval(step.approval.agent, id);
       result.notes.push(`owner decision: ${decision}`);
       if (decision !== 'approved') {
@@ -1538,7 +1619,9 @@ export function planText(options, steps) {
       ? []
       : [
           `Two-machine run   Mac ${options.role.toUpperCase()} (${options.role === 'a' ? 'Claude Code, creates the invite' : 'OpenCode, accepts the invite'}), ${options.sameOwner ? 'same owner on both Macs' : 'a different owner per Mac'}`,
-          'Steps of the other Mac are marked [other Mac]: you confirm them here by hand.',
+          options.twoMac
+            ? `Hands-free: Mac B is ${options.remoteHost} over ssh (key login, BatchMode); steps sync by themselves, the invite goes over stdin only. Approvals run in this terminal: you type the owner code (ssh -t for Mac B).`
+            : 'Steps of the other Mac are marked [other Mac]: you confirm them here by hand.',
           '',
         ]),
     `Results folder   ${join(options.out, '<timestamp>')}`,

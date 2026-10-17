@@ -239,7 +239,36 @@ Product observations (carded under M1-22): OpenCode's offer summary showed raw a
 
 ### 10. Two-machine variant: one agent per Mac (M1-23-b)
 
-Run the J1, J4 and J8 checks of the M1 gate on two Macs, one agent per Mac: Mac A runs Claude Code (agent `cc-test`), Mac B runs OpenCode (agent `oc-test`). The same script (`tools/dogfood/run.mjs`) runs on both Macs with `--role a` and `--role b`. The Macs are never connected: **you carry two values by hand** (a run ID and the invite link) and press Enter on each Mac when the other Mac has finished a step. Nothing here needs SSH.
+Run the J1, J4 and J8 checks of the M1 gate on two Macs, one agent per Mac: Mac A runs Claude Code (agent `cc-test`), Mac B runs OpenCode (agent `oc-test`). The same script (`tools/dogfood/run.mjs`) runs on both Macs with `--role a` and `--role b`. The Macs are never connected: **you carry two values by hand** (a run ID and the invite link) and press Enter on each Mac when the other Mac has finished a step. The manual variant described here needs no SSH; the hands-free variant just below drives both Macs over SSH.
+
+#### Hands-free (recommended, M1-23-d)
+
+Run both Macs from Mac A with one command. Mac A runs its own side and starts Mac B's side over `ssh`. The steps sync by themselves (no Enter, no copying), and the run ends with one table covering both Macs plus each Mac's results folder and secret scan.
+
+**One-time setup** (your own terminals):
+
+1. Mac B: System Settings > General > Sharing > Remote Login: on (allow your user). Check the Mac's name there (for example `Talis-Mac-mini.local`).
+2. Mac A: `ssh-keygen -t ed25519` (skip if `~/.ssh/id_ed25519` exists), then `ssh-copy-id <mac-b-user>@<mac-b-host>` (asks for Mac B's login password once). Check: `ssh -o BatchMode=yes <mac-b-user>@<mac-b-host> true` must succeed silently. The script's preflight runs the same check and prints these steps if it fails; key login is required, a password prompt would hang the run.
+3. Both Macs: the repo checked out and built as in the prerequisites below (Mac B at `~/agentlink` by default), and `node` found by a login shell on Mac B.
+4. Fresh agent names on each Mac (see "Use fresh agent names" below), each with its owner set up: `agentlink init --agent <name> --harness none` and `agentlink owner init --agent <name>` (or `owner add-agent`).
+
+**The command** (Mac A, in the checkout):
+
+```bash
+node tools/dogfood/run.mjs --two-mac --remote <mac-b-user>@<mac-b-host> \
+  --cc-agent <mac-a-agent> --oc-agent <mac-b-agent> \
+  [--remote-repo ~/agentlink] [--remote-opencode <path-on-mac-b>] \
+  [--remote-agentlink '["node","<path-on-mac-b>/apps/cli/dist/agentlink.js"]'] [--same-owner]
+```
+
+What happens: Mac A checks the ssh login, runs its own preflight, starts Mac B's side (`run.mjs --role b --hands-free`) and waits for it to be ready. Each side then runs its steps and tells the other when a step is done; a step that takes too long counts as failed, with the step ID in the message. Mac B's lines appear in the same terminal as `[Mac B] ...`.
+
+- **The invite link** (P1) goes from Mac A to Mac B over the ssh standard input only. It is never printed, never logged, never on a command line (so not in `ps` or shell history), and the saved prompt files show `<invite link>` instead of it. (The OpenCode transcript of the accept step is a results file on Mac B and does contain it, like every transcript; the folders stay outside the repository, mode 0600.)
+- **Owner approvals stay yours.** When an approval is needed, the script prints a box and runs `agentlink approve --agent <name> <id>` in this terminal (`ssh -t` for Mac B's agent), so you type that Mac's owner code at a real prompt. The script never supplies or sees a code, and agents never approve. The command is started from your own terminal: do not run the script from inside an AI app, whose guard on `approve` would (correctly) refuse. No harness variable is passed over ssh.
+- **Results.** Mac A prints one combined table (each step from the Mac that ran it, with a Mac column) and writes `combined.md` and `combined.json` in its folder; Mac B's folder (path shown in the table) holds its transcripts. Both Macs scan their folder for secrets; any finding makes the run fail. Exit status 0 only when every step passed (or was a benign skip) and both scans are clean.
+- If the two agents are already contacts, Mac A tells Mac B itself: no `--paired` needed.
+
+The manual variant below (`--role a` / `--role b`, copying the link, pressing Enter) is unchanged and still works.
 
 **Same owner or two owners.** The only difference is who is at the keyboard.
 - *Same owner* (`--same-owner` on Mac A): you are at both Macs. Each Mac still has its own owner key and owner code (the key never leaves its Mac), so you type the owner code on each Mac for that Mac's agent.
