@@ -16,6 +16,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import process from 'node:process';
 import { createInterface } from 'node:readline';
@@ -50,16 +51,21 @@ import {
   combinedOk,
   encodeLine,
   makeInbox,
+  harnessEnvVars,
   parseLine,
+  plain,
   remoteRunCommand,
   renderCombinedMd,
+  sealLine,
   sshArgs,
   sshCheckArgs,
   sshSetupHelp,
   wireOutcome,
 } from './remote.mjs';
 
-const log = (text) => console.log(text);
+// Hands-free Mac B: stdout carries only protocol lines; everything for humans goes to stderr.
+const HANDS_FREE = process.argv.includes('--hands-free');
+const log = (text) => (HANDS_FREE ? console.error(text) : console.log(text));
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const stamp = () =>
   new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '').replace('T', '-');
@@ -381,16 +387,17 @@ async function listFiles(dir) {
 }
 
 /** One protocol line to stdout (Mac B, hands-free). */
-const emit = (kind, ...fields) => process.stdout.write(`${encodeLine(kind, ...fields)}\n`);
+let runNonce; // Mac B: the secret Mac A sent over stdin; every line B emits carries it
+const emit = (kind, ...fields) =>
+  process.stdout.write(`${sealLine(encodeLine(kind, ...fields), runNonce)}\n`);
 
 /** Feeds lines from a readable into the inbox; other lines go to `other`. */
-function pumpLines(readable, inbox, other) {
+function pumpLines(readable, inbox, other, parse = parseLine) {
   const rl = createInterface({ input: readable });
   rl.on('line', (line) => {
-    const message = parseLine(line);
+    const message = parse(line);
     if (message !== undefined) inbox.push(message);
-    else if (line.startsWith('@@AL ')) other('(ignored a malformed protocol line)');
-    else other(line);
+    else other(plain(line.startsWith('@@AL ') ? '(ignored an unsigned protocol line)' : line));
   });
   return rl;
 }
@@ -402,8 +409,18 @@ function startRemote(options, runId, inbox) {
     env: process.env,
   });
   child.stdin.on('error', () => {});
-  pumpLines(child.stdout, inbox, (line) => log(`[Mac B] ${line}`));
-  createInterface({ input: child.stderr }).on('line', (line) => console.error(`[Mac B] ${line}`));
+  // Only lines that carry this run's nonce are protocol; Mac B's other output cannot forge one.
+  const nonce = randomBytes(16).toString('hex');
+  pumpLines(
+    child.stdout,
+    inbox,
+    (line) => log(`[Mac B] ${line}`),
+    (line) => parseLine(line, nonce),
+  );
+  createInterface({ input: child.stderr }).on('line', (line) =>
+    console.error(`[Mac B] ${plain(line)}`),
+  );
+  child.stdin.write(`${encodeLine('NONCE', nonce)}\n`);
   child.on('error', () => inbox.end());
   child.on('close', () => inbox.end());
   process.on('exit', () => child.kill());
@@ -502,6 +519,14 @@ async function main() {
   }
 
   if (tm) {
+    // L1: approvals need your own terminal, and Mac B's approve guard cannot see Mac A's environment.
+    const inAiApp = harnessEnvVars(process.env);
+    if (!process.stdin.isTTY || inAiApp.length > 0) {
+      console.error(
+        `--two-mac must run from your own terminal (a real TTY, not inside an AI app${inAiApp.length > 0 ? `; found ${inAiApp.join(', ')}` : ''}): you type the owner codes there.`,
+      );
+      return 1;
+    }
     // Key login only (BatchMode): a password prompt would hang the run.
     const r = spawnSync('ssh', sshCheckArgs(options.remoteHost), {
       encoding: 'utf8',
@@ -543,6 +568,12 @@ async function main() {
     }
   }
   if (hf) {
+    const first = await inbox.take((m) => m.kind === 'NONCE', 60_000);
+    if (typeof first === 'string') {
+      console.error('Mac A did not send the run nonce.');
+      return 1;
+    }
+    runNonce = first.nonce;
     emit('READY');
     if (pairing) {
       const got = await inbox.take(

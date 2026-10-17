@@ -19,6 +19,9 @@ const REMOTE_PATH = /^[A-Za-z0-9._/~+@=-]{1,300}$/;
 const OUTCOMES = new Set(['ok', 'skip', 'fail']);
 const MAX_FINAL = 200_000;
 
+/** Mac B needs no build or global install: the published package through npx (override with --remote-agentlink). */
+export const DEFAULT_REMOTE_AGENTLINK = '["npx","-y","@4thtech-io/agentlink@latest"]';
+
 export const validHost = (v) => typeof v === 'string' && HOST.test(v);
 export const validRemotePath = (v) => typeof v === 'string' && REMOTE_PATH.test(v);
 
@@ -46,14 +49,25 @@ export function encodeLine(kind, ...fields) {
  *   APPROVAL <oc|cc> <agent> <apr_...>   B -> A: an owner approval is waiting on B
  *   FINAL <json>               B -> A: B's results
  */
-export function parseLine(line) {
-  if (typeof line !== 'string' || !line.startsWith(PROTOCOL_PREFIX)) return undefined;
+export function parseLine(line, nonce) {
+  if (typeof line !== 'string') return undefined;
+  if (nonce !== undefined) {
+    // Mac B's stdout: only lines that carry this run's secret nonce count.
+    const mark = `${PROTOCOL_PREFIX}${nonce} `;
+    if (!line.startsWith(mark)) return undefined;
+    line = PROTOCOL_PREFIX + line.slice(mark.length);
+  }
+  if (!line.startsWith(PROTOCOL_PREFIX)) return undefined;
   const rest = line.slice(PROTOCOL_PREFIX.length).replace(/\r?\n$/, '');
   const space = rest.indexOf(' ');
   const kind = space === -1 ? rest : rest.slice(0, space);
   const arg = space === -1 ? '' : rest.slice(space + 1);
   const words = arg === '' ? [] : arg.split(' ');
   switch (kind) {
+    case 'NONCE':
+      return words.length === 1 && /^[0-9a-f]{32}$/.test(words[0])
+        ? { kind, nonce: words[0] }
+        : undefined;
     case 'READY':
     case 'PAIRED':
     case 'ABORT':
@@ -86,7 +100,14 @@ export function parseLine(line) {
   }
 }
 
-const str = (v, max) => String(v ?? '').slice(0, max);
+/** Text with control characters (CR, LF, ESC ...) replaced: it ends up in tables and terminals. */
+// eslint-disable-next-line no-control-regex -- the point is to remove control characters
+export const plain = (v) => String(v ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ');
+const str = (v, max) => plain(v).slice(0, max);
+
+/** A protocol line for Mac B's stdout: the run's nonce right after the prefix. */
+export const sealLine = (line, nonce) =>
+  `${PROTOCOL_PREFIX}${nonce} ${line.slice(PROTOCOL_PREFIX.length)}`;
 
 /** B's final report with fixed fields and bounded strings; undefined when the shape is wrong. */
 export function sanitizeFinal(json) {
@@ -196,6 +217,22 @@ export function remoteShell(script) {
   return `exec "$SHELL" -lc ${shq(withPath)}`;
 }
 
+/** Names of AI-harness variables present in `env` (the approve guard looks for these on Mac A). */
+const HARNESS_ENV = [
+  'CLAUDECODE',
+  'CLAUDE_CODE_ENTRYPOINT',
+  'CLAUDE_CODE_SSE_PORT',
+  'CODEX_SANDBOX',
+  'CODEX_THREAD_ID',
+  'GEMINI_CLI',
+  'OPENCODE',
+  'OPENCODE_CONFIG_CONTENT',
+  'ANTIGRAVITY_AGENT',
+  'CURSOR_AGENT',
+];
+export const harnessEnvVars = (env) =>
+  HARNESS_ENV.filter((name) => env[name] !== undefined && env[name] !== '');
+
 /**
  * The ssh arguments. `tty: true` is for the interactive approve (a real terminal on both ends);
  * every other call uses BatchMode so it can never stop at a password prompt. No environment
@@ -215,7 +252,7 @@ export function sshArgs(host, remoteCommand, { tty = false } = {}) {
 
 /** The remote AgentLink argv as a quoted shell fragment (`agentlink` or from --remote-agentlink). */
 function remoteAgentlinkWords(options, parse) {
-  const { cmd, args } = parse(options.remoteAgentlink ?? 'agentlink');
+  const { cmd, args } = parse(options.remoteAgentlink ?? DEFAULT_REMOTE_AGENTLINK);
   return [cmd, ...args].map(shq).join(' ');
 }
 
@@ -226,9 +263,7 @@ export function remoteRunCommand(options, runId) {
     `--run-id ${runId}`,
     `--cc-agent ${options.ccAgent} --oc-agent ${options.ocAgent}`,
     ...(options.sameOwner ? ['--same-owner'] : []),
-    ...(options.remoteAgentlink === undefined
-      ? []
-      : [`--agentlink ${shq(options.remoteAgentlink)}`]),
+    `--agentlink ${shq(options.remoteAgentlink ?? DEFAULT_REMOTE_AGENTLINK)}`,
     ...(options.remoteOpencode === undefined ? [] : [`--opencode ${shq(options.remoteOpencode)}`]),
     ...(options.ocModel === undefined ? [] : [`--oc-model ${shq(options.ocModel)}`]),
     ...(options.only === undefined ? [] : [`--only ${shq(options.only.join(','))}`]),
@@ -325,7 +360,7 @@ export function combinedOk(rows, aFindings, bFinal) {
 }
 
 export function renderCombinedMd(meta, rows) {
-  const esc = (s) => String(s).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  const esc = (s) => plain(s).replace(/\|/g, '\\|');
   const pass = rows.filter((r) => r.outcome === 'pass').length;
   return [
     `# AgentLink two-Mac dogfood (hands-free) ${meta.startedAt}`,

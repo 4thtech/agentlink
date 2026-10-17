@@ -13,7 +13,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validHost, validRemotePath } from './remote.mjs';
+import { plain, validHost, validRemotePath } from './remote.mjs';
 import { scanForCanaries } from '../../e2e/src/canary-scan.mjs';
 
 export const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -1518,7 +1518,7 @@ export function renderResultsMd(meta, results) {
     meta.role === undefined
       ? ''
       : ` (Mac ${meta.role.toUpperCase()}, ${meta.sameOwner ? 'same owner' : 'two owners'})`;
-  const esc = (s) => String(s).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  const esc = (s) => plain(s).replace(/\|/g, '\\|');
   const rows = results.map(
     (r) =>
       `| ${r.id} | ${esc(r.title)} | ${r.harness === 'cc' ? 'Claude Code' : 'OpenCode'}${r.local === false ? ' (other Mac)' : ''} | ${r.outcome} | ${String(r.seconds)} s | ${esc(r.notes.join('; '))} |`,
