@@ -8,6 +8,7 @@ export {
   HARNESS_IDS,
   PACKAGE_NAME,
   applyHarness,
+  configParts,
   detectHarnesses,
   displayPath,
   harnessById,

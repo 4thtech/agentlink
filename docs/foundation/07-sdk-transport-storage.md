@@ -464,7 +464,12 @@ The console and the desktop app keep the owner's own store, never an agent's. Th
 interface Transport {
   wrap(envelope: Envelope, recipients: NostrRecipient[], keys: EnvelopeKeys): Promise<WrappedEnvelope>; // one gift wrap per distinct recipient key; publishes nothing
   publish(storedWrap: SignedWrap, relays: RelayUrl[]): Promise<PublishResult>; // exactly the row's relays (§3.2, §4.3), never any other
-  subscribe(keys: EnvelopeKeys, onEnvelope: (e: Envelope, meta) => void): Unsubscribe;
+  subscribe(options: {                           // live form of sync (M1-9s): backlog from the cursor, then live
+    relays: RelayUrl[];                          // the own list only (§4.3)
+    identities: { pubkey: string; epoch?: number }[];
+    persistence: { getCursor; setCursor; isSeen }; // the same object as for sync
+    onEnvelope(item: { envelope; giftWrapId; relay; recipient }): 'processed' | 'verified' | 'retry';
+  }): () => Promise<void>;                       // unsubscribe: CLOSE, no reconnect; resolves when in-flight handlers settle
   sync(options: {
     relays: RelayUrl[];                          // the own list only (§4.3); AUTH only there
     identities: { pubkey: string; epoch?: number }[]; // own Nostr keys at every epoch: the REQ's #p

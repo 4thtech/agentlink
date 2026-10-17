@@ -67,7 +67,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 140 (M1a 80, M1b 60, M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| M1 Local beta | 141 (M1a 80, M1b 61, M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
@@ -682,8 +682,19 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - A title `OPS-CI-3 ci: ...` passes; `OPS-ci-3`, `OPS-` and `OPS-CI` fail (tests).
 - **Also (found in PR #187):** since OPS-REL-1 (`privatePackages.version: true`) the private tooling packages (`tools`, `e2e`) count as published, so a tooling-only PR fails the `changesets` check without an empty changeset. Exempt private tooling packages from the changeset requirement, or have CI add empty changesets for them; test both cases.
 
+#### OPS-CI-4 · Guard the sync secret-scan stub pin (new)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
+- **Repo/path:** agentlink · `tools/sync-pin-check/**`, `.github/workflows/security.yml`, `docs/process/sync-protocol.md`, `docs/process/ci-cd.md`
+- **Depends on:** —
+- **Spec:** `ci-cd.md` ("The sync branch")
+- **Invariants:** —
+- **Scope:**
+  - The stub on `sync` was pinned to v0.0.1, before main loaded `.gitleaks.toml`, so every sync push failed on the test-vector keys. A `sync-pin` job fails when the pin is not equal to or a descendant of the last main commit that changed `secret-scan.yml` or `.gitleaks.toml`; document the re-pin procedure.
+- **Acceptance:**
+  - Tests: pin parsing, ancestry (older, equal, later, unknown SHA), missing stub passes with a notice. No gitleaks allowlist change, no new action, read-only token.
+
 #### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/release.yml` or a Changesets hook, `tools/**`, `docs/process/versioning.md` §5
 - **Depends on:** —
 - **Spec:** `versioning.md` §5; `release-and-deployment.md` §5.1
@@ -955,17 +966,32 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - `check-generators.mjs` passes for every suite, run locally in a virtual environment with the pinned packages (output in the PR); the vector check passes in every declared runtime; the suites table matches `pending-suites.json`.
 
 #### M1-1i · Independent test vectors for the proof-layer suites (new, split from M1-1h)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · test-vectors/, tools/vectors/generators/
-- **Depends on:** M1-1h
-- **Spec:** 04 §2.3, §4, §5; 05 §3.1, §4, §8; `development-process.md` §9.1
+- **Status:** in-progress (partial scope, owner-orchestrator decision 2026-10-17: STREAM and revoke moved to M1-1i-b) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · test-vectors/, tools/vectors/
+- **Depends on:** M1-1h (its generators, rules and pinned packages are merged; its open G-2 follow-up suite `envelope-sig` is unrelated to the proof layer and does not block this card)
+- **Spec:** 04 §2.3, §5; 05 §3.1, §4, §8; `development-process.md` §9.1
 - **Invariants:** I-6, I-8
 - **Scope:**
   - Same rules and generators as M1-1h (written by a session that does not implement the TypeScript code).
-  - Suites: STREAM (empty, 1 B, exactly 1 chunk, chunk + 1, multi-chunk), owner-seed wrap (passkey PRF path), EIP-712 domain separators / struct hashes / digests for `Record`, `Receipt` (OCC v2 chain domain) and `Registration`; revoke after G-20.
-  - Vectors that depend on open gaps (G-20, G-26) are added only after those are resolved. May start during M1a.
+  - Suite `eip712-proof` (pending under M1-1j): EIP-712 type hash, domain separator, struct hash and digest for `Record`, `Receipt` (OCC v2 chain domain) and `Registration` (same domain form, the Registry as `verifyingContract`); the recipient commitment; the 05 §3.1 JSON-form rejections of `Record` and `Receipt`. Hashing only. Generator `tools/vectors/generate_eip712_proof.py`.
+  - Suite `prf-wrap` (pending under M1-1k): the PRF salt and `wrapKey` of 04 §2.3 step 3. Generator `tools/vectors/generate_prf_wrap.py`.
+  - Not here: STREAM (G-26) and the revoke struct (G-20) are M1-1i-b. The sealed PRF seed blob has no vectors until 04 §2.3 fixes its nonce, AAD and layout (M1-1k).
+  - Open spec points found here (flagged, not decided): 05 §4 calls `cardHash` the "EIP-712 hash of the AgentCard" without saying struct hash or digest, so no case derives it from a card; 04 §2.4.1 lists no `Registration` paths, so its cases use the `Record` form and have no rejections; the `Registration` nonce rules wait for G-20.
 - **Acceptance:**
   - Every case records generator, version and inputs; regeneration reproduces the files byte for byte; the contracts repo's parity job runs against the pinned commit.
+
+#### M1-1i-b · Independent test vectors: STREAM and revoke (new, split from M1-1i on 2026-10-17)
+- **Status:** blocked (G-26, G-20) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · test-vectors/, tools/vectors/
+- **Depends on:** M1-1i; gap G-26 resolved (STREAM); gap G-20 resolved (revoke)
+- **Spec:** 04 §4; 05 §4; `development-process.md` §9.1
+- **Invariants:** I-2, I-6, I-8
+- **Scope:**
+  - Same rules and generators as M1-1h and M1-1i (written by a session that does not implement the TypeScript code).
+  - Suite `stream` (pending under M1-1d): STREAM `ALF1` vectors for empty, 1 B, exactly 1 chunk, chunk + 1 and multi-chunk plaintexts, with the AAD that G-26 decides, plus the tamper rejections of M1-1d.
+  - EIP-712 vectors for the revoke struct once G-20 defines it, and any `Registration` nonce cases G-20 adds, in `eip712-proof` (or a new suite if `eip712-proof` is no longer pending).
+- **Acceptance:**
+  - Every case records generator, version and inputs; regeneration reproduces the files byte for byte.
 
 #### M1-1a · crypto: encodings, hashing, JCS, randomness, wiping
 - **Status:** done (4thtech/agentlink#27, merged 2026-10-14) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1024,14 +1050,14 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 #### M1-1d · crypto: STREAM file encryption (ALF1)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto
-- **Depends on:** M1-1a, M1-1i; gap G-26 resolved
+- **Depends on:** M1-1a, M1-1i-b; gap G-26 resolved
 - **Spec:** 04 §4 (object layout, nonce, AAD, chunk size); 07 §5.2 (streaming); 03 §4.2
 - **Invariants:** I-2
 - **Scope:**
   - Web-Streams encrypt/decrypt with bounded memory: header `"ALF1" ‖ u8 version ‖ u32be chunkSize ‖ noncePrefix(8)`; chunk nonce = noncePrefix ‖ u32be(index); AAD = u8(isFinal) (plus header binding if G-26 decides so); default chunk 1 MiB.
   - Incremental SHA-256 of ciphertext and plaintext while streaming; chunk-size bounds and maximum chunk count enforced.
 - **Acceptance:**
-  - M1-1i STREAM vectors pass in all runtimes.
+  - M1-1i-b STREAM vectors pass in all runtimes.
   - Dropped final chunk, reordered, duplicated or appended chunks, bit flips and header tampering all fail (tests).
   - 1 GiB encrypt + decrypt in Node with RSS growth < 64 MiB (slow-tagged benchmark test).
 
@@ -1049,7 +1075,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - `AgentCard` EIP-712 vectors from M1-1h pass in all runtimes.
 
 #### M1-1j · crypto: EIP-712 proof types and commitment helpers (new, split from M1-1e)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in-progress (revoke struct deferred until G-20 lands, PR #215 / M1-1i-b) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto
 - **Depends on:** M1-1e, M1-1i
 - **Spec:** 04 §5; 05 §3.1, §4, §8
@@ -1059,7 +1085,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - `recordStructHash`; recipient commitment `keccak256(abi.encode(recipientAgentEvm, salt))`.
   - EIP-3009 `ReceiveWithAuthorization` typed data (used in M3-4b); the token's domain is read from chain, never hard-coded.
 - **Acceptance:**
-  - EIP-712 vectors from M1-1i pass in all runtimes; the contracts repo's parity job passes against the same commit (M1-3d).
+  - Vector suite `eip712-proof` (M1-1i): its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares; the contracts repo's parity job passes against the same commit (M1-3d). The revoke vectors come from M1-1i-b after G-20.
 
 #### M1-1f · crypto: owner passphrase wrapping, pairing proof, safety code
 - **Status:** done (4thtech/agentlink#37, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1093,7 +1119,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - PRF path: PRF salt = SHA-256("agentlink-owner-v1"); wrapKey = HKDF-SHA256(ikm = PRF output, salt = "", info = "owner-seed-wrap", L = 32); AES-256-GCM seal/open of the seed.
   - Recovery code: 120 random bits as 24 base32 characters in groups; Argon2id (m = 64 MiB, t = 3, p = 1) wrapping in the M1-1f blob format.
 - **Acceptance:**
-  - M1-1i wrapKey vectors pass in all runtimes; recovery-code round trip and format tests (grouping, alphabet); a mistyped code fails cleanly without partial output.
+  - Vector suite `prf-wrap` (M1-1i): its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares; recovery-code round trip and format tests (grouping, alphabet); a mistyped code fails cleanly without partial output.
 
 #### M1-1g · crypto: KeyStore / OwnerKeyStore interfaces, MemoryKeyStore, NIP-44 helpers
 - **Status:** done (4thtech/agentlink#41, merged 2026-10-14; the `envelope-sig` vector suite is registered here once the M1-1h G-2 follow-up has committed it as pending) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1811,7 +1837,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Storage (`@agentlink/storage`)
 
 #### M1-6a · storage: adapter interface, inline adapter, S3 adapter
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet · **Security:** S2 (`packages/*`; card said S1) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage
 - **Depends on:** M1-1a, M0-8, M0-2g (R2 test token); gap G-23 resolved
 - **Spec:** 07 §5.1–§5.3; 04 §4 (delivery, expiry); 02 F-30–F-32; D-18
@@ -1823,6 +1849,21 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Integration tests against MinIO (Docker, every PR) and Cloudflare R2 (scheduled job using the bucket-scoped test token): upload, presign, download, delete.
   - Presign beyond 7 days is clamped (test); canary test shows no URL query strings or keys in logs.
+- **Split (orchestrator, 2026-10-17):** M0-2g (R2 test token) is not done, and the MinIO job touches `.github/**`. This card ships the interface and both adapters with unit tests against an in-memory fake endpoint (no network), handled as S2 (`packages/*`). The MinIO and R2 integration tests move to M1-6a-2. The endpoint check is the 04 §4 raw-string grammar; the DNS-level check comes from the SSRF-safe fetch (M1-15) that the caller injects.
+
+#### M1-6a-2 · storage: MinIO and R2 integration tests (new, split from M1-6a)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (sensitive: `.github/**`) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/storage (integration tests), .github/workflows
+- **Depends on:** M1-6a; M0-2g (R2 bucket and bucket-scoped test token) for the R2 job
+- **Spec:** 07 §5.2; 04 §4 (delivery, expiry); `ci-cd.md`; `audit-rules.md` §2 (sensitive paths)
+- **Invariants:** I-2, I-7
+- **Scope:**
+  - MinIO (Docker) integration job on every PR: upload, presign, download through the presigned URL, delete. The S3 adapter accepts only `https` endpoints, so MinIO runs with TLS (a CI-generated certificate) rather than adding an `http` or loopback exception to the adapter.
+  - Scheduled Cloudflare R2 job with the bucket-scoped test token from a GitHub Environment secret; skipped (not failed) on forks.
+  - Neither job prints a presigned URL, object key or credential.
+- **Acceptance:**
+  - Both jobs green with the round trip; the R2 token cannot list or write any other bucket (M0-2g).
+  - The log canary run in CI shows no URL query strings or keys.
 
 #### M1-6b · storage: streaming encryption and multipart upload
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -2364,7 +2405,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The build-plan test above covers a batch: the same-user script, with the same read access, cannot add an item to a batch the owner reviewed or use an item for another call (with M1-9b and M1-7e).
 
 #### M1-8d · node: local approval server
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#207) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node
 - **Depends on:** M1-8c, M1-7e
 - **Spec:** 08 §1; 03 §4.5; 04 §2.5; 06 §2.5
@@ -2612,7 +2653,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - F06 and F07 each have a test named after the finding; the bundle-check job fails on an injected `jose` import.
 
 #### M1-9c-c · CI: neutral-platform bundle-check job (new, IR-M1-9c-1 F07)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**` sensitive path: merges only on Tali's "merge"; supply-chain surface for the bundler) · **Phase:** M1a
+- **Status:** in review (no bundler dependency was needed: the check reuses the repository's Vite for parsing and the neutral bundle) · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**` sensitive path: merges only on Tali's "merge"; supply-chain surface for the bundler) · **Phase:** M1a
 - **Repo/path:** agentlink · `.github/workflows`, `apps/cli` (the check script)
 - **Depends on:** M1-9c, M1-9c-b (both merged)
 - **Spec:** 06 §2.0; IR-M1-9c-1 F07; D-76
@@ -2674,7 +2715,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Note (IR-M1-7k-1 Q3, 2026-10-15):** the outbox needs no leader: M1-7k's per-row claim already lets only one process publish each row. For relay subscriptions, use a per-agent lease row with compare-and-set (a random holder ID, a 60 s lease renewed every 20 s, takeover once it lapses), as the idempotency lease does (07 §3.3); this needs a store table and a migration. Do not hold the M1-8b inter-process lock for this: a long-lived holder would block the policy-mark and file-KeyStore critical sections (`store_busy` after 10 s). Receiving is idempotent (seen-set, envelopeHash, one store transaction), so a lapsed or doubled holder only costs extra relay connections.
 
 #### M1-9s · core: live relay subscriptions (Transport.subscribe) for the background loop (new, IR-M1-9r-1 L2)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/core/**`, the receive path) · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/core/**`, the receive path) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core, packages/transport-nostr, apps/cli (`src/mcp/loop.ts`)
 - **Depends on:** M1-9r
 - **Spec:** 06 §6; 07 §4.1 (`subscribe` follows the same handler shape as `sync`), §4.2
@@ -2881,6 +2922,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Repo/path:** agentlink · apps/cli (local UI bundle)
 - **Depends on:** M1-8d, M1-8e, M1-2e; gap G-32 resolved
 - **Spec:** 08 §1; 11 §6.2 (first run, approval), §6.2.1 (review together); 02 J4; 04 §2.5, §2.5.2 (D-68)
+- **From IR-M1-8d-1 (L-2, L-3):** add a backoff after repeated wrong owner codes at the approval server (today bounded only by one operation at a time and the KDF cost); consider a one-shot token exchange, or rotating the session token on `agentlink ui`, since the `/?t=` link stays valid for the server's lifetime and can persist in browser history.
 - **Invariants:** I-4, I-5
 - **Scope:**
   - First run: create the owner passkey (PRF) on `localhost`, or set the owner passphrase.
@@ -3186,8 +3228,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Follow-up from the third live LLM dispatch (run 38864138908, test report 5.2): J8 reached L18 (counter delivered, one owner approval). L19 failed because its prompt has only the `approvalId`, and `agentlink_respond_to_terms` also needs the counter's `envelopeId`; the fresh session had no way to find it. Harness: add the counter envelope ID to the L19 prompt. Product question: should `agentlink_get_approval` return the pending tool and envelope ID so a fresh session can finish? **In review (2026-10-16, same PR):** yes; `agentlink_get_approval` returns `action` (the tool and, for a terms accept or reject, the `envelopeId` and `decision`; structured values only) and, once approved, a `nextStep` to finish with the `approvalId` alone (06 §2.5). I-4 unchanged.
   - Deterministic variant green on PRs; no binding `accept` leaves A without an owner-signed approval or a matching owner-signed limit (asserted on relay traffic); each owner is asked at most once per agreement (approval count).
   - Inbound `terms` reach the harness wrapped as untrusted content (06 §4); canary scan of logs finds no plaintext.
-- **Notes (IR-M1-22-1):** the "nothing leaves" relay check polls every 2 s and only catches publishes within that window; the sent-`accept` store check covers the rest. Not covered yet (cheap follow-up): voiding an approval that is still pending (a newer version arrives before the owner decides); only approved-unused is tested. The `clientRequestId` repeat check waits for M1-32-c.
-- **Note (IR-M1-22-L15-1):** 06 §4 wrapping strips only closing tags; a body can contain opening-tag-like text. Assess whether the opening tag should also be neutralised (S2 question).
+- **Notes (IR-M1-22-1):** the "nothing leaves" relay check polls every 2 s and only catches publishes within that window; the sent-`accept` store check covers the rest. Not covered yet (cheap follow-up): voiding an approval that is still pending (a newer version arrives before the owner decides); only approved-unused is tested. The `clientRequestId` repeat check is in the M1-22 e2e since M1-32-c.
+- **Note (IR-M1-22-L15-1):** resolved by M1-9v (spec only): the code already escapes opening-tag look-alikes as well as closing ones (`apps/cli/src/tools/untrusted.ts`, tested in `untrusted.test.ts`); 06 §4 now says so.
 - **Follow-up (local dogfood run 2, 2026-10-16; card as M1-22 or M1-12a work):** (a) OpenCode's summary of an offer showed raw addresses ("paid by 0xb680…8275 to 0x40a9…9337"). Check whether `agentlink_inbox` and the terms summaries expose address-like strings to the agent, and whether 11 §5 copy should show contact names instead. (b) A duplicate identical offer (same terms sent twice) appears as two open offers; consider a dedupe hint in the inbox or status summary.
 
 #### M1-23 · J9 dogfood: Tali's and Denis's agents sync through AgentLink (M1a gate) (new)
@@ -3208,8 +3250,21 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - For at least two weeks the dogfood replaces the **personal handoff** part of the git sync branch for Tali and Denis (their own `<login>.md` handoff notes; `board.md` stays on git, `docs/process/sync-protocol.md`). The dogfood log records, per week, where AgentLink beat git and where it lost (for example missed messages, the session-start check skipped, or content that belonged on the board) (D-53).
   - No wallet, extension, gas or chain choice appeared in either setup (D-39); dogfood log (dates, harnesses, versions, issues filed) and owner sign-off recorded.
 
+#### M1-23-b · Dogfood: two-machine mode and runbook (new)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`tools/dogfood/**` and a runbook; sensitive path `docs/runbooks/**`: merges only on Tali's "merge") · **Phase:** M1b (after M1-23)
+- **Repo/path:** agentlink · `tools/dogfood/**`, `docs/runbooks/dogfood-m1a.md` (RB-17 section 10)
+- **Depends on:** M1-23 (the single-machine script and RB-17)
+- **Spec:** 10 "Gate M1" (J1, J4, J8 and the no-wallet UX rule, run by hand on two Macs); D-39, D-78; 04 §2.5 (approvals are typed by the owner)
+- **Invariants:** I-1, I-4, I-5
+- **Scope:**
+  - `tools/dogfood/run.mjs --role a|b`: Mac A (Claude Code) creates the invite and prints the exact Mac B command; Mac B (OpenCode) takes the invite by hand (`--invite`, or it asks) and accepts. The invite link and the run ID travel by hand; no SSH, no network between the Macs. Each Mac runs only its own harness and agent, keeps its own results folder, secret scan and pass/fail table, and confirms the other Mac's steps with Enter, `f` (failed) or `s` (skip). The table ends with the checks (J1, J4, J8, J9, I-5, F1) this Mac verified and the ones only the other Mac ran.
+  - `--same-owner` (one person types the approvals on both Macs) or the default of two owners (each types their own); each Mac still has its own owner key and code. Approvals are typed on the Mac that owns the agent (`agentlink approve --agent <name> <id>`); the script never approves, as in single-machine mode.
+  - Single-machine mode is unchanged. `--paired` for Macs whose agents are already contacts. `--cc-via opencode` runs Mac A through OpenCode when the claude CLI is missing; `--manual` has a person drive any chat app (Claude desktop, Antigravity) while the script prints the prompts and checks pairing through the CLI.
+  - RB-17 section 10 "Two-machine variant": prerequisites per Mac, the exact commands for both, what to expect, troubleshooting.
+- **Acceptance:** unit tests for the argument rules, the role split, the hand-off values, the exit status and the per-side summary; the invite link appears only in the Mac A terminal box and the Mac B argument or prompt (not in `results.md` or `results.json`; transcripts and prompt files hold it exactly as in single-machine mode). The agent and owner setup stay manual (owner presence). J2, J3 and J5 (files, credits, proof) are not part of this tool and wait for M1b.
+
 #### M1-9t · CLI: several agents under one OS user, and init for one harness (new, found by the M1-23 runbook)
-- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1a (needed for the one-computer part of M1-23, not for the gate)
+- **Status:** merged (#178) · **Size:** M · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1a (needed for the one-computer part of M1-23, not for the gate)
 - **Repo/path:** agentlink · apps/cli (`init`, `owner init`), packages/node (`initOwner`)
 - **Depends on:** M1-9a, M1-9b, M1-8h
 - **Spec:** 04 §2.2, §2.5, §2.8 ("Adding an agent to the existing owner"); 06 §7; D-39, D-67, D-78; `docs/runbooks/dogfood-m1a.md`
@@ -3221,16 +3276,38 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Docs: runbook `docs/runbooks/dogfood-m1a.md` §3 (remove the STOP), quickstart pages for the new flags, CHANGELOG, changeset.
 - **Acceptance:** tests first (RED commit): two agents under one OS user each get a card for the same owner, an agent cannot trigger it (no TTY or a harness marker refuses before the owner key is read), an approval for one agent is refused by the other, `init` writes only to the chosen harness, and declining every change keeps the identity.
 
-#### M1-9u · CLI: add-agent dead end and Gemini CLI detection (new, from IR-M1-9t-1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+#### M1-9u · CLI: add-agent dead end and the missing owner card (new, from IR-M1-9t-1; extended by a live finding)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`owner add-agent`, `doctor`, harness detection)
 - **Depends on:** M1-9t
 - **Spec:** 04 §2.8 ("Adding an agent to the existing owner"); 06 §7; D-78
 - **Invariants:** I-4
 - **Scope:**
   - (a) An owner item exists on the machine but no local agent has a card naming it (for example after every carded agent was removed): `owner add-agent` cannot learn the owner keys and points to `owner init`, which refuses because an owner exists. Give this case its own fixed message and a `doctor` hint (what is on the machine, what to do), without reading or showing any secret (IR-M1-9t-1 L-2).
-  - (b) Without `--harness`, any `~/.gemini` folder detects Gemini CLI, so an Antigravity user (whose config also lives under `~/.gemini`) is offered a Gemini CLI change. Detect Gemini CLI by the `gemini` binary on `PATH` or `~/.gemini/settings.json` instead (IR-M1-9t-1 L-3).
-- **Acceptance:** tests for both cases; (a) prints the new message and `doctor` names the state; (b) a home with only `~/.gemini/config/mcp_config.json` proposes Antigravity and not Gemini CLI.
+  - (b) **Extended (live finding, 2026-10-17):** an agent created with `init` but without an owner card (`owner add-agent` not yet run) made `agentlink_status` say "not set up" and suggest `init`. In that state `agentlink_status`, every other tool answering the no-identity case, and `doctor` now say: this agent has no card from your owner yet, run `agentlink owner add-agent --agent <name>` in your own terminal. Never `init`. The name passes the 06 §6 check before it is inserted. Detected from the agent's own store, no KeyStore secret read. The truly-not-set-up state keeps its text.
+  - **Moved:** the Gemini CLI detection fix (IR-M1-9t-1 L-3: detect by the `gemini` binary on `PATH` or `~/.gemini/settings.json`, not any `~/.gemini` folder) is now card **M1-9w**.
+- **Acceptance:** tests for (a) (new message, `doctor` names the state), (b) (status, other tools and `doctor` in the no-card state; the unchanged not-set-up state).
+
+#### M1-9w · CLI: Claude Desktop in init, Gemini CLI detection (new, from M1-9a and M1-9u (b))
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`src/harness/**`, `src/commands/init.ts`), docs-site `technical/reference/harness-configuration.md`
+- **Depends on:** M1-9t
+- **Spec:** 06 §7 (harness table, Claude Desktop row); D-39, D-78
+- **Invariants:** I-4
+- **Scope:**
+  - (a) `agentlink init --harness claude-desktop` (and detection without `--harness`) writes the `agentlink` entry to the Claude desktop app's own file, not Claude Code's `~/.claude.json`: macOS `~/Library/Application Support/Claude/claude_desktop_config.json`, Windows `%APPDATA%\Claude\claude_desktop_config.json` (`~/AppData/Roaming/Claude`; `APPDATA` is not followed, like every env value). Linux: a fixed "not available on this system" message, nothing written. Same rules as every harness: other servers kept, exact diff and confirmation, malformed JSON refused, backup; the entry is `command` and `args` (`npx -y @4thtech-io/agentlink mcp`). Restart copy: "Quit and reopen the Claude app. AgentLink appears under Connectors."
+  - (b) Gemini CLI is detected by the `gemini` binary on `PATH` or `~/.gemini/settings.json`, not by any `~/.gemini` folder (IR-M1-9t-1 L-3, moved from M1-9u (b)); a home with only `~/.gemini/config/mcp_config.json` proposes Antigravity.
+- **Acceptance:** fixture-home tests per system (injected platform and home) for no config, other servers present and malformed; detection tests for Claude Desktop and Gemini CLI; the harness docs page has the row.
+
+#### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
+- **Status:** in review · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · docs/foundation/06-mcp-server.md §4
+- **Depends on:** M1-9c (the wrapper)
+- **Spec:** 06 §4; 04 §4 (untrusted content)
+- **Invariants:** I-5
+- **Scope:**
+  - The code (`apps/cli/src/tools/untrusted.ts`, test `untrusted.test.ts`) escapes every opening and closing `untrusted_content` look-alike in content, not only closing tags. The spec text lagged: 06 §4 named only `</untrusted_content>`. Rewrite the content bullet to state what the code does, with no new behaviour.
+- **Acceptance:** 06 §4 names both opening and closing tags and the look-alike forms; the code and tests are unchanged; IR-M1-22-L15-1 is resolved here.
 
 #### M1-24 · Product name and trademark check before the production domain (D-38) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet prepares search material) · **Security:** S0 · **Phase:** M1b
@@ -3322,7 +3399,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Property test: across random interleavings of offers, counters, approvals and `proof` envelopes, no scope ever sends more than one `accept` or signs more than one receipt, and nothing runs without an owner-signed approval or a matching grant.
 
 #### M1-32-c · MCP terms tools: accept and pass `clientRequestId` (new, IR-M1-22-1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (2026-10-17) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`src/tools/{propose-terms,respond-to-terms}.ts`)
 - **Depends on:** M1-9q, M1-32-b
 - **Spec:** 06 §1 rule 6, §2.2a; 07 §3.3
@@ -4034,6 +4111,8 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Acceptance:**
   - J3 completed without gas on Base (and on Gnosis if a supported token exists).
   - A replayed authorization fails; a below-minimum authorization is rejected by the submitter before submission.
+  - The core refuses to sign a `ReceiveWithAuthorization` unless `to` equals the configured fee vault for that chain, and reads the token domain from chain (EIP-5267 `eip712Domain()`), never hard-coded (M1-1j, IR-M1-1j-1 L-1).
+  - Independent EIP-3009 vectors (an `eip3009` case set) cover the `ReceiveWithAuthorization` digest (IR-M1-1j-1 L-2).
 
 #### M3-5 · Submitter on mainnet: operations, monitoring, alerts
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
@@ -4434,13 +4513,13 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 17. **G-17 (L) EIP-3009 flag location.** 05 §2.2 has no on-chain flag; 05 §2.5 says "flagged in the chain config". *Proposed:* off-chain flag (client + submitter), contract relies on the token call reverting. *Blocks:* M1-3c.
 18. **G-18 (L) GA undefined.** 05 §5 freezes the Notary "at GA"; 10 has no GA milestone. *Blocks:* M4-EPIC.
 19. **G-19 (M) Who pays `REGISTER`.** 05 §4 charges `card.ownerEvm`; there is no owner top-up flow (J3 is for agents) and local owner keys are presence-gated. *Proposed:* allow the agent to pay under the owner's `regOwnerSig`, or add owner credits to the console. *Blocks:* M2-4b.
-20. **G-20 (M) Revocation typed data.** 05 §4 `revoke(agentEvm, nonce, deadline, ownerSig)` has no EIP-712 struct; nonce rules for `Registration` and revoke unspecified. *Blocks:* M1-1i (vectors), M2-4a.
+20. **G-20 (M) Revocation typed data.** 05 §4 `revoke(agentEvm, nonce, deadline, ownerSig)` has no EIP-712 struct; nonce rules for `Registration` and revoke unspecified. *Blocks:* M1-1i-b (vectors), M2-4a.
 21. **G-21 (M) Measuring beta metrics without analytics.** 02 §7 and 10 gates vs 08 §2.3 and zero access. *Proposed:* moderated sessions plus opt-in, local-only timing exported by testers. *Blocks:* M1-GATE, M2-GATE.
 22. **G-22 (M) Owner archive mechanics.** 04 §4; 02 F-33; 06 §3: whose storage credentials, how the file key reaches the owner, who deletes. *Blocks:* M2-9.
 23. **G-23 (M) `agentId` undefined.** Resolved by branch `docs/G-23-G-28-agentid-safety-code` (pending owner; proposed, owner confirms at merge), with G-28: `agentId` is the agent's EVM address (`agentlink/v1/evm`, epoch 0), `0x` + 40 lowercase hex, the same value as card `agentEvm`, owner-action `agent` (D-58), `terms.parties` and the commitment scope, so never a second binding (04 §2.9). Derived from the seed and checked on every seed load (keychain and `ALKS`). Invites and handshakes carry `cardAgentSig`, and a handshake is accepted only from the card's own `agentNostr`, so an owner cannot claim another agent's address and a replayed card completes nothing. One contact per `agentId`; a re-pair needs unchanged owner keys and takes effect only on completion. Object keys use a random per-agent `storagePrefix`, never the address (07 §5.2). Owner and agent fingerprints are tagged hashes, short form `7F3A·19C2`, display only and never an authenticator. *Was:* Used in 04 §2.2 (keychain account), 06 §6, 07 §3, 07 §5.2 (object key). The object-key path also gives every recipient of a presigned URL a stable per-agent identifier. *Proposed:* define `agentId`; use a random per-agent prefix in object keys. Owner actions bind the canonical EVM address, not `agentId` (G-29), and `agentId` must not become a second binding. *Blocks:* M1-6a, M1-7a, M1-8a.
 24. **G-24 (M) Relays for owner copies.** RESOLVED by 4thtech/agentlink#51 (D-65; accepted by Tali, 2026-10-14, at merge, with every value below), in 07 §4.3, with pointers in 04 §3.1.1, §3.4.1, §3.5 and §4, the relay columns in 07 §3 and §3.6, and 08 §2.2. Each gift wrap goes to the relay list of the agent it concerns (the recipient's agent and owner to the recipient's list, the sender's agent and owner to the sender's own list, the union when one owner owns both agents), and an owner surface subscribes with `ownerNostr` on the bootstrap set (the release's default relays plus the owner's own Settings entries) and the lists of all its agents, inside the `OwnerSession`. A list counts only if it hashes to the `relaysHash` of a card whose `cardSig` is the owner's own; the surface learns it by signing the card, from owner copies of the agent's `handshake` or `card-update`, or from the owner link. A new owner-channel `card-update` (amends D-58) tells the owner of every new card, even with no contacts. Own lists hold 2–8 relays (3–5 by default), received lists 1–16 (unchanged); a relay change is a rotation, and the old list stays in use for 30 days. The console keeps at most 32 live connections and syncs the rest in turns. Kinds 10002 and 10050, relay hints and NIP-11 are never sources. Linkability through `ownerNostr` is stated, not removed. After IR-G-24-1 (also accepted at that merge): invite, `handshake` and `handshake-ack` lists must match `relaysHash` and `nameHash` (04 §3.6); `handshake-ack` carries `relays` (amends D-58; M1-2d); lists carried with a card hold 2–16 relays; a relay change is refused while an overlap runs; the owner `card-update` is also sent at `init`, re-published every 24 h during an overlap and every 7 days otherwise, and also published to the release default set; no agent-directory event kind now (a directory, if wanted, goes into the G-36 owner-backup blob); the 15-minute sync turn is a target. New cards M1-2d and M1-7j. The two D-58 amendments (owner-channel `card-update`, `handshake-ack` `relays`) are recorded as D-65 (accepted) in the decision log (00-README). After round 2: a 9-day look-back on a surface's first sync of a relay with no cursor, and a per-agent Advanced opt-out from announcing on the default relays, with its privacy cost stated. *Was:* 04 §3.5; 07 §4.2; 08 §2.2. AgentCard carries only the agent's `relaysHash`; owners have no relay list. *Proposed:* each owner copy goes to the relays of the agent it concerns; the console subscribes to all its agents' relays. *Blocks:* M1-5b, M2-2d.
 25. **G-25 (M) `agentlink_verify_proof_pack {path}`.** 06 §2.4 lets a tool read a caller-chosen file, against 06 §1 rule 4. *Proposed:* `json` only, or `path` restricted to `proofs.exportFolder`/inbox with realpath checks. *Blocks:* M1-9d.
-26. **G-26 (L) STREAM header not authenticated.** 04 §4: AAD is `u8(isFinal)` only; header fields rely on `ciphertextSha256`. *Proposed:* AAD = header ‖ isFinal, decided before vectors freeze. *Blocks:* M1-1d, M1-1i.
+26. **G-26 (L) STREAM header not authenticated.** 04 §4: AAD is `u8(isFinal)` only; header fields rely on `ciphertextSha256`. *Proposed:* AAD = header ‖ isFinal, decided before vectors freeze. *Blocks:* M1-1d, M1-1i-b.
 27. **G-27 (L) Inline file vs envelope size.** 04 §3.5; 02 F-30; 06 §2.3. A 12 KB file, base64-encoded inside an encrypted, base64-encoded payload with four recipient wraps, is already near 24 KB before any text. *Proposed:* "inline only if the final envelope ≤ 24 KB". *Blocks:* M1-7f.
 28. **G-28 (L) Safety-code encoding.** Resolved by branch `docs/G-23-G-28-agentid-safety-code` (pending owner; proposed, owner confirms at merge), with G-23: a commit-then-reveal code (04 §3.6.1). The invite commits to A's nonce, B's handshake adds its nonce, A's ack reveals; `digest = taggedHash("agentlink/safety-code/v1", cardHashA ‖ cardHashB ‖ inviteId ‖ nonceA ‖ nonceB)`, shown as `u64(digest[0..8]) mod 10^12` in three groups of four digits. Keys-only codes can be ground offline: 2^(t/2) per leg if B's card is known in advance, otherwise 2^t, so no short keys-only code is safe. With the commitment, a MITM matches with probability 10^-12 per attempt. Surfaces recompute the code from the signed handshake and ack, never from a stored digest (IR-G2328-1). The code is shown only on owner surfaces, never in MCP results; "checked" needs an owner-signed `contact.check`; it survives a `card-update` and changes on re-pair. Rated L as an encoding gap, but the old construction was also grindable. *Was:* 04 §3.6: the first 40 bits (2^40 ≈ 1.1 × 10^12) do not fit 12 decimal digits, the format 11 §1 and §8 specify. *Blocks:* M1-1f, M1-1h.
 29. **G-29 (M) Owner-operation payload bodies.** Resolved by PR #10 (D-58, confirmed by the owner at merge): one owner-signed object, `SignedOwnerAction` (04 §2.5.1, BIP-340 by the owner Nostr key over a tagged hash, bound to the agent's EVM address, with nonce and expiry), is produced by the local UI, the CLI and the console; `approval`, `policy` and `revoke` envelopes only carry it. Bodies for `approval-request`, `approval`, `policy`, `revoke`, `card-update` and `handshake-ack` in 04 §3.4.1, with receiver rules and the rule that no MCP tool can create them. Lifetimes stay with G-7, policy fail-closed with G-6. *Was:* 04 §3.4 listed these types without body schemas. *Blocks:* M1-2a, M2-2e.

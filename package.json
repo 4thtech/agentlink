@@ -21,7 +21,8 @@
     "test:e2e": "turbo run test:e2e",
     "vectors:check": "node tools/vectors/check.mjs",
     "format": "prettier --write .",
-    "changeset": "changeset"
+    "changeset": "changeset",
+    "version-packages": "changeset version && node tools/release/roll-changelog.mjs roll"
   },
   "devDependencies": {
     "@changesets/cli": "3.0.3",

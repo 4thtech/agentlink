@@ -112,6 +112,29 @@ jobs:
     with:
       ref: sync
 
+  # Guard against the sync stub's pin rotting (OPS-CI-4). The stub on `sync` pins this repository's
+  # secret-scan.yml at a commit SHA, while that workflow loads .gitleaks.toml from main at run time; a
+  # pin older than the last change to either file makes sync pushes scan with outdated logic or fail.
+  # This fails when the pin is not equal to or a descendant of that last change (a missing sync branch
+  # passes with a notice). It runs on pushes to main and weekly, not on pull requests: a PR that
+  # changes the scan must not be blocked by a re-pin that can only happen after it merges.
+  sync-pin:
+    name: sync-pin
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository (full history)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check that the sync secret-scan stub is pinned to a current commit
+        run: node tools/sync-pin-check/index.mjs
+
   codeql:
     name: codeql (${{ matrix.language }})
     if: github.event_name != 'merge_group'
@@ -190,7 +213,7 @@ jobs:
 
   security-gate:
     name: security-gate
-    needs: [dependency-review, secret-scan, secret-scan-sync, codeql, zizmor]
+    needs: [dependency-review, secret-scan, secret-scan-sync, sync-pin, codeql, zizmor]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

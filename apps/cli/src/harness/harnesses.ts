@@ -5,8 +5,8 @@
 // can set must not move a write). The only path from input is `--config <path>`, for OpenCode and
 // Antigravity only, resolved and checked by resolveConfigTarget under the 06 §7 write rules. The entry
 // runs `npx -y @4thtech-io/agentlink mcp`, as 06 §7 shows for every harness; a non-default agent adds
-// `--agent <name>` (the name is checked against 06 §6 first). Claude Desktop and the printed snippets
-// for Cursor, VS Code, Windsurf and Cline follow in M1b.
+// `--agent <name>` (the name is checked against 06 §6 first). Claude Desktop (M1-9w) has its own file
+// per system. The printed snippets for Cursor, VS Code, Windsurf and Cline follow in M1b.
 //
 // Nothing here puts a secret in a config: the entry holds the command and its arguments only.
 import { lstat, realpath, stat } from 'node:fs/promises';
@@ -17,11 +17,13 @@ import { readConfigFile, writeConfigFile, type ConfigFile, type FileOptions } fr
 import { addJsonMcpServer } from './json-config.js';
 import { addTomlMcpServer, agentlinkTable } from './toml-config.js';
 
-export type HarnessId = 'claude-code' | 'codex' | 'gemini-cli' | 'opencode' | 'antigravity';
+export type HarnessId =
+  'claude-code' | 'claude-desktop' | 'codex' | 'gemini-cli' | 'opencode' | 'antigravity';
 
 /** The `--harness` values (06 §7, D-78): one harness id, or `none` for the identity only. */
 export const HARNESS_IDS: readonly HarnessId[] = Object.freeze([
   'claude-code',
+  'claude-desktop',
   'codex',
   'gemini-cli',
   'opencode',
@@ -65,12 +67,27 @@ export interface HarnessDef {
   readonly id: HarnessId;
   /** Fixed display name (never taken from a file). */
   readonly appName: string;
-  /** The config file below the home folder. */
+  /** The config file below the home folder (the same on every system unless `byPlatform` is set). */
   readonly parts: readonly string[];
+  /**
+   * Desktop apps keep their config in a place that depends on the system (M1-9w). A system that is
+   * not listed is unsupported: nothing is detected or written there.
+   */
+  readonly byPlatform?: Readonly<
+    Partial<
+      Record<
+        'darwin' | 'win32',
+        {
+          readonly parts: readonly string[];
+          readonly installedMarks: readonly (readonly string[])[];
+        }
+      >
+    >
+  >;
   /** Things below the home folder whose presence means the app is installed. */
   readonly installedMarks: readonly (readonly string[])[];
-  /** The command name searched on PATH. */
-  readonly binary: string;
+  /** The command name searched on PATH (none for a desktop app). */
+  readonly binary?: string;
   readonly edit: (
     text: string | undefined,
     args: readonly string[],
@@ -96,6 +113,27 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
       addJsonMcpServer(text, { type: 'stdio', command: 'npx', args: [...args], env: {} }),
   },
   {
+    // Claude desktop app (chat), not Claude Code: its own file, `claude_desktop_config.json` (06 §7,
+    // M1-9w). macOS: ~/Library/Application Support/Claude; Windows: %APPDATA%\\Claude, which is
+    // ~/AppData/Roaming/Claude (APPDATA itself is not followed, like every other env value). No Linux
+    // app. The entry has the stdio shape every other harness gets: `command` and `args`.
+    id: 'claude-desktop',
+    appName: 'Claude Desktop',
+    parts: [],
+    byPlatform: {
+      darwin: {
+        parts: ['Library', 'Application Support', 'Claude', 'claude_desktop_config.json'],
+        installedMarks: [['Library', 'Application Support', 'Claude']],
+      },
+      win32: {
+        parts: ['AppData', 'Roaming', 'Claude', 'claude_desktop_config.json'],
+        installedMarks: [['AppData', 'Roaming', 'Claude']],
+      },
+    },
+    installedMarks: [],
+    edit: (text, args) => addJsonMcpServer(text, { command: 'npx', args: [...args] }),
+  },
+  {
     id: 'codex',
     appName: 'Codex',
     parts: ['.codex', 'config.toml'],
@@ -107,7 +145,9 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
     id: 'gemini-cli',
     appName: 'Gemini CLI',
     parts: ['.gemini', 'settings.json'],
-    installedMarks: [['.gemini']],
+    // Not the whole ~/.gemini folder: Antigravity keeps its config there too (IR-M1-9t-1 L-3). The
+    // `gemini` binary on PATH or its settings file means Gemini CLI.
+    installedMarks: [['.gemini', 'settings.json']],
     binary: 'gemini',
     edit: (text, args) => addJsonMcpServer(text, { command: 'npx', args: [...args] }),
   },
@@ -144,9 +184,25 @@ export function harnessById(id: HarnessId): HarnessDef {
   return def;
 }
 
+/** The config file's parts on this system, or `undefined` when the app has none here (Linux). */
+export function configParts(
+  def: HarnessDef,
+  platform: NodeJS.Platform = process.platform,
+): readonly string[] | undefined {
+  if (def.byPlatform === undefined) return def.parts;
+  return platform === 'darwin' || platform === 'win32'
+    ? def.byPlatform[platform]?.parts
+    : undefined;
+}
+
 /** `~/.codex/config.toml`: how a config path is shown to the user. */
-export function displayPath(def: HarnessDef, config?: ConfigTarget): string {
-  return config === undefined ? `~/${def.parts.join('/')}` : config.display;
+export function displayPath(
+  def: HarnessDef,
+  config?: ConfigTarget,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (config !== undefined) return config.display;
+  return `~/${(configParts(def, platform) ?? def.parts).join('/')}`;
 }
 
 /**
@@ -242,11 +298,19 @@ async function onPath(
 export async function detectHarnesses(context: HarnessContext): Promise<HarnessDef[]> {
   const found: HarnessDef[] = [];
   for (const def of HARNESSES) {
+    const platform = context.platform ?? process.platform;
     let installed = false;
-    for (const mark of def.installedMarks) {
+    if (configParts(def, platform) === undefined) continue;
+    const marks =
+      def.byPlatform === undefined
+        ? def.installedMarks
+        : ((platform === 'darwin' || platform === 'win32'
+            ? def.byPlatform[platform]?.installedMarks
+            : undefined) ?? []);
+    for (const mark of marks) {
       if (await exists(join(context.home, ...mark))) installed = true;
     }
-    installed ||= await onPath(def.binary, context.env, context.platform ?? process.platform);
+    if (def.binary !== undefined) installed ||= await onPath(def.binary, context.env, platform);
     if (installed) found.push(def);
   }
   return found;
@@ -271,7 +335,11 @@ export type HarnessPlan =
 /** The folder and parts of the file to read and write: the default, or the `--config` target. */
 function where(def: HarnessDef, context: HarnessContext): [string, readonly string[]] {
   const config = context.config;
-  if (config === undefined) return [context.home, def.parts];
+  if (config === undefined) {
+    const parts = configParts(def, context.platform);
+    if (parts === undefined) throw new HarnessError('unsupported_platform');
+    return [context.home, parts];
+  }
   if (!(CONFIG_PATH_HARNESSES as readonly string[]).includes(def.id)) {
     throw new HarnessError('unsafe_path');
   }
@@ -295,7 +363,11 @@ export async function planHarness(def: HarnessDef, context: HarnessContext): Pro
       def,
       before,
       text: edit.text,
-      diff: unifiedDiff(before.text ?? '', edit.text, displayPath(def, context.config)),
+      diff: unifiedDiff(
+        before.text ?? '',
+        edit.text,
+        displayPath(def, context.config, context.platform),
+      ),
     };
   } catch (error) {
     if (error instanceof HarnessError) return { status: 'blocked', def, reason: error.code };
