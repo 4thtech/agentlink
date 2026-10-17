@@ -220,7 +220,7 @@ export default tseslint.config(
     // apps/cli/scripts/ (never published: `files` names only dist/agentlink.js) print to the terminal.
     files: [
       'tools/**',
-      'apps/cli/scripts/**',
+      'apps/cli/scripts/**/*.mjs',
       '**/*.test.ts',
       '**/*.config.{ts,mjs}',
       'eslint.config.mjs',
@@ -230,7 +230,7 @@ export default tseslint.config(
   {
     // The console channels and the repository scripts. This turns off ALL no-restricted-syntax
     // selectors for these files, not only CONSOLE_SYNTAX: keep the list to these exact paths.
-    files: ['tools/**', 'apps/cli/scripts/**', ...CONSOLE_CHANNELS],
+    files: ['tools/**', 'apps/cli/scripts/**/*.mjs', ...CONSOLE_CHANNELS],
     rules: { 'no-console': 'off', 'no-restricted-syntax': 'off' },
   },
 );

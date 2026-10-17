@@ -50,6 +50,39 @@ export const SDK_ENTRIES = [
   '@modelcontextprotocol/sdk/types.js',
 ];
 const SDK = '@modelcontextprotocol/sdk';
+/**
+ * The Node built-ins the published bundle may import: exactly the ones it uses today (IR-M1-9c-c-1
+ * L1). Anything else (`node:module`, `node:vm`, `node:child_process`, `node:worker_threads`,
+ * `node:crypto`, …) fails until a reviewed change adds it here. No `node:crypto`: crypto goes through
+ * @agentlink/crypto on @noble/* and @hpke/core (I-8).
+ */
+export const BUNDLE_BUILTINS = [
+  'node:dns',
+  'node:fs',
+  'node:fs/promises',
+  'node:https',
+  'node:net',
+  'node:os',
+  'node:path',
+  'node:process',
+  'node:readline/promises',
+  'node:tls',
+  'node:tty',
+  'node:util',
+];
+/** Names that load a module without an import declaration (IR-M1-9c-c-1 L1). */
+const LOADER_NAMES = new Set(['require', 'createRequire', 'getBuiltinModule']);
+/** Globals whose computed (non-literal) member access could reach a loader by a built-up name. */
+const LOADER_HOSTS = new Set(['globalThis', 'global', 'self', 'window', 'module', 'process']);
+/**
+ * Computed global accesses that are reviewed and allowed, by their exact source text. Fails closed:
+ * a renamed or new site is a finding until it is reviewed and listed here.
+ */
+export const COMPUTED_GLOBAL_EXCEPTIONS = [
+  // packages/core/src/invite-link.ts `codec(kind)`: `kind` is typed
+  // 'CompressionStream' | 'DecompressionStream' and both call sites pass a literal (04 §3.6).
+  'globalThis[kind]',
+];
 
 /** The package name of a bare specifier (`@scope/name` or `name`). */
 export function packageName(specifier) {
@@ -74,13 +107,24 @@ function excerpt(source, node) {
   return source.slice(node.start, node.end).replace(/\s+/g, ' ').slice(0, 80);
 }
 
+/** The static name of a member expression's property, or undefined when it is computed. */
+function memberName(node) {
+  if (!node.computed && node.property.type === 'Identifier') return node.property.name;
+  if (node.computed && node.property.type === 'Literal') return String(node.property.value);
+  return undefined;
+}
+
 /**
  * Every import specifier of an ESM source, read from its AST (comments and string contents never
- * count), plus the `import(…)` and `require(…)` calls that cannot be read statically.
+ * count), plus the `import(…)` and `require(…)` calls that cannot be read statically and every
+ * loader access: a `require`, `createRequire` or `getBuiltinModule` reference (bare or as a member),
+ * `import.meta.resolve`, and a computed member access with a built-up name on a global such as
+ * `globalThis[…]` (IR-M1-9c-c-1 L1, L2).
  */
 export function extractImports(source) {
   const specifiers = new Set();
   const unreadable = [];
+  const loader = new Set();
   const visit = (node) => {
     if (node === null || typeof node !== 'object') return;
     if (Array.isArray(node)) {
@@ -105,26 +149,52 @@ export function extractImports(source) {
       node.callee.name === 'require'
     ) {
       unreadable.push(excerpt(source, node));
+    } else if (node.type === 'Identifier' && LOADER_NAMES.has(node.name)) {
+      loader.add(node.name);
+    }
+    if (node.type === 'MemberExpression') {
+      const name = memberName(node);
+      const host = node.object.type === 'Identifier' ? node.object.name : undefined;
+      if (name !== undefined && LOADER_NAMES.has(name)) loader.add(excerpt(source, node));
+      if (name === 'resolve' && node.object.type === 'MetaProperty') {
+        loader.add(excerpt(source, node));
+      }
+      if (name === undefined && host !== undefined && LOADER_HOSTS.has(host)) {
+        const text = excerpt(source, node);
+        if (!COMPUTED_GLOBAL_EXCEPTIONS.includes(text)) loader.add(text);
+      }
     }
     for (const [key, child] of Object.entries(node)) {
       if (key !== 'type' && key !== 'start' && key !== 'end') visit(child);
     }
   };
   visit(parseAst(source));
-  return { specifiers: [...specifiers].sort(), unreadable };
+  return { specifiers: [...specifiers].sort(), unreadable, loader: [...loader].sort() };
+}
+
+/** Findings for the loader accesses and unreadable imports of one extraction. */
+function loaderFindings({ unreadable, loader }) {
+  return [
+    ...unreadable.map((call) => `${call}: not a static import; imports must be literal`),
+    ...loader.map((access) => `loader access: ${access} (loads a module without an import)`),
+  ];
 }
 
 /** The findings for the published bundle `source`, given the declared runtime dependencies. */
 export function checkBundleSource(source, dependencies, banned) {
   const findings = [];
-  const { specifiers, unreadable } = extractImports(source);
-  for (const call of unreadable) {
-    findings.push(`${call}: not a static import; the bundle's imports must be literal`);
-  }
+  const extracted = extractImports(source);
+  const { specifiers } = extracted;
+  findings.push(...loaderFindings(extracted));
   for (const specifier of specifiers) {
     const quoted = JSON.stringify(specifier);
     // The bundler writes every Node built-in with the `node:` prefix; a bare `fs` is a finding.
-    if (specifier.startsWith('node:')) continue;
+    if (specifier.startsWith('node:')) {
+      if (!BUNDLE_BUILTINS.includes(specifier)) {
+        findings.push(`${quoted}: Node built-in outside the bundle allowlist (BUNDLE_BUILTINS)`);
+      }
+      continue;
+    }
     if (/^[./]|^[A-Za-z]:[\\/]/.test(specifier)) {
       findings.push(`${quoted}: relative or absolute import; the bundle must be one file`);
       continue;
@@ -189,7 +259,7 @@ export async function checkToolsEntry(entry, banned) {
     if (banned.has(name)) return `${quoted}: banned (D-76)`;
     return undefined;
   };
-  await build({
+  const result = await build({
     configFile: false,
     root: packageDir,
     logLevel: 'silent',
@@ -229,10 +299,22 @@ export async function checkToolsEntry(entry, banned) {
       rolldownOptions: {
         input: entry,
         platform: 'neutral',
+        // Keep the entry's exports: an app build would tree-shake src/tools/ to nothing, and the
+        // output scan below would then see an empty chunk.
+        preserveEntrySignatures: 'strict',
         output: { format: 'es', codeSplitting: false },
       },
     },
   });
+  // IR-M1-9c-c-1 L2: the output chunk itself may hold no loader access and no unreadable import(),
+  // whatever code in the graph produced it. Literal imports there are the externals flagged above or
+  // NEUTRAL_EXCEPTIONS.
+  const outputs = (Array.isArray(result) ? result : [result]).flatMap((r) => r.output);
+  for (const chunk of outputs.filter((o) => o.type === 'chunk')) {
+    for (const finding of loaderFindings(extractImports(chunk.code))) {
+      findings.add(`output: ${finding}`);
+    }
+  }
   return [...findings].sort();
 }
 
@@ -262,7 +344,13 @@ async function main() {
   }
   if (!values['skip-tools']) {
     const toolFindings = await checkToolsEntry(resolve(values['tools-entry']), banned);
-    findings.push(...toolFindings.map((f) => `src/tools/ neutral bundle: ${f}`));
+    findings.push(
+      ...toolFindings.map((f) =>
+        f.startsWith('output: ')
+          ? `src/tools/ neutral bundle ${f}`
+          : `src/tools/ neutral bundle: ${f}`,
+      ),
+    );
     if (toolFindings.length === 0) ok.push('bundle-check: src/tools/ neutral bundle ok');
   }
   if (ok.length > 0) process.stdout.write(`${ok.join('\n')}\n`);
