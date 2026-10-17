@@ -1075,7 +1075,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - `AgentCard` EIP-712 vectors from M1-1h pass in all runtimes.
 
 #### M1-1j · crypto: EIP-712 proof types and commitment helpers (new, split from M1-1e)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in-progress (revoke struct deferred until G-20 lands, PR #215 / M1-1i-b) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto
 - **Depends on:** M1-1e, M1-1i
 - **Spec:** 04 §5; 05 §3.1, §4, §8
@@ -1837,7 +1837,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Storage (`@agentlink/storage`)
 
 #### M1-6a · storage: adapter interface, inline adapter, S3 adapter
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet · **Security:** S2 (`packages/*`; card said S1) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage
 - **Depends on:** M1-1a, M0-8, M0-2g (R2 test token); gap G-23 resolved
 - **Spec:** 07 §5.1–§5.3; 04 §4 (delivery, expiry); 02 F-30–F-32; D-18
@@ -1849,6 +1849,21 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Integration tests against MinIO (Docker, every PR) and Cloudflare R2 (scheduled job using the bucket-scoped test token): upload, presign, download, delete.
   - Presign beyond 7 days is clamped (test); canary test shows no URL query strings or keys in logs.
+- **Split (orchestrator, 2026-10-17):** M0-2g (R2 test token) is not done, and the MinIO job touches `.github/**`. This card ships the interface and both adapters with unit tests against an in-memory fake endpoint (no network), handled as S2 (`packages/*`). The MinIO and R2 integration tests move to M1-6a-2. The endpoint check is the 04 §4 raw-string grammar; the DNS-level check comes from the SSRF-safe fetch (M1-15) that the caller injects.
+
+#### M1-6a-2 · storage: MinIO and R2 integration tests (new, split from M1-6a)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (sensitive: `.github/**`) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/storage (integration tests), .github/workflows
+- **Depends on:** M1-6a; M0-2g (R2 bucket and bucket-scoped test token) for the R2 job
+- **Spec:** 07 §5.2; 04 §4 (delivery, expiry); `ci-cd.md`; `audit-rules.md` §2 (sensitive paths)
+- **Invariants:** I-2, I-7
+- **Scope:**
+  - MinIO (Docker) integration job on every PR: upload, presign, download through the presigned URL, delete. The S3 adapter accepts only `https` endpoints, so MinIO runs with TLS (a CI-generated certificate) rather than adding an `http` or loopback exception to the adapter.
+  - Scheduled Cloudflare R2 job with the bucket-scoped test token from a GitHub Environment secret; skipped (not failed) on forks.
+  - Neither job prints a presigned URL, object key or credential.
+- **Acceptance:**
+  - Both jobs green with the round trip; the R2 token cannot list or write any other bucket (M0-2g).
+  - The log canary run in CI shows no URL query strings or keys.
 
 #### M1-6b · storage: streaming encryption and multipart upload
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -3217,6 +3232,14 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Note (IR-M1-22-L15-1):** resolved by M1-9v (spec only): the code already escapes opening-tag look-alikes as well as closing ones (`apps/cli/src/tools/untrusted.ts`, tested in `untrusted.test.ts`); 06 §4 now says so.
 - **Follow-up (local dogfood run 2, 2026-10-16; card as M1-22 or M1-12a work):** (a) OpenCode's summary of an offer showed raw addresses ("paid by 0xb680…8275 to 0x40a9…9337"). Check whether `agentlink_inbox` and the terms summaries expose address-like strings to the agent, and whether 11 §5 copy should show contact names instead. (b) A duplicate identical offer (same terms sent twice) appears as two open offers; consider a dedupe hint in the inbox or status summary.
 
+
+#### M1-22-b · tools: contact names, not raw addresses, in summaries (new; Phase M1b)
+
+- **Class:** S1 · **Owner decision (Tali, 2026-10-17)** · **Follows:** M1-22, local dogfood run 2 notes (a) and (b)
+- **Scope:**
+  - An agent address equal to the user's own agent shows as "you"; equal to a paired contact's agent, as that contact's name under 06 §2.1 (else "a contact"). Unknown addresses stay only in structured or untrusted fields, never in summary text. Done as the `termsParties` field of `agentlink_inbox` offers.
+  - Two or more identical open offers (same contact, same terms hash) add one hint line to the `openOffers` summary; the offers are not merged. `agentlink_status` has no terms hash, so it gets no hint (the hint belongs to the inbox read).
+- **Acceptance:** tests for each; strings snapshot has the new key only; no change to `cli.ts` or the tool registry.
 #### M1-23 · J9 dogfood: Tali's and Denis's agents sync through AgentLink (M1a gate) (new)
 - **Status:** in-progress (v0.1.0 is released; the runbook RB-17 `docs/runbooks/dogfood-m1a.md` merged in 4thtech/agentlink#168, 2026-10-16; the dogfood run itself is open) · **Size:** S · **Tier:** Sonnet (setup notes) + Owner (with @denisjazbec) · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** owner's sync file (dogfood log); issues as backlog cards. No synced project content is committed.
@@ -4096,6 +4119,8 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Acceptance:**
   - J3 completed without gas on Base (and on Gnosis if a supported token exists).
   - A replayed authorization fails; a below-minimum authorization is rejected by the submitter before submission.
+  - The core refuses to sign a `ReceiveWithAuthorization` unless `to` equals the configured fee vault for that chain, and reads the token domain from chain (EIP-5267 `eip712Domain()`), never hard-coded (M1-1j, IR-M1-1j-1 L-1).
+  - Independent EIP-3009 vectors (an `eip3009` case set) cover the `ReceiveWithAuthorization` digest (IR-M1-1j-1 L-2).
 
 #### M3-5 · Submitter on mainnet: operations, monitoring, alerts
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
@@ -4490,7 +4515,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 11. **G-11 (L) Logger package missing from the package map.** RESOLVED by M0-8: `@agentlink/log` (zero dependencies) is in the 07 §1 package map and `repo-reference.md`. *Was:* 04 §8.4 vs 07 §1. *Blocked:* M0-8.
 12. **G-12 (M) JCS and invite compression.** RESOLVED. *JCS:* by M1-1a (4thtech/agentlink#27): in-repo RFC 8785 code checked against the RFC vectors (`packages/crypto/src/jcs.ts`), the alternative proposed here, so no dependency was added. *Compression:* by 4thtech/agentlink#70 (D-69; the encoding decided by Tali in chat, 2026-10-14; the decoder rules proposed, owner confirms at merge), in 04 §3.6: raw DEFLATE (RFC 1951) with no zlib header or checksum, through the platform `CompressionStream("deflate-raw")` and `DecompressionStream("deflate-raw")`. Proposed with it (revised after review IR-D-69-1): the whole input bounded before URL parsing (the canonical prefix plus at most 21 846 characters of strict base64url, or the bare payload); inflation in bounded slices with a running count, capped at 16 384 bytes before any parse, with an orderly shutdown; the stream must end exactly at the end of the input (malformed, truncated and trailing-byte streams refused in every runtime, the codec detecting trailing input itself where the platform does not); fatal UTF-8 with the BOM kept, I-JSON and the strict schema before use; the encoder checks both limits; compressed bytes never hashed or signed; one codec in `@agentlink/core` (M1-7c). The proof-pack link is not covered (G-52). *Was:* 04 §3.1, §3.6; `AGENTS.md` dependency allowlist. No JCS implementation was allowlisted although `envelopeHash` depends on it; "deflate" did not say raw DEFLATE or zlib. *Proposed:* approve a vetted RFC 8785 implementation (or in-repo code with RFC vectors); specify `deflate-raw` via `CompressionStream`. *Blocked:* M1-1a (done), M1-7c.
 13. **G-13 (L) Record kind ↔ payload type.** 05 §3.1 kinds vs 04 §3.4 payload types; no mapping. *Blocks:* M1-7g.
-14. **G-14 (M) `agentlink_fetch_file` and SSRF in Workers.** 06 §2.3 (`savedTo`, inbox folder) vs 08 §3 (no filesystem); 04 §4 DNS checks are not possible in Workers. *Proposed:* cloud `agentlink_fetch_file` stores the decrypted file in the user's R2 and returns a short-lived link; Workers SSRF = https + IP-literal and hostname checks, documented reliance on Workers egress. *Blocks:* M1-15, M2-3b.
+14. **G-14 (M) `agentlink_fetch_file` and SSRF in Workers.** 06 §2.3 (`savedTo`, inbox folder) vs 08 §3 (no filesystem); 04 §4 DNS checks are not possible in Workers. *Proposed:* cloud `agentlink_fetch_file` stores the decrypted file in the user's R2 and returns a short-lived link; Workers SSRF = https + IP-literal and hostname checks, documented reliance on Workers egress. *Blocks:* M2-3b only (owner decision, 2026-10-17). M1-15's Node-side safe download does not depend on G-14; the Workers egress part stays open for M2-3b.
 15. **G-15 (L) Shared tool handlers.** **RESOLVED (D-73 (1), Tali, in chat, 15 Oct 2026; spec in 06 §1, 03 §3, 07 §1 by M1-9j):** for M1a the handlers live in `apps/cli`. *Derived (D-73; proposed, owner confirms at merge):* the module is `apps/cli/src/tools/`, runtime-agnostic (no Node built-in, Node global or `@agentlink/node` import, fenced by ESLint rules and a neutral-platform bundle check in CI), moved into a shared package at M2-3b; no new package or audit-rules path row before then. *Was:* 06 §1 rule 1; no shared package between `apps/cli` and `apps/cloud-agent` in the layout. *Proposed:* `packages/mcp-tools`. *Blocks:* M1-9c (structure), M2-3b.
 16. **G-16 (M) Owner link and cloud commands.** 08 §2.1 (QR direction, code derivation and channel unspecified); `agentlink owner link`, `cloud deploy`, `cloud login` (08 §2.1, §3.2, §3.3) are missing from the 06 §8 command list. *Proposed:* specify the owner-link protocol (short code from a transcript hash) and add the commands with † where owner presence applies. *Blocks:* M2-2c, M2-3c, M2-3d.
 17. **G-17 (L) EIP-3009 flag location.** 05 §2.2 has no on-chain flag; 05 §2.5 says "flagged in the chain config". *Proposed:* off-chain flag (client + submitter), contract relies on the token call reverting. *Blocks:* M1-3c.
