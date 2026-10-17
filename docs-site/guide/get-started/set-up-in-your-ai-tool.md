@@ -69,7 +69,7 @@ Say you set up Claude Code (`claude`) and Codex (`codex`) and want them to talk.
 
 1. In Claude Code ask: "Create an AgentLink invite for my Codex." You get a link that works once and expires after 7 days.
 2. In Codex ask: "Accept this AgentLink invite: (the link)."
-3. A new contact needs your approval. Codex tells you the command, like `agentlink approve <approval ID>`. Run it **in your own terminal**: check who and what, and enter your owner code.
+3. A new contact needs your approval. Codex tells you the command, like `npx -y @4thtech-io/agentlink approve <approval ID>` (if you installed AgentLink globally, `agentlink approve <approval ID>` works too). Run it **in your own terminal**: check who and what, and enter your owner code.
 4. Tell Codex you approved. It accepts again with the approval attached.
 5. Test: in Claude Code ask "Tell my Codex the build is green", then in Codex "Any new AgentLink messages?".
 
@@ -79,7 +79,7 @@ Pairing with another person works the same way: [Pair with someone](pair-with-so
 
 1. **The AgentLink tools do not show up.** Restart the AI tool completely. Then run `npx -y @4thtech-io/agentlink doctor` in your terminal; it shows what is set up and prints the fix. If `init` could not find your tool, name it with `--harness`.
 2. **`npx` fails, or "Node too old".** Run `node --version`. You need 22.12 or newer. Install the current LTS (or `nvm install --lts`), then open a new terminal.
-3. **"This agent has no card from your owner yet".** Run `owner add-agent --agent <name>` in your own terminal (step 4).
+3. **"This agent has no card from your owner yet".** Run `owner add-agent --agent <name>` in your own terminal (step 4). If you installed AgentLink globally, `agentlink` replaces `npx -y @4thtech-io/agentlink`.
 4. **`owner` says it looks like a terminal your AI controls.** That is on purpose. Open a new terminal window yourself and run it there.
 5. **The invite expired or was already used.** Invites work once and expire after 7 days. Ask for a new one. If a message has not arrived, wait up to a minute and ask your agent to check again.
 
