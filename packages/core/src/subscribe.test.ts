@@ -319,6 +319,48 @@ describe('subscribeInbox (M1-9s; 07 §4.1, §4.2; 06 §6)', () => {
     expect(net.openSockets).toBe(0);
   });
 
+  it('close() racing a handler in flight: nothing is stored or marked seen, and the next pass stores it', async () => {
+    const net = new LiveRelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    await pair(a, b);
+    const sub = await b.client.subscribeInbox();
+    await until(() => liveSubsOn(net, RELAYS_B) === RELAYS_B.length);
+    // Hold the live handler at its first store read (the admission limit), before #handle runs.
+    const loadPolicy = b.client.ownerActions.loadPolicy.bind(b.client.ownerActions);
+    let release: (() => void) | undefined;
+    let held = 0;
+    b.client.ownerActions.loadPolicy = () => {
+      held += 1;
+      return new Promise((resolve) => {
+        release = () => resolve(loadPolicy());
+      });
+    };
+    const built = await a.client.envelopes.build({ to: { contact: b.id }, payload: textPayload() });
+    const event = await deliverRaw(net, a, b, built.envelope);
+    await until(() => held > 0);
+
+    let done = false;
+    const closing = sub.close().then(() => {
+      done = true;
+    });
+    await settle();
+    expect(done).toBe(false); // close() waits for the handler in flight
+    b.client.ownerActions.loadPolicy = loadPolicy;
+    release?.();
+    await closing;
+    expect(await inboundText(b)).toEqual([]);
+    expect(b.receives.count).toBe(0);
+    expect((await rowsOf(b)).seen.some((r) => r.kind === 'wrap' && r.id === event.id)).toBe(false);
+
+    // The wrap was left for the next pass (not marked, cursor not moved past it): a catch-up stores it.
+    const next = await b.client.syncInbox();
+    expect(next.items).toHaveLength(1);
+    expect(await inboundText(b)).toHaveLength(1);
+    b.client.close();
+    a.client.close();
+  });
+
   it('client.close() also ends an open subscription: no live REQ and no socket left', async () => {
     const net = new LiveRelayNetwork();
     const b = await openAgent(2, 'bob', RELAYS_B, net);

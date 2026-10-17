@@ -1,5 +1,6 @@
 ---
 '@agentlink/core': minor
+'@agentlink/transport-nostr': minor
 '@4thtech-io/agentlink': minor
 ---
 

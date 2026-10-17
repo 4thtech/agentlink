@@ -60,7 +60,7 @@ export interface TransportSubscribeOptions {
   readonly onEnvelope: EnvelopeHandler;
 }
 
-/** Ends a live subscription: sends CLOSE on each relay and stops its reconnects. Idempotent. */
+/** Ends a live subscription: CLOSE on each relay, no reconnect; resolves once in-flight handlers settle. */
 export type TransportUnsubscribe = Unsubscribe;
 
 /** The transport as the core's send pipeline and outbox use it (07 §4.1, split as above). */

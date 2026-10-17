@@ -394,7 +394,10 @@ export class SyncService {
       // After close nothing touches the store: the wrap is left for the next pass (not marked seen).
       if (closed) return Promise.resolve('retry');
       const run = (async (): Promise<SyncDisposition> => {
-        const outcome = await this.#handle(item, await limitNow());
+        const limitValue = await limitNow();
+        // Closed while the limit was read: leave the wrap for the next pass, store nothing.
+        if (closed) return 'retry';
+        const outcome = await this.#handle(item, limitValue);
         if (outcome.stored) {
           stored += 1;
           kick();
@@ -406,20 +409,22 @@ export class SyncService {
       return run;
     };
 
-    let unsubscribe: () => void;
+    let unsubscribe: () => Promise<void> | void;
     try {
       unsubscribe = subscribe({ relays, identities, persistence: this.#persistence, onEnvelope });
     } catch {
       log.warn('live subscription failed', { relays: relays.length });
       throw new CoreError('transport_unavailable', 'Live delivery is not available in this setup.');
     }
+    // The transport's drain: its event tasks (handler calls, cursor writes) still running.
+    let drained: Promise<unknown> = Promise.resolve();
     const entry = {
       end: (): void => {
         if (closed) return;
         closed = true;
         this.#live.delete(entry);
         try {
-          unsubscribe();
+          drained = Promise.resolve(unsubscribe()).catch(() => undefined);
         } catch {
           // the transport's stop does not throw; nothing more to end here
         }
@@ -433,7 +438,7 @@ export class SyncService {
       },
       close: async (): Promise<void> => {
         entry.end();
-        await Promise.allSettled([...inflight, processing]);
+        await Promise.allSettled([...inflight, processing, drained]);
       },
     };
   }

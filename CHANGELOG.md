@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Added
 
 - Live relay subscriptions (M1-9s): while `agentlink mcp` runs and holds the publisher lease, new messages and handshakes are stored and processed as they reach a relay instead of on the next 30 s poll. The core `Transport` gains `subscribe` and the client `subscribeInbox` (same receive path as `syncInbox`: dedup by gift-wrap ID and envelopeHash, one store transaction, rate limit). The background loop keeps a catch-up every 5 min as a fallback, polls when no subscription can open, and closes the subscription on lease loss and on shutdown.
+- Spec text sync (M1-9s): the 07 §4.1 interface sketch now shows `subscribe` with the implemented `sync` handler shape (relays, identities, persistence, onEnvelope) and an unsubscribe that resolves once in-flight handlers settle; no protocol change.
 
 ### Changed
 
