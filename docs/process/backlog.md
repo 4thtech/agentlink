@@ -137,6 +137,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
 - **Acceptance:**
   - First runs after M0-2b are green, or every zizmor/CodeQL finding is triaged in a follow-up `CHORE` PR.
   - The items under "Not verified when this was written" in `ci-cd.md` are each checked off or turned into a follow-up card.
+- Review note (Renovate cooldown (PR #149, 2026-10-17), 2026-10-17): Renovate merged `pycparser` 3.11 inside the 14-day age window. `renovate.json` sets `minimumReleaseAge` to 3 days globally (7 days for the crypto group) and has no pip-specific rule, so a 14-day cooldown is not enforced anywhere. Decide the intended age (set `minimumReleaseAge` for the pip manager, or document the 3-day value) and find where 14 days was assumed.
 
 #### M0-2d · Monorepo skeleton and CI strict mode
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1
@@ -681,6 +682,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:**
   - A title `OPS-CI-3 ci: ...` passes; `OPS-ci-3`, `OPS-` and `OPS-CI` fail (tests).
 - **Also (found in PR #187):** since OPS-REL-1 (`privatePackages.version: true`) the private tooling packages (`tools`, `e2e`) count as published, so a tooling-only PR fails the `changesets` check without an empty changeset. Exempt private tooling packages from the changeset requirement, or have CI add empty changesets for them; test both cases.
+- Review note (PR #197 review L1, 2026-10-17): tighten the tooling-only path exemption for nested packages.
 
 #### OPS-CI-4 · Guard the sync secret-scan stub pin (new)
 - **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
@@ -692,6 +694,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - The stub on `sync` was pinned to v0.0.1, before main loaded `.gitleaks.toml`, so every sync push failed on the test-vector keys. A `sync-pin` job fails when the pin is not equal to or a descendant of the last main commit that changed `secret-scan.yml` or `.gitleaks.toml`; document the re-pin procedure.
 - **Acceptance:**
   - Tests: pin parsing, ancestry (older, equal, later, unknown SHA), missing stub passes with a notice. No gitleaks allowlist change, no new action, read-only token.
+- Review note (IR-OPS-CI-4-1 L1/L2/L3, 2026-10-17): tighten the pin check (reachability from `main`), improve its message and add a subdirectory test.
 
 #### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
 - **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
@@ -704,6 +707,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Also (found on release day):** the step that creates the GitHub Release failed with HTTP 422 because the `## [0.1.0]` section (about 130 KB) is over GitHub's 125,000-character body limit. Fall back to a short note (`docs/releases/<version>.md` if present, else a link to the CHANGELOG section) when the section is too long.
 - **Acceptance:**
   - A Version packages PR contains the rolled root CHANGELOG; the `notes` guard passes without a manual PR (test on a fixture CHANGELOG); an empty `[Unreleased]` is refused or left untouched.
+- Review note (PR #198 review L1/L2, 2026-10-17): the "nothing to release" message is misleading when changesets are pending (say "add an entry under [Unreleased] in CHANGELOG.md, versioning.md section 5"); CRLF input gives mixed line endings.
 
 #### OPS-REL-4 · Changelog fragments in `changelog.d/` (new, owner-approved 2026-10-17)
 - **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`, `AGENTS.md`; owner "merge")
@@ -715,6 +719,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - Nearly every PR added a line at the same spot in `CHANGELOG.md` `[Unreleased]`, so parallel PRs conflicted in the merge queue after each merge. Each PR now adds `changelog.d/<card-id>.md` (section by front matter or heading, then bullets); the release roll folds the fragments and any legacy `[Unreleased]` lines into the version section, grouped in a stable order, and deletes them.
 - **Acceptance:**
   - The roll reads fragments and legacy lines, refuses only when both are empty, rejects an unknown section naming the file, deletes consumed fragments and is idempotent (fixture tests); CI fails a user-visible, spec or process PR without an entry and only warns on a direct `[Unreleased]` edit; docs, PR template and the `AGENTS.md` Versioning bullet updated.
+- Review note (IR-OPS-REL-4-1 L1..L5, 2026-10-17): validate changelog fragments in CI (format and section); align `versioning.md` wording with the check.
 
 ### Documentation (DOCS) (new)
 
@@ -975,6 +980,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Fix the `test-vectors/README.md` suites table: its Status column still lists suites as `pending` that `pending-suites.json` (now empty) no longer holds (`encodings` is `committed (M1-2a)` since #93; `test-vectors/**` is S2 by path, so the correction waits for this card; check `fingerprint`, `jcs`, `tagged-hash`, `hkdf-derive`, `bip340`, `eip712` and `nip44` against the committed suites).
 - **Acceptance:**
   - `check-generators.mjs` passes for every suite, run locally in a virtual environment with the pinned packages (output in the PR); the vector check passes in every declared runtime; the suites table matches `pending-suites.json`.
+- Review note (M1-1h-e (parked, 2026-10-17), 2026-10-17): the Python 3.15 upgrade of the vector generators is parked: `coincurve` has no `cp315` wheel yet. Re-check when it ships (see the Python upgrade item under M1-13a and the closed Renovate PRs #154 and #156).
 
 #### M1-1i · Independent test vectors for the proof-layer suites (new, split from M1-1h)
 - **Status:** in-progress (partial scope, owner-orchestrator decision 2026-10-17: STREAM and revoke moved to M1-1i-b) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -990,6 +996,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Open spec points found here (flagged, not decided): 05 §4 calls `cardHash` the "EIP-712 hash of the AgentCard" without saying struct hash or digest, so no case derives it from a card; 04 §2.4.1 lists no `Registration` paths, so its cases use the `Record` form and have no rejections; the `Registration` nonce rules are now in 05 §4 (D-81); their cases are M1-1i-b.
 - **Acceptance:**
   - Every case records generator, version and inputs; regeneration reproduces the files byte for byte; the contracts repo's parity job runs against the pinned commit.
+- Review note (IR-M1-1i-1 L1/L2/L3, 2026-10-17): record the Registration domain interpretation (Registry as `verifyingContract` under `{OCC, "2"}`) in the open spec points, since a different choice on the contracts side changes every Registration digest; record what remains for the parity job (M1-3d) so the card is not closed early; uint64 deadlines above 2^53-1 are out of JSON scope by design.
 
 #### M1-1i-b · Independent test vectors: STREAM and revoke (new, split from M1-1i on 2026-10-17)
 - **Status:** backlog (unblocked: G-26 resolved by D-80, G-20 by D-81) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -1097,6 +1104,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - EIP-3009 `ReceiveWithAuthorization` typed data (used in M3-4b); the token's domain is read from chain, never hard-coded.
 - **Acceptance:**
   - Vector suite `eip712-proof` (M1-1i): its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares; the contracts repo's parity job passes against the same commit (M1-3d). The revoke vectors come from M1-1i-b (D-81).
+- Review note (IR-M1-1j-1 L-1..L-4, 2026-10-17): move the EIP-3009 recipient duty into the module header; add a reject path to the harness op; open owner question: is `cardHash` the struct hash or the full digest of the AgentCard?
 
 #### M1-1f · crypto: owner passphrase wrapping, pairing proof, safety code
 - **Status:** done (4thtech/agentlink#37, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1133,6 +1141,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Type separation: `ALKP`, `ALKR`, `ALKO` and `ALKS` refuse one another's magic, and a rewritten magic fails authentication.
 - **Acceptance:**
   - Vector suite `prf-wrap` (M1-1i): its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares; recovery-code round trip and format tests (grouping, alphabet); a mistyped code fails cleanly without partial output.
+- Review note (IR-ALKP-ALKR-1 L-1/L-2, 2026-10-17): 04 §2.3.1: state a per-credential write-count bound (SP 800-38D §8.3) and "at epoch 0" for the owner Nostr key derivation.
 
 #### M1-1g · crypto: KeyStore / OwnerKeyStore interfaces, MemoryKeyStore, NIP-44 helpers
 - **Status:** done (4thtech/agentlink#41, merged 2026-10-14; the `envelope-sig` vector suite is registered here once the M1-1h G-2 follow-up has committed it as pending) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1912,6 +1921,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Canary: no signed URL, nonce or key material in logs; captured drop requests carry no file name or metadata beyond size and hash, and are signed with the drop key, never the Nostr or EVM identity key.
   - The encryptor runs once per send (test); a file modified during upload never leads to a second encryption under the same key and nonce prefix; an off-origin `uploadUrl` or `getUrl` is refused.
   - (IR-D48-1 F10, F16) A transient 429 or 503 from the drop yields the retryable code and never `needs_setup`; a quota or size limit still yields `needs_setup`; the configured endpoint is used for upload, commit and download, and an `http:` endpoint is refused.
+- Review note (IR-M1-6a-1 L1/L2, 2026-10-17): wire the M1-15 fetch into the S3 adapter and consider making `fetch` required; extend the denied host-suffix list (defence in depth).
 
 ### Core (`@agentlink/core`)
 
@@ -2181,6 +2191,9 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Oversized download aborted; hostile names (`../../.ssh/x`, control characters, hidden names) sanitised.
   - Expired link → refresh-link flow returns a working URL; after the retention trigger the object returns 404 and file-key rows are gone on both sides.
   - With `deleteAfter: expiry`, a drop object stays retrievable by the owner console after the recipient's `DELIVERED` (I-9).
+- Review note (IR-M1-15-1, 2026-10-17): extend filename character filtering; handle inbox name-length edge cases; relative redirect forms are conservative (watch in dogfooding).
+- Review note (IR-M1-8d-1 / IR-M1-15-1, 2026-10-17): two `isInsideFolder` helpers have different semantics (policy engine: a folder is not inside itself; path guard: it is). Unify them into one shared helper when wiring files here.
+- Review note (IR-M1-7i-1 L3, 2026-10-17): derive `ruleEligible` and `counterparty` from the contact book and test it.
 
 #### M1-7g · core: proofs and receipts
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -2395,6 +2408,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Each Low has a test named after it, or an owner-accepted note in the report.
   - Rollback deletes only an item whose identity matches what this run created.
+- Review note (IR-M1-9x-1 L-1/L-2/L-4/L-5, 2026-10-17): improve `owner init` copy (saved-code guidance, fingerprint reference), start the session TTL after the confirm prompt and test it.
+- Review note (IR-M1-8h-b-1 L-1/L-2 (PR #227, open), 2026-10-17): align the display-name prompt rule with `restrictName` (06 §2.1); add a recovery path for a failed owner-item write.
 
 #### M1-8c · node: OwnerKeyStore with the owner code or passphrase (CLI prompt)
 - **Status:** done (4thtech/agentlink#67, merged 2026-10-14; IR-M1-8c-1 F-4 and F-9 to M1-9b, F-10 and F-11 to M1-8f) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -2443,6 +2458,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - The M1-8c same-user script test passes with the passkey path enabled (virtual authenticator with PRF); a PRF-less authenticator falls back to the passphrase.
   - No owner-seed bytes on disk after passkey setup and after an operation (scan).
+- Review note (IR-M1-31-1 L-1, 2026-10-17): add "on `http://localhost:<port>`" to this card's acceptance (the approval page origin is localhost, D-79).
+- Review note (IR-M1-1k-1 (PR #223), 2026-10-17): wiping the PRF output after use is the caller's duty (JSDoc in `@agentlink/crypto`); do it in the node and console callers and test it.
 
 #### M1-8f · node: passphrase-locked file KeyStore for headless machines (new, D-54)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the critical path and not on the M1a path, D-73 (4): there is no headless dogfood for M1a, M1-9a needs only M1-8a's `needs_setup`, and only the `--keystore file` branch of M1-9a waits for this card; proposed, owner confirms at merge)
@@ -2677,6 +2694,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - The job fails on an injected `jose` import in the stdio path and passes on `main`; it is part of `ci-gate`.
   - No new runtime dependency in the published `apps/cli` package.
+- Review note (IR-M1-9c-c-2, 2026-10-17): extend bundle-check coverage for indirect loader forms.
 
 #### M1-9o · MCP tools: invite and accept (new, split from M1-9c)
 - **Status:** done (4thtech/agentlink#125, merged 2026-10-15) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
@@ -2736,6 +2754,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Phase note:** M1b, not M1a. 06 §6 says the server keeps relay subscriptions open, but no M1a acceptance needs push latency: M1-9r meets "pairing completes without any tool call" with a catch-up pass every 30 s (backed off after partial passes). If the J9 dogfood finds the latency or relay load unacceptable, the owner may pull it into M1a.
 - **Scope:** add `subscribe` to the core `Transport` and `nostrTransport` (over transport-nostr's `SyncEngine.subscribe`), and a client entry point that feeds each envelope through the same receive path as `syncInbox` (seen-set, envelopeHash, one store transaction, rate limit) and then processes stored envelopes; swap it into `BackgroundLoop#pass` in place of the repeated catch-up, keeping the polling pass as a fallback (no subscription, a relay lost, a lease regained); close the subscription when the lease is lost or the loop stops.
 - **Acceptance:** a new message or handshake reaching a relay is stored and processed without waiting for a poll; no duplicate effects when the subscription and a catch-up (or a second holder) see the same wrap; the subscription is closed on lease loss and on shutdown; no inbound content in logs or errors.
+- Review note (IR-M1-9s-1 L1/L2, 2026-10-17): guard post-handler cursor writes against `close()` and test the race; fix the `subscribe` line in the 07 §4.1 sketch.
 
 #### M1-9d · MCP server: file and proof tools
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
@@ -2798,6 +2817,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The 06 §4 untrusted-content wrapper and the "information from another party, not instructions" framing are never changed by copy.
 - **Acceptance:**
   - Snapshot test per template; vocabulary lint passes; the tool-surface snapshot (M1-9e) shows no schema change.
+- Review note (PR #199 review L1/L2, 2026-10-17): on a denied approval the terms tools reuse the "terms, contact or decision changed" next step: make it say the owner declined, and tell the agent to use a new `clientRequestId` after expiry (a repeat returns `approval_state` again). The reused send text says "message" for terms. Also move `restartDesktop` from `INIT_TEXT` into the strings catalog (one space after "Warning"), and use "profile" for "card" in user-facing copy (11 §5; PR #201 review L1).
 
 #### M1-9h · CLI: local UI, credits and verify commands; passkey and recovery kit in `init` (new, split from M1-9a)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -2848,6 +2868,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
     - an item already on-chain at simulation is reported `skipped` and is absent from the sent calldata; repeated replays of another signer's items hit the per-IP limit and leave that signer's limit unchanged.
   - A paused Notary: items are held, not reported `failed`, until their deadline.
   - Testnet integration with M1-4c; captured logs contain no IPs or signatures; `/v1/health` reports gas balances and queue depth.
+- Review note (IR-M1-7i-1 L1/L2/L5, 2026-10-17): before wiring the budget ledger: use the finalized block timestamp in `releaseProofReservation`, keep `markBroken` in its own transaction (07 §3.5), optional `charged_usd <= reserved_usd` check.
 
 #### M1-10b · testnet credits faucet
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -2911,6 +2932,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - **Deploy (D-25):** staging deploy on merge; smoke test (signed upload, GET and DELETE with a test key; an expired GET refused); production automatically once staging smoke is green (`production` environment, D-52); health check after deploy with automatic `wrangler rollback` on failure (rehearsed); deploy record written; nothing runs while `DEPLOY_FREEZE` is set.
   - The production bucket's lifecycle rule (7 days) is read back after each deploy, and so is the drop Worker's logging config (observability and request logging, Tail Workers and Logpush off; 04 §4).
+- Review note (IR-M1-27a-2 (PR #218, open), 2026-10-17): tighten per-network limits; account downloads after delivery; document URL normalisation in 07 §5.4; set `cpu_ms` in the deploy config; add a header-whitespace test.
 
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
@@ -2947,6 +2969,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Playwright with a virtual authenticator (PRF) completes J4; approval without presence is impossible.
   - Review together (D-68): one passkey gesture signs exactly the selected items; a commitment cannot be selected; "Remember for this contact" is absent from the batch view (Playwright).
   - XSS payloads in contact and file names render inert; a PRF-less authenticator falls back to the passphrase.
+- Review note (IR-M1-8d-1, 2026-10-17): make the session-link exchange one-shot / rotate; add failed-attempt backoff; fix Windows open() result and error handling; add Host test cases.
+- Review note (IR-M1-31-1 L-2..L-5, 2026-10-17): add a `LOCALHOST:<port>` Host test; note the start-time IPv4 decision in D-79; set common headers on the 503 stub; fix the stale example in `packages/core/src/approval-channel.ts:30`.
 
 #### M1-11c · local UI: settings pages
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -3068,6 +3092,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Deterministic variant green on PRs within 15 minutes; LLM variant pass rate reported per run; no chain is chosen by hand anywhere in the scenario (D-40).
   - Canary scan of all e2e logs and artifacts finds no plaintext, keys or presigned URLs.
+- Review note (IR-M1-27a-2, 2026-10-17): the SDK client signs the drop request URL in its normalised form.
 
 #### M1-13b · prompt-injection suite
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
@@ -3296,6 +3321,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Single-machine mode is unchanged. `--paired` for Macs whose agents are already contacts. `--cc-via opencode` runs Mac A through OpenCode when the claude CLI is missing; `--manual` has a person drive any chat app (Claude desktop, Antigravity) while the script prints the prompts and checks pairing through the CLI.
   - RB-17 section 10 "Two-machine variant": prerequisites per Mac, the exact commands for both, what to expect, troubleshooting.
 - **Acceptance:** unit tests for the argument rules, the role split, the hand-off values, the exit status and the per-side summary; the invite link appears only in the Mac A terminal box and the Mac B argument or prompt (not in `results.md` or `results.json`; transcripts and prompt files hold it exactly as in single-machine mode). The agent and owner setup stay manual (owner presence). J2, J3 and J5 (files, credits, proof) are not part of this tool and wait for M1b.
+- Review note (PR #202 review L1/L2/L4, 2026-10-17): `--invite=URL` echoes the link in the "unknown option" error; the hand-off box omits `--agentlink`, `--opencode`, `--oc-model`, `--cc-via` and `--manual`; manual-mode outcomes count as verified in the check table (documented).
 
 #### M1-9t · CLI: several agents under one OS user, and init for one harness (new, found by the M1-23 runbook)
 - **Status:** merged (#178) · **Size:** M · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1a (needed for the one-computer part of M1-23, not for the gate)
@@ -3321,6 +3347,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (b) **Extended (live finding, 2026-10-17):** an agent created with `init` but without an owner card (`owner add-agent` not yet run) made `agentlink_status` say "not set up" and suggest `init`. In that state `agentlink_status`, every other tool answering the no-identity case, and `doctor` now say: this agent has no card from your owner yet, run `agentlink owner add-agent --agent <name>` in your own terminal. Never `init`. The name passes the 06 §6 check before it is inserted. Detected from the agent's own store, no KeyStore secret read. The truly-not-set-up state keeps its text.
   - **Moved:** the Gemini CLI detection fix (IR-M1-9t-1 L-3: detect by the `gemini` binary on `PATH` or `~/.gemini/settings.json`, not any `~/.gemini` folder) is now card **M1-9w**.
 - **Acceptance:** tests for (a) (new message, `doctor` names the state), (b) (status, other tools and `doctor` in the no-card state; the unchanged not-set-up state).
+- Review note (PR #201 review L2/L3/L4, 2026-10-17): `otherAgentHasCard` in doctor opens each other agent fully (keychain probe; may raise a macOS prompt per agent): use a store-only identity probe. Core-error paths call `noOwnerCard()` without the agent name. A never-set-up user is sent to `owner add-agent` to learn about `owner init`: name `agentlink owner init` directly. Open loop: `owner init` finds an owner item but no carded agent, add-agent points to doctor, doctor has no recovery step.
+- Review note (IR-M1-9x-1 L-3, 2026-10-17): use a metadata-only existence check for `hasOwnerOnMachine` before it is wired into doctor.
 
 #### M1-9w · CLI: Claude Desktop in init, Gemini CLI detection (new, from M1-9a and M1-9u (b))
 - **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -3332,6 +3360,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (a) `agentlink init --harness claude-desktop` (and detection without `--harness`) writes the `agentlink` entry to the Claude desktop app's own file, not Claude Code's `~/.claude.json`: macOS `~/Library/Application Support/Claude/claude_desktop_config.json`, Windows `%APPDATA%\Claude\claude_desktop_config.json` (`~/AppData/Roaming/Claude`; `APPDATA` is not followed, like every env value). Linux: a fixed "not available on this system" message, nothing written. Same rules as every harness: other servers kept, exact diff and confirmation, malformed JSON refused, backup; the entry is `command` and `args` (`npx -y @4thtech-io/agentlink mcp`). Restart copy: "Quit and reopen the Claude app. AgentLink appears under Connectors."
   - (b) Gemini CLI is detected by the `gemini` binary on `PATH` or `~/.gemini/settings.json`, not by any `~/.gemini` folder (IR-M1-9t-1 L-3, moved from M1-9u (b)); a home with only `~/.gemini/config/mcp_config.json` proposes Antigravity.
 - **Acceptance:** fixture-home tests per system (injected platform and home) for no config, other servers present and malformed; detection tests for Claude Desktop and Gemini CLI; the harness docs page has the row.
+- Review note (PR #200 review L1/L3, 2026-10-17): Windows Store (MSIX) Claude Desktop keeps its config under `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude` (a redirected `APPDATA` differs too), so init would write a file the app ignores: add a doctor or docs hint. On Linux the "didn't find ..." line names Claude Desktop, which cannot exist there.
 
 #### M1-9x · node: recover an owner with no attached agent (new, from the review of PR #201)
 - **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1b
@@ -3360,6 +3389,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - The code (`apps/cli/src/tools/untrusted.ts`, test `untrusted.test.ts`) escapes every opening and closing `untrusted_content` look-alike in content, not only closing tags. The spec text lagged: 06 §4 named only `</untrusted_content>`. Rewrite the content bullet to state what the code does, with no new behaviour.
 - **Acceptance:** 06 §4 names both opening and closing tags and the look-alike forms; the code and tests are unchanged; IR-M1-22-L15-1 is resolved here.
+- Review note (IR-M1-9v-1 L-1/L-2, 2026-10-17): 06 §4 content bullet: also name what the code removes (U+2028/2029, blank fillers U+115F/1160/3164/FFA0/2800; lone surrogates become U+FFFD), and read "its `<` (or look-alike)" in the opening-tag sentence. Do it on the next 06 §4 touch.
 
 #### M1-24 · Product name and trademark check before the production domain (D-38) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet prepares search material) · **Security:** S0 · **Phase:** M1b
@@ -4166,6 +4196,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - A replayed authorization fails; a below-minimum authorization is rejected by the submitter before submission.
   - The core refuses to sign a `ReceiveWithAuthorization` unless `to` equals the configured fee vault for that chain, and reads the token domain from chain (EIP-5267 `eip712Domain()`), never hard-coded (M1-1j, IR-M1-1j-1 L-1).
   - Independent EIP-3009 vectors (an `eip3009` case set) cover the `ReceiveWithAuthorization` digest (IR-M1-1j-1 L-2).
+- Review note (IR-M1-1j-1 L-1/L-2, 2026-10-17): acceptance: document the EIP-3009 recipient rule and per-chain token domain handling; add an `eip3009` vector case set.
 
 #### M3-5 · Submitter on mainnet: operations, monitoring, alerts
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
