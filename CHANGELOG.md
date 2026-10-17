@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - CLI: an agent that has no card from its owner yet is now told so. `agentlink_status`, the other tools and `agentlink doctor` say to run `agentlink owner add-agent --agent <name>` in your own terminal instead of suggesting `init` (M1-9u). `owner add-agent` also explains the case where an owner exists but no agent here is attached to it.
 - OPS-REL-3: the "Version packages" PR now rolls `CHANGELOG.md` `[Unreleased]` into the version section (`tools/release/roll-changelog.mjs`), and a GitHub Release body over 125,000 characters falls back to a short note with a link.
 - CI (OPS-CI-4, S2, process): new `sync-pin` job in `security.yml` (push to `main`, weekly) fails when the secret-scan stub on the `sync` branch is pinned to a commit older than the last change to `secret-scan.yml` or `.gitleaks.toml` on `main`; `sync-protocol.md` and `ci-cd.md` document the re-pin procedure.
+- Process (owner decision, 2026-10-17): open question G-14 (`agentlink_fetch_file` and SSRF in Workers) blocks only M2-3b, not M1-15; the Workers egress part stays open.
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.
 
 ## [0.1.0] - 2026-10-16
