@@ -256,32 +256,6 @@ describe('upload, PUT, commit and GET', () => {
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
   });
 
-  it('round-trips a multipart object (one signed target per part)', async () => {
-    const key = newKey();
-    const ip = newIp();
-    const data = bytesOf(6 * MiB, 9);
-    const g = await grant(await requestUpload(key, ip, data.length));
-    expect(g.uploadUrl).toBeUndefined();
-    expect(g.parts?.map((p) => [p.part, p.size])).toEqual([
-      [1, 5 * MiB],
-      [2, MiB],
-    ]);
-    // Parts may arrive in any order; each target is single-use.
-    const [first, second] = g.parts ?? [];
-    expect((await put(second?.uploadUrl ?? '', data.subarray(5 * MiB))).status).toBe(201);
-    expect((await put(first?.uploadUrl ?? '', data.subarray(0, 5 * MiB))).status).toBe(201);
-    expect((await put(first?.uploadUrl ?? '', data.subarray(0, 5 * MiB))).status).toBe(409);
-    const committed = await commit(key, ip, g.objectId, hashHex(data));
-    expect(committed.status).toBe(200);
-    const { getUrl } = (await committed.json()) as { getUrl: string };
-    secrets.add(getUrl);
-    const response = await SELF.fetch(getUrl);
-    expect(response.status).toBe(200);
-    const got = new Uint8Array(await response.arrayBuffer());
-    expect(got.length).toBe(data.length);
-    expect(hashHex(got)).toBe(hashHex(data));
-  });
-
   it('stores objects under random IDs with no metadata', async () => {
     const key = newKey();
     const { objectId } = await storeFile(key, newIp(), bytesOf(13_000));
@@ -422,6 +396,25 @@ describe('limits', () => {
       expect((await requestUpload(newKey(), ip, 20_000)).status).toBe(201);
     expect((await requestUpload(newKey(), ip, 20_000)).status).toBe(429);
     expect((await requestUpload(known, ip, 20_000)).status).toBe(201);
+  });
+});
+
+describe('per-IP ceiling', () => {
+  it('limits every key from one IP only at the absolute ceiling, before any key state', async () => {
+    // Test ceiling: 8 signed requests per IP per hour (vitest.config.ts). Two known keys behind one
+    // address share it; the fresh-key admission (3 per day) is not what stops them.
+    const ip = newIp();
+    const a = newKey();
+    const b = newKey();
+    for (let i = 0; i < 4; i += 1) {
+      expect((await requestUpload(a, ip, 20_000)).status).toBe(201);
+      expect((await requestUpload(b, ip, 20_000)).status).toBe(201);
+    }
+    const over = await requestUpload(a, ip, 20_000);
+    expect(over.status).toBe(429);
+    expect(await errorOf(over)).toEqual({ error: 'rate_limited', retryable: true });
+    // The same keys from another address still work: the ceiling is per IP, not per key.
+    expect((await requestUpload(a, newIp(), 20_000)).status).toBe(201);
   });
 });
 
@@ -660,8 +653,17 @@ describe('canary: nothing sensitive is logged or used as a metric label (I-7)', 
   });
 
   it('metric names are a fixed set and carry no identifier', async () => {
-    const stub = env.DROP_STATE.get(env.DROP_STATE.idFromName('global'));
-    const metrics = await stub.metrics();
+    const metrics: Record<string, number> = {};
+    for (let shard = 0; shard < 8; shard += 1) {
+      const stub = env.DROP_STATE.get(env.DROP_STATE.idFromName(`metrics:${String(shard)}`));
+      for (const [name, value] of Object.entries(await stub.metrics())) {
+        metrics[name] = (metrics[name] ?? 0) + value;
+      }
+    }
+    // The global-cap instance never holds counters (IR-M1-27a-1 M-2).
+    const global = env.DROP_STATE.get(env.DROP_STATE.idFromName('global'));
+    expect(await global.metrics()).toEqual({});
+    expect(metrics.upload_granted).toBeGreaterThan(0);
     const names = Object.keys(metrics);
     expect(names.length).toBeGreaterThan(0);
     for (const name of names) expect(name).toMatch(/^[a-z_]+$/);

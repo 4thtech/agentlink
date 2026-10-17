@@ -20,8 +20,9 @@ export interface Limits {
   readonly keyRequestsPerHour: number;
   /** Drop keys first admitted from one IP (IPv6 /64) in any rolling 24 hours. */
   readonly ipNewKeysPerDay: number;
-  /** Upload grants per IP (IPv6 /64) per hour, all keys together. */
-  readonly ipUploadsPerHour: number;
+  /** Absolute ceiling on signed requests (upload, commit, DELETE) per IP (IPv6 /64) per hour, all
+   * keys together. Generous, so a shared NAT is not blocked; an abuse backstop only. */
+  readonly ipRequestsPerHour: number;
   /** Abuse reports per IP (IPv6 /64) per hour. */
   readonly ipReportsPerHour: number;
   /** Bytes the whole drop may grant in any rolling 24 hours (global cap). */
@@ -43,7 +44,7 @@ export const DEFAULTS: Limits = Object.freeze({
   keyUploadsPerHour: 60,
   keyRequestsPerHour: 240,
   ipNewKeysPerDay: 10,
-  ipUploadsPerHour: 120,
+  ipRequestsPerHour: 3_000,
   ipReportsPerHour: 20,
   globalBytesPerDay: 500 * GiB,
   globalUploadsPerHour: 20_000,
@@ -62,7 +63,7 @@ const OVERRIDES: Readonly<Record<Overridable, readonly [string, number, number]>
   keyUploadsPerHour: ['DROP_KEY_UPLOADS_PER_HOUR', 1, 1_000],
   keyRequestsPerHour: ['DROP_KEY_REQUESTS_PER_HOUR', 1, 10_000],
   ipNewKeysPerDay: ['DROP_IP_NEW_KEYS_PER_DAY', 1, 1_000],
-  ipUploadsPerHour: ['DROP_IP_UPLOADS_PER_HOUR', 1, 100_000],
+  ipRequestsPerHour: ['DROP_IP_REQUESTS_PER_HOUR', 1, 1_000_000],
   ipReportsPerHour: ['DROP_IP_REPORTS_PER_HOUR', 1, 1_000],
   globalBytesPerDay: ['DROP_GLOBAL_BYTES_PER_DAY', 1, 10 * 1024 * GiB],
   globalUploadsPerHour: ['DROP_GLOBAL_UPLOADS_PER_HOUR', 1, 1_000_000],

@@ -86,9 +86,33 @@ function respond(
   return new Response(JSON.stringify(body), { status, headers });
 }
 
+/**
+ * Refusals that need no valid signature or MAC to trigger. They are counted in this isolate only and
+ * flushed with the next counted event, so a flood of junk requests costs no Durable Object write.
+ */
+const DEFERRED: ReadonlySet<Metric> = new Set<Metric>([
+  'bad_request',
+  'unauthorized',
+  'download_refused',
+  'put_refused',
+  'unavailable',
+  'internal_error',
+]);
+const METRIC_SHARDS = 8;
+let pending: Partial<Record<Metric, number>> = {};
+
+/**
+ * Counts one event. Counters live in `metrics:<0..7>` shards, never in the `global` instance that
+ * holds the global cap, so counting can never slow an upload grant (IR-M1-27a-1 M-2).
+ */
 function bump(c: Pick<Context, 'env' | 'ctx'>, name: Metric): void {
-  const stub = c.env.DROP_STATE.get(c.env.DROP_STATE.idFromName('global'));
-  c.ctx.waitUntil(stub.bump(name).catch(() => undefined));
+  pending[name] = (pending[name] ?? 0) + 1;
+  if (DEFERRED.has(name)) return;
+  const counts = pending;
+  pending = {};
+  const shard = `metrics:${String((randomBytes(1)[0] ?? 0) % METRIC_SHARDS)}`;
+  const stub = c.env.DROP_STATE.get(c.env.DROP_STATE.idFromName(shard));
+  c.ctx.waitUntil(stub.bump(counts).catch(() => undefined));
 }
 
 function badRequest(c: Context): Response {
@@ -309,25 +333,37 @@ async function handleUpload(c: Context): Promise<Response> {
     return badRequest(c);
   }
 
+  // The per-IP ceiling runs first, before any drop key's state is created or touched.
+  const ipStub = stateStub(c, ipName(c));
+  const ipGate = await ipStub.ipRequest({ now: c.now, limits: c.limits });
+  if (!ipGate.ok) {
+    bump(c, 'upload_refused');
+    return refused(c, ipGate);
+  }
   const keyStub = stateStub(c, `k:${pubkey}`);
   const key = await keyStub.keyRequest({ nonce, now: c.now, limits: c.limits, uploadSize: size });
   if (!key.ok) {
     bump(c, 'upload_refused');
     return refused(c, key);
   }
-  const ipStub = stateStub(c, ipName(c));
+  // Only a key's first upload needs admission from this IP; a key admitted before keeps working.
   const freshKey = !key.known;
-  const ip = await ipStub.ipUpload({ now: c.now, freshKey, limits: c.limits });
-  if (!ip.ok) {
-    await keyStub.keyRefund({ now: c.now, size, known: key.known });
-    bump(c, 'upload_refused');
-    return refused(c, ip);
+  if (freshKey) {
+    const admitted = await ipStub.ipAdmitFreshKey({ now: c.now, limits: c.limits });
+    if (!admitted.ok) {
+      await keyStub.keyRefund({ now: c.now, size, known: key.known });
+      bump(c, 'upload_refused');
+      return refused(c, admitted);
+    }
   }
+  const undoAdmission = async (): Promise<void> => {
+    await keyStub.keyRefund({ now: c.now, size, known: key.known });
+    if (freshKey) await ipStub.ipUnadmitFreshKey({ now: c.now });
+  };
   const globalStub = stateStub(c, 'global');
   const global = await globalStub.globalReserve({ now: c.now, size, limits: c.limits });
   if (!global.ok) {
-    await keyStub.keyRefund({ now: c.now, size, known: key.known });
-    await ipStub.ipRefund({ now: c.now, freshKey });
+    await undoAdmission();
     bump(c, 'upload_refused');
     return refused(c, global);
   }
@@ -342,8 +378,7 @@ async function handleUpload(c: Context): Promise<Response> {
     try {
       uploadId = (await c.env.DROP_BUCKET.createMultipartUpload(r2Key)).uploadId;
     } catch {
-      await keyStub.keyRefund({ now: c.now, size, known: key.known });
-      await ipStub.ipRefund({ now: c.now, freshKey });
+      await undoAdmission();
       await globalStub.globalRefund({ now: c.now, size });
       return refused(c, { ok: false, error: 'unavailable', retryAfter: 60 });
     }
@@ -447,6 +482,8 @@ async function handleCommit(c: Context, idText: string): Promise<Response> {
   }
   const objectIdBytes = decodeObjectId(idText);
   if (objectIdBytes === null) return badRequest(c);
+  const ipGate = await stateStub(c, ipName(c)).ipRequest({ now: c.now, limits: c.limits });
+  if (!ipGate.ok) return refused(c, ipGate);
   const key = await stateStub(c, `k:${pubkey}`).keyRequest({ nonce, now: c.now, limits: c.limits });
   if (!key.ok) return refused(c, key);
   const objectStub = stateStub(c, `o:${idText}`);
@@ -518,15 +555,20 @@ async function handleGet(c: Context): Promise<Response> {
     bump(c, 'download_refused');
     return respond(410, { error: 'expired' });
   }
+  // Fetch first and count after: a failed R2 read never uses up one of the object's downloads
+  // (IR-M1-27a-1 L-1). The count is still checked and taken atomically in the object's state.
+  const stored = await c.env.DROP_BUCKET.get(`o/${target.idText}`);
+  if (stored === null) {
+    bump(c, 'download_refused');
+    return respond(404, { error: 'not_found' });
+  }
   const download = await stateStub(c, `o:${target.idText}`).objDownload({
     now: c.now,
     limit: c.limits.downloadLimit,
   });
-  if (!download.ok) return objectRefused(c, download, 'download_refused');
-  const stored = await c.env.DROP_BUCKET.get(download.r2Key);
-  if (stored === null) {
-    bump(c, 'download_refused');
-    return respond(404, { error: 'not_found' });
+  if (!download.ok) {
+    await stored.body.cancel().catch(() => undefined);
+    return objectRefused(c, download, 'download_refused');
   }
   const headers = new Headers({
     ...BASE_HEADERS,
@@ -549,6 +591,8 @@ async function handleDelete(c: Context, idText: string): Promise<Response> {
   if (!hasExactly(body, ['v', 'objectId', 'nonce', 'ts']) || body.objectId !== idText) {
     return badRequest(c);
   }
+  const ipGate = await stateStub(c, ipName(c)).ipRequest({ now: c.now, limits: c.limits });
+  if (!ipGate.ok) return refused(c, ipGate);
   const key = await stateStub(c, `k:${pubkey}`).keyRequest({
     nonce: body.nonce as string,
     now: c.now,

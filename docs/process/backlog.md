@@ -2869,6 +2869,9 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - CI-only `wrangler deploy`; staging on `workers.dev` previews; beta hostname `drop.agentlink.4thtech.io`; R2 bucket bindings per environment.
   - Any Worker signing secret (for GET and PUT URLs) set by the owner with `wrangler secret put`; never in GitHub, logs or sync files.
   - Adds the drop to `release-and-deployment.md`: hostname (§1.1), deployables (§2), Workers pipeline (§4.5), secrets inventory (§6) and rollback matrix (§8).
+  - (IR-M1-27a-1) From M1-27a: bindings `DROP_BUCKET` (R2) and `DROP_STATE` (Durable Object, class `DropState`, with its migration); secret `DROP_URL_KEY` (32 random bytes, base64url) per environment; var `DROP_CORS_ORIGINS` (the console origins).
+  - (IR-M1-27a-1 L-3) Workers paid plan with `limits.cpu_ms` raised (for example 30 000): the commit hashes up to 100 MiB of stored ciphertext, about 0.4 s of CPU; the free plan's 10 ms fails every large commit.
+  - (IR-M1-27a-1 M-2) A Cloudflare rate-limiting rule in front of the drop host (per IP, unauthenticated floods) as the first line, so junk never reaches the Worker's Durable Objects; values recorded in `release-and-deployment.md`.
 - **Acceptance:**
   - **Deploy (D-25):** staging deploy on merge; smoke test (signed upload, GET and DELETE with a test key; an expired GET refused); production automatically once staging smoke is green (`production` environment, D-52); health check after deploy with automatic `wrangler rollback` on failure (rehearsed); deploy record written; nothing runs while `DEPLOY_FREEZE` is set.
   - The production bucket's lifecycle rule (7 days) is read back after each deploy, and so is the drop Worker's logging config (observability and request logging, Tail Workers and Logpush off; 04 §4).

@@ -192,6 +192,32 @@ describe('verifyDropAuthorization', () => {
     }
   });
 
+  it('accepts any JSON spelling of the signed event, whitespace and key order included (by design)', () => {
+    // The header JSON is transport only: the verifier recomputes the NIP-01 id from the parsed
+    // fields, so re-spelling the JSON changes nothing that is signed, and replay is stopped by the
+    // body nonce (IR-M1-27a-1 L-4).
+    const event = signed();
+    const spaced = JSON.stringify(
+      {
+        sig: event.sig,
+        tags: event.tags,
+        content: event.content,
+        kind: event.kind,
+        created_at: event.created_at,
+        pubkey: event.pubkey,
+        id: event.id,
+      },
+      null,
+      2,
+    );
+    const auth = `Nostr ${encodeBase64url(encodeUtf8(` ${spaced}\n`))}`;
+    expect(verifyDropAuthorization(auth, REQUEST, NOW)).toEqual({
+      ok: true,
+      pubkey: DROP_PUB,
+      createdAt: NOW,
+    });
+  });
+
   it('never throws, whatever it is given', () => {
     expect(() => verifyDropAuthorization(42 as unknown as string, REQUEST, NOW)).not.toThrow();
     expect(() =>

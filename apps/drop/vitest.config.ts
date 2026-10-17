@@ -33,9 +33,15 @@ const testBindings = {
   DROP_PART_SIZE: String(5 * MiB),
   DROP_WEEKLY_QUOTA: String(20 * MiB),
   DROP_IP_NEW_KEYS_PER_DAY: '3',
+  DROP_IP_REQUESTS_PER_HOUR: '8',
 };
 
-function workerProject(name: string, include: string[], bindings: Record<string, string>) {
+function workerProject(
+  name: string,
+  include: string[],
+  bindings: Record<string, string>,
+  testTimeout = 20_000,
+) {
   return {
     plugins: [
       cloudflareTest({
@@ -53,7 +59,7 @@ function workerProject(name: string, include: string[], bindings: Record<string,
       name,
       include,
       // Repository-wide test timeout policy (M0-10e): 20 s, not the 5 s default.
-      testTimeout: 20_000,
+      testTimeout,
     },
   };
 }
@@ -75,6 +81,10 @@ export default defineConfig({
         ...testBindings,
         DROP_GLOBAL_BYTES_PER_DAY: String(MiB),
       }),
+      // The one 5 MiB multipart round trip runs alone. Evidence for its 60 s timeout: on the Linux CI
+      // runner a 6 MiB version took 32.6 s in Miniflare's R2 (CI run 39018466636; 1.9 s on macOS),
+      // so 20 s is too tight there (IR-M1-27a-1 H-1). The data is already the smallest two-part object.
+      workerProject('drop-multipart', ['test/multipart.test.ts'], testBindings, 60_000),
     ],
   },
 });

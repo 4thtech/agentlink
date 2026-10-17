@@ -1,8 +1,10 @@
 // The drop's Durable Object (07 §5.4 State, 08 §6): quota, nonce and rate counters, and the state of
-// each object. One class, four kinds of instance, each named by the Worker:
+// each object. One class, five kinds of instance, each named by the Worker:
 //   `k:<drop key hex>`  nonces seen, signed-request and upload rates, rolling 7-day quota;
-//   `i:<HMAC of the IP bucket>`  upload rate and fresh-key admissions per IP (IPv6 /64);
-//   `global`  the global cap and the aggregate counters (the only metrics the drop keeps);
+//   `i:<HMAC of the IP bucket>`  signed-request ceiling, reports and fresh-key admissions per IP
+//     (IPv6 /64);
+//   `global`  the global cap only (upload grants touch it, nothing else does);
+//   `metrics:<0..7>`  shards of the aggregate counters (the only metrics the drop keeps);
 //   `o:<object id>`  one object: owner key, size, expiry, part states, downloads.
 // No account, file name, recipient or raw IP is stored. Every instance deletes its own storage when
 // it is no longer needed (alarm), so key and IP counters do not outlive their windows.
@@ -75,7 +77,8 @@ interface KeyState {
 
 interface IpState {
   readonly role: 'ip';
-  uploads: Window;
+  /** Signed requests from this IP this hour (the absolute ceiling). */
+  requests: Window;
   reports: Window;
   /** Hour index -> fresh keys admitted that hour (the last 24 hours). */
   newKeys: Record<string, number>;
@@ -87,7 +90,11 @@ interface GlobalState {
   uploads: Window;
   /** Hour index -> bytes granted that hour (the last 24 hours). */
   bytes: Record<string, number>;
-  metrics: Record<string, number>;
+}
+
+interface MetricsState {
+  readonly role: 'metrics';
+  counts: Record<string, number>;
 }
 
 interface PartState {
@@ -121,7 +128,7 @@ interface ObjectState {
   downloads: number;
 }
 
-type State = KeyState | IpState | GlobalState | ObjectState;
+type State = KeyState | IpState | GlobalState | MetricsState | ObjectState;
 
 interface Env {
   readonly DROP_BUCKET: R2Bucket;
@@ -222,64 +229,75 @@ export class DropState extends DurableObject<Env> {
 
   // --- IP bucket --------------------------------------------------------------------------------
 
-  /** Counts one upload from this IP and, for a key not admitted before, one fresh-key admission. */
-  async ipUpload(input: {
-    now: number;
-    freshKey: boolean;
-    limits: Limits;
-  }): Promise<{ ok: true } | Refusal> {
-    const { now, freshKey, limits } = input;
-    const s: IpState = (await this.load<IpState>('ip')) ?? {
-      role: 'ip',
-      uploads: [0, 0],
-      reports: [0, 0],
-      newKeys: {},
-      lastSeen: now,
-    };
+  private async loadIp(now: number): Promise<IpState> {
+    return (
+      (await this.load<IpState>('ip')) ?? {
+        role: 'ip',
+        requests: [0, 0],
+        reports: [0, 0],
+        newKeys: {},
+        lastSeen: now,
+      }
+    );
+  }
+
+  /**
+   * Counts one signed request (upload, commit, DELETE) from this IP against the absolute per-IP
+   * ceiling. Runs before any drop key's state is touched. The ceiling is generous: it is an abuse
+   * backstop, not the limit that shares an address fairly (that is the fresh-key admission below).
+   */
+  async ipRequest(input: { now: number; limits: Limits }): Promise<{ ok: true } | Refusal> {
+    const { now, limits } = input;
+    const s = await this.loadIp(now);
     const hour = Math.floor(now / HOUR);
-    s.uploads = tick(s.uploads, hour);
-    if (s.uploads[1] >= limits.ipUploadsPerHour) {
+    s.requests = tick(s.requests, hour);
+    if (s.requests[1] >= limits.ipRequestsPerHour) {
       return { ok: false, error: 'rate_limited', retryAfter: (hour + 1) * HOUR - now };
     }
-    if (freshKey) {
-      const admitted = sumRecent(s.newKeys, hour - 23);
-      if (admitted >= limits.ipNewKeysPerDay) {
-        const oldest = Math.min(...Object.keys(s.newKeys).map(Number));
-        await this.save(s, now + IP_IDLE);
-        return {
-          ok: false,
-          error: 'rate_limited',
-          retryAfter: Math.max(1, (oldest + 24) * HOUR - now),
-        };
-      }
-      s.newKeys[String(hour)] = (s.newKeys[String(hour)] ?? 0) + 1;
-    }
-    s.uploads[1] += 1;
+    s.requests[1] += 1;
     s.lastSeen = now;
     await this.save(s, now + IP_IDLE);
     return { ok: true };
   }
 
-  /** Undoes ipUpload (a later check refused the upload). */
-  async ipRefund(input: { now: number; freshKey: boolean }): Promise<void> {
+  /**
+   * Admits a drop key that has never been admitted before (its first upload) from this IP, at most
+   * `ipNewKeysPerDay` in any rolling 24 hours. A key admitted before never comes here, so users
+   * behind a shared address keep working with their own keys when new keys are limited.
+   */
+  async ipAdmitFreshKey(input: { now: number; limits: Limits }): Promise<{ ok: true } | Refusal> {
+    const { now, limits } = input;
+    const s = await this.loadIp(now);
+    const hour = Math.floor(now / HOUR);
+    const admitted = sumRecent(s.newKeys, hour - 23);
+    if (admitted >= limits.ipNewKeysPerDay) {
+      const oldest = Math.min(...Object.keys(s.newKeys).map(Number));
+      await this.save(s, now + IP_IDLE);
+      return {
+        ok: false,
+        error: 'rate_limited',
+        retryAfter: Math.max(1, (oldest + 24) * HOUR - now),
+      };
+    }
+    s.newKeys[String(hour)] = (s.newKeys[String(hour)] ?? 0) + 1;
+    s.lastSeen = now;
+    await this.save(s, now + IP_IDLE);
+    return { ok: true };
+  }
+
+  /** Undoes ipAdmitFreshKey (a later check refused the upload). */
+  async ipUnadmitFreshKey(input: { now: number }): Promise<void> {
     const s = await this.load<IpState>('ip');
     if (!s) return;
-    const hour = Math.floor(input.now / HOUR);
-    if (s.uploads[0] === hour) s.uploads[1] = Math.max(0, s.uploads[1] - 1);
-    if (input.freshKey) s.newKeys[String(hour)] = Math.max(0, (s.newKeys[String(hour)] ?? 0) - 1);
+    const hour = String(Math.floor(input.now / HOUR));
+    s.newKeys[hour] = Math.max(0, (s.newKeys[hour] ?? 0) - 1);
     await this.save(s);
   }
 
   /** Counts one abuse report from this IP. */
   async ipReport(input: { now: number; limits: Limits }): Promise<{ ok: true } | Refusal> {
     const { now, limits } = input;
-    const s: IpState = (await this.load<IpState>('ip')) ?? {
-      role: 'ip',
-      uploads: [0, 0],
-      reports: [0, 0],
-      newKeys: {},
-      lastSeen: now,
-    };
+    const s = await this.loadIp(now);
     const hour = Math.floor(now / HOUR);
     s.reports = tick(s.reports, hour);
     if (s.reports[1] >= limits.ipReportsPerHour) {
@@ -299,7 +317,6 @@ export class DropState extends DurableObject<Env> {
         role: 'global',
         uploads: [0, 0],
         bytes: {},
-        metrics: {},
       }
     );
   }
@@ -334,17 +351,25 @@ export class DropState extends DurableObject<Env> {
     await this.save(s);
   }
 
-  /** Adds one to an aggregate counter. Unknown names are ignored. */
-  async bump(name: Metric): Promise<void> {
-    if (!(METRICS as readonly string[]).includes(name)) return;
-    const s = await this.loadGlobal();
-    s.metrics[name] = (s.metrics[name] ?? 0) + 1;
+  // --- aggregate counters (sharded: `metrics:<n>`, never the `global` instance) -------------------
+
+  /** Adds the given counts to this shard's counters. Unknown names and bad counts are ignored. */
+  async bump(counts: Partial<Record<Metric, number>>): Promise<void> {
+    const s: MetricsState = (await this.load<MetricsState>('metrics')) ?? {
+      role: 'metrics',
+      counts: {},
+    };
+    for (const [name, count] of Object.entries(counts)) {
+      if (!(METRICS as readonly string[]).includes(name)) continue;
+      if (typeof count !== 'number' || !Number.isSafeInteger(count) || count <= 0) continue;
+      s.counts[name] = (s.counts[name] ?? 0) + count;
+    }
     await this.save(s);
   }
 
-  /** The aggregate counters (internal: never served by the health endpoint). */
+  /** This shard's counters (internal: never served by the health endpoint). */
   async metrics(): Promise<Record<string, number>> {
-    return { ...(await this.loadGlobal()).metrics };
+    return { ...((await this.load<MetricsState>('metrics'))?.counts ?? {}) };
   }
 
   // --- one object -------------------------------------------------------------------------------
@@ -516,6 +541,7 @@ export class DropState extends DurableObject<Env> {
         else await this.ctx.storage.setAlarm((s.lastSeen + IP_IDLE) * 1000);
         return;
       case 'global':
+      case 'metrics':
         return;
       case 'object':
         await this.objectAlarm(s, now);
