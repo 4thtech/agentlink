@@ -36,7 +36,7 @@ import {
   termsInProgress,
   termsRefusal,
 } from './terms-common.js';
-import { TOOL_TEXT } from './text.js';
+import { noOwnerCard } from './text.js';
 
 interface ProposeInput {
   to: string;
@@ -57,7 +57,11 @@ export async function proposeTermsHandler(
   const { to, revises, note, approvalId, clientRequestId } = input as ProposeInput;
 
   if ((await client.self()) === undefined) {
-    return fail('needs_setup', TOOL_TEXT.noIdentity, TOOL_TEXT.setupNextStep);
+    return fail(
+      'needs_setup',
+      noOwnerCard(context.agentName).summary,
+      noOwnerCard(context.agentName).nextStep,
+    );
   }
   const resolved = resolveContact(to, await client.contacts());
   if (!resolved.ok) return resolved.output;

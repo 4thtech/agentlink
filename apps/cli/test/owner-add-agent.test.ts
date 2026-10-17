@@ -211,6 +211,9 @@ describe('agentlink owner add-agent (M1-9t, D-78)', () => {
     expect(m.calls).toHaveLength(0);
     expect(m.err.join('\n')).toContain(OWNER_TEXT.addAgentNoOwner);
     expect(OWNER_TEXT.addAgentNoOwner).toContain('agentlink owner init');
+    // M1-9u: the owner-exists-but-unattached state is named, with the way to see it.
+    expect(OWNER_TEXT.addAgentNoOwner).toContain('already exists');
+    expect(OWNER_TEXT.addAgentNoOwner).toContain('agentlink doctor');
   });
 
   it('refuses an agent that is not set up, and points to init --agent', async () => {

@@ -30,7 +30,7 @@ import {
 } from './result.js';
 import { SEND_TEXT } from './send.js';
 import { copy, formatDate } from './strings/index.js';
-import { TOOL_TEXT } from './text.js';
+import { TOOL_TEXT, noOwnerCard } from './text.js';
 import { removeInvisible } from './untrusted.js';
 
 export const TERMS_TEXT = Object.freeze({
@@ -204,7 +204,7 @@ export function termsCoreError(error: unknown): HandlerOutput | undefined {
     case 'transport_unavailable':
       return fail('error', copy('chat.status.error.network'), SEND_TEXT.networkNextStep, 'NETWORK');
     case 'identity_missing':
-      return fail('needs_setup', TOOL_TEXT.noIdentity, TOOL_TEXT.setupNextStep);
+      return fail('needs_setup', noOwnerCard().summary, noOwnerCard().nextStep);
     case 'identity_revoked':
       return fail('error', SEND_TEXT.revoked, SEND_TEXT.revokedNextStep, 'AGENT_REVOKED');
     case 'rotation_pending':

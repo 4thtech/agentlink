@@ -40,7 +40,7 @@ import {
   termsInProgress,
   termsRefusal,
 } from './terms-common.js';
-import { TOOL_TEXT } from './text.js';
+import { noOwnerCard } from './text.js';
 
 interface RespondInput {
   envelopeId: string;
@@ -67,7 +67,11 @@ export async function respondToTermsHandler(
   const tools = client.terms;
   if (tools === undefined) return notAvailable();
   if ((await client.self()) === undefined) {
-    return fail('needs_setup', TOOL_TEXT.noIdentity, TOOL_TEXT.setupNextStep);
+    return fail(
+      'needs_setup',
+      noOwnerCard(context.agentName).summary,
+      noOwnerCard(context.agentName).nextStep,
+    );
   }
 
   const request: RespondToTermsInput = {
