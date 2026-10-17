@@ -986,7 +986,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Same rules and generators as M1-1h (written by a session that does not implement the TypeScript code).
   - Suite `eip712-proof` (pending under M1-1j): EIP-712 type hash, domain separator, struct hash and digest for `Record`, `Receipt` (OCC v2 chain domain) and `Registration` (same domain form, the Registry as `verifyingContract`); the recipient commitment; the 05 §3.1 JSON-form rejections of `Record` and `Receipt`. Hashing only. Generator `tools/vectors/generate_eip712_proof.py`.
   - Suite `prf-wrap` (pending under M1-1k): the PRF salt and `wrapKey` of 04 §2.3 step 3. Generator `tools/vectors/generate_prf_wrap.py`.
-  - Not here: STREAM (G-26) and the revoke struct (G-20) are M1-1i-b. The sealed PRF seed blob has no vectors until 04 §2.3 fixes its nonce, AAD and layout (M1-1k).
+  - Not here: STREAM (G-26) and the revoke struct (G-20) are M1-1i-b. The sealed `ALKP` and `ALKR` blobs (04 §2.3.1, §2.3.2, D-82) are added to `prf-wrap` with M1-1k, by a vectors session separate from its implementation.
   - Open spec points found here (flagged, not decided): 05 §4 calls `cardHash` the "EIP-712 hash of the AgentCard" without saying struct hash or digest, so no case derives it from a card; 04 §2.4.1 lists no `Registration` paths, so its cases use the `Record` form and have no rejections; the `Registration` nonce rules are now in 05 §4 (D-81); their cases are M1-1i-b.
 - **Acceptance:**
   - Every case records generator, version and inputs; regeneration reproduces the files byte for byte; the contracts repo's parity job runs against the pinned commit.
@@ -1121,14 +1121,16 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - M1-1f (follow-up, D-66): owner passphrase minimum. Setting or changing a chosen owner passphrase (kind 2) refuses a candidate with fewer than 12 Unicode code points after NFKC, the same rule as `newKeystoreKek` applies to the agent passphrase. The check runs on `normalizeSecret`'s output, before the KDF (04 §2.8). Tests: 11 code points refused; 12 accepted; a string that NFKC shortens below 12 refused. Unlocking an existing wrap is unaffected.
 
 #### M1-1k · crypto: passkey PRF seed wrapping and recovery code (new, split from M1-1f)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · packages/crypto
-- **Depends on:** M1-1f, M1-1i
-- **Spec:** 04 §2.3; 08 §2.1
+- **Status:** ready (unblocked by D-82, owner decision 2026-10-17: blob formats `ALKP` and `ALKR` defined in 04 §2.3.1 and §2.3.2) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/crypto, test-vectors/prf-wrap, tools/vectors/
+- **Depends on:** M1-1f, M1-1i; D-82 spec PR merged
+- **Spec:** 04 §2.3, §2.3.1, §2.3.2, §2.8 (`password` kind 1); 08 §2.1
+- **Order (D-82):** spec PR → vectors (extend `prf-wrap` with sealed `ALKP` and `ALKR` cases, tamper and cross-type rejects; generator `tools/vectors/generate_prf_wrap.py`, written independently of the TypeScript) → implementation.
 - **Invariants:** I-1, I-4, I-10
 - **Scope:**
-  - PRF path: PRF salt = SHA-256("agentlink-owner-v1"); wrapKey = HKDF-SHA256(ikm = PRF output, salt = "", info = "owner-seed-wrap", L = 32); AES-256-GCM seal/open of the seed.
-  - Recovery code: 120 random bits as 24 base32 characters in groups; Argon2id (m = 64 MiB, t = 3, p = 1) wrapping in the M1-1f blob format.
+  - PRF path: PRF salt = SHA-256("agentlink-owner-v1"); wrapKey = HKDF-SHA256(ikm = PRF output, salt = "", info = "owner-seed-wrap", L = 32); seal/open of the seed as `ALKP` v1 (04 §2.3.1): header checks and size before decryption, AAD = header, seed → `ownerNostr` check after decryption.
+  - Recovery code: 120 random bits as 24 base32 characters in six groups of four; Argon2id (m = 64 MiB, t = 3, p = 1) wrapping as `ALKR` v1 (04 §2.3.2, label `agentlink/v1/owner-recovery-wrap`, generated codes only).
+  - Type separation: `ALKP`, `ALKR`, `ALKO` and `ALKS` refuse one another's magic, and a rewritten magic fails authentication.
 - **Acceptance:**
   - Vector suite `prf-wrap` (M1-1i): its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares; recovery-code round trip and format tests (grouping, alphabet); a mistyped code fails cleanly without partial output.
 
@@ -2436,7 +2438,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 04 §2.2, §2.3, §2.5; 08 §1; D-16
 - **Invariants:** I-1, I-4
 - **Scope:**
-  - Owner seed wrapped with the PRF-derived key from a passkey registered for `localhost` (ceremony through the M1-8d server); unwrapped only inside one owner operation, then wiped. Passphrase stays as the fallback.
+  - Owner seed wrapped with the PRF-derived key from a passkey registered for `localhost` (ceremony through the M1-8d server), stored as an `ALKP` v1 blob (04 §2.3.1, D-82; M1-1k provides seal/open) whose `credId` names that passkey; unwrapped only inside one owner operation, then wiped. Passphrase stays as the fallback.
   - Threat note extended for the shared `localhost` RP ID (G-1); D-36 desktop biometrics are the intended long-term mitigation (G-42).
 - **Acceptance:**
   - The M1-8c same-user script test passes with the passkey path enabled (virtual authenticator with PRF); a PRF-less authenticator falls back to the passphrase.
