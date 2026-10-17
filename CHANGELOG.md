@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- CI (OPS-CI-4, S2, process): new `sync-pin` job in `security.yml` (push to `main`, weekly) fails when the secret-scan stub on the `sync` branch is pinned to a commit older than the last change to `secret-scan.yml` or `.gitleaks.toml` on `main`; `sync-protocol.md` and `ci-cd.md` document the re-pin procedure.
+
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.
 
 ## [0.1.0] - 2026-10-16

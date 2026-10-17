@@ -682,6 +682,17 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - A title `OPS-CI-3 ci: ...` passes; `OPS-ci-3`, `OPS-` and `OPS-CI` fail (tests).
 - **Also (found in PR #187):** since OPS-REL-1 (`privatePackages.version: true`) the private tooling packages (`tools`, `e2e`) count as published, so a tooling-only PR fails the `changesets` check without an empty changeset. Exempt private tooling packages from the changeset requirement, or have CI add empty changesets for them; test both cases.
 
+#### OPS-CI-4 · Guard the sync secret-scan stub pin (new)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
+- **Repo/path:** agentlink · `tools/sync-pin-check/**`, `.github/workflows/security.yml`, `docs/process/sync-protocol.md`, `docs/process/ci-cd.md`
+- **Depends on:** —
+- **Spec:** `ci-cd.md` ("The sync branch")
+- **Invariants:** —
+- **Scope:**
+  - The stub on `sync` was pinned to v0.0.1, before main loaded `.gitleaks.toml`, so every sync push failed on the test-vector keys. A `sync-pin` job fails when the pin is not equal to or a descendant of the last main commit that changed `secret-scan.yml` or `.gitleaks.toml`; document the re-pin procedure.
+- **Acceptance:**
+  - Tests: pin parsing, ancestry (older, equal, later, unknown SHA), missing stub passes with a notice. No gitleaks allowlist change, no new action, read-only token.
+
 #### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/release.yml` or a Changesets hook, `tools/**`, `docs/process/versioning.md` §5
