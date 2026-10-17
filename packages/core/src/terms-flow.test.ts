@@ -2068,3 +2068,47 @@ describe('fresh sessions (M1-22): open offers and what an approval is for (06 §
     expect(await b.client.approvalService.resumeOf(p.approvalId)).toBeUndefined();
   });
 });
+
+describe('M1-32-d: one clock read for an approval scope (04 §3.4.1, §3.4.2)', () => {
+  /** From `arm()` on, every read of the clock moves it one second forward (a slow host). */
+  function tickingClock(): { arm(): void; disarm(): void } {
+    let t = clock.t;
+    let ticking = false;
+    Object.defineProperty(clock, 't', {
+      configurable: true,
+      get: () => (ticking ? (t += 1) : t),
+      set: (v: number) => {
+        t = v;
+      },
+    });
+    return {
+      arm: () => {
+        ticking = true;
+      },
+      disarm: () => {
+        ticking = false;
+      },
+    };
+  }
+
+  it('a second boundary between the scope and the owner request still asks the owner once', async () => {
+    const { a, b, offer } = await offered();
+    const ticks = tickingClock();
+    ticks.arm();
+    const r = await b.client.respondToTerms({ envelopeId: offer.envelopeId, decision: 'accept' });
+    ticks.disarm();
+    const p = pending(r);
+    // The stored request is well formed and usable: the owner approves, the accept goes out once.
+    expect(await approve(b, p.approvalId)).toMatchObject({ status: 'applied' });
+    const done = ok(
+      await b.client.respondToTerms({
+        envelopeId: offer.envelopeId,
+        decision: 'accept',
+        approvalId: p.approvalId,
+      }),
+    );
+    expect(done).toMatchObject({ decision: 'accept', version: 1, termsHash: offer.termsHash });
+    expect(await outRows(b, 'accept')).toHaveLength(1);
+    expect((await deliver(b, a)).map((x) => x.outcome)).toEqual(['ok']);
+  });
+});
