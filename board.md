@@ -1,5 +1,5 @@
 # AgentLink — sync board
-_Updated 2026-10-16 16:28 UTC by @talirezun_
+_Updated 2026-10-17 13:00 UTC by @talirezun_
 
 ## Area ownership
 | Area | Repo / paths | Lead | Review |
@@ -11,8 +11,8 @@ _Updated 2026-10-16 16:28 UTC by @talirezun_
 |---|---|---|---|---|
 | M0-2 Repos, CI, branch protection | @talirezun | in-progress | main pushed; settings pending | 2026-10-12 |
 | M0-4 Decide D-11, D-12, D-14 | @talirezun | in-progress | — | 2026-10-12 |
-| M1b waves — orchestrator (next session) | @talirezun (agents) | ready | — | 2026-10-16 |
-| M1 gate two-machine test — Tali | @talirezun | ready | — | 2026-10-16 |
+| M1b waves — orchestrator | @talirezun (agents) | in-progress | ~35 PRs merged 10-17 | 2026-10-17 |
+| M1 gate two-machine test — Tali | @talirezun | in-progress | run 1 done; rerun pending | 2026-10-17 |
 
 ## Waiting on a decision
 | # | Question | Decider | Raised by / when |

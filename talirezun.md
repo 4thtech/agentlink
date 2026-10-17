@@ -1,21 +1,21 @@
 # @talirezun — sync
-**Headline:** v0.1.0 released on npm as @4thtech-io/agentlink (2026-10-16); M1a complete; M1b and the two-machine M1 gate test next
-_Updated 2026-10-16 16:28 UTC · claude-code / claude-haiku-5-5 · sync update for 2026-10-15/16_
+**Headline:** M1b in progress: ~35 PRs merged on 2026-10-17 (wave 1 + most of waves 3–4); npm latest still 0.1.0; two-Mac M1 gate test started
+_Updated 2026-10-17 13:00 UTC · claude-code / claude-opus-5-5 · orchestrator session 2026-10-17_
 
 ## Now
-- **2026-10-16:** v0.1.0 released on npm as `@4thtech-io/agentlink`.
-- **M1a complete:** background loop, tool-surface guard, UCD vendoring, J8 e2e, multi-agent per owner, fresh-session fixes, install docs, skill file.
-- **AI e2e passing;** local dogfood Claude Code ↔ OpenCode 16/17.
-- **Release pipeline:** ci-green gate, deploy freeze, merge queue, trusted publishing.
+- **2026-10-17 merged:** live relay subscriptions; `init --harness claude-desktop`; Gemini CLI vs Antigravity detection; "no card from your owner yet" status/doctor; owner recovery without an attached agent; local approval server on localhost (passkey-ready, D-79); terms idempotency; SSRF-safe fetch + path guard (Windows fixes); storage adapters; files/proof policy engine; EIP-712 proof hashing + vectors; ALKP/ALKR backup formats spec (D-82); G-26/G-20 resolved (D-80/D-81); Node ≥ 22.14 check; contact names instead of addresses; changelog fragments (`changelog.d/`); CI gates (bundle-check, e2e in merge gate, Windows/macOS path tests, sync pin guard); knowledge/ consolidated; beginner setup page; two-machine dogfood.
+- **Two-Mac gate run 1:** pairing + receive passed; sends hit AMBIGUOUS_CONTACT (stale duplicate test contact; product behaved correctly). Rerun with fresh agent names pending.
 
 ## In flight
-None. No open PRs as of 2026-10-16.
+- #228 M1-1k ALKP/ALKR code (queued); #237 docs pass; e2e J8 flake fix; #218 encrypted drop and #230 STREAM/Revocation vectors await owner confirmation of spec details.
 
 ## Next
-1. M1b in a new session (orchestrator).
-2. M1 gate: two-machine test run by Tali (Denis busy).
-
+1. Two-Mac rerun (Tali); confirm drop + STREAM spec details.
+2. M1-1d STREAM, M1-6b/c, M1-7f/7g, M1-9d file + proof tools; OPS-REL-2 internal scope → @4thtech-io/* (private).
+3. Next 0.1.x release (owner approval for npm latest).
 ## Decisions (still relevant)
+- D-79 approval page on localhost (127.0.0.1+::1); D-80 STREAM AAD binds header; D-81 Revocation struct; D-82 ALKP/ALKR blobs.
+- Proof default per 06 §3 (≤$1/proof, ≤$5/24h without approval); M1b changesets patch-only until the M1 gate (0.2.0).
 - D-72 request accept/block; D-73 M1-9 owner answers; D-74 terms rules.
 - D-75 default relays: nos.lol, relay.primal.net, relay.snort.social, nostr.mom.
 - D-76 MCP SDK, with module-graph guard; D-77 interim Unicode table.
