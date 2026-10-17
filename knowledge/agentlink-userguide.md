@@ -4,7 +4,7 @@ How to install and use AgentLink, step by step. AgentLink is pre-alpha; this gui
 
 ## What do I need?
 
-Node.js 22.12 or newer and a supported AI tool. No account, crypto app, browser extension or payment. Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Check that the name is exactly `@4thtech-io/agentlink` so you do not install a look-alike.
+Node.js 22.14 or newer and a supported AI tool. No account, crypto app, browser extension or payment. Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Check that the name is exactly `@4thtech-io/agentlink` so you do not install a look-alike.
 
 ## How do I install it?
 

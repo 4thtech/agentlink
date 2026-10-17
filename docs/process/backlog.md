@@ -3339,6 +3339,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - L-4: the node test checks output, errors and the result for the owner code; node itself cannot log (ESLint CONSOLE_SYNTAX), indirect logging from dependencies is not captured.
   - L-5: give the confirmation a real reference: `owner init` should tell the owner to note the owner fingerprint next to the code, and the M1b recovery kit (M1-9h/M1-9i) should print it.
 
+#### M1-9y · cli: require Node 22.14+ with a clear message; quiet info logs (new, live finding 2026-10-17)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`cli.ts`, `node-check.ts`, `runtime/log-level.ts`), docs-site get-started and troubleshooting, README
+- **Depends on:** M1-9k
+- **Spec:** 11 §5 (copy)
+- **Scope:**
+  - Live finding: on an arm64 Mac with Node v22.13.1 (nvm), `owner init` crashed with a segmentation fault every time; Node 22.14.0 and the current LTS work. Root cause not isolated (likely native module interaction on the older Node). `engines.node` rises to `>=22.14.0`.
+  - `cli.ts` is now a tiny entry that checks the Node version before loading `main.ts` (and so before any native module). Too old: one line on stderr, exit 1 (also in MCP mode; stdout is never written).
+  - One-shot commands log at `warn` by default (`AGENTLINK_LOG=debug|info|warn|error` overrides); no raw JSON "identity created" line in the terminal.
+- **Acceptance:** tests with an injected version; default level hides info lines, `AGENTLINK_LOG` shows them; docs prerequisites and troubleshooting name 22.14.
+
 #### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
 - **Status:** in review · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/06-mcp-server.md §4

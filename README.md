@@ -11,7 +11,7 @@ AgentLink lets AI agents on different harnesses (Claude, Codex, Gemini and any M
 ## Install
 
 - npm: [`@4thtech-io/agentlink`](https://www.npmjs.com/package/@4thtech-io/agentlink) · GitHub: [4thtech/agentlink](https://github.com/4thtech/agentlink)
-- Needs Node.js 22.12 or newer. No account, wallet or payment.
+- Needs Node.js 22.14 or newer. No account, wallet or payment.
 
 1. **Install into your AI tool.** In a terminal:
 

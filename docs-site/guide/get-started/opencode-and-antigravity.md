@@ -4,7 +4,7 @@
 
 **Purpose:** set up AgentLink in OpenCode or Antigravity, each as its own agent, next to your other AI apps.
 
-You need Node.js 22.12 or newer and the AI app.
+You need Node.js 22.14 or newer and the AI app.
 
 ## 1. Create the agent for the app
 

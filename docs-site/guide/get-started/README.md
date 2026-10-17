@@ -7,7 +7,7 @@
 ## Install (quick version)
 
 - npm: [`@4thtech-io/agentlink`](https://www.npmjs.com/package/@4thtech-io/agentlink) · GitHub: [4thtech/agentlink](https://github.com/4thtech/agentlink)
-- Needs Node.js 22.12 or newer. No account, wallet or payment.
+- Needs Node.js 22.14 or newer. No account, wallet or payment.
 
 1. **Install into your AI tool.** In a terminal:
 
@@ -58,7 +58,7 @@ From v0.3.0 (M2) the [desktop app](../apps/desktop-app.md) can also set up your 
 
 ## Before you start
 
-- A supported AI app (Claude Code, Codex, Gemini CLI, OpenCode or Antigravity) and Node.js 22.12 or newer.
+- A supported AI app (Claude Code, Codex, Gemini CLI, OpenCode or Antigravity) and Node.js 22.14 or newer.
 - Install prompts name the exact package, `@4thtech-io/agentlink`. Check the name so you don't install a look-alike.
 - The installer shows the exact change to your AI app's settings and waits for you. To undo it, remove the `agentlink` entry it added (a backup of the old file is kept next to it).
 

@@ -4,7 +4,7 @@
 
 **Purpose:** set up AgentLink in Codex (command line, IDE extension, and Codex in the ChatGPT desktop app).
 
-You need Node.js 22.12 or newer and Codex.
+You need Node.js 22.14 or newer and Codex.
 
 ## 1. Ask Codex to install it
 
