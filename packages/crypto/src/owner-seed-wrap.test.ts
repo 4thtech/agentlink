@@ -222,7 +222,11 @@ describe('ALKR v1 (04 §2.3.2)', () => {
     const tampered = blob.slice();
     tampered[50] = (tampered[50] as number) ^ 1;
     const a = await refusal(() =>
-      openRecoverySeed(blob, { secret: CODE, source: 'prompt' }, { expectedOwnerNostr: OTHER_OWNER }),
+      openRecoverySeed(
+        blob,
+        { secret: CODE, source: 'prompt' },
+        { expectedOwnerNostr: OTHER_OWNER },
+      ),
     );
     const b = await refusal(() => openRecoverySeed(tampered, { secret: CODE, source: 'prompt' }));
     expect(a.code).toBe('open_failed');
@@ -263,7 +267,10 @@ describe('type separation (D-82): ALKP, ALKR, ALKO and ALKS never open as one an
       new Uint8Array(16).fill(1),
       FLOOR,
     );
-    const alko = await sealOwnerSeed(kek, SEED, { destination: 'local', fileKeystoreMachine: true });
+    const alko = await sealOwnerSeed(kek, SEED, {
+      destination: 'local',
+      fileKeystoreMachine: true,
+    });
     const asAlkr = alko.slice();
     asAlkr.set(encodeUtf8('ALKR'), 0);
     const alksKek = await deriveKeystoreKek(
@@ -272,7 +279,9 @@ describe('type separation (D-82): ALKP, ALKR, ALKO and ALKS never open as one an
       new Uint8Array(16).fill(2),
       FLOOR,
     );
-    const alks = await sealKeystoreFile(alksKek, deriveAgentId(SEED), [{ name: 'seed', value: SEED }]);
+    const alks = await sealKeystoreFile(alksKek, deriveAgentId(SEED), [
+      { name: 'seed', value: SEED },
+    ]);
     for (const blob of [alko, asAlkr, alks]) {
       await refusal(() => openRecoverySeed(blob, { secret: CODE, source: 'prompt' }));
       await refusal(() => openPasskeySeed(blob, PRF));

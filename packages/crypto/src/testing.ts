@@ -6,6 +6,7 @@
 // - M1-1l: the CEK derivations (payload key, key commitment, wrap ephemeral key) for the vectors.
 // - M1-1f: sealKeystoreFile and sealOwnerSeed with a fixed nonce, Argon2id with a secret value (K)
 //   and associated data (X) for the RFC 9106 vector, and pairingDigest for the `labels` vectors.
+// - M1-1k: sealPasskeySeed and sealRecoverySeed with a fixed nonce (and salt).
 // - M1-1g: MemoryKeyStore and MemoryOwnerKeyStore, in-memory KeyStore doubles that hold a seed in
 //   plain memory (below; IR-M1-1g-G2-1 M-2: one test seam, one policy entry).
 //
@@ -110,6 +111,12 @@ export {
   sealKeystoreFileWithNonceUnsafe as sealKeystoreFileWithNonce,
   sealOwnerSeedWithNonceUnsafe as sealOwnerSeedWithNonce,
 } from './keystore-file.js';
+
+// M1-1k: ALKP and ALKR seals with a fixed nonce (and salt) for the prf-wrap vectors.
+export {
+  sealPasskeySeedWithNonceUnsafe as sealPasskeySeedWithNonce,
+  sealRecoverySeedWithSaltAndNonceUnsafe as sealRecoverySeedWithSaltAndNonce,
+} from './owner-seed-wrap.js';
 
 // IR-M1-1f-1 L-7: pairingDigest without the commitment check is not public; the `labels` vectors
 // (the same input under both tags) reach it here.

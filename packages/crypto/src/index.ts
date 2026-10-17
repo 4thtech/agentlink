@@ -180,6 +180,15 @@ export {
   type AgentCard,
   type AgentCardHashes,
 } from './agent-card.js';
+// M1-1k (04 §2.3, D-82): the passkey PRF salt and the public header of an `ALKP` blob (owner key and
+// credential ID). Sealing and opening the owner seed blobs are in @agentlink/crypto/keystore.
+export {
+  ownerPrfSalt,
+  readPasskeyBlobHeader,
+  type ExpectedOwnerNostr,
+  type PasskeyBlobHeader,
+  type RecoveryCodeSecret,
+} from './owner-seed-wrap.js';
 // M1-1f: the pairing proof and the safety code (04 §3.6, §3.6.1; only the commit-checked functions
 // produce digits, IR-M1-1f-1 L-7), and the public constants of the
 // file KeyStore and owner wrap (04 §2.8). Argon2id, password() and the ALKS / ALKO seal and open

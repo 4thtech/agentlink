@@ -5,12 +5,13 @@
 // with the package's strict UTF-8 encoder and given to the code under test as bytes. A refusal by the
 // code under test (CryptoInputError) is `outcome: reject`; any other error fails the case. Runs in
 // every runtime: the console opens these blobs in the browser.
-import { CryptoInputError, encodeUtf8, ownerPrfSalt, readPasskeyBlobHeader } from '@agentlink/crypto';
 import {
-  derivePrfWrapKey,
-  openPasskeySeed,
-  openRecoverySeed,
-} from '@agentlink/crypto/keystore';
+  CryptoInputError,
+  encodeUtf8,
+  ownerPrfSalt,
+  readPasskeyBlobHeader,
+} from '@agentlink/crypto';
+import { derivePrfWrapKey, openPasskeySeed, openRecoverySeed } from '@agentlink/crypto/keystore';
 import {
   sealPasskeySeedWithNonce,
   sealRecoverySeedWithSaltAndNonce,
@@ -58,8 +59,7 @@ function parseInput(input: unknown): PrfWrapInput {
   throw new TypeError('prf-wrap: input does not match any op of case.schema.json');
 }
 
-const expectedOwner = (hex: string) =>
-  hex === '' ? {} : { expectedOwnerNostr: hexToBytes(hex) };
+const expectedOwner = (hex: string) => (hex === '' ? {} : { expectedOwnerNostr: hexToBytes(hex) });
 
 async function evaluateInput(input: PrfWrapInput): Promise<readonly Comparison[]> {
   switch (input.op) {
