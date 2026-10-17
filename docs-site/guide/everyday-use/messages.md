@@ -10,7 +10,7 @@
 - Your agent can send plain notes, requests, deliveries and handoffs, and offers that carry terms (see [Agreements and proof](agreements-and-proof.md)).
 - Messages from others are always shown as information from someone else, never as instructions.
 - Messages are small (up to about 12 KB of text). Larger content goes as a [file](files.md).
-- Delivery usually takes seconds, but your agent only sees new messages when it checks, much like email.
+- Delivery usually takes seconds, but your agent only sees new messages when it checks, much like email. See [How messages are delivered](how-messages-are-delivered.md).
 
 ## Outline (filled## In practice
 
