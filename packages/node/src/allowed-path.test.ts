@@ -28,6 +28,8 @@ import {
 } from './allowed-path.js';
 
 const isWindows = process.platform === 'win32';
+/** `it` on POSIX; on Windows the test is not registered at all (the Windows job refuses skips). */
+const posixIt: typeof it = isWindows ? ((() => undefined) as unknown as typeof it) : it;
 /** A keychain directory protectedRoots() lists for this platform (04 §4). */
 const KEYCHAIN_DIR: readonly string[] = isWindows
   ? ['AppData', 'Roaming', 'Microsoft', 'Protect']
@@ -256,6 +258,27 @@ describe('openAllowedFile', () => {
     expect(await codeOf(promise)).toBe('protected');
     expect(swapped).toBe(true);
   });
+
+  // POSIX only: Windows refuses to rename a folder that holds an open file, so this swap cannot
+  // happen there (registered conditionally, not skipped: the Windows job fails on any skip).
+  posixIt(
+    'refuses when a folder on the path becomes a link to ~/.ssh after the open (L1)',
+    async () => {
+      const dir = join(home, 'Work', 'swapdir-post');
+      mkdirSync(dir);
+      writeFileSync(join(dir, 'id_ed25519'), 'decoy');
+      let swapped = false;
+      const promise = openAllowedFileWith('~/Work/swapdir-post/id_ed25519', opts(['~/Work']), {
+        afterOpen: () => {
+          renameSync(dir, join(home, 'Work', 'swapdir-post-old'));
+          link(join(home, '.ssh'), dir);
+          swapped = true;
+        },
+      });
+      expect(await codeOf(promise)).toBe('protected');
+      expect(swapped).toBe(true);
+    },
+  );
 
   it('refuses when the file disappears after the open (L1)', async () => {
     const target = join(home, 'Work', 'gone.txt');
