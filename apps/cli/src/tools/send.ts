@@ -18,7 +18,7 @@ import { contactRef, renderRef, resolveContact } from './contacts.js';
 import type { ToolContext } from './context.js';
 import { fail, internalError, invalidArgument, ok, type HandlerOutput } from './result.js';
 import { copy } from './strings/index.js';
-import { TOOL_TEXT } from './text.js';
+import { TOOL_TEXT, noOwnerCard } from './text.js';
 
 /** Fixed text for this tool (I-5: no slot takes another party's or the agent's text). */
 export const SEND_TEXT = Object.freeze({
@@ -61,7 +61,7 @@ function coreErrorOutput(code: CoreErrorCode): HandlerOutput | undefined {
     case 'transport_unavailable':
       return fail('error', copy('chat.status.error.network'), SEND_TEXT.networkNextStep, 'NETWORK');
     case 'identity_missing':
-      return fail('needs_setup', TOOL_TEXT.noIdentity, TOOL_TEXT.setupNextStep);
+      return fail('needs_setup', noOwnerCard().summary, noOwnerCard().nextStep);
     case 'identity_revoked':
       return fail('error', SEND_TEXT.revoked, SEND_TEXT.revokedNextStep, 'AGENT_REVOKED');
     case 'contact_not_active':
@@ -97,7 +97,11 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
 
   const { client, logger } = context;
   if ((await client.self()) === undefined) {
-    return fail('needs_setup', TOOL_TEXT.noIdentity, TOOL_TEXT.setupNextStep);
+    return fail(
+      'needs_setup',
+      noOwnerCard(context.agentName).summary,
+      noOwnerCard(context.agentName).nextStep,
+    );
   }
 
   // 3. The contact.
