@@ -694,6 +694,17 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:**
   - A Version packages PR contains the rolled root CHANGELOG; the `notes` guard passes without a manual PR (test on a fixture CHANGELOG); an empty `[Unreleased]` is refused or left untouched.
 
+#### OPS-REL-4 · Changelog fragments in `changelog.d/` (new, owner-approved 2026-10-17)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`, `AGENTS.md`; owner "merge")
+- **Repo/path:** agentlink · `tools/release/**`, `changelog.d/**`, `.github/workflows/ci.yml`, `.github/pull_request_template.md`, `docs/process/{versioning,delivery-process}.md`, `AGENTS.md` (one bullet)
+- **Depends on:** OPS-REL-3
+- **Spec:** `versioning.md` §5
+- **Invariants:** —
+- **Scope:**
+  - Nearly every PR added a line at the same spot in `CHANGELOG.md` `[Unreleased]`, so parallel PRs conflicted in the merge queue after each merge. Each PR now adds `changelog.d/<card-id>.md` (section by front matter or heading, then bullets); the release roll folds the fragments and any legacy `[Unreleased]` lines into the version section, grouped in a stable order, and deletes them.
+- **Acceptance:**
+  - The roll reads fragments and legacy lines, refuses only when both are empty, rejects an unknown section naming the file, deletes consumed fragments and is idempotent (fixture tests); CI fails a user-visible, spec or process PR without an entry and only warns on a direct `[Unreleased]` edit; docs, PR template and the `AGENTS.md` Versioning bullet updated.
+
 ### Documentation (DOCS) (new)
 
 #### DOCS-RB · Runbooks, lessons and onboarding map (new)

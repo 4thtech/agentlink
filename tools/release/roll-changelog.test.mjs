@@ -181,7 +181,10 @@ describe('fragments', () => {
   });
 
   it('merges fragments with legacy lines already under [Unreleased]', () => {
-    const legacy = EMPTY.replace('## [Unreleased]\n', '## [Unreleased]\n\n### Added\n\n- Legacy.\n');
+    const legacy = EMPTY.replace(
+      '## [Unreleased]\n',
+      '## [Unreleased]\n\n### Added\n\n- Legacy.\n',
+    );
     const out = rollChangelog(legacy, '0.2.0', '2026-11-01', [
       frag('x.md', 'Added', '- From fragment.'),
     ]);
@@ -228,7 +231,15 @@ describe('runCli with a fragments directory', () => {
     return { d, file, fdir };
   };
   const args = (file, fdir) => [
-    'roll', '--file', file, '--fragments', fdir, '--version', '0.2.0', '--date', '2026-11-01',
+    'roll',
+    '--file',
+    file,
+    '--fragments',
+    fdir,
+    '--version',
+    '0.2.0',
+    '--date',
+    '2026-11-01',
   ];
 
   it('consumes fragments, deletes them, keeps README.md, and is idempotent', () => {
