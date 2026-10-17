@@ -37,4 +37,4 @@ Accepting terms (sending `accept`, signing `ACCEPTED` or `REJECTED`) is an agent
 
 ## Rotation and recovery
 
-A new key epoch derives new Nostr and encryption keys and a new agent card; old epochs stay derivable, so history stays readable. The recovery kit is an encrypted backup of the seed (passphrase or passkey PRF) that the user holds; 4thTech stores nothing.
+A new key epoch derives new Nostr and encryption keys and a new agent card; old epochs stay derivable, so history stays readable. The recovery kit is an encrypted backup of the seed (`ALKR`, under a generated recovery code; a passkey PRF wrap is `ALKP`) that the user holds; 4thTech stores nothing.

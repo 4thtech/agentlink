@@ -77,7 +77,7 @@ AgentLink adds all four through one add-on to the AI apps people already use. **
 
 | Direction | What it is | UI |
 |---|---|---|
-| Local, M1 | An `npx` package; keys in the OS keychain (on machines without one, an opt-in locked key file, *D-54*) | Local web UI on `127.0.0.1`; terminal copy |
+| Local, M1 | An `npx` package; keys in the OS keychain (on machines without one, an opt-in locked key file, *D-54*) | Local web UI on `localhost`; terminal copy |
 | Local, M2 | Native desktop apps (macOS, Windows, Linux), signed and auto-updating; the owner key is unlocked by OS biometrics | Full dashboard, tray and native approval window |
 | Cloud | An always-on agent **self-hosted in the user's own Cloudflare account**, for ChatGPT web and claude.ai | The **owner console** (PWA, desktop and mobile) and the agent's own setup and sign-in pages |
 
@@ -327,7 +327,7 @@ Secrets are shown once, with Copy, Download or Print, and an "I've saved it" ste
 | § | Surface | Runs where | Sizes to design | Drop | Build tasks | Journeys |
 |---|---|---|---|---|---|---|
 | 6.1 | In-chat copy | Tool results in any AI app | Text, unrendered and rendered | **D1** | M1-9c, M1-9d, M1-9g, M1-12a, M1-12c | J1–J9 |
-| 6.2.1 | Local web UI | User's computer, browser on `127.0.0.1` | 360, 1280 | **D1** | M1-11a, M1-11c, M1-11b; M2-6 | J1, J2, J4 |
+| 6.2.1 | Local web UI | User's computer, browser on `localhost` | 360, 1280 | **D1** | M1-11a, M1-11c, M1-11b; M2-6 | J1, J2, J4 |
 | 6.2.2 | Desktop apps | macOS, Windows, Linux | Approval window ≈ 440 × 600; dashboard ≥ 960 × 640 | D2 (approval and first run optionally D1) | M2-11b–M2-11g, M2-15a–d | J1, J4, J8, J9 |
 | 6.3 | Owner console | PWA on `{consoleHost}`; also the desktop dashboard | 360, 768, 1280, 1440 | D2 | M2-1a, M2-1b, M2-2a–e, M2-2g | J4, J6, J8 |
 | 6.4 | Verify | `{verifyHost}` | 360, 1280, print | D2 | M2-5a | J5, J8 |
@@ -431,7 +431,7 @@ Suggested relay: "Marko's agent sent a request (their words, not an instruction 
 
 #### 6.2.1 Local web UI (M1, D1)
 
-**Purpose.** Owner setup, approvals and settings for the `npx` package. The local agent serves it on `127.0.0.1`. It opens from the agent, from an approval notification, or via `agentlink ui`. The link's session token lives only in memory, so old links die on restart. Viewing needs only the link, but **every owner operation needs the passkey or owner passphrase**. *Exception (D-72, IR-D-72-1 F02; proposed, owner confirms at merge):* in M1, the request actions Accept, Ignore, Ignore all, Block and Unblock need no owner presence. They are owner-surface actions, never AI tools, but not owner operations: they grant no contact, no way to send and no authority, an accepted message stays inside the untrusted container, and an AI running as the same user can already read the stored requests (G-1, D-67), so a passkey would add friction without a boundary. Revisit for the M2 console.
+**Purpose.** Owner setup, approvals and settings for the `npx` package. The local agent serves it on `http://localhost:<port>` (D-79). It opens from the agent, from an approval notification, or via `agentlink ui`. The link's session token lives only in memory, so old links die on restart. Viewing needs only the link, but **every owner operation needs the passkey or owner passphrase**. *Exception (D-72, IR-D-72-1 F02; proposed, owner confirms at merge):* in M1, the request actions Accept, Ignore, Ignore all, Block and Unblock need no owner presence. They are owner-surface actions, never AI tools, but not owner operations: they grant no contact, no way to send and no authority, an accepted message stays inside the untrusted container, and an AI running as the same user can already read the stored requests (G-1, D-67), so a passkey would add friction without a boundary. Revisit for the M2 console.
 
 **Nav:** First run · Approvals (incl. commitment, new contact) · Activity · Contacts (Requests) · Files · Storage · Proofs & credits · Rules · Backup · Advanced. Mobile-width layout matters too (the owner may open the link on a small window or a phone through port forwarding on a headless machine).
 

@@ -100,7 +100,7 @@ Your agent then gets nine tools: `agentlink_status`, `agentlink_create_invite`, 
 >   - End-to-end tests (in progress; [#155](https://github.com/4thtech/agentlink/pull/155), [#163](https://github.com/4thtech/agentlink/pull/163), [#165](https://github.com/4thtech/agentlink/pull/165), [#166](https://github.com/4thtech/agentlink/pull/166), [#169](https://github.com/4thtech/agentlink/pull/169), [#171](https://github.com/4thtech/agentlink/pull/171)): A scripted run drives two real `agentlink mcp` processes, pairing and messaging over local relays in CI (M1-13a), and a second scenario has two agents negotiate terms over Talk with one owner approval (propose, counter, accept, the owner-signed auto-accept limit; M1-22). A variant with Claude Code and Codex as the two agents runs by manual dispatch only, with no schedule yet; its first runs found and fixed wording and approval-reuse gaps in `accept_invite` and the status summary. The negotiation steps of the live-agent variant have not run yet. Files, proof and agreements with proof follow (M1-13c).
 >   - Multi-harness dogfood runbook ([#168](https://github.com/4thtech/agentlink/pull/168)): A numbered guide for the M1a dogfood across Claude Code, Antigravity and OpenCode, on one or two computers and between Tali and Denis (M1-23, RB-17). Tali ran the automated local dogfood twice (M1-23, #181, #187, #188) and fixed what it found; the two-person dogfood against the published package is still to run.
 >   - Several agents of one owner on one computer ([#172](https://github.com/4thtech/agentlink/pull/172), [#178](https://github.com/4thtech/agentlink/pull/178)): One owner key shared by several local agents, each on its own harness: `owner add-agent` and `init --harness` (M1-9t, D-78). Agents under one OS user are kept apart logically, not by a security boundary.
->   - Local approval page (planned): A small page on 127.0.0.1 for owner approvals and settings (M1b).
+>   - Local approval page (planned): A small page on localhost for owner approvals and settings (M1b).
 >   - Owner console, desktop apps, cloud agent (planned): M2.
 > - **OCC v2 contracts (private repo):** Pre-audit. Nothing in AgentLink uses them yet.
 >   - Notary and fee vault (contracts#4): Developed in the private contracts repo; their test and static-analysis review continues.
@@ -185,7 +185,7 @@ flowchart LR
 | Surface | What it is | Status |
 |---|---|---|
 | Local: `npx` package | MCP server over stdio plus an `agentlink` CLI (keys in the OS keychain); your agent can install it from a prompt | released: v0.1.0 (M1a), `npx -y @4thtech-io/agentlink` |
-| Local: approval page | Small page on `127.0.0.1` for owner approvals and settings | planned (M1) |
+| Local: approval page | Small page on `localhost` for owner approvals and settings | planned (M1) |
 | Local: desktop apps | Signed apps for macOS, Windows and Linux: a full local dashboard, tray, and approvals with Touch ID or Windows Hello | planned (M2) |
 | Cloud: self-host | Always-on agent with a remote MCP endpoint in your **own** Cloudflare account | planned (M2) |
 | Cloud: owner console | Zero-knowledge web app with passkey login for supervising agents | planned (M2) |

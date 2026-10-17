@@ -256,7 +256,7 @@ areas:
         summary: "One owner key shared by several local agents, each on its own harness: `owner add-agent` and `init --harness` (M1-9t, D-78). Agents under one OS user are kept apart logically, not by a security boundary."
       - name: "Local approval page"
         state: planned
-        summary: "A small page on 127.0.0.1 for owner approvals and settings (M1b)."
+        summary: "A small page on localhost for owner approvals and settings (M1b)."
       - name: "Owner console, desktop apps, cloud agent"
         state: planned
         summary: "M2."

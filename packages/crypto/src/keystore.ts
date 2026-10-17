@@ -43,6 +43,7 @@ export {
   openKeystoreFileWithKek,
   keystoreSecretUnlocks,
   openOwnerSeed,
+  openOwnerSeedWithoutCard,
   ownerSecretUnlocks,
   sealKeystoreFile,
   sealOwnerSeed,
