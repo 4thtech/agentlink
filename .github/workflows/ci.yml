@@ -467,6 +467,41 @@ jobs:
             if (t.length < 4 || bad.length > 0) { console.error("::error::the Docker relay suite must run 4+ tests, all passed"); process.exit(1); }
           '
 
+  # M1-9c-c (IR-M1-9c-1 F07; D-76, 06 §1): the neutral-platform bundle check. A plain Linux runner
+  # with no keychain service and no native-module build (the install runs no lifecycle scripts)
+  # builds the CLI bundle with the repository's own Vite config (no new dependency) and runs
+  # apps/cli/scripts/bundle-check.mjs: every import the published dist/agentlink.js keeps must be a
+  # Node built-in or a declared runtime dependency, never jose, pkce-challenge, cookie-signature,
+  # etag, hono or another SDK HTTP/OAuth package, and SDK imports only the stdio subpaths; and
+  # src/tools/ bundled for a neutral (Worker) platform reaches no Node built-in, @agentlink/node or
+  # the MCP SDK. The script's own test (an injected `jose` import must fail it) and the runtime
+  # module-graph guard against the bundle run in the same job. In `ci-gate`'s `needs`.
+  bundle-check:
+    name: bundle-check
+    needs: detect
+    if: needs.detect.outputs.has_skeleton == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build the CLI bundle and its workspace dependencies
+        run: pnpm exec turbo run build --filter='@4thtech-io/agentlink...'
+
+      - name: Check the published bundle and the neutral src/tools/ bundle
+        run: node apps/cli/scripts/bundle-check.mjs
+
+      - name: Run the bundle-check test and the module-graph guard against the bundle
+        run: pnpm --filter @4thtech-io/agentlink exec vitest run test/bundle-check.test.ts test/mcp-module-graph.test.ts
+
   # AGENTS.md and CLAUDE.md are auto-loaded into every agent session, so they have hard
   # size budgets to keep context lean. Plain shell, no Node skeleton needed: this job runs
   # on a docs-only repository too and does not depend on `detect`. A missing file passes.
@@ -563,7 +598,7 @@ jobs:
     # merge with `main`. Only the latter may satisfy the required check `ci-gate`, so a feature
     # branch push publishes `ci-gate (push)` instead.
     name: ${{ (github.event_name == 'push' && github.ref != 'refs/heads/main') && 'ci-gate (push)' || 'ci-gate' }}
-    needs: [detect, checks, vectors, keychain, context-budget, relays-docker, changesets]
+    needs: [detect, checks, vectors, keychain, context-budget, relays-docker, bundle-check, changesets]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

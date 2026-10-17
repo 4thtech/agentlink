@@ -6,9 +6,20 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Added
+
+- CLI (M1-9w, S1): `agentlink init --harness claude-desktop` sets up the Claude desktop app (macOS and Windows; its own `claude_desktop_config.json`, not Claude Code's file), with the usual diff, confirmation, backup and refusal of malformed files. On Linux it says the app isn't available there.
+
+### Fixed
+
+- CLI (M1-9w, S1): Gemini CLI is detected by the `gemini` program or `~/.gemini/settings.json`, so a computer with only Antigravity's `~/.gemini/config/mcp_config.json` is offered Antigravity, not Gemini CLI.
+
 ### Changed
 
 - OPS-REL-3: the "Version packages" PR now rolls `CHANGELOG.md` `[Unreleased]` into the version section (`tools/release/roll-changelog.mjs`), and a GitHub Release body over 125,000 characters falls back to a short note with a link.
+- CI (M1-9c-c, S2, process): new `bundle-check` job in `ci-gate`. It builds the CLI on a runner with no keychain and no native-module build and fails when the published `dist/agentlink.js` imports a crypto-capable MCP SDK transitive package (`jose`, `pkce-challenge`, `cookie-signature`, `etag`, `hono`), an SDK subpath outside the stdio set or an undeclared package, or when `src/tools/` bundled for a neutral (Worker) platform reaches a Node built-in, `@agentlink/node` or the MCP SDK (IR-M1-9c-1 F07, D-76, 06 §1). No new dependency: it reuses the repository's Vite. `docs/process/ci-cd.md` records it.
+
+- Spec (M1-9v, S1, 06 §4): the untrusted-content wrapper spec now says that every opening and closing `untrusted_content` tag inside content is escaped, look-alike forms included, as the code already does. No behaviour change.
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.
 
 ## [0.1.0] - 2026-10-16

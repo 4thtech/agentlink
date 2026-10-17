@@ -2623,7 +2623,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - F06 and F07 each have a test named after the finding; the bundle-check job fails on an injected `jose` import.
 
 #### M1-9c-c · CI: neutral-platform bundle-check job (new, IR-M1-9c-1 F07)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**` sensitive path: merges only on Tali's "merge"; supply-chain surface for the bundler) · **Phase:** M1a
+- **Status:** in review (no bundler dependency was needed: the check reuses the repository's Vite for parsing and the neutral bundle) · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**` sensitive path: merges only on Tali's "merge"; supply-chain surface for the bundler) · **Phase:** M1a
 - **Repo/path:** agentlink · `.github/workflows`, `apps/cli` (the check script)
 - **Depends on:** M1-9c, M1-9c-b (both merged)
 - **Spec:** 06 §2.0; IR-M1-9c-1 F07; D-76
@@ -3198,7 +3198,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Deterministic variant green on PRs; no binding `accept` leaves A without an owner-signed approval or a matching owner-signed limit (asserted on relay traffic); each owner is asked at most once per agreement (approval count).
   - Inbound `terms` reach the harness wrapped as untrusted content (06 §4); canary scan of logs finds no plaintext.
 - **Notes (IR-M1-22-1):** the "nothing leaves" relay check polls every 2 s and only catches publishes within that window; the sent-`accept` store check covers the rest. Not covered yet (cheap follow-up): voiding an approval that is still pending (a newer version arrives before the owner decides); only approved-unused is tested. The `clientRequestId` repeat check waits for M1-32-c.
-- **Note (IR-M1-22-L15-1):** 06 §4 wrapping strips only closing tags; a body can contain opening-tag-like text. Assess whether the opening tag should also be neutralised (S2 question).
+- **Note (IR-M1-22-L15-1):** resolved by M1-9v (spec only): the code already escapes opening-tag look-alikes as well as closing ones (`apps/cli/src/tools/untrusted.ts`, tested in `untrusted.test.ts`); 06 §4 now says so.
 - **Follow-up (local dogfood run 2, 2026-10-16; card as M1-22 or M1-12a work):** (a) OpenCode's summary of an offer showed raw addresses ("paid by 0xb680…8275 to 0x40a9…9337"). Check whether `agentlink_inbox` and the terms summaries expose address-like strings to the agent, and whether 11 §5 copy should show contact names instead. (b) A duplicate identical offer (same terms sent twice) appears as two open offers; consider a dedupe hint in the inbox or status summary.
 
 #### M1-23 · J9 dogfood: Tali's and Denis's agents sync through AgentLink (M1a gate) (new)
@@ -3240,8 +3240,29 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-4
 - **Scope:**
   - (a) An owner item exists on the machine but no local agent has a card naming it (for example after every carded agent was removed): `owner add-agent` cannot learn the owner keys and points to `owner init`, which refuses because an owner exists. Give this case its own fixed message and a `doctor` hint (what is on the machine, what to do), without reading or showing any secret (IR-M1-9t-1 L-2).
-  - (b) Without `--harness`, any `~/.gemini` folder detects Gemini CLI, so an Antigravity user (whose config also lives under `~/.gemini`) is offered a Gemini CLI change. Detect Gemini CLI by the `gemini` binary on `PATH` or `~/.gemini/settings.json` instead (IR-M1-9t-1 L-3).
-- **Acceptance:** tests for both cases; (a) prints the new message and `doctor` names the state; (b) a home with only `~/.gemini/config/mcp_config.json` proposes Antigravity and not Gemini CLI.
+  - (b) Moved to M1-9w (Gemini CLI detection by the `gemini` binary or `~/.gemini/settings.json`, IR-M1-9t-1 L-3).
+- **Acceptance:** tests for (a): it prints the new message and `doctor` names the state.
+
+#### M1-9w · CLI: Claude Desktop in init, Gemini CLI detection (new, from M1-9a and M1-9u (b))
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`src/harness/**`, `src/commands/init.ts`), docs-site `technical/reference/harness-configuration.md`
+- **Depends on:** M1-9t
+- **Spec:** 06 §7 (harness table, Claude Desktop row); D-39, D-78
+- **Invariants:** I-4
+- **Scope:**
+  - (a) `agentlink init --harness claude-desktop` (and detection without `--harness`) writes the `agentlink` entry to the Claude desktop app's own file, not Claude Code's `~/.claude.json`: macOS `~/Library/Application Support/Claude/claude_desktop_config.json`, Windows `%APPDATA%\Claude\claude_desktop_config.json` (`~/AppData/Roaming/Claude`; `APPDATA` is not followed, like every env value). Linux: a fixed "not available on this system" message, nothing written. Same rules as every harness: other servers kept, exact diff and confirmation, malformed JSON refused, backup; the entry is `command` and `args` (`npx -y @4thtech-io/agentlink mcp`). Restart copy: "Quit and reopen the Claude app. AgentLink appears under Connectors."
+  - (b) Gemini CLI is detected by the `gemini` binary on `PATH` or `~/.gemini/settings.json`, not by any `~/.gemini` folder (IR-M1-9t-1 L-3, moved from M1-9u (b)); a home with only `~/.gemini/config/mcp_config.json` proposes Antigravity.
+- **Acceptance:** fixture-home tests per system (injected platform and home) for no config, other servers present and malformed; detection tests for Claude Desktop and Gemini CLI; the harness docs page has the row.
+
+#### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
+- **Status:** in review · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · docs/foundation/06-mcp-server.md §4
+- **Depends on:** M1-9c (the wrapper)
+- **Spec:** 06 §4; 04 §4 (untrusted content)
+- **Invariants:** I-5
+- **Scope:**
+  - The code (`apps/cli/src/tools/untrusted.ts`, test `untrusted.test.ts`) escapes every opening and closing `untrusted_content` look-alike in content, not only closing tags. The spec text lagged: 06 §4 named only `</untrusted_content>`. Rewrite the content bullet to state what the code does, with no new behaviour.
+- **Acceptance:** 06 §4 names both opening and closing tags and the look-alike forms; the code and tests are unchanged; IR-M1-22-L15-1 is resolved here.
 
 #### M1-24 · Product name and trademark check before the production domain (D-38) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet prepares search material) · **Security:** S0 · **Phase:** M1b
