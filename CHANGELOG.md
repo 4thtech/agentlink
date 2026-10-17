@@ -9,10 +9,19 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Added
 
 - Local approval server (M1-8d, S2, `@agentlink/node`; not wired into the CLI yet, M1-11a): an HTTP server on `127.0.0.1` and a random port with a view-only session token kept in memory (exchanged for an HttpOnly cookie, never written to disk or logged), exact `Host` and `Origin` checks against DNS rebinding, a CSRF token and non-simple requests for decisions, and owner presence (owner code or owner passphrase) for every approve or deny, signed as one `approval.decide` that core verifies. Each approval ID is decided once through it; a fixed OS notification and the `/approve/<id>` route are included. The same-user script test runs against the live server.
+- CLI (M1-9w, S1): `agentlink init --harness claude-desktop` sets up the Claude desktop app (macOS and Windows; its own `claude_desktop_config.json`, not Claude Code's file), with the usual diff, confirmation, backup and refusal of malformed files. On Linux it says the app isn't available there.
+
+### Fixed
+
+- CLI (M1-9w, S1): Gemini CLI is detected by the `gemini` program or `~/.gemini/settings.json`, so a computer with only Antigravity's `~/.gemini/config/mcp_config.json` is offered Antigravity, not Gemini CLI.
 
 ### Changed
 
 - Local approval page on `http://localhost:<port>` (M1-31, S2, D-79; 08 §1, 04 §2.5, 06 §2.5, 11 §6.2.1; owner decision 2026-10-17): WebAuthn does not accept an IP address as an RP ID, so the page moves from `127.0.0.1` to `localhost` for the passkey (M1-8e). The server listens on `127.0.0.1` and `::1` (IPv6-only) on the same random port and nowhere else; if another program holds `::1` on that port it tries a new one (at most 5), and a machine with no IPv6 loopback gets `127.0.0.1` only. Only `Host: localhost:<port>` and `Origin: http://localhost:<port>` are accepted; `127.0.0.1:<port>` is now refused. The OAuth loopback redirect stays on `127.0.0.1`.
+
+- CI (M1-9c-c, S2, process): new `bundle-check` job in `ci-gate`. It builds the CLI on a runner with no keychain and no native-module build and fails when the published `dist/agentlink.js` imports a crypto-capable MCP SDK transitive package (`jose`, `pkce-challenge`, `cookie-signature`, `etag`, `hono`), an SDK subpath outside the stdio set or an undeclared package, or when `src/tools/` bundled for a neutral (Worker) platform reaches a Node built-in, `@agentlink/node` or the MCP SDK (IR-M1-9c-1 F07, D-76, 06 §1). No new dependency: it reuses the repository's Vite. `docs/process/ci-cd.md` records it.
+
+- Spec (M1-9v, S1, 06 §4): the untrusted-content wrapper spec now says that every opening and closing `untrusted_content` tag inside content is escaped, look-alike forms included, as the code already does. No behaviour change.
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.
 
 ## [0.1.0] - 2026-10-16
