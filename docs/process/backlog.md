@@ -1121,7 +1121,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - M1-1f (follow-up, D-66): owner passphrase minimum. Setting or changing a chosen owner passphrase (kind 2) refuses a candidate with fewer than 12 Unicode code points after NFKC, the same rule as `newKeystoreKek` applies to the agent passphrase. The check runs on `normalizeSecret`'s output, before the KDF (04 §2.8). Tests: 11 code points refused; 12 accepted; a string that NFKC shortens below 12 refused. Unlocking an existing wrap is unaffected.
 
 #### M1-1k · crypto: passkey PRF seed wrapping and recovery code (new, split from M1-1f)
-- **Status:** ready (unblocked by D-82, owner decision 2026-10-17: blob formats `ALKP` and `ALKR` defined in 04 §2.3.1 and §2.3.2) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in-progress (4thtech/agentlink#223, stacked on #222; unblocked by D-82, owner decision 2026-10-17: blob formats `ALKP` and `ALKR` defined in 04 §2.3.1 and §2.3.2) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto, test-vectors/prf-wrap, tools/vectors/
 - **Depends on:** M1-1f, M1-1i; D-82 spec PR merged
 - **Spec:** 04 §2.3, §2.3.1, §2.3.2, §2.8 (`password` kind 1); 08 §2.1
