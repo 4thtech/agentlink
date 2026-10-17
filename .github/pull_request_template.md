@@ -1,6 +1,6 @@
 <!--
 Title format: start with the task ID, e.g. `M1-5 transport-nostr sync`
-(other allowed prefixes: OPS-<n>, DOCS, CHORE, DEPS).
+(other allowed prefixes: OPS-<n>, OPS-<WORD>-<n> such as OPS-CI-3, DOCS, CHORE, DEPS).
 
 Two required checks read this description:
 - `pr-hygiene`: every section below up to "Checklist" must contain something.

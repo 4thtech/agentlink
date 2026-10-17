@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- CI (OPS-CI-3, S2, process): `pr-hygiene` accepts task IDs of the form `OPS-<WORD>-<n>` (for example `OPS-CI-3`) in PR titles, and the `changesets` check no longer asks for an empty changeset when a PR touches only the private tooling packages (`tools/`, `e2e/`); any other workspace package still requires one.
+
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.
 
 ## [0.1.0] - 2026-10-16

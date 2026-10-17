@@ -671,7 +671,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - deps-check refuses any `@agentlink/*` dependency or import.
 
 #### OPS-CI-3 · pr-hygiene accepts `OPS-<WORD>-<n>` task IDs (new)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/pr-hygiene.yml`, `tools/pr-hygiene.test.mjs`, `.github/pull_request_template.md`
 - **Depends on:** —
 - **Spec:** `ci-cd.md` (Workflows, pr-hygiene)
