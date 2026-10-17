@@ -15,6 +15,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer as createNetServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -27,6 +28,10 @@ import {
 } from './allowed-path.js';
 
 const isWindows = process.platform === 'win32';
+/** A keychain directory protectedRoots() lists for this platform (04 §4). */
+const KEYCHAIN_DIR: readonly string[] = isWindows
+  ? ['AppData', 'Roaming', 'Microsoft', 'Protect']
+  : ['Library', 'Keychains'];
 let base: string;
 let home: string;
 let outside: string;
@@ -46,14 +51,14 @@ beforeAll(() => {
     join(home, 'Work', 'sub'),
     join(home, 'Inbox'),
     join(home, 'dotssh-real'),
-    join(home, 'Library', 'Keychains'),
+    join(home, ...KEYCHAIN_DIR),
     outside,
   ]) {
     mkdirSync(dir, { recursive: true });
   }
   writeFileSync(join(home, '.ssh', 'id_ed25519'), 'PRIVATE');
   writeFileSync(join(home, '.agentlink', 'agent.alko'), 'KEYSTORE');
-  writeFileSync(join(home, 'Library', 'Keychains', 'login.keychain-db'), 'KC');
+  writeFileSync(join(home, ...KEYCHAIN_DIR, 'login.keychain-db'), 'KC');
   writeFileSync(join(home, 'Work', 'a.txt'), 'hello');
   writeFileSync(join(home, 'Work', 'sub', 'b.txt'), 'nested');
   writeFileSync(join(home, 'Work', '.env'), 'SECRET=1');
@@ -63,7 +68,7 @@ beforeAll(() => {
   // Links inside the allowed folder that escape it.
   link(join(home, '.ssh'), join(home, 'Work', 'sshdir'));
   link(outside, join(home, 'Work', 'outdir'));
-  link(join(home, 'Library', 'Keychains'), join(home, 'Work', 'kc'));
+  link(join(home, ...KEYCHAIN_DIR), join(home, 'Work', 'kc'));
   link(join(home, 'Work', '.git'), join(home, 'Work', 'gitdir'));
   // An allowed folder that is itself a link.
   link(join(home, 'Work'), join(home, 'WorkLink'));
@@ -92,8 +97,8 @@ const opts = (allowedFolders: string[], h = home) => ({ allowedFolders, home: h 
 describe('resolveAllowedFile (04 §4)', () => {
   it('allows a file inside an allowed folder given with ~/', async () => {
     const file = await resolveAllowedFile('~/Work/a.txt', opts(['~/Work']));
-    expect(file.realPath).toBe(realpathSync(join(home, 'Work', 'a.txt')));
-    expect(file.folder).toBe(realpathSync(join(home, 'Work')));
+    expect(file.realPath).toBe(realpathSync.native(join(home, 'Work', 'a.txt')));
+    expect(file.folder).toBe(realpathSync.native(join(home, 'Work')));
     expect(file.size).toBe(5);
     expect(
       (await resolveAllowedFile(join(home, 'Work', 'sub', 'b.txt'), opts(['~/Work']))).size,
@@ -102,7 +107,7 @@ describe('resolveAllowedFile (04 §4)', () => {
 
   it('resolves the allowed folder too: a linked allowed folder covers its target', async () => {
     const file = await resolveAllowedFile(join(home, 'Work', 'a.txt'), opts(['~/WorkLink']));
-    expect(file.realPath).toBe(realpathSync(join(home, 'Work', 'a.txt')));
+    expect(file.realPath).toBe(realpathSync.native(join(home, 'Work', 'a.txt')));
     const viaLink = await resolveAllowedFile(join(home, 'WorkLink', 'a.txt'), opts(['~/Work']));
     expect(viaLink.realPath).toBe(file.realPath);
   });
@@ -177,7 +182,21 @@ describe('resolveAllowedFile (04 §4)', () => {
     expect(await codeOf(resolveAllowedFile('~/Work/sub', opts(['~/Work'])))).toBe('not_a_file');
   });
 
-  it.skipIf(isWindows)('refuses a FIFO (opening it would block)', async () => {
+  it('refuses a FIFO or named pipe (opening it would block)', async () => {
+    if (isWindows) {
+      // Windows has no FIFO in the file system: named pipes live under \\.\pipe\, a device
+      // namespace the path parser refuses before anything is opened.
+      const pipe = `\\\\.\\pipe\\agentlink-path-guard-${process.pid}`;
+      const server = createNetServer();
+      await new Promise<void>((resolve) => server.listen(pipe, resolve));
+      try {
+        expect(await codeOf(resolveAllowedFile(pipe, opts(['~/Work'])))).toBe('path_malformed');
+        expect(await codeOf(openAllowedFile(pipe, opts(['~/Work'])))).toBe('path_malformed');
+      } finally {
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
+      return;
+    }
     const fifo = join(home, 'Work', 'pipe');
     execFileSync('mkfifo', [fifo]);
     expect(await codeOf(resolveAllowedFile(fifo, opts(['~/Work'])))).toBe('not_a_file');
@@ -222,17 +241,20 @@ describe('openAllowedFile', () => {
     expect(await codeOf(promise)).toBe('changed');
   });
 
-  it('refuses when a folder on the path becomes a link to ~/.ssh after the open (L1)', async () => {
+  it('refuses when a folder on the path becomes a link to ~/.ssh before the open (L1)', async () => {
     const dir = join(home, 'Work', 'swapdir');
     mkdirSync(dir);
     writeFileSync(join(dir, 'id_ed25519'), 'decoy');
+    let swapped = false;
     const promise = openAllowedFileWith('~/Work/swapdir/id_ed25519', opts(['~/Work']), {
-      afterOpen: () => {
+      afterCheck: () => {
         renameSync(dir, join(home, 'Work', 'swapdir-old'));
         link(join(home, '.ssh'), dir);
+        swapped = true;
       },
     });
     expect(await codeOf(promise)).toBe('protected');
+    expect(swapped).toBe(true);
   });
 
   it('refuses when the file disappears after the open (L1)', async () => {
@@ -253,7 +275,7 @@ describe('createInboxFile (04 §4 "Downloads")', () => {
     await handle.writeFile('data');
     await handle.close();
     expect(name).toBe('authorized_keys');
-    expect(path).toBe(join(realpathSync(join(home, 'Inbox')), 'authorized_keys'));
+    expect(path).toBe(join(realpathSync.native(join(home, 'Inbox')), 'authorized_keys'));
     expect(readFileSync(path, 'utf8')).toBe('data');
     expect(readFileSync(join(home, '.ssh', 'id_ed25519'), 'utf8')).toBe('PRIVATE');
     if (!isWindows) expect(statSync(path).mode & 0o777).toBe(0o600);
