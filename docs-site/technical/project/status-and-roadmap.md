@@ -36,7 +36,7 @@ Code that is merged is not necessarily published: nothing is released or install
 | Crypto (@agentlink/crypto) | EIP-712 typed data and the agent card | Done | [#32](https://github.com/4thtech/agentlink/pull/32) |
 | Crypto (@agentlink/crypto) | EIP-712 proof types | In progress | [#221](https://github.com/4thtech/agentlink/pull/221) |
 | Crypto (@agentlink/crypto) | Owner passphrase wrap, pairing proof, safety code | Done | [#37](https://github.com/4thtech/agentlink/pull/37) |
-| Crypto (@agentlink/crypto) | Passkey seed wrap and recovery code | Done | [#222](https://github.com/4thtech/agentlink/pull/222), [#223](https://github.com/4thtech/agentlink/pull/223) |
+| Crypto (@agentlink/crypto) | Passkey seed wrap and recovery code | Done | [#222](https://github.com/4thtech/agentlink/pull/222), [#228](https://github.com/4thtech/agentlink/pull/228) |
 | Crypto (@agentlink/crypto) | Key interfaces, NIP-44 v2, gift wrap | Done | [#41](https://github.com/4thtech/agentlink/pull/41), [#42](https://github.com/4thtech/agentlink/pull/42), [#55](https://github.com/4thtech/agentlink/pull/55) |
 | Crypto (@agentlink/crypto) | Independent test vectors | In progress | [#25](https://github.com/4thtech/agentlink/pull/25), [#35](https://github.com/4thtech/agentlink/pull/35), [#72](https://github.com/4thtech/agentlink/pull/72), [#75](https://github.com/4thtech/agentlink/pull/75), [#104](https://github.com/4thtech/agentlink/pull/104) |
 | Crypto (@agentlink/crypto) | Sender code for unknown senders | Done | [#110](https://github.com/4thtech/agentlink/pull/110) |

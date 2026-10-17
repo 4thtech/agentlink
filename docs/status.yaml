@@ -80,7 +80,7 @@ areas:
         summary: "The owner passphrase wrap, the pairing proof and the pairing safety code."
       - name: "Passkey seed wrap and recovery code"
         state: done
-        prs: [222, 223]
+        prs: [222, 228]
         summary: "The owner seed sealed under a passkey's PRF output (`ALKP`) or a generated recovery code (`ALKR`), with the vectors in Node, three browsers and workerd (D-82). The console and localhost passkey flows that use them follow."
       - name: "Key interfaces, NIP-44 v2, gift wrap"
         state: done
