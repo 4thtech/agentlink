@@ -29,6 +29,8 @@ export type CryptoInputErrorCode =
   | 'invalid_signature'
   | 'invalid_typed_data'
   | 'invalid_card'
+  /** M1-1j: an OCC v2 proof message or domain outside the 05 §3.1 JSON form (04 §2.4.1). */
+  | 'invalid_proof_struct'
   /** M1-1f: a secret refused by 04 §2.8 password() before any KDF runs (not a wrong secret). */
   | 'invalid_secret'
   /**

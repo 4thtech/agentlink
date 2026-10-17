@@ -103,7 +103,7 @@ const viemDigest = (
   domain: Record<string, unknown>,
   message: Record<string, unknown>,
 ): string => {
-  const { EIP712Domain: _domain, ...rest } = types;
+  const rest = omit(types, 'EIP712Domain');
   return viemHashTypedData({
     types: rest,
     primaryType,
@@ -111,6 +111,9 @@ const viemDigest = (
     message,
   } as unknown as TypedDataDefinition).slice(2);
 };
+
+const omit = <T extends object>(value: T, key: string): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(value).filter(([k]) => k !== key));
 
 const expectRefused = (run: () => unknown): void => {
   expect(run).toThrow(CryptoInputError);
@@ -210,8 +213,7 @@ describe('hashRecord, hashReceipt, hashRegistration', () => {
     expectRefused(() => hashRecord({ ...DOMAIN, chainId: 2 ** 53 }, RECORD));
     expectRefused(() => hashRecord({ ...DOMAIN, verifyingContract: getAddress(NOTARY) }, RECORD));
     expectRefused(() => hashRecord({ ...DOMAIN, salt: hex32('00') }, RECORD));
-    const { verifyingContract: _vc, ...noContract } = DOMAIN;
-    expectRefused(() => hashRecord(noContract, RECORD));
+    expectRefused(() => hashRecord(omit(DOMAIN, 'verifyingContract'), RECORD));
     expectRefused(() => hashRecord(null, RECORD));
     expectRefused(() => occV2Domain(84532, getAddress(NOTARY)));
   });
@@ -255,8 +257,7 @@ describe('parseRecord, parseReceipt, parseRegistration (05 ยง3.1 JSON form, 04 ย
   });
 
   it('refuses a missing field, accessors, symbols and non-plain objects', () => {
-    const { nonce: _n, ...missing } = RECORD;
-    expectRefused(() => parseRecord(missing));
+    expectRefused(() => parseRecord(omit(RECORD, 'nonce')));
     const getter = { ...RECORD };
     Object.defineProperty(getter, 'kind', { get: () => 1, enumerable: true });
     expectRefused(() => parseRecord(getter));
@@ -286,8 +287,7 @@ describe('parseRecord, parseReceipt, parseRegistration (05 ยง3.1 JSON form, 04 ย
       { extra: 1 },
     ];
     for (const change of rejects) expectRefused(() => parseReceipt({ ...RECEIPT, ...change }));
-    const { salt: _s, ...missing } = RECEIPT;
-    expectRefused(() => parseReceipt(missing));
+    expectRefused(() => parseReceipt(omit(RECEIPT, 'salt')));
     expect(parseReceipt(RECEIPT)).toEqual(RECEIPT);
   });
 
@@ -353,8 +353,7 @@ describe('EIP-3009 ReceiveWithAuthorization', () => {
     expectRefused(() => hashReceiveWithAuthorization({ ...TOKEN_DOMAIN, chainId: 0 }, AUTH));
     expectRefused(() => hashReceiveWithAuthorization({ ...TOKEN_DOMAIN, name: 1 }, AUTH));
     expectRefused(() => hashReceiveWithAuthorization({ ...TOKEN_DOMAIN, extra: 'x' }, AUTH));
-    const { version: _v, ...noVersion } = TOKEN_DOMAIN;
-    expectRefused(() => hashReceiveWithAuthorization(noVersion, AUTH));
+    expectRefused(() => hashReceiveWithAuthorization(omit(TOKEN_DOMAIN, 'version'), AUTH));
   });
 
   it('refuses a non-canonical authorization', () => {

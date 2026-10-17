@@ -1075,7 +1075,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - `AgentCard` EIP-712 vectors from M1-1h pass in all runtimes.
 
 #### M1-1j · crypto: EIP-712 proof types and commitment helpers (new, split from M1-1e)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in-progress (revoke struct deferred until G-20 lands, PR #215 / M1-1i-b) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto
 - **Depends on:** M1-1e, M1-1i
 - **Spec:** 04 §5; 05 §3.1, §4, §8
