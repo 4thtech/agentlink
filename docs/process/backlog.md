@@ -682,7 +682,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:**
   - A title `OPS-CI-3 ci: ...` passes; `OPS-ci-3`, `OPS-` and `OPS-CI` fail (tests).
 - **Also (found in PR #187):** since OPS-REL-1 (`privatePackages.version: true`) the private tooling packages (`tools`, `e2e`) count as published, so a tooling-only PR fails the `changesets` check without an empty changeset. Exempt private tooling packages from the changeset requirement, or have CI add empty changesets for them; test both cases.
-- Review note (PR #197 review L1, 2026-10-17): the tooling-only exemption trusts the first path segment: a non-private package nested under `tools/` (with a visible workspace edit) is still exempt. Walk up to the nearest `package.json` and exempt only when it is `tools/package.json` or `e2e/package.json` and private.
+- Review note (PR #197 review L1, 2026-10-17): tighten the tooling-only path exemption for nested packages.
 
 #### OPS-CI-4 · Guard the sync secret-scan stub pin (new)
 - **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
@@ -694,7 +694,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - The stub on `sync` was pinned to v0.0.1, before main loaded `.gitleaks.toml`, so every sync push failed on the test-vector keys. A `sync-pin` job fails when the pin is not equal to or a descendant of the last main commit that changed `secret-scan.yml` or `.gitleaks.toml`; document the re-pin procedure.
 - **Acceptance:**
   - Tests: pin parsing, ancestry (older, equal, later, unknown SHA), missing stub passes with a notice. No gitleaks allowlist change, no new action, read-only token.
-- Review note (IR-OPS-CI-4-1 L1/L2/L3, 2026-10-17): require the pin to be reachable from `main` (`isAncestor(pin, mainRef)`), say "is not a commit on main" instead of "predates" for an unknown SHA, and add a unit test for running from a subdirectory.
+- Review note (IR-OPS-CI-4-1 L1/L2/L3, 2026-10-17): tighten the pin check (reachability from `main`), improve its message and add a subdirectory test.
 
 #### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
 - **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
@@ -719,7 +719,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - Nearly every PR added a line at the same spot in `CHANGELOG.md` `[Unreleased]`, so parallel PRs conflicted in the merge queue after each merge. Each PR now adds `changelog.d/<card-id>.md` (section by front matter or heading, then bullets); the release roll folds the fragments and any legacy `[Unreleased]` lines into the version section, grouped in a stable order, and deletes them.
 - **Acceptance:**
   - The roll reads fragments and legacy lines, refuses only when both are empty, rejects an unknown section naming the file, deletes consumed fragments and is idempotent (fixture tests); CI fails a user-visible, spec or process PR without an entry and only warns on a direct `[Unreleased]` edit; docs, PR template and the `AGENTS.md` Versioning bullet updated.
-- Review note (IR-OPS-REL-4-1 L1..L5, 2026-10-17): the CI step checks only the fragment filename: run `parseFragment` on added fragments so an empty or malformed one fails in CI and not in the release `version` job; reject link-reference lines (`[0.1.0]: url`) in fragments; require the one-line reason for `section: none`; a symlinked fragment passes CI but is skipped by the roll; `versioning.md` says refactors need none while CI wants a `section: none` fragment, and calls the step "the `changelog` step".
+- Review note (IR-OPS-REL-4-1 L1..L5, 2026-10-17): validate changelog fragments in CI (format and section); align `versioning.md` wording with the check.
 
 ### Documentation (DOCS) (new)
 
@@ -1104,7 +1104,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - EIP-3009 `ReceiveWithAuthorization` typed data (used in M3-4b); the token's domain is read from chain, never hard-coded.
 - **Acceptance:**
   - Vector suite `eip712-proof` (M1-1i): its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares; the contracts repo's parity job passes against the same commit (M1-3d). The revoke vectors come from M1-1i-b (D-81).
-- Review note (IR-M1-1j-1 L-1..L-4, 2026-10-17): the EIP-3009 fee-vault `to` duty is one JSDoc sentence: put it in the module header; the harness `recipientCommitment` op has no reject path (add it when reject vectors land); token domains with a non-standard EIP-5267 field set are refused (fail closed). Open owner question: is `cardHash` the struct hash or the full digest of the AgentCard?
+- Review note (IR-M1-1j-1 L-1..L-4, 2026-10-17): move the EIP-3009 recipient duty into the module header; add a reject path to the harness op; open owner question: is `cardHash` the struct hash or the full digest of the AgentCard?
 
 #### M1-1f · crypto: owner passphrase wrapping, pairing proof, safety code
 - **Status:** done (4thtech/agentlink#37, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1141,7 +1141,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Type separation: `ALKP`, `ALKR`, `ALKO` and `ALKS` refuse one another's magic, and a rewritten magic fails authentication.
 - **Acceptance:**
   - Vector suite `prf-wrap` (M1-1i): its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares; recovery-code round trip and format tests (grouping, alphabet); a mistyped code fails cleanly without partial output.
-- Review note (IR-ALKP-ALKR-1 L-1/L-2, 2026-10-17): 04 §2.3.1: state a write-count bound per credential (wrapKey is fixed per credential and the nonce is random 96-bit, so at most 2^32 writes, SP 800-38D §8.3; the same for ALKR rewrites that reuse the salt), and say "at epoch 0" where the seed must derive the owner Nostr key.
+- Review note (IR-ALKP-ALKR-1 L-1/L-2, 2026-10-17): 04 §2.3.1: state a per-credential write-count bound (SP 800-38D §8.3) and "at epoch 0" for the owner Nostr key derivation.
 
 #### M1-1g · crypto: KeyStore / OwnerKeyStore interfaces, MemoryKeyStore, NIP-44 helpers
 - **Status:** done (4thtech/agentlink#41, merged 2026-10-14; the `envelope-sig` vector suite is registered here once the M1-1h G-2 follow-up has committed it as pending) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1921,7 +1921,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Canary: no signed URL, nonce or key material in logs; captured drop requests carry no file name or metadata beyond size and hash, and are signed with the drop key, never the Nostr or EVM identity key.
   - The encryptor runs once per send (test); a file modified during upload never leads to a second encryption under the same key and nonce prefix; an off-origin `uploadUrl` or `getUrl` is refused.
   - (IR-D48-1 F10, F16) A transient 429 or 503 from the drop yields the retryable code and never `needs_setup`; a quota or size limit still yields `needs_setup`; the configured endpoint is used for upload, commit and download, and an `http:` endpoint is refused.
-- Review note (IR-M1-6a-1 L1/L2, 2026-10-17): the S3 adapter `fetch` defaults to `globalThis.fetch` (unguarded). Wire the M1-15 SSRF-safe fetch and consider making `fetch` required. `DENIED_SUFFIXES` in `endpoint.ts` also lacks `.lan`, `.home`, `.corp`, `.intranet`, `.test`, `.invalid`, `.onion` (defence in depth).
+- Review note (IR-M1-6a-1 L1/L2, 2026-10-17): wire the M1-15 fetch into the S3 adapter and consider making `fetch` required; extend the denied host-suffix list (defence in depth).
 
 ### Core (`@agentlink/core`)
 
@@ -2191,9 +2191,9 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Oversized download aborted; hostile names (`../../.ssh/x`, control characters, hidden names) sanitised.
   - Expired link → refresh-link flow returns a working URL; after the retention trigger the object returns 404 and file-key rows are gone on both sides.
   - With `deleteAfter: expiry`, a drop object stays retrievable by the owner console after the recipient's `DELIVERED` (I-9).
-- Review note (IR-M1-15-1 L3/L4/L5, 2026-10-17): `sanitizeFileName` lets `CON .txt` / `nul .txt` (space before the dot, Windows device names) and U+2028/2029, tag characters and variation selectors through; `createInboxFile` turns a clashing 255-byte name into `inbox_unavailable` (the suffix overflows) and its header comment over-states the hidden-inbox refusal; `resolveRedirect` refuses legitimate relative forms such as `?x` and `obj` (conservative; watch in dogfooding).
+- Review note (IR-M1-15-1, 2026-10-17): extend filename character filtering; handle inbox name-length edge cases; relative redirect forms are conservative (watch in dogfooding).
 - Review note (IR-M1-8d-1 / IR-M1-15-1, 2026-10-17): two `isInsideFolder` helpers have different semantics (policy engine: a folder is not inside itself; path guard: it is). Unify them into one shared helper when wiring files here.
-- Review note (IR-M1-7i-1 L3, 2026-10-17): derive `ruleEligible` and `counterparty` from the contact book (paired, not blocked or revoked) and test it; the policy rules take both from the caller.
+- Review note (IR-M1-7i-1 L3, 2026-10-17): derive `ruleEligible` and `counterparty` from the contact book and test it.
 
 #### M1-7g · core: proofs and receipts
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -2408,8 +2408,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Each Low has a test named after it, or an owner-accepted note in the report.
   - Rollback deletes only an item whose identity matches what this run created.
-- Review note (IR-M1-9x-1 L-1/L-2/L-4/L-5, 2026-10-17): owner-init copy: "type the owner code you saved yourself; if your AI gave you a code, stop", and tell the owner to write the fingerprint down next to the code (the recovery kit should carry it); the 60 s session TTL starts before the confirm prompt (start it after, or say so, and test); the stdout spy was dropped (indirect logging from dependencies is no longer observed).
-- Review note (IR-M1-8h-b-1 L-1/L-2 (PR #227, open), 2026-10-17): the display-name prompt rule diverges from `restrictName` (06 §2.1: NFC not NFKC, combining marks allowed, no reserved-word, mixed-script or confusable check): accept only a name that `restrictName` returns unchanged. If the backend mangles this run's own owner-item write, the item stays and `owner init` reports "owner on machine" with no recovery path.
+- Review note (IR-M1-9x-1 L-1/L-2/L-4/L-5, 2026-10-17): improve `owner init` copy (saved-code guidance, fingerprint reference), start the session TTL after the confirm prompt and test it.
+- Review note (IR-M1-8h-b-1 L-1/L-2 (PR #227, open), 2026-10-17): align the display-name prompt rule with `restrictName` (06 §2.1); add a recovery path for a failed owner-item write.
 
 #### M1-8c · node: OwnerKeyStore with the owner code or passphrase (CLI prompt)
 - **Status:** done (4thtech/agentlink#67, merged 2026-10-14; IR-M1-8c-1 F-4 and F-9 to M1-9b, F-10 and F-11 to M1-8f) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -2694,7 +2694,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - The job fails on an injected `jose` import in the stdio path and passes on `main`; it is part of `ci-gate`.
   - No new runtime dependency in the published `apps/cli` package.
-- Review note (IR-M1-9c-c-2, 2026-10-17): the bundle-check `globalThis[kind]` exception is exact text, not file-scoped; `globalThis[kind][x]`, aliasing (`g = globalThis; g[x]`) and `eval` pass. Pin the exception to an occurrence count of 1 and flag `eval` / `Function` identifiers.
+- Review note (IR-M1-9c-c-2, 2026-10-17): extend bundle-check coverage for indirect loader forms.
 
 #### M1-9o · MCP tools: invite and accept (new, split from M1-9c)
 - **Status:** done (4thtech/agentlink#125, merged 2026-10-15) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
@@ -2754,7 +2754,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Phase note:** M1b, not M1a. 06 §6 says the server keeps relay subscriptions open, but no M1a acceptance needs push latency: M1-9r meets "pairing completes without any tool call" with a catch-up pass every 30 s (backed off after partial passes). If the J9 dogfood finds the latency or relay load unacceptable, the owner may pull it into M1a.
 - **Scope:** add `subscribe` to the core `Transport` and `nostrTransport` (over transport-nostr's `SyncEngine.subscribe`), and a client entry point that feeds each envelope through the same receive path as `syncInbox` (seen-set, envelopeHash, one store transaction, rate limit) and then processes stored envelopes; swap it into `BackgroundLoop#pass` in place of the repeated catch-up, keeping the polling pass as a fallback (no subscription, a relay lost, a lease regained); close the subscription when the lease is lost or the loop stops.
 - **Acceptance:** a new message or handshake reaching a relay is stored and processed without waiting for a poll; no duplicate effects when the subscription and a catch-up (or a second holder) see the same wrap; the subscription is closed on lease loss and on shutdown; no inbound content in logs or errors.
-- Review note (IR-M1-9s-1 L1/L2, 2026-10-17): in `transport-nostr` sync, `writeCursor` and the second `safeMark` run after the core handler resolves and are not guarded by `run.stopped`, and `close()` does not wait for them: guard them or expose a drain, and test `close()` racing an in-flight handler. Also fix the `subscribe` line in the 07 §4.1 sketch.
+- Review note (IR-M1-9s-1 L1/L2, 2026-10-17): guard post-handler cursor writes against `close()` and test the race; fix the `subscribe` line in the 07 §4.1 sketch.
 
 #### M1-9d · MCP server: file and proof tools
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
@@ -2868,7 +2868,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
     - an item already on-chain at simulation is reported `skipped` and is absent from the sent calldata; repeated replays of another signer's items hit the per-IP limit and leave that signer's limit unchanged.
   - A paused Notary: items are held, not reported `failed`, until their deadline.
   - Testnet integration with M1-4c; captured logs contain no IPs or signatures; `/v1/health` reports gas balances and queue depth.
-- Review note (IR-M1-7i-1 L1/L2/L5, 2026-10-17): before the submitter wires the budget ledger: rename `releaseProofReservation`'s `now` to the finalized block timestamp (04 §5 needs the finalized block time after the deadline, not a local clock); `markBroken` should run in its own transaction (07 §3.5) so a caller rollback cannot lose the mark; optionally check `charged_usd <= reserved_usd`.
+- Review note (IR-M1-7i-1 L1/L2/L5, 2026-10-17): before wiring the budget ledger: use the finalized block timestamp in `releaseProofReservation`, keep `markBroken` in its own transaction (07 §3.5), optional `charged_usd <= reserved_usd` check.
 
 #### M1-10b · testnet credits faucet
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -2932,7 +2932,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - **Deploy (D-25):** staging deploy on merge; smoke test (signed upload, GET and DELETE with a test key; an expired GET refused); production automatically once staging smoke is green (`production` environment, D-52); health check after deploy with automatic `wrangler rollback` on failure (rehearsed); deploy record written; nothing runs while `DEPLOY_FREEZE` is set.
   - The production bucket's lifecycle rule (7 days) is read back after each deploy, and so is the drop Worker's logging config (observability and request logging, Tail Workers and Logpush off; 04 §4).
-- Review note (IR-M1-27a-1 L-1..L-4 (PR #218, open), 2026-10-17): the drop counts a download before the R2 get, so aborted fetches burn the 16 allowed; the `u` tag is compared with the URL as workerd normalises it, so the SDK (M1-13c) must sign the normalised form (add a sentence to 07 §5.4); large commits need a paid Workers plan or a `cpu_ms` setting in the deploy config (about 0.4 s CPU per 100 MiB for the read-back hash); add a test that whitespace in the header JSON is accepted. Also consider rejecting junk requests before the shared counter write, and fewer per-key objects for fresh keys.
+- Review note (IR-M1-27a-2 (PR #218, open), 2026-10-17): tighten per-network limits; account downloads after delivery; document URL normalisation in 07 §5.4; set `cpu_ms` in the deploy config; add a header-whitespace test.
 
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
@@ -2969,8 +2969,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Playwright with a virtual authenticator (PRF) completes J4; approval without presence is impossible.
   - Review together (D-68): one passkey gesture signs exactly the selected items; a commitment cannot be selected; "Remember for this contact" is absent from the batch view (Playwright).
   - XSS payloads in contact and file names render inert; a PRF-less authenticator falls back to the passphrase.
-- Review note (IR-M1-8d-1 L-2..L-5, 2026-10-17): no wrong-code throttle on `presence_rejected` (add backoff after N failures); the session token lives for the server lifetime and the `/?t=` URL can sit in browser history and opener argv (consider a one-shot exchange or rotate on `agentlink ui`); Windows `explorer.exe` exits 1 on success so `open()` reports false, and `open(badId)` throws instead of rejecting; add trailing-dot and uppercase Host test cases.
-- Review note (IR-M1-31-1 L-2..L-5, 2026-10-17): add a `LOCALHOST:<port>` Host test; the IPv4-only decision is made once at start (note it in D-79); the 503 stub skips `setCommonHeaders` (no-store, CSP); fix the stale example in `packages/core/src/approval-channel.ts:30`.
+- Review note (IR-M1-8d-1, 2026-10-17): make the session-link exchange one-shot / rotate; add failed-attempt backoff; fix Windows open() result and error handling; add Host test cases.
+- Review note (IR-M1-31-1 L-2..L-5, 2026-10-17): add a `LOCALHOST:<port>` Host test; note the start-time IPv4 decision in D-79; set common headers on the 503 stub; fix the stale example in `packages/core/src/approval-channel.ts:30`.
 
 #### M1-11c · local UI: settings pages
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -3092,7 +3092,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Deterministic variant green on PRs within 15 minutes; LLM variant pass rate reported per run; no chain is chosen by hand anywhere in the scenario (D-40).
   - Canary scan of all e2e logs and artifacts finds no plaintext, keys or presigned URLs.
-- Review note (IR-M1-27a-1 L-2, 2026-10-17): the e2e/SDK client signs the drop request URL in the form workerd normalises (default port, host case).
+- Review note (IR-M1-27a-2, 2026-10-17): the SDK client signs the drop request URL in its normalised form.
 
 #### M1-13b · prompt-injection suite
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
@@ -3336,7 +3336,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - **Moved:** the Gemini CLI detection fix (IR-M1-9t-1 L-3: detect by the `gemini` binary on `PATH` or `~/.gemini/settings.json`, not any `~/.gemini` folder) is now card **M1-9w**.
 - **Acceptance:** tests for (a) (new message, `doctor` names the state), (b) (status, other tools and `doctor` in the no-card state; the unchanged not-set-up state).
 - Review note (PR #201 review L2/L3/L4, 2026-10-17): `otherAgentHasCard` in doctor opens each other agent fully (keychain probe; may raise a macOS prompt per agent): use a store-only identity probe. Core-error paths call `noOwnerCard()` without the agent name. A never-set-up user is sent to `owner add-agent` to learn about `owner init`: name `agentlink owner init` directly. Open loop: `owner init` finds an owner item but no carded agent, add-agent points to doctor, doctor has no recovery step.
-- Review note (IR-M1-9x-1 L-3, 2026-10-17): `hasOwnerOnMachine` reads the whole wrapped blob without the AI-app guard; use a metadata-only existence check before it is wired into doctor.
+- Review note (IR-M1-9x-1 L-3, 2026-10-17): use a metadata-only existence check for `hasOwnerOnMachine` before it is wired into doctor.
 
 #### M1-9w · CLI: Claude Desktop in init, Gemini CLI detection (new, from M1-9a and M1-9u (b))
 - **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -4184,7 +4184,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - A replayed authorization fails; a below-minimum authorization is rejected by the submitter before submission.
   - The core refuses to sign a `ReceiveWithAuthorization` unless `to` equals the configured fee vault for that chain, and reads the token domain from chain (EIP-5267 `eip712Domain()`), never hard-coded (M1-1j, IR-M1-1j-1 L-1).
   - Independent EIP-3009 vectors (an `eip3009` case set) cover the `ReceiveWithAuthorization` digest (IR-M1-1j-1 L-2).
-- Review note (IR-M1-1j-1 L-1/L-2, 2026-10-17): acceptance: core refuses to sign unless `to` equals the configured vault for that chain and the token domain is read via `eip712Domain()` per chain; add an `eip3009` vector case set (today only viem unit tests cover it).
+- Review note (IR-M1-1j-1 L-1/L-2, 2026-10-17): acceptance: document the EIP-3009 recipient rule and per-chain token domain handling; add an `eip3009` vector case set.
 
 #### M3-5 · Submitter on mainnet: operations, monitoring, alerts
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
