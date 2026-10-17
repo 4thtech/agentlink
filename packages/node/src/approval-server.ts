@@ -1,18 +1,24 @@
 // M1-8d: the local approval server (08 §1; 04 §2.5; 06 §2.5; I-4, I-7).
 //
-// What it is: an HTTP server inside the MCP/CLI process, on 127.0.0.1 and a random port, that shows
+// What it is: an HTTP server inside the MCP/CLI process, at `http://localhost:<random port>`, that shows
 // the agent's pending approval requests and lets the owner approve or deny one with owner presence.
 // The M1b `ApprovalChannel` that returns its `/approve/<id>` link, the full local UI and the localhost
 // passkey are later cards (M1-11a, M1-11c, M1-8e); this module is the server and its security rules.
 //
 // Rules (each has a test in approval-server.test.ts):
-// - Listens on 127.0.0.1 only (never 0.0.0.0 or ::). Requests from a non-loopback peer are refused.
+// - Served as `http://localhost:<port>` (M1-31, D-79: WebAuthn takes `localhost` as an RP ID, never an
+//   IP address). Listens on 127.0.0.1 and ::1 (IPv6-only) with the same port, and on no other address
+//   (never 0.0.0.0 or ::), so whichever address the browser resolves `localhost` to reaches this
+//   server and no other program can answer there. If another program holds ::1 on the chosen port,
+//   both listeners close and a new port is tried (at most 5 times). A machine with no IPv6 gets
+//   127.0.0.1 only and a fixed `ipv6_unavailable` event. Requests from a non-loopback peer are refused.
 // - A random 256-bit session token, in memory only, is put in the URL the process opens (`/?t=…`);
 //   the first request exchanges it for an HttpOnly, SameSite=Lax session cookie scoped to this port's
 //   name and redirects to the same path without the token. No token, cookie or CSRF value is written
 //   to disk, logged, put in an event, an approval URL or an error body.
-// - DNS rebinding: the `Host` header must be exactly `127.0.0.1:<port>`; any `Origin` header present
-//   must be exactly `http://127.0.0.1:<port>`; a POST must carry that Origin.
+// - DNS rebinding: the `Host` header must be exactly `localhost:<port>` (so `127.0.0.1:<port>`,
+//   `[::1]:<port>`, `LOCALHOST:<port>` and `localhost.:<port>` are refused); any `Origin` header present
+//   must be exactly `http://localhost:<port>`; a POST must carry that Origin.
 // - Cross-site requests: no CORS grant ever; API calls need a per-server CSRF token (in the page,
 //   never in the URL) in `X-AgentLink-CSRF` and fetch metadata that is absent or `same-origin`; a
 //   decision is a POST with `Content-Type: application/octet-stream` (not a simple request).
@@ -32,7 +38,7 @@
 // by port, so another local server the owner's browser visits could receive the session cookie; it
 // grants viewing only. The opener's argv briefly holds the session link (approval-os.ts).
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import type { AddressInfo, ListenOptions } from 'node:net';
 import type { OwnerActionOutcome } from '@agentlink/core';
 import {
   KeyStoreError,
@@ -57,8 +63,15 @@ import { KeychainOwnerKeyStore } from './owner-keystore.js';
 import type { PromptingOwnerKeyStore } from './owner-operation.js';
 import type { OwnerTerminal } from './owner-terminal.js';
 
-/** 08 §1: the local UI is served on this address. The origin question is M1-31. */
-export const APPROVAL_SERVER_HOST = '127.0.0.1';
+/** 08 §1 (M1-31, D-79): the local UI's host name; its origin is `http://localhost:<port>`. */
+export const APPROVAL_SERVER_HOST = 'localhost';
+/** The loopback addresses held on the one port: IPv4 first (it picks the port), then IPv6. */
+const LISTEN_V4 = '127.0.0.1';
+const LISTEN_V6 = '::1';
+/** Ports tried when another program holds ::1 on the port 127.0.0.1 was given. */
+const MAX_PORT_ATTEMPTS = 5;
+/** ::1 listen errors that mean the machine has no IPv6 loopback (then 127.0.0.1 only). */
+const NO_IPV6 = new Set(['EADDRNOTAVAIL', 'EAFNOSUPPORT']);
 /** Longest accepted owner secret in bytes (the same bound as the TTY prompt). */
 const MAX_SECRET_BYTES = 1024;
 const NOTIFICATION = ['AgentLink', 'An approval is waiting for you.'] as const;
@@ -109,6 +122,8 @@ export interface ApprovalServerSource {
 /** Structured events, fixed values only: never a token, URL, secret, ID or request text (I-7). */
 export type ApprovalServerEvent =
   | { readonly kind: 'listening' }
+  /** The machine has no IPv6 loopback: the server listens on 127.0.0.1 only (M1-31). */
+  | { readonly kind: 'ipv6_unavailable' }
   | {
       readonly kind: 'rejected';
       readonly reason:
@@ -144,18 +159,32 @@ export interface ApprovalServerOptions {
   readonly onEvent?: (event: ApprovalServerEvent) => void;
 }
 
-/** Internal (tests): the owner store, browser opener and notifier seams. Not exported from index. */
+/** One listen call: a loopback host, a port (0 = the OS picks), IPv6-only for ::1. */
+export interface ApprovalListenOptions {
+  readonly host: string;
+  readonly port: number;
+  readonly ipv6Only?: boolean;
+}
+
+/** Internal (tests): owner store, browser opener, notifier and listen seams. Not exported from index. */
 export interface ApprovalServerInternals {
+  /** Listens `server` as asked; rejects with the socket error (its `code`). Default: server.listen. */
+  readonly listen?: (server: Server, options: ApprovalListenOptions) => Promise<void>;
   readonly openOwnerStore?: (owner: OwnerPublicKeys) => Promise<PromptingOwnerKeyStore>;
   readonly opener?: BrowserOpener;
   readonly notifier?: OsNotifier;
 }
 
 export interface ApprovalServer {
-  /** `http://127.0.0.1:<port>`. */
+  /** `http://localhost:<port>`. */
   readonly origin: string;
   readonly port: number;
-  address(): { readonly address: string; readonly port: number };
+  /** The host name, the port and the loopback addresses held (`127.0.0.1`, and `::1` when present). */
+  address(): {
+    readonly host: string;
+    readonly port: number;
+    readonly addresses: readonly string[];
+  };
   /**
    * The link for one request, as the agent's `pending_approval.url` (06 §2.5). It never holds the
    * session token: it works in a browser that already opened the session link.
@@ -173,6 +202,36 @@ export interface ApprovalServer {
 
 type DecisionOutcome = Extract<ApprovalServerEvent, { kind: 'decision' }>['outcome'];
 type RejectReason = Extract<ApprovalServerEvent, { kind: 'rejected' }>['reason'];
+
+/** The default listen: one `server.listen`, rejecting with the socket error. */
+function listenOnce(server: Server, options: ApprovalListenOptions): Promise<void> {
+  return new Promise<void>((resolve, rejectListen) => {
+    const listenOptions: ListenOptions = {
+      host: options.host,
+      port: options.port,
+      exclusive: true,
+      ...(options.ipv6Only === undefined ? {} : { ipv6Only: options.ipv6Only }),
+    };
+    server.once('error', rejectListen);
+    server.listen(listenOptions, () => {
+      server.off('error', rejectListen);
+      resolve();
+    });
+  });
+}
+
+const closeServer = (server: Server): Promise<void> =>
+  new Promise<void>((resolve) => {
+    if (!server.listening) {
+      resolve();
+      return;
+    }
+    server.close(() => resolve());
+    server.closeAllConnections();
+  });
+
+const errorCode = (error: unknown): unknown =>
+  typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : undefined;
 
 const invalidId = (): NodeKeyStoreError =>
   new NodeKeyStoreError('owner_operation_invalid', 'That is not a valid approval ID.');
@@ -247,6 +306,7 @@ export async function startApprovalServerWith(
     ((owner: OwnerPublicKeys) => KeychainOwnerKeyStore.open(osKeychain(), owner));
   const opener = internals.opener ?? osBrowserOpener;
   const notifier = internals.notifier ?? osNotifier;
+  const listen = internals.listen ?? listenOnce;
   const emit = (event: ApprovalServerEvent): void => {
     try {
       options.onEvent?.(event);
@@ -262,19 +322,51 @@ export async function startApprovalServerWith(
   const decided = new Set<string>();
   let busy = false;
 
-  const server: Server = createServer({
-    requestTimeout: 30_000,
-    headersTimeout: 10_000,
-    maxHeaderSize: 16_384,
-  });
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    server.listen({ host: APPROVAL_SERVER_HOST, port: 0, exclusive: true }, () => {
-      server.off('error', reject);
-      resolve();
+  // One request handler and one session behind both loopback listeners. Until both are bound, a
+  // request (only possible on 127.0.0.1, in that short window) gets 503 and nothing else.
+  let dispatch = (_req: IncomingMessage, res: ServerResponse): void => {
+    res.statusCode = 503;
+    res.end();
+  };
+  const newServer = (): Server => {
+    const created = createServer({
+      requestTimeout: 30_000,
+      headersTimeout: 10_000,
+      maxHeaderSize: 16_384,
     });
-  });
-  const port = (server.address() as AddressInfo).port;
+    created.on('request', (req: IncomingMessage, res: ServerResponse) => dispatch(req, res));
+    return created;
+  };
+
+  // 127.0.0.1 picks the port; ::1 must take the same one, or both close and a new port is tried.
+  const listeners: Server[] = [];
+  let ipv6Available = true;
+  let port = 0;
+  for (let attempt = 1; listeners.length === 0; attempt += 1) {
+    const v4 = newServer();
+    await listen(v4, { host: LISTEN_V4, port: 0 });
+    const chosen = (v4.address() as AddressInfo).port;
+    const v6 = newServer();
+    // The socket error is reduced to its code; nothing of it reaches an error or event (I-7).
+    const code = await listen(v6, { host: LISTEN_V6, port: chosen, ipv6Only: true }).then(
+      () => undefined,
+      (error: unknown) => errorCode(error) ?? 'unknown',
+    );
+    if (code === undefined) {
+      listeners.push(v4, v6);
+      port = chosen;
+    } else if (typeof code === 'string' && NO_IPV6.has(code)) {
+      ipv6Available = false;
+      listeners.push(v4);
+      port = chosen;
+    } else {
+      await closeServer(v6);
+      await closeServer(v4);
+      if (code !== 'EADDRINUSE' || attempt >= MAX_PORT_ATTEMPTS) {
+        throw new Error('The local approval page could not start on a free local port.');
+      }
+    }
+  }
   const hostValue = `${APPROVAL_SERVER_HOST}:${String(port)}`;
   const origin = `http://${hostValue}`;
   const cookieName = `agentlink_${String(port)}`;
@@ -466,7 +558,7 @@ export async function startApprovalServerWith(
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     setCommonHeaders(res);
     const peer = req.socket.remoteAddress;
-    if (peer !== '127.0.0.1' && peer !== '::ffff:127.0.0.1') {
+    if (peer !== '127.0.0.1' && peer !== '::ffff:127.0.0.1' && peer !== '::1') {
       reject(res, 403, 'peer');
       return;
     }
@@ -543,13 +635,15 @@ export async function startApprovalServerWith(
     sendJson(res, 200, { approvals });
   }
 
-  server.on('request', (req: IncomingMessage, res: ServerResponse) => {
+  dispatch = (req, res) => {
     handle(req, res).catch(() => {
       if (!res.headersSent) sendJson(res, 500, { status: 'failed' });
       else res.destroy();
     });
-  });
+  };
+  if (!ipv6Available) emit({ kind: 'ipv6_unavailable' });
   emit({ kind: 'listening' });
+  const addresses = Object.freeze(ipv6Available ? [LISTEN_V4, LISTEN_V6] : [LISTEN_V4]);
 
   const approvalUrl = (approvalId: string): string => {
     if (typeof approvalId !== 'string' || !APPROVAL_ID.test(approvalId)) throw invalidId();
@@ -559,7 +653,7 @@ export async function startApprovalServerWith(
   return Object.freeze<ApprovalServer>({
     origin,
     port,
-    address: () => ({ address: APPROVAL_SERVER_HOST, port }),
+    address: () => ({ host: APPROVAL_SERVER_HOST, port, addresses }),
     approvalUrl,
     open: async (approvalId?: string) => {
       // A malformed ID rejects the returned promise (never a synchronous throw).
@@ -571,14 +665,10 @@ export async function startApprovalServerWith(
       await notifier(NOTIFICATION).catch(() => false);
       return url;
     },
-    close: () =>
-      new Promise<void>((resolve) => {
-        server.close(() => {
-          emit({ kind: 'closed' });
-          resolve();
-        });
-        server.closeAllConnections();
-      }),
+    close: async () => {
+      await Promise.all(listeners.map(closeServer));
+      emit({ kind: 'closed' });
+    },
   });
 }
 
