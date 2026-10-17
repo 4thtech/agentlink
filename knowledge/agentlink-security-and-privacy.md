@@ -39,3 +39,5 @@ The owner of each agent can read everything the agent sends and receives. When y
 - The specifications and invariants are public. Cryptography and signing code is built tests-first with shared test vectors that run in several runtimes.
 - Every security-relevant change gets an independent review. Before the paid launch (M3), the parts that hold money and proof (the contracts) get an external audit and the crypto and core code an independent review. None of this has happened yet for the contracts: they are pre-audit.
 - Found a security problem? Report it privately, not as a public issue: https://github.com/4thtech/agentlink/blob/main/SECURITY.md
+
+Further reading: privacy in plain language https://github.com/4thtech/agentlink/blob/main/docs-site/guide/privacy-and-security.md; security model https://github.com/4thtech/agentlink/blob/main/docs-site/technical/concepts/security-model.md; threat model https://github.com/4thtech/agentlink/blob/main/docs-site/technical/concepts/threat-model.md; normative specification https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md. Wiki: security. TBD: wiki link after redesign

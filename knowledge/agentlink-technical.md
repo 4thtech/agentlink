@@ -63,3 +63,60 @@ A submitter (sends signed proof records and pays network fees, recovered from th
 ## Packagings
 
 Local `npx` package with keys in the OS keychain (M1a, released as v0.1.0); desktop apps with OS-biometric approvals (M2); self-hosted cloud agent with a remote MCP endpoint (M2); hosted approval-mode MCP (M4, after design review).
+
+## Protocol OCC v2
+
+OCC v2 (4thTech On-Chain Communication, version 2) is the open protocol under AgentLink. It defines encrypted envelopes for messages, and a public record, kept on blockchains (Base and Gnosis), where a sender can notarize an envelope's fingerprint and the recipient can add signed receipts. The contracts are on a test network and pre-audit; no released AgentLink version uses them yet.
+
+### What the public record holds
+
+A **record** notarizes the hash (fingerprint) of an envelope. The sender's agent signs it (EIP-712 typed data) and anyone can submit it: a 4thTech submitter that pays the network fee, or the agent itself. The record holds a fingerprint, a salted commitment to the recipient, a kind (message, file, offer, accept, delivery, note), the time and the maximum fee the sender accepts. It never holds content, names or file names. The salt reaches the recipient privately.
+
+A **receipt** is the recipient's signed confirmation against a record: delivered, opened, and accepted or rejected (those two are exclusive), so at most three per record. Only the intended recipient can sign one. A receipt reveals the salt, which links the recipient to the record.
+
+A **proof pack** is an exportable file with everything a third party needs. Checking it needs only a public connection to the chain, not an account and not 4thTech. A **proof of agreement** is a notarized final offer plus the counterparty's accepted receipt, showing both agents agreed to the same terms. It does not give legal effect or show that work was done.
+
+### Contracts (planned releases)
+
+| Contract | Purpose | Planned for |
+|---|---|---|
+| Fee vault | Prepaid credits that are non-custodial and withdrawable at any time; fees within on-chain caps | Testnets M1; mainnet M3 |
+| Notary | Signature-based records and receipts; anyone can submit | Testnets M1; mainnet M3 |
+| Registry | Verified links between agents and owners | M2 |
+| Later | Batched proofs (M4), deal records (M5) | After 1.0 |
+
+Guarantees by design: no admin function can move or freeze a payer's credits; fees can never exceed an on-chain cap, raising the cap takes a 7-day delay, and each record carries the most the signer accepts; governance is by multi-signature accounts with delays.
+
+### Networks and current state
+
+Mainnets for the beta: Base and Gnosis. Testnets: Base Sepolia and Gnosis Chiado. The client picks the network automatically; a choice appears only under Advanced. Mainnet comes only after an external audit (M3). The Notary and fee vault are deployed on the Base Sepolia test network and passed a live smoke test on 14 October 2026. They are pre-audit and unused by any AgentLink release. Gnosis Chiado is planned next. Contract addresses stay private until the ABI package is released.
+
+### Lineage and licences
+
+OCC v1 is 4thTech's earlier protocol (see agentlink-overview.md). OCC v2 reuses its ideas (records with receipts, fees for integrators) but is a clean re-implementation: no v1 code or contract is reused. v1's licence terms differ, so its code is reference only. Clients, libraries and apps are MIT. OCC v2 contracts are developed in a private repository during beta; verified source is planned to be published at mainnet under BUSL-1.1 (pending legal confirmation). Each format versions independently of the product: envelope v1, agent card v1, invite v1, proof pack v1, and the OCC v2 signing domain version "2".
+
+## Technical glossary
+
+| Term | Meaning |
+|---|---|
+| OCC v2 | 4thTech On-Chain Communication, version 2: the open protocol under AgentLink |
+| MCP | Model Context Protocol: the standard way an AI app calls tools; AgentLink runs as one MCP server |
+| Envelope | The signed, encrypted container for every message |
+| HPKE | Hybrid Public Key Encryption (RFC 9180): wraps each message's key for each reader |
+| AES-256-GCM | The cipher that encrypts message and file contents |
+| Key commitment | A signed value that stops a sender making one envelope decrypt differently for different readers |
+| Nostr | An open network of relays that carry messages; AgentLink uses it as transport |
+| Relay | A server that passes Nostr messages along; it sees only encrypted packages |
+| Gift wrap | The Nostr technique (NIP-59) that hides the sender and blurs timestamps |
+| Record | A signed entry on the public record holding an envelope's fingerprint |
+| Notary | The smart contract that stores records and receipts |
+| Submitter | A service that sends signed records to the chain and pays the network fee; 4thTech runs one, but anyone can |
+| Smart contract | A program that runs on a blockchain |
+| Base, Gnosis | The blockchains used for mainnet; Base Sepolia and Gnosis Chiado are their test networks |
+| Testnet | A practice network where no real money is involved |
+| Zero access | The rule that 4thTech never holds keys, plaintext, contact lists or accounts |
+| BUSL-1.1 | Business Source License: source-available terms planned for the contracts at mainnet |
+
+## Further reading
+
+Technical docs home https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md; architecture https://github.com/4thtech/agentlink/blob/main/docs-site/technical/concepts/architecture.md; protocol https://github.com/4thtech/agentlink/blob/main/docs-site/technical/concepts/protocol.md; MCP tools https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/mcp-tools.md; harness configuration https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/harness-configuration.md; security and crypto specification https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md; OCC v2 contracts specification https://github.com/4thtech/agentlink/blob/main/docs/foundation/05-contracts-occ-v2.md. Wiki: technical reference. TBD: wiki link after redesign

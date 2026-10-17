@@ -9,7 +9,7 @@ import {
   extractLinks,
 } from './check-knowledge-links.mjs';
 
-const present = new Set(['README.md', 'knowledge/01-overview.md', 'docs-site/guide/README.md']);
+const present = new Set(['README.md', 'knowledge/agentlink-overview.md', 'docs-site/guide/README.md']);
 const exists = (path) => present.has(path);
 const base = 'https://github.com/4thtech/agentlink/blob/main/';
 
@@ -23,7 +23,7 @@ describe('extractLinks', () => {
 describe('checkLinks', () => {
   it('accepts relative links that resolve from the file directory', () => {
     expect(
-      checkLinks('knowledge/README.md', '[o](01-overview.md) [r](../README.md)', exists),
+      checkLinks('knowledge/README.md', '[o](agentlink-overview.md) [r](../README.md)', exists),
     ).toEqual([]);
   });
 
@@ -63,7 +63,7 @@ describe('the committed knowledge base', () => {
   it('has no broken links', () => {
     const root = join(dirname(fileURLToPath(import.meta.url)), '..');
     const real = (path) => existsSync(join(root, path));
-    for (const file of ['llms.txt', 'knowledge/README.md', 'knowledge/11-links.md']) {
+    for (const file of ['llms.txt', 'knowledge/README.md', 'knowledge/agentlink-userguide.md']) {
       expect(checkLinks(file, readFileSync(join(root, file), 'utf8'), real)).toEqual([]);
     }
   });

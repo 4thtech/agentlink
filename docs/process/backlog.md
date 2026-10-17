@@ -71,7 +71,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
-| Public docs (DOCS-PUB, all milestones) | 6 (DOCS-PUB, DOCS-M1a, DOCS-M1b, DOCS-M2, DOCS-M3, DOCS-LINT) |
+| Public docs (DOCS-PUB, all milestones) | 7 (DOCS-PUB, DOCS-M1a, DOCS-M1b, DOCS-KNOW, DOCS-M2, DOCS-M3, DOCS-LINT) |
 
 ---
 
@@ -4257,6 +4257,18 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
   - Follow-up (IR-M1-3b-1 I-1): the contracts page states that native coin sent to the vault outside the deposit functions, or attached to an upgrade call, is surplus that no one can recover (no admin path moves funds, I-10).
 - **Acceptance:**
   - As DOCS-M1a, for v0.2.0; testnet contract addresses on the Contracts page equal `@agentlink/occ-v2-abi`.
+
+#### DOCS-KNOW · Consolidate `knowledge/` into an overview and a user guide (new)
+- **Status:** in-review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · knowledge/, llms.txt, tools/
+- **Depends on:** DOCS-M1a
+- **Spec:** `knowledge/README.md` (maintenance rule); 11 §5 (vocabulary); the pattern of The Curator's `llm-docs/` (few self-contained files, headings as visitor questions)
+- **Invariants:** — (docs only; nothing unbuilt is claimed)
+- **Scope:**
+  - Replace the eleven numbered knowledge files with `agentlink-overview.md`, `agentlink-userguide.md`, `agentlink-security-and-privacy.md` and `agentlink-technical.md`; site map and reading files stay future.
+  - `knowledge/README.md` states the maintenance rule: update the files on every valuable or user-visible change. Update `llms.txt`, the status-block target in `tools/docs-status` and its tests, the link-check test, and the docs-pass steps in `docs/process`.
+- **Acceptance:**
+  - `node tools/docs-status/index.mjs --check`, `check-knowledge-size` and `check-knowledge-links` pass; no true fact is lost; no reference to an old path remains.
 
 #### DOCS-M2 · Public docs pass for v0.3.0 (console, desktop apps, cloud agent) (new)
 - **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S1
