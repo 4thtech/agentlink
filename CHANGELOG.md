@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-17
+
 ### Added
 
 - Spec (D-82, owner decision): 04 §2.3 now defines the owner seed blobs. `ALKP` v1 is the passkey PRF wrap (owner key and credential ID in the header, random nonce, whole header as AAD, size and owner checks); `ALKR` v1 is the recovery-code wrap (the `ALKO` layout with its own magic and label, generated codes only, Argon2id 64 MiB / 3 / 1). M1-1k is unblocked: vectors first, then code.
@@ -18,12 +20,11 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Dogfood tooling (M1-23-b): `tools/dogfood/run.mjs --role a|b` runs the pairing, messages, owner approvals and the J8 negotiation across two Macs, one agent per Mac, with the invite link and run ID exchanged by hand; `--same-owner` for one person at both Macs. Single-machine mode is unchanged. Runbook RB-17 section 10 has the commands.
 - Test vectors (M1-1i, S2): two new suites, pending until their code lands. `eip712-proof` (M1-1j) covers EIP-712 hashing of `Record`, `Receipt` and `Registration` under the OCC v2 chain domain, the recipient commitment, and the `Record`/`Receipt` JSON-form rejections. `prf-wrap` (M1-1k) covers the passkey PRF salt and wrap key (04 §2.3). STREAM and revoke vectors wait for G-26 and G-20 (new card M1-1i-b).
 - CLI (M1-9w, S1): `agentlink init --harness claude-desktop` sets up the Claude desktop app (macOS and Windows; its own `claude_desktop_config.json`, not Claude Code's file), with the usual diff, confirmation, backup and refusal of malformed files. On Linux it says the app isn't available there.
-
-### Fixed
-
-- CLI (M1-9w, S1): Gemini CLI is detected by the `gemini` program or `~/.gemini/settings.json`, so a computer with only Antigravity's `~/.gemini/config/mcp_config.json` is offered Antigravity, not Gemini CLI.
-- `agentlink owner add-agent --agent <name>` (M1-9x, S2): when an owner is set up on this computer but no agent has a card from it (for example after every agent was removed), it no longer dead-ends between `owner init` and `owner add-agent`. Your owner code unlocks the saved owner, you confirm the owner fingerprint, and the agent gets its card. Same rules as before: your own terminal only, refused inside an AI app, the owner key is never changed.
-- Spec 04 §2.8 (M1-9x, S2, proposed, owner confirms at merge): new rule "No local card names the owner" (owner keys derived from the unlocked owner item, fingerprint confirmed before the one card is signed, a consistency check, not authentication); "Expected owner" names this case.
+- Docs (DOCS-SETUP, S1): a beginner page, "Set up AgentLink in your AI tool", with the Node check, one install line per tool, the owner step, a first test, pairing two of your own tools and the top troubleshooting fixes. Claude Desktop is marked as merged but not in v0.1.0.
+- Crypto (M1-1k, S2): `@agentlink/crypto` seals and opens the owner seed as `ALKP` v1 under a passkey PRF output and as `ALKR` v1 under a generated recovery code (24 base32 characters in six groups of four), with header, size and owner checks, one generic error and no partial output on failure. The `prf-wrap` vector suite (80 cases, including cross-type cases with `ALKO` and `ALKS`) is no longer pending.
+- Hands-free two-Mac dogfood: `node tools/dogfood/run.mjs --two-mac --remote <ssh-host>` runs both Macs from Mac A over ssh, syncs the steps by itself and ends with one combined table. The invite link goes over ssh stdin only; owner approvals are still typed by you in the same terminal (M1-23-d, S1).
+- Auto-sync two-Mac dogfood for macOS: `run.mjs --role b --auto-sync` on Mac B, then `--role a --auto-sync --remote <host>` on Mac A. Each agent runs in its own Mac terminal (ssh only moves small files), so the keychain works; approvals are typed locally on each Mac. `--two-mac` now detects the macOS keychain-over-ssh failure and points to it (M1-23-e, S1).
+- A nightly two-machine test (OPS-CI-7, S2, process): two real agents on a Mac and a Linux runner pair, message, resist a hostile note and agree terms over the default relays. It is not part of the merge gate, runs only when `main` has changed, and uses the cheapest model.
 
 ### Changed
 
@@ -42,6 +43,24 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Local approval page on `http://localhost:<port>` (M1-31, S2, D-79; 08 §1, 04 §2.5, 06 §2.5, 11 §6.2.1; owner decision 2026-10-17): WebAuthn does not accept an IP address as an RP ID, so the page moves from `127.0.0.1` to `localhost` for the passkey (M1-8e). The server listens on `127.0.0.1` and `::1` (IPv6-only) on the same random port and nowhere else; if another program holds `::1` on that port it tries a new one (at most 5), and a machine with no IPv6 loopback gets `127.0.0.1` only. Only `Host: localhost:<port>` and `Origin: http://localhost:<port>` are accepted; `127.0.0.1:<port>` is now refused. The OAuth loopback redirect stays on `127.0.0.1`.
 - Process (owner decision, 2026-10-17): open question G-14 (`agentlink_fetch_file` and SSRF in Workers) blocks only M2-3b, not M1-15; the Workers egress part stays open.
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.
+- Docs (DOCS-DELIVERY, S1): a plain-language page, "How messages are delivered", on live and mailbox delivery, the status-first habit and the limits (relay retention, look-back); live delivery is marked as shipping in the next release.
+- Docs (DOCS-KNOW, S1): `knowledge/` is consolidated from eleven numbered files into `agentlink-overview.md`, `agentlink-userguide.md`, `agentlink-security-and-privacy.md` and `agentlink-technical.md`, following the pattern of The Curator's `llm-docs/`; `knowledge/README.md` states the maintenance rule (update on every valuable or user-visible change). `llms.txt`, the generated status target, the link check and the docs-pass steps follow. No feature is newly claimed as available.
+- Docs updated for M1b progress (DOCS, S0): the README Status and Roadmap, the docs-site status page, the knowledge base and the backlog card statuses now show M1b in progress and separate what is merged from what is released (npm `latest` is still 0.1.0); the Claude Desktop and Node.js 22.14 notes say which release they ship in.
+- Owner setup (M1-8h-b, S2, `@agentlink/node`; IR-M1-8h-1 Lows): `owner init` asks for the agent's name for contacts before the owner code is shown (Enter keeps the local agent name; up to 32 letters, digits, spaces, dots, apostrophes or hyphens in one script, accepted only if the contact-name rule shows it unchanged, so contacts see it as self-declared). If the first card fails, the rollback removes the owner key only while it is still the one this run stored, so a concurrent run's owner key is never deleted. The generic owner operation no longer signs agent cards at all; cards are signed only in the bound sessions of `owner init` and `owner add-agent`.
+- The deterministic e2e suite is now part of the merge gate (OPS-CI-6, S1, process): `ci.yml` calls it and `ci-gate` requires it, in pull requests and in the merge queue; docs-only changes skip it.
+- Changelog fragments (OPS-REL-4, S2, process): a PR now adds `changelog.d/<card-id>.md` instead of a line under `CHANGELOG.md` `[Unreleased]`, so parallel PRs stop conflicting in the merge queue. The release roll (`tools/release/roll-changelog.mjs`) folds the fragments and any legacy `[Unreleased]` lines into the version section and deletes them; a new CI step fails a user-visible, spec or process PR with no entry and warns on a direct `[Unreleased]` edit. Format in `changelog.d/README.md`.
+
+### Fixed
+
+- CLI (M1-9w, S1): Gemini CLI is detected by the `gemini` program or `~/.gemini/settings.json`, so a computer with only Antigravity's `~/.gemini/config/mcp_config.json` is offered Antigravity, not Gemini CLI.
+- `agentlink owner add-agent --agent <name>` (M1-9x, S2): when an owner is set up on this computer but no agent has a card from it (for example after every agent was removed), it no longer dead-ends between `owner init` and `owner add-agent`. Your owner code unlocks the saved owner, you confirm the owner fingerprint, and the agent gets its card. Same rules as before: your own terminal only, refused inside an AI app, the owner key is never changed.
+- Spec 04 §2.8 (M1-9x, S2, proposed, owner confirms at merge): new rule "No local card names the owner" (owner keys derived from the unlocked owner item, fingerprint confirmed before the one card is signed, a consistency check, not authentication); "Expected owner" names this case.
+- Windows file-path checks (M1-15-b, S2, 04 §4): the allowed-folder tests now run on Windows with no skipped test. Paths written with 8.3 short names are compared in their long form on both sides, a folder swapped for a link is refused check→open on every OS, and post-open where the OS allows it, and a Windows named pipe is refused before it is opened. No change to what is allowed or refused.
+- CLI (M1-22-b, S1, 06 §2.2): `agentlink_inbox` failed with an output-schema error for any message that carried terms, because the new `termsParties` field was not declared in the tool's output schema. It is declared now, and the inbox, status and contacts tests validate their results against the declared schema.
+- Dogfood script reports tool error codes (for example AMBIGUOUS_CONTACT) in the step notes, stops before the run when two contacts share the peer agent name, and addresses the peer by contact ID (M1-23-c, S1).
+- Accepting terms sometimes failed with an internal error instead of asking the owner (M1-32-d, S2, 04 §3.4.2): the approval request read the clock a second time, so a second boundary after the commitment scope was built made the request invalid. The request now starts at the scope's `createdAt`; a scope that expires while it is asked is reported as expired terms.
+- CLI (M1-9y, S1): `agentlink` needs Node.js 22.14 or newer (was 22.12). On an older Node it prints one line ("AgentLink needs Node.js 22.14 or newer; you have vX. Update Node ...") on stderr and exits, instead of crashing with a segmentation fault (seen on 22.13.1); this includes `agentlink mcp`, which never writes it to stdout. One-shot commands like `owner init` no longer print raw JSON info log lines; `AGENTLINK_LOG=info|debug` brings them back.
+- CI (OPS-CI-5, S2): a required `path-guard` job runs the Windows and POSIX path-guard tests on macOS and Windows runners and fails if they were skipped or did not run.
 
 ## [0.1.0] - 2026-10-16
 
@@ -249,6 +268,7 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/4thtech/agentlink/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/4thtech/agentlink/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/4thtech/agentlink/releases/tag/v0.0.1

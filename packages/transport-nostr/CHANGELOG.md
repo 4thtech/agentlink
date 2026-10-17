@@ -1,5 +1,16 @@
 # @agentlink/transport-nostr
 
+## 0.1.1
+
+### Patch Changes
+
+- 088b5fd: Live relay subscriptions (M1-9s): `Transport.subscribe` and `AgentLinkClient.subscribeInbox` in the core; the MCP server's background loop receives new messages and handshakes as they reach a relay, with a 5-minute fallback catch-up, and closes the subscription on lease loss and on shutdown.
+- Updated dependencies [af00aaa]
+- Updated dependencies [e768cd1]
+  - @agentlink/crypto@0.1.1
+  - @agentlink/log@0.1.1
+  - @agentlink/types@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes

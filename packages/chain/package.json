@@ -1,6 +1,6 @@
 {
   "name": "@agentlink/chain",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Chain clients and OCC v2 bindings.",
   "license": "MIT",
