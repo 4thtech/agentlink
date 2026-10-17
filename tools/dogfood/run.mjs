@@ -17,10 +17,18 @@ import { createWriteStream } from 'node:fs';
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import process from 'node:process';
+import { createInterface } from 'node:readline';
 import {
   OPENCODE_DENIED_PERMISSIONS,
   USAGE,
   buildSteps,
+  handoffBox,
+  manualBox,
+  parseRemoteAnswer,
+  remoteBox,
+  sideOf,
+  sideOk,
+  validInviteUrl,
   childEnv,
   parseApprovalResult,
   parseArgs,
@@ -62,17 +70,33 @@ function agentlinkRun(options, args) {
 
 /** Preflight: the programs exist, both agents open, have a card and reach their relays. */
 async function preflight(options, dir) {
+  const side = sideOf(options.role);
+  // Two-machine mode checks only this Mac's harness and agent.
   const versions = {
     agentlink: versionOf(options.agentlinkBin),
-    claude: versionOf(options.claudeBin),
-    opencode: versionOf(options.opencodeBin),
+    claude: side === 'oc' || options.manual ? undefined : versionOf(options.claudeBin),
+    opencode: options.manual ? undefined : versionOf(options.opencodeBin),
   };
   const problems = [];
+  const viaOpenCode = options.ccVia === 'opencode';
+  const needed = {
+    agentlink: true,
+    claude: !options.manual && side !== 'oc' && !viaOpenCode,
+    opencode: !options.manual && (side !== 'cc' || viaOpenCode),
+  };
   for (const [name, v] of Object.entries(versions)) {
-    if (v === undefined) problems.push(`${name} is not on PATH or does not answer --version`);
+    if (needed[name] && v === undefined) {
+      problems.push(`${name} is not on PATH or does not answer --version`);
+    }
   }
   if (versions.agentlink !== undefined) {
-    for (const agent of [options.ccAgent, options.ocAgent]) {
+    const mine =
+      side === 'cc'
+        ? [options.ccAgent]
+        : side === 'oc'
+          ? [options.ocAgent]
+          : [options.ccAgent, options.ocAgent];
+    for (const agent of mine) {
       for (const sub of [['doctor'], ['status', '--brief']]) {
         const r = agentlinkRun(options, [...sub, '--agent', agent]);
         await writeFile(join(dir, `preflight.${agent}.${sub[0]}.txt`), r.text, { mode: 0o600 });
@@ -129,22 +153,23 @@ async function makeHarnesses(options, dir) {
   );
   // OpenCode: an inline config (highest precedence) that points `agentlink` at its own agent and
   // refuses the shell, web and outside-folder tools, so a hostile message cannot use them.
-  const ocConfig = JSON.stringify({
-    $schema: 'https://opencode.ai/config.json',
-    mcp: {
-      agentlink: {
-        type: 'local',
-        command: [al.cmd, ...mcpArgs(options.ocAgent)],
-        enabled: true,
+  const ocConfigFor = (agent) =>
+    JSON.stringify({
+      $schema: 'https://opencode.ai/config.json',
+      mcp: {
+        agentlink: {
+          type: 'local',
+          command: [al.cmd, ...mcpArgs(agent)],
+          enabled: true,
+        },
       },
-    },
-    // Denied: the shell, subagents, skills, web access and anything outside the project folder.
-    // `read`, `edit`, `glob` and `grep` stay allowed on purpose: OpenCode's free tier refuses to run
-    // at all ("free tier can only be used from within OpenCode") when the file tools are denied.
-    // The project folder is the empty temp dir `workspace-oc`, and `external_directory` is what
-    // refuses a read of ~/.agentlink (tested on the owner's Mac; step F1 asserts it on every run).
-    permission: Object.fromEntries(OPENCODE_DENIED_PERMISSIONS.map((key) => [key, 'deny'])),
-  });
+      // Denied: the shell, subagents, skills, web access and anything outside the project folder.
+      // `read`, `edit`, `glob` and `grep` stay allowed on purpose: OpenCode's free tier refuses to run
+      // at all ("free tier can only be used from within OpenCode") when the file tools are denied.
+      // The project folder is the empty temp dir `workspace-oc`, and `external_directory` is what
+      // refuses a read of ~/.agentlink (tested on the owner's Mac; step F1 asserts it on every run).
+      permission: Object.fromEntries(OPENCODE_DENIED_PERMISSIONS.map((key) => [key, 'deny'])),
+    });
   const ocEnvKeep =
     process.env.OPENROUTER_API_KEY === undefined
       ? {}
@@ -179,7 +204,8 @@ async function makeHarnesses(options, dir) {
     return { ...res, ...parseClaude(await readFile(transcript, 'utf8')) };
   };
 
-  const opencode = async (step, prompt) => {
+  const opencodeFor = (agent, tag) => async (step, prompt) => {
+    const ocConfig = ocConfigFor(agent);
     const args = [
       'run',
       '--format',
@@ -189,18 +215,22 @@ async function makeHarnesses(options, dir) {
       ...(options.ocModel === undefined ? [] : ['-m', options.ocModel]),
       prompt,
     ];
-    const transcript = join(dir, `${step.id}.oc.transcript.jsonl`);
+    const transcript = join(dir, `${step.id}.${tag}.transcript.jsonl`);
     const res = await runChild(options.opencodeBin, args, {
       cwd: ocWork,
       env: childEnv(process.env, { ...ocEnvKeep, OPENCODE_CONFIG_CONTENT: ocConfig }),
       transcript,
-      stderr: join(dir, `${step.id}.oc.stderr.log`),
+      stderr: join(dir, `${step.id}.${tag}.stderr.log`),
       timeoutMs: options.stepTimeoutMs,
     });
     return { ...res, ...parseOpenCode(await readFile(transcript, 'utf8')) };
   };
 
-  return { cc: claude, oc: opencode };
+  // `--cc-via opencode`: the Claude Code side runs through OpenCode too (a Mac without the claude CLI).
+  return {
+    cc: options.ccVia === 'opencode' ? opencodeFor(options.ccAgent, 'cc') : claude,
+    oc: opencodeFor(options.ocAgent, 'oc'),
+  };
 }
 
 /**
@@ -269,6 +299,43 @@ function approvalPoller(options, agent) {
   };
 }
 
+/** One shared line reader for the hand-off prompts; a closed input answers `undefined`, never hangs. */
+function makeAsker() {
+  let rl;
+  let closed = false;
+  return {
+    ask(question) {
+      return new Promise((resolve) => {
+        if (rl === undefined) {
+          rl = createInterface({ input: process.stdin, output: process.stdout });
+          rl.on('close', () => {
+            closed = true;
+          });
+        }
+        if (closed) return resolve(undefined);
+        const onClose = () => resolve(undefined);
+        rl.once('close', onClose);
+        rl.question(question, (answer) => {
+          rl.off('close', onClose);
+          resolve(answer);
+        });
+      });
+    },
+    close() {
+      rl?.close();
+    },
+  };
+}
+
+/** Asks until `accept(answer)` returns a value; a closed input gives `accept(undefined)` once. */
+async function askUntil(asker, question, accept) {
+  for (;;) {
+    const answer = await asker.ask(question);
+    const value = accept(answer);
+    if (value !== undefined || answer === undefined) return value;
+  }
+}
+
 async function listFiles(dir) {
   const out = [];
   for (const name of await readdir(dir)) {
@@ -292,7 +359,37 @@ async function main() {
     log(USAGE);
     return 0;
   }
-  const runId = stamp();
+  const side = sideOf(options.role);
+  const asker = makeAsker();
+  // Mac B uses Mac A's run ID, so both sides name this run's offer the same way.
+  let runId = options.role === 'b' ? options.runId : stamp();
+  if (runId === undefined && !options.dryRun) {
+    runId = await askUntil(asker, 'Run ID printed on Mac A (like 20261017-101500): ', (v) =>
+      v !== undefined && /^\d{8}-\d{6}$/.test(v.trim()) ? v.trim() : undefined,
+    );
+    if (runId === undefined) {
+      console.error('Mac B needs the run ID that Mac A printed (--run-id).');
+      return 2;
+    }
+  }
+  runId ??= stamp();
+  const pairing = options.only === undefined || options.only.includes('P2');
+  let invite = options.invite;
+  if (
+    options.role === 'b' &&
+    !options.paired &&
+    pairing &&
+    invite === undefined &&
+    !options.dryRun
+  ) {
+    invite = await askUntil(asker, 'Invite link printed on Mac A: ', (v) =>
+      v !== undefined && validInviteUrl(v.trim()) ? v.trim() : undefined,
+    );
+    if (invite === undefined) {
+      console.error('Mac B needs the invite link that Mac A printed (--invite), unless --paired.');
+      return 2;
+    }
+  }
   const dir = join(options.out, runId);
   const steps = buildSteps({
     cc: options.ccAgent,
@@ -319,6 +416,25 @@ async function main() {
     return 1;
   }
 
+  const initialCtx = {};
+  if (invite !== undefined) initialCtx.inviteUrl = invite;
+  if (options.role === 'b' && options.paired) {
+    const r = agentlinkRun(options, ['contacts', '--agent', options.ocAgent]);
+    if (!r.ok || !r.text.includes(options.ccAgent)) {
+      console.error(
+        `--paired: ${options.ocAgent} has no contact ${options.ccAgent}. Nothing was started.`,
+      );
+      return 1;
+    }
+    initialCtx.alreadyPaired = true;
+  }
+  if (options.role !== undefined) {
+    log(
+      `Mac ${options.role.toUpperCase()}: ${options.sameOwner ? 'same owner on both Macs' : 'a different owner per Mac'}. Approvals are typed on the Mac that owns the agent; agents never approve.`,
+    );
+    if (options.role === 'a') log(`Run ID for Mac B: ${runId}`);
+  }
+
   const harnesses = await makeHarnesses(options, dir);
   const pollers = {
     cc: approvalPoller(options, options.ccAgent),
@@ -336,6 +452,35 @@ async function main() {
         Promise.resolve(agentlinkRun(options, ['contacts', '--agent', agent])).then(
           (r) => r.ok && r.text.includes(other),
         ),
+      side,
+      initialCtx,
+      manual: options.manual,
+      async manualStep(step, prompt) {
+        log(`\n${manualBox(step, prompt, options.sameOwner)}`);
+        const answer = await askUntil(asker, '> ', parseRemoteAnswer);
+        if (answer !== 'ok') return answer;
+        // State check through the agentlink CLI only: after the pairing steps the contact must exist.
+        if (step.id === 'P3' || step.id === 'P4') {
+          const [mine, other] =
+            side === 'cc' ? [options.ccAgent, options.ocAgent] : [options.ocAgent, options.ccAgent];
+          const r = agentlinkRun(options, ['contacts', '--agent', mine]);
+          if (!r.ok || !r.text.includes(other)) return 'unconfirmed';
+        }
+        return 'ok';
+      },
+      async waitRemote(step, info) {
+        log(`\n${remoteBox(step, info, options.sameOwner)}`);
+        return askUntil(asker, '> ', parseRemoteAnswer);
+      },
+      afterStep(step, ctx, result) {
+        // Mac A hands the invite to Mac B by hand: printed once, to the terminal only.
+        if (options.role !== 'a' || step.id !== 'P1' || result.outcome !== 'pass') return;
+        if (ctx.alreadyPaired) {
+          log('\nThe agents are already paired. On Mac B add --paired and no --invite.');
+        } else if (validInviteUrl(ctx.inviteUrl) && !ctx.inviteUrl.includes("'")) {
+          log(`\n${handoffBox(options, runId, ctx.inviteUrl)}`);
+        }
+      },
       approvalMinutes: options.approvalTimeoutMs / 60_000,
       async run(harness, step, prompt) {
         log(`-> ${step.id} (${harness === 'cc' ? 'Claude Code' : 'OpenCode'}) ${step.title}`);
@@ -358,8 +503,15 @@ async function main() {
   );
   pollers.cc.close();
   pollers.oc.close();
+  asker.close();
 
-  for (const agent of [options.ccAgent, options.ocAgent]) {
+  const finalAgents =
+    side === 'cc'
+      ? [options.ccAgent]
+      : side === 'oc'
+        ? [options.ocAgent]
+        : [options.ccAgent, options.ocAgent];
+  for (const agent of finalAgents) {
     const r = agentlinkRun(options, ['status', '--agent', agent]);
     await writeFile(join(dir, `final.${agent}.status.txt`), r.text, { mode: 0o600 });
   }
@@ -378,6 +530,8 @@ async function main() {
     ocAgent: options.ocAgent,
     versions: pre.versions,
     scan: scanText,
+    role: options.role,
+    sameOwner: options.sameOwner,
   };
   await writeFile(
     join(dir, 'results.json'),
@@ -391,7 +545,7 @@ async function main() {
     console.error(`SECRET SCAN: "${f.name}" found in ${f.file}. Do not share this folder.`);
   }
   log(`Saved to ${dir}`);
-  const allPass = results.every((r) => r.outcome === 'pass');
+  const allPass = side === undefined ? results.every((r) => r.outcome === 'pass') : sideOk(results);
   return allPass && scan.findings.length === 0 ? 0 : 1;
 }
 

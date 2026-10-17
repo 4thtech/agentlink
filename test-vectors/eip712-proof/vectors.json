@@ -1,0 +1,1416 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "eip712-proof",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib, pycryptodome 3.23.0)",
+    "version": "cpython 3.12.13",
+    "script": "tools/vectors/generate_eip712_proof.py"
+  },
+  "cases": [
+    {
+      "id": "commitment-basic",
+      "source": "04 \u00a75, 05 \u00a73.1: recipientCommitment = keccak256(abi.encode(recipientAgentEvm, salt)); a synthetic recipient agent address and salt",
+      "input": {
+        "op": "recipientCommitment",
+        "recipient": "0xe09a6724ce75ed0badc4bb6a5ecf4f28e75ee558",
+        "salt": "0xb529be83d68c21c739ecccae31d44b853b51551a9c436f57bbc617da4a287731"
+      },
+      "expected": {
+        "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b"
+      }
+    },
+    {
+      "id": "commitment-other-salt",
+      "source": "04 \u00a75, 05 \u00a73.1: recipientCommitment = keccak256(abi.encode(recipientAgentEvm, salt)); the same recipient with a fresh salt (unlinkable, 04 \u00a75)",
+      "input": {
+        "op": "recipientCommitment",
+        "recipient": "0xe09a6724ce75ed0badc4bb6a5ecf4f28e75ee558",
+        "salt": "0x0d87efa81dcf23b3d5ea2682f941d412824a58d27ec16b57ddf23abd92439a98"
+      },
+      "expected": {
+        "recipientCommitment": "0xecc903a8d6583c956d238e1224074cb35de2960bd0a092e9b9d4bebacff08bcb"
+      }
+    },
+    {
+      "id": "commitment-zero-salt",
+      "source": "04 \u00a75, 05 \u00a73.1: recipientCommitment = keccak256(abi.encode(recipientAgentEvm, salt)); an all-zero salt (an encoding edge, never a real salt)",
+      "input": {
+        "op": "recipientCommitment",
+        "recipient": "0xe09a6724ce75ed0badc4bb6a5ecf4f28e75ee558",
+        "salt": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "expected": {
+        "recipientCommitment": "0xf777cfa253fc3b14ffe958e19be672fc899b82c9af9d860800a4af45c890f73d"
+      }
+    },
+    {
+      "id": "commitment-max-address",
+      "source": "04 \u00a75, 05 \u00a73.1: recipientCommitment = keccak256(abi.encode(recipientAgentEvm, salt)); the address 0xff\u2026ff and salt 0xff\u2026ff",
+      "input": {
+        "op": "recipientCommitment",
+        "recipient": "0xffffffffffffffffffffffffffffffffffffffff",
+        "salt": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "expected": {
+        "recipientCommitment": "0xcdcdfaf640ccaa746456591f72b9aab9064a3ce6a2a22e2355139c8e948612eb"
+      }
+    },
+    {
+      "id": "record-message",
+      "source": "05 \u00a73.1 Record; 04 \u00a75; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract}; a MESSAGE (kind 1) to one recipient, stablecoin fee",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "typeHash": "4973ba516df14eb498782adb1b208632ae67f1a31da3b44e34b92ea623d85d32",
+        "domainSeparator": "c5821c8e3a7d8f3abc373965163288a80469d2b48c201393faf66694949d0362",
+        "structHash": "b48f916acb552ca670a5a112006956be55a9b28db6fd364a2705963783c6e3b5",
+        "digest": "62cf8d22185e1ce6d534993e24e3e41c2f34eb7f5dc38649d153627cfe8a8802"
+      }
+    },
+    {
+      "id": "record-message-chiado",
+      "source": "05 \u00a73.1 Record; 04 \u00a75; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract}; the same Record under Gnosis Chiado (another chainId: another domain separator and digest)",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 10200,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "typeHash": "4973ba516df14eb498782adb1b208632ae67f1a31da3b44e34b92ea623d85d32",
+        "domainSeparator": "e751d1198bc7b82848547bb5f840000bff8449e174a528c59a27a90ed7a249ef",
+        "structHash": "b48f916acb552ca670a5a112006956be55a9b28db6fd364a2705963783c6e3b5",
+        "digest": "00c54f43943035cd50f42bd1e97176e73fff498933c960eae2c512ae3bf3552e"
+      }
+    },
+    {
+      "id": "record-message-other-notary",
+      "source": "05 \u00a73.1 Record; 04 \u00a75; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract}; the same Record under another verifyingContract",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0xce4a87e9463a714e836acf75cad92f526da55216"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "typeHash": "4973ba516df14eb498782adb1b208632ae67f1a31da3b44e34b92ea623d85d32",
+        "domainSeparator": "95ab1a64d61a203aaa4902c3f2f1fc05f3f75bfdd45a47823826f5e5cde4dbf7",
+        "structHash": "b48f916acb552ca670a5a112006956be55a9b28db6fd364a2705963783c6e3b5",
+        "digest": "b586c123d9a83a85a15d1d725f9b9b2fbf95aa2fdbd4b22445d1546e9faa7a36"
+      }
+    },
+    {
+      "id": "record-reply-file",
+      "source": "05 \u00a73.1 Record; 04 \u00a75; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract}; a FILE (kind 2) reply with parentRecordId and appId, native fee token address(0), maxFee \"0\", nonce \"0\", deadline 0",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0xbb1e0b3666a8f4c1d7340845f34636051f2f357af119e84e2a05fb4442d1f49b",
+          "recipientCommitment": "0xecc903a8d6583c956d238e1224074cb35de2960bd0a092e9b9d4bebacff08bcb",
+          "parentRecordId": "0xe24e95611787c13ff990f930ae7f5e4fd5aabbbc6c493929691180d708efe1a6",
+          "appId": "0x0c9a90b9b477b1e4a08fb1d5a42ae6c1b9ebad0109522c60807d599c134fb621",
+          "kind": 2,
+          "feeToken": "0x0000000000000000000000000000000000000000",
+          "maxFee": "0",
+          "nonce": "0",
+          "deadline": 0
+        }
+      },
+      "expected": {
+        "typeHash": "4973ba516df14eb498782adb1b208632ae67f1a31da3b44e34b92ea623d85d32",
+        "domainSeparator": "c5821c8e3a7d8f3abc373965163288a80469d2b48c201393faf66694949d0362",
+        "structHash": "6a2080996983ec68edc8da7c0872b95d90fe3095996d823a47eb1e98b2ccee3e",
+        "digest": "1b4b6ea3aa7297ac4b6689057ef342f2634238822432985efce6c1c282028b1e"
+      }
+    },
+    {
+      "id": "record-self-note",
+      "source": "05 \u00a73.1 Record; 04 \u00a75; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract}; a NOTE (kind 6) to self: recipientCommitment 0",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x8f18f92224e601f0f7fda7f2f619c4309c76b334fac4ecfb9e27477c8df61719",
+          "recipientCommitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 6,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "1000000",
+          "nonce": "32335023169853923071254069445495495254027989318932054804258061970092455533438",
+          "deadline": 1760007200
+        }
+      },
+      "expected": {
+        "typeHash": "4973ba516df14eb498782adb1b208632ae67f1a31da3b44e34b92ea623d85d32",
+        "domainSeparator": "c5821c8e3a7d8f3abc373965163288a80469d2b48c201393faf66694949d0362",
+        "structHash": "aa7bf01c80180007555f1dca167aa649fcbbf17aeee16b93f496db38ecd042ad",
+        "digest": "a15b90e4924633dcdec9b02061a17a83e7b9d20073eedc71d9f623599f93cc44"
+      }
+    },
+    {
+      "id": "record-limits",
+      "source": "05 \u00a73.1 Record; 04 \u00a75; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract}; every field at its maximum: kind 255, maxFee and nonce 2^256 - 1, deadline 2^53 - 1",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0xffffffffffffffffffffffffffffffffffffffff",
+          "envelopeHash": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "recipientCommitment": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "parentRecordId": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "appId": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "kind": 255,
+          "feeToken": "0xffffffffffffffffffffffffffffffffffffffff",
+          "maxFee": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+          "nonce": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+          "deadline": 9007199254740991
+        }
+      },
+      "expected": {
+        "typeHash": "4973ba516df14eb498782adb1b208632ae67f1a31da3b44e34b92ea623d85d32",
+        "domainSeparator": "c5821c8e3a7d8f3abc373965163288a80469d2b48c201393faf66694949d0362",
+        "structHash": "eeebda85c0852897caba81ddeab1b03f0bb4a22dc91528f836e888cb4dc8202c",
+        "digest": "17306b37f9e78452f794867a65fe838c8cd5cf933dd0fd685950ae4372023aa8"
+      }
+    },
+    {
+      "id": "receipt-delivered",
+      "source": "05 \u00a73.1 Receipt; 04 \u00a75; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract}; DELIVERED (1) by the recipient, with the Record's commitment salt",
+      "input": {
+        "op": "receipt",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "receipt": {
+          "signer": "0xe09a6724ce75ed0badc4bb6a5ecf4f28e75ee558",
+          "recordId": "0xe24e95611787c13ff990f930ae7f5e4fd5aabbbc6c493929691180d708efe1a6",
+          "receiptType": 1,
+          "salt": "0xb529be83d68c21c739ecccae31d44b853b51551a9c436f57bbc617da4a287731",
+          "deadline": 1760090000
+        }
+      },
+      "expected": {
+        "typeHash": "5b6f972a463bedeae0907a01d9c2d619165bfefe57f418cc4625f984054fe042",
+        "domainSeparator": "c5821c8e3a7d8f3abc373965163288a80469d2b48c201393faf66694949d0362",
+        "structHash": "0011a4dd597f7f77816f6db7c0d8bc7c98d628f9d8498e4888e4bb446d33397f",
+        "digest": "75144d891a9a823287c0e3e7d253f1b3fe7e767e3c0b8b305721bd3c4ec6e452"
+      }
+    },
+    {
+      "id": "receipt-accepted",
+      "source": "05 \u00a73.1 Receipt; 04 \u00a75; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract}; ACCEPTED (3): only the type changes",
+      "input": {
+        "op": "receipt",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "receipt": {
+          "signer": "0xe09a6724ce75ed0badc4bb6a5ecf4f28e75ee558",
+          "recordId": "0xe24e95611787c13ff990f930ae7f5e4fd5aabbbc6c493929691180d708efe1a6",
+          "receiptType": 3,
+          "salt": "0xb529be83d68c21c739ecccae31d44b853b51551a9c436f57bbc617da4a287731",
+          "deadline": 1760090000
+        }
+      },
+      "expected": {
+        "typeHash": "5b6f972a463bedeae0907a01d9c2d619165bfefe57f418cc4625f984054fe042",
+        "domainSeparator": "c5821c8e3a7d8f3abc373965163288a80469d2b48c201393faf66694949d0362",
+        "structHash": "8429ab8c6bbd1073486b5fcc153032b6f44190d9e21efc2511e2a1085e6d7b82",
+        "digest": "e260404b422198e2583d5291e835e961ceb55c67bc42bcbf450da8423c375c94"
+      }
+    },
+    {
+      "id": "receipt-rejected-chiado",
+      "source": "05 \u00a73.1 Receipt; 04 \u00a75; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract}; REJECTED (4) under Gnosis Chiado",
+      "input": {
+        "op": "receipt",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 10200,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "receipt": {
+          "signer": "0xe09a6724ce75ed0badc4bb6a5ecf4f28e75ee558",
+          "recordId": "0xe24e95611787c13ff990f930ae7f5e4fd5aabbbc6c493929691180d708efe1a6",
+          "receiptType": 4,
+          "salt": "0xb529be83d68c21c739ecccae31d44b853b51551a9c436f57bbc617da4a287731",
+          "deadline": 1760090000
+        }
+      },
+      "expected": {
+        "typeHash": "5b6f972a463bedeae0907a01d9c2d619165bfefe57f418cc4625f984054fe042",
+        "domainSeparator": "e751d1198bc7b82848547bb5f840000bff8449e174a528c59a27a90ed7a249ef",
+        "structHash": "510a252befc1285b2d9beaafa8894a477a5edcbf1234cea346fe44f52e82b8ec",
+        "digest": "1d1d3427c026df55e50a59ec03987d4ed837d5c618d610596a62aefe5aad410b"
+      }
+    },
+    {
+      "id": "receipt-limits",
+      "source": "05 \u00a73.1 Receipt; 04 \u00a75; OCC v2 chain domain {name: \"OCC\", version: \"2\", chainId, verifyingContract}; receiptType 255, deadline 2^53 - 1, all-ones fields",
+      "input": {
+        "op": "receipt",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "receipt": {
+          "signer": "0xffffffffffffffffffffffffffffffffffffffff",
+          "recordId": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "receiptType": 255,
+          "salt": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "deadline": 9007199254740991
+        }
+      },
+      "expected": {
+        "typeHash": "5b6f972a463bedeae0907a01d9c2d619165bfefe57f418cc4625f984054fe042",
+        "domainSeparator": "c5821c8e3a7d8f3abc373965163288a80469d2b48c201393faf66694949d0362",
+        "structHash": "ced02a15f97e979c208228849a5d4fc1fd1ea6fab520e048487a3aab3985ea17",
+        "digest": "880f8921447868ce83f3487e563782119ca011913ff340b9f946fc98c8699381"
+      }
+    },
+    {
+      "id": "registration-basic",
+      "source": "05 \u00a74 Registration (regOwnerSig); OCC v2 chain-specific domain with the Registry as verifyingContract; nonce rules open (G-20); stablecoin fee, official client (appId 0)",
+      "input": {
+        "op": "registration",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0xc3c7797dd554c8de871aa72b40882764803eb675"
+        },
+        "registration": {
+          "cardHash": "0xb60df69a70c245a1cdbbdff0d5722fddf4c4625503e51f284616b5081cc4fea3",
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "1000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "nonce": "78219569170084842465697082356206593203654915056229411319944921062164124938175",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "typeHash": "b814129e86c4b13f9a94e203850797901ab189c287ea19f8f84fba9f88696b2e",
+        "domainSeparator": "648582d707a988c019139ded0eee4a091a70ce8d89478d32803b1c3895da55c5",
+        "structHash": "2d45b8e6f6ac70be22495bfcc99aa5d3858a76753f8f0f82b4682bb694c52cdb",
+        "digest": "cade53d130be18cc70fdb24d36c745301d75bad3c4d12526fad922f9c9c1dbe9"
+      }
+    },
+    {
+      "id": "registration-app-native",
+      "source": "05 \u00a74 Registration (regOwnerSig); OCC v2 chain-specific domain with the Registry as verifyingContract; nonce rules open (G-20); an integrator appId and the native fee token",
+      "input": {
+        "op": "registration",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0xc3c7797dd554c8de871aa72b40882764803eb675"
+        },
+        "registration": {
+          "cardHash": "0xb60df69a70c245a1cdbbdff0d5722fddf4c4625503e51f284616b5081cc4fea3",
+          "feeToken": "0x0000000000000000000000000000000000000000",
+          "maxFee": "0",
+          "appId": "0x0c9a90b9b477b1e4a08fb1d5a42ae6c1b9ebad0109522c60807d599c134fb621",
+          "nonce": "78219569170084842465697082356206593203654915056229411319944921062164124938175",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "typeHash": "b814129e86c4b13f9a94e203850797901ab189c287ea19f8f84fba9f88696b2e",
+        "domainSeparator": "648582d707a988c019139ded0eee4a091a70ce8d89478d32803b1c3895da55c5",
+        "structHash": "f60f59339e5154be0900dc46e8079b035ac275f43422c7187852148566840d0c",
+        "digest": "9045c862a8df1dff332f380f70e8b538a6fe0e7e6ac8fb9c58df68bc19c692bd"
+      }
+    },
+    {
+      "id": "registration-chiado",
+      "source": "05 \u00a74 Registration (regOwnerSig); OCC v2 chain-specific domain with the Registry as verifyingContract; nonce rules open (G-20); the same Registration under Gnosis Chiado",
+      "input": {
+        "op": "registration",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 10200,
+          "verifyingContract": "0xc3c7797dd554c8de871aa72b40882764803eb675"
+        },
+        "registration": {
+          "cardHash": "0xb60df69a70c245a1cdbbdff0d5722fddf4c4625503e51f284616b5081cc4fea3",
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "1000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "nonce": "78219569170084842465697082356206593203654915056229411319944921062164124938175",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "typeHash": "b814129e86c4b13f9a94e203850797901ab189c287ea19f8f84fba9f88696b2e",
+        "domainSeparator": "2843747cff8c6fde6f156d238163082a08d4c10a9ca5b9b9acc0dc0cea058fc8",
+        "structHash": "2d45b8e6f6ac70be22495bfcc99aa5d3858a76753f8f0f82b4682bb694c52cdb",
+        "digest": "9b55f39d07d1afbbc5bbf6eb4f36ea95df4388b85989d5ad480f46bf2ba039ec"
+      }
+    },
+    {
+      "id": "registration-limits",
+      "source": "05 \u00a74 Registration (regOwnerSig); OCC v2 chain-specific domain with the Registry as verifyingContract; nonce rules open (G-20); maxFee and nonce 2^256 - 1, deadline 2^53 - 1",
+      "input": {
+        "op": "registration",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0xc3c7797dd554c8de871aa72b40882764803eb675"
+        },
+        "registration": {
+          "cardHash": "0xb60df69a70c245a1cdbbdff0d5722fddf4c4625503e51f284616b5081cc4fea3",
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "nonce": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+          "deadline": 9007199254740991
+        }
+      },
+      "expected": {
+        "typeHash": "b814129e86c4b13f9a94e203850797901ab189c287ea19f8f84fba9f88696b2e",
+        "domainSeparator": "648582d707a988c019139ded0eee4a091a70ce8d89478d32803b1c3895da55c5",
+        "structHash": "f4783af365bd7b47286c61b316d10d2ec278e799d607a8c092ea62ba433dd3b9",
+        "digest": "575c698085b928b5fb1996043224b78ba6628a288b6ce799ff918e7f945844bc"
+      }
+    },
+    {
+      "id": "record-reject-max-fee-number",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: maxFee as a JSON number; rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": 250000,
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-max-fee-leading-zero",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: maxFee \"0250000\" (leading zero); rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "0250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-max-fee-sign",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: maxFee \"+250000\" (sign); rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "+250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-max-fee-negative",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: maxFee \"-1\"; rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "-1",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-max-fee-fraction",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: maxFee \"250000.0\" (fraction); rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000.0",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-max-fee-exponent",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: maxFee \"2.5e5\" (exponent); rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "2.5e5",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-max-fee-whitespace",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: maxFee \" 250000\" (whitespace); rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": " 250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-max-fee-empty",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: maxFee \"\"; rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-nonce-2-pow-256",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: nonce = 2^256 (above uint256); rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "115792089237316195423570985008687907853269984665640564039457584007913129639936",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-nonce-hex",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: nonce as 0x hex; rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "0x7616bb7efe9432084c45a5f905c8771609d76a1762e91dd2636a35c4575ae843",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-signer-checksummed",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: signer in EIP-55 mixed case; rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52EaEFEBE4eC263f7fFD6ca678613e4d6195868A",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-signer-no-prefix",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: signer without 0x; rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-fee-token-capital-prefix",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: feeToken with 0X; rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0X05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-envelope-hash-uppercase",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: envelopeHash in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38FEBEB3650A8E5D354BFA5493835B16012673181C3E1755AAF8B234D053ED88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-envelope-hash-bare",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: envelopeHash as bare hex (the 04 \u00a73.1 sha256 without 0x); rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-recipient-commitment-31-bytes",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: recipientCommitment of 31 bytes; rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab7886",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-parent-record-id-zero-short",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: parentRecordId \"0x0\" for zero (must be 32 bytes); rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-app-id-base64url",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: appId as base64url; rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-kind-256",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: kind = 256 (outside uint8); rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 256,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-kind-string",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: kind as a string; rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": "1",
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-kind-boolean",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: kind as true; rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": true,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-deadline-2-pow-53",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: deadline = 2^53 (uint64 above 2^53 - 1); rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 9007199254740992
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-deadline-negative",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: deadline = -1; rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": -1
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-deadline-string",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: deadline as a decimal string; rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": "1760003600"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-unknown-field",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: an eleventh field; rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "nonce": "53413080818580974331135570314775698628850412394171742376625802275545193048131",
+          "deadline": 1760003600,
+          "salt": "0xb529be83d68c21c739ecccae31d44b853b51551a9c436f57bbc617da4a287731"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "record-reject-missing-field",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: nonce missing; rejected, never normalised",
+      "input": {
+        "op": "record",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "record": {
+          "signer": "0x52eaefebe4ec263f7ffd6ca678613e4d6195868a",
+          "envelopeHash": "0x38febeb3650a8e5d354bfa5493835b16012673181c3e1755aaf8b234d053ed88",
+          "recipientCommitment": "0xdf8769780934da646f92597340ae4efeb1a0702cba1e49b07dfd97eaab78860b",
+          "parentRecordId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "appId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": 1,
+          "feeToken": "0x05f7cddba6070777972ad9ff9df5312872a49685",
+          "maxFee": "250000",
+          "deadline": 1760003600
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "receipt-reject-record-id-base64url",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: recordId as base64url (04 \u00a72.4.1 cross-class case); rejected, never normalised",
+      "input": {
+        "op": "receipt",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "receipt": {
+          "signer": "0xe09a6724ce75ed0badc4bb6a5ecf4f28e75ee558",
+          "recordId": "4k6VYReHwT_5kPkwrn9eT9Wqu7xsSTkpaRGA1wjv4aY",
+          "receiptType": 1,
+          "salt": "0xb529be83d68c21c739ecccae31d44b853b51551a9c436f57bbc617da4a287731",
+          "deadline": 1760090000
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "receipt-reject-record-id-uppercase",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: recordId in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "receipt",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "receipt": {
+          "signer": "0xe09a6724ce75ed0badc4bb6a5ecf4f28e75ee558",
+          "recordId": "0xE24E95611787C13FF990F930AE7F5E4FD5AABBBC6C493929691180D708EFE1A6",
+          "receiptType": 1,
+          "salt": "0xb529be83d68c21c739ecccae31d44b853b51551a9c436f57bbc617da4a287731",
+          "deadline": 1760090000
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "receipt-reject-salt-base64url",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: salt as base64url (04 \u00a72.4.1 cross-class case); rejected, never normalised",
+      "input": {
+        "op": "receipt",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "receipt": {
+          "signer": "0xe09a6724ce75ed0badc4bb6a5ecf4f28e75ee558",
+          "recordId": "0xe24e95611787c13ff990f930ae7f5e4fd5aabbbc6c493929691180d708efe1a6",
+          "receiptType": 1,
+          "salt": "tSm-g9aMIcc57MyuMdRLhTtRVRqcQ29Xu8YX2koodzE",
+          "deadline": 1760090000
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "receipt-reject-salt-33-bytes",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: salt of 33 bytes; rejected, never normalised",
+      "input": {
+        "op": "receipt",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "receipt": {
+          "signer": "0xe09a6724ce75ed0badc4bb6a5ecf4f28e75ee558",
+          "recordId": "0xe24e95611787c13ff990f930ae7f5e4fd5aabbbc6c493929691180d708efe1a6",
+          "receiptType": 1,
+          "salt": "0xb529be83d68c21c739ecccae31d44b853b51551a9c436f57bbc617da4a28773100",
+          "deadline": 1760090000
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "receipt-reject-signer-checksummed",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: signer in EIP-55 mixed case; rejected, never normalised",
+      "input": {
+        "op": "receipt",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "receipt": {
+          "signer": "0xe09a6724CE75ED0bADc4bB6A5ECF4F28e75Ee558",
+          "recordId": "0xe24e95611787c13ff990f930ae7f5e4fd5aabbbc6c493929691180d708efe1a6",
+          "receiptType": 1,
+          "salt": "0xb529be83d68c21c739ecccae31d44b853b51551a9c436f57bbc617da4a287731",
+          "deadline": 1760090000
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "receipt-reject-receipt-type-256",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: receiptType = 256 (outside uint8); rejected, never normalised",
+      "input": {
+        "op": "receipt",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "receipt": {
+          "signer": "0xe09a6724ce75ed0badc4bb6a5ecf4f28e75ee558",
+          "recordId": "0xe24e95611787c13ff990f930ae7f5e4fd5aabbbc6c493929691180d708efe1a6",
+          "receiptType": 256,
+          "salt": "0xb529be83d68c21c739ecccae31d44b853b51551a9c436f57bbc617da4a287731",
+          "deadline": 1760090000
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "receipt-reject-receipt-type-string",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: receiptType as a string; rejected, never normalised",
+      "input": {
+        "op": "receipt",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "receipt": {
+          "signer": "0xe09a6724ce75ed0badc4bb6a5ecf4f28e75ee558",
+          "recordId": "0xe24e95611787c13ff990f930ae7f5e4fd5aabbbc6c493929691180d708efe1a6",
+          "receiptType": "1",
+          "salt": "0xb529be83d68c21c739ecccae31d44b853b51551a9c436f57bbc617da4a287731",
+          "deadline": 1760090000
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "receipt-reject-deadline-2-pow-53",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: deadline = 2^53; rejected, never normalised",
+      "input": {
+        "op": "receipt",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "receipt": {
+          "signer": "0xe09a6724ce75ed0badc4bb6a5ecf4f28e75ee558",
+          "recordId": "0xe24e95611787c13ff990f930ae7f5e4fd5aabbbc6c493929691180d708efe1a6",
+          "receiptType": 1,
+          "salt": "0xb529be83d68c21c739ecccae31d44b853b51551a9c436f57bbc617da4a287731",
+          "deadline": 9007199254740992
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "receipt-reject-unknown-field",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: a sixth field; rejected, never normalised",
+      "input": {
+        "op": "receipt",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "receipt": {
+          "signer": "0xe09a6724ce75ed0badc4bb6a5ecf4f28e75ee558",
+          "recordId": "0xe24e95611787c13ff990f930ae7f5e4fd5aabbbc6c493929691180d708efe1a6",
+          "receiptType": 1,
+          "salt": "0xb529be83d68c21c739ecccae31d44b853b51551a9c436f57bbc617da4a287731",
+          "deadline": 1760090000,
+          "kind": 1
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "receipt-reject-missing-field",
+      "source": "05 \u00a73.1 JSON form, 04 \u00a72.4.1: salt missing; rejected, never normalised",
+      "input": {
+        "op": "receipt",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x252d9a9c22652a8c08b12eda14d30906850542c9"
+        },
+        "receipt": {
+          "signer": "0xe09a6724ce75ed0badc4bb6a5ecf4f28e75ee558",
+          "recordId": "0xe24e95611787c13ff990f930ae7f5e4fd5aabbbc6c493929691180d708efe1a6",
+          "receiptType": 1,
+          "deadline": 1760090000
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    }
+  ]
+}
