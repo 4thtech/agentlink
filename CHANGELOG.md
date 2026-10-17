@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- `agentlink_propose_terms` and `agentlink_respond_to_terms` now pass `clientRequestId` to the core (M1-32-c, S1): a repeated call returns the original result and sends nothing more; a different request under the same key is `IDEMPOTENCY_KEY_REUSED`, a concurrent repeat is `IN_PROGRESS` (as `agentlink_send`), and a repeat whose approval has since been decided reports that approval's state.
+
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.
 
 ## [0.1.0] - 2026-10-16
