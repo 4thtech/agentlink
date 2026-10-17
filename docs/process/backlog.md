@@ -3515,7 +3515,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Property test: across random interleavings of offers, counters, approvals and `proof` envelopes, no scope ever sends more than one `accept` or signs more than one receipt, and nothing runs without an owner-signed approval or a matching grant.
 
 #### M1-32-d · core: one clock read for an approval scope (new, e2e flake on J8)
-- **Status:** in review (2026-10-17) · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#238) · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (`src/approvals.ts`), apps/cli (`src/tools/terms-common.ts`)
 - **Depends on:** M1-32
 - **Spec:** 04 §3.4.1, §3.4.2 (`scope.createdAt` equals `requestedAt`); 06 §2.2a
