@@ -464,3 +464,137 @@ describe('owner init signs the first agent card (M1-8h; 04 §2.5, §2.4)', () =>
     await ownerStore.close();
   });
 });
+
+// M1-8h-b (IR-M1-8h-1 Lows; 04 §2.5, §2.8; 11 §5): rollback identity check and the display-name prompt.
+describe('owner-card follow-ups (M1-8h-b; IR-M1-8h-1)', () => {
+  it('IR-M1-8h-1 L2: rollback deletes only the owner item this run created', async () => {
+    const alice = await initAgent('alice');
+    // Another run's owner item replaces this run's while the card is being issued (two concurrent
+    // `owner init` runs), and the card fails: the other item must survive the rollback.
+    const other = new Uint8Array(90).fill(7);
+    const card: FirstAgentCard = {
+      ...firstCard(alice, 'Alice', ALPHA),
+      identity: {
+        get: () => alice.client.identity.get(),
+        init: () => {
+          alice.keychain.items.set(OWNER_ACCOUNT, other.slice());
+          return Promise.reject(new Error('card refused'));
+        },
+      },
+    };
+    expect(await failure(() => ownerInit(alice, card))).toEqual({
+      code: 'owner_card_failed',
+      message:
+        "Owner setup didn't finish. Run `agentlink doctor` in your own terminal to see what is missing.",
+    });
+    expect(alice.keychain.items.get(OWNER_ACCOUNT)).toEqual(other);
+    expect(await alice.client.identity.get()).toBeUndefined();
+  });
+
+  it('IR-M1-8h-1 L2: rollback is a no-op when the item is already gone', async () => {
+    const alice = await initAgent('alice');
+    const card: FirstAgentCard = {
+      ...firstCard(alice, 'Alice', ALPHA),
+      identity: {
+        get: () => alice.client.identity.get(),
+        init: () => {
+          alice.keychain.items.delete(OWNER_ACCOUNT);
+          return Promise.reject(new Error('card refused'));
+        },
+      },
+    };
+    expect((await failure(() => ownerInit(alice, card))).code).toBe('owner_card_failed');
+    expect(alice.keychain.items.has(OWNER_ACCOUNT)).toBe(false);
+  });
+
+  /** The owner's terminal with a visible line prompt (the display-name question). */
+  function namingOwner(answers: string[]) {
+    const run = ownerAtTerminal();
+    const asked: string[] = [];
+    const terminal: OwnerTerminal = {
+      ...run.terminal,
+      readText: (label: string) => {
+        asked.push(label);
+        return Promise.resolve(answers.shift() ?? '');
+      },
+    };
+    return { ...run, terminal, asked };
+  }
+
+  function recordingCard(agent: Agent, name: string): { card: FirstAgentCard; names: string[] } {
+    const names: string[] = [];
+    const card: FirstAgentCard = {
+      ...firstCard(agent, name, ALPHA),
+      identity: {
+        get: () => agent.client.identity.get(),
+        init: (input: InitIdentityInput) => {
+          names.push(input.name);
+          return agent.client.identity.init(input);
+        },
+      },
+    };
+    return { card, names };
+  }
+
+  const setUp = (agent: Agent, terminal: OwnerTerminal, card: FirstAgentCard) =>
+    initOwnerWith(
+      agent.keychain,
+      terminal,
+      { backend: 'keychain', env: {}, firstCard: card },
+      { kdf: KDF },
+    );
+
+  it('owner init asks for the display name before the code, and the card commits to it', async () => {
+    const alice = await initAgent('alice');
+    const { card, names } = recordingCard(alice, 'alice');
+    const run = namingOwner(['  Ana Kovač  ']);
+    await setUp(alice, run.terminal, card);
+    expect(run.asked).toEqual(['Your agent\'s name for contacts (press Enter for "alice"):']);
+    expect(names).toEqual(['Ana Kovač']);
+    const nameAt = run.written.findIndex((t) => t.startsWith('Contacts see this name'));
+    const codeAt = run.written.findIndex((t) => t.startsWith('Your owner code: '));
+    expect(nameAt).toBeGreaterThanOrEqual(0);
+    expect(nameAt).toBeLessThan(codeAt);
+    expect(await alice.client.identity.get()).toBeDefined();
+  });
+
+  it('an empty answer keeps the local agent name', async () => {
+    const alice = await initAgent('alice');
+    const { card, names } = recordingCard(alice, 'alice');
+    await setUp(alice, namingOwner(['']).terminal, card);
+    expect(names).toEqual(['alice']);
+  });
+
+  it('a name outside the rule is asked again, and three refusals keep the local name', async () => {
+    const alice = await initAgent('alice');
+    const { card, names } = recordingCard(alice, 'alice');
+    const run = namingOwner(['<script>', 'A'.repeat(33), 'Ana‮Kovač']);
+    await setUp(alice, run.terminal, card);
+    expect(run.asked).toHaveLength(3);
+    expect(
+      run.written.filter((t) =>
+        t.startsWith('Use up to 32 letters, digits, spaces, dots, apostrophes or hyphens.'),
+      ),
+    ).toHaveLength(3);
+    expect(names).toEqual(['alice']);
+  });
+
+  it('a valid name after a refused one is used', async () => {
+    const alice = await initAgent('alice');
+    const { card, names } = recordingCard(alice, 'alice');
+    await setUp(alice, namingOwner(['bad\u0007name', "Marko O'Neil-Novak"]).terminal, card);
+    expect(names).toEqual(["Marko O'Neil-Novak"]);
+  });
+
+  it('the name is not asked when owner init refuses (an agent with a card)', async () => {
+    const alice = await initAgent('alice');
+    await ownerInit(alice, firstCard(alice, 'Alice', ALPHA));
+    alice.keychain.items.delete(OWNER_ACCOUNT);
+    const run = namingOwner(['Mallory']);
+    const refused = await failure(() =>
+      setUp(alice, run.terminal, firstCard(alice, 'alice', ALPHA)),
+    );
+    expect(refused.code).toBe('owner_exists');
+    expect(run.asked).toEqual([]);
+  });
+});
