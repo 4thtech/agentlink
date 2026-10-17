@@ -279,17 +279,19 @@ describe('subscribeInbox (M1-9s; 07 §4.1, §4.2; 06 §6)', () => {
       deliverRaw(net, a, b, built.envelope),
       b.client.syncInbox(),
     ]);
+    const ackRows = async () =>
+      (await rowsOf(b)).envelopes.filter((r) => r.direction === 'out' && r.type === 'ack');
     await until(async () => (await inboundText(b))[0]?.state !== 'received');
+    // The row leaves `received` before the ack is stored (the ack follows in the same run), so wait
+    // for the ack itself; a fixed number of ticks is not enough on a loaded runner.
+    await until(async () => (await ackRows()).length >= 1);
     await settle();
     await b.client.syncInbox();
     await settle();
     expect(caught).toBeDefined();
     expect(await inboundText(b)).toHaveLength(1);
-    // One ack for the one message, whichever path processed it.
-    const acks = (await rowsOf(b)).envelopes.filter(
-      (r) => r.direction === 'out' && r.type === 'ack',
-    );
-    expect(acks).toHaveLength(1);
+    // One ack for the one message, whichever path processed it (nothing sent a second one).
+    expect(await ackRows()).toHaveLength(1);
     await sub.close();
     b.client.close();
     a.client.close();
