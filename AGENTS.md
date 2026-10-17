@@ -79,5 +79,5 @@ The main session is the **orchestrator**. Its job is to **orchestrate, deploy wo
 - **New dependencies** need a justification in the PR. No `postinstall` scripts.
 - **UX first (D-39, D-40).** Users never need a wallet, browser extension, gas, seed phrase or chain choice. The only setup step is adding the MCP, and their agent can do it for them. Chains are picked automatically; a picker appears only under Advanced. User-facing strings follow 11 §5: no "wallet", "gas", "seed phrase" or "transaction" in the default UI or in tool summaries.
 - **PRs:** fill every section of `.github/pull_request_template.md`. `pr-hygiene` and `review-gate` check them.
-- **Versioning (D-43).** A PR that changes a published package adds a changeset. A user-visible, spec or process change adds a line under `CHANGELOG.md` → `[Unreleased]`. Never bump versions by hand (`docs/process/versioning.md`).
+- **Versioning (D-43).** A PR that changes a published package adds a changeset. A user-visible, spec or process change adds a `changelog.d/` fragment (see its `README.md`). Never bump versions by hand (`docs/process/versioning.md`).
 - **We build in public.** `README.md` is the public face. Update its Status and Roadmap whenever a milestone, a release or a user-visible capability changes. Never claim unimplemented features. Licence: MIT. The contracts are BUSL-1.1 at mainnet.
