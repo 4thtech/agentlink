@@ -126,7 +126,10 @@ describe('checkChangelogFragment on a fixture repository', () => {
 
   it('fails when the only CHANGELOG edit is in an old version section', async () => {
     write('AGENTS.md', 'b\n');
-    write('CHANGELOG.md', '# C\n\n## [Unreleased]\n\n## [0.1.0] - 2026-10-16\n\n- old\n- typo fix\n');
+    write(
+      'CHANGELOG.md',
+      '# C\n\n## [Unreleased]\n\n## [0.1.0] - 2026-10-16\n\n- old\n- typo fix\n',
+    );
     commit();
     expect((await run()).ok).toBe(false);
   });

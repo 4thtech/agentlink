@@ -8,10 +8,16 @@
 //          nothing for a prerelease or when this version already has its section (the product
 //          version was not bumped, e.g. only private packages were released).
 //
-//   node tools/release/roll-changelog.mjs roll [--file CHANGELOG.md] [--version X.Y.Z] [--date YYYY-MM-DD]
+//   OPS-REL-4: the entries come from changelog fragments (`changelog.d/*.md`, format in
+//   changelog.d/README.md) and from any legacy lines already under `[Unreleased]`; both are folded into
+//   the new section, grouped by Keep a Changelog section in a stable order, and the consumed fragments
+//   are deleted. It refuses only when both are empty, and a fragment with an unknown section is an error.
+//
+//   node tools/release/roll-changelog.mjs roll [--file CHANGELOG.md] [--fragments changelog.d] [--version X.Y.Z] [--date YYYY-MM-DD]
 //
 // Without --version, `roll` reads the product version from apps/cli/package.json.
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const STABLE = /^\d+\.\d+\.\d+$/;
@@ -19,7 +25,101 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const isStableVersion = (v) => typeof v === 'string' && STABLE.test(v);
 
-export function rollChangelog(text, version, date) {
+export const SECTIONS = ['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security'];
+const HEADING = /^#{2,4}\s+(.+?)\s*#*\s*$/;
+
+// Parse one fragment into { Section: [lines] }. Front matter `section: X` and/or `### X` headings name
+// the section; `none` records a reason and adds no entry (the CI check accepts it for a refactor).
+export function parseFragment({ name, text }) {
+  const lines = String(text).replace(/\r\n/g, '\n').split('\n');
+  let current = null;
+  let i = 0;
+  if (lines[0]?.trim() === '---') {
+    const close = lines.findIndex((l, k) => k > 0 && l.trim() === '---');
+    if (close === -1) throw new Error(`${name}: front matter is not closed with "---".`);
+    for (const l of lines.slice(1, close)) {
+      const m = /^section\s*:\s*(.+?)\s*$/i.exec(l);
+      if (m) current = m[1];
+    }
+    i = close + 1;
+  }
+  const out = {};
+  const check = (sec) => {
+    if (sec.toLowerCase() === 'none') return 'none';
+    if (!SECTIONS.includes(sec))
+      throw new Error(`${name}: unknown section "${sec}" (use ${SECTIONS.join(', ')}, or none).`);
+    return sec;
+  };
+  if (current !== null) current = check(current);
+  for (const l of lines.slice(i)) {
+    const h = HEADING.exec(l);
+    if (h) {
+      current = check(h[1]);
+    } else if (l.trim() !== '') {
+      if (current === null)
+        throw new Error(
+          `${name}: no section named (add "section: Added" front matter or a "### Added" heading).`,
+        );
+      if (current !== 'none') (out[current] ??= []).push(l.replace(/\s+$/, ''));
+    }
+  }
+  if (current === null)
+    throw new Error(
+      `${name}: no section named (add "section: Added" front matter or a "### Added" heading).`,
+    );
+  for (const [sec, ls] of Object.entries(out)) {
+    if (!ls.some((l) => /^[-*]\s/.test(l)))
+      throw new Error(`${name}: section "${sec}" has no bullet line ("- ...").`);
+  }
+  if (current !== 'none' && Object.keys(out).length === 0)
+    throw new Error(`${name}: no bullet line ("- ...") found.`);
+  return out;
+}
+
+// Merge legacy [Unreleased] body lines and parsed fragments into one body in canonical order.
+function mergeBody(body, fragments) {
+  const parsed = [...fragments]
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+    .map(parseFragment);
+  if (!parsed.some((f) => Object.keys(f).length > 0)) return { lines: body, hasFragments: false };
+  const pre = [];
+  const sections = new Map();
+  let cur = null;
+  for (const l of body) {
+    const h = /^###\s+(.+?)\s*$/.exec(l);
+    if (h) {
+      cur = h[1];
+      if (!sections.has(cur)) sections.set(cur, []);
+    } else if (cur === null) pre.push(l);
+    else sections.get(cur).push(l);
+  }
+  const trim = (ls) => {
+    const r = [...ls];
+    while (r.length && r[r.length - 1].trim() === '') r.pop();
+    while (r.length && r[0].trim() === '') r.shift();
+    return r;
+  };
+  for (const f of parsed)
+    for (const [sec, ls] of Object.entries(f)) {
+      const base = trim(sections.get(sec) ?? []);
+      sections.set(sec, [...base, ...ls]);
+    }
+  const order = [
+    ...SECTIONS.filter((s) => sections.has(s)),
+    ...[...sections.keys()].filter((s) => !SECTIONS.includes(s)),
+  ];
+  const lines = [];
+  const p = trim(pre);
+  if (p.length) lines.push(...p, '');
+  for (const sec of order) {
+    const ls = trim(sections.get(sec));
+    if (!ls.length) continue;
+    lines.push(`### ${sec}`, '', ...ls, '');
+  }
+  return { lines, hasFragments: true };
+}
+
+export function rollChangelog(text, version, date, fragments = []) {
   if (!isStableVersion(version))
     throw new Error(`Only a stable version can be rolled, got "${version}".`);
   if (!DATE.test(date)) throw new Error(`Invalid date "${date}" (want YYYY-MM-DD).`);
@@ -31,11 +131,12 @@ export function rollChangelog(text, version, date) {
   }
   let end = lines.findIndex((l, i) => i > start && (/^## \[/.test(l) || /^\[[^\]]+\]:/.test(l)));
   if (end === -1) end = lines.length;
-  const body = lines.slice(start + 1, end);
+  const merged = mergeBody(lines.slice(start + 1, end), fragments);
+  const body = merged.lines;
   const hasContent = body.some((l) => l.trim() !== '' && !/^#{1,6}\s/.test(l));
   if (!hasContent)
     throw new Error(
-      '"## [Unreleased]" is empty: add an entry under [Unreleased] in CHANGELOG.md before releasing.',
+      '"## [Unreleased]" is empty: add an entry under [Unreleased] in CHANGELOG.md or a fragment in changelog.d/ before releasing.',
     );
 
   const prevLine = lines.find((l, i) => i >= end && /^## \[\d+\.\d+\.\d+\]/.test(l));
@@ -101,7 +202,16 @@ export function runCli(argv) {
       );
       return;
     }
-    writeFileSync(file, rollChangelog(text, version, date));
+    const dir = opts.fragments ?? 'changelog.d';
+    const names = existsSync(dir)
+      ? readdirSync(dir, { withFileTypes: true })
+          .filter((e) => e.isFile() && e.name.endsWith('.md') && e.name !== 'README.md')
+          .map((e) => e.name)
+          .sort()
+      : [];
+    const fragments = names.map((name) => ({ name, text: readFileSync(join(dir, name), 'utf8') }));
+    writeFileSync(file, rollChangelog(text, version, date, fragments));
+    for (const name of names) unlinkSync(join(dir, name));
     console.log(`Rolled [Unreleased] into [${version}] - ${date}.`);
     return;
   }

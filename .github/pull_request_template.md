@@ -45,7 +45,7 @@ Write "None" if no invariant is touched.
 
 
 ## Docs impact
-<!-- Required. List every doc updated by this PR (README Status, docs/status.yaml and its generated blocks, docs-site/, knowledge/, CHANGELOG, specs, runbooks), or write "none: <reason>" (for example "none: internal refactor, no behaviour or interface change"). A bare "None" is refused by pr-hygiene. -->
+<!-- Required. List every doc updated by this PR (README Status, docs/status.yaml and its generated blocks, docs-site/, knowledge/, changelog fragment in changelog.d/, specs, runbooks), or write "none: <reason>" (for example "none: internal refactor, no behaviour or interface change"). A bare "None" is refused by pr-hygiene. -->
 
 
 ## Dependencies added
