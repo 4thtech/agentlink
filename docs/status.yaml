@@ -246,6 +246,9 @@ areas:
       - name: "Owner console, desktop apps, cloud agent"
         state: planned
         summary: "M2."
+      - name: "Encrypted drop service"
+        state: in-progress
+        summary: "The 4thTech drop Worker (signed uploads with no accounts, single-use upload targets, a hash-checked commit, signed downloads until expiry, quotas and rate limits, no logs) is built and tested locally (M1-27a). Not deployed: deployment (M1-27b), the storage buckets (M1-28) and sending files through it (M1-13c) follow."
   - id: contracts
     title: "OCC v2 contracts (private repo)"
     intro: "Pre-audit. Nothing in AgentLink uses them yet."
@@ -285,7 +288,7 @@ deploy:
     note: "After the external audit (M3). Not deployed."
   services:
     state: planned
-    note: "Submitter, faucet and encrypted drop are not built or deployed yet."
+    note: "None deployed yet. The encrypted drop Worker is built and tested locally (M1-27a); the submitter and faucet are not built yet."
 
 # Prose for the README Status block and the docs-site page.
 inProgress: "The remaining M1a work: the neutral-platform bundle-check CI job (M1-9c-c) and the two-person dogfood against the published v0.1.0 package (M1-23). Next: file encryption and the remaining contract work (M1b)."

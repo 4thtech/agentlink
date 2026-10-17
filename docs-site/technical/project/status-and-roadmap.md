@@ -11,7 +11,7 @@
 
 **Not yet:** files, proof, credits, live relay subscriptions, the local approval page, the owner console, desktop apps and the cloud agent. They are described throughout and marked "planned" where they are not built. v0.1.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha, testnets only) was released on 16 Oct 2026; install it with `npx -y @4thtech-io/agentlink init`.
 
-**Testnet:** OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit; AgentLink does not use them yet. **Mainnet:** After the external audit (M3). Not deployed. **Services:** Submitter, faucet and encrypted drop are not built or deployed yet.
+**Testnet:** OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit; AgentLink does not use them yet. **Mainnet:** After the external audit (M3). Not deployed. **Services:** None deployed yet. The encrypted drop Worker is built and tested locally (M1-27a); the submitter and faucet are not built yet.
 
 **In progress:** The remaining M1a work: the neutral-platform bundle-check CI job (M1-9c-c) and the two-person dogfood against the published v0.1.0 package (M1-23). Next: file encryption and the remaining contract work (M1b).
 
@@ -74,6 +74,7 @@ Code that is merged is not necessarily published: nothing is released or install
 | MCP server, CLI and apps | Several agents of one owner on one computer | Done | [#172](https://github.com/4thtech/agentlink/pull/172), [#178](https://github.com/4thtech/agentlink/pull/178) |
 | MCP server, CLI and apps | Local approval page | Planned | - |
 | MCP server, CLI and apps | Owner console, desktop apps, cloud agent | Planned | - |
+| MCP server, CLI and apps | Encrypted drop service | In progress | - |
 | OCC v2 contracts (private repo) | Notary and fee vault | Done | contracts#4 |
 | OCC v2 contracts (private repo) | Testnet deployment | Done | [#65](https://github.com/4thtech/agentlink/pull/65), contracts#8, contracts#9 |
 | OCC v2 contracts (private repo) | Gnosis Chiado deployment, ABI package, pre-audit fixes | Planned | - |

@@ -279,7 +279,11 @@ importers:
 
   apps/console: {}
 
-  apps/drop: {}
+  apps/drop:
+    dependencies:
+      '@agentlink/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
 
   apps/invite: {}
 

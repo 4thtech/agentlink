@@ -20,7 +20,33 @@ export {
   type ByteLengthOption,
 } from './encoding.js';
 export { concatBytes, equalBytes } from './bytes.js';
-export { TAGS, keccak256, sha256, taggedHash } from './hash.js';
+export { TAGS, createSha256, keccak256, sha256, taggedHash, type Sha256Hasher } from './hash.js';
+// M1-27a (D-48): the encrypted-drop request signature (verification and the unsigned event; the
+// drop key signs in a KeyStore) and the drop's URL MAC (07 §5.4, 04 §4).
+export {
+  DROP_AUTH_DOMAIN,
+  DROP_AUTH_KIND,
+  DROP_AUTH_MAX_HEADER_LENGTH,
+  DROP_AUTH_MAX_SKEW_SECONDS,
+  DROP_AUTH_MAX_URL_LENGTH,
+  DROP_AUTH_METHODS,
+  DROP_AUTH_SCHEME,
+  DROP_MAX_PART,
+  DROP_OBJECT_ID_LENGTH,
+  DROP_URL_KEY_LENGTH,
+  DROP_URL_MAC_LABEL,
+  DROP_URL_MAC_LENGTH,
+  dropAuthEvent,
+  dropUrlMac,
+  encodeDropAuthorization,
+  verifyDropAuthorization,
+  verifyDropUrlMac,
+  type DropAuthFailure,
+  type DropAuthRequest,
+  type DropAuthResult,
+  type DropUrlFields,
+  type DropUrlPurpose,
+} from './drop-auth.js';
 export {
   MAX_JSON_DEPTH,
   canonicalize,

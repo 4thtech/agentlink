@@ -29,7 +29,9 @@ const DROP_SECRET = new Uint8Array(32).fill(7);
 const DROP_PUB = encodeHex(bip340PublicKey(DROP_SECRET));
 const NOW = 1_790_000_000;
 const URL_UPLOAD = 'https://drop.agentlink.4thtech.io/v1/upload';
-const BODY = encodeUtf8('{"v":1,"size":20000,"expiresAt":1790600000,"nonce":"AAAAAAAAAAAAAAAAAAAAAA","ts":1790000000}');
+const BODY = encodeUtf8(
+  '{"v":1,"size":20000,"expiresAt":1790600000,"nonce":"AAAAAAAAAAAAAAAAAAAAAA","ts":1790000000}',
+);
 const REQUEST: DropAuthRequest = { method: 'POST', url: URL_UPLOAD, body: BODY };
 
 function signed(request: DropAuthRequest = REQUEST, createdAt = NOW): NostrEvent {
@@ -68,19 +70,23 @@ describe('dropAuthEvent', () => {
   });
 
   it('refuses methods other than POST and DELETE, non-https URLs and bad timestamps', () => {
-    expect(codeOf(() => dropAuthEvent({ ...REQUEST, method: 'GET' }, NOW))).toBe('invalid_argument');
-    expect(codeOf(() => dropAuthEvent({ ...REQUEST, method: 'post' }, NOW))).toBe('invalid_argument');
-    expect(codeOf(() => dropAuthEvent({ ...REQUEST, url: 'http://drop.example/v1/upload' }, NOW))).toBe(
+    expect(codeOf(() => dropAuthEvent({ ...REQUEST, method: 'GET' }, NOW))).toBe(
       'invalid_argument',
     );
-    expect(codeOf(() => dropAuthEvent({ ...REQUEST, url: `https://d.example/${'a'.repeat(600)}` }, NOW))).toBe(
+    expect(codeOf(() => dropAuthEvent({ ...REQUEST, method: 'post' }, NOW))).toBe(
       'invalid_argument',
     );
+    expect(
+      codeOf(() => dropAuthEvent({ ...REQUEST, url: 'http://drop.example/v1/upload' }, NOW)),
+    ).toBe('invalid_argument');
+    expect(
+      codeOf(() => dropAuthEvent({ ...REQUEST, url: `https://d.example/${'a'.repeat(600)}` }, NOW)),
+    ).toBe('invalid_argument');
     expect(codeOf(() => dropAuthEvent(REQUEST, -1))).toBe('invalid_argument');
     expect(codeOf(() => dropAuthEvent(REQUEST, 1.5))).toBe('invalid_argument');
-    expect(codeOf(() => dropAuthEvent({ ...REQUEST, body: 'x' as unknown as Uint8Array }, NOW))).toBe(
-      'invalid_argument',
-    );
+    expect(
+      codeOf(() => dropAuthEvent({ ...REQUEST, body: 'x' as unknown as Uint8Array }, NOW)),
+    ).toBe('invalid_argument');
   });
 });
 
@@ -102,8 +108,12 @@ describe('verifyDropAuthorization', () => {
   it('accepts timestamps at the edge of the skew window and refuses beyond it as stale', () => {
     const skew = DROP_AUTH_MAX_SKEW_SECONDS;
     expect(skew).toBe(60);
-    expect(verifyDropAuthorization(header(signed(REQUEST, NOW - skew)), REQUEST, NOW).ok).toBe(true);
-    expect(verifyDropAuthorization(header(signed(REQUEST, NOW + skew)), REQUEST, NOW).ok).toBe(true);
+    expect(verifyDropAuthorization(header(signed(REQUEST, NOW - skew)), REQUEST, NOW).ok).toBe(
+      true,
+    );
+    expect(verifyDropAuthorization(header(signed(REQUEST, NOW + skew)), REQUEST, NOW).ok).toBe(
+      true,
+    );
     expect(verifyDropAuthorization(header(signed(REQUEST, NOW - skew - 1)), REQUEST, NOW)).toEqual({
       ok: false,
       reason: 'stale',
@@ -122,7 +132,10 @@ describe('verifyDropAuthorization', () => {
       { ...REQUEST, url: 'https://evil.example/v1/upload' },
       { ...REQUEST, body: encodeUtf8('{"v":1}') },
     ]) {
-      expect(verifyDropAuthorization(auth, other, NOW)).toEqual({ ok: false, reason: 'request_mismatch' });
+      expect(verifyDropAuthorization(auth, other, NOW)).toEqual({
+        ok: false,
+        reason: 'request_mismatch',
+      });
     }
   });
 
@@ -143,11 +156,17 @@ describe('verifyDropAuthorization', () => {
       { ...base, tags: [...base.tags, ['x', 'y']] },
       { ...base, tags: [base.tags[1], base.tags[0], base.tags[2], base.tags[3]] },
       { ...base, tags: base.tags.slice(0, 3) },
-      { ...base, tags: [base.tags[0], base.tags[1], base.tags[2], ['domain', 'agentlink/v1/other']] },
+      {
+        ...base,
+        tags: [base.tags[0], base.tags[1], base.tags[2], ['domain', 'agentlink/v1/other']],
+      },
     ];
     for (const variant of variants) {
       const event = signNostrEvent(DROP_SECRET, variant as typeof base);
-      expect(verifyDropAuthorization(header(event), REQUEST, NOW)).toEqual({ ok: false, reason: 'malformed' });
+      expect(verifyDropAuthorization(header(event), REQUEST, NOW)).toEqual({
+        ok: false,
+        reason: 'malformed',
+      });
     }
   });
 
@@ -163,7 +182,7 @@ describe('verifyDropAuthorization', () => {
       `${good}=`,
       good.replace('Nostr ', 'Nostr  '),
       `${good.slice(0, 10)}+${good.slice(11)}`, // a '+' is not base64url
-      `Nostr ${encodeBase64url(encodeUtf8(`${json} `))}`,
+      `Nostr ${encodeBase64url(encodeUtf8(`${json},`))}`,
       `Nostr ${encodeBase64url(encodeUtf8(json.replace('"sig"', '"sig":"x","extra":1,"sig2"')))}`,
       `Nostr ${'A'.repeat(DROP_AUTH_MAX_HEADER_LENGTH)}`,
     ]) {
@@ -176,7 +195,11 @@ describe('verifyDropAuthorization', () => {
   it('never throws, whatever it is given', () => {
     expect(() => verifyDropAuthorization(42 as unknown as string, REQUEST, NOW)).not.toThrow();
     expect(() =>
-      verifyDropAuthorization(header(signed()), { ...REQUEST, body: null as unknown as Uint8Array }, NOW),
+      verifyDropAuthorization(
+        header(signed()),
+        { ...REQUEST, body: null as unknown as Uint8Array },
+        NOW,
+      ),
     ).not.toThrow();
     expect(verifyDropAuthorization(header(signed()), REQUEST, Number.NaN).ok).toBe(false);
   });
@@ -218,11 +241,17 @@ describe('dropUrlMac', () => {
 
   it('refuses a short key, a wrong-length object id, a bad part or expiry', () => {
     expect(codeOf(() => dropUrlMac(key.subarray(0, 16), fields))).toBe('invalid_length');
-    expect(codeOf(() => dropUrlMac(key, { ...fields, objectId: objectId.subarray(0, 15) }))).toBe('invalid_length');
+    expect(codeOf(() => dropUrlMac(key, { ...fields, objectId: objectId.subarray(0, 15) }))).toBe(
+      'invalid_length',
+    );
     expect(codeOf(() => dropUrlMac(key, { ...fields, part: 1 }))).toBe('invalid_argument'); // get has part 0
-    expect(codeOf(() => dropUrlMac(key, { ...fields, purpose: 'put', part: 10_001 }))).toBe('invalid_argument');
+    expect(codeOf(() => dropUrlMac(key, { ...fields, purpose: 'put', part: 10_001 }))).toBe(
+      'invalid_argument',
+    );
     expect(codeOf(() => dropUrlMac(key, { ...fields, expiresAt: -1 }))).toBe('invalid_argument');
-    expect(codeOf(() => dropUrlMac(key, { ...fields, purpose: 'other' as 'get' }))).toBe('invalid_argument');
+    expect(codeOf(() => dropUrlMac(key, { ...fields, purpose: 'other' as 'get' }))).toBe(
+      'invalid_argument',
+    );
     expect(verifyDropUrlMac(key, { ...fields, part: 1 }, dropUrlMac(key, fields))).toBe(false);
   });
 });

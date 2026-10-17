@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Added
 
+- Encrypted drop (M1-27a, S2, D-48): the drop Worker in `apps/drop`, tested locally under Miniflare and not deployed (deployment is M1-27b; the R2 buckets and lifecycle rule are the owner's M1-28). Signed uploads with no accounts, single-use upload targets that take exactly the declared size (multipart above 64 MiB), a commit that hashes the stored bytes and deletes them on a mismatch, signed downloads until expiry with a download limit of 16, DELETE by the uploading drop key only, an abuse report that deletes only that object, per-key quotas, per-IP (IPv6 per /64) and global limits, and no logs: aggregate counters only. `@agentlink/crypto` gains the drop request signature (verification and the unsigned event), the drop URL MAC and an incremental SHA-256, with the `drop-auth` vectors in all runtimes. Spec (07 §5.4, 04 §4, 08 §7; proposed, owner confirms at merge): the signature format, the signed URLs, the limits with the shared-egress and global-cap rules, the download limit, and the CORS policy for browser downloads.
 - CLI (M1-9w, S1): `agentlink init --harness claude-desktop` sets up the Claude desktop app (macOS and Windows; its own `claude_desktop_config.json`, not Claude Code's file), with the usual diff, confirmation, backup and refusal of malformed files. On Linux it says the app isn't available there.
 
 ### Fixed

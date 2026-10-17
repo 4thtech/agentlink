@@ -1,10 +1,13 @@
 // M1-27a (IR-D48-1 F10): when the global cap is exhausted the drop fails closed with a typed,
 // retryable `unavailable` and stores nothing (07 §5.4 Limits, 04 §4). This file runs in its own
 // Miniflare project (vitest.config.ts `drop-global-cap`) whose global cap is 1 MiB per day.
-import { SELF, env } from 'cloudflare:test';
+import { SELF, env as testEnv } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { encodeBase64url, encodeUtf8 } from '@agentlink/crypto';
 import { signDropAuthorization } from '@agentlink/crypto/testing';
+import type { DropEnv } from '../src/index.js';
+
+const env = testEnv as DropEnv;
 
 const HOST = 'https://drop.test';
 
@@ -19,7 +22,13 @@ async function requestUpload(secret: Uint8Array, ip: string, size: number): Prom
   const ts = Math.floor(Date.now() / 1000);
   const nonce = new Uint8Array(16);
   crypto.getRandomValues(nonce);
-  const text = JSON.stringify({ v: 1, size, expiresAt: ts + 3600, nonce: encodeBase64url(nonce), ts });
+  const text = JSON.stringify({
+    v: 1,
+    size,
+    expiresAt: ts + 3600,
+    nonce: encodeBase64url(nonce),
+    ts,
+  });
   const url = `${HOST}/v1/upload`;
   const { authorization } = signDropAuthorization(
     secret,

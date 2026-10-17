@@ -6,10 +6,13 @@
 // The canary block at the end runs after every other test of this file and searches everything the
 // Worker wrote to the console, and every metric name it keeps, for the URLs, object IDs, drop keys,
 // signatures and nonces the tests used (I-7, 04 §4 Logging).
-import { SELF, env } from 'cloudflare:test';
+import { SELF, env as testEnv } from 'cloudflare:test';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createSha256, encodeBase64url, encodeHex, encodeUtf8 } from '@agentlink/crypto';
 import { signDropAuthorization } from '@agentlink/crypto/testing';
+import type { DropEnv } from '../src/index.js';
+
+const env = testEnv as DropEnv;
 
 const HOST = 'https://drop.test';
 const MiB = 1024 * 1024;
@@ -76,7 +79,7 @@ function hashHex(data: Uint8Array): string {
   return encodeHex(createSha256().update(data).digest());
 }
 
-function bytesOf(size: number, seed = 1): Uint8Array {
+function bytesOf(size: number, seed = 1): Uint8Array<ArrayBuffer> {
   const out = new Uint8Array(size);
   for (let i = 0; i < size; i += 1) out[i] = (i * 31 + seed) & 0xff;
   return out;
@@ -154,7 +157,11 @@ async function grant(response: Response): Promise<UploadGrant> {
 }
 
 async function put(url: string, data: Uint8Array, ip = '203.0.113.9'): Promise<Response> {
-  return SELF.fetch(url, { method: 'PUT', body: data, headers: { 'cf-connecting-ip': ip } });
+  return SELF.fetch(url, {
+    method: 'PUT',
+    body: data as Uint8Array<ArrayBuffer>,
+    headers: { 'cf-connecting-ip': ip },
+  });
 }
 
 async function commit(
@@ -199,7 +206,9 @@ async function storeFile(
   } else {
     let offset = 0;
     for (const part of g.parts ?? []) {
-      expect((await put(part.uploadUrl, data.subarray(offset, offset + part.size))).status).toBe(201);
+      expect((await put(part.uploadUrl, data.subarray(offset, offset + part.size))).status).toBe(
+        201,
+      );
       offset += part.size;
     }
   }
@@ -355,7 +364,10 @@ describe('signed requests', () => {
 
   it('refuses an expiry beyond 7 days or in the past', async () => {
     const ts = now();
-    const far = await requestUpload(newKey(), newIp(), 20_000, { ts, expiresAt: ts + 7 * 86_400 + 1 });
+    const far = await requestUpload(newKey(), newIp(), 20_000, {
+      ts,
+      expiresAt: ts + 7 * 86_400 + 1,
+    });
     expect(far.status).toBe(400);
     const past = await requestUpload(newKey(), newIp(), 20_000, { ts, expiresAt: ts - 1 });
     expect(past.status).toBe(400);
@@ -383,7 +395,8 @@ describe('limits', () => {
 
   it('limits many fresh drop keys from one IP, with a retryable rate_limited error', async () => {
     const ip = newIp();
-    for (let i = 0; i < 3; i += 1) expect((await requestUpload(newKey(), ip, 20_000)).status).toBe(201);
+    for (let i = 0; i < 3; i += 1)
+      expect((await requestUpload(newKey(), ip, 20_000)).status).toBe(201);
     const fourth = await requestUpload(newKey(), ip, 20_000);
     expect(fourth.status).toBe(429);
     expect(await errorOf(fourth)).toEqual({ error: 'rate_limited', retryable: true });
@@ -405,7 +418,8 @@ describe('limits', () => {
     const ip = newIp();
     const known = newKey();
     expect((await requestUpload(known, ip, 20_000)).status).toBe(201);
-    for (let i = 0; i < 2; i += 1) expect((await requestUpload(newKey(), ip, 20_000)).status).toBe(201);
+    for (let i = 0; i < 2; i += 1)
+      expect((await requestUpload(newKey(), ip, 20_000)).status).toBe(201);
     expect((await requestUpload(newKey(), ip, 20_000)).status).toBe(429);
     expect((await requestUpload(known, ip, 20_000)).status).toBe(201);
   });
@@ -616,7 +630,17 @@ describe('canary: nothing sensitive is logged or used as a metric label (I-7)', 
   }
 
   it('the check itself finds a planted leak (negative control)', () => {
-    expect(leaks(['upload https://drop.test/v1/get/abc?e=1&m=zzz'], ['https://drop.test/v1/get/abc'])).toHaveLength(1);
+    expect(
+      leaks(['upload https://drop.test/v1/get/abc?e=1&m=zzz'], ['https://drop.test/v1/get/abc']),
+    ).toHaveLength(1);
+  });
+
+  it('the capture sees console output of this isolate, where the Worker runs (positive control)', () => {
+    const before = captured.length;
+    // eslint-disable-next-line no-console -- the positive control writes one line on purpose
+    console.log('drop-canary-probe');
+    expect(captured.slice(before)).toEqual(['drop-canary-probe']);
+    captured.pop();
   });
 
   it('collected the values to search for', () => {
