@@ -155,7 +155,7 @@ jobs:
             *) base="" ;;
           esac
           if [[ "$base" =~ ^[0-9a-f]{40}$ ]] && git fetch --quiet --no-tags --depth=1 origin "$base" 2> /dev/null; then
-            if files="$(git diff --name-only "$base" HEAD 2> /dev/null)"; then
+            if files="$(git diff --no-renames --name-only "$base" HEAD 2> /dev/null)"; then
               if [ -z "$(printf '%s\n' "$files" | grep -Ev '^(docs/|docs-site/|knowledge/|changelog\.d/|\.changeset/|[^/]+\.md$)' || true)" ]; then
                 relevant=false
               fi
