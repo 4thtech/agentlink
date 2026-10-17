@@ -72,6 +72,7 @@ export function parseLine(line, nonce) {
     case 'READY':
     case 'PAIRED':
     case 'ABORT':
+    case 'DONE': // auto-sync (M1-23-e): B finished and wrote results.json
       return words.length === 0 ? { kind } : undefined;
     case 'STEP':
       return words.length === 2 && STEP_ID.test(words[0]) && OUTCOMES.has(words[1])
@@ -311,6 +312,26 @@ export function sshPreflight(host, run = spawnSync) {
   return r.error || r.status !== 0 ? { ok: false, help: sshSetupHelp(host) } : { ok: true };
 }
 
+/** What `agentlink doctor` prints when macOS refuses the login keychain (an ssh session has no GUI session). */
+export const KEYCHAIN_OVER_SSH = /no system keychain|User interaction is not allowed/i;
+export const KEYCHAIN_OVER_SSH_HELP =
+  'macOS blocks the keychain over SSH; use --auto-sync (start role b on Mac B first)';
+
+/**
+ * --two-mac preflight: runs `agentlink doctor` for Mac B's agent over ssh and recognises the macOS
+ * keychain-over-ssh failure. Any other failure is left to Mac B's own preflight. `run` is injectable.
+ */
+export function keychainOverSshCheck(options, parse, run = spawnSync) {
+  const script = `${remoteAgentlinkWords({ remoteAgentlink: options.remoteAgentlink }, parse)} doctor --agent ${options.ocAgent}`;
+  const r = run('ssh', sshArgs(options.remoteHost, remoteShell(script)), {
+    encoding: 'utf8',
+    timeout: 120_000,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const text = `${r.stdout ?? ''}${r.stderr ?? ''}`;
+  return KEYCHAIN_OVER_SSH.test(text) ? { ok: false, help: KEYCHAIN_OVER_SSH_HELP } : { ok: true };
+}
+
 export function sshSetupHelp(host) {
   return [
     `Cannot reach ${host} over ssh without a password prompt. One-time setup:`,
@@ -377,7 +398,7 @@ export function renderCombinedMd(meta, rows) {
   const esc = (s) => plain(s).replace(/\|/g, '\\|');
   const pass = rows.filter((r) => r.outcome === 'pass').length;
   return [
-    `# AgentLink two-Mac dogfood (hands-free) ${meta.startedAt}`,
+    `# AgentLink two-Mac dogfood (${meta.mode ?? 'hands-free'}) ${meta.startedAt}`,
     '',
     `Agents: ${meta.ccAgent} (Mac A, Claude Code ${meta.versionsA.claude ?? '-'}), ${meta.ocAgent} (Mac B ${meta.host}, OpenCode ${meta.versionsB?.opencode ?? '-'}); AgentLink A ${meta.versionsA.agentlink ?? '-'}, B ${meta.versionsB?.agentlink ?? '-'}`,
     `Passed ${String(pass)} of ${String(rows.length)}; secret scan: Mac A ${meta.scanA}, Mac B ${meta.scanB}`,

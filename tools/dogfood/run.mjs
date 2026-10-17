@@ -58,11 +58,29 @@ import {
   renderCombinedMd,
   sealLine,
   sshArgs,
+  sanitizeFinal,
+  keychainOverSshCheck,
   sshPreflight,
+  validRemotePath,
   wireOutcome,
 } from './remote.mjs';
+import {
+  DEFAULT_REMOTE_OUT,
+  FILES,
+  approvalNoticeLocal,
+  approveCommandText,
+  discoverWaiting,
+  inviteText,
+  localTransport,
+  makeChannel,
+  parseInviteFile,
+  sshTransport,
+  waitingText,
+} from './autosync.mjs';
 
 // Hands-free Mac B: stdout carries only protocol lines; everything for humans goes to stderr.
+const SYNC_WAIT_MS = 30 * 60_000; // how long either Mac waits for the other to show up
+const SYNC_POLL_MS = 3_000;
 const HANDS_FREE = process.argv.includes('--hands-free');
 const log = (text) => (HANDS_FREE ? console.error(text) : console.log(text));
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -472,12 +490,13 @@ async function main() {
   const asker = makeAsker();
   const hf = options.handsFree;
   const tm = options.twoMac;
+  const as = options.autoSync; // M1-23-e: agents local on each Mac, ssh only moves small files
   const inbox = makeInbox();
   const hfLines = hf ? pumpLines(process.stdin, inbox, () => {}) : undefined;
   hfLines?.on('close', () => inbox.end());
   // Mac B uses Mac A's run ID, so both sides name this run's offer the same way.
   let runId = options.role === 'b' ? options.runId : stamp();
-  if (runId === undefined && !options.dryRun && !hf) {
+  if (runId === undefined && !options.dryRun && !hf && !as) {
     runId = await askUntil(asker, 'Run ID printed on Mac A (like 20261017-101500): ', (v) =>
       v !== undefined && /^\d{8}-\d{6}$/.test(v.trim()) ? v.trim() : undefined,
     );
@@ -492,6 +511,7 @@ async function main() {
   if (
     options.role === 'b' &&
     !hf &&
+    !as &&
     !options.paired &&
     pairing &&
     invite === undefined &&
@@ -504,6 +524,35 @@ async function main() {
       console.error('Mac B needs the invite link that Mac A printed (--invite), unless --paired.');
       return 2;
     }
+  }
+  // Auto-sync, Mac A: find the run Mac B is waiting in; its run ID names this run on both Macs.
+  let syncInfo;
+  if (as && options.role === 'a' && !options.dryRun) {
+    const check = sshPreflight(options.remoteHost);
+    if (!check.ok) {
+      console.error(`PREFLIGHT: ${check.help}`);
+      console.error('Nothing was started.');
+      return 1;
+    }
+    const remoteOut = options.remoteOut ?? DEFAULT_REMOTE_OUT;
+    if (!validRemotePath(remoteOut)) {
+      console.error('--remote-out has characters that are not allowed.');
+      return 1;
+    }
+    log(`Looking for Mac B's waiting run on ${options.remoteHost} ...`);
+    const until = Date.now() + SYNC_WAIT_MS;
+    while (syncInfo === undefined && Date.now() < until) {
+      syncInfo = await discoverWaiting(options.remoteHost, remoteOut);
+      if (syncInfo === undefined) await sleep(5_000);
+    }
+    if (syncInfo === undefined) {
+      console.error(
+        'Mac B is not waiting. On Mac B start the same command with --role b --auto-sync first (no --remote), then run this again.',
+      );
+      return 1;
+    }
+    runId = syncInfo.runId;
+    log(`Found Mac B's run ${runId}.`);
   }
   const dir = join(options.out, runId);
   const steps = buildSteps({
@@ -533,6 +582,13 @@ async function main() {
       console.error('Nothing was started.');
       return 1;
     }
+    // macOS gives an ssh session no keychain: say so now instead of failing in the middle of a run.
+    const keychain = keychainOverSshCheck(options, splitCommand);
+    if (!keychain.ok) {
+      console.error(`PREFLIGHT: ${keychain.help}`);
+      console.error('Nothing was started.');
+      return 1;
+    }
   }
   const startedAt = new Date().toISOString();
   await mkdir(dir, { recursive: true, mode: 0o700 });
@@ -550,6 +606,9 @@ async function main() {
 
   let remote;
   let handsPaired = false;
+  let channel;
+  let transport;
+  let nonce;
   if (tm) {
     remote = startRemote(options, runId, inbox);
     log(`Starting Mac B on ${options.remoteHost} (run ID ${runId})...`);
@@ -560,6 +619,54 @@ async function main() {
       );
       await remote.stop();
       return 1;
+    }
+  }
+  if (as) {
+    const chanDeps = { sleep, intervalMs: SYNC_POLL_MS };
+    if (options.role === 'b') {
+      // Mac B: announce the run in the sync folder (0700), then wait for Mac A. No stdin prompts.
+      transport = localTransport(join(dir, 'sync'));
+      await transport.init();
+      nonce = randomBytes(16).toString('hex');
+      channel = makeChannel({ transport, nonce, role: 'b', ...chanDeps });
+      await transport.write(FILES.waiting, waitingText(runId, nonce));
+      log(
+        `Waiting for Mac A (run ${runId}). On Mac A run:\n  node tools/dogfood/run.mjs --role a --auto-sync --remote <this Mac's ssh host> [same agent flags]`,
+      );
+      const ready = await channel.take(
+        (m) => m.kind === 'READY' || m.kind === 'ABORT',
+        SYNC_WAIT_MS,
+      );
+      if (typeof ready === 'string' || ready.kind === 'ABORT') {
+        console.error('Mac A did not connect (or stopped). Nothing was started.');
+        await transport.remove(FILES.waiting);
+        return 1;
+      }
+      if (pairing) {
+        log('Mac A connected. Waiting for its invite ...');
+        const until = Date.now() + options.stepTimeoutMs + 120_000;
+        let got;
+        while (got === undefined && Date.now() < until) {
+          const text = await transport.read(FILES.invite);
+          got = text === undefined ? undefined : parseInviteFile(text, nonce);
+          // The link is a secret: delete the file right after reading it.
+          if (got !== undefined) await transport.remove(FILES.invite);
+          else await sleep(SYNC_POLL_MS);
+        }
+        if (got === undefined || got.kind === 'ABORT') {
+          console.error('Mac A did not send the invite (its pairing step failed or it stopped).');
+          return 1;
+        }
+        if (got.kind === 'INVITE') invite = got.url;
+        else handsPaired = true;
+      }
+    } else {
+      // Mac A: claim the run (the marker is deleted so no second run can take it) and say READY.
+      transport = sshTransport(options.remoteHost, syncInfo.syncDir);
+      nonce = syncInfo.nonce;
+      channel = makeChannel({ transport, nonce, role: 'a', ...chanDeps });
+      await transport.remove(FILES.waiting);
+      await channel.send('READY');
     }
   }
   if (hf) {
@@ -599,7 +706,7 @@ async function main() {
     log(
       `Mac ${options.role.toUpperCase()}: ${options.sameOwner ? 'same owner on both Macs' : 'a different owner per Mac'}. Approvals are typed on the Mac that owns the agent; agents never approve.`,
     );
-    if (options.role === 'a' && !tm) log(`Run ID for Mac B: ${runId}`);
+    if (options.role === 'a' && !tm && !as) log(`Run ID for Mac B: ${runId}`);
   }
 
   const harnesses = await makeHarnesses(options, dir);
@@ -615,9 +722,10 @@ async function main() {
     {
       now: () => Date.now(),
       log,
-      quietApproval: tm || hf,
+      quietApproval: tm || hf || as,
       onResult(result) {
         if (result.local !== true) return;
+        if (as) void channel.send('STEP', result.id, wireOutcome(result.outcome));
         if (tm) remote.send('STEP', result.id, wireOutcome(result.outcome));
         if (hf) emit('STEP', result.id, wireOutcome(result.outcome));
       },
@@ -644,6 +752,20 @@ async function main() {
         return 'ok';
       },
       async waitRemote(step, info) {
+        if (as) {
+          log(`... waiting for the other Mac: ${step.id} ${step.title}`);
+          const m = await channel.take(
+            (x) => x.kind === 'ABORT' || (x.kind === 'STEP' && x.id === step.id),
+            maxWait(step),
+          );
+          if (m === 'timeout' || m.kind === 'ABORT') {
+            log(
+              `The other Mac ${m === 'timeout' ? `did not finish ${step.id} in time` : 'stopped'}; counting ${step.id} as failed.`,
+            );
+            return 'fail';
+          }
+          return m.outcome === 'ok' ? 'ok' : m.outcome === 'skip' ? 'skip' : 'fail';
+        }
         if (!tm && !hf) {
           log(`\n${remoteBox(step, info, options.sameOwner)}`);
           return askUntil(asker, '> ', parseRemoteAnswer);
@@ -673,7 +795,22 @@ async function main() {
           return m.outcome === 'ok' ? 'ok' : m.outcome === 'skip' ? 'skip' : 'fail';
         }
       },
-      afterStep(step, ctx, result) {
+      async afterStep(step, ctx, result) {
+        if (as) {
+          if (options.role !== 'a' || step.id !== 'P1') return;
+          // The invite goes to Mac B's sync folder through ssh stdin only; B deletes it after reading.
+          let text;
+          if (result.outcome !== 'pass') text = inviteText(nonce, 'ABORT');
+          else if (ctx.alreadyPaired) text = inviteText(nonce, 'PAIRED');
+          else if (validInviteUrl(ctx.inviteUrl)) text = inviteText(nonce, 'INVITE', ctx.inviteUrl);
+          else text = inviteText(nonce, 'ABORT');
+          try {
+            await transport.write(FILES.invite, text);
+          } catch {
+            console.error('Could not hand the invite to Mac B over ssh; Mac B will time out.');
+          }
+          return;
+        }
         // Mac A hands the invite to Mac B by hand: printed once, to the terminal only.
         if (tm && step.id === 'P1') {
           // The invite goes to Mac B over the ssh stdin only: never printed, logged or in argv.
@@ -704,6 +841,19 @@ async function main() {
       async waitApproval(harness, approvalId) {
         if (hf) emit('APPROVAL', harness, agentOf(harness), approvalId);
         let timeoutMs = options.approvalTimeoutMs;
+        if (as) {
+          // The owner types the code on THIS Mac, in a second window; nothing crosses ssh.
+          const inv = approveInvocation(
+            options,
+            'local',
+            agentOf(harness),
+            approvalId,
+            splitCommand,
+          );
+          log(
+            `\n${approvalNoticeLocal(agentOf(harness), approvalId, approveCommandText(inv.cmd, inv.args), options.approvalTimeoutMs / 60_000)}`,
+          );
+        }
         if (tm) {
           // Mac A's own approval: the approve command runs in this terminal; you type the code.
           log(`\n${approvalNotice('local', '', agentOf(harness), approvalId)}`);
@@ -779,11 +929,31 @@ async function main() {
     hfLines?.close();
     process.stdin.pause();
   }
-  if (tm) {
+  if (as && options.role === 'b') await channel.send('DONE'); // after results.json is written
+  if (tm || (as && options.role === 'a')) {
     // One combined table: each step from the Mac that ran it, plus both secret scans.
-    const f = await inbox.take((m) => m.kind === 'FINAL', 180_000);
-    await remote.stop();
-    const bFinal = typeof f === 'object' ? f.final : undefined;
+    let bFinal;
+    if (tm) {
+      const f = await inbox.take((m) => m.kind === 'FINAL', 180_000);
+      await remote.stop();
+      bFinal = typeof f === 'object' ? f.final : undefined;
+    } else {
+      // Mac B says DONE after it wrote results.json (next to its sync folder); read it through ssh.
+      const done = await channel.take((m) => m.kind === 'DONE', 300_000);
+      const text = done === 'timeout' ? undefined : await transport.read('../results.json');
+      try {
+        const j = JSON.parse(text ?? '');
+        bFinal = sanitizeFinal({
+          results: j.results,
+          findings: j.findings,
+          versions: j.meta?.versions,
+          scan: j.meta?.scan,
+          dir: syncInfo.syncDir.replace(/\/sync$/, ''),
+        });
+      } catch {
+        bFinal = undefined;
+      }
+    }
     if (bFinal === undefined)
       console.error('Mac B did not send its results; counting the run as failed.');
     const rows = combineResults(
@@ -793,6 +963,7 @@ async function main() {
     );
     const combinedMeta = {
       startedAt,
+      mode: as ? 'auto-sync' : 'hands-free',
       ccAgent: options.ccAgent,
       ocAgent: options.ocAgent,
       host: options.remoteHost,

@@ -3346,6 +3346,14 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** unit tests for the argument rules, the role split, the hand-off values, the exit status and the per-side summary; the invite link appears only in the Mac A terminal box and the Mac B argument or prompt (not in `results.md` or `results.json`; transcripts and prompt files hold it exactly as in single-machine mode). The agent and owner setup stay manual (owner presence). J2, J3 and J5 (files, credits, proof) are not part of this tool and wait for M1b.
 - Review note (PR #202 review L1/L2/L4, 2026-10-17): `--invite=URL` echoes the link in the "unknown option" error; the hand-off box omits `--agentlink`, `--opencode`, `--oc-model`, `--cc-via` and `--manual`; manual-mode outcomes count as verified in the check table (documented).
 
+#### M1-23-e · Dogfood: auto-sync two-Mac mode, agents local, ssh only for files (new, live finding 2026-10-17)
+- **Status:** in progress · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`tools/dogfood/**`; sensitive path `docs/runbooks/**`: merges only on Tali's "merge") · **Phase:** M1b
+- **Repo/path:** agentlink · `tools/dogfood/**`, `docs/runbooks/dogfood-m1a.md` (RB-17 section 10)
+- **Depends on:** M1-23-d
+- **Why:** macOS denies the login keychain in SSH sessions (`User interaction is not allowed`; `agentlink doctor`: no system keychain), so `--two-mac` cannot run Mac B's agent over ssh.
+- **Scope:** `--role b --auto-sync` (Mac B, waits) and `--role a --auto-sync --remote <host>` (Mac A): each agent runs in its own Mac's terminal; ssh only moves small files in a 0700 sync folder on Mac B (per-run nonce, sealed status lines, invite through stdin and deleted after reading). Approvals typed locally on each Mac. One combined table on Mac A. `--two-mac` preflight detects the keychain failure and points to `--auto-sync`.
+- **Acceptance:** tests with a fake ssh for the file protocol (nonce, invite via stdin, status parsing, timeouts); existing modes unchanged.
+
 #### M1-9t · CLI: several agents under one OS user, and init for one harness (new, found by the M1-23 runbook)
 - **Status:** merged (#178) · **Size:** M · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1a (needed for the one-computer part of M1-23, not for the gate)
 - **Repo/path:** agentlink · apps/cli (`init`, `owner init`), packages/node (`initOwner`)
