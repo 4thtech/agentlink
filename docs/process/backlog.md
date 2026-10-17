@@ -3318,6 +3318,24 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (b) Gemini CLI is detected by the `gemini` binary on `PATH` or `~/.gemini/settings.json`, not by any `~/.gemini` folder (IR-M1-9t-1 L-3, moved from M1-9u (b)); a home with only `~/.gemini/config/mcp_config.json` proposes Antigravity.
 - **Acceptance:** fixture-home tests per system (injected platform and home) for no config, other servers present and malformed; detection tests for Claude Desktop and Gemini CLI; the harness docs page has the row.
 
+#### M1-9x · node: recover an owner with no attached agent (new, from the review of PR #201)
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/node (`owner-add-agent.ts`, `owner-keystore.ts`), packages/crypto (`openOwnerSeedWithoutCard`), apps/cli (`owner add-agent`)
+- **Depends on:** M1-9t
+- **Spec:** 04 §2.5, §2.8 ("Adding an agent to the existing owner", "Expected owner"); 07 §9.4; D-78
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - The loop: an owner item exists on this machine but no local agent has a card naming it (for example after every carded agent was removed). `owner init` refuses because an owner exists and points to `owner add-agent`; `owner add-agent` needed another agent's card to learn the owner's public keys. Dead end.
+  - `agentlink owner add-agent --agent <name>` with no agent naming an owner takes the owner's public keys from the owner item itself: the owner code (or opted-in passphrase), typed once, unwraps the seed, which derives them. With no card to compare against (04 §2.8 "Expected owner"), the authenticated decryption under the typed secret is the only check, so the owner sees the owner fingerprint and confirms it (`[y/N]`) before the one card is signed. Same guards (TTY only, AI-app marker refused before the owner item is read, owner presence per 04 §2.5), same restricted first-card session; it never writes or removes the owner item.
+  - `@agentlink/crypto/keystore` gains `openOwnerSeedWithoutCard` (all other `openOwnerSeed` rules unchanged; `openOwnerSeed` still refuses a missing expected owner).
+  - `hasOwnerOnMachine()` (`@agentlink/node`): a store-only check (no secret read, nothing unlocked) whether the owner item exists, for `doctor` and messages (not wired yet; M1-9u (a) landed a `doctor` hint from the cards alone, whose copy now points to this recovery).
+- **Acceptance:** tests first (RED commit): after every agent is removed, add-agent succeeds and names the same owner; a call with an AI-app marker is refused before the owner item is read; declining the fingerprint or three wrong entries writes nothing; no owner code in the output, an error or the result; the existing add-agent path is unchanged.
+- **Notes (IR-M1-9x-1):**
+  - Round 1 fixes: spec 04 §2.8 "No local card names the owner" added (M-1); `owner add-agent` uses a revoked card's owner as the expected owner and refuses, naming them, when an agent can't be read (M-2); a warning before the code prompt (L-1); the owner session starts after the fingerprint answer (L-2).
+  - L-3: `hasOwnerOnMachine` reads the whole wrapped item and has no AI-app guard. It is wired nowhere yet; before M1-9u wires it into `doctor` (or anything an agent can run), switch it to a metadata-only existence check.
+  - L-4: the node test checks output, errors and the result for the owner code; node itself cannot log (ESLint CONSOLE_SYNTAX), indirect logging from dependencies is not captured.
+  - L-5: give the confirmation a real reference: `owner init` should tell the owner to note the owner fingerprint next to the code, and the M1b recovery kit (M1-9h/M1-9i) should print it.
+
 #### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
 - **Status:** in review · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/06-mcp-server.md §4

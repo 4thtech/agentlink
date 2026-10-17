@@ -24,6 +24,8 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'assertAgentId',
       'createOsKeychainAgent',
       'decideReviewedApprovals',
+      // M1-9x: a store-only boolean (owner item present); no bytes, no secret, nothing unlocked.
+      'hasOwnerOnMachine',
       'initOwner',
       'nodeHostResolver',
       'nodeNip11Fetcher',
