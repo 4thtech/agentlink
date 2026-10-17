@@ -580,6 +580,19 @@ jobs:
           git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
           node tools/release/check-changesets.mjs --base origin/main
 
+      # OPS-REL-4: a user-visible, spec or process change adds a changelog fragment in changelog.d/
+      # (or, during the transition, a line under CHANGELOG.md [Unreleased]); editing [Unreleased]
+      # directly only warns. Same exemption and env-only inputs as the step above.
+      - name: Require a changelog entry for a user-visible, spec or process change
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          set -euo pipefail
+          node tools/release/check-changelog-fragment.mjs --base origin/main
+
   ci-gate:
     # A push run on a feature branch tests the branch tip, while the pull request run tests the
     # merge with `main`. Only the latter may satisfy the required check `ci-gate`, so a feature

@@ -573,9 +573,21 @@ describe('owner-card follow-ups (M1-8h-b; IR-M1-8h-1)', () => {
     expect(run.asked).toHaveLength(3);
     expect(
       run.written.filter((t) =>
-        t.startsWith('Use up to 32 letters, digits, spaces, dots, apostrophes or hyphens.'),
+        t.startsWith(
+          'Use up to 32 letters, digits, spaces, dots, apostrophes or hyphens, in one script',
+        ),
       ),
     ).toHaveLength(3);
+    expect(names).toEqual(['alice']);
+  });
+
+  it('IR-M1-8h-b-1 L1: a name restrictName would change is refused (NFKC, reserved word, mixed script)', async () => {
+    const alice = await initAgent('alice');
+    const { card, names } = recordingCard(alice, 'alice');
+    // A ligature NFKC rewrites, a reserved label word, and Latin mixed with a Cyrillic look-alike.
+    const run = namingOwner(['ﬁne Agent', 'Owner Bot', 'Pаypal']);
+    await setUp(alice, run.terminal, card);
+    expect(run.asked).toHaveLength(3);
     expect(names).toEqual(['alice']);
   });
 

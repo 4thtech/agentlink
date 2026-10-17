@@ -29,6 +29,7 @@ import {
   type OwnerPublicKeys,
 } from '@agentlink/crypto';
 import { generateSecretCode } from '@agentlink/crypto/keystore';
+import { restrictName } from '@agentlink/core';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS } from './keychain-keystore.js';
 import {
@@ -132,7 +133,8 @@ const COPY = {
   nameNote: 'Contacts see this name labelled as self-declared. You can keep the suggested one.',
   nameQuestion: (suggested: string): string =>
     `Your agent's name for contacts (press Enter for "${suggested}"):`,
-  nameRefused: 'Use up to 32 letters, digits, spaces, dots, apostrophes or hyphens.',
+  nameRefused:
+    'Use up to 32 letters, digits, spaces, dots, apostrophes or hyphens, in one script, without words such as "owner" or "verified".',
   nameKept: (suggested: string): string => `Keeping "${suggested}" as your agent's name.`,
 } as const;
 
@@ -329,10 +331,16 @@ async function issueFirstCard(
 /**
  * M1-8h-b: a display name the owner typed is used only when it fits the restricted-name rule of
  * 11 §5.2 (06 §2.1), so contacts can show it: after NFC and trimming, 1 to 32 letters, digits,
- * spaces, `.`, `'` and `-` (combining marks allowed). Control, format (bidi) and other characters are
- * refused, never stripped.
+ * spaces, `.`, `'` and `-` (combining marks allowed), and core `restrictName` returns it unchanged
+ * (IR-M1-8h-b-1 L1: no NFKC change, no reserved word, no mixed or look-alike script). Control,
+ * format (bidi) and other characters are refused, never stripped.
  */
 const DISPLAY_NAME = /^[\p{L}\p{M}\p{N} .'-]{1,32}$/u;
+
+function displayNameAllowed(typed: string): boolean {
+  // The fingerprint argument only shapes the fallback, which never equals an accepted name here.
+  return DISPLAY_NAME.test(typed) && restrictName(typed, '0000·0000') === typed;
+}
 
 /**
  * M1-8h-b: asks the owner for the agent's display name (self-declared, 04 §2.4), on terminals that
@@ -349,7 +357,7 @@ async function withDisplayName(
   for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
     const typed = (await terminal.readText(COPY.nameQuestion(first.name))).normalize('NFC').trim();
     if (typed === '') return first;
-    if (DISPLAY_NAME.test(typed)) return { ...first, name: typed };
+    if (displayNameAllowed(typed)) return { ...first, name: typed };
     terminal.write(COPY.nameRefused);
   }
   terminal.write(COPY.nameKept(first.name));

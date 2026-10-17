@@ -60,6 +60,7 @@ import {
   nip44EncryptWithKey,
   normalizeSecret,
   openOwnerSeed,
+  openOwnerSeedWithoutCard,
   sealOwnerSeed,
   signEnvelopeHash,
   signTypedData,
@@ -192,6 +193,37 @@ export async function readOwnerItem(
   timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
 ): Promise<Uint8Array | null> {
   return guarded(() => keychain.get(OWNER_ACCOUNT), timeoutMs);
+}
+
+/**
+ * M1-9x: a store-only check for `doctor` and messages: true when the `owner` item exists on this
+ * machine. It reads only the wrapped item (never a secret), asks for nothing and unlocks nothing;
+ * the bytes are wiped at once.
+ */
+export async function ownerItemPresent(
+  keychain: KeychainBackend,
+  timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+): Promise<boolean> {
+  const blob = await readOwnerItem(keychain, timeoutMs);
+  if (blob === null) return false;
+  wipe(blob);
+  return true;
+}
+
+/**
+ * M1-9x: the stored wrap's `secretKind` header byte (public header data), or null when there is no
+ * `owner` item; `owner_mismatch` when the item is not a 90-byte `ALKO` v1 wrap of kind 1 or 2.
+ */
+export async function storedOwnerSecretKind(
+  keychain: KeychainBackend,
+  timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+): Promise<SecretKind | null> {
+  const blob = await readOwnerItem(keychain, timeoutMs);
+  if (blob === null) return null;
+  const kind = blob.length === ALKO_LENGTH ? blob[ALKO_KIND_OFFSET] : undefined;
+  wipe(blob);
+  if (kind !== 1 && kind !== 2) throw ownerMismatch();
+  return kind;
 }
 
 /** A fresh random owner seed and its public keys (04 §2.1). The caller wipes the seed. */
@@ -639,30 +671,95 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
       if (this.#closed || generation !== this.#generation) {
         throw new KeyStoreError('owner_locked', 'owner keystore: locked while unlocking');
       }
-      let nostr: Uint8Array | undefined;
-      let evm: Uint8Array | undefined;
-      let enc: Uint8Array | undefined;
-      let session: KeychainOwnerSession;
-      try {
-        nostr = deriveSecretKey(seed, KEY_LABELS.nostr, 0);
-        evm = deriveSecretKey(seed, KEY_LABELS.evm, 0);
-        enc = deriveSecretKey(seed, KEY_LABELS.enc, 0);
-        session = new KeychainOwnerSession(
-          SESSION_TOKEN,
-          { nostr, evm, enc },
-          encodeHex(this.#expected.ownerNostr),
-          ttlMs,
-          (ended) => this.#sessions.delete(ended),
-        );
-      } catch (error) {
-        wipe(nostr, evm, enc);
-        throw error;
-      }
-      this.#sessions.add(session);
-      ISSUED_SESSIONS.set(session, this);
-      return session;
+      return this.#issue(seed, ttlMs);
     } finally {
       // The presented secret, the blob and the seed never outlive this call (04 §8.3).
+      wipe(secret, blob, seed);
+    }
+  }
+
+  /** Derives the session's owner keys from `seed` (not modified; the caller wipes it). */
+  #issue(seed: Uint8Array, ttlMs: number): OwnerSession {
+    let nostr: Uint8Array | undefined;
+    let evm: Uint8Array | undefined;
+    let enc: Uint8Array | undefined;
+    let session: KeychainOwnerSession;
+    try {
+      nostr = deriveSecretKey(seed, KEY_LABELS.nostr, 0);
+      evm = deriveSecretKey(seed, KEY_LABELS.evm, 0);
+      enc = deriveSecretKey(seed, KEY_LABELS.enc, 0);
+      session = new KeychainOwnerSession(
+        SESSION_TOKEN,
+        { nostr, evm, enc },
+        encodeHex(this.#expected.ownerNostr),
+        ttlMs,
+        (ended) => this.#sessions.delete(ended),
+      );
+    } catch (error) {
+      wipe(nostr, evm, enc);
+      throw error;
+    }
+    this.#sessions.add(session);
+    ISSUED_SESSIONS.set(session, this);
+    return session;
+  }
+
+  /**
+   * M1-9x (04 §2.8 "Adding an agent to the existing owner"): unlocks the `owner` item when no local
+   * agent card names the owner, so there is no expected owner to check against. The owner keys are
+   * taken from the item itself: the seed the owner code (or opted-in passphrase) unwraps derives
+   * them, and the returned store expects exactly those keys from then on. The authenticated
+   * decryption under the typed secret is the only check, so `confirm` (which MUST show the owner
+   * fingerprint and ask the owner) runs before the session is issued; false returns null and
+   * issues nothing. The seed is held only until the answer and wiped either way.
+   *
+   * `owner_missing` without an item, `owner_mismatch` when it is not 90 bytes, `presence_rejected`
+   * for a wrong secret or a damaged item (one answer, 04 §2.8). The presented secret, the blob and
+   * the seed are wiped whether or not it unlocks.
+   */
+  static async unlockWithoutCard(
+    keychain: KeychainBackend,
+    presence: OwnerPresence,
+    confirm: (owner: OwnerPublicKeys) => Promise<boolean>,
+    options: UnlockOptions & KeychainOwnerKeyStoreOptions = {},
+  ): Promise<{
+    readonly store: KeychainOwnerKeyStore;
+    readonly session: OwnerSession;
+    readonly owner: OwnerPublicKeys;
+  } | null> {
+    const secret = presenceSecret(presence);
+    let blob: Uint8Array | null = null;
+    let seed: Uint8Array | undefined;
+    try {
+      const ttlMs = options.ttlMs ?? OWNER_SESSION_DEFAULT_TTL_MS;
+      if (!Number.isInteger(ttlMs) || ttlMs < 1 || ttlMs > OWNER_SESSION_MAX_TTL_MS) {
+        throw new CryptoInputError(
+          'invalid_argument',
+          'owner keystore: ttlMs must be an integer from 1 to OWNER_SESSION_MAX_TTL_MS',
+        );
+      }
+      const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
+      blob = await readOwnerItem(keychain, timeoutMs);
+      if (blob === null) throw ownerMissing();
+      if (blob.length !== ALKO_LENGTH) throw ownerMismatch();
+      try {
+        seed = await openOwnerSeedWithoutCard(
+          blob,
+          { secret, source: 'prompt' },
+          { fileKeystoreMachine: false },
+        );
+      } catch (error) {
+        if (error instanceof CryptoInputError) throw presenceRejected();
+        throw error;
+      }
+      const owner = publicKeysOf(seed);
+      // The owner confirms the derived fingerprint before any session exists, so the session's
+      // TTL starts only after the answer (IR-M1-9x-1 L-2). Declining issues nothing.
+      if (!(await confirm(ownerKeysCopy(owner)))) return null;
+      const store = new KeychainOwnerKeyStore(keychain, ownerKeysCopy(owner), timeoutMs);
+      const session = store.#issue(seed, ttlMs);
+      return Object.freeze({ store, session, owner: ownerKeysCopy(owner) });
+    } finally {
       wipe(secret, blob, seed);
     }
   }
