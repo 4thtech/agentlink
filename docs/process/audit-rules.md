@@ -216,7 +216,7 @@ Reviewers apply every checklist the diff touches. Item IDs are stable; new items
 - CR-6 HPKE Base mode, DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-256-GCM; `info = "agentlink/v1/cek"‖id`; empty AAD; `kid` = first 16 bytes of `sha256(encPub)`.
 - CR-7 Recipient set always includes recipient agent, recipient owner, sender owner, sender agent (I-9, 04 §3.2).
 - CR-8 CEK 32 random bytes per envelope; AES-GCM IVs 12 random bytes, never reused under a key; randomness only from `globalThis.crypto` via libraries.
-- CR-9 STREAM file format per 04 §4: `ALF1` header, nonce `noncePrefix‖u32be(index)`, AAD `u8(isFinal)`; truncation and reordering detected.
+- CR-9 STREAM file format per 04 §4: `ALF1` header, nonce `noncePrefix‖u32be(index)`, AAD `header (17 B) ‖ u8(isFinal)` (D-80); header tampering, truncation and reordering detected.
 - CR-10 Pairing: the invite store holds `proofKey = HKDF-SHA256(secret, "", "agentlink/v1/pairing-proof")`, encrypted at rest, and never the raw `secret`; single use; expiry; proof `HMAC-SHA256(proofKey, "agentlink-handshake"‖inviteId‖sha256(JCS(B card)))` over the raw bytes of 04 §3.6, compared in constant time; safety code per 04 §3.6.
 - CR-11 Owner seed wrap per 04 §2.3 (PRF salt, HKDF info, AES-256-GCM); recovery code 120 bits with Argon2id m=64 MiB, t=3, p=1; no user-chosen passphrase for relay-published blobs.
 - CR-12 Secrets zeroed with `fill(0)` where the platform allows; decrypt failures give uniform errors.
