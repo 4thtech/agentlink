@@ -51,7 +51,7 @@ flowchart LR
 | Storage | `@agentlink/storage` | All | Ciphertext blobs: inline, encrypted drop (default), S3-compatible; consumer connectors in M2 |
 | Chain | `@agentlink/chain` | All | Chain configs, contract bindings, fee quotes, credits, submitter client, proof verification |
 | MCP server and CLI | `@4thtech-io/agentlink` | Local (stdio) or Worker (HTTP) | Tools, schemas, approval flow, untrusted-content wrapping; the `agentlink` CLI |
-| Local approval UI | same package | `127.0.0.1` | Approvals and settings (M1) |
+| Local approval UI | same package | `localhost` | Approvals and settings (M1) |
 | Desktop apps | `apps/desktop` | macOS, Windows, Linux | Tray app hosting the MCP server, native approval window, local dashboard (M2) |
 | Owner console | `apps/console` | Browser (PWA) | Passkey owner identity, activity, approvals, policies, proofs, credits (M2) |
 | Cloud agent template | `apps/cloud-agent` | The user's own Cloudflare account | Always-on agent, remote MCP with OAuth (M2) |
