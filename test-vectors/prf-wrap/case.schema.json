@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/prf-wrap/case.schema.json",
+  "title": "prf-wrap case",
+  "description": "Passkey PRF wrap key (04 \u00a72.3). `prfSalt`: the 32-byte PRF salt sha256(\"agentlink-owner-v1\"). `wrapKey`: HKDF-SHA256 of a 32-byte PRF output with an empty salt and info \"owner-seed-wrap\", 32 bytes. Hex without 0x.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op"
+          ],
+          "properties": {
+            "op": {
+              "const": "prfSalt"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "salt"
+          ],
+          "properties": {
+            "salt": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "prfOutput"
+          ],
+          "properties": {
+            "op": {
+              "const": "wrapKey"
+            },
+            "prfOutput": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "wrapKey"
+          ],
+          "properties": {
+            "wrapKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

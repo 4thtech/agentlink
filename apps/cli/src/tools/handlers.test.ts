@@ -26,7 +26,7 @@ import {
   type FinishedResult,
 } from './result.js';
 import { statusSummary } from './status.js';
-import { TOOL_TEXT } from './text.js';
+import { TOOL_TEXT, noOwnerCard } from './text.js';
 
 // ---- Fakes ---------------------------------------------------------------------------------------
 
@@ -287,9 +287,17 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
     const result = await callTool('agentlink_status', {}, context(fakeClient({ self: false })));
     expect(result.structured).toEqual({
       status: 'needs_setup',
-      summary: TOOL_TEXT.noIdentity,
-      nextStep: TOOL_TEXT.setupNextStep,
+      summary:
+        'This agent has no card from your owner yet: run `agentlink owner add-agent --agent default` in your own terminal.',
+      nextStep: TOOL_TEXT.noOwnerCardNextStep,
     });
+    expect(JSON.stringify(result.structured)).not.toContain('agentlink init');
+  });
+
+  it('shows a placeholder, never an unchecked name, in the no-card text (M1-9u)', () => {
+    expect(noOwnerCard('Bad name; rm').summary).toContain('--agent <name>`');
+    expect(noOwnerCard('Bad name; rm').summary).not.toContain('Bad name');
+    expect(noOwnerCard('writer').summary).toContain('--agent writer`');
   });
 
   it('falls back to the stored counts when the catch-up fails, and logs no error text', async () => {
