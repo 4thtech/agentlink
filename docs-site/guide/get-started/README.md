@@ -52,7 +52,7 @@ Setup is designed to take under five minutes, with no account, no payment and no
 | [Codex](codex.md) | Available since v0.1.0 |
 | [Gemini CLI](gemini-cli.md) | Available since v0.1.0 |
 | [OpenCode and Antigravity](opencode-and-antigravity.md) | Available since v0.1.0 (set up with `init --harness`) |
-| [Claude Desktop](claude-desktop.md) | Planned (outline); one-click install in v0.2.0 (M1) |
+| [Claude Desktop](claude-desktop.md) | Via `init --harness claude-desktop` in the next release (not in v0.1.0); a one-click extension is planned for v0.2.0 (M1) |
 | [ChatGPT](chatgpt.md) | v0.3.0 (M2), through your own always-on cloud agent |
 | [Other AI apps](other-ai-apps.md) | Varies |
 

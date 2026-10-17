@@ -43,7 +43,7 @@ Sources: [Claude Code MCP](https://code.claude.com/docs/en/mcp) (`claude mcp add
 
 ### Claude Desktop (the Claude app)
 
-The Claude desktop app (chat) has its own file, separate from Claude Code's `~/.claude.json`. Setting up one does not set up the other: run `init --harness claude-code` for Claude Code and `init --harness claude-desktop` for the app.
+The Claude desktop app (chat) has its own file, separate from Claude Code's `~/.claude.json`. Setting up one does not set up the other: run `init --harness claude-code` for Claude Code and `init --harness claude-desktop` (next release; not in v0.1.0) for the app.
 
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json` (`init` uses `~/AppData/Roaming/Claude`; the `APPDATA` variable is not followed)
