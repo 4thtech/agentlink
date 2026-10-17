@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- OPS-REL-3: the "Version packages" PR now rolls `CHANGELOG.md` `[Unreleased]` into the version section (`tools/release/roll-changelog.mjs`), and a GitHub Release body over 125,000 characters falls back to a short note with a link.
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.
 
 ## [0.1.0] - 2026-10-16

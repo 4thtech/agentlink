@@ -228,14 +228,15 @@ jobs:
           cache: "false"
 
       # Title and commit message use the CHORE prefix so they satisfy pr-hygiene's title rule.
-      # If `changeset version` leaves pnpm-lock.yaml stale, add a root script
-      # (version-packages: changeset version && pnpm install --lockfile-only --ignore-scripts)
-      # and pass `script: pnpm run version-packages` here. The same script must roll the root
-      # CHANGELOG.md for a stable version (docs/process/versioning.md §5): [Unreleased] becomes
-      # "## [<version>] - <date>"; the PR branch is push-restricted, so nobody can do it by hand there.
+      # The root script `version-packages` runs `changeset version` and then rolls the root CHANGELOG.md
+      # (tools/release/roll-changelog.mjs, OPS-REL-3, docs/process/versioning.md §5): for a stable version
+      # [Unreleased] becomes "## [<version>] - <date>" and an empty [Unreleased] is added; an empty
+      # [Unreleased] fails this job; prereleases leave the file alone. The PR branch is push-restricted,
+      # so nobody can do it by hand there.
       - name: Open or update the Version packages pull request
         uses: changesets/action/version@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
+          script: pnpm run version-packages
           commit-message: "CHORE: Version packages"
           pr-title: "CHORE: Version packages"
 
@@ -625,6 +626,8 @@ jobs:
             echo "::error file=CHANGELOG.md::CHANGELOG.md has no non-empty \"## [$version]\" section; the release PR must roll [Unreleased] into it (docs/process/versioning.md §5)."
             exit 1
           fi
+          # GitHub rejects a Release body over 125,000 characters (HTTP 422): swap in a short note with a link.
+          node tools/release/roll-changelog.mjs body --notes "$notes" --version "$version" --repo "$GITHUB_REPOSITORY"
           echo "Release notes for v$version found."
           echo "version=$version" >> "$GITHUB_OUTPUT"
 

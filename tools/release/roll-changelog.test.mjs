@@ -55,16 +55,20 @@ describe('rollChangelog', () => {
     expect(out).toContain(
       '[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.2.0...HEAD',
     );
-    expect(out).toContain(
-      '[0.2.0]: https://github.com/4thtech/agentlink/compare/v0.1.0...v0.2.0',
-    );
+    expect(out).toContain('[0.2.0]: https://github.com/4thtech/agentlink/compare/v0.1.0...v0.2.0');
     expect(out).toContain('[0.1.0]: https://github.com/4thtech/agentlink/compare/v0.0.1...v0.1.0');
   });
 
   it('refuses an empty [Unreleased], including one with only headings', () => {
-    const empty = FIXTURE.replace(/## \[Unreleased\][\s\S]*?(?=## \[0\.1\.0\])/, '## [Unreleased]\n\n');
+    const empty = FIXTURE.replace(
+      /## \[Unreleased\][\s\S]*?(?=## \[0\.1\.0\])/,
+      '## [Unreleased]\n\n',
+    );
     expect(() => rollChangelog(empty, '0.2.0', '2026-11-01')).toThrow(/empty/i);
-    const headings = FIXTURE.replace(/- Thing one \(M1-1\)\./, '').replace(/- Thing two \(M1-2\)\./, '');
+    const headings = FIXTURE.replace(/- Thing one \(M1-1\)\./, '').replace(
+      /- Thing two \(M1-2\)\./,
+      '',
+    );
     expect(() => rollChangelog(headings, '0.2.0', '2026-11-01')).toThrow(/empty/i);
   });
 
@@ -76,7 +80,8 @@ describe('rollChangelog', () => {
   });
 
   it('works for the first release (no earlier version section)', () => {
-    const first = '# C\n\n## [Unreleased]\n\n- a\n\n[Unreleased]: https://github.com/o/r/commits/main\n';
+    const first =
+      '# C\n\n## [Unreleased]\n\n- a\n\n[Unreleased]: https://github.com/o/r/commits/main\n';
     const out = rollChangelog(first, '0.0.1', '2026-10-12');
     expect(out).toContain('## [0.0.1] - 2026-10-12\n\n- a');
     expect(out).toContain('[0.0.1]: https://github.com/o/r/releases/tag/v0.0.1');
@@ -151,7 +156,17 @@ describe('runCli', () => {
     const d = dir();
     const notes = join(d, 'notes.md');
     writeFileSync(notes, 'x'.repeat(GITHUB_BODY_LIMIT + 5));
-    runCli(['body', '--notes', notes, '--version', '0.2.0', '--repo', '4thtech/agentlink', '--date', '2026-11-01']);
+    runCli([
+      'body',
+      '--notes',
+      notes,
+      '--version',
+      '0.2.0',
+      '--repo',
+      '4thtech/agentlink',
+      '--date',
+      '2026-11-01',
+    ]);
     const out = readFileSync(notes, 'utf8');
     expect(out.length).toBeLessThan(2000);
     expect(out).toContain('CHANGELOG.md#');

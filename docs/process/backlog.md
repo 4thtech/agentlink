@@ -683,7 +683,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Also (found in PR #187):** since OPS-REL-1 (`privatePackages.version: true`) the private tooling packages (`tools`, `e2e`) count as published, so a tooling-only PR fails the `changesets` check without an empty changeset. Exempt private tooling packages from the changeset requirement, or have CI add empty changesets for them; test both cases.
 
 #### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/release.yml` or a Changesets hook, `tools/**`, `docs/process/versioning.md` §5
 - **Depends on:** —
 - **Spec:** `versioning.md` §5; `release-and-deployment.md` §5.1
