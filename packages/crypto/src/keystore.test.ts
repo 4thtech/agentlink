@@ -42,6 +42,8 @@ const SEED_OR_SECRET = [
   'openKeystoreFileWithKek',
   'sealOwnerSeed',
   'openOwnerSeed',
+  // M1-9x (04 §2.8): the owner wrap opened when no local card names the owner.
+  'openOwnerSeedWithoutCard',
   // IR-M1-1f-1 L-3: the agent ≠ owner probes take a candidate secret (04 §2.8).
   'ownerSecretUnlocks',
   'keystoreSecretUnlocks',

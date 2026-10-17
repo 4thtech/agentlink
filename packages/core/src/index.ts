@@ -329,3 +329,27 @@ export {
 // restart would forget owner-action nonces, the seen-set and idempotency results. Moving it to a
 // test-only subpath needs a boundary-policy change (S1): backlog M1-7a-b.
 export { MemoryStore, type MemoryStoreOptions } from './store/memory-store.js';
+// M1-15: pure security checks for files and downloads (04 §4). The platform halves (DNS-pinned
+// fetch, realpath, exclusive inbox writes) are in @agentlink/node.
+export {
+  MAX_FETCH_REDIRECTS,
+  MAX_FETCH_URL_LENGTH,
+  checkFetchUrl,
+  pickPublicAddress,
+  resolveRedirect,
+  type CheckedFetchUrl,
+  type FetchUrlCheck,
+  type FetchUrlRefusal,
+} from './fetch-url.js';
+export { FALLBACK_FILE_NAME, MAX_FILE_NAME_BYTES, sanitizeFileName } from './file-name.js';
+export {
+  decidePath,
+  expandHome,
+  parseAbsolutePath,
+  protectedRoots,
+  segmentsBelow,
+  type PathCheck,
+  type PathDecisionInput,
+  type PathFlavor,
+  type PathRefusal,
+} from './path-guard.js';

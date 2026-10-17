@@ -168,7 +168,7 @@ export const en = {
   'cli.doctor.noOwnerCard':
     'Problem  This agent has no card from your owner yet\n         Run `agentlink owner add-agent --agent {agent}` in your own terminal.',
   'cli.doctor.noOwnerCardNoOthers':
-    "Problem  No agent on this computer has a card from an owner\n         If you have never set up an owner, `agentlink owner add-agent` tells you what to run first.\n         If an owner already exists here, no agent is attached to it, so AgentLink can't add this one.",
+    'Problem  No agent on this computer has a card from an owner\n         If you have never set up an owner, `agentlink owner add-agent` tells you what to run first.\n         If an owner already exists here, `agentlink owner add-agent --agent <name>` adds this agent to it with your owner code.',
   'cli.doctor.networkOk': 'OK       Message network reachable',
   'cli.doctor.networkDown':
     "Problem  Can't reach the message network\n         Check your connection and run `agentlink doctor` again.",
