@@ -420,6 +420,63 @@ jobs:
             if (tests.length !== 1 || bad.length > 0) { console.error("::error::two-process.keychain.test.ts must run exactly 1 test, passed (none skipped)"); process.exit(1); }
           '
 
+  # OPS-CI-5: the Windows and POSIX path-guard tests (packages/node/src/allowed-path.test.ts, M1-15)
+  # as a required check on the two OS families the Linux `checks` job cannot cover. `node-os` runs
+  # the whole @agentlink/node suite there but is not in `ci-gate` (unrelated flakes); this job runs
+  # only the path-guard file and fails if it did not run, ran too few tests, or skipped any.
+  # `path-guard` is in `ci-gate`'s `needs`. It needs allowed-path.test.ts from PR #208 on main, so
+  # #208 must merge first.
+  path-guard:
+    name: path-guard (${{ matrix.os }})
+    needs: detect
+    if: needs.detect.outputs.has_skeleton == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # Same exact images as `keychain`; a bump is its own reviewed change.
+        os: [macos-26, windows-2025-vs2026]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Choose the test report path
+        shell: bash
+        run: echo "PATH_GUARD_REPORT=$RUNNER_TEMP/path-guard-vitest.json" >> "$GITHUB_ENV"
+
+      - name: Build the workspace dependencies of @agentlink/node
+        shell: bash
+        run: pnpm exec turbo run build --filter='@agentlink/node...'
+
+      - name: Run the path-guard tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --filter @agentlink/node exec vitest run src/allowed-path.test.ts --passWithNoTests=false --reporter=default --reporter=json --outputFile.json="$PATH_GUARD_REPORT"
+
+      # The file must have run, at least 10 tests, all passed (none skipped, todo or failed).
+      - name: Check that allowed-path.test.ts ran in full, with no skipped test
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e '
+            const report = JSON.parse(require("node:fs").readFileSync(process.env.PATH_GUARD_REPORT, "utf8"));
+            const files = report.testResults.filter((f) => /allowed-path\.test\.ts$/.test(f.name.replace(/\\/g, "/")));
+            if (files.length !== 1) { console.error("::error::allowed-path.test.ts did not run"); process.exit(1); }
+            const tests = files[0].assertionResults;
+            const bad = tests.filter((t) => t.status !== "passed");
+            console.log(`allowed-path.test.ts: ${tests.length} tests, ${bad.length} not passed`);
+            if (tests.length < 10 || bad.length > 0) { console.error("::error::allowed-path.test.ts must run at least 10 tests, all passed (none skipped)"); process.exit(1); }
+          '
+
   # The whole @agentlink/node suite on macOS and Windows (it used to run inside the keychain job).
   # Not part of `ci-gate`: OS-timing flakes in unrelated suites must not block merges, but a real
   # OS-specific bug stays visible here. The keychain files themselves run in `keychain`.
@@ -639,7 +696,7 @@ jobs:
     # merge with `main`. Only the latter may satisfy the required check `ci-gate`, so a feature
     # branch push publishes `ci-gate (push)` instead.
     name: ${{ (github.event_name == 'push' && github.ref != 'refs/heads/main') && 'ci-gate (push)' || 'ci-gate' }}
-    needs: [detect, checks, vectors, keychain, context-budget, relays-docker, bundle-check, changesets, e2e-deterministic]
+    needs: [detect, checks, vectors, keychain, path-guard, context-budget, relays-docker, bundle-check, changesets, e2e-deterministic]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

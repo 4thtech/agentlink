@@ -684,6 +684,17 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Also (found in PR #187):** since OPS-REL-1 (`privatePackages.version: true`) the private tooling packages (`tools`, `e2e`) count as published, so a tooling-only PR fails the `changesets` check without an empty changeset. Exempt private tooling packages from the changeset requirement, or have CI add empty changesets for them; test both cases.
 - Review note (PR #197 review L1, 2026-10-17): tighten the tooling-only path exemption for nested packages.
 
+#### OPS-CI-5 · Required Windows/macOS path-guard test job (new)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/ci.yml`, `docs/process/ci-cd.md`
+- **Depends on:** M1-15
+- **Spec:** `ci-cd.md` (Workflows, ci); `04` §4
+- **Invariants:** —
+- **Scope:**
+  - The path-guard tests of M1-15 (`packages/node/src/allowed-path.test.ts`) ran only in the non-required `node-os` job. Add a `path-guard` job on `macos-26` and `windows-2025-vs2026` (structure of `keychain`) that runs only that file and is in `ci-gate`'s `needs`.
+- **Acceptance:**
+  - The job fails if the file did not run, ran fewer than 10 tests, or any test was skipped or did not pass (JSON report check).
+
 #### OPS-CI-4 · Guard the sync secret-scan stub pin (new)
 - **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `tools/sync-pin-check/**`, `.github/workflows/security.yml`, `docs/process/sync-protocol.md`, `docs/process/ci-cd.md`
