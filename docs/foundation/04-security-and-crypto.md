@@ -72,10 +72,64 @@ Rationale: harness agents (Claude Code, Codex, Gemini CLI…) can run shell comm
 
 1. On first use, the console generates the owner seed in the browser.
 2. It creates a passkey with the PRF extension. `user.id` = the owner's Nostr public key (32 bytes), so a new device can find the owner after passkey sign-in.
-3. `wrapKey = HKDF-SHA256(ikm = PRF(salt = sha256("agentlink-owner-v1")), salt = "", info = "owner-seed-wrap", L = 32)`; the seed is encrypted with AES-256-GCM and stored in IndexedDB.
-4. **Backup:** the same encrypted blob is published as a Nostr parameterized-replaceable event (`d`-tag `agentlink-owner-backup`) signed by the owner Nostr key. A new device signs in with the synced passkey, reads `user.id`, fetches the blob from relays and decrypts it with PRF.
-5. **Fallback** when PRF is unsupported: a **generated recovery code** (120 bits, shown as 24 base32 characters in groups) wraps the seed (Argon2id, m=64 MiB, t=3, p=1). User-chosen passphrases must not be used for blobs published to public relays, since those can be brute-forced offline.
-6. **Recovery kit:** downloadable file with the encrypted seed, the recovery code (to be printed or stored in a password manager) and instructions. Raw seed export only under "Advanced".
+3. `wrapKey = HKDF-SHA256(ikm = PRF(salt = sha256("agentlink-owner-v1")), salt = "", info = "owner-seed-wrap", L = 32)`; the seed is sealed with AES-256-GCM in the `ALKP` v1 format (§2.3.1, D-82) and stored in IndexedDB.
+4. **Backup:** the same `ALKP` blob is published as a Nostr parameterized-replaceable event (`d`-tag `agentlink-owner-backup`) signed by the owner Nostr key. A new device signs in with the synced passkey, reads `user.id`, fetches the blob from relays and decrypts it with PRF.
+5. **Fallback** when PRF is unsupported: a **generated recovery code** (120 bits, shown as 24 base32 characters in groups) wraps the seed (Argon2id, m=64 MiB, t=3, p=1) in the `ALKR` v1 format (§2.3.2, D-82). User-chosen passphrases must not be used for blobs published to public relays, since those can be brute-forced offline.
+6. **Recovery kit:** downloadable file with the encrypted seed (the `ALKR` blob), the recovery code (to be printed or stored in a password manager) and instructions. Raw seed export only under "Advanced".
+
+#### 2.3.1 Passkey PRF wrap format `ALKP` v1 (D-82)
+
+Used for the owner seed wrapped under a passkey's PRF output: in the console's IndexedDB (step 3), in the relay backup (step 4) and for the localhost passkey of the local agent (§2.2, M1-8e). One blob per passkey; an owner with several passkeys has several `ALKP` blobs for the same seed.
+
+```
+magic       "ALKP"              4 B
+version     u8 = 1
+aead        u8 = 1              AES-256-GCM
+ownerNostr  32 B                x-only owner Nostr public key (= the passkey's user.id, step 2)
+credIdLen   u16be               1..1023
+credId      credIdLen B         WebAuthn credential ID of the passkey whose PRF output made wrapKey
+nonce       12 B                random; new on every write
+ct          ciphertext || 16-byte tag
+```
+
+- **Key.** `wrapKey` as in step 3: the PRF input is the 32-byte `prfSalt = sha256(utf8("agentlink-owner-v1"))`, the PRF output is 32 bytes, and `wrapKey = HKDF-SHA256(ikm = PRF output, salt = "", info = utf8("owner-seed-wrap"), L = 32)`. The PRF output and `wrapKey` are wiped after use. The label is kept as written (M1-1i `prf-wrap` vectors pin it).
+- **AAD = every header byte** from `magic` through `nonce`. A changed owner key, credential ID, nonce or ciphertext, or a truncated blob, fails authentication.
+- **Plaintext** is exactly the owner seed: 32 bytes. The blob is therefore exactly `100 + credIdLen` bytes (`52 + credIdLen` header, 32 seed, 16 tag).
+- **Refused before decryption:** a wrong magic, `version` ≠ 1, `aead` ≠ 1, `credIdLen` of 0 or above 1023, a total length other than `100 + credIdLen`, a PRF output that is not 32 bytes, and, when the caller knows the expected owner (the passkey's `user.id`, the backup event's author or the card's `ownerNostr`), a header `ownerNostr` that differs from it. The caller asks the authenticator with `allowCredentials = [credId]` and refuses an assertion whose credential ID is not `credId`.
+- **Expected owner after decryption.** The seed must derive (§2.1) the owner Nostr key whose x-only public key equals the header `ownerNostr`, compared as bytes. Otherwise the seed is wiped and the blob refused.
+- **Failure** is one generic error with no partial output: a wrong passkey, a tampered blob and a wrong owner look the same to the caller, and no plaintext byte is returned.
+- `credId` and `ownerNostr` are public (the backup is published), so they are not secrets; the blob holds no salt, because the PRF salt is fixed and the PRF output is per credential.
+
+#### 2.3.2 Recovery code wrap format `ALKR` v1 (D-82)
+
+Used for the owner seed wrapped under a generated recovery code: the PRF fallback (step 5) and the recovery kit (step 6). It mirrors `ALKO` (§2.8) with its own magic and label, so a recovery blob, which may be published, never opens as a keychain or `owner.alko` blob, and the reverse.
+
+```
+magic       "ALKR"              4 B
+version     u8 = 1
+secretKind  u8 = 1              generated recovery code; no other value is defined
+kdf         u8 = 1              Argon2id v1.3 (RFC 9106)
+m           u32be               memory in KiB
+t           u8                  iterations
+p           u8                  lanes
+salt        16 B                random; new on create and on every re-wrap
+aead        u8 = 1              AES-256-GCM
+nonce       12 B                random; new on every write
+ct          ciphertext || 16-byte tag
+```
+
+- `kek = HKDF-SHA256(ikm = Argon2id(password(code, 1), salt, m, t, p, L = 32), salt = "", info = utf8("agentlink/v1/owner-recovery-wrap"), L = 32)`. `password` kind 1 is the generated-code rule of §2.8 (the 15 decoded bytes). Argon2id is version 0x13, with no secret value and no associated data.
+- **Defaults** for new blobs: m = 64 MiB (65536 KiB), t = 3, p = 1. The `ALKS` floor and cap (§2.8) are checked on read before the KDF runs.
+- **Generated codes only.** A chosen passphrase never wraps a recovery blob, since the blob may be published to relays (step 5). `secretKind` ≠ 1 is refused before the KDF runs, and the API offers no passphrase input for `ALKR`.
+- **Recovery code:** 15 CSPRNG bytes, exactly 120 bits, encoded as 24 RFC 4648 base32 characters with no bias and shown in six groups of four. Input follows `password` kind 1, so a mistyped character outside the alphabet is refused before the KDF runs and a wrong code fails authentication.
+- **AAD = every header byte** from `magic` through `nonce`.
+- **Plaintext** is exactly the owner seed: 32 bytes. The blob is therefore exactly 90 bytes (42 header, 32 seed, 16 tag). Any other size, a wrong magic, `version` ≠ 1, `kdf` ≠ 1 or `aead` ≠ 1 is refused before the KDF runs.
+- **Expected owner.** When the caller knows the expected owner (the backup event's author, the passkey's `user.id` or the card's `ownerNostr`), the decrypted seed must derive it; otherwise the seed is wiped and the blob refused. Failure is one generic error with no partial output.
+
+**Both formats.**
+- **Versioning.** `version` is 1. A reader refuses any other version before the KDF or decryption runs; a new version needs a spec change, a decision and new vectors. Writers write v1 only.
+- **Type separation.** `ALKP`, `ALKR`, `ALKO` and `ALKS` each refuse the other three magics before any KDF or decryption. A blob whose magic is rewritten to another type still fails, because the magic is in the AAD and each type has its own key derivation. The vectors carry these cross-type cases (M1-1i, `prf-wrap` suite).
+- All of this runs through `@agentlink/crypto` (HKDF and Argon2id from `@noble/hashes`, AES-256-GCM via WebCrypto, as for `ALKS` and `ALKO`); callers never call a primitive.
 
 ### 2.4 Agent card
 
@@ -363,7 +417,7 @@ ct          ciphertext || 16-byte tag
 ```
 
 - `kek = HKDF-SHA256(ikm = Argon2id(password(secret, secretKind), salt, m, t, p, L = 32), salt = "", info = utf8("agentlink/v1/keystore-file"), L = 32)`. Argon2id is version 0x13, with no secret value (K) and no associated data (X); `salt` is the 16 header bytes.
-- **`password(secret, secretKind)`** (proposed; owner confirms at merge). The same rule applies to `ALKS`, `ALKO` and the recovery code (§2.3):
+- **`password(secret, secretKind)`** (proposed; owner confirms at merge). The same rule applies to `ALKS`, `ALKO` and the recovery code (`ALKR`, §2.3.2):
   - **Both kinds.** A secret read from a file first loses exactly one trailing `\n` or `\r\n`. Prompt and environment input lose nothing.
   - **Kind 1, generated code.** The steps below run on the input in order:
     1. Refuse any byte outside ASCII.
@@ -387,7 +441,7 @@ ct          ciphertext || 16-byte tag
 - **Chosen passphrase:** follows `password` kind 2 above. The header's `secretKind` tells the reader which rule to apply.
 - All of this runs through `@agentlink/crypto` (Argon2id and HKDF from `@noble/hashes`, AES-256-GCM via WebCrypto or `@noble/ciphers`) and the `KeyStore` interface (§8.1). `@agentlink/node` handles only files and never calls a primitive itself.
 
-**Owner wrap format `ALKO` v1** (proposed; owner confirms at merge). It mirrors `ALKS`. It is used for the owner seed wrapped under an owner code or passphrase, both as the file `owner.alko` and as the keychain value on machines with a keychain (§2.2). The passkey PRF wrap (§2.3, M1-1k) is a different format.
+**Owner wrap format `ALKO` v1** (proposed; owner confirms at merge). It mirrors `ALKS`. It is used for the owner seed wrapped under an owner code or passphrase, both as the file `owner.alko` and as the keychain value on machines with a keychain (§2.2). The passkey PRF wrap is the different format `ALKP` and the recovery code wrap is `ALKR` (§2.3.1, §2.3.2, D-82); neither ever opens as `ALKO`.
 
 ```
 magic       "ALKO"              4 B
