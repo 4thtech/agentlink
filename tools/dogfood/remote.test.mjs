@@ -204,7 +204,7 @@ describe('nonce and control characters (M1 status spoofing)', () => {
         },
       ],
     );
-    expect(row.includes("\r")).toBe(false);
+    expect(row.includes('\r')).toBe(false);
     expect(plain(evil)).not.toMatch(/\r/);
     const final = parseLine(
       encodeLine('FINAL', JSON.stringify({ results: [{ id: 'P1', notes: [evil] }] })),
