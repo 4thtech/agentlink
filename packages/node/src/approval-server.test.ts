@@ -1,7 +1,9 @@
 // M1-8d acceptance: the local approval server (08 §1; 04 §2.5; 06 §2.5; I-4, I-7).
 //
-// - Binds 127.0.0.1 only, on a random port; the session token lives in memory and in the opened URL.
-// - Wrong or missing token → 401; a wrong `Host` (DNS rebinding) and a foreign `Origin` are refused;
+// - Served as `http://localhost:<port>` (M1-31, D-79), listening on 127.0.0.1 and ::1 on one random
+//   port and nowhere else; the session token lives in memory and in the opened URL.
+// - Wrong or missing token → 401; a `Host` other than `localhost:<port>` (DNS rebinding, and
+//   `127.0.0.1:<port>`) and a foreign `Origin` are refused;
 //   no state change through a simple cross-site request (CSRF token, non-simple content type).
 // - The token grants viewing only: approving or denying needs the owner code or owner passphrase,
 //   and produces an owner-signed `approval.decide` that the source (core) verifies and applies.
@@ -10,7 +12,8 @@
 // - The M1-8c same-user script, run against the live server, cannot approve without the owner code.
 import { execFile } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { request as httpRequest, type IncomingHttpHeaders } from 'node:http';
+import { request as httpRequest, type IncomingHttpHeaders, type Server } from 'node:http';
+import { createServer as createNetServer, type Server as NetServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,8 +36,10 @@ import {
 import type { OwnerActionOutcome } from '@agentlink/core';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
+  APPROVAL_SERVER_HOST,
   startApprovalServerWith,
   type ApprovalForDecision,
+  type ApprovalServerInternals,
   type ApprovalServer,
   type ApprovalServerEvent,
   type ApprovalServerSource,
@@ -90,8 +95,15 @@ const keychain = new FileKeychain();
 let agentId = '';
 let owner: OwnerPublicKeys;
 let code = '';
+/** Whether this machine can listen on ::1 (then the server must too). */
+let hostHasIpv6 = false;
 
 beforeAll(async () => {
+  hostHasIpv6 = await new Promise<boolean>((resolve) => {
+    const probe = createNetServer();
+    probe.once('error', () => resolve(false));
+    probe.listen({ host: '::1', port: 0, ipv6Only: true }, () => probe.close(() => resolve(true)));
+  });
   agentId = await createKeychainAgent(keychain);
   const written: string[] = [];
   const setup: OwnerTerminal = {
@@ -215,16 +227,18 @@ function send(
     method?: string;
     headers?: Record<string, string>;
     body?: Uint8Array;
+    /** The loopback address to connect to (a browser may pick either for `localhost`). */
+    via?: '127.0.0.1' | '::1';
   } = {},
 ): Promise<Response> {
   return new Promise((resolve, reject) => {
     const req = httpRequest(
       {
-        host: '127.0.0.1',
+        host: options.via ?? '127.0.0.1',
         port,
         path,
         method: options.method ?? 'GET',
-        headers: { Host: `127.0.0.1:${String(port)}`, ...options.headers },
+        headers: { Host: `localhost:${String(port)}`, ...options.headers },
         setHost: false,
       },
       (res) => {
@@ -265,7 +279,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-async function harness(): Promise<Harness> {
+async function harness(extra: ApprovalServerInternals = {}): Promise<Harness> {
   const source = fakeSource();
   const events: ApprovalServerEvent[] = [];
   const opened: string[] = [];
@@ -286,6 +300,7 @@ async function harness(): Promise<Harness> {
         notified.push([...lines]);
         return Promise.resolve(true);
       },
+      ...extra,
     },
   );
   servers.push(server);
@@ -347,13 +362,19 @@ async function decide(
 }
 
 describe('binding and the session token (08 §1)', () => {
-  it('listens on 127.0.0.1 only, on a random port, and the origin names it', async () => {
+  it('serves http://localhost:<port> from 127.0.0.1 and ::1 on one random port', async () => {
     const a = await harness();
     const b = await harness();
-    expect(a.server.address()).toEqual({ address: '127.0.0.1', port: a.port });
+    expect(APPROVAL_SERVER_HOST).toBe('localhost');
+    expect(a.server.address()).toEqual({
+      host: 'localhost',
+      port: a.port,
+      addresses: hostHasIpv6 ? ['127.0.0.1', '::1'] : ['127.0.0.1'],
+    });
     expect(a.port).toBeGreaterThan(0);
     expect(a.port).not.toBe(b.port);
-    expect(a.origin).toBe(`http://127.0.0.1:${String(a.port)}`);
+    expect(a.origin).toBe(`http://localhost:${String(a.port)}`);
+    expect(a.server.approvalUrl(id(1))).toBe(`${a.origin}/approve/${id(1)}`);
     // A random 256-bit token, base64url, different per server.
     expect(a.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(a.token).not.toBe(b.token);
@@ -416,6 +437,148 @@ describe('binding and the session token (08 §1)', () => {
   });
 });
 
+describe('both loopback addresses on one port (M1-31, D-79)', () => {
+  /** Holds `host:port` the way another program on the machine would. */
+  const hold = (host: string, port: number): Promise<NetServer> =>
+    new Promise((resolve, rejectHold) => {
+      const s = createNetServer();
+      s.once('error', rejectHold);
+      s.listen({ host, port, ipv6Only: host === '::1' }, () => resolve(s));
+    });
+  const held: NetServer[] = [];
+  afterEach(async () => {
+    await Promise.all(held.splice(0).map((s) => new Promise((r) => s.close(r))));
+  });
+  const realListen = (
+    server: Server,
+    options: { readonly host: string; readonly port: number; readonly ipv6Only?: boolean },
+  ): Promise<void> =>
+    new Promise((resolve, rejectListen) => {
+      server.once('error', rejectListen);
+      server.listen({ ...options, exclusive: true }, () => {
+        server.off('error', rejectListen);
+        resolve();
+      });
+    });
+  const addressError = (code: string): Error => Object.assign(new Error(code), { code });
+
+  it('answers a request that arrives over ::1 with Host localhost:<port>', async () => {
+    const h = await harness();
+    if (!hostHasIpv6) {
+      // No IPv6 on this machine: the server listens on 127.0.0.1 only (the fallback test below).
+      expect(h.server.address().addresses).toEqual(['127.0.0.1']);
+      return;
+    }
+    const res = await send(h.port, `/?t=${h.token}`, { via: '::1' });
+    expect(res.status).toBe(303);
+    const cookie = (res.headers['set-cookie']?.[0] ?? '').split(';')[0] ?? '';
+    expect((await send(h.port, '/', { via: '::1', headers: { Cookie: cookie } })).status).toBe(200);
+    // One session behind both addresses: a cookie set over ::1 works over 127.0.0.1 too.
+    expect((await send(h.port, '/', { headers: { Cookie: cookie } })).status).toBe(200);
+    // Over ::1 the Host rule is the same.
+    const wrong = await send(h.port, `/?t=${h.token}`, {
+      via: '::1',
+      headers: { Host: `[::1]:${String(h.port)}` },
+    });
+    expect(wrong.status).toBe(403);
+  });
+
+  it('moves to a new port when another program holds ::1 on the one it chose', async () => {
+    const tried: number[] = [];
+    let first = true;
+    const h = await harness({
+      listen: async (server, options) => {
+        if (options.host === '::1') {
+          tried.push(options.port);
+          if (first) {
+            first = false;
+            if (!hostHasIpv6) throw addressError('EADDRINUSE');
+            held.push(await hold('::1', options.port));
+          }
+        }
+        return realListen(server, options);
+      },
+    });
+    expect(tried.length).toBe(2);
+    expect(tried[1]).toBe(h.port);
+    expect(h.port).not.toBe(tried[0]);
+    expect(h.server.address().addresses).toEqual(
+      hostHasIpv6 ? ['127.0.0.1', '::1'] : ['127.0.0.1'],
+    );
+    // The first port's IPv4 listener was released.
+    await expect(send(tried[0] as number, `/?t=${h.token}`)).rejects.toThrow();
+    expect((await send(h.port, `/?t=${h.token}`)).status).toBe(303);
+  });
+
+  it('gives up after five ports when ::1 is always taken, closing what it opened', async () => {
+    let attempts = 0;
+    const v4: Server[] = [];
+    await expect(
+      harness({
+        listen: (server, options) => {
+          if (options.host === '::1') {
+            attempts += 1;
+            return Promise.reject(addressError('EADDRINUSE'));
+          }
+          v4.push(server);
+          return realListen(server, options);
+        },
+      }),
+    ).rejects.toThrow();
+    expect(attempts).toBe(5);
+    expect(v4.length).toBe(5);
+    for (const s of v4) expect(s.listening).toBe(false);
+  });
+
+  it('listens on 127.0.0.1 only, with a fixed event, when the machine has no IPv6', async () => {
+    for (const code of ['EADDRNOTAVAIL', 'EAFNOSUPPORT']) {
+      const h = await harness({
+        listen: (server, options) =>
+          options.host === '::1' ? Promise.reject(addressError(code)) : realListen(server, options),
+      });
+      expect(h.server.address()).toEqual({
+        host: 'localhost',
+        port: h.port,
+        addresses: ['127.0.0.1'],
+      });
+      expect(h.origin).toBe(`http://localhost:${String(h.port)}`);
+      expect(h.events).toContainEqual({ kind: 'ipv6_unavailable' });
+      expect((await send(h.port, `/?t=${h.token}`)).status).toBe(303);
+    }
+  });
+
+  it('fails closed on any other ::1 listen error', async () => {
+    const v4: Server[] = [];
+    await expect(
+      harness({
+        listen: (server, options) => {
+          if (options.host === '::1') return Promise.reject(addressError('EACCES'));
+          v4.push(server);
+          return realListen(server, options);
+        },
+      }),
+    ).rejects.toThrow();
+    expect(v4.length).toBe(1);
+    for (const s of v4) expect(s.listening).toBe(false);
+  });
+
+  it('listens only on 127.0.0.1 and ::1 (IPv6-only), never a wildcard or other address', async () => {
+    const calls: { host: string; ipv6Only?: boolean }[] = [];
+    await harness({
+      listen: (server, options) => {
+        calls.push({
+          host: options.host,
+          ...(options.ipv6Only === undefined ? {} : { ipv6Only: options.ipv6Only }),
+        });
+        return hostHasIpv6 || options.host !== '::1'
+          ? realListen(server, options)
+          : Promise.reject(addressError('EADDRNOTAVAIL'));
+      },
+    });
+    expect(calls).toEqual([{ host: '127.0.0.1' }, { host: '::1', ipv6Only: true }]);
+  });
+});
+
 describe('Host and Origin checks (DNS rebinding, cross-site requests)', () => {
   it('refuses a wrong Host header even with the right token', async () => {
     const h = await harness();
@@ -423,7 +586,13 @@ describe('Host and Origin checks (DNS rebinding, cross-site requests)', () => {
     for (const host of [
       'evil.example',
       `evil.example:${String(h.port)}`,
-      `localhost:${String(h.port)}`,
+      `127.0.0.1:${String(h.port)}`,
+      'localhost',
+      `localhost:${String(h.port + 1)}`,
+      `localhost.:${String(h.port)}`,
+      `localhost:0${String(h.port)}`,
+      `localhost.evil.example:${String(h.port)}`,
+      '[::1]',
       '127.0.0.1',
       `127.0.0.1:${String(h.port + 1)}`,
       `127.0.0.1.evil.example:${String(h.port)}`,
@@ -449,7 +618,12 @@ describe('Host and Origin checks (DNS rebinding, cross-site requests)', () => {
     for (const headers of [
       { Origin: 'http://evil.example' },
       { Origin: `http://127.0.0.1:${String(h.port + 1)}` },
-      { Origin: `http://localhost:${String(h.port)}` },
+      { Origin: `http://127.0.0.1:${String(h.port)}` },
+      { Origin: `http://[::1]:${String(h.port)}` },
+      { Origin: `http://localhost:${String(h.port + 1)}` },
+      { Origin: `https://localhost:${String(h.port)}` },
+      { Origin: `http://localhost.:${String(h.port)}` },
+      { Origin: `http://LOCALHOST:${String(h.port)}` },
       { Origin: 'null' },
       { Origin: '' },
       { 'Sec-Fetch-Site': 'cross-site' },

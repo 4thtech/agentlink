@@ -23,7 +23,7 @@ function send(path, { method = 'GET', headers = {}, body } = {}) {
         port: job.port,
         path,
         method,
-        headers: { Host: `127.0.0.1:${job.port}`, ...headers },
+        headers: { Host: new URL(job.origin).host, ...headers },
         setHost: false,
       },
       (res) => {
