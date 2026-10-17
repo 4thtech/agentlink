@@ -11,6 +11,9 @@
 // 3. `pending_approval` carries the fixed M1a `nextStep` (06 §2.5 step 2, no URL) and a summary
 //    built from the core's card data: the contact under the 06 §2.1 rule, the version, nothing else.
 //
+// `clientRequestId` goes to the core (M1-32-b): a repeat returns the original result, another
+// request under the key is IDEMPOTENCY_KEY_REUSED, a concurrent repeat is IN_PROGRESS (as send).
+//
 // I-4: nothing here creates, decides or widens an approval; `approvalId` is passed to the core,
 // which re-verifies the owner's stored signature. I-5, I-7: the terms, the note and anything the
 // counterparty wrote never reach a summary, `nextStep`, error or log line.
@@ -32,7 +35,9 @@ import {
   askSummary,
   dateOf,
   nameOf,
+  termsApprovalState,
   termsCoreError,
+  termsInProgress,
   termsRefusal,
 } from './terms-common.js';
 import { noOwnerCard } from './text.js';
@@ -43,6 +48,7 @@ interface RespondInput {
   terms?: Record<string, unknown>;
   note?: string;
   approvalId?: string;
+  clientRequestId?: string;
 }
 
 /** Shown when the sender cannot be named (the core decided anyway; summaries only). */
@@ -52,7 +58,7 @@ export async function respondToTermsHandler(
   input: unknown,
   context: ToolContext,
 ): Promise<HandlerOutput> {
-  const { envelopeId, decision, terms, note, approvalId } = input as RespondInput;
+  const { envelopeId, decision, terms, note, approvalId, clientRequestId } = input as RespondInput;
   // 1. 06 §2.2a: never terms with accept or reject; a counter needs them; no note with accept.
   if ((decision === 'counter') !== (terms !== undefined)) return invalidArgument();
   if (decision === 'accept' && note !== undefined) return invalidArgument();
@@ -74,6 +80,7 @@ export async function respondToTermsHandler(
     ...(terms === undefined ? {} : { terms }),
     ...(note === undefined ? {} : { note }),
     ...(approvalId === undefined ? {} : { approvalId }),
+    ...(clientRequestId === undefined ? {} : { clientRequestId }),
   };
   let result;
   try {
@@ -86,6 +93,10 @@ export async function respondToTermsHandler(
   }
 
   switch (result.status) {
+    case 'in_progress':
+      return termsInProgress();
+    case 'approval_state':
+      return termsApprovalState(context, 'agentlink_respond_to_terms', result);
     case 'pending_approval':
       logger.info('terms approval requested', { requests: 1 });
       return pendingApproval(context, result.approvalId, askSummary(result.card), { decision });

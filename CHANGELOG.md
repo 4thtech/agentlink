@@ -6,8 +6,20 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Added
+
+- CLI (M1-9w, S1): `agentlink init --harness claude-desktop` sets up the Claude desktop app (macOS and Windows; its own `claude_desktop_config.json`, not Claude Code's file), with the usual diff, confirmation, backup and refusal of malformed files. On Linux it says the app isn't available there.
+
+### Fixed
+
+- CLI (M1-9w, S1): Gemini CLI is detected by the `gemini` program or `~/.gemini/settings.json`, so a computer with only Antigravity's `~/.gemini/config/mcp_config.json` is offered Antigravity, not Gemini CLI.
+
 ### Changed
 
+- CI (M1-9c-c, S2, process): new `bundle-check` job in `ci-gate`. It builds the CLI on a runner with no keychain and no native-module build and fails when the published `dist/agentlink.js` imports a crypto-capable MCP SDK transitive package (`jose`, `pkce-challenge`, `cookie-signature`, `etag`, `hono`), an SDK subpath outside the stdio set or an undeclared package, or when `src/tools/` bundled for a neutral (Worker) platform reaches a Node built-in, `@agentlink/node` or the MCP SDK (IR-M1-9c-1 F07, D-76, 06 §1). No new dependency: it reuses the repository's Vite. `docs/process/ci-cd.md` records it.
+
+- Spec (M1-9v, S1, 06 §4): the untrusted-content wrapper spec now says that every opening and closing `untrusted_content` tag inside content is escaped, look-alike forms included, as the code already does. No behaviour change.
+- `agentlink_propose_terms` and `agentlink_respond_to_terms` now pass `clientRequestId` to the core (M1-32-c, S1): a repeated call returns the original result and sends nothing more; a different request under the same key is `IDEMPOTENCY_KEY_REUSED`, a concurrent repeat is `IN_PROGRESS` (as `agentlink_send`), and a repeat whose approval has since been decided reports that approval's state.
 - CLI: an agent that has no card from its owner yet is now told so. `agentlink_status`, the other tools and `agentlink doctor` say to run `agentlink owner add-agent --agent <name>` in your own terminal instead of suggesting `init` (M1-9u). `owner add-agent` also explains the case where an owner exists but no agent here is attached to it.
 - Docs: README, `knowledge/`, `llms.txt`, `docs-site/` and `docs/status.yaml` now say v0.1.0 is released (16 Oct 2026, `npx -y @4thtech-io/agentlink init`); the OpenCode and Antigravity quickstart, the messages, contacts, approvals, first-message and troubleshooting pages are filled in. Files, proof and the apps stay planned.
 
