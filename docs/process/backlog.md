@@ -1075,7 +1075,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - `AgentCard` EIP-712 vectors from M1-1h pass in all runtimes.
 
 #### M1-1j · crypto: EIP-712 proof types and commitment helpers (new, split from M1-1e)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in-progress (revoke struct deferred until G-20 lands, PR #215 / M1-1i-b) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto
 - **Depends on:** M1-1e, M1-1i
 - **Spec:** 04 §5; 05 §3.1, §4, §8
@@ -4113,6 +4113,8 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Acceptance:**
   - J3 completed without gas on Base (and on Gnosis if a supported token exists).
   - A replayed authorization fails; a below-minimum authorization is rejected by the submitter before submission.
+  - The core refuses to sign a `ReceiveWithAuthorization` unless `to` equals the configured fee vault for that chain, and reads the token domain from chain (EIP-5267 `eip712Domain()`), never hard-coded (M1-1j, IR-M1-1j-1 L-1).
+  - Independent EIP-3009 vectors (an `eip3009` case set) cover the `ReceiveWithAuthorization` digest (IR-M1-1j-1 L-2).
 
 #### M3-5 · Submitter on mainnet: operations, monitoring, alerts
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
