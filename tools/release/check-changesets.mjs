@@ -39,25 +39,36 @@ function isPrivatePackageDir(cwd, dir) {
 }
 
 /** True when every changed file is in a private tooling package or in no workspace package. */
-export function onlyToolingChanged(cwd, files) {
+export function onlyToolingChanged(cwd, files, base) {
   if (files.length === 0) return false;
+  const inBase = (dir) =>
+    base !== undefined &&
+    spawnSync('git', ['cat-file', '-e', `${base}:${dir}/package.json`], { cwd }).status === 0;
   let tooling = false;
   for (const file of files) {
     const parts = file.split('/');
-    if (TOOLING_DIRS.includes(parts[0]) && parts.length > 1 && isPrivatePackageDir(cwd, parts[0])) {
+    // The nearest package.json below the repository root decides (on disk or in the base, so a
+    // deleted package still counts).
+    let owner = null;
+    for (let n = parts.length - 1; n >= 1; n--) {
+      const dir = parts.slice(0, n).join('/');
+      if (existsSync(join(cwd, dir, 'package.json')) || inBase(dir)) {
+        owner = dir;
+        break;
+      }
+    }
+    if (owner === null) continue;
+    if (TOOLING_DIRS.includes(owner) && isPrivatePackageDir(cwd, owner)) {
       tooling = true;
       continue;
     }
-    // Walk up to the nearest ancestor package.json below the repository root.
-    for (let n = parts.length - 1; n >= 1; n--) {
-      if (existsSync(join(cwd, ...parts.slice(0, n), 'package.json'))) return false;
-    }
+    return false;
   }
   return tooling;
 }
 
 function changedFiles(cwd, base) {
-  const result = spawnSync('git', ['diff', '--name-only', `${base}...HEAD`], {
+  const result = spawnSync('git', ['diff', '--name-only', '--no-renames', `${base}...HEAD`], {
     cwd,
     encoding: 'utf8',
   });
@@ -77,7 +88,7 @@ export async function checkChangesets({ cwd, base, changesetBin, pr, log = conso
   });
   log(`${result.stdout ?? ''}${result.stderr ?? ''}`.trim());
   if (result.status !== 0) {
-    if (onlyToolingChanged(cwd, changedFiles(cwd, base))) {
+    if (onlyToolingChanged(cwd, changedFiles(cwd, base), base)) {
       log('Only private tooling packages (tools/, e2e/) changed: no changeset needed (OPS-CI-3).');
       return { ok: true, tooling: true };
     }

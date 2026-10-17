@@ -207,5 +207,24 @@ describe('checkChangesets on a fixture repository', () => {
       commit('priv lib');
       expect((await check()).ok).toBe(false);
     });
+    it('is red when a published file is moved into tools/ (rename)', async () => {
+      write('packages/pub/x.js', 'export const x = 1;\n');
+      git('switch', '-q', 'main');
+      commit('add x on main');
+      git('switch', '-q', '-c', 'feature3');
+      git('mv', 'packages/pub/x.js', 'tools/x.js');
+      commit('move into tools');
+      expect((await check()).ok).toBe(false);
+    });
+
+    it('is red for a non-private package nested under tools/', async () => {
+      write(
+        'tools/newpub/package.json',
+        JSON.stringify({ name: '@fixture/newpub', version: '0.0.0' }),
+      );
+      write('tools/newpub/index.js', 'export const n = 1;\n');
+      commit('nested published package');
+      expect((await check()).ok).toBe(false);
+    });
   });
 });
