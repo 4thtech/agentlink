@@ -9,6 +9,8 @@ import * as entry from './index.js';
 describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
   it('exports exactly the opaque entry points', () => {
     expect(Object.keys(entry).sort()).toEqual([
+      // M1-15: the allowed-folder and inbox file guards (fixed-text errors, no seams).
+      'AllowedPathError',
       'KEYCHAIN_SERVICE',
       'LOCAL_APPROVAL_LIFETIME_S',
       'MAX_APPROVAL_BATCH_ITEMS',
@@ -17,20 +19,27 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'NodeKeyStoreError',
       // M1-8b: the store entry returns the Store and its cipher, never the store key.
       'NodeStoreError',
+      // M1-15: the SSRF-safe download (no lookup, CA or route seam).
+      'SAFE_FETCH_TIMEOUT_MS',
+      'SafeFetchError',
       // M1-9t (D-78): `owner add-agent`, a prompting entry point like initOwner.
       'addAgentToOwner',
       'assertAgentId',
+      'createInboxFile',
       'createOsKeychainAgent',
       'decideReviewedApprovals',
       'initOwner',
       'nodeHostResolver',
       'nodeNip11Fetcher',
       'nodeRelayConnector',
+      'nodeSafeFetch',
       'openAgentKeyStore',
       'openAgentStore',
+      'openAllowedFile',
       'packageName',
       'performOwnerOperation',
       'probeOsKeychain',
+      'resolveAllowedFile',
       'selectKeyStoreBackend',
     ]);
   });
@@ -60,6 +69,8 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       'createRelayConnectorWith',
       'createNip11FetcherWith',
       'createHostResolverWith',
+      // M1-15: the safe-fetch test seams stay internal.
+      'createSafeFetchWith',
     ]) {
       expect(names).not.toContain(name);
     }
