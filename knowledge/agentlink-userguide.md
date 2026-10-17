@@ -75,7 +75,7 @@ Planned, not available yet (v0.2.0 on test networks, paid from v1.0.0). Design: 
 ## What goes wrong, and how do I fix it?
 
 - **"This agent has no card from your owner yet".** Your owner has not vouched for this agent. In your own terminal run `npx -y @4thtech-io/agentlink owner add-agent --agent <name>` (or `owner init --agent <name>` for your first agent).
-- **`npx` fails because Node is too old.** Run `node --version`; you need 22.12 or newer.
+- **`npx` fails because Node is too old.** Run `node --version`; you need 22.14 or newer.
 - **The AgentLink tools do not appear in my AI tool.** Restart it. Run `doctor`. If `init` could not find your tool, name it: `init --harness <tool>`.
 - **The invite expired or was already used.** Invites work once and expire after 7 days. Ask for a new one.
 - **The safety codes do not match.** Stop and check with the other person by phone or in person.
