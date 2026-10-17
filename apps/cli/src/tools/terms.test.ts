@@ -223,7 +223,9 @@ describe('agentlink_propose_terms (06 §2.2a)', () => {
       termsHash: HASH,
       validUntil: '2025-10-23T08:00:00Z',
     });
-    expect(client.proposed).toEqual([{ to: B, terms: termsInput, note: CANARY }]);
+    expect(client.proposed).toEqual([
+      { to: B, terms: termsInput, note: CANARY, clientRequestId: 'req-1' },
+    ]);
     expectNoCanary(result, lines);
   });
 
@@ -469,6 +471,160 @@ describe('agentlink_respond_to_terms: results (06 §2.2a, §2.5; 11 §6.1)', () 
     const result = await respond({ envelopeId: ENVELOPE, decision: 'accept' }, client, logger);
     expect(result.structured.code).toBe('INTERNAL');
     expectNoCanary(result, lines);
+  });
+});
+
+describe('terms tools: clientRequestId idempotency (06 §1 rule 6, 07 §3.3; M1-32-c)', () => {
+  /** A core stand-in that honours the key like the real one: same request → same result, no second effect. */
+  function keyed(): Fake & { effects: number } {
+    const kept = new Map<string, { digest: string; result: never }>();
+    const state = { effects: 0 };
+    const run = <T extends { clientRequestId?: string }>(
+      input: T,
+      make: () => unknown,
+    ): Promise<never> => {
+      const key = input.clientRequestId;
+      const digest = JSON.stringify({ ...input, clientRequestId: undefined });
+      const seen = key === undefined ? undefined : kept.get(key);
+      if (seen !== undefined) {
+        return Promise.resolve(
+          seen.digest === digest
+            ? seen.result
+            : ({ status: 'rejected', code: 'IDEMPOTENCY_KEY_REUSED' } as never),
+        );
+      }
+      state.effects += 1;
+      const result = make() as never;
+      if (key !== undefined) kept.set(key, { digest, result });
+      return Promise.resolve(result);
+    };
+    const base = fake();
+    const terms = base.terms as TermsTools;
+    const client = {
+      ...base,
+      terms: {
+        ...terms,
+        propose: (input: ProposeTermsInput) =>
+          run(input, () => ({
+            status: 'ok',
+            envelopeId: ENVELOPE,
+            thread: THREAD,
+            termsId: TERMS_ID,
+            version: 1,
+            termsHash: HASH,
+            validUntil: VALID_UNTIL,
+          })),
+        respond: (input: RespondToTermsInput) =>
+          run(input, () => ({
+            status: 'ok',
+            decision: input.decision,
+            thread: THREAD,
+            termsId: TERMS_ID,
+            version: 3,
+            termsHash: HASH,
+            envelopeId: ENVELOPE,
+          })),
+      },
+    };
+    return Object.defineProperty(client, 'effects', { get: () => state.effects }) as never;
+  }
+
+  it('a repeated propose under one key has one effect and the same result; other args are refused', async () => {
+    const client = keyed();
+    const first = await propose({ to: B, terms: termsInput, clientRequestId: 'k1' }, client);
+    const second = await propose({ to: B, terms: termsInput, clientRequestId: 'k1' }, client);
+    expect(second.structured).toEqual(first.structured);
+    expect(client.effects).toBe(1);
+    const other = await propose(
+      { to: B, terms: { ...termsInput, subject: 'other' }, clientRequestId: 'k1' },
+      client,
+    );
+    expect(other.structured).toMatchObject({ status: 'rejected', code: 'IDEMPOTENCY_KEY_REUSED' });
+    expect(client.effects).toBe(1);
+  });
+
+  it('a repeated respond under one key has one effect and the same result; another decision is refused', async () => {
+    const client = keyed();
+    const args = { envelopeId: ENVELOPE, decision: 'reject', clientRequestId: 'k2' };
+    const first = await respond(args, client);
+    const second = await respond(args, client);
+    expect(second.structured).toEqual(first.structured);
+    expect(client.effects).toBe(1);
+    const other = await respond({ ...args, decision: 'counter', terms: termsInput }, client);
+    expect(other.structured).toMatchObject({ status: 'rejected', code: 'IDEMPOTENCY_KEY_REUSED' });
+    expect(client.effects).toBe(1);
+    expect(client.responded).toEqual([]);
+  });
+
+  it('passes the key to the core for respond; no key means none is passed', async () => {
+    const client = fake();
+    await respond({ envelopeId: ENVELOPE, decision: 'reject', clientRequestId: 'k3' }, client);
+    await respond({ envelopeId: ENVELOPE, decision: 'reject' }, client);
+    expect(client.responded[0]).toMatchObject({ clientRequestId: 'k3' });
+    expect(client.responded[1]).not.toHaveProperty('clientRequestId');
+  });
+
+  it('in_progress and a refused key map as agentlink_send does, on both tools', async () => {
+    const reused = () =>
+      Promise.resolve({ status: 'rejected', code: 'IDEMPOTENCY_KEY_REUSED' } as const);
+    const busy = () => Promise.resolve({ status: 'in_progress' } as const);
+    const client = fake({ propose: busy, respond: busy });
+    for (const result of [
+      await propose({ to: B, terms: termsInput, clientRequestId: 'k' }, client),
+      await respond({ envelopeId: ENVELOPE, decision: 'reject', clientRequestId: 'k' }, client),
+    ]) {
+      expect(result.structured).toMatchObject({ status: 'error', code: 'IN_PROGRESS' });
+      expect(typeof result.structured.nextStep).toBe('string');
+    }
+    const refused = fake({ propose: reused, respond: reused });
+    for (const result of [
+      await propose({ to: B, terms: termsInput, clientRequestId: 'k' }, refused),
+      await respond({ envelopeId: ENVELOPE, decision: 'accept', clientRequestId: 'k' }, refused),
+    ]) {
+      expect(result.structured).toMatchObject({
+        status: 'rejected',
+        code: 'IDEMPOTENCY_KEY_REUSED',
+      });
+    }
+  });
+
+  it('a repeat of a call whose approval is decided reports the approval state, not the stale result', async () => {
+    const stale = (status: string) => () =>
+      Promise.resolve({
+        status: 'approval_state',
+        approvalId: APPROVAL,
+        approval: { status, actionDigest: HASH, expiresAt: VALID_UNTIL },
+      } as never);
+    const cases: [string, string][] = [
+      ['pending', 'pending_approval'],
+      ['approved', 'pending_approval'],
+      ['denied', 'rejected'],
+      ['expired', 'rejected'],
+      ['used', 'rejected'],
+    ];
+    for (const [approval, status] of cases) {
+      const client = fake({ respond: stale(approval), propose: stale(approval) });
+      const result = await respond(
+        { envelopeId: ENVELOPE, decision: 'accept', clientRequestId: 'k' },
+        client,
+      );
+      expect(result.structured.status).toBe(status);
+      expect(typeof result.structured.nextStep).toBe('string');
+      const again = await propose({ to: B, terms: termsInput, clientRequestId: 'k' }, client);
+      expect(again.structured.status).toBe(status);
+    }
+    const gone = fake({
+      respond: () =>
+        Promise.resolve({
+          status: 'approval_state',
+          approvalId: APPROVAL,
+          approval: { status: 'unknown', reason: 'not_found' },
+        } as never),
+    });
+    expect(
+      (await respond({ envelopeId: ENVELOPE, decision: 'accept', clientRequestId: 'k' }, gone))
+        .structured.status,
+    ).toBe('not_found');
   });
 });
 

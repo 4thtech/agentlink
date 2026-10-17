@@ -19,14 +19,24 @@
 //   sooner when the fetch did not finish (budget, a relay down): 1 s after the first partial pass,
 //   doubling with each consecutive partial one up to `syncIntervalMs`, reset by a full pass. So an
 //   offline machine or a dead relay set costs at most one pass per `syncIntervalMs` once backed off.
-// - Relay "subscriptions". The core's Transport has no live `subscribe` yet (packages/core
-//   transport.ts: "`subscribe` joins later"; S2), so the holder reads its relays with a repeated
-//   catch-up pass. Swapping in a live subscription changes only `#pass`.
+// - Live relay subscription (M1-9s; 06 §6, 07 §4.1). After the start-up pass (the catch-up above),
+//   the holder opens the core's `subscribeInbox`: new envelopes are stored and processed as they
+//   reach a relay, through the same receive path as `syncInbox` (dedup by gift-wrap ID and
+//   envelopeHash, so a wrap seen by both is handled once). The transport reconnects a lost relay
+//   with a doubling delay (5 s up to 5 min) and reads its backlog from the cursor again. While live,
+//   a pass skips the fetch and only delivers due outbox rows, except for a fallback catch-up every
+//   `catchUpIntervalMs` (it also picks up a new own relay list or key epoch). Without a subscription
+//   (the client has none, it could not open, or the core closed it) every pass catches up as above
+//   and tries to open it again. It is closed when the lease is lost (a regained lease runs the
+//   start-up pass again first) and on stop, before the lease is released. After the subscription
+//   processed something, the inbox notification goes out and due outbox rows (a handshake-ack, a
+//   delivery ack) are delivered without waiting for the next pass.
 // - Notifications (optional, 06 §6). `attachInboxResource` serves `agentlink://inbox` (counts only)
 //   and sends `notifications/resources/updated` after a pass that stored or processed something,
 //   only to a client that subscribed. Nothing depends on it: the tools work without it.
-// - Shutdown. `stop()` clears the timers, waits for a lease step or pass in flight, then releases the
-//   lease, so another server takes over at its next try. Call it before the agent's store closes.
+// - Shutdown. `stop()` clears the timers, waits for a lease step or pass in flight, closes the live
+//   subscription (waiting for its processing in flight), then releases the lease, so another server
+//   takes over at its next try. Call it before the agent's store closes.
 //
 // I-5, I-7: nothing from an inbound envelope reaches a log line or an error here. A failed pass logs
 // a fixed message and, at most, a fixed lower-case error code; never an error message, a relay URL,
@@ -56,6 +66,11 @@ export const PASS_BUDGET_MS = 10_000;
  * with each further consecutive partial pass, capped at the sync interval.
  */
 export const PARTIAL_RETRY_MS = 1_000;
+/**
+ * While live, a fallback catch-up runs this often (M1-9s): the transport's longest reconnect delay,
+ * so a wrap missed while a relay was down is fetched within one reconnect period anyway.
+ */
+export const CATCH_UP_INTERVAL_MS = 300_000;
 
 /** The publisher lease as the loop uses it (core `PublisherLease`). */
 export interface LoopLease {
@@ -63,6 +78,12 @@ export interface LoopLease {
   take(): Promise<boolean>;
   renew(): Promise<boolean>;
   release(): Promise<boolean>;
+}
+
+/** A live subscription as the loop uses it (core `InboxSubscription`; M1-9s). */
+export interface LoopSubscription {
+  readonly closed: boolean;
+  close(): Promise<void>;
 }
 
 /** The part of the core client the loop drives (`AgentLinkClient` fits). */
@@ -74,6 +95,13 @@ export interface LoopClient {
     readonly reports: readonly unknown[];
   }>;
   readonly outbox: { processDue(): Promise<unknown> };
+  /** Live delivery (M1-9s). Optional: without it the loop polls with `syncInbox`. */
+  subscribeInbox?(options?: {
+    readonly onProcessed?: (result: {
+      readonly stored: number;
+      readonly reports: readonly unknown[];
+    }) => void;
+  }): Promise<LoopSubscription>;
 }
 
 /** One-shot timers. Tests pass a manual scheduler; production uses unref'd `setTimeout`. */
@@ -91,6 +119,8 @@ export interface BackgroundLoopOptions {
   readonly leaseIntervalMs?: number;
   readonly syncIntervalMs?: number;
   readonly passBudgetMs?: number;
+  /** While live, the fallback catch-up interval (default CATCH_UP_INTERVAL_MS). */
+  readonly catchUpIntervalMs?: number;
 }
 
 const nodeTimers: LoopTimers = {
@@ -126,6 +156,7 @@ export class BackgroundLoop {
   readonly #leaseMs: number;
   readonly #syncMs: number;
   readonly #budgetMs: number;
+  readonly #catchUpMs: number;
   #state: State = 'new';
   /** True from a successful take until a renewal fails or the loop stops. */
   #holding = false;
@@ -135,6 +166,13 @@ export class BackgroundLoop {
   #passRun: Promise<void> | undefined;
   /** Consecutive partial passes, for the retry backoff. */
   #partials = 0;
+  /** The open live subscription (M1-9s), only while holding. */
+  #subscription: LoopSubscription | undefined;
+  /** Milliseconds of passes since the last full catch-up while live. */
+  #sinceCatchUp = 0;
+  /** An outbox run started after the subscription processed something; runs never overlap. */
+  #deliverRun: Promise<void> | undefined;
+  #deliverAgain = false;
 
   constructor(options: BackgroundLoopOptions) {
     this.#client = options.client;
@@ -144,6 +182,7 @@ export class BackgroundLoop {
     this.#leaseMs = options.leaseIntervalMs ?? LEASE_INTERVAL_MS;
     this.#syncMs = options.syncIntervalMs ?? SYNC_INTERVAL_MS;
     this.#budgetMs = options.passBudgetMs ?? PASS_BUDGET_MS;
+    this.#catchUpMs = options.catchUpIntervalMs ?? CATCH_UP_INTERVAL_MS;
     // A handle with its own random holder ID; creating it writes nothing.
     this.#lease = this.#client.publisherLease();
   }
@@ -151,6 +190,11 @@ export class BackgroundLoop {
   /** True while this process holds the publisher lease and runs the passes. */
   get holding(): boolean {
     return this.#state === 'running' && this.#holding && this.#lease.held;
+  }
+
+  /** True while a live subscription is open (M1-9s). */
+  get live(): boolean {
+    return this.holding && this.#subscription !== undefined && !this.#subscription.closed;
   }
 
   /** True while a pass runs (tests wait on it). */
@@ -197,6 +241,7 @@ export class BackgroundLoop {
       // Lost: stop the passes before anything else (07 §3.2 "Renew").
       this.#holding = false;
       this.#clearPassTimer();
+      this.#closeSubscription();
       this.#log.info('background loop idle');
     }
   }
@@ -226,20 +271,109 @@ export class BackgroundLoop {
 
   async #pass(): Promise<boolean> {
     let partial = false;
-    try {
-      const result = await this.#client.syncInbox({ budgetMs: this.#budgetMs });
-      partial = result.partial;
-      if (result.stored > 0 || result.reports.length > 0) this.#notify();
-    } catch (error) {
-      this.#log.warn('background sync failed', errorCode(error));
+    if (this.live && this.#sinceCatchUp + this.#syncMs < this.#catchUpMs) {
+      // Live (M1-9s): the subscription receives; this pass only delivers due outbox rows.
+      this.#sinceCatchUp += this.#syncMs;
+    } else {
+      let fetched = false;
+      try {
+        const result = await this.#client.syncInbox({ budgetMs: this.#budgetMs });
+        partial = result.partial;
+        fetched = true;
+        if (result.stored > 0 || result.reports.length > 0) this.#notify();
+      } catch (error) {
+        this.#log.warn('background sync failed', errorCode(error));
+      }
+      // A catch-up that did not finish stays due for the next pass.
+      this.#sinceCatchUp = fetched && !partial ? 0 : this.#catchUpMs;
     }
     if (!this.holding) return false; // lost during the fetch: deliver nothing more
+    // After the catch-up (on the start-up pass, the 48 h look-back), open or reopen the subscription.
+    if (!this.live) await this.#openSubscription();
+    if (!this.holding) return false;
     try {
       await this.#client.outbox.processDue();
     } catch (error) {
       this.#log.warn('background delivery failed', errorCode(error));
     }
     return partial;
+  }
+
+  /** Opens the live subscription, if the client has one (M1-9s). Never rejects. */
+  async #openSubscription(): Promise<void> {
+    const client = this.#client;
+    if (client.subscribeInbox === undefined) return;
+    let subscription: LoopSubscription;
+    try {
+      subscription = await client.subscribeInbox({
+        onProcessed: (result) => {
+          this.#onProcessed(result);
+        },
+      });
+    } catch (error) {
+      // Polling continues; the next pass tries again. A fixed code only (I-5, I-7).
+      this.#log.warn('live subscription unavailable', errorCode(error));
+      return;
+    }
+    if (!this.holding) {
+      // The lease was lost (or the loop stopped) while it opened: close it at once.
+      await this.#closeQuietly(subscription);
+      return;
+    }
+    this.#subscription = subscription;
+    this.#log.info('live subscription active');
+  }
+
+  /** The subscription processed stored envelopes: notify, and deliver what that queued. */
+  #onProcessed(result: { readonly stored: number; readonly reports: readonly unknown[] }): void {
+    if (!this.holding) return;
+    if (result.stored > 0 || result.reports.length > 0) this.#notify();
+    // Processing may stage outbound rows (a handshake-ack, a delivery ack): deliver them now.
+    if (result.reports.length > 0) this.#deliverSoon();
+  }
+
+  /** One outbox run at a time; a request during a run makes one more run after it. */
+  #deliverSoon(): void {
+    if (!this.holding) return;
+    if (this.#deliverRun !== undefined) {
+      this.#deliverAgain = true;
+      return;
+    }
+    const run = (async () => {
+      do {
+        this.#deliverAgain = false;
+        try {
+          await this.#client.outbox.processDue();
+        } catch (error) {
+          this.#log.warn('background delivery failed', errorCode(error));
+        }
+      } while (this.#deliverAgain && this.holding);
+    })();
+    this.#deliverRun = run;
+    void run.finally(() => {
+      if (this.#deliverRun === run) this.#deliverRun = undefined;
+    });
+  }
+
+  /** Closes the live subscription, if one is open, without waiting (stop() waits). */
+  #closeSubscription(): void {
+    const subscription = this.#subscription;
+    this.#subscription = undefined;
+    if (subscription !== undefined) void this.#closeQuietly(subscription);
+  }
+
+  readonly #closings = new Set<Promise<void>>();
+
+  #closeQuietly(subscription: LoopSubscription): Promise<void> {
+    let closing: Promise<void>;
+    try {
+      closing = subscription.close().catch(() => undefined);
+    } catch {
+      closing = Promise.resolve();
+    }
+    this.#closings.add(closing);
+    void closing.finally(() => this.#closings.delete(closing));
+    return closing;
   }
 
   #notify(): void {
@@ -264,6 +398,9 @@ export class BackgroundLoop {
     this.#leaseTimer = undefined;
     this.#clearPassTimer();
     await Promise.allSettled([this.#leaseStep, this.#passRun]);
+    // Close the live subscription and wait for its processing before the lease (and the store) go.
+    this.#closeSubscription();
+    await Promise.allSettled([...this.#closings, this.#deliverRun]);
     if (!wasRunning) return;
     // Compare-and-set on this process's holder ID: a no-op when it does not hold the lease.
     try {
