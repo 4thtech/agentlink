@@ -456,7 +456,11 @@ describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', 
     );
     expect(entries).toHaveLength(1);
     expect(entries[0]?.zones).toEqual(['test-vectors', 'e2e']);
-    expect(entries[0]?.testZones).toEqual(['packages/core', 'packages/transport-nostr']);
+    expect(entries[0]?.testZones).toEqual([
+      'packages/core',
+      'packages/transport-nostr',
+      'packages/storage',
+    ]);
   });
 });
 

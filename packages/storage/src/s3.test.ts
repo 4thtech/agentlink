@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { encodeHex, sha256 } from '@4thtech-io/crypto';
 import {
   MAX_PRESIGN_SECONDS,
+  MULTIPART_MAX_BYTES,
   S3_MAX_SINGLE_PUT_BYTES,
   StorageError,
   createS3Adapter,
@@ -20,6 +21,7 @@ import {
   testPrefix,
   type FakeEndpoint,
 } from './fake-s3.fixture.js';
+import { chunked, fakeMultipartS3, patternBytes } from './multipart.fixture.js';
 
 const ACCESS_KEY_ID = 'AKIDEXAMPLETESTONLY';
 const SECRET = 'test-secret-access-key-never-logged';
@@ -109,13 +111,47 @@ describe('S3 adapter: put', () => {
     expect(fake.requests).toHaveLength(0);
   });
 
-  it('refuses objects above the single-PUT limit (multipart is M1-6b)', async () => {
+  // M1-6c (open question from #260): above the single-PUT limit, `put` routes to multipart upload
+  // (07 §5.2) instead of refusing; only objects above the multipart maximum are too large.
+  it('refuses objects above the multipart maximum before any request', async () => {
     const { adapter, fake } = setup();
     expect(S3_MAX_SINGLE_PUT_BYTES).toBe(64 * 1024 * 1024);
     await expect(
-      adapter.put(bytes(1), { size: S3_MAX_SINGLE_PUT_BYTES + 1, expiresAt: inADay }),
+      adapter.put(bytes(1), { size: MULTIPART_MAX_BYTES + 1, expiresAt: inADay }),
     ).rejects.toMatchObject({ code: 'too_large' });
     expect(fake.requests).toHaveLength(0);
+  });
+
+  it('routes a put above 64 MiB to multipart upload, one part in memory at a time', async () => {
+    const fake = fakeMultipartS3(BUCKET);
+    const storagePrefix = testPrefix();
+    const adapter = createS3Adapter({
+      endpoint: ENDPOINT,
+      bucket: BUCKET,
+      storagePrefix,
+      credentials: async () => ({ accessKeyId: ACCESS_KEY_ID, secretAccessKey: SECRET }),
+      fetch: fake.fetch,
+      now: () => NOW,
+    });
+    const size = S3_MAX_SINGLE_PUT_BYTES + 1;
+    const data = patternBytes(size, 5);
+    const obj = await adapter.put(chunked(data, 1024 * 1024), { size, expiresAt: inADay });
+    expect(obj).toMatchObject({ kind: 's3', size, sha256: encodeHex(sha256(data)) });
+    expect(obj.locator).toMatch(new RegExp(`^agentlink/${storagePrefix}/[A-Za-z0-9_-]{22}$`));
+    expect(fake.objects.get(obj.locator)?.length).toBe(size);
+    const methods = fake.requests.map((r) => r.method);
+    expect(methods[0]).toBe('POST');
+    expect(methods.filter((m) => m === 'PUT').length).toBeGreaterThan(1);
+    expect(fake.uploads.size).toBe(0);
+    // The object it stored is the adapter's own: presign and delete accept it.
+    await expect(adapter.presignGet(obj, inADay)).resolves.toMatch(/^https:/);
+  });
+
+  it('keeps a put of exactly 64 MiB a single PUT', async () => {
+    const { adapter, fake } = setup();
+    const size = S3_MAX_SINGLE_PUT_BYTES;
+    await adapter.put(new Uint8Array(size), { size, expiresAt: inADay });
+    expect(fake.requests.map((r) => r.method)).toEqual(['PUT']);
   });
 
   it('refuses an expiry in the past', async () => {

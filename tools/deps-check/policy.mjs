@@ -128,7 +128,9 @@ export const RESTRICTED_ENTRY_POINTS = [
   {
     group: ['@4thtech-io/crypto/testing', '@4thtech-io/crypto/testing/*'],
     zones: ['test-vectors', 'e2e'],
-    testZones: ['packages/core', 'packages/transport-nostr'],
+    // M1-6c: packages/storage, for the drop adapter's Miniflare test against the drop Worker, which
+    // signs drop requests with fixed test keys (signDropAuthorization) in place of the KeyStore.
+    testZones: ['packages/core', 'packages/transport-nostr', 'packages/storage'],
     // IR-M1-9k-1 F01 (S1, owner-side decision on #107): narrower than a test zone. Only *.test.ts
     // files under these directories may import it, never the package's src/ (production or tests):
     // apps/cli/test holds the two-process keychain test, which needs a test owner identity
