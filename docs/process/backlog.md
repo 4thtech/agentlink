@@ -729,6 +729,13 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:**
   - Not a required check; no secret, invite or plaintext in any log or artifact; actions pinned; timeout under 45 min; summary with both sides; a failure fails the run.
 
+#### OPS-CI-8 · Pin the MinIO CI image to the `-debian-12-r5` tag (new, review low 2026-10-18)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/ci.yml` (job `storage-minio`, `MINIO_IMAGE`)
+- **Depends on:** —
+- **Scope:** `MINIO_IMAGE` is `docker.io/bitnamilegacy/minio:2025.7.23@sha256:...`. Use the explicit `2025.7.23-debian-12-r5` tag and keep the digest pin (the repo convention is tag plus digest); re-resolve the digest for that tag. Source: review low, 2026-10-18.
+- **Acceptance:** `storage-minio` stays green with the new tag and digest; no other workflow change.
+
 #### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
 - **Status:** done (4thtech/agentlink#198) · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/release.yml` or a Changesets hook, `tools/**`, `docs/process/versioning.md` §5
@@ -2226,7 +2233,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Expired link → refresh-link flow returns a working URL; after the retention trigger the object returns 404 and file-key rows are gone on both sides.
   - With `deleteAfter: expiry`, a drop object stays retrievable by the owner console after the recipient's `DELIVERED` (I-9).
 - Review note (IR-M1-15-1, 2026-10-17): extend filename character filtering; handle inbox name-length edge cases; relative redirect forms are conservative (watch in dogfooding).
-- Review note (IR-M1-8d-1 / IR-M1-15-1, 2026-10-17): two `isInsideFolder` helpers have different semantics (policy engine: a folder is not inside itself; path guard: it is). Unify them into one shared helper when wiring files here.
+- Review note (IR-M1-8d-1 / IR-M1-15-1, 2026-10-17): two `isInsideFolder` helpers have different semantics (policy engine: a folder is not inside itself; path guard: it is). Unify them into one shared helper when wiring files here. Locations: `packages/core/src/path-guard.ts` (`isInsideFolder(path, folder, flavor)`, a folder is inside itself) and `packages/core/src/policy-engine.ts` (`isInsideFolder(realpath, folder)`, a folder is not inside itself). Acceptance: one exported helper, the self-inclusion rule explicit in its name or option, both call sites and `path-guard.test.ts` / `policy-files-proofs.test.ts` cover it. Source: review low, 2026-10-18.
 - Review note (IR-M1-7i-1 L3, 2026-10-17): derive `ruleEligible` and `counterparty` from the contact book and test it.
 
 #### M1-7g · core: proofs and receipts
@@ -3369,6 +3376,16 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:** `--role b --auto-sync` (Mac B, waits) and `--role a --auto-sync --remote <host>` (Mac A): each agent runs in its own Mac's terminal; ssh only moves small files in a 0700 sync folder on Mac B (per-run nonce, sealed status lines, invite through stdin and deleted after reading). Approvals typed locally on each Mac. One combined table on Mac A. `--two-mac` preflight detects the keychain failure and points to `--auto-sync`.
 - **Acceptance:** tests with a fake ssh for the file protocol (nonce, invite via stdin, status parsing, timeouts); existing modes unchanged.
 
+#### M1-23-f · Dogfood lows: error text cap, SSH keychain wording, auto-sync cleanup (new, review lows 2026-10-18)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`tools/dogfood/**`; sensitive path `docs/runbooks/**`: merges only on Tali's "merge") · **Phase:** M1b
+- **Repo/path:** agentlink · `tools/dogfood/**`, `docs/runbooks/dogfood-m1a.md` (RB-17)
+- **Depends on:** M1-23-e
+- **Scope:** source: review lows, 2026-10-18.
+  - Cap the length of error text and tokens the tool copies into notes and results (truncate with a marker); a secret-scan pass still runs on the capped text.
+  - The hands-free SSH preflight names the macOS limitation: the login keychain is unavailable in SSH sessions, so the agent must run in the Mac's own terminal (`--auto-sync`).
+  - Auto-sync fixes: RB-17 documents how Mac A handles `--agentlink`; a stale invite file left behind on Mac B is removed at start and on exit; Mac A sends ABORT to Mac B on any early exit.
+- **Acceptance:** tests with a fake ssh: oversized error text is truncated; keychain failure message names the SSH limitation; early exit sends ABORT and leaves no invite file.
+
 #### M1-9t · CLI: several agents under one OS user, and init for one harness (new, found by the M1-23 runbook)
 - **Status:** merged (#178) · **Size:** M · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1a (needed for the one-computer part of M1-23, not for the gate)
 - **Repo/path:** agentlink · apps/cli (`init`, `owner init`), packages/node (`initOwner`)
@@ -3470,6 +3487,27 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 06 §2.1 (restrictName), 11 §5 (copy); I-5
 - **Scope:** the accept-invite approval "Who" line shows the inviter's self-declared name (labelled, restricted) plus the owner fingerprint from the invite's verified card, e.g. `“oc-test” (self-declared) · owner B254·C21B · not in your contacts yet`; fingerprint only when no usable name. The action and its digest are unchanged (re-derived from the link at render time).
 - **Acceptance:** tests for name+fingerprint, hostile name, missing name; dogfood `--oc-model` defaults to `opencode/deepseek-v4.1-flash-free`.
+
+#### M1-9zc · cli: bundle test that no native module loads before the Node version check (new, review low 2026-10-18)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 (test only) · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`cli.ts`, `node-check.ts`, bundle test)
+- **Depends on:** M1-9y
+- **Scope:** M1-9y relies on `cli.ts` checking Node >= 22.14 before `main.ts` loads any native module. Add a test on the built bundle that fails if a static import of a native module (or `main.ts`) is reachable before the check runs. Source: review low, 2026-10-18.
+- **Acceptance:** the test fails when a native import is moved ahead of the check; existing tests unchanged.
+
+#### M1-9zd · cli: owner code typed at a shell prompt (new, UX review low 2026-10-18)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`commands/owner/**`, `strings.ts`), docs-site troubleshooting; 11 §5
+- **Depends on:** M1-9z
+- **Scope:** `owner-code-typed-at-shell-prompt` (the M1-9z incident: a code typed into a shell and a chat). The code prompt states that it is not a shell command and not for chat; guard where feasible (for example a hint when the entry looks like a command). Never log or echo the entry (I-1).
+- **Acceptance:** prompt copy per 11 §5 and tests for the guard; nothing about the entry is logged.
+
+#### M1-9ze · core: invite acceptance checks the invite's contact id equals the counterparty (new, review low 2026-10-18)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (`client.ts`, `card.ts`, pairing tests)
+- **Depends on:** M1-9zb
+- **Scope:** when an invite is accepted, require the contact id derived from the invite to equal the counterparty's verified card id; refuse otherwise with no state change. Source: review low, 2026-10-18.
+- **Acceptance:** RED commit; test with a mismatching invite is refused and writes nothing; the matching case passes.
 
 #### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
 - **Status:** done (4thtech/agentlink#196) · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
