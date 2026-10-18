@@ -12,6 +12,7 @@ import { parseYaml } from './yaml.mjs';
 export const STATUS_FILE = 'docs/status.yaml';
 const STATES = ['done', 'in-progress', 'planned'];
 const REPO = 'https://github.com/4thtech/agentlink';
+const SITE_STATUS_PAGE = 'docs-site/technical/project/status-and-roadmap.md';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // --- Validation -----------------------------------------------------------------------------------
@@ -119,36 +120,52 @@ function componentTag(c) {
   return prs ? ` (${word}; ${prs})` : ` (${word})`;
 }
 
-/** README: the Status blockquote. */
+/** README: the Status blockquote (compact: the full component list lives on the docs site). */
 export function renderReadmeStatus(data) {
   const out = [
     `**Phase:** ${data.phase} · **Version:** ${data.version} (${data.versionLabel}) · **Last updated:** ${data.updated}`,
     '',
   ];
   for (const area of data.areas) {
-    out.push(`- **${area.title}:** ${area.intro}`);
-    for (const c of area.components) out.push(`  - ${c.name}${componentTag(c)}: ${c.summary}`);
+    const count = (state) => area.components.filter((c) => c.state === state).length;
+    const parts = [
+      [count('done'), 'merged'],
+      [count('in-progress'), 'in progress'],
+      [count('planned'), 'planned'],
+    ]
+      .filter(([n]) => n > 0)
+      .map(([n, word]) => `${n} ${word}`);
+    out.push(`- **${area.title}:** ${parts.join(', ')}`);
   }
   out.push(
-    `- **Testnet:** ${data.deploy.testnet.note}`,
-    `- **Mainnet:** ${data.deploy.mainnet.note}`,
     `- **In progress:** ${data.inProgress}`,
     `- **Does not exist yet:** ${data.notYet}`,
     `- **Next:** ${data.next}`,
     '',
-    'We build in public. This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI, so it is as current as that file, which every status-changing pull request updates.',
+    `Every component, with its pull requests, is on the [status and roadmap page](${SITE_STATUS_PAGE}). This section is generated from [\`docs/status.yaml\`](docs/status.yaml) (\`node tools/docs-status/index.mjs\`) and checked in CI.`,
   );
   return out.map((line) => (line === '' ? '>' : `> ${line}`)).join('\n');
 }
 
-/** README: the roadmap table. */
+/** README: the roadmap table (compact: the gates are on the docs site). */
 export function renderReadmeRoadmap(data) {
+  const rows = data.roadmap.map((m) => {
+    const note = m.state !== 'planned' && m.stateNote ? ` (${m.stateNote})` : '';
+    return `| **${m.id} ${m.name}**${note} | ${m.outcome} | ${m.version} |`;
+  });
+  return ['| Milestone | What you can do at the end | Version |', '|---|---|---|', ...rows].join(
+    '\n',
+  );
+}
+
+/** Docs site: the milestone gates in full (what the README roadmap used to carry). */
+export function renderSiteRoadmapDetail(data) {
   const rows = data.roadmap.map((m) => {
     const note = m.state !== 'planned' && m.stateNote ? ` (${m.stateNote})` : '';
     const gate = m.progress ? `${m.gate} ${m.progress}` : m.gate;
     return `| **${m.id} ${m.name}**${note} | ${gate} |`;
   });
-  return ['| Milestone | Gate |', '|---|---|', ...rows].join('\n');
+  return ['| Milestone | Gate and progress |', '|---|---|', ...rows].join('\n');
 }
 
 /** Docs site and knowledge base: the "Status: Current as of" line. */
@@ -171,14 +188,16 @@ export function renderSiteSummary(data) {
     '',
     '### Components',
     '',
-    'Code that is merged is not necessarily published: nothing is released or installable yet.',
+    'Code that is merged is not necessarily published: only the `@4thtech-io/agentlink` command-line package is on npm; the libraries are bundled into it.',
     '',
-    '| Area | Component | State | Pull requests |',
-    '|---|---|---|---|',
+    '| Area | Component | State | Pull requests | What it is |',
+    '|---|---|---|---|---|',
   ];
   for (const area of data.areas) {
     for (const c of area.components) {
-      out.push(`| ${area.title} | ${c.name} | ${stateWord(c.state)} | ${prList(c) || '-'} |`);
+      out.push(
+        `| ${area.title} | ${c.name} | ${stateWord(c.state)} | ${prList(c) || '-'} | ${c.summary.replaceAll('|', '\\|')} |`,
+      );
     }
   }
   return out.join('\n');
@@ -263,6 +282,7 @@ export const TARGETS = [
       'status-hint': renderSiteHint,
       'status-summary': renderSiteSummary,
       'status-milestones': renderSiteMilestones,
+      'status-roadmap-detail': renderSiteRoadmapDetail,
     },
   },
   {

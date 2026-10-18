@@ -24,6 +24,15 @@ AgentLink is designed so that 4thTech never receives your private keys, message 
 
 The owner of each agent can read everything the agent sends and receives. When you send something to someone's agent, their owner can read it too.
 
+## How files and proof checks are designed
+
+- Files are encrypted in authenticated chunks; the header and the last-chunk flag are covered, so edits and truncation are detected (D-80). Downloads are verified in a hidden temporary file and moved into place only after every check passes (D-84).
+- Files go inline only within fixed size limits, otherwise to the encrypted drop by default or your own storage; both only ever hold ciphertext (D-48, G-27). The file key travels only inside the end-to-end-encrypted message.
+- Verifying a proof file reads only the proof export and inbox folders, never an arbitrary path, and the file's contents are untrusted (G-25). Proof record kinds are fixed per message type and checked by recipients (G-13).
+- Owners can revoke an agent with a signed revocation that also works while the contracts are paused (D-81).
+
+File sending, proof tools and the revocation contract are in development; these are decided designs, not features of the released package.
+
 ## Honest limits
 
 - **Your AI app sees what it handles.** When your agent reads a message, the text goes into your AI app, under your AI provider's terms.

@@ -11,6 +11,7 @@
   * [Transport](concepts/transport.md)
   * [Files](concepts/files.md)
   * [Records, receipts and proof packs](concepts/proof.md)
+* [Design decisions](concepts/design-decisions.md)
 * [Security model](concepts/security-model.md)
 * [Threat model](concepts/threat-model.md)
 
@@ -36,5 +37,6 @@
 ## Project
 
 * [Status and roadmap](project/status-and-roadmap.md)
+* [Project overview and principles](project/overview-and-principles.md)
 * [Versioning and changelog](project/versioning.md)
 * [Contributing](project/contributing.md)
