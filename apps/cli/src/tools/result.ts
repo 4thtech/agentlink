@@ -6,7 +6,8 @@
 // - `summary` and `nextStep` are our text: I-JSON, 1 to 500 code points, no control or format
 //   character (`toolTextSchema`, @4thtech-io/types). Inbound content never reaches them (I-5).
 // - A `url` must start with one of the context's allowed origins (the local UI or the console;
-//   IR-M1-2b-1 F-5). M1a has none (D-73 (3)), so any `url` is refused.
+//   IR-M1-2b-1 F-5). M1a has none (D-73 (3)); M1-11a-b allows only the origin of the local
+//   approval UI link that `agentlink mcp` itself adds to a `pending_approval` result.
 // - A result that breaks a rule is replaced by a fixed internal error: the server never echoes the
 //   offending text.
 import { toolResultCommonSchema, type McpStatus } from '@4thtech-io/types';
@@ -74,7 +75,10 @@ export function fail(
   };
 }
 
-/** A `pending_approval` result (06 §2.5 step 2): no `url` in M1a; `nextStep` from M1-9k. */
+/**
+ * A `pending_approval` result (06 §2.5 step 2): `nextStep` from M1-9k, no `url`. Under `agentlink
+ * mcp`, callTool adds the local UI link afterwards (withApprovalLink, M1-11a-b).
+ */
 export function pendingApproval(
   context: ToolContext,
   approvalId: string,
@@ -122,6 +126,49 @@ export function resultIsValid(result: ToolResult, urlOrigins: readonly string[])
 /** The default text block: the summary, then the `nextStep` on its own line. */
 export function resultText(result: ToolResult): string {
   return result.nextStep === undefined ? result.summary : `${result.summary}\n${result.nextStep}`;
+}
+
+/**
+ * M1-11a-b (06 §2.5, 08 §1): adds the local approval UI's `url` to a `pending_approval` result, and
+ * puts the link's nextStep in place of the M1a text at the start of `nextStep` (a tool's own
+ * sentence after it, such as the accept retry, is kept). Returns the output and the origins its
+ * `url` may use. Fails closed to the M1a result (no url, the `agentlink approve` command): when no
+ * link is given, the provider throws, the handler wrote its own text, the nextStep does not start
+ * with the M1a text, or the result with the link breaks a rule (origin pin, length).
+ */
+export async function withApprovalLink(
+  output: HandlerOutput,
+  context: ToolContext,
+): Promise<{ readonly output: HandlerOutput; readonly origins: readonly string[] }> {
+  const unchanged = { output, origins: context.urlOrigins };
+  const result = output.result;
+  if (
+    context.approvalLink === undefined ||
+    result.status !== 'pending_approval' ||
+    typeof result.approvalId !== 'string' ||
+    result.url !== undefined ||
+    output.text !== undefined
+  ) {
+    return unchanged;
+  }
+  let link: Awaited<ReturnType<NonNullable<ToolContext['approvalLink']>>>;
+  let base: string;
+  try {
+    link = await context.approvalLink(result.approvalId);
+    base = context.approvalNextStep(result.approvalId);
+  } catch {
+    // The error could carry a value (I-7): never logged or returned.
+    return unchanged;
+  }
+  const current = result.nextStep;
+  if (link === undefined || typeof current !== 'string' || !current.startsWith(base)) {
+    return unchanged;
+  }
+  const linked: HandlerOutput = {
+    result: { ...result, url: link.url, nextStep: `${link.nextStep}${current.slice(base.length)}` },
+  };
+  const origins = [...context.urlOrigins, link.origin];
+  return resultIsValid(linked.result, origins) ? { output: linked, origins } : unchanged;
 }
 
 /** Checks a handler's output and gives the MCP layer its structured content and text. */

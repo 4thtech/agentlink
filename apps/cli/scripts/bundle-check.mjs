@@ -52,14 +52,19 @@ export const SDK_ENTRIES = [
 const SDK = '@modelcontextprotocol/sdk';
 /**
  * The Node built-ins the published bundle may import: exactly the ones it uses today (IR-M1-9c-c-1
- * L1). Anything else (`node:module`, `node:vm`, `node:child_process`, `node:worker_threads`,
- * `node:crypto`, …) fails until a reviewed change adds it here. No `node:crypto`: crypto goes through
- * @4thtech-io/crypto on @noble/* and @hpke/core (I-8).
+ * L1). Anything else (`node:module`, `node:vm`, `node:worker_threads`, `node:crypto`, …) fails until
+ * a reviewed change adds it here. No `node:crypto`: crypto goes through @4thtech-io/crypto on
+ * @noble/* and @hpke/core (I-8).
+ *
+ * Added by M1-11a-b (reviewed with that S2 PR), when `agentlink mcp` started serving the local
+ * approval UI (08 §1): `node:http` for the approval server on localhost (@4thtech-io/node
+ * approval-server.ts). `node:child_process` stays out of this list: see BUNDLE_BUILTIN_NAMED.
  */
 export const BUNDLE_BUILTINS = [
   'node:dns',
   'node:fs',
   'node:fs/promises',
+  'node:http',
   'node:https',
   'node:net',
   'node:os',
@@ -70,6 +75,17 @@ export const BUNDLE_BUILTINS = [
   'node:tty',
   'node:util',
 ];
+/**
+ * Node built-ins the bundle may import only as the named bindings listed, in static `import { … }`
+ * declarations (no default, namespace or bare import, no re-export, no `import()`). M1-11a-b: the
+ * local approval UI's OS browser opener and notifier (@4thtech-io/node approval-os.ts) run a fixed
+ * program with fixed arguments through `execFile` (no shell); `spawn`, `exec`, `fork` and the rest
+ * stay findings.
+ */
+export const BUNDLE_BUILTIN_NAMED = Object.freeze({
+  'node:child_process': Object.freeze(['execFile']),
+});
+
 /** Names that load a module without an import declaration (IR-M1-9c-c-1 L1). */
 const LOADER_NAMES = new Set(['require', 'createRequire', 'getBuiltinModule']);
 /** Globals whose computed (non-literal) member access could reach a loader by a built-up name. */
@@ -125,6 +141,8 @@ export function extractImports(source) {
   const specifiers = new Set();
   const unreadable = [];
   const loader = new Set();
+  /** BUNDLE_BUILTIN_NAMED built-ins imported in any other form than their listed named bindings. */
+  const misused = new Set();
   const visit = (node) => {
     if (node === null || typeof node !== 'object') return;
     if (Array.isArray(node)) {
@@ -135,10 +153,26 @@ export function extractImports(source) {
       node.type === 'ImportDeclaration' ||
       node.type === 'ExportNamedDeclaration' ||
       node.type === 'ExportAllDeclaration';
-    if (isModuleDeclaration && node.source?.type === 'Literal') specifiers.add(node.source.value);
+    if (isModuleDeclaration && node.source?.type === 'Literal') {
+      specifiers.add(node.source.value);
+      const allowed = BUNDLE_BUILTIN_NAMED[node.source.value];
+      if (allowed !== undefined) {
+        const named =
+          node.type === 'ImportDeclaration' &&
+          node.specifiers.length > 0 &&
+          node.specifiers.every(
+            (s) =>
+              s.type === 'ImportSpecifier' &&
+              s.imported.type === 'Identifier' &&
+              allowed.includes(s.imported.name),
+          );
+        if (!named) misused.add(node.source.value);
+      }
+    }
     if (node.type === 'ImportExpression') {
       if (node.source.type === 'Literal' && typeof node.source.value === 'string') {
         specifiers.add(node.source.value);
+        if (BUNDLE_BUILTIN_NAMED[node.source.value] !== undefined) misused.add(node.source.value);
       } else {
         unreadable.push(excerpt(source, node));
       }
@@ -169,7 +203,12 @@ export function extractImports(source) {
     }
   };
   visit(parseAst(source));
-  return { specifiers: [...specifiers].sort(), unreadable, loader: [...loader].sort() };
+  return {
+    specifiers: [...specifiers].sort(),
+    unreadable,
+    loader: [...loader].sort(),
+    misused: [...misused].sort(),
+  };
 }
 
 /** Findings for the loader accesses and unreadable imports of one extraction. */
@@ -190,7 +229,9 @@ export function checkBundleSource(source, dependencies, banned) {
     const quoted = JSON.stringify(specifier);
     // The bundler writes every Node built-in with the `node:` prefix; a bare `fs` is a finding.
     if (specifier.startsWith('node:')) {
-      if (!BUNDLE_BUILTINS.includes(specifier)) {
+      const namedOnly =
+        Object.hasOwn(BUNDLE_BUILTIN_NAMED, specifier) && !extracted.misused.includes(specifier);
+      if (!BUNDLE_BUILTINS.includes(specifier) && !namedOnly) {
         findings.push(`${quoted}: Node built-in outside the bundle allowlist (BUNDLE_BUILTINS)`);
       }
       continue;

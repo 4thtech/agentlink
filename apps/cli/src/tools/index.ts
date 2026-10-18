@@ -21,6 +21,7 @@ import {
   internalError,
   invalidArgument,
   notAvailable,
+  withApprovalLink,
   type FinishedResult,
   type HandlerOutput,
 } from './result.js';
@@ -81,12 +82,15 @@ export async function callTool(
     env.logger.warn('tool handler failed', { tool: tool.name });
     output = internalError();
   }
-  return finalizeResult(output, origins);
+  // M1-11a-b: under `agentlink mcp`, a pending_approval gets the local approval UI link.
+  const linked = await withApprovalLink(output, env);
+  return finalizeResult(linked.output, linked.origins);
 }
 
 export { TOOLS, PENDING_M1A_TOOLS, findTool, type ToolDefinition } from './registry.js';
 export {
   coreToolClient,
+  type ApprovalLink,
   type HandlerEnvironment,
   type InboxPage,
   type InboxPageQuery,
