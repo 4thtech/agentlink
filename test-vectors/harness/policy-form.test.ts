@@ -1,10 +1,10 @@
 // Cross-check of the owner-action `policy.set` vectors against the M1-2b strict policy schema
 // (M1-1h-c, IR-M1-2b-1). The vectors come from the independent Python generator
-// (tools/vectors/generate_owner_action.py) and the schema from @agentlink/types; neither is derived
+// (tools/vectors/generate_owner_action.py) and the schema from @4thtech-io/types; neither is derived
 // from the other, so agreement is evidence that both follow 06 §3 "Policy JSON form" (G-32) and
 // 04 §2.5.1. Runs in the Node project only: the schema is plain data validation and the vector files
 // are identical in every runtime. The owner-action suite itself stays pending until M1-7d.
-import { defaultPolicy, policySetActionSchema, signedPolicySetSchema } from '@agentlink/types';
+import { defaultPolicy, policySetActionSchema, signedPolicySetSchema } from '@4thtech-io/types';
 import { describe, expect, test } from 'vitest';
 import { vectorFiles, type VectorCase } from './registry';
 

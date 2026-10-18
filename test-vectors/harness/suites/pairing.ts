@@ -1,5 +1,5 @@
 // Suite `pairing` (M1-1f): RFC 4231 HMAC-SHA256 and the 04 §3.6 pairing proof through
-// @agentlink/crypto. Wire values (base64url `secret`, `inviteId`, `proof`) are decoded with the
+// @4thtech-io/crypto. Wire values (base64url `secret`, `inviteId`, `proof`) are decoded with the
 // package's strict decoder; its refusals and the card parser's (CryptoInputError) are what
 // `outcome: reject` measures, as is a proof that does not verify. Any other error fails the case.
 import {
@@ -11,7 +11,7 @@ import {
   hmacSha256,
   pairingProof,
   verifyPairingProof,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

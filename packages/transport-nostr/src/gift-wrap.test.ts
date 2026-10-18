@@ -3,10 +3,10 @@
 // nostr-tools NIP-59 reference. Every key is generated at runtime; no key material is committed.
 //
 // Interop and the KeyStore paths use the in-memory KeyStore and OwnerSession from the crypto test
-// seam (@agentlink/crypto/testing, M1-1g-b). The rule tests use an EnvelopeKeys double over
+// seam (@4thtech-io/crypto/testing, M1-1g-b). The rule tests use an EnvelopeKeys double over
 // nostr-tools (referenceKeys), which can build the malformed and hostile events a real KeyStore
 // never would. The code under test (rumor, size checks, seal, createGiftWrap from
-// @agentlink/crypto and every unwrap rule) is ours either way.
+// @4thtech-io/crypto and every unwrap rule) is ours either way.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AEAD_CT_MAX_LENGTH,
@@ -26,8 +26,8 @@ import {
   type EnvelopeKeys,
   type NostrEvent,
   type UnsignedNostrEvent,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { finalizeEvent, generateSecretKey, getPublicKey, verifyEvent } from 'nostr-tools/pure';
 import { v2 as nip44 } from 'nostr-tools/nip44';
 import { createRumor, createSeal, createWrap, unwrapEvent, wrapEvent } from 'nostr-tools/nip59';
@@ -176,8 +176,8 @@ describe('constants (04 §3.1.1, §3.5)', () => {
 
 // --- interop with nostr-tools ---------------------------------------------------------------------
 //
-// Our side is the real in-memory KeyStore and OwnerSession (@agentlink/crypto/testing): seal
-// signing and both NIP-44 layers go through @agentlink/crypto. The other side is nostr-tools.
+// Our side is the real in-memory KeyStore and OwnerSession (@4thtech-io/crypto/testing): seal
+// signing and both NIP-44 layers go through @4thtech-io/crypto. The other side is nostr-tools.
 
 /** A MemoryKeyStore over a fresh random seed, with its Nostr key as 64 lowercase hex. */
 async function memoryKeys(keyEpoch = 0) {

@@ -1,4 +1,4 @@
-# @agentlink/transport-nostr
+# @4thtech-io/transport-nostr
 
 ## 0.1.0
 

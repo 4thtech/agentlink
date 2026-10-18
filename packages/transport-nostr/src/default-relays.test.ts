@@ -1,7 +1,7 @@
 // M1-18 (D-75): the default relay set is valid. The single-source scan is
 // tools/relays/default-relays.test.mjs (a repository scan needs Node built-ins, which this package
 // may not import).
-import { MAX_RELAYS, MIN_RELAYS, isAllowedRelayUrl, relayListSchema } from '@agentlink/types';
+import { MAX_RELAYS, MIN_RELAYS, isAllowedRelayUrl, relayListSchema } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RELAYS } from './default-relays.js';
 import { DEFAULT_RELAYS as FROM_INDEX } from './index.js';

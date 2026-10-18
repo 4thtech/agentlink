@@ -4,7 +4,7 @@
 // that disguise the extension (`invoice\u202Efdp.exe`), a hidden-file dot, an NTFS stream colon or a
 // Windows device name (`CON`, `nul.txt`). The result is a single, visible path segment that is safe
 // to create inside the inbox folder on macOS, Linux and Windows. The inbox write itself (realpath,
-// no overwrite, no symlink follow) is `@agentlink/node`'s `createInboxFile`.
+// no overwrite, no symlink follow) is `@4thtech-io/node`'s `createInboxFile`.
 //
 // Pure code, no I/O, no Node built-in.
 

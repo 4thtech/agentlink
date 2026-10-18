@@ -1,6 +1,6 @@
-// Suite `tagged-hash` (M1-1a): BIP-340 tagged hashes through @agentlink/crypto, under the protocol
+// Suite `tagged-hash` (M1-1a): BIP-340 tagged hashes through @4thtech-io/crypto, under the protocol
 // tags of 04 §3.1 and §2.5.1, the BIP-340 tags, and tags that differ only in case, version or script.
-import { taggedHash } from '@agentlink/crypto';
+import { taggedHash } from '@4thtech-io/crypto';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { SuiteModule } from '../suite';
 

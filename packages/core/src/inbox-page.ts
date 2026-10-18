@@ -23,8 +23,13 @@
 // I-5: sender-chosen values (bodies, terms, notes, file names and types, the declared name) are
 // returned only as data under fields the CLI wraps. File URLs, file keys, inline bytes and the
 // ciphertext hash are never copied into an item (zero access). I-7: logs carry counts only.
-import { ENVELOPE_ID_LENGTH, decodeBase64url, parseJson, verifyTermsHash } from '@agentlink/crypto';
-import { payloadSchema, type Payload } from '@agentlink/types';
+import {
+  ENVELOPE_ID_LENGTH,
+  decodeBase64url,
+  parseJson,
+  verifyTermsHash,
+} from '@4thtech-io/crypto';
+import { payloadSchema, type Payload } from '@4thtech-io/types';
 import type { ContactBook, ContactView } from './contacts.js';
 import { nowOf, open, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';

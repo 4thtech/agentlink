@@ -15,8 +15,8 @@
 //
 // I-5, I-7: ack payloads are inbound content; nothing from them reaches a log line or an error.
 // Logs carry counts only.
-import { encodeUtf8, parseJson } from '@agentlink/crypto';
-import { payloadSchema } from '@agentlink/types';
+import { encodeUtf8, parseJson } from '@4thtech-io/crypto';
+import { payloadSchema } from '@4thtech-io/types';
 import type { CoreContext } from './context.js';
 import { open } from './context.js';
 import type { EnvelopeService, InboundReport } from './envelopes.js';

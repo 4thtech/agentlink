@@ -12,8 +12,8 @@
 // stdout carries only the MCP protocol; the redacting logger writes to stderr (06 §1, 04 §8.4).
 // Nothing here holds or sees an owner key.
 import process from 'node:process';
-import { nostrTransport } from '@agentlink/core';
-import { createLogger } from '@agentlink/log';
+import { nostrTransport } from '@4thtech-io/core';
+import { createLogger } from '@4thtech-io/log';
 import { createMcpCommand, stdioTransport } from '../../apps/cli/dist/mcp/command.js';
 import { BackgroundLoop } from '../../apps/cli/dist/mcp/loop.js';
 import { nodeRuntimeDeps, openAgent } from '../../apps/cli/dist/runtime/index.js';

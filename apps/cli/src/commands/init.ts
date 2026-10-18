@@ -18,13 +18,13 @@
 // `init --keystore file`, waits for M1-8f and is not registered, D-73 (4)). The owner key is not
 // created here (`agentlink owner init`, M1-9b), and `init` never prints or accepts an owner secret.
 // An existing agent is reused and never replaced, so `init` can be re-run to add another harness.
-// All key creation is `@agentlink/node`'s (`createOsKeychainAgent`); nothing here is crypto, apart
+// All key creation is `@4thtech-io/node`'s (`createOsKeychainAgent`); nothing here is crypto, apart
 // from hashing the proposed changes into the confirmation code.
 import { homedir } from 'node:os';
 import { createInterface } from 'node:readline/promises';
-import { encodeHex, sha256 } from '@agentlink/crypto';
-import { createOsKeychainAgent, probeOsKeychain, selectKeyStoreBackend } from '@agentlink/node';
-import type { KeychainProbe } from '@agentlink/node';
+import { encodeHex, sha256 } from '@4thtech-io/crypto';
+import { createOsKeychainAgent, probeOsKeychain, selectKeyStoreBackend } from '@4thtech-io/node';
+import type { KeychainProbe } from '@4thtech-io/node';
 import {
   DISPATCH_TEXT,
   EXIT_FAILED,

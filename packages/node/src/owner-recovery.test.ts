@@ -16,8 +16,8 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AgentLinkClient, type ApprovalChannel } from '@agentlink/core';
-import { encodeUtf8, equalBytes, verifyAgentCard, type KeyStore } from '@agentlink/crypto';
+import { AgentLinkClient, type ApprovalChannel } from '@4thtech-io/core';
+import { encodeUtf8, equalBytes, verifyAgentCard, type KeyStore } from '@4thtech-io/crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';
 import { NodeKeyStoreError } from './errors.js';
@@ -207,7 +207,7 @@ describe('owner add-agent with no agent naming the owner (M1-9x; 04 §2.8)', () 
     expect(ownerItem !== undefined && after !== undefined && equalBytes(after, ownerItem)).toBe(
       true,
     );
-    // No secret in the output or the result. (@agentlink/node has no log channel: ESLint refuses
+    // No secret in the output or the result. (@4thtech-io/node has no log channel: ESLint refuses
     // console and process.stdout/stderr there, eslint.config.mjs CONSOLE_SYNTAX.)
     const output = [...run.written, ...run.questions, JSON.stringify(result)].join('\n');
     expect(output).toContain('bob');

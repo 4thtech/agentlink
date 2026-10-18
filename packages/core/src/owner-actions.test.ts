@@ -2,9 +2,9 @@
 // 07 §3.4). The pure checks are owner-action.test.ts; here: the nonce, the record and the effects in
 // one store transaction, whole-or-nothing batches with the nonce burnt, the policy-version mark,
 // re-verification on load and on use, and the store edits that must not count (I-4).
-import { canonicalize, type JsonObject } from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { defaultPolicy, type OwnerActionOp } from '@agentlink/types';
+import { canonicalize, type JsonObject } from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { defaultPolicy, type OwnerActionOp } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import { computeActionDigest } from './owner-action.js';

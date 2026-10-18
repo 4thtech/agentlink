@@ -17,8 +17,8 @@
 //
 // I-4: nothing here takes presence or holds an owner key; the owner signature is the authority.
 // I-5, I-7: refusals are fixed codes; nothing from the object is logged.
-import { canonicalize, encodeHex } from '@agentlink/crypto';
-import type { Payload } from '@agentlink/types';
+import { canonicalize, encodeHex } from '@4thtech-io/crypto';
+import type { Payload } from '@4thtech-io/types';
 import type { ContactBook } from './contacts.js';
 import { nowOf, type CoreContext } from './context.js';
 import type { InboundReason, PreparedRevoke, RevokeHandler } from './envelopes.js';

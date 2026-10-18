@@ -8,11 +8,11 @@
     "rootDir": "..",
     // The crypto test seam (M1-1g-b) is never built and has no package export: type-check it from
     // source, as vitest.config.ts resolves it. Only this noEmit config has the path; tsconfig.json
-    // (the build) cannot resolve it, so no build can include it. `@agentlink/crypto` maps to the
+    // (the build) cannot resolve it, so no build can include it. `@4thtech-io/crypto` maps to the
     // same source, so the seam's types and the main entry's types are one copy.
     "paths": {
-      "@agentlink/crypto": ["../crypto/src/index.ts"],
-      "@agentlink/crypto/testing": ["../crypto/src/testing.ts"]
+      "@4thtech-io/crypto": ["../crypto/src/index.ts"],
+      "@4thtech-io/crypto/testing": ["../crypto/src/testing.ts"]
     }
   },
   "include": ["src"],

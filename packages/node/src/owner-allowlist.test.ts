@@ -17,7 +17,7 @@ import {
   type JsonObject,
   type OwnerPublicKeys,
   type TypedData,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { describe, expect, it } from 'vitest';
 import { NodeKeyStoreError } from './errors.js';
 import { performOwnerOperation } from './index.js';

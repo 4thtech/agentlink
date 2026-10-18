@@ -13,8 +13,8 @@
 // result file of the run: none may contain a canary.
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { encodeHex, randomBytes } from '@agentlink/crypto';
-import { probeOsKeychain } from '@agentlink/node';
+import { encodeHex, randomBytes } from '@4thtech-io/crypto';
+import { probeOsKeychain } from '@4thtech-io/node';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { scanForCanaries } from '../src/canary-scan.mjs';
 import { dumpRelay, startRelays, stopRelays } from '../src/relays.mjs';

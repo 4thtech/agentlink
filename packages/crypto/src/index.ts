@@ -1,8 +1,8 @@
-// @agentlink/crypto: the only package that reaches crypto primitives (04 §8.1). M1-1a adds the
+// @4thtech-io/crypto: the only package that reaches crypto primitives (04 §8.1). M1-1a adds the
 // base layer: canonical encodings, hashing, JCS, randomness and wiping. M1-1e adds EIP-712 typed-data
 // hashing, canonical ECDSA verification and the AgentCard; its signing functions are in
-// @agentlink/crypto/keystore.
-export const packageName = '@agentlink/crypto';
+// @4thtech-io/crypto/keystore.
+export const packageName = '@4thtech-io/crypto';
 
 export { CryptoInputError, type CryptoInputErrorCode } from './errors.js';
 export {
@@ -59,11 +59,11 @@ export {
 } from './jcs.js';
 export { randomBytes } from './random.js';
 // M1-21 (D-32): termsHash = sha256(JCS(terms)), bare hex (04 §3.4). The terms schema is in
-// @agentlink/types; this hashes the JSON object it is given.
+// @4thtech-io/types; this hashes the JSON object it is given.
 export { termsHash, verifyTermsHash } from './terms-hash.js';
 export { wipe } from './wipe.js';
 // M1-1b: public keys, identities, BIP-340 verification and fingerprints. Everything that takes a
-// master seed or a secret key is in the restricted subpath @agentlink/crypto/keystore (keystore.ts).
+// master seed or a secret key is in the restricted subpath @4thtech-io/crypto/keystore (keystore.ts).
 export { HKDF_SHA256_MAX_LENGTH, hkdfSha256 } from './hkdf.js';
 export {
   KEY_LABELS,
@@ -94,7 +94,7 @@ export {
 // payload operations, which take a per-envelope CEK but no long-term secret (04 §3.1.1:
 // EnvelopeKeys.unwrapCek hands the CEK to core).
 // Unwrapping a CEK with a recipient's secret key and signing an envelopeHash are in
-// @agentlink/crypto/keystore. The deterministic test seam (testing.ts) is not exported from any entry.
+// @4thtech-io/crypto/keystore. The deterministic test seam (testing.ts) is not exported from any entry.
 export {
   AEAD_ALG,
   AEAD_CT_MAX_ENCODED_LENGTH,
@@ -143,8 +143,8 @@ export {
 } from './aead.js';
 // M1-1g: the key interfaces (types only; G-2, 04 §3.1.1, puts them here so transport-nostr and core
 // can name them), public NIP-44 helpers, Nostr events and the gift wrap. The NIP-44 functions that
-// take a secret or conversation key are in @agentlink/crypto/keystore; the in-memory KeyStores are
-// in the test-only @agentlink/crypto/testing.
+// take a secret or conversation key are in @4thtech-io/crypto/keystore; the in-memory KeyStores are
+// in the test-only @4thtech-io/crypto/testing.
 export {
   KeyStoreError,
   OWNER_SESSION_DEFAULT_TTL_MS,
@@ -239,7 +239,7 @@ export {
   type TokenDomain,
 } from './proof-types.js';
 // M1-1k (04 §2.3, D-82): the passkey PRF salt and the public header of an `ALKP` blob (owner key and
-// credential ID). Sealing and opening the owner seed blobs are in @agentlink/crypto/keystore.
+// credential ID). Sealing and opening the owner seed blobs are in @4thtech-io/crypto/keystore.
 export {
   ownerPrfSalt,
   readPasskeyBlobHeader,
@@ -250,7 +250,7 @@ export {
 // M1-1f: the pairing proof and the safety code (04 §3.6, §3.6.1; only the commit-checked functions
 // produce digits, IR-M1-1f-1 L-7), and the public constants of the
 // file KeyStore and owner wrap (04 §2.8). Argon2id, password() and the ALKS / ALKO seal and open
-// functions are in @agentlink/crypto/keystore.
+// functions are in @4thtech-io/crypto/keystore.
 export {
   INVITE_ID_LENGTH,
   INVITE_SECRET_LENGTH,

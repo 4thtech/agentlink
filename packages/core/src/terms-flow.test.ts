@@ -9,10 +9,10 @@ import {
   type JsonObject,
   type KeyStore,
   type NostrEvent,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { defaultPolicy, type Policy } from '@agentlink/types';
-import { wrapEnvelope, type PublishOutcome } from '@agentlink/transport-nostr';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { defaultPolicy, type Policy } from '@4thtech-io/types';
+import { wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import { policyDocumentHash } from './commitments.js';

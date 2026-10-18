@@ -1,6 +1,6 @@
 ---
-'@agentlink/core': patch
-'@agentlink/transport-nostr': patch
+'@4thtech-io/core': patch
+'@4thtech-io/transport-nostr': patch
 '@4thtech-io/agentlink': patch
 ---
 

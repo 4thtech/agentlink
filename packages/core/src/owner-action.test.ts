@@ -8,14 +8,14 @@ import {
   taggedHash,
   encodeUtf8,
   type JsonObject,
-} from '@agentlink/crypto';
-import { MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
+} from '@4thtech-io/crypto';
+import { MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import {
   CLOCK_SKEW_SECONDS,
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
   defaultPolicy,
   type OwnerActionOp,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import {
   computeActionDigest,

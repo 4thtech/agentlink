@@ -1,4 +1,4 @@
-// @agentlink/crypto/keystore: the restricted entry point for code that holds a master seed or a
+// @4thtech-io/crypto/keystore: the restricted entry point for code that holds a master seed or a
 // secret key (04 §8.1: secret-key operations go through the KeyStore interface). Every function here
 // takes a seed or a secret key, or returns one. Only KeyStore backends may import this subpath:
 // tools/deps-check/policy.mjs (RESTRICTED_ENTRY_POINTS) allows it in packages/node and the vector
@@ -13,7 +13,7 @@ export {
 } from './keys.js';
 export { bip340PublicKey, bip340Sign } from './bip340.js';
 // M1-1g: NIP-44 v2 under a given secret key or conversation key (KeyStore backends and the vector
-// harness). The in-memory KeyStores are in the test-only subpath @agentlink/crypto/testing.
+// harness). The in-memory KeyStores are in the test-only subpath @4thtech-io/crypto/testing.
 export {
   nip44ConversationKey,
   nip44DecryptWithKey,

@@ -2,7 +2,7 @@
 // are the spec's proposed values. Environment overrides exist for staging and tests; each is bounded,
 // and the size cap can never exceed the spec's 100 MiB. Any invalid value makes readConfig return
 // null and the Worker fail closed (`unavailable`), never run with a guessed limit.
-import { DROP_URL_KEY_LENGTH, decodeBase64url } from '@agentlink/crypto';
+import { DROP_URL_KEY_LENGTH, decodeBase64url } from '@4thtech-io/crypto';
 
 const MiB = 1024 * 1024;
 const GiB = 1024 * MiB;

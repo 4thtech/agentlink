@@ -1,5 +1,5 @@
 // Suite `safety-code` (M1-1f): 04 §3.6.1 codeCommit, the reveal check, T, pairingDigest and the
-// 12-digit code, and the two labels, through @agentlink/crypto. The `code` op derives codeCommit from
+// 12-digit code, and the two labels, through @4thtech-io/crypto. The `code` op derives codeCommit from
 // inviteId and nonceA with the code under test and passes it in, because the code is computed only
 // after the commitment check (step 3, IR-M1-1f-1 M-2). Wire values are decoded with the strict
 // base64url decoder; a refusal (CryptoInputError) or a reveal that does not open is
@@ -14,8 +14,8 @@ import {
   encodeBase64url,
   safetyCodeCommit,
   taggedHash,
-} from '@agentlink/crypto';
-import { pairingDigest } from '@agentlink/crypto/testing';
+} from '@4thtech-io/crypto';
+import { pairingDigest } from '@4thtech-io/crypto/testing';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

@@ -6,7 +6,7 @@ Moved out of `AGENTS.md` to keep the auto-loaded context lean. Open this when yo
 
 TypeScript (strict, ESM) · pnpm + Turborepo · viem (not ethers) · @noble/* + @hpke/core · nostr-tools · official MCP TypeScript SDK · Cloudflare Workers / Durable Objects / R2 · SQLite (better-sqlite3) · Vitest · Playwright · Miniflare. Contracts are in the separate private `occ-v2-contracts` repo (Foundry).
 
-Shared packages must run in Node LTS, browsers and Workers: use `globalThis.crypto`, `fetch`, `Uint8Array`; no Node built-ins outside `@agentlink/node` and `apps/cli`.
+Shared packages must run in Node LTS, browsers and Workers: use `globalThis.crypto`, `fetch`, `Uint8Array`; no Node built-ins outside `@4thtech-io/node` and `apps/cli`.
 
 ## Repository layout
 
@@ -20,10 +20,10 @@ agentlink/
 │  ├─ types/                     # shared types + zod schemas
 │  ├─ log/                       # redacting logger + secret-canary test helper (zero dependencies)
 │  ├─ crypto/                    # key derivation, HPKE, AES-GCM, STREAM, JCS, BIP-340, EIP-712
-│  ├─ chain/                     # viem clients, OCC v2 bindings (ABIs from @agentlink/occ-v2-abi)
+│  ├─ chain/                     # viem clients, OCC v2 bindings (ABIs from @4thtech-io/occ-v2-abi)
 │  ├─ transport-nostr/           # NIP-17/59 gift wraps, relay pool, sync
 │  ├─ storage/                   # inline, drop and S3 (aws4fetch) adapters; Drive/Dropbox/OneDrive connectors (M2)
-│  ├─ core/                      # AgentLinkClient, policies, approvals, Store interface (KeyStore types: @agentlink/crypto, G-2)
+│  ├─ core/                      # AgentLinkClient, policies, approvals, Store interface (KeyStore types: @4thtech-io/crypto, G-2)
 │  ├─ node/                      # keychain KeyStore, SQLite Store, local approval server
 │  └─ ui/                        # shared React components (design system)
 ├─ apps/

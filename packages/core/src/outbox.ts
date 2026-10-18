@@ -44,8 +44,8 @@ import {
   parseJson,
   type AgentCard,
   type Envelope,
-} from '@agentlink/crypto';
-import { isAllowedRelayUrl } from '@agentlink/types';
+} from '@4thtech-io/crypto';
+import { isAllowedRelayUrl } from '@4thtech-io/types';
 import {
   MAX_RELAYS_PER_WRAP,
   OutboxWorker,
@@ -57,7 +57,7 @@ import {
   type OutboxPersistence,
   type OutboxRow,
   type OutboxSummary,
-} from '@agentlink/transport-nostr';
+} from '@4thtech-io/transport-nostr';
 import { agentNostrKey } from './card.js';
 import { OUTBOX_GIVE_UP_SECONDS, STAGED_MAX_AGE_SECONDS } from './constants.js';
 import type { ContactBook } from './contacts.js';

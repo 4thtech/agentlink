@@ -1,5 +1,5 @@
 {
-  "name": "@agentlink/core",
+  "name": "@4thtech-io/core",
   "version": "0.1.0",
   "private": true,
   "description": "AgentLinkClient, policies, approvals, KeyStore and Store interfaces.",
@@ -33,11 +33,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@agentlink/types": "workspace:*",
-    "@agentlink/log": "workspace:*",
-    "@agentlink/crypto": "workspace:*",
-    "@agentlink/chain": "workspace:*",
-    "@agentlink/transport-nostr": "workspace:*",
-    "@agentlink/storage": "workspace:*"
+    "@4thtech-io/types": "workspace:*",
+    "@4thtech-io/log": "workspace:*",
+    "@4thtech-io/crypto": "workspace:*",
+    "@4thtech-io/chain": "workspace:*",
+    "@4thtech-io/transport-nostr": "workspace:*",
+    "@4thtech-io/storage": "workspace:*"
   }
 }

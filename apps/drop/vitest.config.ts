@@ -2,10 +2,10 @@
 // Miniflare (workerd) with an in-memory R2 bucket and its Durable Object (test/**/*.test.ts), with
 // test-sized limits so the limit paths run fast. No Cloudflare account, secret or network is needed.
 //
-// The crypto test seam `@agentlink/crypto/testing` (signDropAuthorization; M1-1g-b, 04 §3.1.1) has no
+// The crypto test seam `@4thtech-io/crypto/testing` (signDropAuthorization; M1-1g-b, 04 §3.1.1) has no
 // package export and is never built: this alias is the only thing that resolves it, and only for
 // tests. deps-check and ESLint allow it by that exact name in `apps/drop/test/**/*.test.ts` only
-// (tools/deps-check/policy.mjs `testDirs`). `@agentlink/crypto` maps to the same source, so a test
+// (tools/deps-check/policy.mjs `testDirs`). `@4thtech-io/crypto` maps to the same source, so a test
 // sees one copy of the crypto module.
 import { cloudflareTest } from '@cloudflare/vitest-plugin';
 import { defineConfig } from 'vitest/config';
@@ -15,8 +15,8 @@ const cryptoSource = (file: string): string =>
 
 const resolve = {
   alias: [
-    { find: /^@agentlink\/crypto$/, replacement: cryptoSource('index.ts') },
-    { find: /^@agentlink\/crypto\/testing$/, replacement: cryptoSource('testing.ts') },
+    { find: /^@4thtech-io\/crypto$/, replacement: cryptoSource('index.ts') },
+    { find: /^@4thtech-io\/crypto\/testing$/, replacement: cryptoSource('testing.ts') },
   ],
 };
 

@@ -410,7 +410,7 @@ Notes:
   - Role map (§5.1): every restricted selector has exactly the role and delay of the table; with the Safe compromised, no path to a 7-day power (use, new grant, selector remap, `updateAuthority`, delay reduction) completes in under 7 days.
 - ERC-1271 signer tests (Safe-style and passkey-style smart accounts).
 - Static analysis: Slither and Aderyn clean (or justified) in CI. Gas snapshots in CI.
-- Shared EIP-712 test vectors with `@agentlink/chain` (TypeScript) to guarantee identical hashing, including the chain-agnostic AgentCard domain.
+- Shared EIP-712 test vectors with `@4thtech-io/chain` (TypeScript) to guarantee identical hashing, including the chain-agnostic AgentCard domain.
 - **External audit before mainnet** (M3 gate). Bug bounty after mainnet.
 
 ---
@@ -423,7 +423,7 @@ Notes:
 - **Testnet faucet:** a 4thTech-run `depositFor` faucet credits testnet agents (M1) so testers never need gas.
 - Verify on Sourcify and explorers at mainnet.
 - Deployer key: on testnets a testnet-only key (D-64, D-71 (1)); on mainnet a separate key from the owner's Trezor hardware wallet, used only for deployment (D-71 (1), superseding D-64's shared key), so testnet and mainnet addresses differ (§9.1). All roles are transferred to the Safe in the same script; the deployer retains no role (CI check). Mainnet contracts are initialised paused and unpaused by the Safe once the configured grant and target admin delays are in effect (§5).
-- Publish ABIs and addresses as `@agentlink/occ-v2-abi`.
+- Publish ABIs and addresses as `@4thtech-io/occ-v2-abi`.
 
 ### 9.1 Salts, addresses and the deployer key (G-8)
 

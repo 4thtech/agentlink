@@ -5,7 +5,7 @@
 // numeric forms onto localhost or IP literals), and refuses IP literals, numeric labels and local
 // names. It cannot see DNS: a public name that resolves to a private address is caught by the
 // SSRF-safe fetch (M1-15) that the caller injects, not here.
-import { decodeBase64url, encodeBase64url, randomBytes } from '@agentlink/crypto';
+import { decodeBase64url, encodeBase64url, randomBytes } from '@4thtech-io/crypto';
 import { StorageError } from './errors.js';
 
 const MAX_ENDPOINT_LENGTH = 256;

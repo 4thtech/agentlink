@@ -4,7 +4,7 @@
 // strict schema, and steps 1-5 run for the surface's own agent ID and the contact's current card.
 // A refusal (`safety_code_unavailable`, "Can't show the safety code") is `outcome: reject`; any
 // other error is a bug and fails the case.
-import { recomputeSafetyCode } from '@agentlink/core/safety-code';
+import { recomputeSafetyCode } from '@4thtech-io/core/safety-code';
 import { hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

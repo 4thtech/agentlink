@@ -1,5 +1,5 @@
 // Suite `eip712-proof` (M1-1j): EIP-712 hashing of the OCC v2 proof types `Record`, `Receipt` and
-// `Registration` (05 §3.1, §4; 04 §5) and the recipient commitment, through @agentlink/crypto. A
+// `Registration` (05 §3.1, §4; 04 §5) and the recipient commitment, through @4thtech-io/crypto. A
 // refusal by the code under test (CryptoInputError) is reported as `outcome: reject`. Any other
 // error is a bug and fails the case.
 import {
@@ -10,7 +10,7 @@ import {
   hashRegistration,
   recipientCommitment,
   type ProofTypeHashes,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { bytesToHex } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

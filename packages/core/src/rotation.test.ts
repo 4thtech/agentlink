@@ -12,8 +12,8 @@ import {
   type KeyEpochControl,
   type OwnerSession,
   type PublicIdentity,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { describe, expect, it } from 'vitest';
 import { cardTypedData, parseStoredCard, storedCardText } from './card.js';
 import { AgentLinkClient } from './client.js';

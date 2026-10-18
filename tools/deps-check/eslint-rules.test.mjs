@@ -46,13 +46,13 @@ describe('static imports (no-restricted-imports zones)', () => {
     ['fs', 'packages/chain/src/a.ts'],
     ['node:crypto', 'packages/node/src/a.ts'],
     ['crypto', 'apps/cli/src/a.ts'],
-    ['@agentlink/core', 'packages/crypto/src/a.ts'],
-    ['@agentlink/storage', 'packages/chain/src/a.ts'],
-    ['@agentlink/node', 'packages/core/src/a.ts'],
-    ['@agentlink/node', 'apps/console/src/a.ts'],
-    ['@agentlink/ui', 'apps/submitter/src/a.ts'],
+    ['@4thtech-io/core', 'packages/crypto/src/a.ts'],
+    ['@4thtech-io/storage', 'packages/chain/src/a.ts'],
+    ['@4thtech-io/node', 'packages/core/src/a.ts'],
+    ['@4thtech-io/node', 'apps/console/src/a.ts'],
+    ['@4thtech-io/ui', 'apps/submitter/src/a.ts'],
     ['@4thtech-io/agentlink', 'apps/console/src/a.ts'],
-    ['@agentlink/types', 'packages/unknown/src/a.ts'],
+    ['@4thtech-io/types', 'packages/unknown/src/a.ts'],
   ])('rejects import of %s in %s', async (specifier, filePath) => {
     const messages = await lint(filePath, `import * as x from '${specifier}';\nvoid x;\n`);
     expect(rules(messages)).toEqual(['no-restricted-imports']);
@@ -67,10 +67,10 @@ describe('static imports (no-restricted-imports zones)', () => {
     ['aws4fetch', 'packages/storage/src/a.ts'],
     ['node:fs', 'packages/node/src/a.ts'],
     ['node:path', 'apps/cli/src/a.ts'],
-    ['@agentlink/crypto', 'packages/chain/src/a.ts'],
-    ['@agentlink/core', 'packages/node/src/a.ts'],
-    ['@agentlink/node', 'apps/cli/src/a.ts'],
-    ['@agentlink/ui', 'apps/console/src/a.ts'],
+    ['@4thtech-io/crypto', 'packages/chain/src/a.ts'],
+    ['@4thtech-io/core', 'packages/node/src/a.ts'],
+    ['@4thtech-io/node', 'apps/cli/src/a.ts'],
+    ['@4thtech-io/ui', 'apps/console/src/a.ts'],
   ])('allows import of %s in %s', async (specifier, filePath) => {
     expect(await lint(filePath, `import * as x from '${specifier}';\nvoid x;\n`)).toEqual([]);
   });
@@ -83,7 +83,7 @@ describe('boundaries/no-bypass (forms no-restricted-imports cannot see)', () => 
     [`const m = require('viem');`],
     [`import fs = require('node:fs');`],
     [`type T = import('@hpke/core').CipherSuite;`],
-    [`const m = await import(\`@agentlink/node\`);`],
+    [`const m = await import(\`@4thtech-io/node\`);`],
   ])('rejects %s', async (code) => {
     expect(rules(await lint('packages/core/src/a.ts', code))).toContain('boundaries/no-bypass');
   });
@@ -97,7 +97,7 @@ describe('boundaries/no-bypass (forms no-restricted-imports cannot see)', () => 
   it('applies the layering to dynamic imports as well', async () => {
     expect(await lint('packages/crypto/src/a.ts', `await import('@noble/curves');`)).toEqual([]);
     expect(
-      rules(await lint('packages/crypto/src/a.ts', `await import('@agentlink/core');`)),
+      rules(await lint('packages/crypto/src/a.ts', `await import('@4thtech-io/core');`)),
     ).toEqual(['boundaries/no-bypass']);
   });
 
@@ -182,8 +182,8 @@ describe('review IR-M0-10-1 regressions (ESLint side)', () => {
   });
 });
 
-describe('IR-M1-1b-1 M-1: @agentlink/crypto/keystore is for KeyStore backends only', () => {
-  const keystore = `import { deriveSecretKey } from '@agentlink/crypto/keystore';\nvoid deriveSecretKey;\n`;
+describe('IR-M1-1b-1 M-1: @4thtech-io/crypto/keystore is for KeyStore backends only', () => {
+  const keystore = `import { deriveSecretKey } from '@4thtech-io/crypto/keystore';\nvoid deriveSecretKey;\n`;
 
   it.each([
     'packages/core/src/a.ts',
@@ -198,25 +198,25 @@ describe('IR-M1-1b-1 M-1: @agentlink/crypto/keystore is for KeyStore backends on
 
   it('rejects a dynamic import and require in packages/core', async () => {
     for (const code of [
-      `const m = await import('@agentlink/crypto/keystore');`,
-      `const m = require('@agentlink/crypto/keystore');`,
+      `const m = await import('@4thtech-io/crypto/keystore');`,
+      `const m = require('@4thtech-io/crypto/keystore');`,
     ]) {
       expect(rules(await lint('packages/core/src/a.ts', code))).toContain('boundaries/no-bypass');
     }
   });
 
   it('does not apply the rule in packages/node, and keeps the main entry open in packages/core', async () => {
-    // packages/node may import @agentlink/crypto only once its layering entry allows it; this
+    // packages/node may import @4thtech-io/crypto only once its layering entry allows it; this
     // rule must not be what stops the KeyStore backends there.
     const messages = await lint('packages/node/src/a.ts', keystore);
     for (const { message } of messages) expect(message).not.toMatch(/may be imported only in/);
-    const main = `import { bip340Verify } from '@agentlink/crypto';\nvoid bip340Verify;\n`;
+    const main = `import { bip340Verify } from '@4thtech-io/crypto';\nvoid bip340Verify;\n`;
     expect(await lint('packages/core/src/a.ts', main)).toEqual([]);
   });
 });
 
 describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', () => {
-  const byName = `import { MemoryKeyStore } from '@agentlink/crypto/testing';\nvoid MemoryKeyStore;\n`;
+  const byName = `import { MemoryKeyStore } from '@4thtech-io/crypto/testing';\nvoid MemoryKeyStore;\n`;
   const relative = `import { MemoryKeyStore } from './testing.js';\nvoid MemoryKeyStore;\n`;
 
   it.each(['packages/core/src/a.ts', 'packages/node/src/a.ts', 'apps/cli/src/a.ts'])(
@@ -224,7 +224,7 @@ describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', 
     async (filePath) => {
       const messages = await lint(filePath, byName);
       expect(messages.map((m) => m.message).join('\n')).toMatch(
-        /@agentlink\/crypto\/testing may be imported only in test-vectors/,
+        /@4thtech-io\/crypto\/testing may be imported only in test-vectors/,
       );
     },
   );
@@ -244,9 +244,9 @@ describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', 
 });
 
 describe('M1-1g-b (IR-M1-1g-G2-1 R2-L-1): the test seam in core and transport-nostr tests', () => {
-  const byName = `import { MemoryKeyStore } from '@agentlink/crypto/testing';\nvoid MemoryKeyStore;\n`;
-  const dynamic = `const m = await import('@agentlink/crypto/testing');\nvoid m;\n`;
-  const RESTRICTED = /@agentlink\/crypto\/testing may be imported only in test-vectors/;
+  const byName = `import { MemoryKeyStore } from '@4thtech-io/crypto/testing';\nvoid MemoryKeyStore;\n`;
+  const dynamic = `const m = await import('@4thtech-io/crypto/testing');\nvoid m;\n`;
+  const RESTRICTED = /@4thtech-io\/crypto\/testing may be imported only in test-vectors/;
   const zones = ['packages/core', 'packages/transport-nostr'];
 
   it.each(zones)('allows it by name in %s test files, static and dynamic', async (zone) => {
@@ -273,9 +273,9 @@ describe('M1-1g-b (IR-M1-1g-G2-1 R2-L-1): the test seam in core and transport-no
 
   it('rejects deep and sub paths of the seam in test files', async () => {
     for (const specifier of [
-      '@agentlink/crypto/src/testing.js',
-      '@agentlink/crypto/dist/testing.js',
-      '@agentlink/crypto/testing/index.js',
+      '@4thtech-io/crypto/src/testing.js',
+      '@4thtech-io/crypto/dist/testing.js',
+      '@4thtech-io/crypto/testing/index.js',
     ]) {
       const code = `import * as m from '${specifier}';\nvoid m;\n`;
       expect(await lint('packages/core/src/a.test.ts', code), specifier).not.toEqual([]);
@@ -292,11 +292,11 @@ describe('M1-1g-b (IR-M1-1g-G2-1 R2-L-1): the test seam in core and transport-no
 
 describe('IR-M1-1g-b-1 L-1, L-2: dot, empty and case-variant segments in static imports', () => {
   const bad = [
-    '@agentlink/crypto/./testing',
-    '@agentlink/crypto/x/../testing',
-    '@agentlink/crypto//testing',
-    '@agentlink/crypto/Testing',
-    '@agentlink/Crypto/testing',
+    '@4thtech-io/crypto/./testing',
+    '@4thtech-io/crypto/x/../testing',
+    '@4thtech-io/crypto//testing',
+    '@4thtech-io/crypto/Testing',
+    '@4thtech-io/Crypto/testing',
   ];
 
   it.each(['packages/core/src/a.ts', 'packages/core/src/a.test.ts'])(
@@ -317,7 +317,7 @@ describe('IR-M1-1g-b-1 L-1, L-2: dot, empty and case-variant segments in static 
   );
 
   it('leaves the canonical seam import alone in a core test file', async () => {
-    const code = `import { MemoryKeyStore } from '@agentlink/crypto/testing';\nvoid MemoryKeyStore;\n`;
+    const code = `import { MemoryKeyStore } from '@4thtech-io/crypto/testing';\nvoid MemoryKeyStore;\n`;
     expect(await lint('packages/core/src/a.test.ts', code)).toEqual([]);
   });
 });
@@ -349,11 +349,11 @@ describe('IR-M1-1e-1 L-1: viem only in packages/crypto test files', () => {
 
 describe('IR-M1-1f-1 L-2: no deep imports into a workspace package (dist/, src/)', () => {
   it.each([
-    `import { sealOwnerSeedWithNonceUnsafe } from '@agentlink/crypto/dist/keystore-file.js';`,
-    `import { deriveSecretKey } from '@agentlink/crypto/dist/keystore.js';`,
-    `import * as m from '@agentlink/crypto/dist';`,
-    `import { argon2idRaw } from '@agentlink/crypto/src/argon2.js';`,
-    `import * as m from '@agentlink/crypto/src/testing';`,
+    `import { sealOwnerSeedWithNonceUnsafe } from '@4thtech-io/crypto/dist/keystore-file.js';`,
+    `import { deriveSecretKey } from '@4thtech-io/crypto/dist/keystore.js';`,
+    `import * as m from '@4thtech-io/crypto/dist';`,
+    `import { argon2idRaw } from '@4thtech-io/crypto/src/argon2.js';`,
+    `import * as m from '@4thtech-io/crypto/src/testing';`,
   ])('rejects %s in packages/core and packages/node', async (code) => {
     for (const filePath of ['packages/core/src/a.ts', 'packages/node/src/a.ts']) {
       const messages = await lint(filePath, `${code}\n`);
@@ -363,20 +363,20 @@ describe('IR-M1-1f-1 L-2: no deep imports into a workspace package (dist/, src/)
   });
 
   it('rejects a dynamic deep import', async () => {
-    const code = `const m = await import('@agentlink/crypto/dist/keystore-file.js');\n`;
+    const code = `const m = await import('@4thtech-io/crypto/dist/keystore-file.js');\n`;
     expect(rules(await lint('packages/core/src/a.ts', code))).toContain('boundaries/no-bypass');
   });
 
   it('keeps the package entry points open', async () => {
-    const main = `import { bip340Verify } from '@agentlink/crypto';\nvoid bip340Verify;\n`;
+    const main = `import { bip340Verify } from '@4thtech-io/crypto';\nvoid bip340Verify;\n`;
     expect(await lint('packages/core/src/a.ts', main)).toEqual([]);
   });
 });
 
 describe('IR-M1-9k-1 F01: the crypto test seam in apps/cli/test test files only', () => {
-  const byName = `import { MemoryOwnerKeyStore } from '@agentlink/crypto/testing';\nvoid MemoryOwnerKeyStore;\n`;
-  const dynamic = `const m = await import('@agentlink/crypto/testing');\nvoid m;\n`;
-  const subpath = `import { x } from '@agentlink/crypto/testing/deep';\nvoid x;\n`;
+  const byName = `import { MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';\nvoid MemoryOwnerKeyStore;\n`;
+  const dynamic = `const m = await import('@4thtech-io/crypto/testing');\nvoid m;\n`;
+  const subpath = `import { x } from '@4thtech-io/crypto/testing/deep';\nvoid x;\n`;
 
   it('allows it by name in apps/cli/test/**/*.test.ts, static and dynamic', async () => {
     for (const code of [byName, dynamic]) {
@@ -404,10 +404,10 @@ describe('IR-M1-9k-1 F01: the crypto test seam in apps/cli/test test files only'
 
   it('deps-check decides the same (policy.violationFor)', () => {
     expect(
-      violationFor('apps/cli', '@agentlink/crypto/testing', 'apps/cli/test/a.test.ts'),
+      violationFor('apps/cli', '@4thtech-io/crypto/testing', 'apps/cli/test/a.test.ts'),
     ).toBeNull();
     for (const file of ['apps/cli/src/a.ts', 'apps/cli/src/a.test.ts', 'apps/cli/test/x.ts']) {
-      expect(violationFor('apps/cli', '@agentlink/crypto/testing', file), file).not.toBeNull();
+      expect(violationFor('apps/cli', '@4thtech-io/crypto/testing', file), file).not.toBeNull();
     }
   });
 });

@@ -1,6 +1,6 @@
 // What the core services share. Internal: built once by AgentLinkClient.create.
-import type { KeyStore } from '@agentlink/crypto';
-import type { Logger } from '@agentlink/log';
+import type { KeyStore } from '@4thtech-io/crypto';
+import type { Logger } from '@4thtech-io/log';
 import { CoreError } from './errors.js';
 import type { Sealed, TableName } from './store/schema.js';
 import { rowKeyOf, type Store, type StoreCipher } from './store/store.js';

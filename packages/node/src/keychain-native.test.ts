@@ -7,8 +7,8 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { encodeHex, randomBytes } from '@agentlink/crypto';
-import { deriveAgentId } from '@agentlink/crypto/keystore';
+import { encodeHex, randomBytes } from '@4thtech-io/crypto';
+import { deriveAgentId } from '@4thtech-io/crypto/keystore';
 import { afterAll, describe, expect, it } from 'vitest';
 import { KeychainKeyStore, createKeychainAgent } from './keychain-keystore.js';
 import { withInterProcessLock } from './inter-process-lock.js';

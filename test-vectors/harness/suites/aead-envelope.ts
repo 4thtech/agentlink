@@ -1,5 +1,5 @@
 // Suite `aead-envelope` (M1-1c; key commitment M1-1l, G-46, D-66): the 04 §3.1 envelope through
-// @agentlink/crypto. `envelopeHash` and `aad` hash the given envelope; `encryptPayload` encrypts
+// @4thtech-io/crypto. `envelopeHash` and `aad` hash the given envelope; `encryptPayload` encrypts
 // under the given IV through the test seam and returns the AAD, `kc` and `ct`; `decryptPayload`
 // opens the envelope's aead (kc first, then AES-GCM); `checkCommitment` checks `aead.kc` against
 // the CEK alone; `deriveFromCek` runs one 04 §3.3 derivation by its label through the test seam;
@@ -21,9 +21,9 @@ import {
   type Envelope,
   type EnvelopeHeader,
   type UnsignedEnvelope,
-} from '@agentlink/crypto';
-import { signEnvelopeHash } from '@agentlink/crypto/keystore';
-import { deriveFromCek, encryptPayloadWithIv } from '@agentlink/crypto/testing';
+} from '@4thtech-io/crypto';
+import { signEnvelopeHash } from '@4thtech-io/crypto/keystore';
+import { deriveFromCek, encryptPayloadWithIv } from '@4thtech-io/crypto/testing';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

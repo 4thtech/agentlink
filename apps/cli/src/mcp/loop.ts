@@ -41,8 +41,8 @@
 // I-5, I-7: nothing from an inbound envelope reaches a log line or an error here. A failed pass logs
 // a fixed message and, at most, a fixed lower-case error code; never an error message, a relay URL,
 // the holder ID or any content. No timer callback can reject: every step catches.
-import { PUBLISHER_LEASE_RENEW_SECONDS } from '@agentlink/core';
-import type { Logger } from '@agentlink/log';
+import { PUBLISHER_LEASE_RENEW_SECONDS } from '@4thtech-io/core';
+import type { Logger } from '@4thtech-io/log';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   ListResourcesRequestSchema,

@@ -10,7 +10,7 @@ Before the J9 dogfood and before external testers; whenever the default list cha
 The orchestrator or a builder (Sonnet or above) on a machine with network access. The owner confirms the sign-off.
 
 ## Preconditions
-- Dependencies installed and the packages built (`pnpm install`, `pnpm -r build`): the script imports `isAllowedRelayUrl` from `@agentlink/types` and `isGloballyRoutable` from `@agentlink/transport-nostr` (the functions the node relay connector uses), `nostr-tools` from transport-nostr and `ws` from `@agentlink/node`. Node 22 or later.
+- Dependencies installed and the packages built (`pnpm install`, `pnpm -r build`): the script imports `isAllowedRelayUrl` from `@4thtech-io/types` and `isGloballyRoutable` from `@4thtech-io/transport-nostr` (the functions the node relay connector uses), `nostr-tools` from transport-nostr and `ws` from `@4thtech-io/node`. Node 22 or later.
 - Run from an empty scratch directory: the script writes `relay-vet-<time>.json` into the current directory.
 
 ## Steps

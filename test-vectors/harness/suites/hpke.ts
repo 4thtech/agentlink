@@ -1,5 +1,5 @@
 // Suite `hpke` (M1-1c; CEK-derived wraps M1-1l, G-46, D-66): RFC 9180 HPKE, mode Base,
-// DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-256-GCM through @agentlink/crypto. `sealSequence`
+// DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-256-GCM through @4thtech-io/crypto. `sealSequence`
 // and `open` drive the raw suite (the CFRG vector) through the test seam. `wrapCek` and `unwrapCek`
 // are the 04 §3.3 CEK wrap, whose ephemeral key is derived from the CEK; `wrapCekWithEphemeralKey`
 // fixes the ephemeral key through the test seam; `checkWrap` recomputes one entry and compares it;
@@ -12,14 +12,14 @@ import {
   decodeBase64url,
   encodeBase64url,
   wrapCek,
-} from '@agentlink/crypto';
-import { unwrapCek } from '@agentlink/crypto/keystore';
+} from '@4thtech-io/crypto';
+import { unwrapCek } from '@4thtech-io/crypto/keystore';
 import {
   deriveFromCek,
   hpkeOpen,
   hpkeSealSequence,
   wrapCekWithEphemeralKey,
-} from '@agentlink/crypto/testing';
+} from '@4thtech-io/crypto/testing';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

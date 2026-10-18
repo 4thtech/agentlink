@@ -49,7 +49,7 @@ export const cardSigSchema = ecdsaSignatureSchema;
 /**
  * The agent's own EIP-712 signature over the same card (04 §2.9, G-23), canonical ECDSA `0x` + 130
  * lowercase hex. Carried by the invite and the `handshake`; whether it recovers `card.agentEvm` is
- * checked in @agentlink/crypto and the core, not here.
+ * checked in @4thtech-io/crypto and the core, not here.
  */
 export const cardAgentSigSchema = ecdsaSignatureSchema;
 

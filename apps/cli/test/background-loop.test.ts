@@ -14,7 +14,7 @@ import {
   type ApprovalChannel,
   type Sealed,
   type StoreCipher,
-} from '@agentlink/core';
+} from '@4thtech-io/core';
 import {
   decodeBase64url,
   decodeUtf8,
@@ -26,16 +26,16 @@ import {
   type JsonObject,
   type NostrEvent,
   type OwnerKeyStore,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createLogger } from '@agentlink/log';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createLogger } from '@4thtech-io/log';
 import type {
   RelayConnector,
   RelaySocket,
   RelaySocketHandlers,
   RelayTarget,
-} from '@agentlink/transport-nostr';
-import { defaultPolicy } from '@agentlink/types';
+} from '@4thtech-io/transport-nostr';
+import { defaultPolicy } from '@4thtech-io/types';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { ResourceUpdatedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';

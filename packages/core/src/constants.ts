@@ -1,6 +1,6 @@
 // Store-side values of 07 §3.1–§3.7 (G-9). The owner confirmed the proposed values at the merge of
 // 4thtech/agentlink#44; they stay named constants so a later spec change edits one place. Values that
-// @agentlink/types already fixes (G-7: clock skew, approval TTL, nonce retention, budget window) are
+// @4thtech-io/types already fixes (G-7: clock skew, approval TTL, nonce retention, budget window) are
 // imported from there and not repeated here.
 
 /** The logical schema version of 07 §3 that this code implements (forward migrations only, §3.7). */

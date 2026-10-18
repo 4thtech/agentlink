@@ -1,7 +1,7 @@
 # RB-07 · Adding a dependency
 
 ## Purpose
-Add a third-party package only when it earns its place, at an exact, aged version, with no install scripts sneaking in, and inside the import zones that keep crypto in `@agentlink/crypto`.
+Add a third-party package only when it earns its place, at an exact, aged version, with no install scripts sneaking in, and inside the import zones that keep crypto in `@4thtech-io/crypto`.
 
 ## When to use
 Any new runtime or dev dependency, or a new major version. Routine updates come from Renovate. Not for the crypto allowlist (`nostr-tools`, `viem`, `@noble/*`, `@hpke/core`, `aws4fetch`): adding to it changes 04 and needs a decision-log entry and the owner's approval.

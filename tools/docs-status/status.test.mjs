@@ -93,7 +93,7 @@ describe('renderers', () => {
     expect(renderReadmeRoadmap(data)).toContain('| **M0 Foundations** (nearly complete) |');
     expect(renderSiteMilestones(data)).toContain('| **M3** Mainnet beta (Base, Gnosis) |');
     expect(renderSiteSummary(data)).toContain(
-      '| Core (@agentlink/core) | Invites and pairing | Done |',
+      '| Core (@4thtech-io/core) | Invites and pairing | Done |',
     );
   });
 });

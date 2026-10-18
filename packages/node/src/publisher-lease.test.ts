@@ -5,7 +5,7 @@
 // write; a lease never holds forever after a crash.
 //
 // The child process runs this package's TypeScript sources directly (Node's type stripping and a
-// resolve hook, as store-concurrency.test.ts does) and the built @agentlink/core, as sqlite-store.ts
+// resolve hook, as store-concurrency.test.ts does) and the built @4thtech-io/core, as sqlite-store.ts
 // itself imports it.
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -16,12 +16,12 @@ import {
   PUBLISHER_LEASE_RENEW_SECONDS,
   PUBLISHER_LEASE_SECONDS,
   PublisherLease,
-} from '@agentlink/core';
+} from '@4thtech-io/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SqliteStore } from './sqlite-store.js';
 
 const SRC = fileURLToPath(new URL('.', import.meta.url));
-/** The built @agentlink/core of this workspace (its package `exports` point at dist/index.js). */
+/** The built @4thtech-io/core of this workspace (its package `exports` point at dist/index.js). */
 const CORE = new URL('../../core/dist/index.js', import.meta.url).href;
 
 const HOOKS = `

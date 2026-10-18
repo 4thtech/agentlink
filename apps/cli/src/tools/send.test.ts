@@ -10,9 +10,9 @@ import {
   type ContactView,
   type SendMessageInput,
   type SendMessageResult,
-} from '@agentlink/core';
-import { createLogger, type Logger } from '@agentlink/log';
-import type { ContactDisplayName, RestrictedName } from '@agentlink/types';
+} from '@4thtech-io/core';
+import { createLogger, type Logger } from '@4thtech-io/log';
+import type { ContactDisplayName, RestrictedName } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import type { ToolClient, ToolContext } from './context.js';
 import { callTool } from './index.js';

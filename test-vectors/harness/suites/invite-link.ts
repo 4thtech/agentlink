@@ -1,10 +1,10 @@
 // Suite `invite-link` (M1-7c; 04 §3.6 encoding, D-69, G-12): the one invite codec of
-// @agentlink/core, run from source. `decodeInviteLink` gives the strictly valid invite, compared as
+// @4thtech-io/core, run from source. `decodeInviteLink` gives the strictly valid invite, compared as
 // its JCS text, or refuses with `invite_invalid` (`outcome: reject`). Any other error is a bug and
 // fails the case. The decoder uses the platform DecompressionStream("deflate-raw"), so this suite
 // checks every decoder step in Node, the three browsers and workerd.
-import { decodeInviteLink } from '@agentlink/core/invite-link';
-import { canonicalize, type JsonValue } from '@agentlink/crypto';
+import { decodeInviteLink } from '@4thtech-io/core/invite-link';
+import { canonicalize, type JsonValue } from '@4thtech-io/crypto';
 import type { Comparison, SuiteModule } from '../suite';
 
 function parseInput(input: unknown): string {

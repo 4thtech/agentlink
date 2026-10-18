@@ -3,7 +3,7 @@
 //
 // Use it only for what the user asked to see: command results, `--version`, the setup summary.
 // It does not redact, so never pass it diagnostics, inbound content or anything the user did not
-// ask to see; diagnostics go through @agentlink/log. Never use it in the stdio MCP server, where
+// ask to see; diagnostics go through @4thtech-io/log. Never use it in the stdio MCP server, where
 // stdout carries the protocol.
 
 /** Where output goes. The runtime console by default; tests pass their own. */

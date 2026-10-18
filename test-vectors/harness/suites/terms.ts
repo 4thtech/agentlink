@@ -1,5 +1,5 @@
 // Suite `terms` (M1-21, D-32, D-55, D-74): the strict `terms` schema and canonical form, `TermsInput`
-// and its mapping (@agentlink/types), termsHash = sha256(JCS(terms)) (@agentlink/crypto), and the
+// and its mapping (@4thtech-io/types), termsHash = sha256(JCS(terms)) (@4thtech-io/crypto), and the
 // pure negotiation-chain reducer. For the chain ops this module replays the case's `log` the way a
 // core replays its own store: it drops a duplicate (the same envelope, D-71 (3); here the JCS of the
 // abstract envelope stands in for its envelopeHash), checks the body and its termsHash, and passes
@@ -12,7 +12,7 @@ import {
   parseJson,
   termsHash,
   verifyTermsHash,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import {
   EMPTY_NEGOTIATION,
   acceptBodySchema,
@@ -29,7 +29,7 @@ import {
   termsSchema,
   type NegotiationState,
   type Terms,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 import type { Comparison, SuiteModule } from '../suite';
 
 type Obj = Record<string, unknown>;

@@ -2,7 +2,7 @@
 // backend of the mark. M1-8g runs it against the keychain item; M1-8f runs it against the `ALKS`
 // entry `policy-version` of the file KeyStore. Not part of the build (tsconfig.json excludes
 // *.fixture.ts).
-import type { PolicyVersionMark } from '@agentlink/core';
+import type { PolicyVersionMark } from '@4thtech-io/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 /** The value spellings the mark item refuses (04 §2.2, §2.8: canonical ASCII decimal). */

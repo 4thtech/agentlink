@@ -3,7 +3,7 @@
 // and the wrapped CEK is the 32-byte key plus a 16-byte AES-GCM tag.
 //
 // `envelopeHash = sha256(JCS(envelope without sig))` and the AEAD data are computed in
-// @agentlink/crypto; `unsignedEnvelopeSchema` is the shape they hash.
+// @4thtech-io/crypto; `unsignedEnvelopeSchema` is the shape they hash.
 import { z } from 'zod';
 import {
   BYTE_LENGTHS,

@@ -13,7 +13,7 @@
 // envelope type the sender declared. The sender code (04 §2.9) comes from core
 // (`RequestEntry.senderCode`, M1-9c-b): short, or extended when two unknown senders collide. It is
 // printed only if it has the code's own shape, never anything else as a name.
-import type { RequestEntry, RequestsQueue } from '@agentlink/core';
+import type { RequestEntry, RequestsQueue } from '@4thtech-io/core';
 import {
   DISPATCH_TEXT,
   EXIT_FAILED,

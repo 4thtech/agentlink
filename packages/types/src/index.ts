@@ -1,5 +1,5 @@
-// @agentlink/types: protocol constants and strict zod schemas with their inferred types.
-// Shapes only: no hashing, signing or encryption (those live in @agentlink/crypto).
+// @4thtech-io/types: protocol constants and strict zod schemas with their inferred types.
+// Shapes only: no hashing, signing or encryption (those live in @4thtech-io/crypto).
 export * from './constants.js';
 export * from './encoding.js';
 export * from './usd.js';

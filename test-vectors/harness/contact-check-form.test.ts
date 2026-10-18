@@ -1,7 +1,7 @@
 // Cross-check of the owner-action `contact.check` vectors (M1-1h; G-28) against the strict
-// @agentlink/types schema (M1-2f). The vectors come from the independent Python generator
+// @4thtech-io/types schema (M1-2f). The vectors come from the independent Python generator
 // (tools/vectors/generate_owner_action.py, written in a separate session under the M1-1h rules) and
-// the schema from @agentlink/types, written from 04 §2.4.1, §2.5.1 and §3.6.1; neither is derived
+// the schema from @4thtech-io/types, written from 04 §2.4.1, §2.5.1 and §3.6.1; neither is derived
 // from the other. The card asks for agreement "in every runtime the suite declares", so this file
 // runs in all five runtime projects (the suite declares no `runtimes`). Signature checks, the
 // lifetime bound and the comparison with the digest recomputed from the signed `handshake` and
@@ -14,7 +14,7 @@ import {
   ownerActionSchema,
   signedContactCheckSchema,
   signedOwnerActionSchema,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 import { describe, expect, test } from 'vitest';
 import { vectorFiles, type VectorCase } from './registry';
 

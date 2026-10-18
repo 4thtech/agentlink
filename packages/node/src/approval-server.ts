@@ -45,7 +45,7 @@
 // grants viewing only. The opener's argv briefly holds the session link (approval-os.ts).
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo, ListenOptions } from 'node:net';
-import type { OwnerActionOutcome } from '@agentlink/core';
+import type { OwnerActionOutcome } from '@4thtech-io/core';
 import {
   KeyStoreError,
   canonicalizeToBytes,
@@ -61,7 +61,7 @@ import {
   type JsonValue,
   type OwnerPresence,
   type OwnerPublicKeys,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { osBrowserOpener, osNotifier, type BrowserOpener, type OsNotifier } from './approval-os.js';
 import { APP_JS, EXPIRED_HTML, pageHtml } from './approval-page.js';
 import { NodeKeyStoreError } from './errors.js';

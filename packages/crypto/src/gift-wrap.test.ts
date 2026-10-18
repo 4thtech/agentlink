@@ -1,4 +1,4 @@
-// NIP-59 gift wrap with an ephemeral key created and wiped inside @agentlink/crypto (07 §4.1,
+// NIP-59 gift wrap with an ephemeral key created and wiped inside @4thtech-io/crypto (07 §4.1,
 // M1-1g). Seal and rumor handling, timestamp randomisation and unwrap rules are M1-5a.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { encodeHex } from './encoding.js';

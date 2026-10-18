@@ -12,17 +12,17 @@ import {
   type JsonObject,
   type KeyStore,
   type NostrEvent,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createLogger } from '@agentlink/log';
-import { POLICY_DEFAULTS } from '@agentlink/types';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createLogger } from '@4thtech-io/log';
+import { POLICY_DEFAULTS } from '@4thtech-io/types';
 import {
   wrapEnvelope,
   type RelayConnector,
   type RelaySocket,
   type RelaySocketHandlers,
   type RelayTarget,
-} from '@agentlink/transport-nostr';
+} from '@4thtech-io/transport-nostr';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ACK_KIND_RECEIVED } from './acks.js';
 import { AgentLinkClient } from './client.js';

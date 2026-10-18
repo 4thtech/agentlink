@@ -25,15 +25,15 @@ import {
   type RespondToTermsResult,
   type SendMessageInput,
   type SendMessageResult,
-} from '@agentlink/core';
-import type { ContactDisplayName } from '@agentlink/types';
+} from '@4thtech-io/core';
+import type { ContactDisplayName } from '@4thtech-io/types';
 import {
   agentFingerprint,
   decodeHex0x,
   formatFingerprint,
   ownerFingerprint,
-} from '@agentlink/crypto';
-import type { Logger } from '@agentlink/log';
+} from '@4thtech-io/crypto';
+import type { Logger } from '@4thtech-io/log';
 
 /** The agent's own identity as status shows it: IDs and display fingerprints only. */
 export interface SelfView {

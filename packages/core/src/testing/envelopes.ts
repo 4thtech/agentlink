@@ -22,8 +22,8 @@ import {
   type KeyEpochControl,
   type KeyStore,
   type OwnerKeyStore,
-} from '@agentlink/crypto';
-import type { Logger } from '@agentlink/log';
+} from '@4thtech-io/crypto';
+import type { Logger } from '@4thtech-io/log';
 import { AgentLinkClient } from '../client.js';
 import { MemoryStore } from '../store/memory-store.js';
 import {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createLogger } from '@agentlink/log';
+import { createLogger } from '@4thtech-io/log';
 import { cliLogLevel } from './log-level.js';
 
 describe('CLI log level (M1-9y)', () => {

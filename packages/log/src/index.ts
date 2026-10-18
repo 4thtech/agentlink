@@ -1,5 +1,5 @@
-// @agentlink/log: the shared redacting logger (04 §1 I-7, §8.4). Zero dependencies; runs in Node,
-// browsers and Workers. The canary test helper lives in "@agentlink/log/testing".
+// @4thtech-io/log: the shared redacting logger (04 §1 I-7, §8.4). Zero dependencies; runs in Node,
+// browsers and Workers. The canary test helper lives in "@4thtech-io/log/testing".
 
 export { consoleSink, type ConsoleSinkOptions } from './console.js';
 export {

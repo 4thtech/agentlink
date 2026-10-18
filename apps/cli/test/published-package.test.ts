@@ -1,5 +1,5 @@
 // OPS-REL-1: the package that npm publishes, as users get it (owner decision 2026-10-16: for
-// v0.1.0 only the CLI publishes, as `@4thtech-io/agentlink`, with the @agentlink/* workspace packages
+// v0.1.0 only the CLI publishes, as `@4thtech-io/agentlink`, with the @4thtech-io/* workspace packages
 // bundled into one file; they stay private).
 //
 // Checks the manifest, the bundle `dist/agentlink.js` (built by `pnpm build`), the exact file list
@@ -144,7 +144,7 @@ describe('the published manifest (@4thtech-io/agentlink)', () => {
   it('declares no workspace package at runtime: they are bundled', () => {
     for (const field of ['dependencies', 'peerDependencies', 'optionalDependencies'] as const) {
       for (const [name, spec] of Object.entries(manifest[field] ?? {})) {
-        expect(name.startsWith('@agentlink/'), `${field}.${name}`).toBe(false);
+        expect(name.startsWith('@4thtech-io/'), `${field}.${name}`).toBe(false);
         expect(spec.startsWith('workspace:'), `${field}.${name}`).toBe(false);
       }
     }
@@ -168,7 +168,7 @@ describe('the bundle (dist/agentlink.js)', () => {
     const specifiers = importSpecifiers(readBundle());
     const bare = specifiers.filter((s) => !s.startsWith('node:'));
     expect(specifiers.filter((s) => s.startsWith('.') || s.startsWith('/'))).toEqual([]);
-    expect(bare.filter((s) => s.startsWith('@agentlink/'))).toEqual([]);
+    expect(bare.filter((s) => s.startsWith('@4thtech-io/'))).toEqual([]);
     const imported = [...new Set(bare.map(packageName))].sort();
     expect(imported).toEqual(Object.keys(manifest.dependencies ?? {}).sort());
   });
@@ -184,7 +184,7 @@ describe('the bundle (dist/agentlink.js)', () => {
 
 // IR-OPS-REL-1-1 M-1: what npm receives is the publish directory dist/package/ (written by the
 // build, bundle.config.mjs `stagePackage`). Its package.json is generated: no devDependencies, no
-// scripts and no `@agentlink/*` name (that npm scope belongs to a third party).
+// scripts and no `@4thtech-io/*` name (that npm scope belongs to a third party).
 describe('the published tarball (dist/package)', () => {
   const stageDir = join(packageDir, 'dist', 'package');
   const packDir = mkdtempSync(join(tmpdir(), 'agentlink-pack-'));
@@ -224,9 +224,13 @@ describe('the published tarball (dist/package)', () => {
   });
 
   it('ships a generated package.json without workspace names, devDependencies or scripts', () => {
-    expect(packed.manifest).not.toContain('@agentlink/');
-    expect(packed.manifest).not.toContain('workspace:');
+    // OPS-REL-2: the workspace packages share the CLI's scope, so the CLI's own name is the only
+    // `@4thtech-io/` text the published manifest may hold.
     const published = JSON.parse(packed.manifest) as Manifest;
+    expect(published.name).toBe(manifest.name);
+    expect(packed.manifest.split('@4thtech-io/')).toHaveLength(2);
+    expect(packed.manifest).toContain(`"name": "${manifest.name}"`);
+    expect(packed.manifest).not.toContain('workspace:');
     expect(published.devDependencies).toBeUndefined();
     expect(published.scripts).toBeUndefined();
     expect(Object.keys(published)).toEqual([

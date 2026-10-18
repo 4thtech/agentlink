@@ -1,4 +1,4 @@
-// M1-5b-b: the Node implementations of the relay I/O seams of @agentlink/transport-nostr
+// M1-5b-b: the Node implementations of the relay I/O seams of @4thtech-io/transport-nostr
 // (RelayConnector, HostResolver, Nip11Fetcher; 07 §4.2 "Relay connections", 04 §4 "Transport, at
 // connect"). The pool resolves the host, requires every answer to be globally routable and hands
 // this code the checked address; this code keeps the rest of the promise:
@@ -29,7 +29,7 @@ import {
   type RelaySocket,
   type RelaySocketHandlers,
   type RelayTarget,
-} from '@agentlink/transport-nostr';
+} from '@4thtech-io/transport-nostr';
 import WebSocket from 'ws';
 
 /** The NIP-11 read's own deadline, for the whole response; shorter than the 10 s connect budget. */

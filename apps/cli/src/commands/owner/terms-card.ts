@@ -15,9 +15,13 @@
 // who delivers are formatted by us from the stored agent IDs. The fixed lines the owner decides on
 // come after the region: changes, what this one approval does, the auto-accept note, the price
 // honesty line and the fingerprint under "Advanced".
-import type { AgentLinkClient, CommitmentCard, TermsChange } from '@agentlink/core';
-import { termsHash } from '@agentlink/crypto';
-import { commitmentApprovalActionSchema, type CommitmentScope, type Terms } from '@agentlink/types';
+import type { AgentLinkClient, CommitmentCard, TermsChange } from '@4thtech-io/core';
+import { termsHash } from '@4thtech-io/crypto';
+import {
+  commitmentApprovalActionSchema,
+  type CommitmentScope,
+  type Terms,
+} from '@4thtech-io/types';
 import { terminalOneLine, untrustedRegion } from '../../terminal/sanitize.js';
 import { copy, formatDate, formatTime } from '../../tools/strings/index.js';
 import type { PendingRequest } from './pending.js';

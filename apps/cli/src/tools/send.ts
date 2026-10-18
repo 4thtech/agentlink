@@ -13,7 +13,7 @@
 // I-5, I-7: the message text, the body and the `to` query are agent-written (steerable) text: none
 // of it reaches a summary, `nextStep`, error or log line. Summaries name the contact under the
 // 06 §2.1 rule only. Core errors become fixed text by their code; any other failure is INTERNAL.
-import { CoreError, type CoreErrorCode, type SendMessageInput } from '@agentlink/core';
+import { CoreError, type CoreErrorCode, type SendMessageInput } from '@4thtech-io/core';
 import { contactRef, renderRef, resolveContact } from './contacts.js';
 import type { ToolContext } from './context.js';
 import { fail, internalError, invalidArgument, ok, type HandlerOutput } from './result.js';

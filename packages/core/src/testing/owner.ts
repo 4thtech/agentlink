@@ -6,7 +6,7 @@ import {
   randomBytes,
   type JsonObject,
   type OwnerKeyStore,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import type { PolicyVersionMark } from '../owner-actions.js';
 import { passphrase } from './fixtures.js';
 

@@ -17,8 +17,8 @@ import {
   type OwnerPublicKeys,
   type OwnerSession,
   type TypedData,
-} from '@agentlink/crypto';
-import type { IdentityView, InitIdentityInput } from '@agentlink/core';
+} from '@4thtech-io/crypto';
+import type { IdentityView, InitIdentityInput } from '@4thtech-io/core';
 import { allowedTypedData, ownerOperationRefused } from './owner-allowlist.js';
 
 /** What `owner init` needs of core's IdentityService (`client.identity`). */

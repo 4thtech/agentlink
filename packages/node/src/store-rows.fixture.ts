@@ -11,7 +11,7 @@ import {
   type StoreValue,
   type TableName,
   type TableSpec,
-} from '@agentlink/core';
+} from '@4thtech-io/core';
 
 /** The canary every `enc` plaintext carries; no clear value contains it. */
 export const CANARY = 'CANARYplain';

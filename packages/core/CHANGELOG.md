@@ -1,4 +1,4 @@
-# @agentlink/core
+# @4thtech-io/core
 
 ## 0.1.0
 

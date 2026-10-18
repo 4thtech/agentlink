@@ -3,7 +3,7 @@
 
 const freeze = <T>(value: T): Readonly<T> => Object.freeze(value);
 
-export const packageName = '@agentlink/types';
+export const packageName = '@4thtech-io/types';
 
 /** Envelope, payload-body and owner-action format version (04 §2.5.1, §3.1, §3.6). */
 export const PROTOCOL_VERSION = 1;

@@ -1,7 +1,7 @@
 // Test double for the relay pool's I/O seams (relay-io.ts): mock relays, a stub resolver and a stub
 // NIP-11 fetcher in one object, with no network. Excluded from the build (tsconfig.json); only tests
 // import it. A mock relay speaks enough NIP-01, NIP-11 and NIP-42 for the M1-5b acceptance tests.
-import { NOSTR_KIND_AUTH, encodeUtf8, verifyNostrEvent, type NostrEvent } from '@agentlink/crypto';
+import { NOSTR_KIND_AUTH, encodeUtf8, verifyNostrEvent, type NostrEvent } from '@4thtech-io/crypto';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import type {
   HostResolver,

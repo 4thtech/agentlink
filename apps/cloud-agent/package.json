@@ -1,5 +1,5 @@
 {
-  "name": "@agentlink/cloud-agent",
+  "name": "@4thtech-io/cloud-agent",
   "version": "0.0.0",
   "private": true,
   "description": "Cloud agent: Worker, Durable Object and remote MCP.",

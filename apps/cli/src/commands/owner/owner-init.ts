@@ -1,6 +1,6 @@
 // `agentlink owner init` † (M1-9b; 04 §2.2, §2.8 "owner init rules"; 06 §7; 07 §9.3; D-67, D-68 (3)).
 //
-// Creates the owner key on this machine with a generated owner code (@agentlink/node `initOwner`,
+// Creates the owner key on this machine with a generated owner code (@4thtech-io/node `initOwner`,
 // M1-8c): the code is shown once at this process's own terminal, re-typed and cleared; the owner
 // seed is stored only wrapped under it, never in plain text (04 §2.2, G-5). It never replaces an
 // existing owner key, nor an owner the agent's card already names. No argument, environment variable
@@ -14,8 +14,8 @@
 // signs one card for exactly this agent and the new owner, and stores it through core
 // `identity.init`, so the agent can pair as soon as `owner init` succeeds. The card commits to the
 // agent's local name as its display name and to the card relay list (card-relays.ts).
-import type { OwnerPublicKeys } from '@agentlink/crypto';
-import { decodeHex0x } from '@agentlink/crypto';
+import type { OwnerPublicKeys } from '@4thtech-io/crypto';
+import { decodeHex0x } from '@4thtech-io/crypto';
 import { EXIT_FAILED, EXIT_OK, type CommandContext } from '../../dispatch.js';
 import { isAgentName } from '../../runtime/agent-name.js';
 import { badArguments, openOne, ownerStep } from './common.js';

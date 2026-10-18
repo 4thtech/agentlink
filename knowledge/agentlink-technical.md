@@ -22,11 +22,11 @@ flowchart LR
 
 | Name | Role | Status (16 Oct 2026) |
 |---|---|---|
-| `@agentlink/crypto` | Key derivation, HPKE key wrapping, AES-256-GCM, signatures, hashing, key-store interfaces | Built into the released CLI package (v0.1.0), not published on its own; file encryption still to come |
-| `@agentlink/types` | Shared schemas for policies, approvals, proof packs and tool results | Built into the released CLI package, not published on its own |
-| `@agentlink/transport-nostr` | Gift wrap and unwrap, relay pool, delivery outbox, inbox sync, the default relay set | Built into the released CLI package, not published on its own |
-| `@agentlink/core` | Identity, signed agent card, contacts, envelopes, invites and pairing, owner-signed actions and policies, approvals, the send pipeline, inbox, terms negotiation | Built into the released CLI package, not published on its own |
-| `@agentlink/node` | OS-keychain key store, local SQLite database, relay connection | Built into the released CLI package, not published on its own |
+| `@4thtech-io/crypto` | Key derivation, HPKE key wrapping, AES-256-GCM, signatures, hashing, key-store interfaces | Built into the released CLI package (v0.1.0), not published on its own; file encryption still to come |
+| `@4thtech-io/types` | Shared schemas for policies, approvals, proof packs and tool results | Built into the released CLI package, not published on its own |
+| `@4thtech-io/transport-nostr` | Gift wrap and unwrap, relay pool, delivery outbox, inbox sync, the default relay set | Built into the released CLI package, not published on its own |
+| `@4thtech-io/core` | Identity, signed agent card, contacts, envelopes, invites and pairing, owner-signed actions and policies, approvals, the send pipeline, inbox, terms negotiation | Built into the released CLI package, not published on its own |
+| `@4thtech-io/node` | OS-keychain key store, local SQLite database, relay connection | Built into the released CLI package, not published on its own |
 | MCP server and `agentlink` command line (`apps/cli`) | The tools an AI app calls, and the owner commands typed in a terminal | Merged for M1a (nine tools for status, invites, contacts, send, inbox, terms and approvals), released as `@4thtech-io/agentlink` v0.1.0; an agent skill file and quickstart guides exist |
 | Storage and chain client | Encrypted drop and own-storage adapters; proof client | Planned (M1b) |
 | Desktop apps, owner console, cloud agent | Native approvals and dashboard; web supervision; always-on agent in the user's own Cloudflare account | Planned (M2) |
@@ -50,7 +50,7 @@ Messages travel as end-to-end encrypted, gift-wrapped Nostr events (NIP-59 with 
 - **Signatures:** BIP-340 Schnorr for envelopes; EIP-712 typed data for public records, receipts and agent cards.
 - **Files:** chunked AES-256-GCM (1 MiB chunks) so truncation is detected.
 - **Keys:** one 32-byte master seed per agent and per owner; purpose keys derived with HKDF-SHA256. Owner secrets are wrapped by an owner code or passphrase (Argon2id) or a passkey.
-- **Libraries:** only audited ones (`@noble/*`, `@hpke/core`, `nostr-tools`, `viem`, `aws4fetch`), and all crypto goes through `@agentlink/crypto`.
+- **Libraries:** only audited ones (`@noble/*`, `@hpke/core`, `nostr-tools`, `viem`, `aws4fetch`), and all crypto goes through `@4thtech-io/crypto`.
 
 ## The store
 

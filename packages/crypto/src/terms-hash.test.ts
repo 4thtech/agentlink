@@ -1,5 +1,5 @@
 // M1-21 (D-32): termsHash = sha256(JCS(terms)), RFC 8785, bare 64 lower-case hex (04 §2.4.1, §3.4).
-// The shape and canonical form of `terms` are checked by @agentlink/types (`termsSchema`) before
+// The shape and canonical form of `terms` are checked by @4thtech-io/types (`termsSchema`) before
 // hashing; this helper hashes exactly the JSON value it is given.
 import { describe, expect, it } from 'vitest';
 import { CryptoInputError, parseJson, termsHash, verifyTermsHash } from './index.js';

@@ -1,7 +1,7 @@
 // The pure policy engine (M1-7d; 07 §2, 06 §3, G-6): contacts and envelopes, the plain
 // `commitments.accept` rule, and the G-6 fail-closed result. The auto-accept limits are M1-20
 // (commitments.test.ts); the files and proofs rules in full are M1-7i (policy-files-proofs.test.ts).
-import { POLICY_DEFAULTS, defaultPolicy, type Policy } from '@agentlink/types';
+import { POLICY_DEFAULTS, defaultPolicy, type Policy } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import {
   FAIL_CLOSED_CONTACTS,

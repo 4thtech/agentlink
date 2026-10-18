@@ -1,12 +1,12 @@
 // IR-M1-8a-1 M-2: the package entry is the fence around the agent seed (04 §8.1). It exports only
 // opaque entry points: a KeyStore, an agent ID, a probe result. Nothing that returns raw keychain
-// bytes (the backend, account names, the store key) is reachable from `@agentlink/node`, so the CLI
+// bytes (the backend, account names, the store key) is reachable from `@4thtech-io/node`, so the CLI
 // and MCP tool code cannot read a seed through it. Deep imports into dist/ or src/ are refused by
 // package.json `exports` and by deps-check and ESLint (IR-M1-1f-1 L-2).
 import { describe, expect, it } from 'vitest';
 import * as entry from './index.js';
 
-describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
+describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
   it('exports exactly the opaque entry points', () => {
     expect(Object.keys(entry).sort()).toEqual([
       // M1-8d: the local approval server's address constant (08 §1).

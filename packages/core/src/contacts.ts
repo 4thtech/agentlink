@@ -42,8 +42,8 @@ import {
   randomBytes,
   type AgentCard,
   type JsonValue,
-} from '@agentlink/crypto';
-import type { ContactDisplayName, IdentityLabel, OwnerAlias } from '@agentlink/types';
+} from '@4thtech-io/crypto';
+import type { ContactDisplayName, IdentityLabel, OwnerAlias } from '@4thtech-io/types';
 import {
   agentNostrKey,
   checkReceivedCard,

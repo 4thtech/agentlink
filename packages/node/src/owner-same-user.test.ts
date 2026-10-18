@@ -32,7 +32,7 @@ import {
   taggedHash,
   type JsonObject,
   type OwnerPublicKeys,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { createKeychainAgent } from './keychain-keystore.js';
 import type { KeychainBackend } from './keychain.js';
@@ -44,8 +44,8 @@ import type { OwnerTerminal } from './owner-terminal.js';
 
 // Every owner seed opened, copied before it is wiped, so the scan knows what to look for.
 const seen = vi.hoisted(() => ({ seeds: [] as Uint8Array[] }));
-vi.mock('@agentlink/crypto/keystore', async (importOriginal) => {
-  const real = await importOriginal<typeof import('@agentlink/crypto/keystore')>();
+vi.mock('@4thtech-io/crypto/keystore', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@4thtech-io/crypto/keystore')>();
   return {
     ...real,
     openOwnerSeed: async (...args: Parameters<typeof real.openOwnerSeed>) => {

@@ -3,7 +3,7 @@
 // lapses, released on clean shutdown. Several harness MCP processes share one agent store; exactly
 // one of them keeps the relay subscriptions. The node test (packages/node) runs the same cases over
 // one real SQLite file with two connections and a killed child process.
-import { MemoryKeyStore } from '@agentlink/crypto/testing';
+import { MemoryKeyStore } from '@4thtech-io/crypto/testing';
 import { describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import {

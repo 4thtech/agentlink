@@ -1,5 +1,5 @@
 // Agent-card checks shared by identity and contacts (04 §2.4, §2.9, §3.4.1). Every check is a call
-// into @agentlink/crypto; nothing here touches a primitive. Errors are fixed sentences (I-7).
+// into @4thtech-io/crypto; nothing here touches a primitive. Errors are fixed sentences (I-7).
 import {
   AGENT_CARD_DOMAIN,
   AGENT_CARD_TYPES,
@@ -18,8 +18,8 @@ import {
   type JsonValue,
   type OwnerPublicKeys,
   type TypedData,
-} from '@agentlink/crypto';
-import { displayNameSchema, relayListSchema } from '@agentlink/types';
+} from '@4thtech-io/crypto';
+import { displayNameSchema, relayListSchema } from '@4thtech-io/types';
 import { CoreError } from './errors.js';
 
 /** A card with its signatures as the store keeps it, sealed in `agent_card_json` (07 §3, M-3). */

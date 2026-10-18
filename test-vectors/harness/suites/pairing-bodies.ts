@@ -1,4 +1,4 @@
-// Suite `pairing-bodies` (M1-2d, M1-2a G-23/G-28): the strict @agentlink/types schemas of the
+// Suite `pairing-bodies` (M1-2d, M1-2a G-23/G-28): the strict @4thtech-io/types schemas of the
 // pairing bodies (04 §3.4, §3.4.1, §3.6; G-24 relay lists of 2 to 16). `outcome` is whether the
 // schema accepts the body. Signatures, hashes, the proof and the commitment are not checked here
 // (M1-7c, safety-code-recompute). Schemas report through `safeParse` and never throw on input.
@@ -8,7 +8,7 @@ import {
   handshakeBodySchema,
   inviteSchema,
   relayListSchema,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 import type { SuiteModule } from '../suite';
 
 const SCHEMAS = {

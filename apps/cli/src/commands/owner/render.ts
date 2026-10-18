@@ -19,9 +19,9 @@
 //
 // Everything here is derived from the parsed stored action (pending.ts), never from the row's
 // stored summary or any text the agent passed in (IR-M1-8c-1 F-4).
-import { renderContactName, type AgentLinkClient } from '@agentlink/core';
-import { canonicalize, type JsonObject, type JsonValue } from '@agentlink/crypto';
-import { RESTRICTED_NAME_FALLBACK, isUsdAmount, parseUsd } from '@agentlink/types';
+import { renderContactName, type AgentLinkClient } from '@4thtech-io/core';
+import { canonicalize, type JsonObject, type JsonValue } from '@4thtech-io/crypto';
+import { RESTRICTED_NAME_FALLBACK, isUsdAmount, parseUsd } from '@4thtech-io/types';
 import { isApprovalId } from '../../approval/next-step.js';
 import { FROM_YOUR_AI, terminalOneLine, untrustedRegion } from '../../terminal/sanitize.js';
 import { formatDate, formatTime, formatUsd } from '../../tools/strings/index.js';

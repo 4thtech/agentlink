@@ -1,5 +1,5 @@
 // Suite `drop-auth` (M1-27a, D-48): the encrypted drop's request signature and URL MAC (07 §5.4)
-// through @agentlink/crypto. `urlMac` computes the MAC, `authEvent` the body hash and NIP-01 id of the
+// through @4thtech-io/crypto. `urlMac` computes the MAC, `authEvent` the body hash and NIP-01 id of the
 // unsigned kind-27235 event, and `verify` runs verifyDropAuthorization: accept with the drop key, or
 // reject with its reason. Decimal strings carry the integers (the vector format has string values).
 import {
@@ -10,7 +10,7 @@ import {
   nostrEventId,
   verifyDropAuthorization,
   type DropUrlPurpose,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import type { Comparison, SuiteModule } from '../suite';
 
 type DropAuthInput =

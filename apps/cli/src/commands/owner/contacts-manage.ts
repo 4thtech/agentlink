@@ -5,7 +5,7 @@
 // AMBIGUOUS_CONTACT, and nothing could fix it. These owner commands can.
 //
 // - Owner operations: the dispatcher's owner-terminal guard runs first (interactive terminal, no AI
-//   harness marker; a UX guard, not a security boundary, D-67); then @agentlink/node shows the fixed
+//   harness marker; a UX guard, not a security boundary, D-67); then @4thtech-io/node shows the fixed
 //   summary, reads the owner code once at its own TTY prompt and signs one owner action. The core
 //   verifies the owner signature and the nonce and applies it (I-4). No MCP tool does either.
 // - The contact is named by its ID only (`agentlink contacts` lists it): a name can be ambiguous,
@@ -16,9 +16,9 @@
 //   name rule and the alias only after it passed the check above.
 // - Remove keeps the 07 §3 tombstone: later messages from the contact are dropped, and only a new
 //   pairing brings it back. The contact is not told.
-import { isRestrictedAlias, renderContactName, type ContactView } from '@agentlink/core';
-import { encodeBase64url, encodeHex, randomBytes, type JsonObject } from '@agentlink/crypto';
-import { OWNER_ACTION_MAX_LIFETIME_SECONDS } from '@agentlink/types';
+import { isRestrictedAlias, renderContactName, type ContactView } from '@4thtech-io/core';
+import { encodeBase64url, encodeHex, randomBytes, type JsonObject } from '@4thtech-io/crypto';
+import { OWNER_ACTION_MAX_LIFETIME_SECONDS } from '@4thtech-io/types';
 import { EXIT_FAILED, EXIT_OK, type CommandContext, type CommandHandler } from '../../dispatch.js';
 import { terminalOneLine } from '../../terminal/sanitize.js';
 import { removeInvisible } from '../../tools/untrusted.js';

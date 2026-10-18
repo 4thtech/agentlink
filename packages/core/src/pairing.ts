@@ -39,13 +39,13 @@ import {
   wipe,
   type AgentCard,
   type JsonValue,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import {
   INVITE_DEFAULT_EXPIRY_DAYS,
   type ContactDisplayName,
   type Invite,
   type Payload,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 import { agentNostrKey, checkName, checkReceivedCard, ownerFingerprintHex } from './card.js';
 import type { ContactBook, StagedPairing } from './contacts.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';

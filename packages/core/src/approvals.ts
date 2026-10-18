@@ -19,7 +19,7 @@
 // I-4: nothing here decides, widens or creates an approved approval. The row's `status` only ever
 // takes authority away (`void`, `expired`); it never grants it. I-5: the summary is core-built
 // template text checked like `approval-request.summary`; errors and log lines are fixed text.
-import { canonicalize, encodeBase64url, parseJson, randomBytes } from '@agentlink/crypto';
+import { canonicalize, encodeBase64url, parseJson, randomBytes } from '@4thtech-io/crypto';
 import {
   APPROVAL_ID_PREFIX,
   APPROVAL_TTL_SECONDS,
@@ -33,7 +33,7 @@ import {
   signedOwnerActionSchema,
   type ApprovalFee,
   type ApprovalToolName,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 import type { ApprovalChannel } from './approval-channel.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
@@ -218,7 +218,7 @@ export type CollectOutcome =
 export interface FeeQuote {
   readonly token: string;
   readonly amount: bigint;
-  /** The token's decimals, from the chain config (not checkable in @agentlink/types). */
+  /** The token's decimals, from the chain config (not checkable in @4thtech-io/types). */
   readonly decimals: number;
 }
 

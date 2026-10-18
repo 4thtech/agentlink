@@ -1,8 +1,8 @@
 // Shared steps of the owner commands (M1-9b): choosing the agent, the owner context for signing,
-// printing outcomes, and turning @agentlink/node's fixed-text errors into output.
-import type { OwnerActionOutcome } from '@agentlink/core';
-import { decodeHex0x } from '@agentlink/crypto';
-import { NodeKeyStoreError, type ApprovalContext } from '@agentlink/node';
+// printing outcomes, and turning @4thtech-io/node's fixed-text errors into output.
+import type { OwnerActionOutcome } from '@4thtech-io/core';
+import { decodeHex0x } from '@4thtech-io/crypto';
+import { NodeKeyStoreError, type ApprovalContext } from '@4thtech-io/node';
 import { DISPATCH_TEXT, EXIT_FAILED, EXIT_USAGE, type CommandContext } from '../../dispatch.js';
 import type { Output } from '../../output.js';
 import { isAgentName } from '../../runtime/agent-name.js';
@@ -121,7 +121,7 @@ export function printOutcome(
 }
 
 /**
- * Runs an owner command body. @agentlink/node's errors carry fixed text only (no secret, no stored
+ * Runs an owner command body. @4thtech-io/node's errors carry fixed text only (no secret, no stored
  * value), so their message is what the owner sees; every other error goes to the dispatcher, which
  * prints fixed text.
  */

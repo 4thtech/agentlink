@@ -7,11 +7,11 @@
 // stored digest. A row whose action does not open, does not parse, or whose stored digest differs
 // from the recomputed one is a problem: it is shown as such and never offered (IR-M1-8c-1 F-3).
 //
-// What the owner sees (render.ts) and what is signed (the `action` handed to @agentlink/node, which
+// What the owner sees (render.ts) and what is signed (the `action` handed to @4thtech-io/node, which
 // recomputes the digest once more) are the same parsed object (IR-M1-9j-1 F06). The row's stored
 // `summary` is never shown: the review lines are derived from the action, not from text the agent
 // or the core passed in (IR-M1-8c-1 F-4).
-import { computeActionDigest, rowKeyOf, type Row, type Sealed } from '@agentlink/core';
+import { computeActionDigest, rowKeyOf, type Row, type Sealed } from '@4thtech-io/core';
 import {
   encodeHex,
   encodeUtf8,
@@ -19,8 +19,8 @@ import {
   sha256,
   type JsonObject,
   type JsonValue,
-} from '@agentlink/crypto';
-import { approvalActionSchema, approvalIdSchema } from '@agentlink/types';
+} from '@4thtech-io/crypto';
+import { approvalActionSchema, approvalIdSchema } from '@4thtech-io/types';
 import type { OwnerAgent } from './deps.js';
 
 /** A pending request whose stored action parsed and whose digest matched. */

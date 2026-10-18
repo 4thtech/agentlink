@@ -26,57 +26,57 @@ Code that is merged is not necessarily published: nothing is released or install
 | M0 Foundations | Monorepo skeleton | Done | - |
 | M0 Foundations | Delivery pipeline and runbooks | Done | - |
 | M0 Foundations | Public documentation | Done | [#88](https://github.com/4thtech/agentlink/pull/88) |
-| M0 Foundations | Redacting logger (@agentlink/log) | Done | - |
+| M0 Foundations | Redacting logger (@4thtech-io/log) | Done | - |
 | M0 Foundations | Specifications and process | Done | - |
 | M0 Foundations | Dependency updates | Done | [#160](https://github.com/4thtech/agentlink/pull/160) |
 | M0 Foundations | CI follow-ups | In progress | - |
-| Crypto (@agentlink/crypto) | Encodings, hashing, JSON canonicalisation | Done | [#27](https://github.com/4thtech/agentlink/pull/27) |
-| Crypto (@agentlink/crypto) | Key derivation and public identities | Done | [#29](https://github.com/4thtech/agentlink/pull/29) |
-| Crypto (@agentlink/crypto) | Envelope encryption | In progress | [#38](https://github.com/4thtech/agentlink/pull/38), [#61](https://github.com/4thtech/agentlink/pull/61) |
-| Crypto (@agentlink/crypto) | EIP-712 typed data and the agent card | Done | [#32](https://github.com/4thtech/agentlink/pull/32) |
-| Crypto (@agentlink/crypto) | EIP-712 proof types | In progress | [#221](https://github.com/4thtech/agentlink/pull/221), [#212](https://github.com/4thtech/agentlink/pull/212) |
-| Crypto (@agentlink/crypto) | Owner passphrase wrap, pairing proof, safety code | Done | [#37](https://github.com/4thtech/agentlink/pull/37) |
-| Crypto (@agentlink/crypto) | Passkey seed wrap and recovery code | Done | [#222](https://github.com/4thtech/agentlink/pull/222), [#228](https://github.com/4thtech/agentlink/pull/228) |
-| Crypto (@agentlink/crypto) | Key interfaces, NIP-44 v2, gift wrap | Done | [#41](https://github.com/4thtech/agentlink/pull/41), [#42](https://github.com/4thtech/agentlink/pull/42), [#55](https://github.com/4thtech/agentlink/pull/55) |
-| Crypto (@agentlink/crypto) | Independent test vectors | In progress | [#25](https://github.com/4thtech/agentlink/pull/25), [#35](https://github.com/4thtech/agentlink/pull/35), [#72](https://github.com/4thtech/agentlink/pull/72), [#75](https://github.com/4thtech/agentlink/pull/75), [#104](https://github.com/4thtech/agentlink/pull/104) |
-| Crypto (@agentlink/crypto) | Sender code for unknown senders | Done | [#110](https://github.com/4thtech/agentlink/pull/110) |
-| Crypto (@agentlink/crypto) | File encryption (ALF1) | Planned | - |
-| Shared types (@agentlink/types) | Constants and the envelope, payload, card and invite schemas | Done | [#23](https://github.com/4thtech/agentlink/pull/23), [#93](https://github.com/4thtech/agentlink/pull/93) |
-| Shared types (@agentlink/types) | Policy, approval, proof pack and tool-result types | Done | [#31](https://github.com/4thtech/agentlink/pull/31), [#36](https://github.com/4thtech/agentlink/pull/36), [#71](https://github.com/4thtech/agentlink/pull/71), [#72](https://github.com/4thtech/agentlink/pull/72), [#76](https://github.com/4thtech/agentlink/pull/76) |
-| Shared types (@agentlink/types) | Terms, TermsInput and termsHash | Done | [#98](https://github.com/4thtech/agentlink/pull/98), [#100](https://github.com/4thtech/agentlink/pull/100), [#101](https://github.com/4thtech/agentlink/pull/101), [#147](https://github.com/4thtech/agentlink/pull/147) |
-| Transport (@agentlink/transport-nostr) | Gift wrap and unwrap | Done | [#45](https://github.com/4thtech/agentlink/pull/45) |
-| Transport (@agentlink/transport-nostr) | Relay pool and delivery outbox | Done | [#59](https://github.com/4thtech/agentlink/pull/59) |
-| Transport (@agentlink/transport-nostr) | Sync | Done | [#63](https://github.com/4thtech/agentlink/pull/63) |
-| Transport (@agentlink/transport-nostr) | Outbox stays inside the sync look-back | Done | [#87](https://github.com/4thtech/agentlink/pull/87) |
-| Transport (@agentlink/transport-nostr) | Default relay set | Done | [#119](https://github.com/4thtech/agentlink/pull/119) |
-| Storage (@agentlink/storage) | Inline and S3-compatible adapters | Done | - |
-| Storage (@agentlink/storage) | Large files, encrypted drop and storage choice | Planned | - |
-| Core (@agentlink/core) | Skeleton: identity, contacts, store and approval interfaces | Done | [#48](https://github.com/4thtech/agentlink/pull/48) |
-| Core (@agentlink/core) | Envelopes | Done | [#66](https://github.com/4thtech/agentlink/pull/66) |
-| Core (@agentlink/core) | Invites and pairing | Done | [#78](https://github.com/4thtech/agentlink/pull/78) |
-| Core (@agentlink/core) | Safety code checked | Done | [#80](https://github.com/4thtech/agentlink/pull/80), [#85](https://github.com/4thtech/agentlink/pull/85) |
-| Core (@agentlink/core) | Owner-signed actions and policies | Done | [#79](https://github.com/4thtech/agentlink/pull/79) |
-| Core (@agentlink/core) | Commitments policy | Done | [#114](https://github.com/4thtech/agentlink/pull/114) |
-| Core (@agentlink/core) | Approval requests and the requests queue | Done | [#95](https://github.com/4thtech/agentlink/pull/95) |
-| Core (@agentlink/core) | Reading an approval and counting pending ones | Done | [#116](https://github.com/4thtech/agentlink/pull/116) |
-| Core (@agentlink/core) | Requests from unknown senders: accept, ignore, block | Done | [#96](https://github.com/4thtech/agentlink/pull/96), [#105](https://github.com/4thtech/agentlink/pull/105) |
-| Core (@agentlink/core) | Held cards need the sender's own owner entry | Done | [#90](https://github.com/4thtech/agentlink/pull/90) |
-| Core (@agentlink/core) | Send pipeline | Done | [#99](https://github.com/4thtech/agentlink/pull/99), [#133](https://github.com/4thtech/agentlink/pull/133) |
-| Core (@agentlink/core) | Inbox sync, delivery acknowledgements, owner card update | Done | [#106](https://github.com/4thtech/agentlink/pull/106), [#130](https://github.com/4thtech/agentlink/pull/130), [#131](https://github.com/4thtech/agentlink/pull/131) |
-| Core (@agentlink/core) | Live relay subscriptions | Done | [#204](https://github.com/4thtech/agentlink/pull/204) |
-| Core (@agentlink/core) | Policy rules for files, proofs and the budget ledger | Done | [#217](https://github.com/4thtech/agentlink/pull/217) |
-| Core (@agentlink/core) | SSRF-safe fetch and the allowed-folder path guard | Done | [#208](https://github.com/4thtech/agentlink/pull/208) |
-| Core (@agentlink/core) | Terms and one approval per agreement | Done | [#126](https://github.com/4thtech/agentlink/pull/126), [#134](https://github.com/4thtech/agentlink/pull/134) |
-| Node runtime (@agentlink/node) | Agent key store in the OS keychain | Done | [#54](https://github.com/4thtech/agentlink/pull/54), [#57](https://github.com/4thtech/agentlink/pull/57), [#83](https://github.com/4thtech/agentlink/pull/83) |
-| Node runtime (@agentlink/node) | Local SQLite database | Done | [#60](https://github.com/4thtech/agentlink/pull/60), [#68](https://github.com/4thtech/agentlink/pull/68) |
-| Node runtime (@agentlink/node) | Owner code at a prompt | Done | [#67](https://github.com/4thtech/agentlink/pull/67) |
-| Node runtime (@agentlink/node) | Relay connection | Done | [#81](https://github.com/4thtech/agentlink/pull/81), [#84](https://github.com/4thtech/agentlink/pull/84) |
-| Node runtime (@agentlink/node) | Policy version record in the keychain | Done | [#86](https://github.com/4thtech/agentlink/pull/86) |
-| Node runtime (@agentlink/node) | First agent card at owner setup | Done | [#118](https://github.com/4thtech/agentlink/pull/118) |
-| Node runtime (@agentlink/node) | Local approval server | Done | [#207](https://github.com/4thtech/agentlink/pull/207), [#225](https://github.com/4thtech/agentlink/pull/225), [#247](https://github.com/4thtech/agentlink/pull/247) |
-| Node runtime (@agentlink/node) | Owner recovery without an attached agent | Done | [#206](https://github.com/4thtech/agentlink/pull/206), [#227](https://github.com/4thtech/agentlink/pull/227) |
-| Node runtime (@agentlink/node) | Path guard fixes for Windows and macOS | Done | [#229](https://github.com/4thtech/agentlink/pull/229), [#214](https://github.com/4thtech/agentlink/pull/214) |
-| Node runtime (@agentlink/node) | Passphrase-locked key file for headless machines | Planned | - |
+| Crypto (@4thtech-io/crypto) | Encodings, hashing, JSON canonicalisation | Done | [#27](https://github.com/4thtech/agentlink/pull/27) |
+| Crypto (@4thtech-io/crypto) | Key derivation and public identities | Done | [#29](https://github.com/4thtech/agentlink/pull/29) |
+| Crypto (@4thtech-io/crypto) | Envelope encryption | In progress | [#38](https://github.com/4thtech/agentlink/pull/38), [#61](https://github.com/4thtech/agentlink/pull/61) |
+| Crypto (@4thtech-io/crypto) | EIP-712 typed data and the agent card | Done | [#32](https://github.com/4thtech/agentlink/pull/32) |
+| Crypto (@4thtech-io/crypto) | EIP-712 proof types | In progress | [#221](https://github.com/4thtech/agentlink/pull/221), [#212](https://github.com/4thtech/agentlink/pull/212) |
+| Crypto (@4thtech-io/crypto) | Owner passphrase wrap, pairing proof, safety code | Done | [#37](https://github.com/4thtech/agentlink/pull/37) |
+| Crypto (@4thtech-io/crypto) | Passkey seed wrap and recovery code | Done | [#222](https://github.com/4thtech/agentlink/pull/222), [#228](https://github.com/4thtech/agentlink/pull/228) |
+| Crypto (@4thtech-io/crypto) | Key interfaces, NIP-44 v2, gift wrap | Done | [#41](https://github.com/4thtech/agentlink/pull/41), [#42](https://github.com/4thtech/agentlink/pull/42), [#55](https://github.com/4thtech/agentlink/pull/55) |
+| Crypto (@4thtech-io/crypto) | Independent test vectors | In progress | [#25](https://github.com/4thtech/agentlink/pull/25), [#35](https://github.com/4thtech/agentlink/pull/35), [#72](https://github.com/4thtech/agentlink/pull/72), [#75](https://github.com/4thtech/agentlink/pull/75), [#104](https://github.com/4thtech/agentlink/pull/104) |
+| Crypto (@4thtech-io/crypto) | Sender code for unknown senders | Done | [#110](https://github.com/4thtech/agentlink/pull/110) |
+| Crypto (@4thtech-io/crypto) | File encryption (ALF1) | Planned | - |
+| Shared types (@4thtech-io/types) | Constants and the envelope, payload, card and invite schemas | Done | [#23](https://github.com/4thtech/agentlink/pull/23), [#93](https://github.com/4thtech/agentlink/pull/93) |
+| Shared types (@4thtech-io/types) | Policy, approval, proof pack and tool-result types | Done | [#31](https://github.com/4thtech/agentlink/pull/31), [#36](https://github.com/4thtech/agentlink/pull/36), [#71](https://github.com/4thtech/agentlink/pull/71), [#72](https://github.com/4thtech/agentlink/pull/72), [#76](https://github.com/4thtech/agentlink/pull/76) |
+| Shared types (@4thtech-io/types) | Terms, TermsInput and termsHash | Done | [#98](https://github.com/4thtech/agentlink/pull/98), [#100](https://github.com/4thtech/agentlink/pull/100), [#101](https://github.com/4thtech/agentlink/pull/101), [#147](https://github.com/4thtech/agentlink/pull/147) |
+| Transport (@4thtech-io/transport-nostr) | Gift wrap and unwrap | Done | [#45](https://github.com/4thtech/agentlink/pull/45) |
+| Transport (@4thtech-io/transport-nostr) | Relay pool and delivery outbox | Done | [#59](https://github.com/4thtech/agentlink/pull/59) |
+| Transport (@4thtech-io/transport-nostr) | Sync | Done | [#63](https://github.com/4thtech/agentlink/pull/63) |
+| Transport (@4thtech-io/transport-nostr) | Outbox stays inside the sync look-back | Done | [#87](https://github.com/4thtech/agentlink/pull/87) |
+| Transport (@4thtech-io/transport-nostr) | Default relay set | Done | [#119](https://github.com/4thtech/agentlink/pull/119) |
+| Storage (@4thtech-io/storage) | Inline and S3-compatible adapters | Done | - |
+| Storage (@4thtech-io/storage) | Large files, encrypted drop and storage choice | Planned | - |
+| Core (@4thtech-io/core) | Skeleton: identity, contacts, store and approval interfaces | Done | [#48](https://github.com/4thtech/agentlink/pull/48) |
+| Core (@4thtech-io/core) | Envelopes | Done | [#66](https://github.com/4thtech/agentlink/pull/66) |
+| Core (@4thtech-io/core) | Invites and pairing | Done | [#78](https://github.com/4thtech/agentlink/pull/78) |
+| Core (@4thtech-io/core) | Safety code checked | Done | [#80](https://github.com/4thtech/agentlink/pull/80), [#85](https://github.com/4thtech/agentlink/pull/85) |
+| Core (@4thtech-io/core) | Owner-signed actions and policies | Done | [#79](https://github.com/4thtech/agentlink/pull/79) |
+| Core (@4thtech-io/core) | Commitments policy | Done | [#114](https://github.com/4thtech/agentlink/pull/114) |
+| Core (@4thtech-io/core) | Approval requests and the requests queue | Done | [#95](https://github.com/4thtech/agentlink/pull/95) |
+| Core (@4thtech-io/core) | Reading an approval and counting pending ones | Done | [#116](https://github.com/4thtech/agentlink/pull/116) |
+| Core (@4thtech-io/core) | Requests from unknown senders: accept, ignore, block | Done | [#96](https://github.com/4thtech/agentlink/pull/96), [#105](https://github.com/4thtech/agentlink/pull/105) |
+| Core (@4thtech-io/core) | Held cards need the sender's own owner entry | Done | [#90](https://github.com/4thtech/agentlink/pull/90) |
+| Core (@4thtech-io/core) | Send pipeline | Done | [#99](https://github.com/4thtech/agentlink/pull/99), [#133](https://github.com/4thtech/agentlink/pull/133) |
+| Core (@4thtech-io/core) | Inbox sync, delivery acknowledgements, owner card update | Done | [#106](https://github.com/4thtech/agentlink/pull/106), [#130](https://github.com/4thtech/agentlink/pull/130), [#131](https://github.com/4thtech/agentlink/pull/131) |
+| Core (@4thtech-io/core) | Live relay subscriptions | Done | [#204](https://github.com/4thtech/agentlink/pull/204) |
+| Core (@4thtech-io/core) | Policy rules for files, proofs and the budget ledger | Done | [#217](https://github.com/4thtech/agentlink/pull/217) |
+| Core (@4thtech-io/core) | SSRF-safe fetch and the allowed-folder path guard | Done | [#208](https://github.com/4thtech/agentlink/pull/208) |
+| Core (@4thtech-io/core) | Terms and one approval per agreement | Done | [#126](https://github.com/4thtech/agentlink/pull/126), [#134](https://github.com/4thtech/agentlink/pull/134) |
+| Node runtime (@4thtech-io/node) | Agent key store in the OS keychain | Done | [#54](https://github.com/4thtech/agentlink/pull/54), [#57](https://github.com/4thtech/agentlink/pull/57), [#83](https://github.com/4thtech/agentlink/pull/83) |
+| Node runtime (@4thtech-io/node) | Local SQLite database | Done | [#60](https://github.com/4thtech/agentlink/pull/60), [#68](https://github.com/4thtech/agentlink/pull/68) |
+| Node runtime (@4thtech-io/node) | Owner code at a prompt | Done | [#67](https://github.com/4thtech/agentlink/pull/67) |
+| Node runtime (@4thtech-io/node) | Relay connection | Done | [#81](https://github.com/4thtech/agentlink/pull/81), [#84](https://github.com/4thtech/agentlink/pull/84) |
+| Node runtime (@4thtech-io/node) | Policy version record in the keychain | Done | [#86](https://github.com/4thtech/agentlink/pull/86) |
+| Node runtime (@4thtech-io/node) | First agent card at owner setup | Done | [#118](https://github.com/4thtech/agentlink/pull/118) |
+| Node runtime (@4thtech-io/node) | Local approval server | Done | [#207](https://github.com/4thtech/agentlink/pull/207), [#225](https://github.com/4thtech/agentlink/pull/225), [#247](https://github.com/4thtech/agentlink/pull/247) |
+| Node runtime (@4thtech-io/node) | Owner recovery without an attached agent | Done | [#206](https://github.com/4thtech/agentlink/pull/206), [#227](https://github.com/4thtech/agentlink/pull/227) |
+| Node runtime (@4thtech-io/node) | Path guard fixes for Windows and macOS | Done | [#229](https://github.com/4thtech/agentlink/pull/229), [#214](https://github.com/4thtech/agentlink/pull/214) |
+| Node runtime (@4thtech-io/node) | Passphrase-locked key file for headless machines | Planned | - |
 | MCP server, CLI and apps | MCP server and CLI | In progress | [#102](https://github.com/4thtech/agentlink/pull/102), [#103](https://github.com/4thtech/agentlink/pull/103), [#107](https://github.com/4thtech/agentlink/pull/107), [#111](https://github.com/4thtech/agentlink/pull/111), [#112](https://github.com/4thtech/agentlink/pull/112), [#113](https://github.com/4thtech/agentlink/pull/113), [#115](https://github.com/4thtech/agentlink/pull/115), [#124](https://github.com/4thtech/agentlink/pull/124), [#125](https://github.com/4thtech/agentlink/pull/125), [#127](https://github.com/4thtech/agentlink/pull/127), [#131](https://github.com/4thtech/agentlink/pull/131), [#132](https://github.com/4thtech/agentlink/pull/132), [#135](https://github.com/4thtech/agentlink/pull/135), [#142](https://github.com/4thtech/agentlink/pull/142), [#143](https://github.com/4thtech/agentlink/pull/143), [#178](https://github.com/4thtech/agentlink/pull/178), [#183](https://github.com/4thtech/agentlink/pull/183), [#184](https://github.com/4thtech/agentlink/pull/184), [#185](https://github.com/4thtech/agentlink/pull/185), [#186](https://github.com/4thtech/agentlink/pull/186), [#190](https://github.com/4thtech/agentlink/pull/190), [#192](https://github.com/4thtech/agentlink/pull/192), [#193](https://github.com/4thtech/agentlink/pull/193), [#199](https://github.com/4thtech/agentlink/pull/199), [#200](https://github.com/4thtech/agentlink/pull/200), [#201](https://github.com/4thtech/agentlink/pull/201), [#205](https://github.com/4thtech/agentlink/pull/205), [#206](https://github.com/4thtech/agentlink/pull/206), [#219](https://github.com/4thtech/agentlink/pull/219), [#231](https://github.com/4thtech/agentlink/pull/231), [#235](https://github.com/4thtech/agentlink/pull/235), [#238](https://github.com/4thtech/agentlink/pull/238) |
 | MCP server, CLI and apps | Agent skill file and quickstart guides | Done | [#151](https://github.com/4thtech/agentlink/pull/151), [#152](https://github.com/4thtech/agentlink/pull/152) |
 | MCP server, CLI and apps | End-to-end tests | In progress | [#155](https://github.com/4thtech/agentlink/pull/155), [#163](https://github.com/4thtech/agentlink/pull/163), [#165](https://github.com/4thtech/agentlink/pull/165), [#166](https://github.com/4thtech/agentlink/pull/166), [#169](https://github.com/4thtech/agentlink/pull/169), [#171](https://github.com/4thtech/agentlink/pull/171), [#232](https://github.com/4thtech/agentlink/pull/232) |

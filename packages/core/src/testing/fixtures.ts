@@ -1,8 +1,8 @@
-// Test doubles for @agentlink/core tests. Not part of the build (tsconfig.json excludes src/testing).
+// Test doubles for @4thtech-io/core tests. Not part of the build (tsconfig.json excludes src/testing).
 //
 // TestStoreCipher is NOT encryption: it encodes the plaintext with its SealContext so tests can check
 // that `enc` values are sealed, bound to table, column and row key, and refused elsewhere (07 §3.1).
-// The real StoreCipher (AES-256-GCM under the store key through @agentlink/crypto) is M1-8b.
+// The real StoreCipher (AES-256-GCM under the store key through @4thtech-io/crypto) is M1-8b.
 import {
   decodeBase64url,
   decodeUtf8,
@@ -11,7 +11,7 @@ import {
   encodeUtf8,
   hmacSha256,
   type OwnerPresence,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import type { Sealed } from '../store/schema.js';
 import type { SealContext, Store, StoreCipher } from '../store/store.js';
 import type {

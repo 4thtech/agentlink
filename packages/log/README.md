@@ -1,9 +1,9 @@
-# @agentlink/log
+# @4thtech-io/log
 
 The shared redacting logger (04 §1 I-7, §8 rule 4) and the secret-canary test helper. Zero dependencies; runs in Node, browsers and Workers. Every package logs through it; `console` is banned elsewhere by `eslint.config.mjs`.
 
 ```ts
-import { createLogger } from '@agentlink/log';
+import { createLogger } from '@4thtech-io/log';
 
 const log = createLogger({ name: 'transport-nostr', level: 'info' });
 log.info('relay connected', { relayUrl: 'wss://relay.example/' }); // logged as wss://relay.example
@@ -38,13 +38,13 @@ A `Map` with object keys is logged under the key `"[object Object]"`: its values
 
 ## Secret canaries: adding yours
 
-`@agentlink/log/testing` runs your code with a debug-level logger and the console (and, in Node, `process.stdout` and `process.stderr`) captured, and fails if any known fake secret (a canary) appears in any line at any level. Every package that handles secrets adds a canary test:
+`@4thtech-io/log/testing` runs your code with a debug-level logger and the console (and, in Node, `process.stdout` and `process.stderr`) captured, and fails if any known fake secret (a canary) appears in any line at any level. Every package that handles secrets adds a canary test:
 
 1. Define canaries: realistic fake secrets your package handles, built at run time so the secret scanner does not flag the source. Use printable ASCII, at least 8 characters; add other encodings (hex, base64) as `forms`.
 2. Add `src/<area>.canary.test.ts`:
 
    ```ts
-   import { assertNoCanaryLeaks, PATTERN_CANARIES } from '@agentlink/log/testing';
+   import { assertNoCanaryLeaks, PATTERN_CANARIES } from '@4thtech-io/log/testing';
 
    it('no secret reaches the logs', async () => {
      await assertNoCanaryLeaks({

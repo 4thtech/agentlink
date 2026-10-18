@@ -8,8 +8,8 @@
 // signatures and nonces the tests used (I-7, 04 §4 Logging).
 import { SELF, env as testEnv } from 'cloudflare:test';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createSha256, encodeBase64url, encodeHex, encodeUtf8 } from '@agentlink/crypto';
-import { signDropAuthorization } from '@agentlink/crypto/testing';
+import { createSha256, encodeBase64url, encodeHex, encodeUtf8 } from '@4thtech-io/crypto';
+import { signDropAuthorization } from '@4thtech-io/crypto/testing';
 import type { DropEnv } from '../src/index.js';
 
 const env = testEnv as DropEnv;

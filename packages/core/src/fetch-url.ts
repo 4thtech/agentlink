@@ -3,7 +3,7 @@
 // URL, a provider share link), so it is untrusted (I-5). This module decides, on the raw string and
 // before any URL parser runs, whether the URL may be fetched at all, and which resolved addresses
 // may be dialled. The DNS lookup and the pinned connection are the platform's job
-// (`@agentlink/node` safe-fetch); in Workers (G-14, proposed) the same raw check applies and the
+// (`@4thtech-io/node` safe-fetch); in Workers (G-14, proposed) the same raw check applies and the
 // address half relies on Workers egress, because Workers cannot resolve DNS.
 //
 // Why the raw string: a WHATWG parser maps percent-encoding, full-width digits, U+3002 and numeric
@@ -12,7 +12,7 @@
 //
 // Pure code, no I/O, no Node built-in. Nothing here echoes the URL into an error: a download URL is
 // a secret (I-7), so a refusal carries only a fixed reason code.
-import { isGloballyRoutable } from '@agentlink/transport-nostr';
+import { isGloballyRoutable } from '@4thtech-io/transport-nostr';
 
 /** Redirects followed per download, each re-checked (04 §4). A third redirect fails. */
 export const MAX_FETCH_REDIRECTS = 2;

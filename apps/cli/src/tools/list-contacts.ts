@@ -1,7 +1,7 @@
 // `agentlink_list_contacts` (06 §2.1; M1-9c). Read-only and local: it reads the contact book and the
 // stored unread counts, with no relay traffic (`openWorldHint: false`). Names follow the 06 §2.1 rule
 // (the core's `display`); no safety code is ever returned (04 §3.6.1).
-import { MAX_TOOL_TEXT_CHARS } from '@agentlink/types';
+import { MAX_TOOL_TEXT_CHARS } from '@4thtech-io/types';
 import { copy, renderCopy } from './strings/index.js';
 import { activeContacts, contactRef, renderRef } from './contacts.js';
 import type { ToolContext } from './context.js';

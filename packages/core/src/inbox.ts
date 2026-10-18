@@ -12,8 +12,8 @@
 //
 // I-5: payloads are untrusted and returned only as data for the wrapper; nothing from them reaches a
 // log line or an error. I-7: logs carry counts only.
-import { parseJson } from '@agentlink/crypto';
-import { payloadSchema, type ContactDisplayName, type Payload } from '@agentlink/types';
+import { parseJson } from '@4thtech-io/crypto';
+import { payloadSchema, type ContactDisplayName, type Payload } from '@4thtech-io/types';
 import type { ContactBook, ContactView } from './contacts.js';
 import { open, type CoreContext } from './context.js';
 import {

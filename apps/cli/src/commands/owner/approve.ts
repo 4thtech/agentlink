@@ -9,7 +9,7 @@
 // 4. (list) ask approve, deny or later for each; commitments are sent to `approve <id>` on their own;
 //    then check again that every chosen request is still pending and unchanged, and drop the rest
 //    with a notice (04 §2.5.2 step 4);
-// 5. hand exactly the shown, still-pending requests to @agentlink/node, which recomputes each digest
+// 5. hand exactly the shown, still-pending requests to @4thtech-io/node, which recomputes each digest
 //    from the same parsed action, shows the decisions, asks "Continue?", reads the owner code once at
 //    the TTY prompt and signs one `approval.decide` (one item) or `approval.decideBatch` (2–20);
 // 6. apply the signed object through this process's own client (`ownerActions.apply`): the core
@@ -17,7 +17,7 @@
 //
 // The owner code never passes through this module (I-1). Nothing here decides: authority is the
 // owner signature the core verifies (I-4).
-import { MAX_APPROVAL_BATCH_ITEMS, type ReviewedApproval } from '@agentlink/node';
+import { MAX_APPROVAL_BATCH_ITEMS, type ReviewedApproval } from '@4thtech-io/node';
 import { batchRegions } from '../../terminal/sanitize.js';
 import { copy } from '../../tools/strings/index.js';
 import { EXIT_FAILED, EXIT_OK, type CommandContext } from '../../dispatch.js';

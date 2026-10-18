@@ -11,14 +11,14 @@ import {
   type Sealed,
   type StoreValue,
   type TableName,
-} from '@agentlink/core';
+} from '@4thtech-io/core';
 import {
   CryptoInputError,
   canonicalizeToBytes,
   encodeHex,
   randomBytes,
   sha256,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SqliteStore } from './sqlite-store.js';
 import { createAgentStoreCipher, type AgentStoreCipher } from './store-cipher.js';

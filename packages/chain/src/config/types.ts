@@ -52,6 +52,6 @@ export type ChainConfig = {
 
 /**
  * A chain's shipped network and fee-token entry (M1-14). The registry (M1-4a) composes the full
- * `ChainConfig` from it plus `contracts` from the pinned `@agentlink/occ-v2-abi` (07 §6.1).
+ * `ChainConfig` from it plus `contracts` from the pinned `@4thtech-io/occ-v2-abi` (07 §6.1).
  */
 export type ChainNetwork = Omit<ChainConfig, 'contracts'>;

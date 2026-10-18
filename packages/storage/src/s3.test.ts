@@ -1,6 +1,6 @@
 // M1-6a: S3-compatible adapter (07 §5.2, 04 §4) over aws4fetch, against an in-memory fake endpoint.
 import { describe, expect, it } from 'vitest';
-import { encodeHex, sha256 } from '@agentlink/crypto';
+import { encodeHex, sha256 } from '@4thtech-io/crypto';
 import {
   MAX_PRESIGN_SECONDS,
   S3_MAX_SINGLE_PUT_BYTES,

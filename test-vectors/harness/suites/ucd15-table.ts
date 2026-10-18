@@ -1,13 +1,13 @@
 // Suite `ucd15-table` (M1-21-b, D-74): the pinned UCD 15.0.0 refused-category table that
-// @agentlink/types ships for the `terms` character rule (04 §3.4 "Characters"), checked in every
+// @4thtech-io/types ships for the `terms` character rule (04 §3.4 "Characters"), checked in every
 // runtime that loads it, through its public lookup `refusedCategory15`. `tableHash` serializes the
 // table in the canonical form the generator defines (tools/vectors/generate_ucd15_table.py: the line
 // `agentlink/ucd15-refused/v1`, then `FIRST..LAST;Cat` per maximal run in upper-case hex of at least
-// four digits, each line ending in LF) and hashes it with @agentlink/crypto's SHA-256;
+// four digits, each line ending in LF) and hashes it with @4thtech-io/crypto's SHA-256;
 // `categoryCounts` counts the code points per category (an unexpected category adds a field and so
 // fails); `category` looks one code point up. Nothing here supplies an expected value.
-import { sha256 } from '@agentlink/crypto';
-import { refusedCategory15 } from '@agentlink/types';
+import { sha256 } from '@4thtech-io/crypto';
+import { refusedCategory15 } from '@4thtech-io/types';
 import { bytesToHex } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

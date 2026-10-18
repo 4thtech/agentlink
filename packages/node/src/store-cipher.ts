@@ -1,9 +1,9 @@
 // M1-8b: core's StoreCipher for the Node store (07 §3.1): AES-256-GCM under the agent's store key with
-// AAD bound to table, column and row key, and the keyed index digest, both in @agentlink/crypto. The
+// AAD bound to table, column and row key, and the keyed index digest, both in @4thtech-io/crypto. The
 // store key enters non-extractable WebCrypto keys when the cipher is created; nothing here holds or
 // returns its bytes.
-import type { SealContext, Sealed, StoreCipher } from '@agentlink/core';
-import { createStoreColumnCipher } from '@agentlink/crypto/keystore';
+import type { SealContext, Sealed, StoreCipher } from '@4thtech-io/core';
+import { createStoreColumnCipher } from '@4thtech-io/crypto/keystore';
 
 /** core's StoreCipher plus the index digest of 07 §3.1 (idempotency.request_digest, §3.3). */
 export interface AgentStoreCipher extends StoreCipher {

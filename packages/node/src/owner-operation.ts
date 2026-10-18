@@ -16,7 +16,7 @@ import {
   type OwnerPublicKeys,
   type SecretKind,
   type TypedData,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { assertAllowedOwnerAction, ownerOperationRefused } from './owner-allowlist.js';
 import { NodeKeyStoreError } from './errors.js';
 import { osKeychain } from './keychain.js';

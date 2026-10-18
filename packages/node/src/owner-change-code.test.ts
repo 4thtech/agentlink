@@ -11,7 +11,7 @@
 //   old owner item, and the old code, working; the seed is never lost.
 // - No owner code appears in any output line other than the one display of the new code, nor in an
 //   error.
-import { KeyStoreError, encodeUtf8, equalBytes, type OwnerPublicKeys } from '@agentlink/crypto';
+import { KeyStoreError, encodeUtf8, equalBytes, type OwnerPublicKeys } from '@4thtech-io/crypto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { NodeKeyStoreError } from './errors.js';
 import type { KeychainBackend } from './keychain.js';

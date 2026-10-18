@@ -10,7 +10,7 @@
 //   fetch (M1-15) where one is available; the endpoint grammar check here runs either way.
 // Multipart upload and streaming without buffering are M1-6b.
 import { AwsClient } from 'aws4fetch';
-import type { Logger } from '@agentlink/log';
+import type { Logger } from '@4thtech-io/log';
 import {
   checkFuture,
   checkSize,

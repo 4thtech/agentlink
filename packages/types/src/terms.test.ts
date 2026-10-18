@@ -1,5 +1,5 @@
 // M1-21 (D-32, D-55, D-74): the `terms` schema, its canonical form, `TermsInput` and the body
-// shapes (04 §3.4, 06 §2.2a). Hashing is in @agentlink/crypto (`termsHash`); nothing here hashes.
+// shapes (04 §3.4, 06 §2.2a). Hashing is in @4thtech-io/crypto (`termsHash`); nothing here hashes.
 // The negotiation chain is in terms-chain.test.ts.
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';

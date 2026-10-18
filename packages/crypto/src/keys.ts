@@ -4,7 +4,7 @@
 //
 // Every function that takes the master seed (deriveKey, deriveSecretKey, derivePublicKey,
 // deriveAgentId, derivePublicIdentity) is for KeyStore implementations and `init` only (04 §8.1):
-// the package exports them only from the restricted subpath @agentlink/crypto/keystore. Every
+// the package exports them only from the restricted subpath @4thtech-io/crypto/keystore. Every
 // other caller gets public values from the KeyStore. Callers wipe returned secrets (`wipe`) when
 // done. The master seed is never modified or returned. Errors are fixed sentences that never echo
 // an input (I-7).

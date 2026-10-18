@@ -8,9 +8,9 @@ import { PassThrough } from 'node:stream';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
-import type { AgentLinkClient, ContactView } from '@agentlink/core';
-import { createLogger } from '@agentlink/log';
-import { termsInputSchema, type ContactDisplayName, type RestrictedName } from '@agentlink/types';
+import type { AgentLinkClient, ContactView } from '@4thtech-io/core';
+import { createLogger } from '@4thtech-io/log';
+import { termsInputSchema, type ContactDisplayName, type RestrictedName } from '@4thtech-io/types';
 import { describe, expect, it, vi } from 'vitest';
 import type { OpenAgentResult, OpenedAgent } from '../runtime/index.js';
 import { TOOLS, type ToolClient, type ToolContext } from '../tools/index.js';
@@ -410,7 +410,7 @@ describe('src/tools stays runtime-agnostic (06 §1; the ESLint fence, checked he
       const depth = file.split('/').length - 1;
       const specifiers = [...text.matchAll(/\bfrom\s+'([^']+)'/g)].map((m) => m[1]!);
       for (const spec of specifiers) {
-        expect(spec).not.toMatch(/^node:|^@agentlink\/node|^@modelcontextprotocol\//);
+        expect(spec).not.toMatch(/^node:|^@4thtech-io\/node|^@modelcontextprotocol\//);
         if (spec.startsWith('.'))
           expect(spec.split('/').filter((p) => p === '..').length).toBeLessThanOrEqual(depth);
       }

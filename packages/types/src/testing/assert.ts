@@ -1,4 +1,4 @@
-// Test helpers for @agentlink/types. Not part of the build (tsconfig.json excludes src/testing).
+// Test helpers for @4thtech-io/types. Not part of the build (tsconfig.json excludes src/testing).
 import { expect } from 'vitest';
 
 /** A short, never-throwing label for an assertion message (values may be cyclic, deep or hostile). */

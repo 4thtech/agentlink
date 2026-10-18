@@ -1,4 +1,4 @@
-// M1-5b-b: the relay pool and outbox of @agentlink/transport-nostr, through the Node relay connector,
+// M1-5b-b: the relay pool and outbox of @4thtech-io/transport-nostr, through the Node relay connector,
 // against real relays in Docker (IR-M1-5b-1 M-1). Three containers from two relay implementations,
 // pinned by digest:
 //   - relay-open:  strfry with its default limits;
@@ -24,7 +24,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer as createTlsServer } from 'node:tls';
 import { promisify } from 'node:util';
-import type { NostrEvent } from '@agentlink/crypto';
+import type { NostrEvent } from '@4thtech-io/crypto';
 import {
   OUTBOX_GIVE_UP_SECONDS,
   OutboxWorker,
@@ -32,7 +32,7 @@ import {
   type OutboxAttempt,
   type OutboxPersistence,
   type OutboxRow,
-} from '@agentlink/transport-nostr';
+} from '@4thtech-io/transport-nostr';
 import { WebSocket } from 'ws';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { KeychainKeyStore } from './keychain-keystore.js';

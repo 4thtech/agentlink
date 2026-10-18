@@ -6,12 +6,12 @@
 // 2. the recorded KeyStore backend: for the keychain, the probe and `selectKeyStoreBackend`
 //    (`needs_setup` with the 07 §9.4 copy without a usable keychain), then `openAgentKeyStore`;
 // 3. `openAgentStore` (store, cipher, policy mark);
-// 4. the relay I/O from @agentlink/node as the client's transport (07 §4.2);
+// 4. the relay I/O from @4thtech-io/node as the client's transport (07 §4.2);
 // 5. the M1a approval channel over the same store, and `AgentLinkClient.create`.
 //
 // I-1/I-4: the runtime holds only the agent's KeyStore interface; it never holds an owner key and
-// takes no owner presence. Owner commands (M1-9b) take presence themselves, through @agentlink/node.
-// I-7: errors carry fixed text only (RuntimeError, or @agentlink/node's own fixed messages).
+// takes no owner presence. Owner commands (M1-9b) take presence themselves, through @4thtech-io/node.
+// I-7: errors carry fixed text only (RuntimeError, or @4thtech-io/node's own fixed messages).
 import { homedir } from 'node:os';
 import process from 'node:process';
 import {
@@ -19,9 +19,9 @@ import {
   nostrTransport,
   type ApprovalChannel,
   type TransportFactory,
-} from '@agentlink/core';
-import type { KeyStore } from '@agentlink/crypto';
-import { createLogger, type Logger } from '@agentlink/log';
+} from '@4thtech-io/core';
+import type { KeyStore } from '@4thtech-io/crypto';
+import { createLogger, type Logger } from '@4thtech-io/log';
 import { cliLogLevel } from './log-level.js';
 import {
   nodeHostResolver,
@@ -34,13 +34,13 @@ import {
   type AgentStore,
   type KeyStoreBackendKind,
   type KeychainProbe,
-} from '@agentlink/node';
+} from '@4thtech-io/node';
 import { createLocalApprovalChannel, storeApprovalReader } from '../approval/local-channel.js';
 import { readAgentConfig, type AgentPaths } from './agent-dir.js';
 import { DEFAULT_AGENT_NAME, isAgentName } from './agent-name.js';
 import { RuntimeError } from './errors.js';
 
-/** The Node pieces the runtime is built from. Tests pass doubles; production uses @agentlink/node. */
+/** The Node pieces the runtime is built from. Tests pass doubles; production uses @4thtech-io/node. */
 export interface RuntimeDeps {
   readonly probeKeychain: () => Promise<KeychainProbe>;
   readonly openKeyStore: (backend: KeyStoreBackendKind, agentId: string) => Promise<KeyStore>;
@@ -145,7 +145,7 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
     }
   }
 
-  // Each step's own errors are fixed text (@agentlink/node); anything opened is closed on failure.
+  // Each step's own errors are fixed text (@4thtech-io/node); anything opened is closed on failure.
   const keyStore = await deps.openKeyStore(config.keyStore, config.agentId);
   let agentStore: AgentStore;
   try {

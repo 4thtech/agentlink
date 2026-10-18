@@ -28,7 +28,7 @@ import {
   type StoreValue,
   type TableName,
   type Where,
-} from '@agentlink/core';
+} from '@4thtech-io/core';
 import {
   MAX_INT,
   MIGRATIONS,

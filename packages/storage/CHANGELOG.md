@@ -1,4 +1,4 @@
-# @agentlink/storage
+# @4thtech-io/storage
 
 ## 0.1.0
 

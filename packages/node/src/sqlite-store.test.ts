@@ -15,8 +15,8 @@ import {
   type Row,
   type Store,
   type StoreTx,
-} from '@agentlink/core';
-import { encodeHex, encodeUtf8, sha256 } from '@agentlink/crypto';
+} from '@4thtech-io/core';
+import { encodeHex, encodeUtf8, sha256 } from '@4thtech-io/crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   MIGRATIONS,
@@ -660,7 +660,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
   });
 
   it('checks USD amounts in SQL exactly as the 04 §2.4.1 form', async () => {
-    // The canonical form, as @agentlink/types isUsdAmount (packages/node may not import types).
+    // The canonical form, as @4thtech-io/types isUsdAmount (packages/node may not import types).
     const USD = /^(0|[1-9][0-9]{0,8})(\.[0-9]{0,5}[1-9])?$/;
     (await SqliteStore.open(path())).close();
     const raw = new Database(path());

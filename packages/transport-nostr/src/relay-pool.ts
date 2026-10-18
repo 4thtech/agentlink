@@ -21,9 +21,9 @@ import {
   parseJson,
   type EnvelopeKeys,
   type NostrEvent,
-} from '@agentlink/crypto';
-import type { Logger } from '@agentlink/log';
-import { isAllowedRelayUrl } from '@agentlink/types';
+} from '@4thtech-io/crypto';
+import type { Logger } from '@4thtech-io/log';
+import { isAllowedRelayUrl } from '@4thtech-io/types';
 import { TransportError } from './errors.js';
 import { isGloballyRoutable } from './relay-address.js';
 import type {

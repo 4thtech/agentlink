@@ -1,4 +1,4 @@
-// M1-13a: the e2e relay connector. It implements @agentlink/transport-nostr's RelayConnector over
+// M1-13a: the e2e relay connector. It implements @4thtech-io/transport-nostr's RelayConnector over
 // Node's own WebSocket, to the local strfry containers (relays.mjs): a card's relay host maps to a
 // plain ws:// port on 127.0.0.1. Everything above the socket (the pool, gift wraps, the outbox, the
 // relay URL rule) is the production code path; only TLS and the address check are not exercised

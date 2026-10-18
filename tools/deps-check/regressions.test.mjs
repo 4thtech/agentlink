@@ -33,7 +33,7 @@ describe('F01: files in directories that used to be skipped by name', () => {
     dirs.push(root);
     const all = {
       '.gitignore': 'node_modules/\ndist/\ncoverage/\n.turbo/\n',
-      'packages/core/package.json': JSON.stringify({ name: '@agentlink/core' }),
+      'packages/core/package.json': JSON.stringify({ name: '@4thtech-io/core' }),
       ...files,
     };
     for (const [path, content] of Object.entries(all)) {
@@ -79,13 +79,13 @@ describe('F01: files in directories that used to be skipped by name', () => {
 
 describe('F02: aliases and non-registry specs in manifests', () => {
   it.each([
-    ['workspace:@agentlink/node@*', '@agentlink/node'],
-    ['workspace:@agentlink/node@^1.0.0', '@agentlink/node'],
+    ['workspace:@4thtech-io/node@*', '@4thtech-io/node'],
+    ['workspace:@4thtech-io/node@^1.0.0', '@4thtech-io/node'],
   ])('rejects the workspace alias %s under another name', (spec) => {
     for (const field of ['dependencies', 'devDependencies']) {
       const problems = manifest('packages/core', { [field]: { 'keystore-impl': spec } });
       expect(problems.join('\n')).toMatch(/workspace: alias must not point to a different package/);
-      expect(problems.join('\n')).toMatch(/may not import @agentlink\/node/);
+      expect(problems.join('\n')).toMatch(/may not import @4thtech-io\/node/);
     }
   });
 
@@ -130,12 +130,12 @@ describe('F02: aliases and non-registry specs in manifests', () => {
       writeFileSync(join(root, path), JSON.stringify(content));
     };
     write('packages/node/package.json', {
-      name: '@agentlink/node',
-      dependencies: { '@agentlink/core': 'workspace:*' },
+      name: '@4thtech-io/node',
+      dependencies: { '@4thtech-io/core': 'workspace:*' },
     });
     write('packages/core/package.json', {
-      name: '@agentlink/core',
-      devDependencies: { 'keystore-impl': 'workspace:@agentlink/node@*' },
+      name: '@4thtech-io/core',
+      devDependencies: { 'keystore-impl': 'workspace:@4thtech-io/node@*' },
     });
     const { problems } = runChecks(root);
     rmSync(root, { recursive: true, force: true });
@@ -213,13 +213,13 @@ describe('F04/F05/F06: other crypto libraries, @hpke, messages', () => {
   it('points to the package that wraps each library (F06)', () => {
     const via = Object.fromEntries(LIBRARIES.map((lib) => [lib.group[0], lib.via]));
     expect(via).toMatchObject({
-      '@noble/*': '@agentlink/crypto',
-      viem: '@agentlink/chain',
-      'nostr-tools': '@agentlink/transport-nostr',
-      aws4fetch: '@agentlink/storage',
+      '@noble/*': '@4thtech-io/crypto',
+      viem: '@4thtech-io/chain',
+      'nostr-tools': '@4thtech-io/transport-nostr',
+      aws4fetch: '@4thtech-io/storage',
     });
     expect(violationFor('packages/core', 'viem', 'packages/core/src/a.ts')).toMatch(
-      /everything else uses @agentlink\/chain/,
+      /everything else uses @4thtech-io\/chain/,
     );
   });
 });
@@ -323,7 +323,7 @@ describe('IR-M0-10-2: symlinks and CommonJS', () => {
       mkdirSync(dirname(join(root, path)), { recursive: true });
       writeFileSync(join(root, path), text);
     };
-    write('packages/core/package.json', JSON.stringify({ name: '@agentlink/core' }));
+    write('packages/core/package.json', JSON.stringify({ name: '@4thtech-io/core' }));
     write('vendor/lib/x.ts', `export * from 'viem';`);
     write('packages/core/src/leak.ts', `export * from './lib/x.js';`);
     symlinkSync('../../../vendor/lib', join(root, 'packages/core/src/lib'));
@@ -376,37 +376,39 @@ describe('IR-M0-10-2: symlinks and CommonJS', () => {
   });
 });
 
-describe('IR-M1-1b-1 M-1: the restricted @agentlink/crypto/keystore subpath', () => {
-  const keystore = `import { deriveSecretKey } from '@agentlink/crypto/keystore';\n`;
+describe('IR-M1-1b-1 M-1: the restricted @4thtech-io/crypto/keystore subpath', () => {
+  const keystore = `import { deriveSecretKey } from '@4thtech-io/crypto/keystore';\n`;
 
   it('fails when packages/core imports it, in every form', () => {
     for (const code of [
       keystore,
-      `export { deriveKey } from '@agentlink/crypto/keystore';\n`,
-      `const m = await import('@agentlink/crypto/keystore');\n`,
-      `type T = import('@agentlink/crypto/keystore').PublicIdentity;\n`,
+      `export { deriveKey } from '@4thtech-io/crypto/keystore';\n`,
+      `const m = await import('@4thtech-io/crypto/keystore');\n`,
+      `type T = import('@4thtech-io/crypto/keystore').PublicIdentity;\n`,
     ]) {
       expect(src('packages/core', code).join('\n')).toMatch(
-        /@agentlink\/crypto\/keystore may be imported only in packages\/node, test-vectors/,
+        /@4thtech-io\/crypto\/keystore may be imported only in packages\/node, test-vectors/,
       );
     }
     expect(
-      violationFor('packages/core', '@agentlink/crypto/keystore', 'packages/core/src/a.ts'),
+      violationFor('packages/core', '@4thtech-io/crypto/keystore', 'packages/core/src/a.ts'),
     ).toMatch(/KeyStore interface/);
   });
 
-  // packages/node hosts the KeyStore backends. Whether it may import @agentlink/crypto at all is the
+  // packages/node hosts the KeyStore backends. Whether it may import @4thtech-io/crypto at all is the
   // package layering (ZONES), which today does not list crypto for it; the card that adds the file
   // and keychain backends widens that. This rule must not be what stops it.
   const RESTRICTED =
-    /@agentlink\/crypto\/keystore may be imported only in packages\/node, test-vectors/;
+    /@4thtech-io\/crypto\/keystore may be imported only in packages\/node, test-vectors/;
   const ruleFor = (zone) =>
-    violationFor(zone, '@agentlink/crypto/keystore', `${zone}/src/a.ts`) ?? '';
+    violationFor(zone, '@4thtech-io/crypto/keystore', `${zone}/src/a.ts`) ?? '';
 
-  it('applies in every zone except packages/node, even where @agentlink/crypto is allowed', () => {
+  it('applies in every zone except packages/node, even where @4thtech-io/crypto is allowed', () => {
     const exempt = Object.keys(ZONES).filter((zone) => !RESTRICTED.test(ruleFor(zone)));
     expect(exempt).toEqual(['packages/node']);
-    expect(violationFor('packages/core', '@agentlink/crypto', 'packages/core/src/a.ts')).toBeNull();
+    expect(
+      violationFor('packages/core', '@4thtech-io/crypto', 'packages/core/src/a.ts'),
+    ).toBeNull();
   });
 
   it('exempts packages/node (layering still applies) and allows the vector harness', () => {
@@ -419,13 +421,13 @@ describe('IR-M1-1b-1 M-1: the restricted @agentlink/crypto/keystore subpath', ()
 });
 
 describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', () => {
-  const RESTRICTED = /@agentlink\/crypto\/testing may be imported only in test-vectors/;
+  const RESTRICTED = /@4thtech-io\/crypto\/testing may be imported only in test-vectors/;
   const SEAM_SOURCE = /test seam\) may be imported only by test files/;
   const forms = [
-    `import { MemoryKeyStore } from '@agentlink/crypto/testing';\n`,
-    `export { MemoryOwnerKeyStore } from '@agentlink/crypto/testing';\n`,
-    `const m = await import('@agentlink/crypto/testing');\n`,
-    `type T = import('@agentlink/crypto/testing').MemoryKeyStore;\n`,
+    `import { MemoryKeyStore } from '@4thtech-io/crypto/testing';\n`,
+    `export { MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';\n`,
+    `const m = await import('@4thtech-io/crypto/testing');\n`,
+    `type T = import('@4thtech-io/crypto/testing').MemoryKeyStore;\n`,
   ];
 
   it('is refused by name in production source of every zone, in every form', () => {
@@ -450,7 +452,7 @@ describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', 
 
   it('has no second policy entry: exactly one restricted entry names the testing subpath', () => {
     const entries = RESTRICTED_ENTRY_POINTS.filter((entry) =>
-      entry.group.includes('@agentlink/crypto/testing'),
+      entry.group.includes('@4thtech-io/crypto/testing'),
     );
     expect(entries).toHaveLength(1);
     expect(entries[0]?.zones).toEqual(['test-vectors', 'e2e']);
@@ -503,27 +505,27 @@ describe('IR-M1-1e-1 L-1: viem is a test-only library in packages/crypto', () =>
   });
 });
 
-describe('M1-1c, M1-1f: the crypto test seam @agentlink/crypto/testing', () => {
+describe('M1-1c, M1-1f: the crypto test seam @4thtech-io/crypto/testing', () => {
   const seams = [
-    `import { encryptPayloadWithIv } from '@agentlink/crypto/testing';\n`,
-    `import { sealOwnerSeedWithNonce } from '@agentlink/crypto/testing';\n`,
+    `import { encryptPayloadWithIv } from '@4thtech-io/crypto/testing';\n`,
+    `import { sealOwnerSeedWithNonce } from '@4thtech-io/crypto/testing';\n`,
   ];
-  const RESTRICTED = /@agentlink\/crypto\/testing may be imported only in test-vectors/;
+  const RESTRICTED = /@4thtech-io\/crypto\/testing may be imported only in test-vectors/;
 
   it('fails in every zone, packages/node and packages/crypto included', () => {
     for (const zone of Object.keys(ZONES)) {
-      expect(violationFor(zone, '@agentlink/crypto/testing', `${zone}/src/a.ts`), zone).toMatch(
+      expect(violationFor(zone, '@4thtech-io/crypto/testing', `${zone}/src/a.ts`), zone).toMatch(
         RESTRICTED,
       );
     }
-    for (const code of [...seams, `const m = await import('@agentlink/crypto/testing');\n`]) {
+    for (const code of [...seams, `const m = await import('@4thtech-io/crypto/testing');\n`]) {
       expect(src('packages/core', code).join('\n')).toMatch(RESTRICTED);
     }
   });
 
   it('allows the vector harness', () => {
     expect(
-      violationFor('test-vectors', '@agentlink/crypto/testing', 'test-vectors/a.ts') ?? '',
+      violationFor('test-vectors', '@4thtech-io/crypto/testing', 'test-vectors/a.ts') ?? '',
     ).not.toMatch(RESTRICTED);
   });
 
@@ -562,21 +564,21 @@ describe('M1-1g-b (IR-M1-1g-G2-1 R2-L-1): the test seam in package test files (0
   // 04 §3.1.1: the test doubles are "in an entry point that deps-check allows only in tests,
   // test-vectors and e2e, never in production src". Test files of the packages that need a
   // MemoryKeyStore (core M1-7a, transport-nostr M1-5a) may import it by package name.
-  const RESTRICTED = /@agentlink\/crypto\/testing may be imported only in test-vectors/;
+  const RESTRICTED = /@4thtech-io\/crypto\/testing may be imported only in test-vectors/;
   const SEAM_SOURCE = /test seam\) may be imported only by test files/;
   const ZONES_WITH_TESTS = ['packages/core', 'packages/transport-nostr'];
   const forms = [
-    `import { MemoryKeyStore } from '@agentlink/crypto/testing';\n`,
-    `export { MemoryOwnerKeyStore } from '@agentlink/crypto/testing';\n`,
-    `const m = await import('@agentlink/crypto/testing');\n`,
-    `type T = import('@agentlink/crypto/testing').MemoryKeyStore;\n`,
+    `import { MemoryKeyStore } from '@4thtech-io/crypto/testing';\n`,
+    `export { MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';\n`,
+    `const m = await import('@4thtech-io/crypto/testing');\n`,
+    `type T = import('@4thtech-io/crypto/testing').MemoryKeyStore;\n`,
   ];
 
   it('allows it by package name in test files of core and transport-nostr, in every form', () => {
     for (const zone of ZONES_WITH_TESTS) {
       for (const name of ['src/a.test.ts', 'src/deep/er/b.test.ts']) {
         for (const code of forms) expect(src(zone, code, name), `${zone} ${name}`).toEqual([]);
-        expect(violationFor(zone, '@agentlink/crypto/testing', `${zone}/${name}`)).toBeNull();
+        expect(violationFor(zone, '@4thtech-io/crypto/testing', `${zone}/${name}`)).toBeNull();
       }
     }
   });
@@ -584,7 +586,7 @@ describe('M1-1g-b (IR-M1-1g-G2-1 R2-L-1): the test seam in package test files (0
   it('allows e2e and test-vectors (test-only directories, never built)', () => {
     for (const zone of ['e2e', 'test-vectors']) {
       expect(
-        violationFor(zone, '@agentlink/crypto/testing', `${zone}/a.ts`) ?? '',
+        violationFor(zone, '@4thtech-io/crypto/testing', `${zone}/a.ts`) ?? '',
         zone,
       ).not.toMatch(RESTRICTED);
     }
@@ -604,7 +606,7 @@ describe('M1-1g-b (IR-M1-1g-G2-1 R2-L-1): the test seam in package test files (0
     for (const zone of Object.keys(ZONES).filter((z) => !ZONES_WITH_TESTS.includes(z))) {
       if (zone === 'packages/crypto') continue; // its own tests use the relative path
       expect(
-        violationFor(zone, '@agentlink/crypto/testing', `${zone}/src/a.test.ts`),
+        violationFor(zone, '@4thtech-io/crypto/testing', `${zone}/src/a.test.ts`),
         zone,
       ).toMatch(RESTRICTED);
     }
@@ -630,12 +632,12 @@ describe('M1-1g-b (IR-M1-1g-G2-1 R2-L-1): the test seam in package test files (0
     for (const zone of ZONES_WITH_TESTS) {
       for (const name of ['src/a.ts', 'src/a.test.ts']) {
         for (const specifier of [
-          '@agentlink/crypto/src/testing',
-          '@agentlink/crypto/src/testing.ts',
-          '@agentlink/crypto/dist/testing.js',
-          '@agentlink/crypto/testing/../src/testing.js',
-          '@agentlink/crypto/testing/index.js',
-          '@agentlink/crypto/./src/testing.js',
+          '@4thtech-io/crypto/src/testing',
+          '@4thtech-io/crypto/src/testing.ts',
+          '@4thtech-io/crypto/dist/testing.js',
+          '@4thtech-io/crypto/testing/../src/testing.js',
+          '@4thtech-io/crypto/testing/index.js',
+          '@4thtech-io/crypto/./src/testing.js',
         ]) {
           expect(
             violationFor(zone, specifier, `${zone}/${name}`),
@@ -699,7 +701,7 @@ describe('M1-1g-b (IR-M1-1g-G2-1 R2-L-1): the test seam in package test files (0
       mkdirSync(dirname(join(root, path)), { recursive: true });
       writeFileSync(join(root, path), text);
     };
-    write('packages/core/package.json', JSON.stringify({ name: '@agentlink/core' }));
+    write('packages/core/package.json', JSON.stringify({ name: '@4thtech-io/core' }));
     write('packages/core/src/ok.test.ts', forms[0]);
     write('packages/core/src/x.test.mts', forms[0]);
     const { problems } = runChecks(root);
@@ -712,13 +714,13 @@ describe('M1-1g-b (IR-M1-1g-G2-1 R2-L-1): the test seam in package test files (0
 describe('IR-M1-1g-b-1 L-2: non-canonical workspace specifiers are refused', () => {
   const NON_CANONICAL = /non-canonical/;
   const bad = [
-    '@agentlink/crypto//testing',
-    '@agentlink/crypto/Testing',
-    '@agentlink/Crypto/testing',
-    '@AgentLink/crypto',
-    '@agentlink/crypto/testing/',
-    '@agentlink/crypto/./testing',
-    '@agentlink/crypto/x/../testing',
+    '@4thtech-io/crypto//testing',
+    '@4thtech-io/crypto/Testing',
+    '@4thtech-io/Crypto/testing',
+    '@4thTech-io/crypto',
+    '@4thtech-io/crypto/testing/',
+    '@4thtech-io/crypto/./testing',
+    '@4thtech-io/crypto/x/../testing',
     '@4thtech-io/AgentLink',
   ];
 
@@ -745,9 +747,11 @@ describe('IR-M1-1g-b-1 L-2: non-canonical workspace specifiers are refused', () 
   });
 
   it('leaves canonical specifiers and other scopes alone', () => {
-    expect(violationFor('packages/core', '@agentlink/crypto', 'packages/core/src/a.ts')).toBeNull();
     expect(
-      violationFor('packages/core', '@agentlink/crypto/testing', 'packages/core/src/a.test.ts'),
+      violationFor('packages/core', '@4thtech-io/crypto', 'packages/core/src/a.ts'),
+    ).toBeNull();
+    expect(
+      violationFor('packages/core', '@4thtech-io/crypto/testing', 'packages/core/src/a.test.ts'),
     ).toBeNull();
     expect(violationFor('packages/types', 'zod', 'packages/types/src/a.ts')).toBeNull();
   });
@@ -759,10 +763,10 @@ describe('IR-M1-1f-1 L-2: deep imports into a workspace package', () => {
   it('refuses dist/ and src/ subpaths of every workspace package, in every zone', () => {
     for (const zone of Object.keys(ZONES)) {
       for (const specifier of [
-        '@agentlink/crypto/dist/keystore-file.js',
-        '@agentlink/crypto/dist',
-        '@agentlink/crypto/src/testing.ts',
-        '@agentlink/types/dist/index.js',
+        '@4thtech-io/crypto/dist/keystore-file.js',
+        '@4thtech-io/crypto/dist',
+        '@4thtech-io/crypto/src/testing.ts',
+        '@4thtech-io/types/dist/index.js',
       ]) {
         expect(violationFor(zone, specifier, `${zone}/src/a.ts`), `${zone} ${specifier}`).toMatch(
           DEEP,
@@ -770,19 +774,21 @@ describe('IR-M1-1f-1 L-2: deep imports into a workspace package', () => {
       }
     }
     expect(
-      violationFor('test-vectors', '@agentlink/crypto/dist/keystore.js', 'test-vectors/a.ts'),
+      violationFor('test-vectors', '@4thtech-io/crypto/dist/keystore.js', 'test-vectors/a.ts'),
     ).toMatch(DEEP);
   });
 
   it('finds a planted static import in packages/core', () => {
-    const code = `import { sealOwnerSeedWithNonceUnsafe } from '@agentlink/crypto/dist/keystore-file.js';\n`;
+    const code = `import { sealOwnerSeedWithNonceUnsafe } from '@4thtech-io/crypto/dist/keystore-file.js';\n`;
     expect(src('packages/core', code).join('\n')).toMatch(DEEP);
   });
 
   it('leaves the declared entry points alone', () => {
-    expect(violationFor('packages/core', '@agentlink/crypto', 'packages/core/src/a.ts')).toBeNull();
     expect(
-      violationFor('packages/node', '@agentlink/crypto/keystore', 'packages/node/src/a.ts') ?? '',
+      violationFor('packages/core', '@4thtech-io/crypto', 'packages/core/src/a.ts'),
+    ).toBeNull();
+    expect(
+      violationFor('packages/node', '@4thtech-io/crypto/keystore', 'packages/node/src/a.ts') ?? '',
     ).not.toMatch(DEEP);
   });
 });
@@ -791,9 +797,9 @@ describe('M1-5b-b: relay sockets only in packages/node', () => {
   it('allows ws in packages/node and refuses it everywhere else', () => {
     expect(violationFor('packages/node', 'ws', 'packages/node/src/relay-io.ts')).toBeNull();
     for (const zone of ['packages/core', 'packages/transport-nostr', 'apps/cli', 'apps/console']) {
-      expect(violationFor(zone, 'ws', `${zone}/src/a.ts`)).toMatch(/@agentlink\/node/);
+      expect(violationFor(zone, 'ws', `${zone}/src/a.ts`)).toMatch(/@4thtech-io\/node/);
       expect(violationFor(zone, 'ws/lib/websocket.js', `${zone}/src/a.ts`)).toMatch(
-        /@agentlink\/node/,
+        /@4thtech-io\/node/,
       );
     }
   });

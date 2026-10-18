@@ -1,5 +1,5 @@
 {
-  "name": "@agentlink/drop",
+  "name": "@4thtech-io/drop",
   "version": "0.0.0",
   "private": true,
   "description": "Encrypted drop Worker and R2 storage (D-48).",
@@ -30,6 +30,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@agentlink/crypto": "workspace:*"
+    "@4thtech-io/crypto": "workspace:*"
   }
 }

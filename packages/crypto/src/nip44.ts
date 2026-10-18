@@ -5,7 +5,7 @@
 //
 // nip44PaddedLength and the bounds are public and exported from the main entry. Every other
 // function takes a secret key or a conversation key, so the package exports them only from the
-// restricted subpath @agentlink/crypto/keystore (04 §8.1): other callers encrypt and decrypt through
+// restricted subpath @4thtech-io/crypto/keystore (04 §8.1): other callers encrypt and decrypt through
 // KeyStore.nip44Encrypt / nip44Decrypt, which derive the conversation key inside.
 //
 // Decryption follows NIP-44 v2 strictly: the payload size, version byte and base64 are checked

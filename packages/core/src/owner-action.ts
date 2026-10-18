@@ -26,7 +26,7 @@ import {
   parseJson,
   sha256,
   taggedHash,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import {
   CLOCK_SKEW_SECONDS,
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
@@ -34,7 +34,7 @@ import {
   signedOwnerActionSchema,
   type ApprovalDecideParams,
   type SignedOwnerAction,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 
 /** Why an owner action was refused. Fixed codes; never input text (I-5, I-7). */
 export type OwnerActionRefusal =

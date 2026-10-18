@@ -1,7 +1,7 @@
 // Canonical encodings (04 §2.4.1, §3.1). Every binary value has exactly one spelling, so every
 // decoder here is strict: a non-canonical form is rejected, never normalised. These are the
 // per-encoding codecs; which encoding a JSON path uses is decided per schema path in
-// @agentlink/types (M1-2a), which builds on these.
+// @4thtech-io/types (M1-2a), which builds on these.
 //
 // Errors never contain the input (I-7): see errors.ts.
 import { assertBytes } from './bytes.js';

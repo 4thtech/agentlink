@@ -7,11 +7,11 @@ import {
   type JsonObject,
   type KeyStore,
   type NostrEvent,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createLogger } from '@agentlink/log';
-import { defaultPolicy } from '@agentlink/types';
-import { unwrapGiftWrap, wrapEnvelope, type PublishOutcome } from '@agentlink/transport-nostr';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createLogger } from '@4thtech-io/log';
+import { defaultPolicy } from '@4thtech-io/types';
+import { unwrapGiftWrap, wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import { CoreError } from './errors.js';

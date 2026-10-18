@@ -1,4 +1,4 @@
-// Optional local timings for the redaction worst cases (`pnpm --filter @agentlink/log bench`).
+// Optional local timings for the redaction worst cases (`pnpm --filter @4thtech-io/log bench`).
 // Not part of `pnpm test` or CI: wall-clock limits are flaky on shared runners, so the tests assert
 // deterministic work bounds instead (review-ir-m0-8-1.test.ts, F02 and F08).
 

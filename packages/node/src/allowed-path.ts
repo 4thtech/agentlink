@@ -21,7 +21,7 @@ import {
   protectedRoots,
   sanitizeFileName,
   type PathFlavor,
-} from '@agentlink/core';
+} from '@4thtech-io/core';
 import { constants, type Stats } from 'node:fs';
 import { open, realpath, stat, type FileHandle } from 'node:fs/promises';
 import { homedir } from 'node:os';

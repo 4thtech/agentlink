@@ -15,8 +15,8 @@
 // event carries random bytes, never a real envelope; the key is never printed or saved.
 // Relay address checks (04 §4, 07 §4.2), applied to EVERY URL before any connection, the same
 // functions the node relay connector uses: `isAllowedRelayUrl` (wss only, a lowercase DNS name, no
-// IP literal, no local name) from @agentlink/types; then the host is resolved and EVERY answer must
-// pass `isGloballyRoutable` from @agentlink/transport-nostr. The connection is then pinned to the
+// IP literal, no local name) from @4thtech-io/types; then the host is resolved and EVERY answer must
+// pass `isGloballyRoutable` from @4thtech-io/transport-nostr. The connection is then pinned to the
 // checked address (no second lookup), with no redirects. A URL that fails is reported as refused
 // and never contacted. Needs the packages built (`pnpm -r build`) for those functions.
 // Signing uses nostr-tools, resolved from packages/transport-nostr, and the WebSocket client is

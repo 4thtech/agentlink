@@ -1,6 +1,6 @@
 // Suite `owner-action` (M1-7d; 04 §2.5.1, §2.5.2, D-68, G-28): the core's SignedOwnerAction
 // verification. `sign` computes the JCS text, the body hash and the tagged signature input through
-// @agentlink/core, and signs that input with BIP-340 and the case's aux randomness. `verify` and
+// @4thtech-io/core, and signs that input with BIP-340 and the case's aux randomness. `verify` and
 // `verifyJson` run the core's pure verifier against the receiving core described by `context`: its
 // agent address, the card's ownerNostr and the clock, an empty nonce table, the applied policy
 // version (absent = 0) and the pending request(s) an approval names. `outcome` is whether the core
@@ -10,7 +10,7 @@
 // recomputed from the stored signed `handshake` and `handshake-ack` in `context.pairings` (the core's
 // recomputeSafetyCode, 04 §3.6.1 steps 1-5, each message opened with the CEK the vector gives), never
 // a stored digest.
-import { bip340Sign } from '@agentlink/crypto/keystore';
+import { bip340Sign } from '@4thtech-io/crypto/keystore';
 import {
   ownerActionSigningParts,
   verifyContactCheck,
@@ -19,8 +19,8 @@ import {
   type ApprovalRequestView,
   type OwnerActionCheckContext,
   type PairingDigestLookup,
-} from '@agentlink/core';
-import { recomputeSafetyCode } from '@agentlink/core/safety-code';
+} from '@4thtech-io/core';
+import { recomputeSafetyCode } from '@4thtech-io/core/safety-code';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { SuiteModule } from '../suite';
 

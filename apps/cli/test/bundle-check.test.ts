@@ -116,9 +116,9 @@ describe('bundle-check (M1-9c-c, IR-M1-9c-1 F07)', () => {
     });
 
     it('fails on a workspace package left unbundled', () => {
-      const run = checkInjected('workspace', 'import { x } from "@agentlink/core";');
+      const run = checkInjected('workspace', 'import { x } from "@4thtech-io/core";');
       expect(run.code).toBe(1);
-      expect(run.stderr).toContain('"@agentlink/core"');
+      expect(run.stderr).toContain('"@4thtech-io/core"');
     });
 
     it('fails on a relative import (the bundle is one file)', () => {
@@ -196,7 +196,7 @@ describe('bundle-check (M1-9c-c, IR-M1-9c-1 F07)', () => {
         'node:fs',
       ],
       ['bare-builtin', "import { join } from 'path';\nexport const j = join;\n", '"path"'],
-      ['agentlink-node', "export * from '@agentlink/node';\n", '@agentlink/node'],
+      ['agentlink-node', "export * from '@4thtech-io/node';\n", '@4thtech-io/node'],
       [
         'mcp-sdk',
         "export { Server } from '@modelcontextprotocol/sdk/server/index.js';\n",

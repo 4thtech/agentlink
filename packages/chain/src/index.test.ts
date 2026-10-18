@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { packageName } from './index.js';
 
-describe('@agentlink/chain', () => {
+describe('@4thtech-io/chain', () => {
   it('exports its package name', () => {
-    expect(packageName).toBe('@agentlink/chain');
+    expect(packageName).toBe('@4thtech-io/chain');
   });
 });

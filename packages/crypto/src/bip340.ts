@@ -1,7 +1,7 @@
 // BIP-340 Schnorr signatures over secp256k1 (04 §2.1 Nostr and drop keys, §3.1 envelope `sig`,
 // §2.5.1 owner-action `sig`). The scheme is @noble/curves (04 §8.1); nothing here implements it
 // (I-8). Signing takes a secret key, so bip340Sign and bip340PublicKey are for KeyStore
-// implementations only and are exported only from @agentlink/crypto/keystore; every other caller
+// implementations only and are exported only from @4thtech-io/crypto/keystore; every other caller
 // signs through the KeyStore. bip340Verify and isBip340PublicKey are public.
 //
 // BIP-340 has no high-s/low-s pair as ECDSA does: R is fixed to an even y, and verification

@@ -1,5 +1,5 @@
 // IR-M1-1b-1 M-1: functions that take a master seed or a secret key, or return a secret, live only
-// in the restricted subpath @agentlink/crypto/keystore (04 §8.1). The main entry keeps public-key
+// in the restricted subpath @4thtech-io/crypto/keystore (04 §8.1). The main entry keeps public-key
 // and verification functions. tools/deps-check limits who may import the subpath.
 import { describe, expect, it } from 'vitest';
 import * as main from './index.js';
@@ -18,7 +18,7 @@ const SEED_OR_SECRET = [
   'bip340Sign',
   'bip340PublicKey',
   // M1-1g: NIP-44 functions that take a secret key or a conversation key. The in-memory KeyStores
-  // are in the test-only subpath @agentlink/crypto/testing (IR-M1-1g-1 M-2), not here.
+  // are in the test-only subpath @4thtech-io/crypto/testing (IR-M1-1g-1 M-2), not here.
   nip44('ConversationKey'),
   nip44('MessageKeys'),
   nip44('EncryptWithKey'),
@@ -58,7 +58,7 @@ const SEED_OR_SECRET = [
   'openRecoverySeed',
 ];
 
-// The one deterministic test seam (@agentlink/crypto/testing, never built or exported).
+// The one deterministic test seam (@4thtech-io/crypto/testing, never built or exported).
 const TEST_SEAM = [
   // M1-1c: fixed HPKE ephemeral key or AES-GCM IV, and the raw RFC 9180 suite.
   'wrapCekWithEphemeralKey',
@@ -86,7 +86,7 @@ const TEST_SEAM = [
   'signDropAuthorization',
 ];
 
-describe('@agentlink/crypto/keystore', () => {
+describe('@4thtech-io/crypto/keystore', () => {
   it('exports exactly the seed and secret-key functions', () => {
     expect(Object.keys(keystore).sort()).toEqual([...SEED_OR_SECRET].sort());
     for (const name of SEED_OR_SECRET) {

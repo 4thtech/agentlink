@@ -1,16 +1,16 @@
 // M1-5a acceptance: on receipt, the rumor `content` is checked against the 24 576-byte envelope
 // limit on the string, before it is parsed (04 §3.1.1 "Size before parsing"). Spy test: the JSON
-// parser (@agentlink/crypto parseJson, and the global JSON.parse) never sees an oversized content.
+// parser (@4thtech-io/crypto parseJson, and the global JSON.parse) never sees an oversized content.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { encodeUtf8, type EnvelopeKeys } from '@agentlink/crypto';
+import { encodeUtf8, type EnvelopeKeys } from '@4thtech-io/crypto';
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import { v2 as nip44 } from 'nostr-tools/nip44';
 import { wrapEvent } from 'nostr-tools/nip59';
 
 const parseJsonSpy = vi.hoisted(() => ({ calls: [] as string[] }));
 
-vi.mock('@agentlink/crypto', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@agentlink/crypto')>();
+vi.mock('@4thtech-io/crypto', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@4thtech-io/crypto')>();
   return {
     ...original,
     parseJson: (text: string, options?: Parameters<typeof original.parseJson>[1]) => {

@@ -1,12 +1,12 @@
 // IR-M1-5a-1 L-1: randomPastTimestamp draws its offset by rejection sampling, so the offset is
 // uniform over [0, 2 days] with no modulo bias. Sample tests cannot see a 4e-5 bias, so this file
-// fakes the CSPRNG (@agentlink/crypto randomBytes) and checks the rejection branch directly.
+// fakes the CSPRNG (@4thtech-io/crypto randomBytes) and checks the rejection branch directly.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const fake = vi.hoisted(() => ({ draws: [] as number[], calls: 0 }));
 
-vi.mock('@agentlink/crypto', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@agentlink/crypto')>();
+vi.mock('@4thtech-io/crypto', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@4thtech-io/crypto')>();
   return {
     ...original,
     randomBytes: (length: number) => {

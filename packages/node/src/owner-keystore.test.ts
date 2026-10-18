@@ -24,7 +24,7 @@ import {
   type OwnerPublicKeys,
   type OwnerSession,
   type TypedData,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NodeKeyStoreError } from './errors.js';
 import type { KeychainBackend } from './keychain.js';
@@ -49,8 +49,8 @@ import { HARNESS_MARKERS, ttyOwnerTerminal, type OwnerTerminal } from './owner-t
 
 // Every owner seed opened and every secret key derived, so the tests can check they were wiped.
 const captured = vi.hoisted(() => ({ seeds: [] as Uint8Array[], keys: [] as Uint8Array[] }));
-vi.mock('@agentlink/crypto/keystore', async (importOriginal) => {
-  const real = await importOriginal<typeof import('@agentlink/crypto/keystore')>();
+vi.mock('@4thtech-io/crypto/keystore', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@4thtech-io/crypto/keystore')>();
   return {
     ...real,
     openOwnerSeed: async (...args: Parameters<typeof real.openOwnerSeed>) => {

@@ -1,9 +1,9 @@
 // The invite link codec (04 §3.6, D-69, G-12) in Node: the M1-7c decoder tests that need a spy or
 // a slow reader. The fixed payloads and the reject cases run in every runtime through the
 // `invite-link` vector suite (test-vectors/harness/suites/invite-link.ts).
-import { canonicalize, encodeBase64url, encodeUtf8, type JsonValue } from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import type { Invite } from '@agentlink/types';
+import { canonicalize, encodeBase64url, encodeUtf8, type JsonValue } from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import type { Invite } from '@4thtech-io/types';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   INVITE_LINK_PREFIX,

@@ -1,7 +1,7 @@
 // M1-9r: the background loop's scheduling, lease handling, shutdown and logging, over doubles
 // (06 §6; 07 §3.2 `publisher_lease`; I-5, I-7). The end-to-end acceptance with real cores is in
 // test/background-loop.test.ts.
-import { createLogger } from '@agentlink/log';
+import { createLogger } from '@4thtech-io/log';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';

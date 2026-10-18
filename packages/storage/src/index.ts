@@ -1,6 +1,6 @@
-// @agentlink/storage: storage adapters (07 §5). Every adapter receives only ALF1 ciphertext (I-2).
+// @4thtech-io/storage: storage adapters (07 §5). Every adapter receives only ALF1 ciphertext (I-2).
 // M1-6a: the StorageAdapter interface, the inline adapter and the S3-compatible adapter.
-export const packageName = '@agentlink/storage';
+export const packageName = '@4thtech-io/storage';
 
 export { StorageError, type StorageErrorCode } from './errors.js';
 export type { PutOptions, StorageAdapter, StorageKind, StoredObject } from './adapter.js';

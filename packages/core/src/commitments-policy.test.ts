@@ -3,9 +3,9 @@
 // cannot widen the auto-accept limits or turn `commitments.accept` to allow: a store edit, a policy
 // signed by another key and an older looser policy put back all leave every commitment waiting for
 // the owner. A grant made under one policy asks the owner once the policy changed.
-import { canonicalize, termsHash, type JsonObject } from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { defaultPolicy, type OwnerActionOp, type Policy } from '@agentlink/types';
+import { canonicalize, termsHash, type JsonObject } from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { defaultPolicy, type OwnerActionOp, type Policy } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import { evaluateCommitment, recheckCommitmentGrant, type CommitmentFacts } from './commitments.js';

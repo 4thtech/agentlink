@@ -18,16 +18,16 @@ const src = (zone, code, name = 'src/a.ts') =>
   checkSource(zone, join(ROOT, zone, name), code, ROOT);
 
 describe('checkManifest', () => {
-  const crypto = { name: '@agentlink/crypto' };
-  const chain = { name: '@agentlink/chain' };
+  const crypto = { name: '@4thtech-io/crypto' };
+  const chain = { name: '@4thtech-io/chain' };
 
   it('accepts the declared dependencies of the real layering', () => {
     expect(
       checkManifest('packages/chain', {
         ...chain,
         dependencies: {
-          '@agentlink/types': 'workspace:*',
-          '@agentlink/crypto': 'workspace:*',
+          '@4thtech-io/types': 'workspace:*',
+          '@4thtech-io/crypto': 'workspace:*',
           viem: '2.0.0',
         },
       }),
@@ -47,8 +47,8 @@ describe('checkManifest', () => {
   });
 
   it('rejects a package name that differs from the policy', () => {
-    expect(checkManifest('packages/crypto', { name: '@agentlink/crypt0' })).toEqual([
-      expect.stringContaining('policy.mjs expects "@agentlink/crypto"'),
+    expect(checkManifest('packages/crypto', { name: '@4thtech-io/crypt0' })).toEqual([
+      expect.stringContaining('policy.mjs expects "@4thtech-io/crypto"'),
     ]);
   });
 
@@ -56,7 +56,7 @@ describe('checkManifest', () => {
     'rejects a primitive library in %s outside its zone',
     (field) => {
       const problems = checkManifest('packages/core', {
-        name: '@agentlink/core',
+        name: '@4thtech-io/core',
         [field]: { '@noble/hashes': '1.0.0' },
       });
       expect(problems).toEqual([expect.stringContaining('@noble/* may be imported only in')]);
@@ -82,7 +82,7 @@ describe('checkManifest', () => {
     expect(realPackageName('curves', 'npm:@noble/curves@1.2.3')).toBe('@noble/curves');
     expect(realPackageName('x', 'npm:left-pad')).toBe('left-pad');
     const problems = checkManifest('packages/core', {
-      name: '@agentlink/core',
+      name: '@4thtech-io/core',
       dependencies: { curves: 'npm:@noble/curves@1.2.3' },
     });
     expect(problems).toEqual([expect.stringContaining('(alias of @noble/curves)')]);
@@ -91,20 +91,20 @@ describe('checkManifest', () => {
   it('rejects a forbidden workspace dependency (layering)', () => {
     const problems = checkManifest('packages/crypto', {
       ...crypto,
-      dependencies: { '@agentlink/core': 'workspace:*' },
+      dependencies: { '@4thtech-io/core': 'workspace:*' },
     });
-    expect(problems).toEqual([expect.stringContaining('may not import @agentlink/core')]);
+    expect(problems).toEqual([expect.stringContaining('may not import @4thtech-io/core')]);
     expect(
       checkManifest('apps/console', {
-        name: '@agentlink/console',
-        devDependencies: { '@agentlink/node': 'workspace:*' },
+        name: '@4thtech-io/console',
+        devDependencies: { '@4thtech-io/node': 'workspace:*' },
       }),
-    ).toEqual([expect.stringContaining('may not import @agentlink/node')]);
+    ).toEqual([expect.stringContaining('may not import @4thtech-io/node')]);
   });
 
   it('rejects a runtime dependency that is not on the per-package allowlist', () => {
     const problems = checkManifest('packages/storage', {
-      name: '@agentlink/storage',
+      name: '@4thtech-io/storage',
       dependencies: { 'left-pad': '1.0.0' },
     });
     expect(problems).toEqual([expect.stringContaining('runtime-dependency allowlist')]);
@@ -113,7 +113,7 @@ describe('checkManifest', () => {
   it('leaves devDependencies (tools) free of the runtime allowlist', () => {
     expect(
       checkManifest('packages/storage', {
-        name: '@agentlink/storage',
+        name: '@4thtech-io/storage',
         devDependencies: { vitest: '4.0.0' },
       }),
     ).toEqual([]);
@@ -132,7 +132,7 @@ describe('findCycle', () => {
 describe('checkSource', () => {
   it('accepts allowed imports', () => {
     expect(src('packages/crypto', `import { x } from '@noble/curves/secp256k1';`)).toEqual([]);
-    expect(src('packages/chain', `import { y } from '@agentlink/crypto'; import 'viem';`)).toEqual(
+    expect(src('packages/chain', `import { y } from '@4thtech-io/crypto'; import 'viem';`)).toEqual(
       [],
     );
     expect(src('packages/node', `import { readFileSync } from 'node:fs';`)).toEqual([]);
@@ -153,8 +153,8 @@ describe('checkSource', () => {
     [`import { join } from 'path';`, 'packages/chain'],
     [`import { webcrypto } from 'node:crypto';`, 'packages/node'],
     [`import { randomBytes } from 'crypto';`, 'apps/cli'],
-    [`import { x } from '@agentlink/core';`, 'packages/crypto'],
-    [`import { x } from '@agentlink/node';`, 'apps/console'],
+    [`import { x } from '@4thtech-io/core';`, 'packages/crypto'],
+    [`import { x } from '@4thtech-io/node';`, 'apps/console'],
   ])('rejects the static import %s in %s', (code, zone) => {
     expect(src(zone, code)).toHaveLength(1);
   });
@@ -249,21 +249,21 @@ describe('runChecks on a fixture repository', () => {
 
   it('passes a clean repository', () => {
     const root = repo({
-      'packages/crypto/package.json': pkg('@agentlink/crypto', {
+      'packages/crypto/package.json': pkg('@4thtech-io/crypto', {
         dependencies: { '@noble/curves': '1.0.0' },
       }),
       'packages/crypto/src/index.ts': `import { x } from '@noble/curves'; crypto.subtle;`,
-      'packages/chain/package.json': pkg('@agentlink/chain', {
-        dependencies: { '@agentlink/crypto': 'workspace:*', viem: '2.0.0' },
+      'packages/chain/package.json': pkg('@4thtech-io/chain', {
+        dependencies: { '@4thtech-io/crypto': 'workspace:*', viem: '2.0.0' },
       }),
-      'packages/chain/src/index.ts': `import { y } from '@agentlink/crypto';`,
+      'packages/chain/src/index.ts': `import { y } from '@4thtech-io/crypto';`,
     });
     expect(runChecks(root)).toMatchObject({ problems: [], packages: 2, files: 2 });
   });
 
   it('fails a primitive-library import in a non-allowlisted package', () => {
     const root = repo({
-      'packages/storage/package.json': pkg('@agentlink/storage'),
+      'packages/storage/package.json': pkg('@4thtech-io/storage'),
       'packages/storage/src/index.ts': `import { sha256 } from '@noble/hashes/sha2';`,
     });
     const { problems } = runChecks(root);
@@ -272,7 +272,7 @@ describe('runChecks on a fixture repository', () => {
 
   it('fails a forbidden dependency declaration', () => {
     const root = repo({
-      'packages/storage/package.json': pkg('@agentlink/storage', {
+      'packages/storage/package.json': pkg('@4thtech-io/storage', {
         dependencies: { 'nostr-tools': '2.0.0' },
       }),
     });
@@ -282,23 +282,23 @@ describe('runChecks on a fixture repository', () => {
   it('fails a workspace dependency cycle', () => {
     // The layering already forbids both edges; the cycle report is the second line of defence.
     const root = repo({
-      'packages/types/package.json': pkg('@agentlink/types', {
-        dependencies: { '@agentlink/core': 'workspace:*' },
+      'packages/types/package.json': pkg('@4thtech-io/types', {
+        dependencies: { '@4thtech-io/core': 'workspace:*' },
       }),
-      'packages/core/package.json': pkg('@agentlink/core', {
-        dependencies: { '@agentlink/types': 'workspace:*' },
+      'packages/core/package.json': pkg('@4thtech-io/core', {
+        dependencies: { '@4thtech-io/types': 'workspace:*' },
       }),
     });
     const { problems } = runChecks(root);
     expect(problems.some((problem) => problem.includes('dependency cycle'))).toBe(true);
-    expect(problems.some((problem) => problem.includes('may not import @agentlink/core'))).toBe(
+    expect(problems.some((problem) => problem.includes('may not import @4thtech-io/core'))).toBe(
       true,
     );
   });
 
   it('fails a directory that is not in the policy and a missing manifest', () => {
     const root = repo({
-      'packages/newcomer/package.json': pkg('@agentlink/newcomer'),
+      'packages/newcomer/package.json': pkg('@4thtech-io/newcomer'),
       'packages/newcomer/src/index.ts': `export {};`,
       'apps/drop/src/index.ts': `export {};`,
     });
@@ -313,7 +313,7 @@ describe('runChecks on a fixture repository', () => {
 
   it('ignores node_modules at any depth and nothing else (full walk without repository data)', () => {
     const root = repo({
-      'packages/crypto/package.json': pkg('@agentlink/crypto'),
+      'packages/crypto/package.json': pkg('@4thtech-io/crypto'),
       'packages/crypto/node_modules/dep/index.js': `require('node:fs')`,
       'packages/crypto/src/node_modules/dep/index.js': `require('node:fs')`,
     });
@@ -328,27 +328,27 @@ describe('listSourceFilesIn', () => {
   });
 });
 
-// OPS-REL-1: the published CLI bundles the @agentlink/* workspace packages into one file, so it
+// OPS-REL-1: the published CLI bundles the @4thtech-io/* workspace packages into one file, so it
 // re-declares their third-party runtime dependencies (exact same spec) as its own `dependencies`.
 // Only a zone with `bundles: true` may do that; its own source imports stay checked as before.
 describe('bundled workspace packages (policy `bundles`, OPS-REL-1)', () => {
   const cli = { name: '@4thtech-io/agentlink' };
   const manifests = {
-    '@agentlink/crypto': {
-      name: '@agentlink/crypto',
+    '@4thtech-io/crypto': {
+      name: '@4thtech-io/crypto',
       dependencies: { '@noble/hashes': '2.4.0', '@hpke/core': '1.9.0' },
     },
-    '@agentlink/node': {
-      name: '@agentlink/node',
-      dependencies: { '@agentlink/crypto': 'workspace:*', ws: '8.22.0' },
+    '@4thtech-io/node': {
+      name: '@4thtech-io/node',
+      dependencies: { '@4thtech-io/crypto': 'workspace:*', ws: '8.22.0' },
       devDependencies: { vitest: '4.1.11' },
     },
-    '@agentlink/types': { name: '@agentlink/types', dependencies: { zod: '4.6.7' } },
+    '@4thtech-io/types': { name: '@4thtech-io/types', dependencies: { zod: '4.6.7' } },
   };
   const cliManifest = (dependencies) => ({
     ...cli,
     dependencies,
-    devDependencies: { '@agentlink/node': 'workspace:*' },
+    devDependencies: { '@4thtech-io/node': 'workspace:*' },
   });
 
   it('only apps/cli bundles', () => {
@@ -372,11 +372,11 @@ describe('bundled workspace packages (policy `bundles`, OPS-REL-1)', () => {
     const { problems } = bundledRuntimeOf(
       {
         ...cli,
-        devDependencies: { '@agentlink/node': 'workspace:*', '@agentlink/log': 'workspace:*' },
+        devDependencies: { '@4thtech-io/node': 'workspace:*', '@4thtech-io/log': 'workspace:*' },
       },
       {
         ...manifests,
-        '@agentlink/log': { name: '@agentlink/log', dependencies: { ws: '8.21.0' } },
+        '@4thtech-io/log': { name: '@4thtech-io/log', dependencies: { ws: '8.21.0' } },
       },
     );
     expect(problems).toEqual([expect.stringContaining('ws')]);
@@ -426,7 +426,7 @@ describe('bundled workspace packages (policy `bundles`, OPS-REL-1)', () => {
   it('rejects a workspace package at runtime in a bundling zone (it is bundled, not installed)', () => {
     const problems = checkManifest('apps/cli', {
       ...cli,
-      dependencies: { '@agentlink/core': 'workspace:*' },
+      dependencies: { '@4thtech-io/core': 'workspace:*' },
     });
     expect(problems).toEqual([expect.stringContaining('bundled')]);
   });
@@ -434,7 +434,7 @@ describe('bundled workspace packages (policy `bundles`, OPS-REL-1)', () => {
   it('ignores bundledRuntime in a zone that does not bundle', () => {
     const problems = checkManifest(
       'packages/core',
-      { name: '@agentlink/core', dependencies: { '@noble/hashes': '2.4.0' } },
+      { name: '@4thtech-io/core', dependencies: { '@noble/hashes': '2.4.0' } },
       { bundledRuntime: new Map([['@noble/hashes', '2.4.0']]) },
     );
     expect(problems).toEqual([expect.stringContaining('@noble/* may be imported only in')]);

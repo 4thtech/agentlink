@@ -7,7 +7,7 @@ import {
   POLICY_DEFAULTS,
   defaultPolicy,
   type Policy,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { CoreError } from './errors.js';
 import {

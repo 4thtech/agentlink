@@ -130,7 +130,7 @@ jobs:
           cache: "false"
 
       - name: Build the e2e dependencies (the CLI and its packages)
-        run: pnpm exec turbo run build --filter='@agentlink/e2e^...'
+        run: pnpm exec turbo run build --filter='@4thtech-io/e2e^...'
 
       - name: Download and verify Claude Code
         run: |
@@ -167,7 +167,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           set -euo pipefail
-          nohup bash -c 'pnpm --filter @agentlink/e2e exec vitest run llm/nightly-run.test.ts --reporter=default > "$AGENTLINK_E2E_ARTIFACTS/public/vitest-output.log" 2>&1; echo $? > "$RUNNER_TEMP/scenario.exit"' > /dev/null 2>&1 &
+          nohup bash -c 'pnpm --filter @4thtech-io/e2e exec vitest run llm/nightly-run.test.ts --reporter=default > "$AGENTLINK_E2E_ARTIFACTS/public/vitest-output.log" 2>&1; echo $? > "$RUNNER_TEMP/scenario.exit"' > /dev/null 2>&1 &
           echo "started"
 
       # Waits for the invite file, masks it, encrypts it and uploads it for job B.
@@ -278,7 +278,7 @@ jobs:
           fi
 
       - name: Build the e2e dependencies (the CLI and its packages)
-        run: pnpm exec turbo run build --filter='@agentlink/e2e^...'
+        run: pnpm exec turbo run build --filter='@4thtech-io/e2e^...'
 
       - name: Download and verify Claude Code
         run: |
@@ -351,7 +351,7 @@ jobs:
             keyring_env="$(openssl rand -hex 16 | gnome-keyring-daemon --unlock --components=secrets)"
             eval "$keyring_env"
             export GNOME_KEYRING_CONTROL
-            pnpm --filter @agentlink/e2e exec vitest run llm/nightly-run.test.ts --reporter=default
+            pnpm --filter @4thtech-io/e2e exec vitest run llm/nightly-run.test.ts --reporter=default
           ' > "$AGENTLINK_E2E_ARTIFACTS/public/vitest-output.log" 2>&1
           echo "SCENARIO_EXIT=$?" >> "$GITHUB_ENV"
 

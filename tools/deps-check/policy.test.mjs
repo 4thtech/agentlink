@@ -70,22 +70,22 @@ describe('policy data', () => {
 
   it('lets a package import itself and its layer, nothing above or beside it', () => {
     expect(allowedWorkspaceNames('packages/chain')).toEqual([
-      '@agentlink/chain',
-      '@agentlink/types',
-      '@agentlink/log',
-      '@agentlink/crypto',
+      '@4thtech-io/chain',
+      '@4thtech-io/types',
+      '@4thtech-io/log',
+      '@4thtech-io/crypto',
     ]);
     // The logger (M0-8) imports no workspace package, and the trusted base does not import it.
-    expect(violationFor('packages/log', '@agentlink/types')).toMatch(/layering/);
-    expect(violationFor('packages/crypto', '@agentlink/log')).toMatch(/layering/);
-    expect(violationFor('packages/crypto', '@agentlink/core')).toMatch(/layering/);
-    expect(violationFor('packages/chain', '@agentlink/storage')).toMatch(/layering/);
-    expect(violationFor('packages/core', '@agentlink/node')).toMatch(/layering/);
-    expect(violationFor('apps/console', '@agentlink/node')).toMatch(/layering/);
-    expect(violationFor('apps/submitter', '@agentlink/ui')).toMatch(/layering/);
+    expect(violationFor('packages/log', '@4thtech-io/types')).toMatch(/layering/);
+    expect(violationFor('packages/crypto', '@4thtech-io/log')).toMatch(/layering/);
+    expect(violationFor('packages/crypto', '@4thtech-io/core')).toMatch(/layering/);
+    expect(violationFor('packages/chain', '@4thtech-io/storage')).toMatch(/layering/);
+    expect(violationFor('packages/core', '@4thtech-io/node')).toMatch(/layering/);
+    expect(violationFor('apps/console', '@4thtech-io/node')).toMatch(/layering/);
+    expect(violationFor('apps/submitter', '@4thtech-io/ui')).toMatch(/layering/);
     expect(violationFor('packages/core', '@4thtech-io/agentlink')).toMatch(/layering/);
-    expect(violationFor('packages/core', '@agentlink/chain/sub')).toBeNull();
-    expect(violationFor(null, '@agentlink/types')).toMatch(/no entry/);
+    expect(violationFor('packages/core', '@4thtech-io/chain/sub')).toBeNull();
+    expect(violationFor(null, '@4thtech-io/types')).toMatch(/no entry/);
   });
 });
 
@@ -119,7 +119,7 @@ describe('M1-1g-b: no build can include the crypto test seam (IR-M1-1c-G2-1 L-1)
       .map((entry) => `${group}/${entry.name}`),
   );
   const seam = RESTRICTED_ENTRY_POINTS.find((entry) =>
-    entry.group.includes('@agentlink/crypto/testing'),
+    entry.group.includes('@4thtech-io/crypto/testing'),
   );
   // The packages of the seam's testDirs (IR-M1-9k-1 F01): `apps/cli/test` -> `apps/cli`.
   const testDirPackages = (seam?.testDirs ?? []).map((dir) => dir.split('/').slice(0, 2).join('/'));
@@ -143,7 +143,7 @@ describe('M1-1g-b: no build can include the crypto test seam (IR-M1-1c-G2-1 L-1)
       if (!existsSync(path)) return;
       const test = readJsonc(path);
       const paths = test.compilerOptions?.paths ?? {};
-      if (Object.keys(paths).some((key) => key.startsWith('@agentlink/crypto/testing'))) {
+      if (Object.keys(paths).some((key) => key.startsWith('@4thtech-io/crypto/testing'))) {
         expect(seamPackages).toContain(dir);
         expect(test.compilerOptions.noEmit).toBe(true);
       }
@@ -159,8 +159,8 @@ describe('M1-1g-b: no build can include the crypto test seam (IR-M1-1c-G2-1 L-1)
 
   it('the alias detector finds every spelling', () => {
     for (const text of [
-      String.raw`{ find: /^@agentlink\/crypto\/testing$/, replacement: x }`,
-      `alias: { '@agentlink/crypto/testing': y }`,
+      String.raw`{ find: /^@4thtech-io\/crypto\/testing$/, replacement: x }`,
+      `alias: { '@4thtech-io/crypto/testing': y }`,
       `replacement: '../crypto/src/testing.ts'`,
       String.raw`replacement: '..\\crypto\\src\\testing.ts'`,
       `replacement: cryptoSource('testing.ts')`,
@@ -168,7 +168,7 @@ describe('M1-1g-b: no build can include the crypto test seam (IR-M1-1c-G2-1 L-1)
     ]) {
       expect(aliasesSeam(text), text).toBe(true);
     }
-    expect(aliasesSeam(String.raw`{ find: /^@agentlink\/crypto$/, replacement: x }`)).toBe(false);
+    expect(aliasesSeam(String.raw`{ find: /^@4thtech-io\/crypto$/, replacement: x }`)).toBe(false);
   });
 
   it.each(packageDirs)('%s: only a test zone Vite or Vitest config aliases the seam', (dir) => {
@@ -192,11 +192,11 @@ describe('M1-1g-b: no build can include the crypto test seam (IR-M1-1c-G2-1 L-1)
     expect(seam?.testDirs).toEqual(['apps/cli/test', 'apps/drop/test']);
     for (const pkg of testDirPackages) {
       expect(readFileSync(join(REPO, pkg, 'vitest.config.ts'), 'utf8'), pkg).toMatch(
-        /find: \/\^@agentlink\\\/crypto\\\/testing\$\//,
+        /find: \/\^@4thtech-io\\\/crypto\\\/testing\$\//,
       );
       const test = readJsonc(join(REPO, pkg, 'tsconfig.test.json'));
       expect(test.compilerOptions.noEmit, pkg).toBe(true);
-      expect(test.compilerOptions.paths['@agentlink/crypto/testing'], pkg).toEqual([
+      expect(test.compilerOptions.paths['@4thtech-io/crypto/testing'], pkg).toEqual([
         '../../packages/crypto/src/testing.ts',
       ]);
     }
@@ -205,10 +205,10 @@ describe('M1-1g-b: no build can include the crypto test seam (IR-M1-1c-G2-1 L-1)
   it('every test zone of the seam has the alias and the noEmit path it needs', () => {
     for (const zone of seam?.testZones ?? []) {
       expect(readFileSync(join(REPO, zone, 'vitest.config.ts'), 'utf8'), zone).toMatch(
-        /find: \/\^@agentlink\\\/crypto\\\/testing\$\//,
+        /find: \/\^@4thtech-io\\\/crypto\\\/testing\$\//,
       );
       const test = readJsonc(join(REPO, zone, 'tsconfig.test.json'));
-      expect(test.compilerOptions.paths['@agentlink/crypto/testing'], zone).toEqual([
+      expect(test.compilerOptions.paths['@4thtech-io/crypto/testing'], zone).toEqual([
         '../crypto/src/testing.ts',
       ]);
     }

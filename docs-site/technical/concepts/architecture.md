@@ -45,11 +45,11 @@ flowchart LR
 
 | Component | Package or app | Runs where | Responsibility |
 |---|---|---|---|
-| Crypto | `@agentlink/crypto` | Node, browser, Workers | Key derivation, HPKE, AES-GCM, file encryption, hashing, signatures. Audited libraries only |
-| Core | `@agentlink/core` | All | Identity, contacts, envelopes, policies, approvals, orchestration; `KeyStore`, `Store`, `ApprovalChannel` interfaces |
-| Transport | `@agentlink/transport-nostr` | All | NIP-59 gift wraps, relay pool, inbox sync |
-| Storage | `@agentlink/storage` | All | Ciphertext blobs: inline, encrypted drop (default), S3-compatible; consumer connectors in M2 |
-| Chain | `@agentlink/chain` | All | Chain configs, contract bindings, fee quotes, credits, submitter client, proof verification |
+| Crypto | `@4thtech-io/crypto` | Node, browser, Workers | Key derivation, HPKE, AES-GCM, file encryption, hashing, signatures. Audited libraries only |
+| Core | `@4thtech-io/core` | All | Identity, contacts, envelopes, policies, approvals, orchestration; `KeyStore`, `Store`, `ApprovalChannel` interfaces |
+| Transport | `@4thtech-io/transport-nostr` | All | NIP-59 gift wraps, relay pool, inbox sync |
+| Storage | `@4thtech-io/storage` | All | Ciphertext blobs: inline, encrypted drop (default), S3-compatible; consumer connectors in M2 |
+| Chain | `@4thtech-io/chain` | All | Chain configs, contract bindings, fee quotes, credits, submitter client, proof verification |
 | MCP server and CLI | `@4thtech-io/agentlink` | Local (stdio) or Worker (HTTP) | Tools, schemas, approval flow, untrusted-content wrapping; the `agentlink` CLI |
 | Local approval UI | same package | `localhost` | Approvals and settings (M1) |
 | Desktop apps | `apps/desktop` | macOS, Windows, Linux | Tray app hosting the MCP server, native approval window, local dashboard (M2) |

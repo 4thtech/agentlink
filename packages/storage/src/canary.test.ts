@@ -1,7 +1,7 @@
 // M1-6a acceptance: the adapters never write credentials, presigned URLs, URL query strings or object
 // keys to any log or the console (I-7, 04 §4). Exercises every operation, including failures.
 import { describe, expect, it } from 'vitest';
-import { captureOutput } from '@agentlink/log/testing';
+import { captureOutput } from '@4thtech-io/log/testing';
 import { createInlineAdapter, createS3Adapter } from './index.js';
 import {
   BUCKET,

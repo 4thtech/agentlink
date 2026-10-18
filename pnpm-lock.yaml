@@ -242,31 +242,31 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
-      '@agentlink/chain':
+      '@4thtech-io/chain':
         specifier: workspace:*
         version: link:../../packages/chain
-      '@agentlink/core':
+      '@4thtech-io/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@agentlink/crypto':
+      '@4thtech-io/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
-      '@agentlink/log':
+      '@4thtech-io/log':
         specifier: workspace:*
         version: link:../../packages/log
-      '@agentlink/node':
+      '@4thtech-io/node':
         specifier: workspace:*
         version: link:../../packages/node
-      '@agentlink/storage':
+      '@4thtech-io/storage':
         specifier: workspace:*
         version: link:../../packages/storage
-      '@agentlink/transport-nostr':
+      '@4thtech-io/transport-nostr':
         specifier: workspace:*
         version: link:../../packages/transport-nostr
-      '@agentlink/types':
+      '@4thtech-io/types':
         specifier: workspace:*
         version: link:../../packages/types
-      '@agentlink/ui':
+      '@4thtech-io/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       '@types/node':
@@ -281,7 +281,7 @@ importers:
 
   apps/drop:
     dependencies:
-      '@agentlink/crypto':
+      '@4thtech-io/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
 
@@ -296,16 +296,16 @@ importers:
       '@4thtech-io/agentlink':
         specifier: workspace:*
         version: link:../apps/cli
-      '@agentlink/core':
+      '@4thtech-io/core':
         specifier: workspace:*
         version: link:../packages/core
-      '@agentlink/crypto':
+      '@4thtech-io/crypto':
         specifier: workspace:*
         version: link:../packages/crypto
-      '@agentlink/log':
+      '@4thtech-io/log':
         specifier: workspace:*
         version: link:../packages/log
-      '@agentlink/node':
+      '@4thtech-io/node':
         specifier: workspace:*
         version: link:../packages/node
       '@modelcontextprotocol/sdk':
@@ -320,31 +320,31 @@ importers:
 
   packages/chain:
     dependencies:
-      '@agentlink/crypto':
+      '@4thtech-io/crypto':
         specifier: workspace:*
         version: link:../crypto
-      '@agentlink/types':
+      '@4thtech-io/types':
         specifier: workspace:*
         version: link:../types
 
   packages/core:
     dependencies:
-      '@agentlink/chain':
+      '@4thtech-io/chain':
         specifier: workspace:*
         version: link:../chain
-      '@agentlink/crypto':
+      '@4thtech-io/crypto':
         specifier: workspace:*
         version: link:../crypto
-      '@agentlink/log':
+      '@4thtech-io/log':
         specifier: workspace:*
         version: link:../log
-      '@agentlink/storage':
+      '@4thtech-io/storage':
         specifier: workspace:*
         version: link:../storage
-      '@agentlink/transport-nostr':
+      '@4thtech-io/transport-nostr':
         specifier: workspace:*
         version: link:../transport-nostr
-      '@agentlink/types':
+      '@4thtech-io/types':
         specifier: workspace:*
         version: link:../types
 
@@ -371,13 +371,13 @@ importers:
 
   packages/node:
     dependencies:
-      '@agentlink/core':
+      '@4thtech-io/core':
         specifier: workspace:*
         version: link:../core
-      '@agentlink/crypto':
+      '@4thtech-io/crypto':
         specifier: workspace:*
         version: link:../crypto
-      '@agentlink/transport-nostr':
+      '@4thtech-io/transport-nostr':
         specifier: workspace:*
         version: link:../transport-nostr
       '@napi-rs/keyring':
@@ -402,10 +402,10 @@ importers:
 
   packages/storage:
     dependencies:
-      '@agentlink/crypto':
+      '@4thtech-io/crypto':
         specifier: workspace:*
         version: link:../crypto
-      '@agentlink/log':
+      '@4thtech-io/log':
         specifier: workspace:*
         version: link:../log
       aws4fetch:
@@ -414,13 +414,13 @@ importers:
 
   packages/transport-nostr:
     dependencies:
-      '@agentlink/crypto':
+      '@4thtech-io/crypto':
         specifier: workspace:*
         version: link:../crypto
-      '@agentlink/log':
+      '@4thtech-io/log':
         specifier: workspace:*
         version: link:../log
-      '@agentlink/types':
+      '@4thtech-io/types':
         specifier: workspace:*
         version: link:../types
     devDependencies:
@@ -442,13 +442,13 @@ importers:
 
   test-vectors:
     devDependencies:
-      '@agentlink/core':
+      '@4thtech-io/core':
         specifier: workspace:*
         version: link:../packages/core
-      '@agentlink/crypto':
+      '@4thtech-io/crypto':
         specifier: workspace:*
         version: link:../packages/crypto
-      '@agentlink/types':
+      '@4thtech-io/types':
         specifier: workspace:*
         version: link:../packages/types
 

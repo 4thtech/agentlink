@@ -1,5 +1,5 @@
 // Opening an agent (M1-9k; 06 §6, 07 §9.1, §9.4; D-73 (3)). The Node pieces are doubles here: the
-// real keychain and SQLite store are @agentlink/node's (keychain-native.test.ts, store-concurrency
+// real keychain and SQLite store are @4thtech-io/node's (keychain-native.test.ts, store-concurrency
 // .test.ts cover two connections on one file). This suite checks the wiring: which backend, which
 // file, which channel, and that every process opening the agent reaches the same store.
 import { mkdtemp, realpath, rm } from 'node:fs/promises';
@@ -11,11 +11,11 @@ import {
   type AgentLinkClientOptions,
   type Sealed,
   type StoreCipher,
-} from '@agentlink/core';
-import type { KeyStore } from '@agentlink/crypto';
-import { encodeBase64url, encodeHex, randomBytes } from '@agentlink/crypto';
-import { createLogger } from '@agentlink/log';
-import type { AgentStore, KeyStoreBackendKind, KeychainProbe } from '@agentlink/node';
+} from '@4thtech-io/core';
+import type { KeyStore } from '@4thtech-io/crypto';
+import { encodeBase64url, encodeHex, randomBytes } from '@4thtech-io/crypto';
+import { createLogger } from '@4thtech-io/log';
+import type { AgentStore, KeyStoreBackendKind, KeychainProbe } from '@4thtech-io/node';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { writeAgentConfig } from './agent-dir.js';
 import { RUNTIME_MESSAGES } from './errors.js';

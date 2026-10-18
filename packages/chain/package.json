@@ -1,5 +1,5 @@
 {
-  "name": "@agentlink/chain",
+  "name": "@4thtech-io/chain",
   "version": "0.1.0",
   "private": true,
   "description": "Chain clients and OCC v2 bindings.",
@@ -33,7 +33,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@agentlink/types": "workspace:*",
-    "@agentlink/crypto": "workspace:*"
+    "@4thtech-io/types": "workspace:*",
+    "@4thtech-io/crypto": "workspace:*"
   }
 }

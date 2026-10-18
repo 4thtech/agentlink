@@ -1,4 +1,4 @@
-# @agentlink/types
+# @4thtech-io/types
 
 ## 0.1.0
 

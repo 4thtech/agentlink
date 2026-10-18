@@ -59,8 +59,8 @@ jobs:
         with:
           cache: "false"
 
-      - name: Build the workspace dependencies of @agentlink/storage
-        run: pnpm exec turbo run build --filter='@agentlink/storage...'
+      - name: Build the workspace dependencies of @4thtech-io/storage
+        run: pnpm exec turbo run build --filter='@4thtech-io/storage...'
 
       - name: Run the R2 integration test
         shell: bash
@@ -86,7 +86,7 @@ jobs:
           report="$RUNNER_TEMP/storage-r2.json"
           echo "STORAGE_IT_REPORT=$report" >> "$GITHUB_ENV"
           set +e
-          pnpm --filter @agentlink/storage exec vitest run src/integration.test.ts --reporter=default --reporter=json --outputFile.json="$report" > "$out" 2>&1
+          pnpm --filter @4thtech-io/storage exec vitest run src/integration.test.ts --reporter=default --reporter=json --outputFile.json="$report" > "$out" 2>&1
           code=$?
           set -e
           # The log canary of the job: the output must hold no URL query string, no credential and no

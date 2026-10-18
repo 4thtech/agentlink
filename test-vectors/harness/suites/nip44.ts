@@ -1,17 +1,17 @@
-// Suite `nip44` (M1-1g): the official NIP-44 v2 vectors through @agentlink/crypto. The low-level
+// Suite `nip44` (M1-1g): the official NIP-44 v2 vectors through @4thtech-io/crypto. The low-level
 // functions take a secret key or a conversation key, so they come from the restricted subpath
-// @agentlink/crypto/keystore; the KeyStore methods (nip44Encrypt, nip44Decrypt) use the same code
+// @4thtech-io/crypto/keystore; the KeyStore methods (nip44Encrypt, nip44Decrypt) use the same code
 // with the conversation key derived inside. Inputs go to the code under test unchecked, so its own
 // refusals (CryptoInputError) are what `outcome: reject` measures; any other error is a bug and
 // fails the case.
-import { CryptoInputError, encodeUtf8, nip44PaddedLength, sha256 } from '@agentlink/crypto';
+import { CryptoInputError, encodeUtf8, nip44PaddedLength, sha256 } from '@4thtech-io/crypto';
 import {
   bip340PublicKey,
   nip44ConversationKey,
   nip44DecryptWithKey,
   nip44EncryptWithKey,
   nip44MessageKeys,
-} from '@agentlink/crypto/keystore';
+} from '@4thtech-io/crypto/keystore';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

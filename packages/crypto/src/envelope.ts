@@ -10,7 +10,7 @@
 // (or a getter) cannot make what is checked differ from what is hashed.
 //
 // The parser works on parsed JSON values. Checks on the JSON text itself (duplicate keys, integer
-// tokens such as `1.0`) belong to the text parser (parseJson, and @agentlink/types in M1-2a).
+// tokens such as `1.0`) belong to the text parser (parseJson, and @4thtech-io/types in M1-2a).
 //
 // Errors never contain the input (I-7): see errors.ts.
 import { bip340Sign, bip340Verify } from './bip340.js';
@@ -343,7 +343,7 @@ export function verifyEnvelope(envelope: Envelope): boolean {
 }
 
 /**
- * KeyStore and OwnerSession implementations only (@agentlink/crypto/keystore;
+ * KeyStore and OwnerSession implementations only (@4thtech-io/crypto/keystore;
  * EnvelopeKeys.signEnvelopeHash, 04 §3.1.1): the 64-byte BIP-340 signature of
  * envelopeSignatureInput(envelopeHash) under the Nostr secret key of `from` (the agent key at its
  * current epoch, or the owner key for `approval`, `policy` and `revoke`). It applies the tag itself,

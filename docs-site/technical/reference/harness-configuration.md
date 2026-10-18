@@ -135,7 +135,7 @@ Sources: [Antigravity MCP](https://antigravity.google/docs/mcp) (checked 2026-10
 
 ## Default message network
 
-Messages travel over public Nostr relays that see only ciphertext (I-3). The default set, in this order, is `wss://nos.lol`, `wss://relay.primal.net`, `wss://relay.snort.social` and `wss://nostr.mom` (D-75). The list lives in one place, `DEFAULT_RELAYS` in `@agentlink/transport-nostr`. Changing an agent's relay list is not available in v0.1.0.
+Messages travel over public Nostr relays that see only ciphertext (I-3). The default set, in this order, is `wss://nos.lol`, `wss://relay.primal.net`, `wss://relay.snort.social` and `wss://nostr.mom` (D-75). The list lives in one place, `DEFAULT_RELAYS` in `@4thtech-io/transport-nostr`. Changing an agent's relay list is not available in v0.1.0.
 
 ## Tools and approval prompts
 

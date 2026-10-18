@@ -9,10 +9,10 @@ import {
   encodeHex,
   randomBytes,
   type JsonObject,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createLogger } from '@agentlink/log';
-import { APPROVAL_TTL_SECONDS, type OwnerActionOp } from '@agentlink/types';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createLogger } from '@4thtech-io/log';
+import { APPROVAL_TTL_SECONDS, type OwnerActionOp } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { feeContextFromQuote } from './approvals.js';
 import { AgentLinkClient } from './client.js';

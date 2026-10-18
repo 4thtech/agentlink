@@ -6,7 +6,7 @@
 // magic `ALKO`, so neither ever opens as the other. Everything a reader can check before the KDF is
 // checked before it (header values, KDF floor and cap, agent ID, sizes, secret normalisation). Every
 // file-level failure is the same `open_failed` error, so a wrong secret and a tampered file are
-// indistinguishable. Files and paths are @agentlink/node's job; this module only handles bytes.
+// indistinguishable. Files and paths are @4thtech-io/node's job; this module only handles bytes.
 import { argon2id, kdfInBounds, KEYSTORE_KDF_DEFAULTS, type Argon2idParams } from './argon2.js';
 import { AES_GCM_NONCE_LENGTH, aes256GcmOpen, aes256GcmSeal } from './aes-gcm.js';
 import { assertBytes, concatBytes, equalBytes } from './bytes.js';

@@ -13,7 +13,7 @@ import {
   DISPATCH_TEXT,
   type CommandHandler,
 } from '../dispatch.js';
-import { hasUnfinishedOwnerCodeChange } from '@agentlink/node';
+import { hasUnfinishedOwnerCodeChange } from '@4thtech-io/node';
 import { listAgentNames, readAgentConfig } from '../runtime/agent-dir.js';
 import { isAgentName } from '../runtime/agent-name.js';
 import { terminalOneLine } from '../terminal/sanitize.js';

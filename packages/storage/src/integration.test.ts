@@ -15,8 +15,8 @@
 // never print a URL, an object key or a credential.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AwsClient } from 'aws4fetch';
-import { encodeBase64url, encodeHex, randomBytes, sha256 } from '@agentlink/crypto';
-import { captureOutput, findCanaryLeaks, type Canary } from '@agentlink/log/testing';
+import { encodeBase64url, encodeHex, randomBytes, sha256 } from '@4thtech-io/crypto';
+import { captureOutput, findCanaryLeaks, type Canary } from '@4thtech-io/log/testing';
 import {
   MAX_PRESIGN_SECONDS,
   createS3Adapter,

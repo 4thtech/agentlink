@@ -5,7 +5,7 @@
 // set by the deploy configuration (occ-v2-contracts script/config, M1-14) and read back with
 // `OCCFeeVault.quote` (M1-4b); this schedule is the published reference the config is checked against.
 
-/** Micro-dollars per dollar (USD amounts carry 6 decimals, see @agentlink/types `usd`). */
+/** Micro-dollars per dollar (USD amounts carry 6 decimals, see @4thtech-io/types `usd`). */
 export const USD_MICROS = 1_000_000n;
 
 /** Configured fee types at launch. `ANCHOR`, `DEAL` and `DISCLOSE` are not offered yet (fee and cap 0). */

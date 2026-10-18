@@ -13,8 +13,8 @@ import {
   type EnvelopeKeys,
   type NostrEvent,
   type UnsignedNostrEvent,
-} from '@agentlink/crypto';
-import { createLogger, type Level } from '@agentlink/log';
+} from '@4thtech-io/crypto';
+import { createLogger, type Level } from '@4thtech-io/log';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import { v2 as nip44 } from 'nostr-tools/nip44';
 import { createRumor, createSeal } from 'nostr-tools/nip59';

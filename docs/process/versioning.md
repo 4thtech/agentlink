@@ -38,7 +38,7 @@ Each layer has its own number; the product version never stands in for a format'
 
 | Layer | Version | Defined in | Moves when |
 |---|---|---|---|
-| **Product** | `0.0.x` now | D-43; `CHANGELOG.md` | Every release. One Changesets **fixed group** moves together during beta: the CLI `@4thtech-io/agentlink`, the `@agentlink/*` libraries (not the ABI package) and, from M2, the desktop apps (private workspace packages). Only the CLI is published; the libraries are private and bundled into it (OPS-REL-1), and `privatePackages.version: true` keeps them in the group, so a library change releases a new CLI. Set in `.changeset/config.json` |
+| **Product** | `0.0.x` now | D-43; `CHANGELOG.md` | Every release. One Changesets **fixed group** moves together during beta: the CLI `@4thtech-io/agentlink`, the `@4thtech-io/*` libraries (not the ABI package) and, from M2, the desktop apps (private workspace packages). Only the CLI is published; the libraries are private and bundled into it (OPS-REL-1), and `privatePackages.version: true` keeps them in the group, so a library change releases a new CLI. Set in `.changeset/config.json` |
 | **OCC v2 EIP-712 domain** | `version: "2"` | 05 §3.1; 04 §5 | Only for a new contract generation (OCC v3) |
 | **Agent card** | domain `version: "1"` | 04 §2.4 | The card struct or its domain changes |
 | **Envelope** | `v: 1`; labels `agentlink/envelope/v1`, `agentlink/v1/*` | 04 §2.1, §3 | An incompatible change to fields, signing input or labels |
@@ -46,7 +46,7 @@ Each layer has its own number; the product version never stands in for a format'
 | **Proof pack** | `version: 1` | 07 §8 | An incompatible change |
 | **Invite** | `v: 1` | 04 §3.6 | An incompatible change |
 | **Spec pack** | `0.3` | `00-README.md` revision history | §8 |
-| **Contracts** | `occ-v2-contracts` tags `v*`; `@agentlink/occ-v2-abi` has its own SemVer line | 05; `development-process.md` §9 | A contract release. ABI package: MAJOR = ABI-breaking, MINOR = additive (function, event, chain entry), PATCH = metadata. `@agentlink/chain` pins it exactly |
+| **Contracts** | `occ-v2-contracts` tags `v*`; `@4thtech-io/occ-v2-abi` has its own SemVer line | 05; `development-process.md` §9 | A contract release. ABI package: MAJOR = ABI-breaking, MINOR = additive (function, event, chain entry), PATCH = metadata. `@4thtech-io/chain` pins it exactly |
 | **Desktop builds** (M2) | Product version; build identity `<version>+<short commit>` per OS | 08 §8 | With the product. Update channels mirror npm `latest` and `next` (M2-11) |
 
 A format version changes only with a spec change, a decision-log entry, new test vectors (`test-vectors/`) and a §7 row.
@@ -95,7 +95,7 @@ Agents MUST NOT bump a version by hand: not in `package.json`, a changelog headi
 - **Product tag** `v<version>` (stable versions only), created at the released commit together with the GitHub Release. The release body is that version's `CHANGELOG.md` section, nothing generated. SBOMs and, from M2, the desktop installers, update manifests and SHA-256 hashes attach to it; the desktop pipeline adds assets and never creates a release.
 - **Per-package tags** (`<package>@<version>`) MAY exist; Changesets pushes them. A GitHub Release exists **only** for `v*` product tags: `release.yml` sets `create-github-releases: false` on the Changesets publish steps, and `publish-latest` creates the product release after the health check, in the owner-approved environment. Prereleases get per-package tags, no GitHub Release.
 - If a release is rolled back, the owner edits or deletes its GitHub Release. In M0 (pipeline off) the owner creates `v0.0.x` by hand.
-- **Contracts repo:** its own SemVer line and `v*` tags, unrelated to product numbers; each tag maps to deployment records and the `@agentlink/occ-v2-abi` version published from it.
+- **Contracts repo:** its own SemVer line and `v*` tags, unrelated to product numbers; each tag maps to deployment records and the `@4thtech-io/occ-v2-abi` version published from it.
 
 ---
 

@@ -7,7 +7,7 @@
 // 32-byte PRF output for the owner's PRF salt. The PRF is simulated as a keyed function of a
 // per-credential secret that never leaves this object, as a real authenticator's PRF secret never
 // leaves the device; only its output for one salt is handed out, after a simulated gesture.
-import { concatBytes, encodeUtf8, hkdfSha256, randomBytes, sha256 } from '@agentlink/crypto';
+import { concatBytes, encodeUtf8, hkdfSha256, randomBytes, sha256 } from '@4thtech-io/crypto';
 import type { PasskeyAssertion } from './owner-passkey.js';
 
 export interface VirtualAuthenticatorOptions {

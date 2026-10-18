@@ -1,7 +1,7 @@
 // The everyday commands with fake clients (M1-9l): output sanitisation, the requests actions, the
 // read-only `status`, `doctor` and the argument checks. The pairing round trip against two real
 // cores is test/everyday-commands.test.ts.
-import { CoreError } from '@agentlink/core';
+import { CoreError } from '@4thtech-io/core';
 import { chmod, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

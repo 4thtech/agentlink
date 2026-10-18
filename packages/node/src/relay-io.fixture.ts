@@ -1,7 +1,7 @@
 // Test servers for the Node relay connector tests (M1-5b-b). Not part of the build (tsconfig.json
 // excludes *.fixture.ts). Everything listens on 127.0.0.1 with a throwaway certificate made by the
 // `openssl` command line for this run only (no key is committed), so no test touches the network.
-import { createGiftWrap, type NostrEvent } from '@agentlink/crypto';
+import { createGiftWrap, type NostrEvent } from '@4thtech-io/crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer as createHttpsServer, type Server as HttpsServer } from 'node:https';

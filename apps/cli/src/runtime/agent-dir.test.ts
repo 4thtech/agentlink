@@ -15,7 +15,7 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { encodeHex, randomBytes } from '@agentlink/crypto';
+import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   agentPaths,

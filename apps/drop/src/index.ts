@@ -28,7 +28,7 @@ import {
   verifyDropAuthorization,
   verifyDropUrlMac,
   type DropUrlPurpose,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { readConfig, type DropConfig, type Limits } from './config.js';
 import { ipBucket } from './ip.js';
 import { DropState, type Metric, type ObjectRefusal, type Refusal } from './state.js';
@@ -38,7 +38,7 @@ export { DEFAULTS, readConfig, type DropConfig, type Limits } from './config.js'
 export { ipBucket } from './ip.js';
 export { METRICS, type Metric } from './state.js';
 
-export const packageName = '@agentlink/drop';
+export const packageName = '@4thtech-io/drop';
 
 export interface DropEnv {
   readonly DROP_BUCKET: R2Bucket;

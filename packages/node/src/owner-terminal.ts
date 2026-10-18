@@ -6,7 +6,7 @@
 // "Interactive only" is a UX guard, not a security boundary (04 §2.8): a same-user process can fake a
 // terminal. It keeps the owner secret out of the agent's normal flow; it does not stop a tampered
 // installation or a fake prompt (04 §2.5, G-1, D-67).
-import { wipe, type OwnerPresence } from '@agentlink/crypto';
+import { wipe, type OwnerPresence } from '@4thtech-io/crypto';
 import { NodeKeyStoreError } from './errors.js';
 
 /** What owner flows need from a terminal. Tests script it; production uses ttyOwnerTerminal. */

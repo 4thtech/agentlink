@@ -1,5 +1,5 @@
 // Suite `eip712` (M1-1e): EIP-712 typed-data hashing, canonical ECDSA and the AgentCard through
-// @agentlink/crypto (04 §2.4, §2.4.1, §2.9). A refusal by the code under test (CryptoInputError) is
+// @4thtech-io/crypto (04 §2.4, §2.4.1, §2.9). A refusal by the code under test (CryptoInputError) is
 // reported as `outcome: reject`; a verification that returns false is `outcome: reject` too. Any
 // other error is a bug and fails the case.
 import {
@@ -13,8 +13,8 @@ import {
   verifyCardAgentSig,
   verifyCardOwnerSig,
   type TypedData,
-} from '@agentlink/crypto';
-import { signAgentCard, signTypedData } from '@agentlink/crypto/keystore';
+} from '@4thtech-io/crypto';
+import { signAgentCard, signTypedData } from '@4thtech-io/crypto/keystore';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

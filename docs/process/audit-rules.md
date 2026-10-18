@@ -109,7 +109,7 @@ Merging is continuous (D-25, amended by D-51 and D-52): agents work under Tali's
 
 **Automated PRs (Renovate, Changesets "Version packages").** A PR is automated only when its **author** (GitHub's `pull_request.user.login`) is `renovate[bot]` or `github-actions[bot]`. Commit author names, e-mail addresses and the `verified` flag are never used: anyone who can push to the branch can forge them. An automated PR has no report to cite, so for S1/S2 `review-gate` (c) is satisfied **only** by an APPROVED GitHub review from `@talirezun` or `@denisjazbec` on the current head commit; a new commit invalidates it. Nothing else is exempt: (b) needs no ticked class, and (d) applies unchanged for S2. The Threat note and Tests-first evidence sections of a Renovate PR are bot-supplied through `renovate.json` `prBodyNotes`; the approver confirms both through the APPROVED review on the head commit (owner decision, 2026-10-15); the code-owner approval applies as for any S2 PR. The bot is the author, so the owner's own approval counts for (c). Crypto dependency updates remain S2 (`development-process.md` §11): the approver SHOULD have the orchestrator's review of the new version's changelog and diff first. Owner action (`ci-cd.md`, checklist section 6): a ruleset restricting who may push to `renovate/**` and `changeset-release/**` branches, so nobody else can add commits to a bot-authored PR.
 
-**Releases:** any mainnet-bound contract release or crypto release (`@agentlink/crypto`, or any package whose crypto code changed since the last reviewed release) MUST have the owner's "merge" in chat (D-51, D-52) and an independent review recorded on the release PR. `@denisjazbec`'s review is recommended for contracts.
+**Releases:** any mainnet-bound contract release or crypto release (`@4thtech-io/crypto`, or any package whose crypto code changed since the last reviewed release) MUST have the owner's "merge" in chat (D-51, D-52) and an independent review recorded on the release PR. `@denisjazbec`'s review is recommended for contracts.
 
 ### 3.1 Threat note
 
@@ -208,7 +208,7 @@ Full reports MAY contain unfixed vulnerability details, so they are stored priva
 Reviewers apply every checklist the diff touches. Item IDs are stable; new items are appended.
 
 **Crypto (CR)**: 04 §2–§4, §8
-- CR-1 No primitive calls outside `@agentlink/crypto`; only allowlisted libraries (`nostr-tools`, `viem`, `@noble/*`, `@hpke/core`, `aws4fetch`); no custom primitives (I-8).
+- CR-1 No primitive calls outside `@4thtech-io/crypto`; only allowlisted libraries (`nostr-tools`, `viem`, `@noble/*`, `@hpke/core`, `aws4fetch`); no custom primitives (I-8).
 - CR-2 HKDF derivation exactly per 04 §2.1 (salt `agentlink-v1`; info `label‖0x00‖u32be(epoch)‖u8(counter)`; L=32); secp256k1 rejection loop; EVM label always epoch 0.
 - CR-3 X25519 clamping left to the library.
 - CR-4 `envelopeHash = sha256(JCS(envelope without sig))` (RFC 8785); AEAD AD = `sha256(JCS({v,id,thread,from,createdAt,recipients}))`.
@@ -382,7 +382,7 @@ Milestone additions: **M1**: same-OS-user test, prompt-injection suite, testnet 
 
 | Rule | Detail |
 |---|---|
-| Scope | Contracts: external firm. `@agentlink/crypto` and `@agentlink/core`: independent review (10 M3-1, 04 §8.5). Scope = the S2 register (§3.2) at the audit commit. |
+| Scope | Contracts: external firm. `@4thtech-io/crypto` and `@4thtech-io/core`: independent review (10 M3-1, 04 §8.5). Scope = the S2 register (§3.2) at the audit commit. |
 | Procurement | Start no later than when M1-3 contract interfaces stabilise; reputable firms book weeks to months ahead. DECISION NEEDED (owner): firms, budget, start date, and whether scope extends to `packages/node` (`OwnerKeyStore`) and console identity. |
 | Readiness | Specs, threat model, NatSpec, coverage, Slither/Aderyn output, known-issues list and scope register handed over. |
 | Pinned commit | The audited commit is tagged in each repo (`audit-<firm>-<yyyymmdd>`) and recorded with its SHA. |

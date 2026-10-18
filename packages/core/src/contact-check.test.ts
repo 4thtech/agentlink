@@ -12,9 +12,9 @@ import {
   randomBytes,
   type JsonObject,
   type JsonValue,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { CLOCK_SKEW_SECONDS, OWNER_ACTION_MAX_LIFETIME_SECONDS } from '@agentlink/types';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { CLOCK_SKEW_SECONDS, OWNER_ACTION_MAX_LIFETIME_SECONDS } from '@4thtech-io/types';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { storedContactCheckHolds } from './contact-check.js';
 import { FakeClock, passphrase, seed } from './testing/fixtures.js';

@@ -1,6 +1,6 @@
 // The owner commands † of M1-9b: `owner init`, `approve` (one request, or one agent's list),
 // `deny` and `cancel`. The dispatcher (M1-9k) runs the owner-terminal guard (TTY, no harness marker)
-// before any of these handlers; owner presence is the owner code at @agentlink/node's TTY prompt.
+// before any of these handlers; owner presence is the owner code at @4thtech-io/node's TTY prompt.
 import type { CommandHandler, CommandName } from '../../dispatch.js';
 import { approveHandler, denyHandler } from './approve.js';
 import { cancelHandler } from './cancel.js';

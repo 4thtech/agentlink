@@ -21,14 +21,14 @@
 // owner key, takes no presence and has no path that decides, widens or creates an approval or a
 // policy without one. Refusals are returned to the surface that delivered the object (the CLI or
 // the local UI shows them; the console path is M1-7e/M1-7h) and logged as fixed codes (I-5, I-7).
-import { canonicalize, parseJson } from '@agentlink/crypto';
+import { canonicalize, parseJson } from '@4thtech-io/crypto';
 import {
   approvalIdSchema,
   policySchema,
   signedOwnerActionSchema,
   type OwnerActionOp,
   type SignedOwnerAction,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 import { isCommitmentAction } from './commitments.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import type { ContactBook } from './contacts.js';

@@ -7,7 +7,7 @@
 // are a NIP-01 double under the real nostrTransport. Each agent's tools are served by the real MCP
 // server over the SDK's in-memory transport and called by the SDK client, which validates every
 // `structuredContent` against the tool's `outputSchema`. The owner signature comes from the crypto
-// test seam (MemoryOwnerKeyStore), standing in for @agentlink/node's TTY prompt (M1-8c).
+// test seam (MemoryOwnerKeyStore), standing in for @4thtech-io/node's TTY prompt (M1-8c).
 import {
   AgentLinkClient,
   MemoryStore,
@@ -17,7 +17,7 @@ import {
   type ApprovalChannel,
   type Sealed,
   type StoreCipher,
-} from '@agentlink/core';
+} from '@4thtech-io/core';
 import {
   canonicalize,
   decodeBase64url,
@@ -30,17 +30,17 @@ import {
   type JsonObject,
   type NostrEvent,
   type OwnerKeyStore,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createLogger } from '@agentlink/log';
-import type { ApprovalContext, ReviewedApproval } from '@agentlink/node';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createLogger } from '@4thtech-io/log';
+import type { ApprovalContext, ReviewedApproval } from '@4thtech-io/node';
 import type {
   RelayConnector,
   RelaySocket,
   RelaySocketHandlers,
   RelayTarget,
-} from '@agentlink/transport-nostr';
-import { defaultPolicy } from '@agentlink/types';
+} from '@4thtech-io/transport-nostr';
+import { defaultPolicy } from '@4thtech-io/types';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -239,7 +239,7 @@ async function makeAgent(
     cipher: new TestCipher(),
     close: () => Promise.resolve(),
   };
-  // Stands in for @agentlink/node's decideReviewedApprovals: one signed object over exactly the
+  // Stands in for @4thtech-io/node's decideReviewedApprovals: one signed object over exactly the
   // reviewed items, with the digest recomputed from each displayed action.
   const deps: OwnerCommandDeps = {
     listAgents: () => Promise.resolve([name]),

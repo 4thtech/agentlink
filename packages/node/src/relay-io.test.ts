@@ -10,7 +10,7 @@ import {
   RelayPool,
   type RelayConnector,
   type RelayTarget,
-} from '@agentlink/transport-nostr';
+} from '@4thtech-io/transport-nostr';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   RELAY_HOST,
@@ -632,7 +632,7 @@ describe('the host resolver (07 §4.2 step 1)', () => {
   });
 });
 
-describe('with the relay pool of @agentlink/transport-nostr', () => {
+describe('with the relay pool of @4thtech-io/transport-nostr', () => {
   it('publishes through the connector: the pool skips the small relay and gets 2 OKs', async () => {
     const accept = {
       onSocket: (ws: import('ws').WebSocket) =>

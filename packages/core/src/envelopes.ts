@@ -15,7 +15,7 @@
 //   Held envelopes are run again from step 5 at the start of each pass and whenever a `card-update`
 //   is applied for their owner `kid`.
 //
-// Hard rules here: every crypto operation is a call into @agentlink/crypto (I-8). The CEK is held
+// Hard rules here: every crypto operation is a call into @4thtech-io/crypto (I-8). The CEK is held
 // only until step 8 and wiped there, at the first failure, or when the envelope is held. Nothing
 // from an inbound envelope (its text, its payload, its keys) goes into an error, a log line or a
 // report beyond its validated envelope ID (I-5, I-7). Reports carry fixed reason codes only.
@@ -50,7 +50,7 @@ import {
   type EnvelopeHeader,
   type EnvelopeRecipient,
   type JsonValue,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import {
   CLOCK_SKEW_SECONDS,
   MAX_ENVELOPE_BYTES,
@@ -58,7 +58,7 @@ import {
   payloadSchema,
   type Payload,
   type PayloadType,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 import { agentNostrKey } from './card.js';
 import {
   HELD_RELEASE_SECONDS,

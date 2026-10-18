@@ -1,9 +1,9 @@
 // M1-5b acceptance: publish to a relay list, "sent" only with at least 2 OK, NIP-11 size skip, NIP-42,
 // routing, the connect-time SSRF check and the pool bounds (07 §4.2, §4.3). Mock relays only: no
 // network. Fake timers drive the 10 s, 5 min and OK timeouts.
-import { createLogger, type Level } from '@agentlink/log';
-import { encodeHex, encodeUtf8, randomBytes, type EnvelopeKeys } from '@agentlink/crypto';
-import { MemoryKeyStore } from '@agentlink/crypto/testing';
+import { createLogger, type Level } from '@4thtech-io/log';
+import { encodeHex, encodeUtf8, randomBytes, type EnvelopeKeys } from '@4thtech-io/crypto';
+import { MemoryKeyStore } from '@4thtech-io/crypto/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TransportError } from './errors.js';
 import {

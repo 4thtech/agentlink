@@ -9,7 +9,7 @@ flowchart LR
   subgraph UserSide["User side (keys live here)"]
     H[Harness<br/>Claude / Codex / Gemini / Antigravity]
     MCP[AgentLink MCP server<br/>local stdio or self-hosted HTTP]
-    CORE[@agentlink/core<br/>crypto · envelopes · policies · store]
+    CORE[@4thtech-io/core<br/>crypto · envelopes · policies · store]
     KC[(Keychain / Worker secrets)]
     LS[(Local store<br/>SQLite / Durable Object)]
     UI[Local approval UI / Desktop app / Owner console PWA]
@@ -47,11 +47,11 @@ flowchart LR
 
 | Component | Package / repo | Runs where | Responsibility |
 |---|---|---|---|
-| **Core** | `@agentlink/core` | Node, browser, Workers | Identity, key management interfaces, envelope build/open, policies, local store interface, orchestration |
-| **Crypto** | `@agentlink/crypto` | All | HPKE wrapping, AES-GCM, hashing, EIP-712 signing helpers, key derivation. Pure, audited libraries only |
-| **Transport (Nostr)** | `@agentlink/transport-nostr` | All | Publish/subscribe NIP-59 gift-wrapped events; relay pool; dedup; inbox sync |
-| **Storage** | `@agentlink/storage` | All | `put/get/delete` of ciphertext blobs; inline adapter; **drop** adapter (default, D-48); S3 adapter (presigned URLs); Google Drive, Dropbox and OneDrive connectors (M2, D-49); IPFS adapter later; storage selection (07 §5.6) |
-| **Chain** | `@agentlink/chain` | All | viem clients per chain; OCC v2 contract bindings; fee quotes; credits; submitter client; proof verification |
+| **Core** | `@4thtech-io/core` | Node, browser, Workers | Identity, key management interfaces, envelope build/open, policies, local store interface, orchestration |
+| **Crypto** | `@4thtech-io/crypto` | All | HPKE wrapping, AES-GCM, hashing, EIP-712 signing helpers, key derivation. Pure, audited libraries only |
+| **Transport (Nostr)** | `@4thtech-io/transport-nostr` | All | Publish/subscribe NIP-59 gift-wrapped events; relay pool; dedup; inbox sync |
+| **Storage** | `@4thtech-io/storage` | All | `put/get/delete` of ciphertext blobs; inline adapter; **drop** adapter (default, D-48); S3 adapter (presigned URLs); Google Drive, Dropbox and OneDrive connectors (M2, D-49); IPFS adapter later; storage selection (07 §5.6) |
+| **Chain** | `@4thtech-io/chain` | All | viem clients per chain; OCC v2 contract bindings; fee quotes; credits; submitter client; proof verification |
 | **MCP server** | `@4thtech-io/agentlink` (bin) | Local (stdio) or Worker (HTTP) | Tool definitions, schemas, approval flow, inbound-content sanitization |
 | **CLI** | same package, `agentlink` bin | Local | init, pair, policies, optional own-storage setup, backup/restore, verify |
 | **Local approval UI** | same package | `127.0.0.1` | Approvals, settings, optional own-storage setup, top-up link |
@@ -80,10 +80,10 @@ AgentLink goes in **two directions** (D-37):
 | **Self-hosted cloud** | Streamable HTTP + OAuth | Worker secrets in **user's** Cloudflare account | Durable Object (SQLite-backed) | Always-on; polls relays with DO alarms; serves remote-only harnesses |
 | **Hosted remote (P2, M4)** | Streamable HTTP + OAuth | None server-side; signing via owner's browser passkey | Ciphertext only | Approval mode; every action proposed, owner signs in console |
 
-The MCP **tool surface is identical** across packagings (see 06). Differences live behind the `KeyStore`, `Store` and `ApprovalChannel` interfaces. `Store` and `ApprovalChannel` are in core. The key interfaces are types in `@agentlink/crypto`, so `transport-nostr` and core share them without a dependency cycle (04 §3.1.1, G-2; D-62, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34).
+The MCP **tool surface is identical** across packagings (see 06). Differences live behind the `KeyStore`, `Store` and `ApprovalChannel` interfaces. `Store` and `ApprovalChannel` are in core. The key interfaces are types in `@4thtech-io/crypto`, so `transport-nostr` and core share them without a dependency cycle (04 §3.1.1, G-2; D-62, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34).
 
 ```ts
-// @agentlink/crypto (types only). No method returns a private key or a seed (04 §3.1.1).
+// @4thtech-io/crypto (types only). No method returns a private key or a seed (04 §3.1.1).
 interface EnvelopeKeys {    // implemented by KeyStore (agent) and OwnerSession (owner)
   signEnvelopeHash(envelopeHash: Uint8Array): Promise<Hex>;  // BIP-340 under "agentlink/envelope/v1"
   signNostr(event): Promise<SignedEvent>;                     // OwnerSession: kinds 13 and 22242 only
@@ -105,7 +105,7 @@ interface OwnerSession extends EnvelopeKeys {  // one owner flow's signatures, t
   sign712(typedData): Promise<Hex>;
   close(): Promise<void>;
 }
-// @agentlink/core
+// @4thtech-io/core
 interface Store { /* contacts, threads, envelopes, records, approvals, policies */ }
 // Delivery only (I-4): `status` hands back the owner's signed object as unverified text; the core
 // verifies it. `request` returns the approval ID and, where the channel has one, the page URL.
@@ -114,7 +114,7 @@ interface ApprovalChannel { request(a: ApprovalRequest): Promise<{ approvalId; u
 
 **Channels per packaging (D-73 (3); proposed details, owner confirms at merge).** Local M1a: `LocalApprovalChannel` (`apps/cli`, M1-9k) returns no URL and reports only `pending` or `unknown`, because the owner's own CLI process applies the signed decision through core on the shared store (§4.5, 06 §2.5). Local M1b: the local approval server returns the `127.0.0.1` page URL. Desktop app: the native approval window. Console: the signed object arrives in an `approval` envelope, `status` returns it as `signed` and the core verifies it (`collect`).
 
-**Tool handlers (G-15, D-73 (1)).** The MCP tool handlers are one runtime-agnostic module in `apps/cli/src/tools/` (no Node built-in, Node global or `@agentlink/node` import, and no relative import outside the module; 06 §1), which the stdio server uses in M1 and which moves into a shared package for the cloud agent at M2-3b (06 §1).
+**Tool handlers (G-15, D-73 (1)).** The MCP tool handlers are one runtime-agnostic module in `apps/cli/src/tools/` (no Node built-in, Node global or `@4thtech-io/node` import, and no relative import outside the module; 06 §1), which the stdio server uses in M1 and which moves into a shared package for the cloud agent at M2-3b (06 §1).
 
 ---
 
@@ -219,11 +219,11 @@ Console: approval request is sent as an encrypted envelope to the owner key; the
 | Nostr | `nostr-tools` | Reference implementation of NIP-44/59/17 |
 | MCP | Official TypeScript MCP SDK; Cloudflare Agents SDK (`McpAgent`) + workers-oauth-provider for Worker | First-party support for stdio and streamable HTTP |
 | Local store | SQLite (`better-sqlite3`) | Simple, durable |
-| Keychain | `@napi-rs/keyring` (or equivalent) | Cross-platform OS keychain. Headless machines without one: opt-in file KeyStore on `@agentlink/crypto` (04 §2.8, D-54) |
+| Keychain | `@napi-rs/keyring` (or equivalent) | Cross-platform OS keychain. Headless machines without one: opt-in file KeyStore on `@4thtech-io/crypto` (04 §2.8, D-54) |
 | Contracts | Solidity 0.8.x (exact pin in the contracts repo), **Foundry**, OpenZeppelin v5 | Fast tests, fuzzing, invariants |
 | Deterministic deploys | CreateX (CREATE3) | Same addresses on every chain despite per-chain initializer arguments |
 | Web apps | Vite + React, static output; shared `packages/ui` built from the Claude Design system | Static hosting, no server state; one component library for local UI and console |
-| Desktop app (M2) | `DECISION NEEDED (architecture task, security review)`: e.g. Tauri with a Node sidecar vs Electron | Reuse `@agentlink/core` in Node; OS keystore with biometrics; signed auto-update; shares `packages/ui` with the console (08 §8) |
+| Desktop app (M2) | `DECISION NEEDED (architecture task, security review)`: e.g. Tauri with a Node sidecar vs Electron | Reuse `@4thtech-io/core` in Node; OS keystore with biometrics; signed auto-update; shares `packages/ui` with the console (08 §8) |
 | Hosting | Cloudflare Workers (static assets, Durable Objects, R2) | One platform for console, submitter, encrypted drop, template |
 | Testing | Vitest, Playwright, Foundry fuzz/invariant tests | |
 

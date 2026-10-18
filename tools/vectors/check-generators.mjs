@@ -46,7 +46,7 @@ for (const path of files) {
   if (problem !== null) problems.push(problem);
 }
 
-// M1-21 (D-74): the pinned UCD 15.0.0 category table of @agentlink/types is generated, not edited.
+// M1-21 (D-74): the pinned UCD 15.0.0 category table of @4thtech-io/types is generated, not edited.
 // Its generator reads only the vendored tools/unicode/ucd-15.0.0/DerivedGeneralCategory.txt
 // (M1-21-b); `pnpm lint` runs the full drift check (tools/unicode/check-ucd15.mjs), this repeats it.
 {

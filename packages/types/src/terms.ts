@@ -8,7 +8,7 @@
 //   re-cases or re-orders. A value that parses is returned unchanged, so what the owner sees is
 //   exactly what `termsHash` covers.
 // - Characters follow the pinned UCD 15.0.0 table (unicode.ts), never the runtime's categories.
-// - No hashing here: `termsHash = sha256(JCS(terms))` is `termsHash` in @agentlink/crypto (04 §8.1).
+// - No hashing here: `termsHash = sha256(JCS(terms))` is `termsHash` in @4thtech-io/crypto (04 §8.1).
 // - The chain reducer is pure: the core (M1-32) replays its own store through it, keyed by
 //   `negotiationKey`, and persists the result. It never trusts the counterparty's pointer.
 import { z } from 'zod';
@@ -400,7 +400,7 @@ export interface TermsEnvelope {
   /** The payload `replyTo`: the answered offer, or on a resend the other side's conflicting envelope. */
   readonly replyTo: string | null;
   readonly terms: Terms;
-  /** The body's `termsHash`, already recomputed and checked by the core with @agentlink/crypto. */
+  /** The body's `termsHash`, already recomputed and checked by the core with @4thtech-io/crypto. */
   readonly termsHash: string;
 }
 

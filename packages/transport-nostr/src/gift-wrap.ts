@@ -4,14 +4,14 @@
 // Send: rumor (unsigned kind 14, tag ["agentlink","1"], content = JCS(envelope)) -> per recipient, a
 // seal (kind 13, NIP-44 v2 of the rumor to the recipient, signed through EnvelopeKeys.signNostr) ->
 // a gift wrap (kind 1059, NIP-44 v2 of the seal under an ephemeral key created inside
-// @agentlink/crypto). Seal and gift-wrap created_at are back-dated by up to 2 days (NIP-59).
+// @4thtech-io/crypto). Seal and gift-wrap created_at are back-dated by up to 2 days (NIP-59).
 //
 // Receive (fail closed): the gift wrap and seal signatures verify, the rumor key equals the seal key,
 // the agentlink tag is present, the rumor content is at most 24 576 bytes before it is parsed, the
 // envelope passes the strict parser, and the seal key equals envelope.from as bytes. The envelope
 // signature (step 4) and everything after it are core (M1-7b).
 //
-// All secret-key work goes through EnvelopeKeys and @agentlink/crypto (04 §8.1, I-1); this module
+// All secret-key work goes through EnvelopeKeys and @4thtech-io/crypto (04 §8.1, I-1); this module
 // never sees a secret key. Inbound events are untrusted (I-5): every field is read once into a
 // plain copy, and errors never echo the input (I-7).
 import {
@@ -34,7 +34,7 @@ import {
   type EnvelopeKeys,
   type EpochOptions,
   type NostrEvent,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { TransportError, type TransportErrorCode } from './errors.js';
 
 /** NIP-17 private direct message: the rumor kind (04 §3.5). */

@@ -1,5 +1,5 @@
 // Test-only helpers: a fake S3 endpoint behind an injected fetch. No real network is used.
-import { encodeBase64url, randomBytes } from '@agentlink/crypto';
+import { encodeBase64url, randomBytes } from '@4thtech-io/crypto';
 
 export interface RecordedRequest {
   readonly method: string;

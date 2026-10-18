@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { computeActionDigest, nostrTransport } from '@agentlink/core';
+import { computeActionDigest, nostrTransport } from '@4thtech-io/core';
 import {
   encodeBase64url,
   encodeHex,
@@ -24,10 +24,10 @@ import {
   randomBytes,
   type JsonObject,
   type OwnerPresence,
-} from '@agentlink/crypto';
-import { MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createLogger, type Logger } from '@agentlink/log';
-import { createOsKeychainAgent, LOCAL_APPROVAL_LIFETIME_S } from '@agentlink/node';
+} from '@4thtech-io/crypto';
+import { MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createLogger, type Logger } from '@4thtech-io/log';
+import { createOsKeychainAgent, LOCAL_APPROVAL_LIFETIME_S } from '@4thtech-io/node';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { approveHandler } from '../../apps/cli/dist/commands/owner/approve.js';

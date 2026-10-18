@@ -21,10 +21,10 @@ import {
   type Envelope,
   type JsonValue,
   type KeyStore,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createLogger } from '@agentlink/log';
-import type { Invite } from '@agentlink/types';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createLogger } from '@4thtech-io/log';
+import type { Invite } from '@4thtech-io/types';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { SignedCard } from './card.js';
 import { AgentLinkClient } from './client.js';

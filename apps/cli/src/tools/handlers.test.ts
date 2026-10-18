@@ -8,11 +8,11 @@ import {
   type ApprovalState,
   type ContactView,
   type OpenOffer,
-} from '@agentlink/core';
-import { createLogger, type Logger } from '@agentlink/log';
+} from '@4thtech-io/core';
+import { createLogger, type Logger } from '@4thtech-io/log';
 import { Ajv } from 'ajv';
 import { findTool } from './registry.js';
-import type { ContactDisplayName, OwnerAlias, RestrictedName } from '@agentlink/types';
+import type { ContactDisplayName, OwnerAlias, RestrictedName } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { resolveContact } from './contacts.js';
 import { coreToolClient, type Counts, type ToolClient, type ToolContext } from './context.js';
