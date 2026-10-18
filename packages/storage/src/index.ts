@@ -45,3 +45,25 @@ export {
   type S3Lifecycle,
   type S3LifecycleConfig,
 } from './lifecycle.js';
+// M1-6b part 2: STREAM (ALF1) encryption into an upload, and the streaming download with decryption,
+// a byte cap and a provisional output that is committed only once the whole file verified.
+export {
+  alf1CiphertextSize,
+  putEncrypted,
+  type EncryptedObject,
+  type EncryptedPutOptions,
+  type EncryptedPutTarget,
+} from './stream-upload.js';
+export {
+  decryptDownload,
+  type CiphertextSource,
+  type DecryptDownloadOptions,
+  type DecryptedFile,
+} from './stream-download.js';
+export {
+  createTempFileSink,
+  removeStaleTempFiles,
+  type ProvisionalSink,
+  type TempFileHandle,
+  type TempFileOps,
+} from './stream-sink.js';
