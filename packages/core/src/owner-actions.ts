@@ -122,6 +122,19 @@ const refused = (
   nonceBurnt: extra.nonceBurnt ?? false,
 });
 
+/** A shown name folded for comparison (as tool `Contact` resolution compares, 06 §2). */
+const foldName = (name: string): string => name.normalize('NFKC').toLowerCase();
+
+/** The other active contacts' name columns, as one comparable string (M1-9za alias uniqueness). */
+const activeOthers = (tx: StoreTx, contactId: string): string =>
+  JSON.stringify(
+    tx
+      .select('contacts', { status: 'active' })
+      .filter((r) => r.contact_id !== contactId)
+      .map((r) => [r.contact_id, r.name, r.name_source, r.updated_at])
+      .sort((a, b) => (String(a[0]) < String(b[0]) ? -1 : 1)),
+  );
+
 const fromVerdict = (v: Extract<OwnerActionVerdict, { ok: false }>): Refused =>
   refused(v.op, v.reason, v.items === undefined ? {} : { items: v.items });
 
@@ -270,7 +283,10 @@ export class OwnerActions {
   /**
    * `contact.rename` and `contact.remove` (M1-9za; 04 §2.5.1; 06 §2.1 rule 1; 07 §3; 02 F-14). The
    * object checks and the nonce first. Then the op's rule: the alias must already be its own
-   * restricted form (`isRestrictedAlias`), and the contact must be stored and not removed (a revoked
+   * restricted form (`isRestrictedAlias`) and must not be the shown name of another active contact
+   * (compared after NFKC and case folding, so a rename never makes a name ambiguous; the other
+   * contacts' rows are compared again inside the transaction), and the contact must be stored and
+   * not removed (a revoked
    * contact is never removed: removing never changes `revoked`, 07 §3). In one store transaction the
    * nonce is checked again and recorded (the audit row: op, action hash, applied time) and the
    * contact row is written: the sealed alias with `name_source` `owner`, or status `removed`, which
@@ -293,8 +309,17 @@ export class OwnerActions {
     const op = body.op;
     const contactId = body.params.contact;
     let sealedAlias: Sealed | undefined;
+    let othersSnapshot = '';
     if (body.op === 'contact.rename') {
       if (!isRestrictedAlias(body.params.alias)) return this.#report(refused(op, 'alias_invalid'));
+      const wanted = foldName(body.params.alias);
+      const others = (await this.#contacts.list()).filter(
+        (c) => c.id !== contactId && c.status === 'active',
+      );
+      if (others.some((c) => foldName(c.display.name) === wanted)) {
+        return this.#report(refused(op, 'alias_taken'));
+      }
+      othersSnapshot = await this.#ctx.store.transaction((tx) => activeOthers(tx, contactId));
       sealedAlias = await seal(this.#ctx, 'contacts', 'name', [contactId], body.params.alias);
     }
     const now = base.now;
@@ -305,6 +330,8 @@ export class OwnerActions {
       const row = tx.get('contacts', { contact_id: contactId });
       if (row === undefined || row.status === 'removed') return refused(op, 'contact_unknown');
       if (sealedAlias !== undefined) {
+        // The uniqueness check above read these rows; any change since refuses the object.
+        if (activeOthers(tx, contactId) !== othersSnapshot) return refused(op, 'store_changed');
         tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
         tx.update(
           'contacts',

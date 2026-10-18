@@ -140,6 +140,31 @@ describe('contact.rename (M1-9za; 04 §2.5.1; 06 §2.1 rule 1)', () => {
     });
   }
 
+  it('refuses an alias another active contact already shows (case and NFKC folded), writing nothing', async () => {
+    const { a, b, c } = await twoSameNamed();
+    for (const alias of ['OC-TEST', 'oc-test']) {
+      const outcome = await a.client.ownerActions.apply(
+        await signed(a, 'contact.rename', { contact: b.id, alias }),
+      );
+      expect(outcome).toMatchObject({ status: 'refused', reason: 'alias_taken' });
+    }
+    // Another contact's owner alias counts too.
+    await a.client.ownerActions.apply(
+      await signed(a, 'contact.rename', { contact: c.id, alias: 'Build box' }),
+    );
+    const clash = await a.client.ownerActions.apply(
+      await signed(a, 'contact.rename', { contact: b.id, alias: 'build box' }),
+    );
+    expect(clash).toMatchObject({ status: 'refused', reason: 'alias_taken' });
+    expect((await a.client.contacts.get(b.id)).display.nameSource).toBe('counterparty');
+    expect((await nonceRows(a)).map((r) => r.op)).toEqual(['contact.rename']);
+    // Renaming a contact to the name only it shows is fine.
+    const own = await a.client.ownerActions.apply(
+      await signed(a, 'contact.rename', { contact: c.id, alias: 'build box' }),
+    );
+    expect(own.status).toBe('applied');
+  });
+
   it('refuses an unknown or removed contact', async () => {
     const { a, b } = await twoSameNamed();
     const unknown = await a.client.ownerActions.apply(
@@ -187,6 +212,19 @@ describe('contact.remove (M1-9za; 04 §2.5.1; 07 §3; 02 F-14)', () => {
     ]);
     expect(await a.client.inbox.counts()).toEqual({ inbox: [], requests: 0 });
     expect(await a.store.transaction((tx) => tx.count('held_envelopes'))).toBe(0);
+  });
+
+  it('refuses a revoked contact: removing never changes `revoked` (07 §3)', async () => {
+    const { a, b } = await twoSameNamed();
+    await a.store.transaction((tx) =>
+      tx.update('contacts', { contact_id: b.id }, { status: 'revoked' }),
+    );
+    const outcome = await a.client.ownerActions.apply(
+      await signed(a, 'contact.remove', { contact: b.id }),
+    );
+    expect(outcome).toMatchObject({ status: 'refused', reason: 'contact_revoked' });
+    expect((await contactRow(a, b.id))?.status).toBe('revoked');
+    expect(await nonceRows(a)).toEqual([]);
   });
 
   it('refuses an already removed or unknown contact', async () => {

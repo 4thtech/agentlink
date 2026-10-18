@@ -59,6 +59,7 @@ export type OwnerActionRefusal =
   | 'contact_unknown'
   | 'contact_revoked'
   | 'alias_invalid'
+  | 'alias_taken'
   | 'pairing_unavailable'
   | 'unsupported_op'
   // store side (owner-actions.ts)
