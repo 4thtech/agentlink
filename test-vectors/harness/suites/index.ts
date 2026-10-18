@@ -4,6 +4,7 @@ import { bip340 } from './bip340';
 import { dropAuth } from './drop-auth';
 import { eip712 } from './eip712';
 import { eip712Proof } from './eip712-proof';
+import { eip712Revocation } from './eip712-revocation';
 import { encodings } from './encodings';
 import { fingerprint } from './fingerprint';
 import { hkdfDerive } from './hkdf-derive';
@@ -36,6 +37,7 @@ export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['drop-auth', dropAuth],
   ['eip712', eip712],
   ['eip712-proof', eip712Proof],
+  ['eip712-revocation', eip712Revocation],
   ['encodings', encodings],
   ['fingerprint', fingerprint],
   ['hkdf-derive', hkdfDerive],

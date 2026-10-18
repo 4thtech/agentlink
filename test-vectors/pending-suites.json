@@ -1,10 +1,5 @@
 {
   "description": "Suites whose vectors are committed before the code under test (M1-1h). Each runs no cases until its card adds the suite module and removes the entry. Fail closed: see test-vectors/README.md, Pending suites. The list may only shrink against main (tools/vectors/check-pending.mjs), and a release fails while a suite of a gated phase is pending. `cases` lists single cases of an implemented suite that a later card implements (M1-7d): each records a passing pending-case marker instead of a result, and the same rules apply (only shrink, card and phase from the backlog, release gate).",
-  "suites": {
-    "eip712-revocation": {
-      "card": "M1-1j",
-      "phase": "M1b"
-    }
-  },
+  "suites": {},
   "cases": {}
 }
