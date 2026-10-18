@@ -1,5 +1,18 @@
 # @agentlink/chain
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [4dcc340]
+- Updated dependencies [af00aaa]
+- Updated dependencies [b26ef46]
+- Updated dependencies [2a6716d]
+- Updated dependencies [e768cd1]
+- Updated dependencies [58df129]
+  - @agentlink/crypto@0.1.1
+  - @agentlink/types@0.1.1
+
 ## 0.1.0
 
 ### Patch Changes

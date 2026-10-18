@@ -1,5 +1,27 @@
 # @4thtech-io/agentlink
 
+## 0.1.1
+
+### Patch Changes
+
+- 088b5fd: Live relay subscriptions (M1-9s): `Transport.subscribe` and `AgentLinkClient.subscribeInbox` in the core; the MCP server's background loop receives new messages and handshakes as they reach a relay, with a 5-minute fallback catch-up, and closes the subscription on lease loss and on shutdown.
+- 8a3f76e: Local approval page (not opened by the CLI yet): review your waiting approvals together and confirm the list with one passkey or owner code entry (terms are still approved one at a time); each page link opens once; repeated wrong owner codes make you wait before the next try.
+- 3aa3ffa: crypto: passkey PRF owner seed wrap (ALKP v1) and recovery-code wrap (ALKR v1) with the generated recovery code (M1-1k, D-82)
+- 2cb36f8: cli: declare termsParties in the agentlink_inbox output schema
+- 9da67d4: tools: offers in `agentlink_inbox` carry contact names ("you", a contact's name) for the agent addresses in their terms, and identical open offers from one contact get a single hint line
+- 4c6bb4f: core: an owner approval for terms no longer fails when the clock crosses a second while it is being asked
+- 743ff84: core: policy rules for files (allowed folders, size caps, storage choice) and proofs (per-action maximum, rolling 24 h daily budget with a transactional ledger reservation, per-contact rules)
+- 3c9a59f: owner init asks for your agent's name for contacts; the owner-key rollback and card signing are tighter
+- b7f004a: Status and doctor name the missing owner card instead of suggesting init
+- 1367c0a: init: Claude Desktop (`--harness claude-desktop`); Gemini CLI detection no longer matches a bare `~/.gemini` folder
+- e768cd1: `owner add-agent` recovers an owner with no attached agent: the owner keys come from the saved owner itself after the owner code, and the owner confirms the fingerprint (M1-9x).
+- db68613: Require Node.js 22.14 or newer, with one clear message on an older Node instead of a crash; the one-shot commands no longer print structured info log lines (set `AGENTLINK_LOG=info` or `debug` to see them).
+- 1ba92cb: Add `agentlink owner change-code` to replace an exposed owner code without changing the owner
+- 58df129: M1-9za: owner commands `contacts rename` and `contacts remove`, signed as the new owner actions `contact.rename` and `contact.remove`; `contacts` lists each contact's ID.
+- 547c699: Approving an invite shows the inviter's self-declared name and owner fingerprint.
+- 83c03cd: README: install and MCP setup
+- 50e8a02: The terms tools pass `clientRequestId` for idempotency, like `agentlink_send`.
+
 ## 0.1.0
 
 ### Minor Changes

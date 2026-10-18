@@ -1,5 +1,11 @@
 # @agentlink/types
 
+## 0.1.1
+
+### Patch Changes
+
+- 58df129: M1-9za: owner commands `contacts rename` and `contacts remove`, signed as the new owner actions `contact.rename` and `contact.remove`; `contacts` lists each contact's ID.
+
 ## 0.1.0
 
 ### Minor Changes
