@@ -1,6 +1,6 @@
 # Set up AgentLink in your AI tool
 
-> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** Claude Desktop is merged but ships in the next release; v0.1.0 does not have it (see below).
+> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha); current version v0.1.1.** Claude Desktop is available since v0.1.1 (see below).
 
 **Purpose:** a start-to-finish walkthrough for a first-time user: install AgentLink into your AI tool, protect your approvals, check it works, and pair two of your own tools.
 
@@ -23,7 +23,7 @@ Pick a **name** for the agent (for example `claude`, `codex`, `gemini`). It is j
 | Gemini CLI | `npx -y @4thtech-io/agentlink init --agent <name> --harness gemini-cli` |
 | OpenCode | `npx -y @4thtech-io/agentlink init --agent <name> --harness opencode` |
 | Antigravity | `npx -y @4thtech-io/agentlink init --agent <name> --harness antigravity` |
-| Claude Desktop (not in v0.1.0) | `npx -y @4thtech-io/agentlink init --agent <name> --harness claude-desktop` |
+| Claude Desktop (since v0.1.1) | `npx -y @4thtech-io/agentlink init --agent <name> --harness claude-desktop` |
 
 `init` shows the exact change to your tool's settings and asks `y/N`. Read it, and say `y` only if it adds a single entry named `agentlink`. Your old settings file is backed up first. Check that the package name is exactly `@4thtech-io/agentlink`.
 
@@ -31,7 +31,7 @@ You can also paste this into your AI tool and let it run the command: "Install A
 
 ### Claude Desktop is not Claude Code
 
-**Claude Desktop** is the Claude desktop app's chat (the one where you add Connectors). It is a different program from Claude Code, with its own settings file, so it needs its own agent. Support for it is merged but is **not in v0.1.0**, the version on npm today. Running the `claude-desktop` line above with v0.1.0 will not work. Until the next release, use one of the other tools. Available on macOS and Windows only. A one-click extension is planned for v0.2.0.
+**Claude Desktop** is the Claude desktop app's chat (the one where you add Connectors). It is a different program from Claude Code, with its own settings file, so it needs its own agent. Support for it arrived in **v0.1.1**; with the older v0.1.0 the `claude-desktop` line above does not work, so make sure `npx` fetches the current version. Available on macOS and Windows only. A one-click extension is planned for v0.2.0.
 
 ## 3. Protect your approvals (owner step)
 
