@@ -31,6 +31,7 @@ import {
   type S3AdapterConfig,
   type StoredObject,
 } from './index.js';
+import { MiB, RETAINED_LIMIT, forceGc, rss, sampler } from './memory-gate.fixture.js';
 
 // The package has no Node type definitions (it runs in Workers too); only this test reads the environment.
 const env: Record<string, string | undefined> =
@@ -70,7 +71,6 @@ function target(): Target {
 const hexOf = (bytes: Uint8Array): string => encodeHex(sha256(bytes));
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 const inFuture = (ms: number): Date => new Date(Date.now() + ms);
-const MiB = 1024 * 1024;
 const toBase64 = (bytes: Uint8Array): string => {
   const url = encodeBase64url(bytes).replace(/-/g, '+').replace(/_/g, '/');
   return url + '='.repeat((4 - (url.length % 4)) % 4);
@@ -94,72 +94,6 @@ function randomStream(total: number, failAfter?: number): ReadableStream<Uint8Ar
       sent += n;
     },
   });
-}
-
-interface NodeProcess {
-  memoryUsage: {
-    (): { readonly heapUsed: number; readonly arrayBuffers: number };
-    rss(): number;
-  };
-}
-const nodeProcess = (globalThis as { process?: NodeProcess }).process;
-const rss = (): number => nodeProcess?.memoryUsage.rss() ?? 0;
-/** JS heap in use plus ArrayBuffer memory: the buffers the process actually holds (M1-1d gate). */
-const held = (): number => {
-  const m = nodeProcess?.memoryUsage();
-  return m === undefined ? 0 : m.heapUsed + m.arrayBuffers;
-};
-
-/** `gc()` when the process runs with --expose-gc (NODE_OPTIONS=--expose-gc), else undefined. */
-const forceGc = (globalThis as { gc?: () => void }).gc;
-
-/** Yields one macrotask, so work the collector left for later (freeing ArrayBuffer memory) can finish. */
-const nextTask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
-/** Forced collections per settled reading: retained memory is the smallest of these readings. */
-const SETTLE_ROUNDS = 3;
-
-/**
- * Held memory after the collector has settled: `gc()`, then SETTLE_ROUNDS times a yield, `gc()` and a
- * reading, keeping the smallest (IR flake 2026-10-18). A reading right after a single `gc()` still
- * counts ArrayBuffer memory that collection found dead but has not released yet (V8 frees it after the
- * pause); on CI that left 1-48 MiB of garbage in the figure (retained download 27-70 MiB across runs).
- * Settling removes only garbage: whatever the pipeline still references stays in every reading.
- */
-async function settledHeld(gc: () => void): Promise<number> {
-  gc();
-  let least = Number.POSITIVE_INFINITY;
-  for (let round = 0; round < SETTLE_ROUNDS; round += 1) {
-    await nextTask();
-    gc();
-    least = Math.min(least, held());
-  }
-  return least;
-}
-
-/**
- * Peak memory, sampled as bytes flow: RSS and held (heapUsed + arrayBuffers) every 32 calls, and,
- * when `gc()` is exposed, held after a settled forced collection every 256 calls (`peakRetained`,
- * see settledHeld), which measures what the pipeline keeps alive rather than garbage the collector
- * has not reached or released yet. The stream waits for each sample, so the pipeline's buffers stay
- * referenced while it is taken.
- */
-function sampler() {
-  let peakRss = rss();
-  let peakHeld = held();
-  let peakRetained = 0;
-  let calls = 0;
-  return {
-    async sample(force = false): Promise<void> {
-      calls += 1;
-      if (!force && (calls & 31) !== 0) return;
-      peakRss = Math.max(peakRss, rss());
-      peakHeld = Math.max(peakHeld, held());
-      if (forceGc !== undefined && (force || (calls & 255) === 0)) {
-        peakRetained = Math.max(peakRetained, await settledHeld(forceGc));
-      }
-    },
-    peaks: () => ({ peakRss, peakHeld, peakRetained }),
-  };
 }
 
 /** `total` bytes of varied plaintext in 64 KiB blocks, hashed as they are produced. */
@@ -438,7 +372,8 @@ describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}
   //   locally against -8 MiB on CI (IR-M1-6b-2-2), while retained-after-GC held at 48-55 MiB;
   // - held memory (heapUsed + arrayBuffers, the whole test process) after a settled forced collection
   //   < 64 MiB (the M1-1d limit): what the pipeline keeps alive. Settled means repeated gc() with a
-  //   yield in between, smallest reading kept (settledHeld): a reading right after one gc() still
+  //   yield in between, then the reading (settledHeld in memory-gate.fixture.ts, whose
+  //   negative control is memory-gate.test.ts): a reading right after one gc() still
   //   held released-but-unfreed ArrayBuffers and flaked at 73 MiB on CI. vitest.config.ts runs this
   //   file with --expose-gc; without gc() the test fails rather than skip the check. Unforced held
   //   memory is reported only: it mostly measures garbage the collector has not reached yet (flaked
@@ -453,7 +388,6 @@ describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}
       task,
     }) => {
       const RSS_GROWTH_LIMIT = 128 * MiB;
-      const RETAINED_LIMIT = 64 * MiB;
       const mib = (n: number): number => Math.round(n / MiB);
       expect(forceGc, 'run with --expose-gc (vitest.config.ts integration project)').toBeTypeOf(
         'function',
