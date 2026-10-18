@@ -203,6 +203,28 @@ describe('send and fetch between two agents (06 §2.3, 04 §4)', () => {
     },
   );
 
+  it('needs_setup is not replayed: once the folder exists, the same clientRequestId sends (07 §3.3)', async () => {
+    const platform = a.platform as { allowedFolderRealpaths: unknown };
+    const resolve = a.platform.allowedFolderRealpaths;
+    // The allowed folder does not exist yet: the platform resolves none.
+    platform.allowedFolderRealpaths = () => Promise.resolve([]);
+    const input = {
+      to: b.id,
+      text: 'the file',
+      clientRequestId: 'req-needs-setup-1',
+      files: [outgoing('report.pdf', fileBytes(500))],
+    };
+    expect(await a.client.sendMessage(input)).toEqual({
+      status: 'needs_setup',
+      reason: 'outside_folder',
+    });
+    expect(await a.store.transaction((tx) => tx.select('idempotency'))).toHaveLength(0);
+    platform.allowedFolderRealpaths = resolve;
+    const retried = await a.client.sendMessage(input);
+    expect(retried).toMatchObject({ status: 'ok', files: [{ index: 0, delivery: 'inline' }] });
+    expect(a.spy.published.length).toBeGreaterThan(0);
+  });
+
   it('not_found for an unknown envelope or file index', async () => {
     const envelopeId = await sendOne(fileBytes(100));
     expect(await b.client.fetchFile({ envelopeId, fileIndex: 1 })).toEqual({ status: 'not_found' });

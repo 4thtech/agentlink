@@ -108,5 +108,6 @@ export function withNameSuffix(name: string, n: number): string {
   const stem = hasExt ? name.slice(0, dot) : name;
   const tail = ` (${String(n)})${hasExt ? name.slice(dot) : ''}`;
   const room = MAX_FILE_NAME_BYTES - utf8Length(tail);
-  return `${truncateUtf8(stem, room).replace(/\s+$/u, '')}${tail}`;
+  // trimEnd, not a regex: linear on any input (CodeQL js/polynomial-redos).
+  return `${truncateUtf8(stem, room).trimEnd()}${tail}`;
 }

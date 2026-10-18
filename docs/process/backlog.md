@@ -2292,7 +2292,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Threat note:** assets: the use-once approval and the agent's view of it. Abuse cases: (a) an edited row reading as approved and steering the agent; (b) the read leaking the owner signature or sealed action text into a tool result; (c) the read claiming or applying the approval. Stopped by: re-verification of the stored signed objects against the recomputed digest before the cache is read, fail-closed `unknown`; a minimal typed result; no write path. Residual: a same-user process can delete a row or void it (G-1); both only take authority away.
 
 #### M1-7f · core: files (send, fetch, refresh link, crypto-shredding)
-- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#278: send and fetch; the rest moved to M1-7f-2) · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7b, M1-6b, M1-6c, M1-1g-e, M1-15; gaps G-27 (D-85) and G-44 resolved
 - **Spec:** 04 §4; 03 §4.2; 06 §2.3; 07 §5.6; 02 F-30–F-34; D-18, D-48
@@ -2310,6 +2310,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-8d-1 / IR-M1-15-1, 2026-10-17): two `isInsideFolder` helpers have different semantics (policy engine: a folder is not inside itself; path guard: it is). Unify them into one shared helper when wiring files here. Locations: `packages/core/src/path-guard.ts` (`isInsideFolder(path, folder, flavor)`, a folder is inside itself) and `packages/core/src/policy-engine.ts` (`isInsideFolder(realpath, folder)`, a folder is not inside itself). Acceptance: one exported helper, the self-inclusion rule explicit in its name or option, both call sites and `path-guard.test.ts` / `policy-files-proofs.test.ts` cover it. Source: review low, 2026-10-18.
 - Review note (IR-M1-7i-1 L3, 2026-10-17): derive `ruleEligible` and `counterparty` from the contact book and test it.
 - Review note (IR-M1-6c-1, 2026-10-18): a drop object's `locator` is its signed GET URL, a bearer secret like any presigned URL (I-7). Store it encrypted at rest with the file key; send it only inside end-to-end-encrypted payloads or owner copies, never to any 4thTech service other than the drop itself; never log it. Also (IR-M1-6c-1 L2): `planInline` returns an all-stored plan even when that plan cannot fit; check the all-stored payload size before any upload so a send that can never fit is refused before anything reaches storage.
+
+#### M1-7f-2 · core: files refresh-link, retention and crypto-shredding (IR-M1-7f-1 L2)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core
+- **Depends on:** M1-7f (#278)
+- **Spec:** 04 §4 (delivery, retention and crypto-shredding, encrypted drop); 07 §3 (`files`), §3.3, §5.4; 06 §2.3; D-18, D-48, D-53
+- **Invariants:** I-2, I-5, I-7, I-9
+- **Scope (the parts of M1-7f left after #278):**
+  - `refresh-link` request (`request` envelope, `body.kind = "refresh-link"`) and the sender's answer from its sealed `files` row; expired links on the recipient side lead into it.
+  - Retention per `files.deleteAfter` (`expiry` | `receipt`): delete the object (the drop with a DELETE signed by the drop key, D-48, G-44) and discard the file key on both sides; the receiver's key lives today only in its sealed payload, so retention needs a receiver-side record or a payload redaction.
+  - The card's 5 MB round trip via MinIO (own S3 storage), next to the drop round trip of #278.
+  - D-53 re-hash binding (resolved realpath and `plaintextSha256` in the action digest, re-hashed when the approved action runs) once file sends can need approval; today `evaluateFileSend` never returns `approval`.
+- **Acceptance:** M1-7f's remaining lines: expired link → refresh-link returns a working URL; after the retention trigger the object returns 404 and file-key rows are gone on both sides; with `deleteAfter: expiry` a drop object stays retrievable by the owner console after `DELIVERED` (I-9); 5 MB via MinIO.
+- **Decided in IR-M1-7f-1:** `fetchFile` under a fail-closed policy stays `rejected POLICY_DENIED`; a duplicate upload after a crash between upload and the store transaction is the residual 07 §3.3 already names (the orphan expires).
 
 #### M1-7g · core: proofs and receipts
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b

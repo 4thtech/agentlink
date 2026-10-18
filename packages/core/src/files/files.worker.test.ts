@@ -5,7 +5,7 @@
 // URL from the payload. Test limits (vitest.config.ts, project `drop-worker`): 8 MiB per file.
 import { SELF } from 'cloudflare:test';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
-import { encodeHex, sha256, type JsonObject } from '@4thtech-io/crypto';
+import { decodeBase64url, encodeHex, sha256, type JsonObject } from '@4thtech-io/crypto';
 import type { FetchLike } from '@4thtech-io/storage';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { rowKeyOf } from '../store/store.js';
@@ -123,7 +123,7 @@ describe('a file through the encrypted drop, no own storage (D-48, 07 §5.6)', (
     const sent = await a.client.sendMessage({
       to: b.id,
       text: 'file',
-      files: [outgoing('note.txt', fileBytes(40_000))],
+      files: [outgoing('note.txt', fileBytes(40_000, 'DROP-CANARY-PLAINTEXT-7f'))],
     });
     if (sent.status !== 'ok') throw new Error('not sent');
     await deliver(a, b);
@@ -143,6 +143,22 @@ describe('a file through the encrypted drop, no own storage (D-48, 07 §5.6)', (
     );
     const objectId = /\/v1\/get\/([A-Za-z0-9_-]{22})/.exec(url)?.[1] as string;
     const mac = /&m=([A-Za-z0-9_-]{43})/.exec(url)?.[1] as string;
+
+    // Zero access (I-2, IR-M1-7f-1 L3): the file key, in any spelling, the name and the plaintext
+    // never reach the drop, in a URL, a header or a body.
+    const fileKey = await a.cipher.open(
+      { table: 'files', column: 'file_key', rowKey: rowKeyOf([sent.envelopeId, 0]) },
+      row?.file_key as Sealed,
+    );
+    const keyHex = encodeHex(decodeBase64url(fileKey));
+    expect(seen.length).toBeGreaterThan(0);
+    for (const r of seen) {
+      for (const part of [r.url, r.headers, r.body]) {
+        for (const canary of [fileKey, keyHex, 'note.txt', 'DROP-CANARY-PLAINTEXT-7f']) {
+          expect(part).not.toContain(canary);
+        }
+      }
+    }
 
     for (const line of [...a.lines, ...b.lines]) {
       for (const canary of [url, objectId, mac]) expect(line).not.toContain(canary);

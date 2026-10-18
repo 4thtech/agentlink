@@ -233,6 +233,13 @@ export class SendService {
           }
           throw error;
         }
+        if (done.result.status === 'needs_setup') {
+          // Nothing happened and the owner is about to fix the cause (an allowed folder, own
+          // storage): the row is deleted, never replayed, so the same clientRequestId runs again
+          // (07 §3.3).
+          await idempotency.finish(start.run, null, { keep: false }).catch(() => false);
+          return done.result;
+        }
         await idempotency.finish(start.run, done.result);
         await this.#publish(done);
         return done.result;

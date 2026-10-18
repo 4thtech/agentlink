@@ -31,7 +31,9 @@ The core sends and fetches files end to end (M1-7f); the file tools that expose 
 - **Fetching** checks the size cap first, refuses an expired link, checks the URL against the download rules, and for an inline file checks the ciphertext hash before decrypting. The file is decrypted into a hidden quarantine file in the inbox folder and gets its name only after the last chunk and both hashes verified; a tampered, truncated or over-long download leaves nothing behind.
 - **Names** from the sender are sanitised (no folders, no control or direction characters, no hidden or reserved names) and never overwrite an existing entry, including a planted link: a ` (1)`, ` (2)`, … suffix is added within the 255-byte limit.
 
-Not yet built: the refresh-link request and answer, and retention (deleting the object and both sides' file keys at expiry or on receipt).
+A send retried after a crash between the upload and the stored message uploads the file again; the first copy is never referenced and expires with the drop or the storage lifecycle rule (the residual of 07 §3.3).
+
+Not yet built (M1-7f-2): the refresh-link request and answer, and retention (deleting the object and both sides' file keys at expiry or on receipt).
 
 ## The encrypted drop
 
