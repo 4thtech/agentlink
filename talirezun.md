@@ -8,7 +8,7 @@ _Updated 2026-10-18 06:30 UTC · claude-code / claude-opus-5-5 · orchestrator_
 - **Two-Mac gate run 1:** pairing + receive passed; sends hit AMBIGUOUS_CONTACT (stale duplicate test contact; product behaved correctly). Rerun with fresh agent names pending.
 
 ## In flight
-- 2026-10-18: merging owner change-code, contacts rename/remove, passkey unlock (M1-8e), encrypted drop Worker (M1-27a), STREAM/Revocation vectors, invite approval shows inviter, storage integration CI; nightly two-machine CI live.
+- 2026-10-18: MERGED owner change-code, contacts rename/remove, passkey unlock (M1-8e), encrypted drop Worker (M1-27a), STREAM/Revocation vectors, invite approval shows inviter, storage integration CI; nightly two-machine CI live. Only #195 (next 0.1.x release, owner approval) open.
 - #228 M1-1k ALKP/ALKR code (queued); #237 docs pass; e2e J8 flake fix; #218 encrypted drop and #230 STREAM/Revocation vectors await owner confirmation of spec details.
 
 ## Next
