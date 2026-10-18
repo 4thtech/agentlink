@@ -22,3 +22,25 @@ export {
   type S3CredentialsProvider,
 } from './s3.js';
 export { newObjectKey, validateS3Endpoint, validateStoragePrefix } from './endpoint.js';
+// M1-6b part 1: multipart upload with abort and cleanup, and the bucket lifecycle rule.
+export {
+  MULTIPART_DEFAULT_PART_BYTES,
+  MULTIPART_MAX_BYTES,
+  MULTIPART_MAX_PARTS,
+  MULTIPART_MAX_PART_BYTES,
+  MULTIPART_MIN_PART_BYTES,
+  createS3Multipart,
+  multipartPartSize,
+  type MultipartPutOptions,
+  type S3Multipart,
+  type S3MultipartConfig,
+} from './multipart.js';
+export {
+  LIFECYCLE_DEFAULT_DAYS,
+  LIFECYCLE_PREFIX,
+  LIFECYCLE_RULE_ID,
+  createS3Lifecycle,
+  type LifecycleRuleState,
+  type S3Lifecycle,
+  type S3LifecycleConfig,
+} from './lifecycle.js';

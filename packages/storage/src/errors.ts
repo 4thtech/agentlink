@@ -12,7 +12,8 @@ export type StorageErrorCode =
   | 'credentials_expired'
   | 'network'
   | 'upload_failed'
-  | 'delete_failed';
+  | 'delete_failed'
+  | 'lifecycle_failed';
 
 export class StorageError extends Error {
   override readonly name = 'StorageError';

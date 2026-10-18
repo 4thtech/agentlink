@@ -27,7 +27,10 @@ const ACCESS_KEY_ID = 'AKIDMULTIPARTTESTONLY';
 const SECRET = 'multipart-secret-access-key-never-logged';
 const inADay = new Date(NOW.getTime() + DAY_MS);
 
-function setup(over: Partial<S3MultipartConfig> = {}, fake: FakeMultipartS3 = fakeMultipartS3(BUCKET)) {
+function setup(
+  over: Partial<S3MultipartConfig> = {},
+  fake: FakeMultipartS3 = fakeMultipartS3(BUCKET),
+) {
   const storagePrefix = testPrefix();
   const mp = createS3Multipart({
     endpoint: ENDPOINT,
@@ -55,9 +58,9 @@ describe('multipart: part size', () => {
     expect(part % MiB).toBe(0);
     expect(Math.ceil(big / part) <= MULTIPART_MAX_PARTS).toBe(true);
     expect(part).toBeGreaterThan(8 * MiB);
-    expect(Math.ceil(MULTIPART_MAX_BYTES / multipartPartSize(MULTIPART_MAX_BYTES))).toBeLessThanOrEqual(
-      MULTIPART_MAX_PARTS,
-    );
+    expect(
+      Math.ceil(MULTIPART_MAX_BYTES / multipartPartSize(MULTIPART_MAX_BYTES)),
+    ).toBeLessThanOrEqual(MULTIPART_MAX_PARTS);
   });
 
   it('refuses a size that is not a positive integer or is above the limit', () => {
@@ -185,7 +188,9 @@ describe('multipart: abort leaves no open uploads', () => {
     const fake = fakeMultipartS3(BUCKET);
     fake.override = (req) =>
       req.method === 'POST' && req.url.searchParams.has('uploadId')
-        ? new Response('<?xml version="1.0"?><Error><Code>InternalError</Code></Error>', { status: 200 })
+        ? new Response('<?xml version="1.0"?><Error><Code>InternalError</Code></Error>', {
+            status: 200,
+          })
         : undefined;
     const { mp } = setup({}, fake);
     const data = patternBytes(6 * MiB);
@@ -237,7 +242,9 @@ describe('multipart: cleanup of open uploads', () => {
     fake.override = (req) =>
       req.method === 'PUT' ? new Response(null, { status: 503 }) : undefined;
     const noAbort = (req: Request): Promise<Response> =>
-      req.method === 'DELETE' ? Promise.resolve(new Response(null, { status: 500 })) : fake.fetch(req);
+      req.method === 'DELETE'
+        ? Promise.resolve(new Response(null, { status: 500 }))
+        : fake.fetch(req);
     for (const s of [mine, mine, other]) {
       const crashed = createS3Multipart({
         endpoint: ENDPOINT,
@@ -258,14 +265,19 @@ describe('multipart: cleanup of open uploads', () => {
     expect(await mine.mp.openUploads()).toBe(0);
     expect(await other.mp.openUploads()).toBe(1);
     expect(fake.uploads.size).toBe(1);
-    const list = fake.requests.find((r) => r.method === 'GET' && r.url.searchParams.has('uploads'))!;
+    const list = fake.requests.find(
+      (r) => r.method === 'GET' && r.url.searchParams.has('uploads'),
+    )!;
     expect(list.url.searchParams.get('prefix')).toBe(`agentlink/${mine.storagePrefix}/`);
   });
 
   it('never aborts an upload whose key is not one of its own, even if the listing returns it', async () => {
     const fake = fakeMultipartS3(BUCKET);
     const { mp, storagePrefix } = setup({}, fake);
-    fake.uploads.set('foreign-id', { key: `agentlink/${storagePrefix}/../../etc`, parts: new Map() });
+    fake.uploads.set('foreign-id', {
+      key: `agentlink/${storagePrefix}/../../etc`,
+      parts: new Map(),
+    });
     fake.uploads.set('foreign-2', { key: `agentlink/${storagePrefix}/x/y`, parts: new Map() });
     expect(await mp.abortOpenUploads()).toBe(0);
     expect(fake.uploads.size).toBe(2);
@@ -309,7 +321,9 @@ describe('multipart: log canary (I-7)', () => {
       });
       seen.push(obj.locator);
       fake.override = (req) =>
-        req.method === 'PUT' ? new Response(`denied ${req.url.toString()}`, { status: 403 }) : undefined;
+        req.method === 'PUT'
+          ? new Response(`denied ${req.url.toString()}`, { status: 403 })
+          : undefined;
       await mp
         .put(patternBytes(6 * MiB), { size: 6 * MiB, expiresAt: inADay, partSize: 5 * MiB })
         .catch(() => undefined);

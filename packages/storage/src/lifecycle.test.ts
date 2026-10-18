@@ -16,7 +16,10 @@ import { fakeMultipartS3, type FakeMultipartS3 } from './multipart.fixture.js';
 const ACCESS_KEY_ID = 'AKIDLIFECYCLETESTONLY';
 const SECRET = 'lifecycle-secret-access-key-never-logged';
 
-function setup(over: Partial<S3LifecycleConfig> = {}, fake: FakeMultipartS3 = fakeMultipartS3(BUCKET)) {
+function setup(
+  over: Partial<S3LifecycleConfig> = {},
+  fake: FakeMultipartS3 = fakeMultipartS3(BUCKET),
+) {
   const lc = createS3Lifecycle({
     endpoint: ENDPOINT,
     bucket: BUCKET,
@@ -122,7 +125,8 @@ describe('lifecycle: failures', () => {
 
   it('maps a failed read to lifecycle_failed, and does not PUT over a configuration it could not read', async () => {
     const fake = fakeMultipartS3(BUCKET);
-    fake.override = (req) => (req.method === 'GET' ? new Response('nope', { status: 500 }) : undefined);
+    fake.override = (req) =>
+      req.method === 'GET' ? new Response('nope', { status: 500 }) : undefined;
     const { lc } = setup({}, fake);
     expect(codeOf(await lc.read().catch((e: unknown) => e))).toBe('lifecycle_failed');
     expect(codeOf(await lc.apply().catch((e: unknown) => e))).toBe('lifecycle_failed');
@@ -132,7 +136,8 @@ describe('lifecycle: failures', () => {
   it('refuses an oversized or malformed lifecycle document', async () => {
     for (const body of ['x'.repeat(300 * 1024), '<NotLifecycle/>']) {
       const fake = fakeMultipartS3(BUCKET);
-      fake.override = (req) => (req.method === 'GET' ? new Response(body, { status: 200 }) : undefined);
+      fake.override = (req) =>
+        req.method === 'GET' ? new Response(body, { status: 200 }) : undefined;
       const { lc } = setup({}, fake);
       expect(codeOf(await lc.apply().catch((e: unknown) => e))).toBe('lifecycle_failed');
       expect(fake.requests.some((r) => r.method === 'PUT')).toBe(false);

@@ -238,7 +238,7 @@ describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}
   // with an object-scoped token and its own 7-day backstop rule, which this test must not rewrite. The
   // test is not registered (rather than skipped) on R2, since the jobs fail on a skipped test.
   if (MODE === 'minio') {
-    it('lifecycle (M1-6b): rule set and read back, the bucket\'s other rules kept', async () => {
+    it("lifecycle (M1-6b): rule set and read back, the bucket's other rules kept", async () => {
       // Seed an unrelated rule, as a user's bucket may already have one.
       const other =
         '<Rule><ID>it-keep-other</ID><Filter><Prefix>other/</Prefix></Filter><Status>Enabled</Status><Expiration><Days>7</Days></Expiration></Rule>';
