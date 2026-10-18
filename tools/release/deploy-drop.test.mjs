@@ -146,7 +146,7 @@ describe('deploy-drop.yml structure', () => {
     expect(production).toMatch(/wrangler rollback/);
     expect(production).toMatch(/\/v1\/health/);
     expect(production).toMatch(
-      /if: \(failure\(\) \|\| cancelled\(\)\) && steps\.deploy\.outputs\.deployed == 'true' && steps\.head-rollback\.outputs\.current == 'true'/,
+      /if: \(failure\(\) \|\| cancelled\(\)\) && steps\.deploy\.outputs\.deployed == 'true'\n/,
     );
     // The rollback is verified by the live version, not only by /v1/health.
     const rollback = production.slice(production.indexOf('id: rollback'));
@@ -162,9 +162,15 @@ describe('deploy-drop.yml structure', () => {
     expect(head).toBeLessThan(ready);
     expect(ready).toBeLessThan(deploy);
     expect(production).toMatch(/id: ready\n {8}if: steps\.head\.outputs\.current == 'true'/);
-    expect(production.indexOf('id: head-rollback')).toBeLessThan(
-      production.indexOf('id: rollback\n'),
+    // The rollback is not gated on the head of main (IR-M1-27b-2 M-3): the concurrency group
+    // serializes runs, so this run's version is live and must be rolled back even if main moved on.
+    const rollback = production.slice(
+      production.indexOf('- name: Roll back to the recorded version'),
+      production.indexOf('id: rollback\n') + 200,
     );
+    expect(rollback).not.toMatch(/steps\.head/);
+    expect(production).not.toMatch(/head-rollback/);
+    expect(production.match(/HEAD-CHECK-BEGIN/g)?.length).toBe(1);
     expect(job('deploy-production')).toMatch(/concurrency:\n {6}group: deploy-drop-production/);
   });
 
@@ -434,9 +440,8 @@ describe('head-of-main check', () => {
     });
   };
 
-  it('is the same block before the deploy and before the rollback', () => {
-    expect(copies.length).toBe(2);
-    expect(copies[1]).toBe(copies[0]);
+  it('appears once, before the production deploy only', () => {
+    expect(copies.length).toBe(1);
   });
 
   it('is current when main still points at this commit', () => {

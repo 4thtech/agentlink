@@ -688,34 +688,11 @@ jobs:
       # Any failure after the deploy started rolls back. Durable Object migrations are forward-only
       # (§4.5): a version from before a migration may be refused; the freeze then stops everything
       # and the owner decides the forward fix.
-      - name: Check that this commit is still the head of main (before rollback)
-        id: head-rollback
-        if: (failure() || cancelled()) && steps.deploy.outputs.deployed == 'true'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          COMMIT: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          # HEAD-CHECK-BEGIN
-          # Runs can finish out of order: only the run for main's current head may change production.
-          head="$(gh api "repos/$REPOSITORY/commits/main" --jq .sha)"
-          if ! [[ "$head" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::Could not read the head of main."
-            exit 1
-          fi
-          if [ "$head" != "$COMMIT" ]; then
-            echo "::notice::main has moved on from $COMMIT to $head; the newer run handles production. Skipped."
-            echo "current=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "current=true" >> "$GITHUB_OUTPUT"
-          fi
-          # HEAD-CHECK-END
-
+      # No head-of-main gate here (IR-M1-27b-2 M-3): the production concurrency group serializes runs,
+      # so the version this run deployed is live and must be rolled back even if main moved on.
       - name: Roll back to the recorded version
         id: rollback
-        if: (failure() || cancelled()) && steps.deploy.outputs.deployed == 'true' && steps.head-rollback.outputs.current == 'true'
+        if: (failure() || cancelled()) && steps.deploy.outputs.deployed == 'true'
         shell: bash
         working-directory: apps/drop
         env:
@@ -767,7 +744,6 @@ jobs:
           SETTINGS_RESULT: ${{ steps.settings.outcome }}
           LIFECYCLE_RESULT: ${{ steps.lifecycle.outcome }}
           ROLLBACK_RESULT: ${{ steps.rollback.outputs.result }}
-          ROLLBACK_HEAD: ${{ steps.head-rollback.outputs.current }}
         run: |
           set -euo pipefail
           {
@@ -789,11 +765,7 @@ jobs:
             echo "| Health check | ${HEALTH_RESULT:-skipped} |"
             echo "| Logging read-back | ${SETTINGS_RESULT:-skipped} |"
             echo "| Lifecycle read-back | ${LIFECYCLE_RESULT:-skipped} |"
-            if [ "${ROLLBACK_HEAD:-}" = "false" ]; then
-              echo "| Rollback | skipped: main moved on, the newer run owns production |"
-            else
-              echo "| Rollback | ${ROLLBACK_RESULT:-not needed} |"
-            fi
+            echo "| Rollback | ${ROLLBACK_RESULT:-not needed} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
   freeze:
