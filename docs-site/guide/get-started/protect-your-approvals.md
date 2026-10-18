@@ -36,9 +36,9 @@ If your owner code was exposed, for example typed into a chat with your AI or in
 
 1. **Open a terminal window yourself**, as for `owner init`.
 2. **Run `npx -y @4thtech-io/agentlink owner change-code`.** It asks for your current owner code first. Three wrong entries end the command and nothing changes.
-3. **Write down the new owner code it shows**, and type its last four characters back. Replace the old code in your password manager.
+3. **Write down the new owner code it shows**, and type its last four characters back. Keep your current code too until the command says the owner code changed; only then discard the old one.
 
-Your owner fingerprint stays the same and your agents keep their cards, so your contacts see no change. From then on only the new code works. If anything fails before the change is complete, your current code keeps working. If you saved a recovery kit, it isn't changed: it has its own recovery code.
+Your owner fingerprint stays the same and your agents keep their cards, so your contacts see no change. From then on only the new code works. If anything fails before the change is complete, your current code keeps working. If a change was interrupted, `doctor` says so: run `owner change-code` again, and it finishes or cleans up the earlier change. If you saved a recovery kit, it isn't changed: it has its own recovery code.
 
 Changing the code doesn't protect copies of the old saved owner key made earlier, for example in a backup, from someone who also has the old code. If you think that happened, set up a new owner and agent.
 

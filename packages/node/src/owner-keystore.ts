@@ -340,7 +340,8 @@ export interface OpenedOwnerItem {
 }
 
 /**
- * M1-9z: opens the `owner` item with the current owner secret typed at the prompt. With `expected`
+ * M1-9z: opens the `owner` item (or, with `account`, the staged `owner-next` item of an unfinished
+ * change) with the owner secret typed at the prompt. With `expected`
  * (the owner the local cards name), the seed must derive exactly those keys; without, the keys come
  * from the seed. `owner_missing` without an item, `owner_mismatch` for a size other than 90 bytes,
  * `presence_rejected` for a wrong secret, a damaged item or another owner (one answer, 04 §2.8).
@@ -351,13 +352,14 @@ export async function openOwnerItem(
   presence: OwnerPresence,
   expected: OwnerPublicKeys | undefined,
   timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+  account: typeof OWNER_ACCOUNT | typeof OWNER_NEXT_ACCOUNT = OWNER_ACCOUNT,
 ): Promise<OpenedOwnerItem> {
   const secret = presenceSecret(presence);
   let blob: Uint8Array | null = null;
   let seed: Uint8Array | undefined;
   try {
     const want = expected === undefined ? undefined : ownerKeysCopy(expected);
-    blob = await readOwnerItem(keychain, timeoutMs);
+    blob = await guarded(() => keychain.get(account), timeoutMs);
     if (blob === null) throw ownerMissing();
     if (blob.length !== ALKO_LENGTH) throw ownerMismatch();
     try {
@@ -493,8 +495,77 @@ export async function replaceOwnerWrap(
   // Neither the old nor the new wrap: keep the staging item, which holds the seed under the new code.
   throw new NodeKeyStoreError(
     'keychain_failed',
-    "The system keychain didn't confirm the change. Keep both your current and your new owner code, and run `agentlink doctor` in your own terminal before any other owner command.",
+    "The system keychain didn't confirm the change. Keep both your current and your new owner code, and run `agentlink owner change-code` again in your own terminal: it finishes or cleans up this change.",
   );
+}
+
+/**
+ * M1-9z: the staged `owner-next` item of an unfinished owner-code change, or null. Ciphertext only;
+ * the caller wipes it.
+ */
+export async function readStagedOwnerItem(
+  keychain: KeychainBackend,
+  timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+): Promise<Uint8Array | null> {
+  return guarded(() => keychain.get(OWNER_NEXT_ACCOUNT), timeoutMs);
+}
+
+/**
+ * M1-9z: removes the staged `owner-next` item only while it is still exactly `staged` (the bytes the
+ * caller read). Callers do this only after the `owner` item opened with the owner's secret (or was
+ * just replaced by `staged`), so the seed is safe in the `owner` item. False when the item changed
+ * or the keychain refused; nothing is removed then.
+ */
+export async function removeStagedOwnerItem(
+  keychain: KeychainBackend,
+  staged: Uint8Array,
+  timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+): Promise<boolean> {
+  const current = await readStagedOwnerItem(keychain, timeoutMs).catch(() => null);
+  const same = current !== null && equalBytes(current, staged);
+  if (current !== null) wipe(current);
+  if (!same) return false;
+  return guarded(() => keychain.delete(OWNER_NEXT_ACCOUNT), timeoutMs).catch(() => false);
+}
+
+/**
+ * M1-9z: finishes an unfinished owner-code change. `staged` is the `owner-next` blob the owner just
+ * opened with the new code (to the expected owner, when one is known); `ownerSeen` is the `owner`
+ * item as read when the command started (null when there was none). The `owner` item must still be
+ * `ownerSeen`; it is then replaced by `staged` and read back, and only after an exact read-back is
+ * `owner-next` removed. On any failure `owner-next` is kept, so the seed is never lost.
+ */
+export async function promoteStagedOwnerWrap(
+  keychain: KeychainBackend,
+  staged: Uint8Array,
+  ownerSeen: Uint8Array | null,
+  timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+): Promise<void> {
+  const before = await readOwnerItem(keychain, timeoutMs);
+  const unchanged =
+    before === null ? ownerSeen === null : ownerSeen !== null && equalBytes(before, ownerSeen);
+  if (before !== null) wipe(before);
+  if (!unchanged) {
+    throw new NodeKeyStoreError(
+      'owner_mismatch',
+      'The owner key on this computer changed while you were finishing the owner code change, so nothing was changed. Run `agentlink owner change-code` again in your own terminal.',
+    );
+  }
+  try {
+    await guarded(() => keychain.set(OWNER_ACCOUNT, staged), timeoutMs);
+  } catch {
+    // Decided below from what the keychain now holds.
+  }
+  const after = await readOwnerItem(keychain, timeoutMs).catch(() => null);
+  const replaced = after !== null && equalBytes(after, staged);
+  if (after !== null) wipe(after);
+  if (!replaced) {
+    throw new NodeKeyStoreError(
+      'keychain_failed',
+      "The system keychain refused the request, so the owner code change isn't finished yet. Keep both your current and your new owner code, unlock the keychain and run `agentlink owner change-code` again.",
+    );
+  }
+  await removeStagedOwnerItem(keychain, staged, timeoutMs);
 }
 
 // --- Sessions -------------------------------------------------------------------------------------

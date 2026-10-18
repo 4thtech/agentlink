@@ -45,6 +45,7 @@ export {
 // TTY prompt; the owner identity does not change and nothing secret leaves the package.
 export {
   changeOwnerCode,
+  hasUnfinishedOwnerCodeChange,
   type ChangeOwnerCodeOptions,
   type ChangeOwnerCodeResult,
 } from './owner-change-code.js';

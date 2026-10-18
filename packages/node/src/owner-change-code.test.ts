@@ -36,6 +36,10 @@ class MapKeychain implements KeychainBackend {
   failSet: string | undefined;
   /** When set, writes to this account are silently dropped (a keychain that lies). */
   dropSet: string | undefined;
+  /** When set, writes to this account store damaged bytes (neither the old nor the new item). */
+  corruptSet: string | undefined;
+  /** When set, deleting this account fails (a crash before the cleanup). */
+  failDelete: string | undefined;
   async get(account: string): Promise<Uint8Array | null> {
     await Promise.resolve();
     this.accountsRead.push(account);
@@ -45,10 +49,15 @@ class MapKeychain implements KeychainBackend {
     await Promise.resolve();
     if (account === this.failSet) throw new Error('keychain: simulated crash');
     if (account === this.dropSet) return;
+    if (account === this.corruptSet) {
+      this.items.set(account, new Uint8Array(value.length).fill(7));
+      return;
+    }
     this.items.set(account, value.slice());
   }
   async delete(account: string): Promise<boolean> {
     await Promise.resolve();
+    if (account === this.failDelete) throw new Error('keychain: simulated crash');
     return this.items.delete(account);
   }
 }
@@ -85,9 +94,14 @@ async function ownerInit(): Promise<{ code: string; owner: OwnerPublicKeys }> {
  * The owner at their own terminal: types each of `current` in turn at the owner-code prompt, then
  * re-types `retype(newCode)` (default: its last four characters) at each confirmation prompt.
  */
-function owner(current: readonly string[], retype = (code: string) => code.slice(-4)) {
+function owner(
+  current: readonly string[],
+  retype = (code: string) => code.slice(-4),
+  answer = false,
+) {
   const written: string[] = [];
   const labels: string[] = [];
+  const questions: string[] = [];
   const queue = [...current];
   const newCode = (): string =>
     (written.find((t) => t.startsWith(NEW_CODE_PREFIX)) ?? '')
@@ -100,10 +114,13 @@ function owner(current: readonly string[], retype = (code: string) => code.slice
       if (newCode() !== '') return Promise.resolve(encodeUtf8(retype(newCode())));
       return Promise.resolve(encodeUtf8(queue.shift() ?? ''));
     },
-    confirm: () => Promise.resolve(false),
+    confirm: (question) => {
+      questions.push(question);
+      return Promise.resolve(answer);
+    },
     clearScreen: () => void written.push('<clear>'),
   };
-  return { terminal, written, labels, newCode };
+  return { terminal, written, labels, questions, newCode };
 }
 
 async function failure(fn: () => Promise<unknown>): Promise<{ code: string; message: string }> {
@@ -355,5 +372,185 @@ describe('owner change-code (M1-9z)', () => {
     expect(o.labels[0]).toBe('Owner passphrase:');
     expect(await storedOwnerSecretKind(keychain)).toBe(1);
     expect(await unlocks(o.newCode(), keys)).toBe(true);
+  });
+
+  // IR-M1-9z-1 F1: the owner keeps the current code until the replace has succeeded.
+  it('says to keep the current code before the change, and to discard it only after success', async () => {
+    const init = await ownerInit();
+    const o = owner([init.code]);
+    await changeOwnerCodeWith(keychain, o.terminal, { backend: 'keychain', env: {} }, { kdf: KDF });
+    const codeIndex = o.written.findIndex((t) => t.startsWith(NEW_CODE_PREFIX));
+    const keepIndex = o.written.findIndex((t) => t.includes('Keep your current owner code'));
+    const discardIndex = o.written.findIndex((t) => /discard|delete/i.test(t));
+    const clearIndex = o.written.indexOf('<clear>');
+    expect(keepIndex).toBeGreaterThanOrEqual(0);
+    expect(keepIndex).toBeLessThan(codeIndex);
+    expect(discardIndex).toBeGreaterThan(clearIndex);
+    expect(o.written[discardIndex]).toMatch(/^Owner code changed\./);
+    for (const line of o.written.slice(0, clearIndex)) expect(line).not.toMatch(/discard|delete/i);
+  });
+
+  it('never says to discard the current code when the change fails', async () => {
+    const init = await ownerInit();
+    keychain.failSet = OWNER_ACCOUNT;
+    const o = owner([init.code]);
+    const f = await failure(() =>
+      changeOwnerCodeWith(keychain, o.terminal, { backend: 'keychain', env: {} }, { kdf: KDF }),
+    );
+    expect(f.message).toMatch(/current owner code still works/);
+    for (const line of o.written) expect(line).not.toMatch(/discard|delete/i);
+  });
+
+  // IR-M1-9z-1 F2: a leftover `owner-next` item from a change that didn't finish.
+  it('neither branch: keeps owner-next and points to change-code, which then finishes the change', async () => {
+    const init = await ownerInit();
+    keychain.corruptSet = OWNER_ACCOUNT;
+    const first = owner([init.code]);
+    const f = await failure(() =>
+      changeOwnerCodeWith(keychain, first.terminal, { backend: 'keychain', env: {} }, { kdf: KDF }),
+    );
+    keychain.corruptSet = undefined;
+    expect(f.code).toBe('keychain_failed');
+    expect(f.message).toContain('agentlink owner change-code');
+    expect(f.message).not.toContain('doctor');
+    expect(keychain.items.has(OWNER_NEXT_ACCOUNT)).toBe(true);
+    const next = first.newCode();
+    // The damaged owner item opens with neither code; the leftover opens with the new code.
+    const again = owner([next], undefined, true);
+    const result = await changeOwnerCodeWith(
+      keychain,
+      again.terminal,
+      { backend: 'keychain', env: {}, owner: init.owner },
+      { kdf: KDF },
+    );
+    expect(result.fingerprint).toBe(ownerFingerprintText(init.owner));
+    expect(again.questions).toHaveLength(1);
+    expect(again.questions[0]).toContain(ownerFingerprintText(init.owner));
+    expect(again.newCode()).toBe('');
+    expect(await unlocks(next, init.owner)).toBe(true);
+    expect(keychain.items.has(OWNER_NEXT_ACCOUNT)).toBe(false);
+    expect(again.written.join('\n')).toMatch(/Owner code change finished/);
+  });
+
+  it('finish branch: declining changes nothing and keeps owner-next', async () => {
+    const init = await ownerInit();
+    keychain.failSet = OWNER_ACCOUNT;
+    keychain.failDelete = OWNER_NEXT_ACCOUNT;
+    const first = owner([init.code]);
+    await failure(() =>
+      changeOwnerCodeWith(keychain, first.terminal, { backend: 'keychain', env: {} }, { kdf: KDF }),
+    );
+    keychain.failSet = undefined;
+    keychain.failDelete = undefined;
+    expect(keychain.items.has(OWNER_NEXT_ACCOUNT)).toBe(true);
+    const before = keychain.items.get(OWNER_ACCOUNT)?.slice();
+    const again = owner([first.newCode()], undefined, false);
+    const f = await failure(() =>
+      changeOwnerCodeWith(keychain, again.terminal, { backend: 'keychain', env: {} }, { kdf: KDF }),
+    );
+    expect(f.code).toBe('owner_prompt_cancelled');
+    const after = keychain.items.get(OWNER_ACCOUNT);
+    expect(before !== undefined && after !== undefined && equalBytes(before, after)).toBe(true);
+    expect(keychain.items.has(OWNER_NEXT_ACCOUNT)).toBe(true);
+    expect(await unlocks(init.code, init.owner)).toBe(true);
+  });
+
+  it('finish branch: the unapplied new code from an interrupted change can be finished', async () => {
+    const init = await ownerInit();
+    keychain.failSet = OWNER_ACCOUNT;
+    keychain.failDelete = OWNER_NEXT_ACCOUNT;
+    const first = owner([init.code]);
+    await failure(() =>
+      changeOwnerCodeWith(keychain, first.terminal, { backend: 'keychain', env: {} }, { kdf: KDF }),
+    );
+    keychain.failSet = undefined;
+    keychain.failDelete = undefined;
+    const again = owner([first.newCode()], undefined, true);
+    await changeOwnerCodeWith(
+      keychain,
+      again.terminal,
+      { backend: 'keychain', env: {} },
+      { kdf: KDF },
+    );
+    expect(await unlocks(first.newCode(), init.owner)).toBe(true);
+    expect(await unlocks(init.code, init.owner)).toBe(false);
+    expect(keychain.items.has(OWNER_NEXT_ACCOUNT)).toBe(false);
+  });
+
+  it('clean-up branch: the current code still opens the owner item, so owner-next is removed and the change goes on', async () => {
+    const init = await ownerInit();
+    keychain.failSet = OWNER_ACCOUNT;
+    keychain.failDelete = OWNER_NEXT_ACCOUNT;
+    const first = owner([init.code]);
+    await failure(() =>
+      changeOwnerCodeWith(keychain, first.terminal, { backend: 'keychain', env: {} }, { kdf: KDF }),
+    );
+    keychain.failSet = undefined;
+    keychain.failDelete = undefined;
+    expect(keychain.items.has(OWNER_NEXT_ACCOUNT)).toBe(true);
+    const again = owner([init.code]);
+    await changeOwnerCodeWith(
+      keychain,
+      again.terminal,
+      { backend: 'keychain', env: {} },
+      { kdf: KDF },
+    );
+    expect(again.written.join('\n')).toMatch(/cleaned up/);
+    expect(again.questions).toHaveLength(0);
+    expect(keychain.items.has(OWNER_NEXT_ACCOUNT)).toBe(false);
+    expect(await unlocks(again.newCode(), init.owner)).toBe(true);
+    expect(await unlocks(first.newCode(), init.owner)).toBe(false);
+    expect(await unlocks(init.code, init.owner)).toBe(false);
+  });
+
+  it('clean-up branch: a stale owner-next left after a successful replace is removed at the next run', async () => {
+    const init = await ownerInit();
+    keychain.failDelete = OWNER_NEXT_ACCOUNT;
+    const first = owner([init.code]);
+    await changeOwnerCodeWith(
+      keychain,
+      first.terminal,
+      { backend: 'keychain', env: {} },
+      { kdf: KDF },
+    );
+    keychain.failDelete = undefined;
+    expect(keychain.items.has(OWNER_NEXT_ACCOUNT)).toBe(true);
+    const again = owner([first.newCode()]);
+    await changeOwnerCodeWith(
+      keychain,
+      again.terminal,
+      { backend: 'keychain', env: {} },
+      { kdf: KDF },
+    );
+    expect(again.questions).toHaveLength(0);
+    expect(keychain.items.has(OWNER_NEXT_ACCOUNT)).toBe(false);
+    expect(await unlocks(again.newCode(), init.owner)).toBe(true);
+  });
+
+  it('with a leftover, three wrong entries change nothing', async () => {
+    const init = await ownerInit();
+    keychain.failSet = OWNER_ACCOUNT;
+    keychain.failDelete = OWNER_NEXT_ACCOUNT;
+    await failure(() =>
+      changeOwnerCodeWith(
+        keychain,
+        owner([init.code]).terminal,
+        { backend: 'keychain', env: {} },
+        {
+          kdf: KDF,
+        },
+      ),
+    );
+    keychain.failSet = undefined;
+    keychain.failDelete = undefined;
+    const staged = keychain.items.get(OWNER_NEXT_ACCOUNT)?.slice();
+    const o = owner([WRONG, WRONG, WRONG]);
+    const f = await failure(() =>
+      changeOwnerCodeWith(keychain, o.terminal, { backend: 'keychain', env: {} }, { kdf: KDF }),
+    );
+    expect(f.code).toBe('owner_secret_refused');
+    const after = keychain.items.get(OWNER_NEXT_ACCOUNT);
+    expect(staged !== undefined && after !== undefined && equalBytes(staged, after)).toBe(true);
+    expect(await unlocks(init.code, init.owner)).toBe(true);
   });
 });
