@@ -10,10 +10,14 @@
 //   the session cookie, which only the one-shot session link gives, and that link goes only to the
 //   OS browser opener (`server.open`), never into a result, a log line or an error. A decision needs
 //   owner presence (the owner code or the localhost passkey) on top of the session (08 §1).
-// - The owner's browser opens with the one-shot link once per request and at most once per
-//   BROWSER_OPEN_INTERVAL_MS, so an agent that keeps raising requests cannot flood the screen; a
-//   request inside the interval raises the fixed OS notification instead (08 §1: "Opens
-//   automatically (or via OS notification)").
+// - The owner is alerted at most once per BROWSER_OPEN_INTERVAL_MS across all requests (IR-M1-11a-b-1
+//   L-3): the browser opens with the one-shot link, or, when no browser could be opened, the fixed OS
+//   notification is raised (08 §1: "Opens automatically (or via OS notification)"). Requests inside
+//   the interval are coalesced: the page the owner already has lists every pending request, so an
+//   agent that keeps raising requests cannot flood the screen.
+// - No browser, no link (IR-M1-11a-b-1 L-2): when the opener cannot run (its program is missing at
+//   its absolute path, or fails), the session link never reached a browser, so the url would only
+//   show the expired page. The result then stays CLI-only, now and for the rest of the session.
 // - The nextStep keeps the `agentlink approve` command (06 §2.5 step 2) for an owner whose browser
 //   has no session (another browser, or a stale link), and tells the agent never to open or fetch
 //   the link itself.
@@ -92,7 +96,11 @@ export function createApprovalUi(options: ApprovalUiOptions): ApprovalUi {
   let starting: Promise<ApprovalServer | undefined> | undefined;
   let server: ApprovalServer | undefined;
   let closed = false;
-  let lastOpenAt = Number.NEGATIVE_INFINITY;
+  let lastAlertAt = Number.NEGATIVE_INFINITY;
+  /** The latest browser open, and whether any open ever succeeded or failed. */
+  let lastOpen: Promise<boolean> | undefined;
+  let browserOpened = false;
+  let openerFailed = false;
   const announced = new Set<string>();
 
   const ensure = (): Promise<ApprovalServer | undefined> => {
@@ -116,24 +124,41 @@ export function createApprovalUi(options: ApprovalUiOptions): ApprovalUi {
     return starting;
   };
 
-  /** Opens the owner's browser, or notifies, once per request (never awaited by the result). */
-  const announce = (running: ApprovalServer, approvalId: string): void => {
-    if (announced.has(approvalId)) return;
-    announced.add(approvalId);
-    if (announced.size > MAX_ANNOUNCED) {
-      const oldest = announced.values().next().value;
-      if (oldest !== undefined) announced.delete(oldest);
+  /**
+   * Alerts the owner for a new request (at most once per interval overall) and resolves whether the
+   * owner's browser holds a session for the link (a browser was opened at least once).
+   */
+  const announce = async (running: ApprovalServer, approvalId: string): Promise<boolean> => {
+    if (!announced.has(approvalId)) {
+      announced.add(approvalId);
+      if (announced.size > MAX_ANNOUNCED) {
+        const oldest = announced.values().next().value;
+        if (oldest !== undefined) announced.delete(oldest);
+      }
+      const at = now();
+      if (at - lastAlertAt >= BROWSER_OPEN_INTERVAL_MS) {
+        lastAlertAt = at;
+        if (openerFailed) {
+          running.notifyNewApproval(approvalId).catch(() => undefined);
+        } else {
+          lastOpen = running.open(approvalId).then(
+            (opened) => {
+              if (opened) browserOpened = true;
+              else {
+                openerFailed = true;
+                logger.warn('approval ui: no browser could be opened');
+                running.notifyNewApproval(approvalId).catch(() => undefined);
+              }
+              return opened;
+            },
+            () => false,
+          );
+        }
+      }
     }
-    const at = now();
-    if (at - lastOpenAt >= BROWSER_OPEN_INTERVAL_MS) {
-      lastOpenAt = at;
-      running
-        .open(approvalId)
-        .then((opened) => (opened ? undefined : running.notifyNewApproval(approvalId)))
-        .catch(() => undefined);
-    } else {
-      running.notifyNewApproval(approvalId).catch(() => undefined);
-    }
+    if (browserOpened) return true;
+    if (openerFailed || lastOpen === undefined) return false;
+    return (await lastOpen) || browserOpened;
   };
 
   return Object.freeze<ApprovalUi>({
@@ -148,8 +173,7 @@ export function createApprovalUi(options: ApprovalUiOptions): ApprovalUi {
         return undefined;
       }
       if (link === undefined) return undefined;
-      announce(running, approvalId);
-      return link;
+      return (await announce(running, approvalId)) && !closed ? link : undefined;
     },
     get running() {
       return server !== undefined && !closed;

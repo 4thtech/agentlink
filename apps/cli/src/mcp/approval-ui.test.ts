@@ -47,6 +47,7 @@ const ENVELOPE = 'Q2xhaW1zQ2xhaW1zQ2xhaQ';
 const HASH = 'ab'.repeat(32);
 const APPROVAL = 'apr_AAAAAAAAAAAAAAAAAAAAAA';
 const APPROVAL_2 = 'apr_BBBBBBBBBBBBBBBBBBBBBA'; // canonical: 16 bytes
+const APPROVAL_3 = 'apr_CCCCCCCCCCCCCCCCCCCCCA';
 const VALID_UNTIL = 1_761_206_400;
 const silent = createLogger({ sink: () => undefined });
 const NEVER_FETCH = /never open or fetch this link/i;
@@ -197,20 +198,52 @@ describe('the url is pinned to the local UI origin and holds no secret', () => {
 });
 
 describe('the owner’s browser opens with the one-shot link, not the agent', () => {
-  it('opens once per request, at most once per interval; otherwise it notifies', async () => {
+  it('alerts at most once per interval across requests, coalescing the rest (L-3)', async () => {
     let now = 1_000_000;
     const server = fakeServer();
     const { ui: approvalUi } = ui(server, () => now);
-    await approvalUi.link(APPROVAL);
+    expect((await approvalUi.link(APPROVAL))?.url).toContain(APPROVAL);
     await approvalUi.link(APPROVAL); // the agent asks again: no second window
     expect(server.opened).toEqual([APPROVAL]);
-    await approvalUi.link(APPROVAL_2); // within the interval: a notification instead
+    // Within the interval: no window and no notification; the open page lists it. The link works
+    // in the browser that was opened.
+    expect((await approvalUi.link(APPROVAL_2))?.url).toContain(APPROVAL_2);
     expect(server.opened).toEqual([APPROVAL]);
-    expect(server.notified).toEqual([APPROVAL_2]);
+    expect(server.notified).toEqual([]);
     now += BROWSER_OPEN_INTERVAL_MS;
-    await approvalUi.link(APPROVAL_2); // already announced: nothing more
+    await approvalUi.link(APPROVAL_2); // already counted: nothing more
     expect(server.opened).toEqual([APPROVAL]);
-    expect(server.notified).toEqual([APPROVAL_2]);
+    await approvalUi.link(APPROVAL_3); // a new request after the interval: one new window
+    expect(server.opened).toEqual([APPROVAL, APPROVAL_3]);
+    expect(server.notified).toEqual([]);
+    await approvalUi.close();
+  });
+
+  it('with no browser, gives no link (CLI only) and notifies at most once per interval (L-2, L-3)', async () => {
+    let now = 1_000_000;
+    const server = { ...fakeServer(), opened: [] as (string | undefined)[] };
+    const notified: string[] = [];
+    const noBrowser: ApprovalServer = {
+      ...server,
+      open: (id) => {
+        server.opened.push(id);
+        return Promise.resolve(false);
+      },
+      notifyNewApproval: (id) => {
+        notified.push(id);
+        return Promise.resolve('');
+      },
+    };
+    const { ui: approvalUi } = ui(noBrowser, () => now);
+    expect(await approvalUi.link(APPROVAL)).toBeUndefined();
+    expect(notified).toEqual([APPROVAL]);
+    expect(await approvalUi.link(APPROVAL_2)).toBeUndefined();
+    expect(notified).toEqual([APPROVAL]);
+    now += BROWSER_OPEN_INTERVAL_MS;
+    expect(await approvalUi.link(APPROVAL_3)).toBeUndefined();
+    // The opener is not tried again; the owner gets one notification per interval.
+    expect(server.opened).toEqual([APPROVAL]);
+    expect(notified).toEqual([APPROVAL, APPROVAL_3]);
     await approvalUi.close();
   });
 });
