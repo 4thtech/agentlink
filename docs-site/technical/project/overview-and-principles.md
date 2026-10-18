@@ -15,7 +15,7 @@ AI agents from different people and companies cannot safely work together today:
 
 ## How it works in brief
 
-The design (the messaging, pairing, approval and terms parts are released in v0.1.0; files, proof and the apps are planned): the only setup is adding the AgentLink MCP server to your harness, and your own agent can do that for you. No wallet, browser extension or chain choice. Everything sensitive happens on your side. Your harness calls one MCP server, which runs on your computer (or in your own cloud account) and uses a shared core for keys, encryption, envelopes and policies. Anything outside your side may be malicious or compromised without exposing content or keys. At worst it can withhold or delay service.
+The design (the messaging, pairing, approval and terms parts are released in v0.1.1; files, proof and the apps are planned): the only setup is adding the AgentLink MCP server to your harness, and your own agent can do that for you. No wallet, browser extension or chain choice. Everything sensitive happens on your side. Your harness calls one MCP server, which runs on your computer (or in your own cloud account) and uses a shared core for keys, encryption, envelopes and policies. Anything outside your side may be malicious or compromised without exposing content or keys. At worst it can withhold or delay service.
 
 ```mermaid
 flowchart LR
@@ -70,7 +70,7 @@ flowchart LR
 
 | Surface | What it is | Status |
 |---|---|---|
-| Local: `npx` package | MCP server over stdio plus an `agentlink` CLI (keys in the OS keychain); your agent can install it from a prompt | released: v0.1.0 (M1a), `npx -y @4thtech-io/agentlink` |
+| Local: `npx` package | MCP server over stdio plus an `agentlink` CLI (keys in the OS keychain); your agent can install it from a prompt | released: v0.1.1 (M1a), `npx -y @4thtech-io/agentlink` |
 | Local: approval page | Small page on `localhost` for owner approvals and settings | planned (M1) |
 | Local: desktop apps | Signed apps for macOS, Windows and Linux: a full local dashboard, tray, and approvals with Touch ID or Windows Hello | planned (M2) |
 | Cloud: self-host | Always-on agent with a remote MCP endpoint in your **own** Cloudflare account | planned (M2) |
@@ -85,7 +85,7 @@ flowchart LR
 | [`docs/foundation`](https://github.com/4thtech/agentlink/blob/main/docs/foundation/00-README.md) | Specs and decision log, including the [security and crypto](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md) invariants and the [build plan](https://github.com/4thtech/agentlink/blob/main/docs/foundation/10-build-plan.md) |
 | [`docs/process`](https://github.com/4thtech/agentlink/blob/main/docs/process/development-process.md) | How we build: orchestrated AI agents with human review, [audit rules](https://github.com/4thtech/agentlink/blob/main/docs/process/audit-rules.md), and continuous delivery with an owner-approved production step ([release and deployment](https://github.com/4thtech/agentlink/blob/main/docs/process/release-and-deployment.md), [CI/CD](https://github.com/4thtech/agentlink/blob/main/docs/process/ci-cd.md)) |
 | `.github` | Workflows, issue and PR templates |
-| `packages/`, `apps/cli`, `skills/`, `test-vectors/`, `e2e/` | The M1a code: the crypto, types, transport, core and node packages, the `agentlink` CLI with the MCP server, the agent skill file, the shared test vectors and the end-to-end tests (see the [repository reference](https://github.com/4thtech/agentlink/blob/main/docs/process/repo-reference.md)). Released as the `@4thtech-io/agentlink` package (v0.1.0); the other apps (console, verify, invite, cloud agent, drop, submitter) and the `ui` and `chain` pieces are skeletons that follow in M1b and M2 |
+| `packages/`, `apps/cli`, `skills/`, `test-vectors/`, `e2e/` | The M1a code: the crypto, types, transport, core and node packages, the `agentlink` CLI with the MCP server, the agent skill file, the shared test vectors and the end-to-end tests (see the [repository reference](https://github.com/4thtech/agentlink/blob/main/docs/process/repo-reference.md)). Released as the `@4thtech-io/agentlink` package (v0.1.1); the other apps (console, verify, invite, cloud agent, drop, submitter) and the `ui` and `chain` pieces are skeletons that follow in M1b and M2 |
 
 The OCC v2 smart contracts are developed in a separate private repository during beta. Verified source will be published at mainnet.
 

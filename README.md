@@ -19,7 +19,7 @@ You need Node.js 22.14 or newer. In a terminal:
 npx -y @4thtech-io/agentlink init
 ```
 
-It finds your AI tools (Claude Code, Codex, Gemini CLI, OpenCode, Antigravity), shows the exact change to their settings and writes it only after you confirm. Restart the tool, then run `npx -y @4thtech-io/agentlink owner init` in a terminal you opened yourself to protect your approvals.
+It finds your AI tools (Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode, Antigravity), shows the exact change to their settings and writes it only after you confirm. Restart the tool, then run `npx -y @4thtech-io/agentlink owner init` in a terminal you opened yourself to protect your approvals.
 
 **Or let your agent do it:** "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm." Check that the package name is exactly `@4thtech-io/agentlink`.
 
@@ -34,21 +34,21 @@ Files, proof, credits and the apps are **in development or planned**; they are n
 ## Status
 
 <!-- status:start -->
-> **Phase:** M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026 (pre-alpha); M1b (files, proof, credits) in progress, with the first parts merged but not yet released · **Version:** v0.1.0 (M1a, walking skeleton: pair and talk) · **Last updated:** 2026-10-17
+> **Phase:** M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026 and updated in v0.1.1 on 18 Oct 2026 (pre-alpha); M1b (files, proof, credits) in progress, with the building blocks merged but not yet usable from the CLI or the MCP tools · **Version:** v0.1.1 (M1a, walking skeleton: pair and talk) · **Last updated:** 2026-10-18
 >
 > - **M0 Foundations:** 6 merged, 1 in progress
-> - **Crypto (@4thtech-io/crypto):** 7 merged, 3 in progress, 1 planned
+> - **Crypto (@4thtech-io/crypto):** 7 merged, 4 in progress
 > - **Shared types (@4thtech-io/types):** 3 merged
 > - **Transport (@4thtech-io/transport-nostr):** 5 merged
-> - **Storage (@4thtech-io/storage):** 1 merged, 1 planned
+> - **Storage (@4thtech-io/storage):** 1 merged, 1 in progress, 1 planned
 > - **Core (@4thtech-io/core):** 16 merged
 > - **Node runtime (@4thtech-io/node):** 9 merged, 1 planned
 > - **MCP server, CLI and apps:** 4 merged, 4 in progress, 1 planned
 > - **OCC v2 contracts (private repo):** 2 merged, 1 planned
 > - **Design:** 1 merged, 1 in progress
-> - **In progress:** M1b has started. Merged and shipping in the next 0.1.x release: live relay subscriptions, the claude-desktop setup option, clearer status and recovery messages, the localhost approval server and the Node.js 22.14 check. Merged but not used by any tool yet: the safe fetch and path guard, the storage adapters, the files and proof policy rules and the proof hashing. Still open from M1a: the two-person dogfood against the published package (M1-23). Next in M1b: file encryption and the approval page.
-> - **Does not exist yet:** file transfer, proof, credits, the designed local approval page (a functional page with the owner code and a localhost passkey is merged, but the CLI does not open it yet), the owner console, desktop apps and the cloud agent. Live relay subscriptions are merged but not released yet. They are described throughout and marked "planned" where they are not built. v0.1.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha, testnets only) was released on 16 Oct 2026 and is still the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`.
-> - **Next:** Cut the next 0.1.x release with the M1b work merged so far, run the two-person dogfood (the M1a gate), then finish M1b: files, proof and credits on testnets.
+> - **In progress:** M1b is in progress. v0.1.1 (18 Oct 2026) is on npm `latest`. It carries the fixes and small features listed under the MCP server and CLI. In development, merged but not yet usable from the CLI or the MCP tools: STREAM file encryption, the owner-signed Revocation typed data, multipart upload with streaming encryption for your own storage, the localhost approval page (the CLI does not open it yet), the safe fetch and path guard, the files and proof policy rules and the proof hashing. The encrypted drop Worker is built and has its deploy pipeline, but it is not deployed yet: the owner's Cloudflare steps are pending. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23). Next in M1b: sending files through the tools, the designed approval page and proof.
+> - **Does not exist yet:** file transfer, proof, credits, the designed local approval page (a functional page with the owner code and a localhost passkey is merged, but the CLI does not open it yet), the encrypted drop service (built, not deployed), the owner console, desktop apps and the cloud agent. They are described throughout and marked "planned" or "in development" where they are not available. v0.1.1 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha, testnets only) was released on 18 Oct 2026 and is the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`.
+> - **Next:** Wire file sending into the tools (encryption, storage and the encrypted drop once it is deployed), open the approval page from the CLI, run the two-person dogfood, then finish M1b: proof and credits on testnets, and cut the 0.2.0 release.
 >
 > Every component, with its pull requests, is on the [status and roadmap page](docs-site/technical/project/status-and-roadmap.md). This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI.
 <!-- status:end -->
@@ -59,8 +59,8 @@ Files, proof, credits and the apps are **in development or planned**; they are n
 | Milestone | What you can do at the end | Version |
 |---|---|---|
 | **M0 Foundations** (nearly complete) | Repository, CI and rules in place | 0.0.x |
-| **M1a Walking skeleton: pair and talk** (v0.1.0 released 16 Oct 2026; two-person dogfood open) | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 |
-| **M1b Files, proof, credits** (started; first parts merged, not released) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI | 0.2.0 (M1 gate) |
+| **M1a Walking skeleton: pair and talk** (v0.1.0 released 16 Oct 2026, v0.1.1 on 18 Oct 2026; two-person dogfood open) | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 |
+| **M1b Files, proof, credits** (started; building blocks merged, none usable from the tools yet) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI | 0.2.0 (M1 gate) |
 | **M2 Owner console, desktop apps, self-host, design** | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors | 0.3.0 |
 | **M3 Mainnet beta (Base, Gnosis)** | External audit; contracts on Base and Gnosis; paid proof with credits | 1.0.0 |
 | **M4 Expansion** | More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters | after 1.0.0 |

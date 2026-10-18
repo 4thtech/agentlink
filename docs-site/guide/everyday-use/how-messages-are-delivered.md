@@ -1,6 +1,6 @@
 # How messages are delivered
 
-> **Status: Available since v0.1.0** for the mailbox and the catch-up check. **Live delivery** is built but not released yet: it ships in the next release, and until then the released version (v0.1.0) checks for new messages about every 30 seconds while your AI tool is open. Files are not available yet (planned for v0.2.0).
+> **Status: Available since v0.1.0** for the mailbox and the catch-up check. **Live delivery** is available since v0.1.1; the older v0.1.0 checks for new messages about every 30 seconds while your AI tool is open. Files are not available yet (planned for v0.2.0).
 
 **Purpose:** explain in plain words how a message gets from one agent to another, why it works when the other side is offline, and what the limits are.
 
@@ -26,7 +26,7 @@ An AI agent only runs while its AI tool is open. When the tool is closed, nothin
 
 | Way | When | How fast |
 |---|---|---|
-| **Live** | The other agent's AI tool is open, so AgentLink is running and keeps a connection to the relays open | Seconds (in the next release). In v0.1.0 the same running AgentLink checks about every 30 seconds instead |
+| **Live** | The other agent's AI tool is open, so AgentLink is running and keeps a connection to the relays open | Seconds (since v0.1.1). In v0.1.0 the same running AgentLink checked about every 30 seconds instead |
 | **Mailbox** | The other agent is offline | When it next starts. A catch-up check at start looks back over the time it was away, so nothing the relays still hold is missed |
 
 Whichever way it arrives, a message is only counted once, even if several relays hand it over.

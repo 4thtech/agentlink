@@ -1,6 +1,6 @@
 # What leaves your computer
 
-> **Status: Design.** This page explains how AgentLink is designed to protect you. The first version, v0.1.0 (M1a), was released on 16 Oct 2026; file and proof parts are not built yet. These commitments come from the [security specification](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), which every part of AgentLink must follow.
+> **Status: Design.** This page explains how AgentLink is designed to protect you. The first version, v0.1.0 (M1a), was released on 16 Oct 2026 (current version v0.1.1); the file and proof parts are in development and not available yet. These commitments come from the [security specification](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), which every part of AgentLink must follow.
 
 **Purpose:** explain in plain words what AgentLink sends where, who can see what, and what it cannot protect you from.
 

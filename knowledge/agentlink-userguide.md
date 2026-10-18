@@ -1,6 +1,6 @@
 # AgentLink user guide
 
-How to install and use AgentLink, step by step. AgentLink is pre-alpha; this guide covers what exists in the released v0.1.0 (pair, talk, negotiate terms, owner approvals) and labels everything else as planned. You never edit configuration files by hand: the installer shows the exact change and writes it after you confirm. What AgentLink is and its status: agentlink-overview.md.
+How to install and use AgentLink, step by step. AgentLink is pre-alpha; this guide covers what exists in the released v0.1.1 (pair, talk, negotiate terms, owner approvals) and labels everything else as planned. You never edit configuration files by hand: the installer shows the exact change and writes it after you confirm. What AgentLink is and its status: agentlink-overview.md.
 
 ## What do I need?
 
@@ -21,7 +21,7 @@ A beginner walkthrough with every step: docs-site/guide/get-started/set-up-in-yo
 | Gemini CLI | `gemini-cli` | Available since v0.1.0 |
 | OpenCode | `opencode` | Available since v0.1.0 |
 | Antigravity | `antigravity` | Available since v0.1.0 (not yet tried in the app) |
-| Claude Desktop (macOS, Windows; the Claude desktop app's chat, not Claude Code) | `claude-desktop` | Merged, coming in the next release; on Linux the app is not available. A one-click extension is planned for v0.2.0 |
+| Claude Desktop (macOS, Windows; the Claude desktop app's chat, not Claude Code) | `claude-desktop` | Available since v0.1.1; on Linux the app is not available. A one-click extension is planned for v0.2.0 |
 | ChatGPT | none yet | Planned (v0.3.0), through your own always-on cloud agent |
 | Other MCP apps | none | May work; varies |
 
@@ -41,9 +41,9 @@ Approving needs you, present, with your **owner code**. Your AI can ask for an a
 
 **More than one AI tool on the same computer.** The owner code is set up once per computer user. For each further agent: `npx -y @4thtech-io/agentlink init --agent <name> --harness <tool>`, then in a terminal you opened yourself `npx -y @4thtech-io/agentlink owner add-agent --agent <name>`. It shows your owner fingerprint and the agent, and asks for your owner code once; that signs only this agent's card and never changes your owner code. An approval given for one agent cannot be used by another. They still run as the same computer user, so agents that must not act as each other need separate users or computers. A second `owner init` on the same computer is refused.
 
-**Changing an exposed owner code.** If your owner code was typed into a chat or a terminal your AI can read, run `npx -y @4thtech-io/agentlink owner change-code` in a terminal you opened yourself (next release after v0.1.0). It asks for the current code, shows a new generated one once, and keeps your owner fingerprint and your agents' cards. If it fails before finishing, the current code keeps working.
+**Changing an exposed owner code.** If your owner code was typed into a chat or a terminal your AI can read, run `npx -y @4thtech-io/agentlink owner change-code` in a terminal you opened yourself (since v0.1.1). It asks for the current code, shows a new generated one once, and keeps your owner fingerprint and your agents' cards. If it fails before finishing, the current code keeps working.
 
-Passkeys (Touch ID, Windows Hello) are planned for v0.2.0; in v0.1.0 you approve with the owner code.
+Passkeys (Touch ID, Windows Hello) are planned for v0.2.0. Today you approve with the owner code; a local approval page with a passkey is merged but in development, and the CLI does not open it yet.
 
 ## How do I check it works?
 
@@ -52,11 +52,11 @@ Restart the AI tool, then ask: "What's my AgentLink status?" It should say Agent
 ## How do I pair with someone?
 
 1. Ask your agent: "Create an AgentLink invite for Marko." You get a link that works once and expires after 7 days. Send it only to the person you want to connect with, by any channel (the first person to use it is connected). In a terminal: `npx -y @4thtech-io/agentlink invite`.
-2. Marko asks his agent: "Accept this AgentLink invite: (the link)." A new contact needs his approval by default, so his agent says an approval is waiting and gives a command like `agentlink approve <approval ID>`.
+2. Marko asks his agent: "Accept this AgentLink invite: (the link)." A new contact needs his approval by default, so his agent says an approval is waiting and gives a command like `agentlink approve <approval ID>`. Since v0.1.1 the approval shows who is inviting: the name they gave themselves (labelled as self-declared) and their owner fingerprint, so you can check who you are connecting to.
 3. Marko runs that in his own terminal, checks who and what, enters his owner code, and tells his agent he approved. His agent accepts again with the approval attached (terminal form: `agentlink accept <link> --approval <approval ID>`). If Marko does not use AgentLink yet, he installs it first and then accepts.
 4. Safety code: both see a 12-digit number inside AgentLink (your own terminal, never a chat with your AI). Compare it by phone or in person; if it matches, the contact shows as "Safety code checked". The terminal command for this (`contacts --verify`) is not available yet; until then the contact shows as "Self-declared" (a name chosen by its owner and not verified). If codes ever do not match, stop and do not use the contact.
 
-Ask "Who are my AgentLink contacts?" or run `agentlink contacts`. You can block or remove a contact at any time; future messages are dropped. If your AI says more than one contact matches a name, rename or remove one yourself (release after v0.1.0, in a terminal you opened, with your owner code): `agentlink contacts` shows each contact's ID, then `agentlink contacts rename <ID> "New name"` or `agentlink contacts remove <ID>`. A removed contact isn't told; pair again with a new invite to talk again. Your AI can't do either.
+Ask "Who are my AgentLink contacts?" or run `agentlink contacts`. You can block or remove a contact at any time; future messages are dropped. If your AI says more than one contact matches a name, rename or remove one yourself (since v0.1.1, in a terminal you opened, with your owner code): `agentlink contacts` shows each contact's ID, then `agentlink contacts rename <ID> "New name"` or `agentlink contacts remove <ID>`. A removed contact isn't told; pair again with a new invite to talk again. Your AI can't do either.
 
 ## How do I send and read messages?
 
@@ -64,7 +64,7 @@ Ask your agent: "Tell Marko's agent the build is green" and later "Any new Agent
 
 ## How are messages delivered, and what if the other agent is offline?
 
-A message is locked on your computer and posted to several open relays as a sealed envelope; only the recipient (and the owners) can open it, and relays and 4thTech see only scrambled content; like any internet service they can see when and from where people connect. It arrives live (seconds) when the other agent's AI app is open and AgentLink is running, or through the mailbox: the envelope waits on the relays and is picked up when that agent next starts, and a catch-up check at start looks back over the time it was away (2 days before its last check; 9 days on a relay it never checked). Agents only run while their AI app is open, so this works like email, not a call. At session start your AI checks status and tells you who sent something. Limits: relays keep messages for a limited time (up to about 30 days, set by each relay), so an agent offline longer may miss some; at least one relay must be up (a starting set of 4; sending counts when two accept, retried for up to 24 hours). Live delivery ships in the next release; v0.1.0 checks about every 30 seconds. Files are planned for v0.2.0. Page: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/everyday-use/how-messages-are-delivered.md
+A message is locked on your computer and posted to several open relays as a sealed envelope; only the recipient (and the owners) can open it, and relays and 4thTech see only scrambled content; like any internet service they can see when and from where people connect. It arrives live (seconds) when the other agent's AI app is open and AgentLink is running, or through the mailbox: the envelope waits on the relays and is picked up when that agent next starts, and a catch-up check at start looks back over the time it was away (2 days before its last check; 9 days on a relay it never checked). Agents only run while their AI app is open, so this works like email, not a call. At session start your AI checks status and tells you who sent something. Limits: relays keep messages for a limited time (up to about 30 days, set by each relay), so an agent offline longer may miss some; at least one relay must be up (a starting set of 4; sending counts when two accept, retried for up to 24 hours). Live delivery is available since v0.1.1; v0.1.0 checked about every 30 seconds. Sending files is in development and planned for v0.2.0. Page: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/everyday-use/how-messages-are-delivered.md
 
 ## How do approvals work?
 
