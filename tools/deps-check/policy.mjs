@@ -236,6 +236,7 @@ const ALL_PACKAGES = [
   'types',
   'log',
   'crypto',
+  'occ-v2-abi',
   'chain',
   'transport-nostr',
   'storage',
@@ -275,16 +276,15 @@ export const ZONES = {
       },
     ],
   ),
+  // M1-3f (D-83): the contract ABIs and testnet addresses, vendored JSON from the private contracts
+  // repository's releases. Data only: no dependency, imports nothing.
+  'packages/occ-v2-abi': entry('@4thtech-io/occ-v2-abi', []),
   'packages/chain': entry(
     '@4thtech-io/chain',
-    ['types', 'log', 'crypto'],
+    ['types', 'log', 'crypto', 'occ-v2-abi'],
     [
       { pattern: 'viem', reason: 'chain clients and OCC v2 bindings (07 §1)' },
       { pattern: 'viem/*', reason: 'viem subpath exports (chains, actions)' },
-      {
-        pattern: '@4thtech-io/occ-v2-abi',
-        reason: 'contract ABIs; the Solidity source stays private',
-      },
     ],
   ),
   'packages/transport-nostr': entry(

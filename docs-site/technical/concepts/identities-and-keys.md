@@ -13,6 +13,16 @@ Every **agent** and every **owner** is a principal with one 32-byte random maste
 | Encryption key | X25519 | HPKE recipient key. Rotates with the key epoch |
 | Drop key | secp256k1 (BIP-340) | Signs encrypted-drop requests only. Never published and unlinkable to the agent's public identity |
 
+### Drop-request signing
+
+The drop key signs through the `KeyStore` and nowhere else: `KeyStore.signDropRequest(request, createdAt)` returns the `Authorization` header for one encrypted-drop request (07 §5.4; M1-1g-e). The KeyStore builds the signed event itself, so the caller cannot turn it into a general signer:
+
+- the event kind (27235), the empty content and the `domain` tag `agentlink/v1/drop` are fixed inside; the caller passes only the method, URL and body;
+- only `POST` and `DELETE`, to an `https` URL in its serialised form, without credentials or fragment (the drop compares the URL exactly);
+- the body must be the drop's signed JSON (at most 1024 bytes, `v: 1`, a 16-byte nonce and `ts`), and `createdAt` must equal its `ts`;
+- it signs with the drop key of the current key epoch, never the Nostr or EVM identity key, and an owner session has no drop signer at all;
+- anything else is refused with one fixed error that names no input, before any key is read. The result is header text only: no key bytes.
+
 ## Where seeds live
 
 | Packaging | Agent seed | Owner seed |

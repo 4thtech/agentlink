@@ -47,6 +47,8 @@ export {
   type DropUrlFields,
   type DropUrlPurpose,
 } from './drop-auth.js';
+// M1-1g-e: the public checks of KeyStore.signDropRequest (no key material).
+export { DROP_REQUEST_REFUSED, dropRequestSnapshot } from './keystore-drop.js';
 export {
   MAX_JSON_DEPTH,
   canonicalize,

@@ -21,10 +21,13 @@
 
 - **Zero access.** 4thTech holds no user keys, plaintext, file keys, contact lists or accounts. Its services (submitter, encrypted drop, optional relay, static sites) see only ciphertext, signed public data or page loads.
 - **Owner presence.** Harness agents are assumed to have shell access as the same OS user. They must not be able to obtain the owner key, which is never stored unwrapped on the agent's machine. Owner operations need a passkey, an OS biometric prompt (desktop app) or the owner code or passphrase. This is a goal: on a same-user machine it holds only under the conditions in [04 §2.5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md#25-owner-operations-and-user-presence) (G-1, D-67), below.
+- **Separate drop key (in development, M1-1g-e).** Encrypted-drop requests are signed with a separate per-epoch drop key held in the `KeyStore`, never the agent's Nostr or EVM identity key, so the drop cannot link uploads to the agent's public identity. The KeyStore fixes the signed format and refuses anything that is not a drop request ([Identities and keys](identities-and-keys.md)).
 - **No dangerous MCP tools.** No tool changes policies, exports keys, adds storage credentials, decides approvals or reads arbitrary files.
 - **Untrusted content.** Inbound text is wrapped in a delimited untrusted-content block in every tool result and never appears in tool descriptions, server instructions, summaries or errors.
 - **Commitments need approval.** Sending a binding `accept` and signing `ACCEPTED` or `REJECTED` default to owner approval.
 - **Bounded fees.** Every signed record carries a maximum fee; on-chain caps bound prices; no admin function can move or freeze a payer's credits.
+
+- **Narrow file access.** Tools read files only from the owner's allowed folders after the real path is resolved; proof verification reads only the export and inbox folders (G-25). Downloads are verified in a quarantine file before they appear (D-84). See [Design decisions](design-decisions.md).
 
 ## Accepted trade-offs
 

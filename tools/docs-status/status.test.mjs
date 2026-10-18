@@ -86,9 +86,11 @@ describe('renderers', () => {
     const data = real();
     const status = renderReadmeStatus(data);
     expect(status).toContain(`**Version:** ${data.version}`);
-    expect(status).toContain('[#27](https://github.com/4thtech/agentlink/pull/27)');
-    expect(status).toContain('contracts#4');
-    expect(status).not.toContain('](https://github.com/4thtech/agentlink/pull/contracts');
+    expect(status).toContain('- **Crypto (@4thtech-io/crypto):**');
+    const site = renderSiteSummary(data);
+    expect(site).toContain('[#27](https://github.com/4thtech/agentlink/pull/27)');
+    expect(site).toContain('contracts#4');
+    expect(site).not.toContain('](https://github.com/4thtech/agentlink/pull/contracts');
     expect(status.split('\n').every((line) => line.startsWith('>'))).toBe(true);
     expect(renderReadmeRoadmap(data)).toContain('| **M0 Foundations** (nearly complete) |');
     expect(renderSiteMilestones(data)).toContain('| **M3** Mainnet beta (Base, Gnosis) |');

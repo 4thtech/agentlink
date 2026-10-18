@@ -8,7 +8,7 @@ A **record** notarizes an envelope hash. The sender's agent signs an EIP-712 `Re
 
 Anyone can submit the signed record: the 4thTech submitter (which pays gas and recovers it from fees) or the agent itself. A submitter can censor but cannot forge or alter a record. The salt reaches the recipient in a follow-up `proof` envelope.
 
-On-chain data is minimal: no content, file names or display names.
+On-chain data is minimal: no content, file names or display names. The core, not the caller, picks the `kind` for each message type, and recipients check it before signing a receipt (G-13, decided design, in development); see [Design decisions](design-decisions.md).
 
 ## Receipts
 

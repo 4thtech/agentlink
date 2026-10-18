@@ -15,10 +15,10 @@ All shared packages run in Node (LTS), modern browsers and Cloudflare Workers un
 | `@4thtech-io/node` | Node implementations: keychain `KeyStore`, SQLite `Store`, local approval server (Node only) | v0.1.0 |
 | `@4thtech-io/storage` | `StorageAdapter`: inline, encrypted drop, S3-compatible; consumer connectors later | v0.2.0 (connectors v0.3.0) |
 | `@4thtech-io/chain` | Chain configs, contract bindings, fee quotes, credits, submitter client, proof verification | v0.2.0 |
-| `@4thtech-io/occ-v2-abi` | Contract ABIs and addresses (own version line) | v0.2.0 |
+| `@4thtech-io/occ-v2-abi` | Contract ABIs (full and client-safe) and testnet addresses, imported from a tagged contracts release and verified against its SHA-256 manifest; private, bundled into the CLI, never published on its own (D-83). See [Contracts](contracts.md#interface-package) | In the repository (Base Sepolia testnet); used by the CLI from v0.2.0 |
 | `@4thtech-io/agentlink` | CLI and MCP server (stdio; Node only) | v0.1.0 |
 
-Package names follow the specifications and may still change before the first release (trademark check, D-56).
+The `@4thtech-io` scope is the internal workspace scope; only `@4thtech-io/agentlink` is on npm today. See [Design decisions](../concepts/design-decisions.md). Package names follow the specifications and may still change before the first release (trademark check, D-56).
 
 Integrators use `@4thtech-io/core` with their own `KeyStore` and `Store` and pass their `appId` to earn integrator fees.
 

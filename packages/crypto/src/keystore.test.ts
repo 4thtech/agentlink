@@ -28,6 +28,8 @@ const SEED_OR_SECRET = [
   'signEnvelopeHash',
   // M1-1e (IR-M1-1e-1 M-1): ECDSA signing with a secret key.
   'signDigestEcdsa',
+  // M1-1g-e: a drop request signed with a drop secret key (KeyStore backends only).
+  'signDropRequest',
   'signTypedData',
   'signAgentCard',
   // M1-1f: Argon2id, password() normalisation and code generation, and the ALKS / ALKO seal and

@@ -1261,6 +1261,19 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - Regressions in `tools/deps-check`: each of those imports planted in `e2e/` fails both tools, and the seam import passes. The repository scan covers `e2e/`.
 
+#### M1-1g-f · crypto: drop DELETE signed with an older epoch's drop key (new, IR-M1-1g-e-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/crypto (KeyStore interface, MemoryKeyStore, `keystore-drop.ts`), packages/node (keychain KeyStore and facade)
+- **Depends on:** M1-1g-e (#274)
+- **Spec:** 04 §2.1 (drop key per `keyEpoch`; an object's locator records the epoch, so older objects stay deletable), §4; 07 §5.4
+- **Invariants:** I-1, I-3, I-7
+- **Scope:**
+  - `KeyStore.signDropRequest` signs with the current epoch's drop key only (M1-1g-e), so after a key rotation a `deleteAfter: receipt` DELETE for an object uploaded under an older epoch is refused by the drop. Interim mitigation: the drop's hard 7-day expiry and lifecycle rule still remove the object.
+  - Add an optional `{epoch}` to `signDropRequest`, accepted only with method `DELETE` and bounded to retained epochs (never above the current one, `epoch_unavailable`); POST always signs with the current epoch. The same fixed refusal and the check-before-key-read rule apply.
+  - The KeyStore type tests (`EpochTaking`) list `signDropRequest` as the one signing method that takes an epoch, with the reason.
+- **Acceptance:**
+  - Tests first: after an advance, a DELETE signed with `{epoch: n}` verifies with `verifyDropAuthorization` and carries the epoch-n drop key; a POST with an epoch, an epoch above the current one and a malformed epoch are refused before any key is read; MemoryKeyStore and the keychain KeyStore and facade behave the same.
+
 #### M1-1g-d · crypto: owner-only epoch advance with compare-and-set, and an epoch + 1 public preview (new, IR-M1-7a-1 Q1)
 - **Status:** done (4thtech/agentlink#55, merged 2026-10-14; the Node backends implement the contract with M1-8a, M1-8f) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/crypto (interface and test doubles), packages/node (backends with M1-8a, M1-8f), packages/core (rotation flow)
@@ -1577,7 +1590,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The suppression sits at the narrowest scope that keeps Slither clean; no new finding appears.
 
 #### M1-3f · contracts: ABI release artifacts and `@4thtech-io/occ-v2-abi` (private, in-repo)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (contracts export: 4thtech/occ-v2-contracts#19, release `v0.1.0-testnet.2`, audited AUDIT-FABLE-OCC19-1 PASS; agentlink import: #273, replacing #271) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · release workflow; agentlink · packages/occ-v2-abi
 - **Depends on:** M1-3d, M0-2e (G-10 resolved by D-83)
 - **Spec:** 05 §9; D-19; `development-process.md` §9.1–§9.3; `release-and-deployment.md` §2
