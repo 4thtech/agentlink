@@ -27,12 +27,14 @@ import {
 } from './index.js';
 
 const ZERO32 = `0x${'0'.repeat(64)}`;
-/** The vectors' fee asset address (a named constant keeps secret scanners from reading it as a key). */
-const FEE_ASSET = '0x05f7cddba6070777972ad9ff9df5312872a49685';
 const NATIVE_ASSET = `0x${'0'.repeat(40)}`;
 const hex = (b: Uint8Array): string => encodeHex0x(b);
 
 // --- vector copies -----------------------------------------------------------------------------
+// vector-copies:start (checked against test-vectors by tools/vectors/chain-inline-copies.test.mjs)
+
+/** record-message: the fee asset address (a named constant keeps secret scanners from reading it as a key). */
+const FEE_ASSET = '0x05f7cddba6070777972ad9ff9df5312872a49685';
 
 /** record-message: kind 1 MESSAGE to the recipient of commitment-basic, Base Sepolia domain. */
 const RECORD_MESSAGE = {
@@ -123,6 +125,8 @@ const CARD_BASIC = {
   },
   digest: '0x7abb5ab9667f7ee4d86adea395f4feea44a34df00a0937ac623fb3502642a711',
 } as const;
+
+// vector-copies:end
 
 // --- helpers -----------------------------------------------------------------------------------
 

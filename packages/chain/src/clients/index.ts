@@ -10,10 +10,12 @@ export {
   DEFAULT_RPC_RETRY_COUNT,
   DEFAULT_RPC_RETRY_DELAY_MS,
   DEFAULT_RPC_TIMEOUT_MS,
+  MAX_USER_RPC_URLS,
   RPC_READ_METHODS,
   createReadClient,
   type ReadClient,
   type ReadClientOptions,
+  type RpcFetchFn,
 } from './read-client.js';
 export {
   FEE_VAULT_CLIENT_ABI,
@@ -27,3 +29,4 @@ export {
   type NotaryCall,
   type NotaryReader,
 } from './calls.js';
+export { ChainError, type ChainErrorCode } from './errors.js';

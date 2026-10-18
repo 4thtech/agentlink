@@ -9,7 +9,9 @@ import type { ChainConfig, ChainNetwork } from '../config/index.js';
 import { loadOccV2Contracts, type OccV2Contracts } from '../occ-v2.js';
 import { composeChainConfig } from './registry.js';
 import {
+  ChainError,
   FEE_VAULT_CLIENT_ABI,
+  MAX_USER_RPC_URLS,
   NOTARY_CLIENT_ABI,
   RPC_READ_METHODS,
   chainRegistry,
@@ -292,15 +294,79 @@ describe('createReadClient: fallback transport with timeouts and retries', () =>
     ]);
   });
 
-  it('fails when every URL fails, without leaking a URL the user added', async () => {
+  /** A user URL with a fake provider key in its path: no fragment of it may surface. */
+  const CANARY_URL = 'https://canary-node.example-node.io/v3/canary0secret0key0abcdef0123456789';
+  const CANARY_FRAGMENTS = ['canary-node', 'canary0secret', '/v3/', 'example-node.io'];
+
+  /** Message, stack, JSON and every cause in the chain, as one string. */
+  function everythingIn(error: unknown): string {
+    const parts: string[] = [];
+    let current: unknown = error;
+    for (let depth = 0; current !== undefined && current !== null && depth < 16; depth++) {
+      const e = current as { message?: unknown; stack?: unknown; cause?: unknown };
+      parts.push(String(e.message), String(e.stack), JSON.stringify(current), String(current));
+      for (const key of Object.getOwnPropertyNames(current)) {
+        parts.push(`${key}=${String((current as Record<string, unknown>)[key])}`);
+      }
+      current = e.cause;
+    }
+    return parts.join('\n');
+  }
+
+  async function rejection(promise: Promise<unknown>): Promise<unknown> {
+    try {
+      await promise;
+    } catch (error) {
+      return error;
+    }
+    throw new Error('expected a rejection');
+  }
+
+  it('fails when every URL fails, with a fixed code and no fragment of a user URL', async () => {
     const fetchFn = vi.fn(() => Promise.resolve(new Response('down', { status: 500 })));
     const client = createReadClient(config(), {
       fetchFn,
       retryCount: 0,
       retryDelayMs: 1,
-      rpcUrls: ['https://private-node.example-node.io/base'],
+      rpcUrls: [CANARY_URL],
     });
-    await expect(client.getChainId()).rejects.toThrow();
+    const error = await rejection(client.getChainId());
+    expect(error).toBeInstanceOf(ChainError);
+    expect((error as ChainError).code).toBe('rpc_unavailable');
+    expect((error as { cause?: unknown }).cause).toBeUndefined();
+    const text = everythingIn(error);
+    for (const fragment of CANARY_FRAGMENTS) expect(text).not.toContain(fragment);
+    expect(sameUrl((fetchFn.mock.calls[0] as unknown as FetchArgs)[0], CANARY_URL)).toBe(true);
+  });
+
+  it('a JSON-RPC error and a revert from a user URL leak no fragment of it', async () => {
+    const revert = vi.fn(async (_url: FetchInput, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { id: number };
+      return new Response(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: body.id,
+          error: { code: 3, message: 'execution reverted', data: '0x' },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    });
+    const client = createReadClient(config(), { fetchFn: revert, rpcUrls: [CANARY_URL] });
+    const reverted = await rejection(notaryReader(client, config()).read.paused());
+    expect(reverted).toBeInstanceOf(ChainError);
+    expect((reverted as ChainError).code).toBe('call_reverted');
+    const rpcError = await rejection(client.getBlockNumber());
+    expect(rpcError).toBeInstanceOf(ChainError);
+    for (const error of [reverted, rpcError]) {
+      const text = everythingIn(error);
+      for (const fragment of CANARY_FRAGMENTS) expect(text).not.toContain(fragment);
+    }
+  });
+
+  it('does not expose the RPC URLs on the client', () => {
+    const client = createReadClient(config(), { fetchFn: vi.fn(), rpcUrls: [CANARY_URL] });
+    expect(JSON.stringify(client.chain)).not.toContain('canary');
+    expect(client.chain.rpcUrls.default.http).toEqual([]);
   });
 
   it('sends read methods only: no signing, accounts or transactions', async () => {
@@ -318,9 +384,12 @@ describe('createReadClient: fallback transport with timeouts and retries', () =>
     ]) {
       await expect(
         client.request({ method, params: [] } as unknown as Parameters<typeof client.request>[0]),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ name: 'ChainError', code: 'method_refused' });
     }
     expect(fetchFn).not.toHaveBeenCalled();
+    expect('sendRawTransaction' in client).toBe(true); // present at run time, refused above
+    // @ts-expect-error the ReadClient type has no send method (IR-M1-4a-1 L-5)
+    expect(typeof client.sendRawTransaction).toBe('function');
     expect(RPC_READ_METHODS).toContain('eth_call');
     expect(RPC_READ_METHODS.some((m) => /send|sign|account|wallet_|personal_/i.test(m))).toBe(
       false,
@@ -340,11 +409,39 @@ describe('createReadClient: fallback transport with timeouts and retries', () =>
     }
   });
 
-  it('refuses out-of-range timeouts and retries', () => {
-    expect(() => createReadClient(config(), { timeoutMs: 0 })).toThrow();
-    expect(() => createReadClient(config(), { timeoutMs: 120_001 })).toThrow();
-    expect(() => createReadClient(config(), { retryCount: -1 })).toThrow();
-    expect(() => createReadClient(config(), { retryCount: 11 })).toThrow();
+  it('refuses out-of-range timeouts, retries and back-off, too many own URLs, and no fetch', () => {
+    const fetchFn = vi.fn();
+    const bad: Partial<Parameters<typeof createReadClient>[1]>[] = [
+      { timeoutMs: 0 },
+      { timeoutMs: 30_001 },
+      { retryCount: -1 },
+      { retryCount: 4 },
+      { retryDelayMs: -1 },
+      { retryDelayMs: 1_001 },
+    ];
+    for (const options of bad) {
+      expect(() => createReadClient(config(), { fetchFn, ...options })).toThrow(
+        expect.objectContaining({ code: 'bad_client_option' }),
+      );
+    }
+    expect(() =>
+      createReadClient(config(), {
+        fetchFn,
+        timeoutMs: 30_000,
+        retryCount: 3,
+        retryDelayMs: 1_000,
+      }),
+    ).not.toThrow();
+    const own = (n: number) =>
+      Array.from({ length: n }, (_, i) => `https://rpc${'abcdef'[i] ?? 'z'}.example-node.io/x`);
+    expect(MAX_USER_RPC_URLS).toBe(5);
+    expect(() => createReadClient(config(), { fetchFn, rpcUrls: own(5) })).not.toThrow();
+    expect(() => createReadClient(config(), { fetchFn, rpcUrls: own(6) })).toThrow(
+      expect.objectContaining({ code: 'too_many_rpc_urls' }),
+    );
+    expect(() =>
+      createReadClient(config(), {} as unknown as Parameters<typeof createReadClient>[1]),
+    ).toThrow(expect.objectContaining({ code: 'bad_client_option' }));
   });
 });
 
@@ -456,6 +553,9 @@ describe('calls: the client cannot encode admin, upgrade, module or pending func
     expect(call.method).toBe('eth_call');
     expect(call.params[0].to.toLowerCase()).toBe(config().contracts.notary);
     const reads = notary.read as unknown as Record<string, () => Promise<unknown>>;
-    await expect(reads.pause?.()).rejects.toThrow();
+    await expect(reads.pause?.()).rejects.toMatchObject({
+      name: 'ChainError',
+      code: 'invalid_call',
+    });
   });
 });

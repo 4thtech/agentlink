@@ -1,12 +1,16 @@
 // M1-4a: record IDs, nonces and salts (05 §3.3 step 2; 04 §5; D-61).
 //
 // The vector values below are verbatim copies from test-vectors/eip712-proof/vectors.json (this
-// package may not read files outside itself, deps-check). `receipt-delivered` names the recordId of
-// the `record-message` Record, so the derivation is pinned by the shared vectors, not by this file.
+// package may not read files outside itself, deps-check; tools/vectors/chain-inline-copies.test.mjs
+// checks the copies). The recordId of `receipt-delivered` is an input the vector generator computed
+// for `record-message` with its own Python implementation of 05 §3.3 step 2; the generator marks it
+// "not an expected value", and no contract run checked it. Matching it is an independent
+// cross-check (with viem as a second oracle below), not contract parity.
 import { encodeAbiParameters, keccak256 as viemKeccak256 } from 'viem';
 import { describe, expect, it } from 'vitest';
 import { computeRecordId, randomNonce, randomSalt } from './index.js';
 
+// vector-copies:start (checked by tools/vectors/chain-inline-copies.test.mjs)
 // record-message (domain and record) and receipt-delivered (recordId).
 const VECTOR = {
   chainId: 84532,
@@ -15,6 +19,7 @@ const VECTOR = {
   nonce: 53413080818580974331135570314775698628850412394171742376625802275545193048131n,
   recordId: '0xe24e95611787c13ff990f930ae7f5e4fd5aabbbc6c493929691180d708efe1a6',
 } as const;
+// vector-copies:end
 
 const MAX_UINT256 = (1n << 256n) - 1n;
 

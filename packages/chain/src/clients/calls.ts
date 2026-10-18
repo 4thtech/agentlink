@@ -12,8 +12,11 @@ import {
   type Address,
   type ContractFunctionArgs,
   type ContractFunctionName,
+  type Chain,
   type GetContractReturnType,
   type Hex,
+  type PublicClient,
+  type Transport,
 } from 'viem';
 import type { ChainConfig } from '../config/index.js';
 import type { ReadClient } from './read-client.js';
@@ -69,16 +72,19 @@ export function encodeFeeVaultCall<Name extends ContractFunctionName<FeeVaultAbi
 }
 
 /** Read-only Notary bindings. */
-export type NotaryReader = GetContractReturnType<NotaryAbi, { public: ReadClient }>;
+export type NotaryReader = GetContractReturnType<NotaryAbi, { public: ViemReadClient }>;
 /** Read-only fee vault bindings. */
-export type FeeVaultReader = GetContractReturnType<FeeVaultAbi, { public: ReadClient }>;
+export type FeeVaultReader = GetContractReturnType<FeeVaultAbi, { public: ViemReadClient }>;
+
+/** viem's own type for the client; ReadClient only hides the send methods it refuses anyway. */
+type ViemReadClient = PublicClient<Transport, Chain>;
 
 /** Read-only Notary bindings at the configured address (no `write`: the client holds no key). */
 export function notaryReader(client: ReadClient, config: ChainConfig): NotaryReader {
   return getContract({
     address: config.contracts.notary as Address,
     abi: NOTARY_CLIENT_ABI,
-    client: { public: client },
+    client: { public: client as ViemReadClient },
   });
 }
 
@@ -87,6 +93,6 @@ export function feeVaultReader(client: ReadClient, config: ChainConfig): FeeVaul
   return getContract({
     address: config.contracts.vault as Address,
     abi: FEE_VAULT_CLIENT_ABI,
-    client: { public: client },
+    client: { public: client as ViemReadClient },
   });
 }

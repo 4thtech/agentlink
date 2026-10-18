@@ -21,6 +21,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'NodeKeyStoreError',
       // M1-8b: the store entry returns the Store and its cipher, never the store key.
       'NodeStoreError',
+      // M1-4a: the address-checked RPC fetch (no lookup, CA or route seam).
+      'RPC_FETCH_MAX_BYTES',
+      'RpcFetchError',
       // M1-15: the SSRF-safe download (no lookup, CA or route seam).
       'SAFE_FETCH_TIMEOUT_MS',
       'SafeFetchError',
@@ -40,6 +43,7 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'nodeHostResolver',
       'nodeNip11Fetcher',
       'nodeRelayConnector',
+      'nodeRpcFetch',
       'nodeSafeFetch',
       'openAgentKeyStore',
       'openAgentStore',
@@ -85,6 +89,11 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'osNotifier',
       // M1-15: the safe-fetch test seams stay internal.
       'createSafeFetchWith',
+      // M1-4a: the RPC fetch test seams and the shared safe-fetch internals stay internal.
+      'createRpcFetchWith',
+      'resolvePinned',
+      'pinnedTls',
+      'systemLookup',
       'openAllowedFileWith',
     ]) {
       expect(names).not.toContain(name);
