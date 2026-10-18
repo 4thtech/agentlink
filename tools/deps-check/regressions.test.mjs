@@ -456,7 +456,11 @@ describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', 
     );
     expect(entries).toHaveLength(1);
     expect(entries[0]?.zones).toEqual(['test-vectors', 'e2e']);
-    expect(entries[0]?.testZones).toEqual(['packages/core', 'packages/transport-nostr']);
+    expect(entries[0]?.testZones).toEqual([
+      'packages/core',
+      'packages/transport-nostr',
+      'packages/storage',
+    ]);
   });
 });
 
@@ -566,7 +570,7 @@ describe('M1-1g-b (IR-M1-1g-G2-1 R2-L-1): the test seam in package test files (0
   // MemoryKeyStore (core M1-7a, transport-nostr M1-5a) may import it by package name.
   const RESTRICTED = /@4thtech-io\/crypto\/testing may be imported only in test-vectors/;
   const SEAM_SOURCE = /test seam\) may be imported only by test files/;
-  const ZONES_WITH_TESTS = ['packages/core', 'packages/transport-nostr'];
+  const ZONES_WITH_TESTS = ['packages/core', 'packages/transport-nostr', 'packages/storage'];
   const forms = [
     `import { MemoryKeyStore } from '@4thtech-io/crypto/testing';\n`,
     `export { MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';\n`,

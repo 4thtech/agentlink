@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { encodeHex, sha256 } from '@4thtech-io/crypto';
 import {
   MAX_PRESIGN_SECONDS,
+  MULTIPART_DEFAULT_PART_BYTES,
+  MULTIPART_MAX_BYTES,
   S3_MAX_SINGLE_PUT_BYTES,
   StorageError,
   createS3Adapter,
@@ -20,6 +22,7 @@ import {
   testPrefix,
   type FakeEndpoint,
 } from './fake-s3.fixture.js';
+import { chunked, fakeMultipartS3, patternBytes } from './multipart.fixture.js';
 
 const ACCESS_KEY_ID = 'AKIDEXAMPLETESTONLY';
 const SECRET = 'test-secret-access-key-never-logged';
@@ -109,13 +112,116 @@ describe('S3 adapter: put', () => {
     expect(fake.requests).toHaveLength(0);
   });
 
-  it('refuses objects above the single-PUT limit (multipart is M1-6b)', async () => {
+  // M1-6c (open question from #260): above the single-PUT limit, `put` routes to multipart upload
+  // (07 §5.2) instead of refusing; only objects above the multipart maximum are too large.
+  it('refuses objects above the multipart maximum before any request', async () => {
     const { adapter, fake } = setup();
     expect(S3_MAX_SINGLE_PUT_BYTES).toBe(64 * 1024 * 1024);
     await expect(
-      adapter.put(bytes(1), { size: S3_MAX_SINGLE_PUT_BYTES + 1, expiresAt: inADay }),
+      adapter.put(bytes(1), { size: MULTIPART_MAX_BYTES + 1, expiresAt: inADay }),
     ).rejects.toMatchObject({ code: 'too_large' });
     expect(fake.requests).toHaveLength(0);
+  });
+
+  // Timeout: CI run 39164524348 timed out at the 20 s default on the loaded Linux runner (1.5 s on
+  // macOS). Three SHA-256 passes over 64 MiB are inherent to the path under test (multipart's running
+  // hash, the SigV4 payload hash of each part, the fake's ETag), plus the test's expected hash; the
+  // data is a cheap fill instead of a PRNG. 90 s leaves margin over the measured CI time.
+  it('routes a put above 64 MiB to multipart upload, reading at most one part ahead', async () => {
+    const fake = fakeMultipartS3(BUCKET);
+    const storagePrefix = testPrefix();
+    const adapter = createS3Adapter({
+      endpoint: ENDPOINT,
+      bucket: BUCKET,
+      storagePrefix,
+      credentials: async () => ({ accessKeyId: ACCESS_KEY_ID, secretAccessKey: SECRET }),
+      fetch: fake.fetch,
+      now: () => NOW,
+    });
+    const size = S3_MAX_SINGLE_PUT_BYTES + 1;
+    const CHUNK = 1024 * 1024;
+    const data = new Uint8Array(size);
+    for (let i = 0; i < size; i += CHUNK) data.fill((i / CHUNK) & 0xff, i, i + CHUNK);
+    data[size - 1] = 0xa5;
+
+    // Structural memory check: when a part reaches the store, the source has been read at most
+    // one chunk beyond the bytes of the parts sent so far, so no more than one part is buffered.
+    let pulled = 0;
+    let sent = 0;
+    let maxAhead = 0;
+    const source = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulled >= size) {
+          controller.close();
+          return;
+        }
+        const end = Math.min(pulled + CHUNK, size);
+        controller.enqueue(data.slice(pulled, end));
+        pulled = end;
+      },
+    });
+    const partSizes: number[] = [];
+    fake.override = (req) => {
+      if (req.method === 'PUT' && req.url.searchParams.has('partNumber')) {
+        sent += req.body.length;
+        partSizes.push(req.body.length);
+        maxAhead = Math.max(maxAhead, pulled - sent);
+      }
+      return undefined;
+    };
+
+    const obj = await adapter.put(source, { size, expiresAt: inADay });
+    const expected = encodeHex(sha256(data));
+    expect(obj).toMatchObject({ kind: 's3', size, sha256: expected });
+    expect(obj.locator).toMatch(new RegExp(`^agentlink/${storagePrefix}/[A-Za-z0-9_-]{22}$`));
+    expect(fake.objects.get(obj.locator)?.length).toBe(size);
+    const methods = fake.requests.map((r) => r.method);
+    expect(methods[0]).toBe('POST');
+    expect(partSizes.length).toBeGreaterThan(1);
+    expect(partSizes.reduce((n, p) => n + p, 0)).toBe(size);
+    for (const part of partSizes) expect(part).toBeLessThanOrEqual(MULTIPART_DEFAULT_PART_BYTES);
+    expect(maxAhead).toBeLessThanOrEqual(CHUNK);
+    expect(fake.uploads.size).toBe(0);
+    // The object it stored is the adapter's own: presign and delete accept it.
+    await expect(adapter.presignGet(obj, inADay)).resolves.toMatch(/^https:/);
+  }, 90_000);
+
+  it('aborts a routed multipart upload when a part fails, leaving no open upload (IR-M1-6c-1 L3)', async () => {
+    const fake = fakeMultipartS3(BUCKET);
+    const adapter = createS3Adapter({
+      endpoint: ENDPOINT,
+      bucket: BUCKET,
+      storagePrefix: testPrefix(),
+      credentials: async () => ({ accessKeyId: ACCESS_KEY_ID, secretAccessKey: SECRET }),
+      fetch: fake.fetch,
+      now: () => NOW,
+    });
+    let parts = 0;
+    fake.override = (req) => {
+      if (req.method === 'PUT' && req.url.searchParams.has('partNumber')) {
+        parts += 1;
+        if (parts === 2) return new Response(`<Error>${SECRET}</Error>`, { status: 500 });
+      }
+      return undefined;
+    };
+    const size = S3_MAX_SINGLE_PUT_BYTES + 1;
+    const error = await adapter
+      .put(chunked(patternBytes(size, 6), 1024 * 1024), { size, expiresAt: inADay })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(StorageError);
+    expect((error as Error).message).not.toContain(SECRET);
+    expect(fake.uploads.size).toBe(0);
+    expect(fake.objects.size).toBe(0);
+    expect(
+      fake.requests.some((r) => r.method === 'DELETE' && r.url.searchParams.has('uploadId')),
+    ).toBe(true);
+  });
+
+  it('keeps a put of exactly 64 MiB a single PUT', async () => {
+    const { adapter, fake } = setup();
+    const size = S3_MAX_SINGLE_PUT_BYTES;
+    await adapter.put(new Uint8Array(size), { size, expiresAt: inADay });
+    expect(fake.requests.map((r) => r.method)).toEqual(['PUT']);
   });
 
   it('refuses an expiry in the past', async () => {
