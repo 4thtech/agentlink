@@ -113,13 +113,6 @@ const longDate = (iso) => {
 };
 const stateWord = (s) => ({ done: 'Done', 'in-progress': 'In progress', planned: 'Planned' })[s];
 
-function componentTag(c) {
-  const prs = prList(c);
-  if (c.state === 'done') return prs ? ` (${prs})` : '';
-  const word = c.state === 'in-progress' ? 'in progress' : 'planned';
-  return prs ? ` (${word}; ${prs})` : ` (${word})`;
-}
-
 /** README: the Status blockquote (compact: the full component list lives on the docs site). */
 export function renderReadmeStatus(data) {
   const out = [
