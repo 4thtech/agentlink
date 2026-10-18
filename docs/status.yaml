@@ -207,7 +207,7 @@ areas:
       - name: "Live relay subscriptions"
         state: done
         prs: [204]
-        summary: "The running MCP server receives new messages from a relay as they arrive instead of waiting for the next catch-up (M1-9s). Merged after v0.1.0; ships in the next release."
+        summary: "The running MCP server receives new messages from a relay as they arrive instead of waiting for the next catch-up (M1-9s). Released in v0.1.1."
       - name: "Policy rules for files, proofs and the budget ledger"
         state: done
         prs: [217]

@@ -20,7 +20,7 @@
 
 - "Who are my AgentLink contacts?" lists them with their labels; in a terminal, `agentlink contacts`.
 - `agentlink requests` (your own terminal) shows messages from unknown senders, and `agentlink requests accept | ignore | block <requestId>` handles them. Your AI can't read them unless you let it.
-- **Rename or remove a contact** (with the release after v0.1.0), in a terminal you opened yourself:
+- **Rename or remove a contact** (since v0.1.1), in a terminal you opened yourself:
   1. `agentlink contacts` lists each contact with its ID (`0x…`).
   2. `agentlink contacts rename <ID> "New name"` gives it your own name. Use letters, numbers, spaces, dots, apostrophes and hyphens (one script, at most 32 characters, no words such as "verified" or "owner"). The name must differ from your other contacts' names.
   3. `agentlink contacts remove <ID>` removes it: your AI can no longer send to it, and its messages are dropped. The other person isn't told. To talk again, pair with a new invite.
