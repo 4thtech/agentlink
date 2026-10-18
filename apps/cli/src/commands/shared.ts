@@ -40,6 +40,12 @@ export interface CommandDeps {
    * keychain write can leave. @agentlink/node exports no such listing yet, so there is no default.
    */
   readonly strayItems?: StrayItems;
+  /**
+   * M1-9z (IR-M1-9z-1 F2): true when an owner code change didn't finish (a leftover `owner-next`
+   * item). Store-only: nothing is unlocked. Production wires @agentlink/node's check in doctor.ts;
+   * there is no default, so tests never touch the OS keychain.
+   */
+  readonly unfinishedOwnerCodeChange?: () => Promise<boolean>;
 }
 
 export interface StrayItems {
@@ -143,6 +149,8 @@ export const TEXT = Object.freeze({
   doctorStray:
     '{count, plural, one {Warning  1 leftover item from an interrupted setup is in your keychain} other {Warning  # leftover items from an interrupted setup are in your keychain}}',
   doctorStrayAsk: 'Remove them? (y/N)',
+  doctorOwnerCodeUnfinished:
+    "Problem  An owner code change didn't finish. In a terminal you opened yourself, run `agentlink owner change-code` to finish or clean it up. Keep both your current and your new owner code until then.",
   doctorStrayRemoved: 'OK       Removed {count} leftover items',
   doctorNotChecked:
     'Not checked in this version: payments network, file storage and AI apps (`agentlink doctor` adds them later).',

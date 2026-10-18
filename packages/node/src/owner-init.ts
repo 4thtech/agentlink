@@ -139,7 +139,7 @@ const COPY = {
 } as const;
 
 /** The code as groups of four, for display only (04 §2.8). */
-function grouped(code: Uint8Array): string {
+export function grouped(code: Uint8Array): string {
   const text = new TextDecoder().decode(code);
   return (text.match(/.{1,4}/g) ?? []).join(' ');
 }
@@ -151,7 +151,7 @@ const LOOKALIKE: Readonly<Record<number, number>> = { 0x30: 0x4f, 0x31: 0x49, 0x
  * The last group of the code, re-typed, read the way the code itself is read (04 §2.8 kind 1):
  * spaces and dashes ignored, ASCII upper case, and 0/1/8 as O/I/B.
  */
-function retypeMatches(typed: Uint8Array, code: Uint8Array): boolean {
+export function retypeMatches(typed: Uint8Array, code: Uint8Array): boolean {
   const cleaned: number[] = [];
   for (const byte of typed) {
     if (byte === 0x20 || byte === 0x2d) continue;

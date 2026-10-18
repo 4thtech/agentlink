@@ -27,11 +27,15 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       // M1-9t (D-78): `owner add-agent`, a prompting entry point like initOwner.
       'addAgentToOwner',
       'assertAgentId',
+      // M1-9z: `owner change-code`, a prompting entry point like initOwner (no seed or item seam).
+      'changeOwnerCode',
       'createInboxFile',
       'createOsKeychainAgent',
       'decideReviewedApprovals',
       // M1-9x: a store-only boolean (owner item present); no bytes, no secret, nothing unlocked.
       'hasOwnerOnMachine',
+      // M1-9z: a store-only boolean (a leftover owner-code change); nothing unlocked.
+      'hasUnfinishedOwnerCodeChange',
       'initOwner',
       'nodeHostResolver',
       'nodeNip11Fetcher',

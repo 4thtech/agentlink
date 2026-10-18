@@ -2,7 +2,7 @@
 // script it. Production wires @agentlink/node's owner entry points (M1-8c) and the M1-9k runtime.
 //
 // I-1/I-4: no member of this interface carries an owner secret. The owner code is read by
-// @agentlink/node's own TTY prompt inside `initOwner`, `addAgent`, `decide` and `signOwnerAction`, never from an
+// @agentlink/node's own TTY prompt inside `initOwner`, `addAgent`, `changeOwnerCode`, `decide` and `signOwnerAction`, never from an
 // argument, an environment variable or a pipe (04 §2.5, §2.8; D-67). `ask` reads a visible answer
 // (approve, deny or later; an agent number) and is never used for a secret.
 import { homedir } from 'node:os';
@@ -12,12 +12,15 @@ import type { AgentLinkClient, Store, StoreCipher } from '@agentlink/core';
 import type { JsonObject, OwnerPublicKeys } from '@agentlink/crypto';
 import {
   addAgentToOwner,
+  changeOwnerCode,
   decideReviewedApprovals,
   initOwner,
   performOwnerOperation,
   type AddAgentOptions,
   type AddAgentResult,
   type AgentStore,
+  type ChangeOwnerCodeOptions,
+  type ChangeOwnerCodeResult,
   type ApprovalContext,
   type KeyStoreBackendKind,
   type OwnerInitResult,
@@ -74,6 +77,11 @@ export interface OwnerCommandDeps {
    * code once and signs exactly one first card for `options.card.agent`, stored through core.
    */
   addAgent(options: AddAgentOptions): Promise<AddAgentResult>;
+  /**
+   * `owner change-code` (M1-9z): prompts at this process's own terminal for the current owner code,
+   * shows a new generated one and re-wraps the owner key under it. The owner does not change.
+   */
+  changeOwnerCode(options: ChangeOwnerCodeOptions): Promise<ChangeOwnerCodeResult>;
   /**
    * One owner operation over the reviewed items (M1-8c): shows the decisions, asks "Continue?", reads
    * the owner code once at the TTY prompt and signs one `approval.decide` or `approval.decideBatch`.
@@ -153,6 +161,7 @@ export function nodeOwnerDeps(home: string = homedir()): OwnerCommandDeps {
     },
     initOwner: (options) => initOwner(options),
     addAgent: (options) => addAgentToOwner(options),
+    changeOwnerCode: (options) => changeOwnerCode(options),
     decide: (context, reviewed) => decideReviewedApprovals(context, reviewed),
     signOwnerAction: (owner, item) => performOwnerOperation(owner, item),
     ask: askAtTerminal,

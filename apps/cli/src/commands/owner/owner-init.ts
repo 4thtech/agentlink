@@ -186,6 +186,39 @@ async function addAgentOne(deps: OwnerCommandDeps, context: CommandContext): Pro
   return EXIT_OK;
 }
 
+/**
+ * `agentlink owner change-code` † (M1-9z; 04 §2.8 "Changing the owner code"): replaces an exposed
+ * owner code. The owner the machine's agents name is handed to node as the expected owner, so the
+ * owner item must unlock to exactly that owner; node asks for the current code, shows the new one
+ * and re-wraps the owner key. The owner, its fingerprint and every card stay the same.
+ */
+async function changeCodeOne(deps: OwnerCommandDeps, context: CommandContext): Promise<number> {
+  const { output, parsed, terminal } = context;
+  const backend = await deps.backendOf(parsed.agent);
+  if (backend === undefined) {
+    output.printError(OWNER_TEXT.ownerUnknownAgent);
+    return EXIT_FAILED;
+  }
+  const found = await machineOwner(deps, '');
+  if (found.status === 'several') {
+    output.printError(OWNER_TEXT.addAgentSeveralOwners);
+    return EXIT_FAILED;
+  }
+  if (found.status === 'unreadable') {
+    // Agent names are local config names checked by isAgentName, never inbound content (I-5).
+    output.printError(OWNER_TEXT.addAgentUnreadable(found.agents));
+    return EXIT_FAILED;
+  }
+  await deps.changeOwnerCode({
+    backend,
+    ...(found.status === 'one' ? { owner: found.owner } : {}),
+    // Read for AI-app markers only (04 §2.8), never for a secret.
+    env: terminal.env,
+  });
+  output.print(OWNER_TEXT.changeCodeDone);
+  return EXIT_OK;
+}
+
 export function ownerHandler(deps: OwnerCommandDeps) {
   return (context: CommandContext): Promise<number> =>
     ownerStep(context, () => {
@@ -193,6 +226,9 @@ export function ownerHandler(deps: OwnerCommandDeps) {
       if (positionals.length === 1 && positionals[0] === 'init') return initOne(deps, context);
       if (positionals.length === 1 && positionals[0] === 'add-agent') {
         return addAgentOne(deps, context);
+      }
+      if (positionals.length === 1 && positionals[0] === 'change-code') {
+        return changeCodeOne(deps, context);
       }
       return Promise.resolve(badArguments(context.output));
     });
