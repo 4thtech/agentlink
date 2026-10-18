@@ -1,0 +1,773 @@
+# Deploy the 4thTech encrypted drop Worker (apps/drop, D-48, M1-27b): staging on every merge to main,
+# production automatically once the staging smoke test is green (D-25, D-52).
+# Contract: docs/process/release-and-deployment.md §4.5 (Workers pipeline), §6 (secrets), §8
+# (rollback). Configuration: apps/drop/wrangler.toml. Tests of this file:
+# tools/release/deploy-drop.test.mjs (structure, read-back checks on fixtures) and
+# apps/drop/test/smoke-config.test.ts (wrangler.toml).
+#
+# JOBS
+#   ci-green           waits for this commit's ci.yml and security.yml gates (as release.yml).
+#   guard              main of 4thtech/agentlink only, and only once apps/drop/wrangler.toml exists.
+#   build              builds the Worker bundle ONCE (wrangler deploy --dry-run, no credentials) and
+#                      uploads it with its SHA-256; both environments deploy exactly these bytes.
+#   deploy-staging     environment `staging`. Skips cleanly (green, with a notice) while the
+#                      Cloudflare credentials or the Worker secret DROP_URL_KEY are missing. Deploys
+#                      to workers.dev, then reads back the bucket lifecycle rule and the logging
+#                      settings.
+#   smoke-staging      no credentials: health, signed upload / GET / DELETE round trip, expired GET
+#                      refused (apps/drop/test/smoke-remote.test.ts against the staging origin).
+#   deploy-production  environment `production`, only after a green staging smoke. Records the live
+#                      version (rollback target), deploys to the Custom Domain, health-checks over
+#                      HTTP (no repository code runs against production), reads back the lifecycle
+#                      rule and the logging settings, and on any failure rolls back automatically
+#                      with `wrangler rollback`. Writes the deploy record draft to the run summary.
+#   freeze             sets DEPLOY_FREEZE when deploy-production failed after deploying.
+#   rollback-rehearsal manual dispatch with `rehearse-rollback`: on staging, rolls back to the
+#                      previous version, checks it, and rolls forward again (§4.5 "rehearsed").
+#
+# DEPLOY_FREEZE: every deploy job is skipped while the repository variable is 'true' and re-checks it
+# when it starts (after any approval wait). Rollback is remediation and still runs.
+#
+# CREDENTIALS (owner only; never in this file, logs or PR text)
+#   Environment `staging`:    secret CLOUDFLARE_API_TOKEN (staging token), variable CLOUDFLARE_ACCOUNT_ID,
+#                             optional variable DROP_STAGING_URL (the workers.dev origin, used only if
+#                             Wrangler does not report it).
+#   Environment `production`: secret CLOUDFLARE_API_TOKEN (production token), variable CLOUDFLARE_ACCOUNT_ID.
+#   Environment `deploy-freeze`: secret DEPLOY_FREEZE_TOKEN (exists, OPS-CI-2).
+#   Worker secrets DROP_URL_KEY and DROP_CORS_ORIGINS are set per environment by the owner with
+#   `wrangler secret put`; GitHub never holds them.
+#
+# Zero access (AGENTS.md): no step prints an object URL, a drop key or a token. Only the drop's
+# origin, HTTP status codes and Worker version IDs appear in logs.
+name: Deploy drop
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/drop/**"
+      - "packages/crypto/**"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - ".nvmrc"
+      - ".github/actions/setup-node-pnpm/**"
+      - ".github/workflows/deploy-drop.yml"
+  workflow_dispatch:
+    inputs:
+      rehearse-rollback:
+        description: "After the staging deploy and smoke: roll staging back to the previous version, check it, roll forward."
+        type: boolean
+        default: false
+
+permissions: {}
+
+env:
+  TURBO_TELEMETRY_DISABLED: "1"
+  DO_NOT_TRACK: "1"
+  WRANGLER_SEND_METRICS: "false"
+  # The production hostname (release-and-deployment.md §1.1); also the route in apps/drop/wrangler.toml.
+  DROP_PRODUCTION_ORIGIN: https://drop.agentlink.4thtech.io
+
+jobs:
+  ci-green:
+    name: ci-green
+    if: github.repository == '4thtech/agentlink' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Wait for this commit's CI and require it green
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node tools/release/wait-for-ci.mjs \
+            --require ci.yml:ci-gate \
+            --require security.yml:security-gate \
+            --timeout-minutes 45 \
+            --interval-seconds 30 \
+            --missing-grace-minutes 10
+
+  guard:
+    name: guard
+    needs: ci-green
+    if: github.repository == '4thtech/agentlink' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check that the drop has a deploy configuration
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f apps/drop/wrangler.toml ] && [ -f apps/drop/src/index.ts ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::apps/drop/wrangler.toml not found; nothing to deploy."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: build
+    needs: guard
+    if: needs.guard.outputs.enabled == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read # no credentials in this job: build code never sees a deploy token
+    outputs:
+      sha256: ${{ steps.bundle.outputs.sha256 }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Build the workspace dependencies of @agentlink/drop
+        run: pnpm exec turbo run build --filter='@agentlink/drop...'
+
+      # --dry-run bundles without contacting Cloudflare. The bundle is the same for both
+      # environments (no `define` or build-time vars differ); --env only selects the config to validate.
+      - name: Bundle the Worker once
+        id: bundle
+        shell: bash
+        working-directory: apps/drop
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/drop-bundle"
+          rm -rf "$out"
+          pnpm exec wrangler deploy --dry-run --env production --outdir "$out"
+          if [ ! -f "$out/index.js" ]; then
+            echo "::error::The bundle has no index.js."
+            exit 1
+          fi
+          sha="$(sha256sum "$out/index.js" | cut -d' ' -f1)"
+          echo "Bundle index.js sha256 $sha"
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the bundle
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: drop-bundle
+          path: ${{ runner.temp }}/drop-bundle/index.js
+          if-no-files-found: error
+          retention-days: 30
+
+  deploy-staging:
+    name: deploy-staging
+    needs: [guard, build]
+    if: needs.guard.outputs.enabled == 'true' && vars.DEPLOY_FREEZE != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: staging
+    concurrency:
+      group: deploy-drop-staging
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    outputs:
+      deployed: ${{ steps.deploy.outputs.deployed }}
+      url: ${{ steps.deploy.outputs.url }}
+      version: ${{ steps.deploy.outputs.version }}
+      previous: ${{ steps.previous.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Stop if DEPLOY_FREEZE is set
+        shell: bash
+        env:
+          DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
+        run: |
+          set -euo pipefail
+          if [ "${DEPLOY_FREEZE:-}" = "true" ]; then
+            echo "::error::DEPLOY_FREEZE is set; nothing is deployed until the owner clears it."
+            exit 1
+          fi
+
+      # No pnpm store cache in a job that holds secrets (cache poisoning).
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Download the bundle
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: drop-bundle
+          path: ${{ runner.temp }}/drop-bundle
+
+      - name: Verify the bundle is the one built
+        shell: bash
+        env:
+          EXPECTED: ${{ needs.build.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/drop-bundle"
+          echo "${EXPECTED}  index.js" | sha256sum -c -
+
+      - name: Check credentials and the Worker secret
+        id: ready
+        shell: bash
+        working-directory: apps/drop
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+            echo "::notice::Environment staging has no CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID yet (owner steps, M1-27b). The drop is not deployed."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! [[ "$CLOUDFLARE_ACCOUNT_ID" =~ ^[0-9a-f]{32}$ ]]; then
+            echo "::error::CLOUDFLARE_ACCOUNT_ID is not a 32-character hex account ID."
+            exit 1
+          fi
+          # Names only; Wrangler never prints secret values.
+          if ! listing="$(pnpm exec wrangler secret list --env staging --format json)"; then
+            echo "::warning::Could not list the secrets of Worker agentlink-drop-staging (not created yet, or the token lacks access). The drop is not deployed."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          json="$(printf '%s\n' "$listing" | awk 'f || /^\[/ { f = 1; print }')"
+          if ! jq -e 'any(.[]; .name == "DROP_URL_KEY")' <<<"$json" > /dev/null; then
+            echo "::notice::Worker secret DROP_URL_KEY is not set on agentlink-drop-staging yet (owner: wrangler secret put). The drop is not deployed."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Record the live version (rollback rehearsal target)
+        id: previous
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        working-directory: apps/drop
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          version=""
+          if status="$(pnpm exec wrangler deployments status --env staging --json)"; then
+            json="$(printf '%s\n' "$status" | awk 'f || /^\{/ { f = 1; print }')"
+            version="$(jq -r '[.versions[]? | select(.percentage == 100) | .version_id][0] // empty' <<<"$json" || true)"
+          fi
+          if ! [[ "$version" =~ ^[0-9a-f-]{36}$ ]]; then version=""; fi
+          echo "Live staging version before deploy: ${version:-none}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to staging (workers.dev)
+        id: deploy
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        working-directory: apps/drop
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          DROP_STAGING_URL: ${{ vars.DROP_STAGING_URL }}
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/wrangler-staging.ndjson"
+          echo "deployed=true" >> "$GITHUB_OUTPUT"
+          WRANGLER_OUTPUT_FILE_PATH="$report" pnpm exec wrangler deploy "$RUNNER_TEMP/drop-bundle/index.js" --no-bundle --env staging
+          url="$(jq -r 'select(.type == "deploy") | .targets[]?' "$report" | grep -E '^https://[a-z0-9.-]+\.workers\.dev$' | head -n 1 || true)"
+          if [ -z "$url" ]; then url="${DROP_STAGING_URL:-}"; fi
+          if ! [[ "$url" =~ ^https://[a-z0-9.-]+$ ]]; then
+            echo "::error::No staging origin: Wrangler reported no workers.dev URL and the variable DROP_STAGING_URL is not set."
+            exit 1
+          fi
+          version="$(jq -r 'select(.type == "deploy") | .version_id // empty' "$report" | head -n 1)"
+          if ! [[ "$version" =~ ^[0-9a-f-]{36}$ ]]; then version=""; fi
+          echo "Staging origin $url, version ${version:-unknown}"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch the live Worker settings and the bucket lifecycle rule
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID"
+          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          curl -sS --proto '=https' --max-time 30 -H "$auth" \
+            -o "$RUNNER_TEMP/settings.json" "$api/workers/scripts/agentlink-drop-staging/script-settings"
+          curl -sS --proto '=https' --max-time 30 -H "$auth" \
+            -o "$RUNNER_TEMP/lifecycle.json" "$api/r2/buckets/agentlink-drop-staging/lifecycle"
+
+      - name: Read back the logging settings (all off, 04 §4)
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        env:
+          SETTINGS_JSON: ${{ runner.temp }}/settings.json
+        run: |
+          set -euo pipefail
+          # READBACK-SETTINGS-BEGIN
+          if ! jq -e '
+            .success == true
+            and ((.result.logpush // false) == false)
+            and ((.result.observability.enabled // false) == false)
+            and ((.result.observability.logs.enabled // false) == false)
+            and ((.result.observability.logs.invocation_logs // false) == false)
+            and (((.result.tail_consumers // []) | length) == 0)
+          ' "$SETTINGS_JSON" > /dev/null; then
+            echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs and Tail Workers must stay off for the drop (04 §4)."
+            exit 1
+          fi
+          echo "Logging settings read back: Logpush, observability, invocation logs and Tail Workers are off."
+          # READBACK-SETTINGS-END
+
+      - name: Read back the bucket lifecycle rule (7 days)
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        env:
+          LIFECYCLE_JSON: ${{ runner.temp }}/lifecycle.json
+        run: |
+          set -euo pipefail
+          # READBACK-LIFECYCLE-BEGIN
+          if ! jq -e '
+            .success == true
+            and ([.result.rules[]? | select(
+              .enabled == true
+              and ((.conditions.prefix // "") == "")
+              and (.deleteObjectsTransition.condition.type == "Age")
+              and ((.deleteObjectsTransition.condition.maxAge // 0) > 0)
+              and ((.deleteObjectsTransition.condition.maxAge // 0) <= 604800)
+            )] | length > 0)
+          ' "$LIFECYCLE_JSON" > /dev/null; then
+            echo "::error::The bucket has no enabled rule deleting every object within 7 days (604800 s)."
+            exit 1
+          fi
+          echo "Lifecycle rule read back: every object is deleted within 7 days."
+          # READBACK-LIFECYCLE-END
+
+  smoke-staging:
+    name: smoke-staging
+    needs: deploy-staging
+    if: needs.deploy-staging.outputs.deployed == 'true' && needs.deploy-staging.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read # no credentials: a fresh random drop key per run
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Signed upload, GET and DELETE round trip; expired GET refused
+        shell: bash
+        working-directory: apps/drop
+        env:
+          DROP_SMOKE_URL: ${{ needs.deploy-staging.outputs.url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DROP_SMOKE_URL:-}" ]; then
+            echo "::error::No staging origin from deploy-staging."
+            exit 1
+          fi
+          pnpm exec vitest run --project drop-smoke-remote
+
+  deploy-production:
+    name: deploy-production
+    needs: [build, deploy-staging, smoke-staging]
+    if: needs.deploy-staging.outputs.deployed == 'true' && needs.smoke-staging.result == 'success' && vars.DEPLOY_FREEZE != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: production
+    concurrency:
+      group: deploy-drop-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    outputs:
+      deployed: ${{ steps.deploy.outputs.deployed }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Re-checked here: the environment may have waited for an approval click.
+      - name: Stop if DEPLOY_FREEZE is set
+        shell: bash
+        env:
+          DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
+        run: |
+          set -euo pipefail
+          if [ "${DEPLOY_FREEZE:-}" = "true" ]; then
+            echo "::error::DEPLOY_FREEZE is set; nothing is deployed until the owner clears it."
+            exit 1
+          fi
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Download the bundle
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: drop-bundle
+          path: ${{ runner.temp }}/drop-bundle
+
+      - name: Verify the bundle is the one staging ran
+        shell: bash
+        env:
+          EXPECTED: ${{ needs.build.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/drop-bundle"
+          echo "${EXPECTED}  index.js" | sha256sum -c -
+
+      - name: Check credentials and the Worker secret
+        id: ready
+        shell: bash
+        working-directory: apps/drop
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+            echo "::notice::Environment production has no CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID yet (owner steps, M1-27b). Production is not deployed."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! [[ "$CLOUDFLARE_ACCOUNT_ID" =~ ^[0-9a-f]{32}$ ]]; then
+            echo "::error::CLOUDFLARE_ACCOUNT_ID is not a 32-character hex account ID."
+            exit 1
+          fi
+          if ! listing="$(pnpm exec wrangler secret list --env production --format json)"; then
+            echo "::warning::Could not list the secrets of Worker agentlink-drop (not created yet, or the token lacks access). Production is not deployed."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          json="$(printf '%s\n' "$listing" | awk 'f || /^\[/ { f = 1; print }')"
+          if ! jq -e 'any(.[]; .name == "DROP_URL_KEY")' <<<"$json" > /dev/null; then
+            echo "::notice::Worker secret DROP_URL_KEY is not set on agentlink-drop yet (owner: wrangler secret put). Production is not deployed."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Record the live version (rollback target)
+        id: previous
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        working-directory: apps/drop
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          version=""
+          if status="$(pnpm exec wrangler deployments status --env production --json)"; then
+            json="$(printf '%s\n' "$status" | awk 'f || /^\{/ { f = 1; print }')"
+            version="$(jq -r '[.versions[]? | select(.percentage == 100) | .version_id][0] // empty' <<<"$json" || true)"
+          fi
+          if ! [[ "$version" =~ ^[0-9a-f-]{36}$ ]]; then
+            version=""
+            echo "::warning::No single live production version recorded; an automatic rollback will not be possible for this deploy."
+          fi
+          echo "Rollback target: ${version:-none}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to production (Custom Domain)
+        id: deploy
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        working-directory: apps/drop
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/wrangler-production.ndjson"
+          # Set first: a deploy that fails half-way still counts as deployed (rollback, freeze).
+          echo "deployed=true" >> "$GITHUB_OUTPUT"
+          WRANGLER_OUTPUT_FILE_PATH="$report" pnpm exec wrangler deploy "$RUNNER_TEMP/drop-bundle/index.js" --no-bundle --env production
+          version="$(jq -r 'select(.type == "deploy") | .version_id // empty' "$report" | head -n 1)"
+          if ! [[ "$version" =~ ^[0-9a-f-]{36}$ ]]; then version=""; fi
+          echo "Production version ${version:-unknown}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # HTTP only; no repository code runs against production. A 401 for an unsigned upload proves
+      # the Worker loaded its configuration (a missing or invalid DROP_URL_KEY answers 503).
+      - name: Health check
+        id: health
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            health="$(curl -sS --proto '=https' --max-time 15 -o "$RUNNER_TEMP/health.json" -w '%{http_code}' "$DROP_PRODUCTION_ORIGIN/v1/health" || true)"
+            config="$(curl -sS --proto '=https' --max-time 15 -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data '{}' "$DROP_PRODUCTION_ORIGIN/v1/upload" || true)"
+            if [ "$health" = "200" ] && jq -e '. == {"ok": true}' "$RUNNER_TEMP/health.json" > /dev/null 2>&1 && [ "$config" = "401" ]; then
+              echo "Healthy: /v1/health 200, unsigned upload 401 (attempt $attempt)."
+              exit 0
+            fi
+            echo "Attempt $attempt: /v1/health $health, unsigned upload $config; retrying in 15 s."
+            sleep 15
+          done
+          echo "::error::The production health check failed."
+          exit 1
+
+      - name: Fetch the live Worker settings and the bucket lifecycle rule
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID"
+          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          curl -sS --proto '=https' --max-time 30 -H "$auth" \
+            -o "$RUNNER_TEMP/settings.json" "$api/workers/scripts/agentlink-drop/script-settings"
+          curl -sS --proto '=https' --max-time 30 -H "$auth" \
+            -o "$RUNNER_TEMP/lifecycle.json" "$api/r2/buckets/agentlink-drop-prod/lifecycle"
+
+      - name: Read back the logging settings (all off, 04 §4)
+        id: settings
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        env:
+          SETTINGS_JSON: ${{ runner.temp }}/settings.json
+        run: |
+          set -euo pipefail
+          # READBACK-SETTINGS-BEGIN
+          if ! jq -e '
+            .success == true
+            and ((.result.logpush // false) == false)
+            and ((.result.observability.enabled // false) == false)
+            and ((.result.observability.logs.enabled // false) == false)
+            and ((.result.observability.logs.invocation_logs // false) == false)
+            and (((.result.tail_consumers // []) | length) == 0)
+          ' "$SETTINGS_JSON" > /dev/null; then
+            echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs and Tail Workers must stay off for the drop (04 §4)."
+            exit 1
+          fi
+          echo "Logging settings read back: Logpush, observability, invocation logs and Tail Workers are off."
+          # READBACK-SETTINGS-END
+
+      - name: Read back the bucket lifecycle rule (7 days)
+        id: lifecycle
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        env:
+          LIFECYCLE_JSON: ${{ runner.temp }}/lifecycle.json
+        run: |
+          set -euo pipefail
+          # READBACK-LIFECYCLE-BEGIN
+          if ! jq -e '
+            .success == true
+            and ([.result.rules[]? | select(
+              .enabled == true
+              and ((.conditions.prefix // "") == "")
+              and (.deleteObjectsTransition.condition.type == "Age")
+              and ((.deleteObjectsTransition.condition.maxAge // 0) > 0)
+              and ((.deleteObjectsTransition.condition.maxAge // 0) <= 604800)
+            )] | length > 0)
+          ' "$LIFECYCLE_JSON" > /dev/null; then
+            echo "::error::The bucket has no enabled rule deleting every object within 7 days (604800 s)."
+            exit 1
+          fi
+          echo "Lifecycle rule read back: every object is deleted within 7 days."
+          # READBACK-LIFECYCLE-END
+
+      # Any failure after the deploy started rolls back. Durable Object migrations are forward-only
+      # (§4.5): a version from before a migration may be refused; the freeze then stops everything
+      # and the owner decides the forward fix.
+      - name: Roll back to the recorded version
+        id: rollback
+        if: failure() && steps.deploy.outputs.deployed == 'true'
+        shell: bash
+        working-directory: apps/drop
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          PREVIOUS: ${{ steps.previous.outputs.version }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PREVIOUS:-}" ]; then
+            echo "::error::No recorded rollback target. DEPLOY_FREEZE is set by the freeze job; the owner decides the fix."
+            echo "result=no-target" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          pnpm exec wrangler rollback "$PREVIOUS" --env production --message "Automatic rollback after a failed post-deploy check (run $RUN_ID)" --yes
+          for attempt in 1 2 3 4 5 6; do
+            health="$(curl -sS --proto '=https' --max-time 15 -o /dev/null -w '%{http_code}' "$DROP_PRODUCTION_ORIGIN/v1/health" || true)"
+            if [ "$health" = "200" ]; then
+              echo "::warning::Rolled back to $PREVIOUS; /v1/health answers 200. DEPLOY_FREEZE is set by the freeze job."
+              echo "result=rolled-back" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Rolled back to $PREVIOUS, but /v1/health does not answer 200."
+          echo "result=rolled-back-unhealthy" >> "$GITHUB_OUTPUT"
+          exit 1
+
+      - name: Write the deploy record draft
+        if: always() && steps.deploy.outputs.deployed == 'true'
+        shell: bash
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT: ${{ github.sha }}
+          BUNDLE_SHA256: ${{ needs.build.outputs.sha256 }}
+          VERSION: ${{ steps.deploy.outputs.version }}
+          PREVIOUS: ${{ steps.previous.outputs.version }}
+          STAGING_VERSION: ${{ needs.deploy-staging.outputs.version }}
+          DEPLOY_RESULT: ${{ steps.deploy.outcome }}
+          HEALTH_RESULT: ${{ steps.health.outcome }}
+          SETTINGS_RESULT: ${{ steps.settings.outcome }}
+          LIFECYCLE_RESULT: ${{ steps.lifecycle.outcome }}
+          ROLLBACK_RESULT: ${{ steps.rollback.outputs.result }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Deploy record draft (encrypted drop Worker)"
+            echo
+            echo "No secrets here. The orchestrator files the final record in 4thtech/agentlink-ops (release-and-deployment.md §5.2)."
+            echo
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Artifact | Worker \`agentlink-drop\` (apps/drop), bundle \`index.js\` |"
+            echo "| Commit | \`$COMMIT\` |"
+            echo "| Environment | production ($DROP_PRODUCTION_ORIGIN) |"
+            echo "| Time (UTC) | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"
+            echo "| Approved | none required once the owner removed the production reviewer (D-52); see the run |"
+            echo "| Executed by | CI run $RUN_URL |"
+            echo "| Bundle sha256 | \`$BUNDLE_SHA256\` (the same bytes as staging version \`${STAGING_VERSION:-unknown}\`) |"
+            echo "| Version deployed | \`${VERSION:-unknown}\` (deploy: $DEPLOY_RESULT) |"
+            echo "| Rollback target | \`${PREVIOUS:-none}\` |"
+            echo "| Health check | ${HEALTH_RESULT:-skipped} |"
+            echo "| Logging read-back | ${SETTINGS_RESULT:-skipped} |"
+            echo "| Lifecycle read-back | ${LIFECYCLE_RESULT:-skipped} |"
+            echo "| Rollback | ${ROLLBACK_RESULT:-not needed} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  freeze:
+    name: freeze
+    needs: deploy-production
+    if: >-
+      always() && vars.DEPLOY_FREEZE != 'true' &&
+      needs.deploy-production.outputs.deployed == 'true' && needs.deploy-production.result != 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: deploy-freeze
+    permissions: {}
+    steps:
+      - name: Set DEPLOY_FREEZE
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.DEPLOY_FREEZE_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::DEPLOY_FREEZE_TOKEN is not configured. The orchestrator or the owner sets DEPLOY_FREEZE=true now (release-and-deployment.md §3.1)."
+            exit 1
+          fi
+          gh variable set DEPLOY_FREEZE --body true --repo "$REPOSITORY"
+          echo "::error::The drop's production deploy failed after deploying. DEPLOY_FREEZE is set; only the owner clears it."
+          exit 1
+
+  rollback-rehearsal:
+    name: rollback-rehearsal
+    needs: [deploy-staging, smoke-staging]
+    if: inputs.rehearse-rollback && needs.smoke-staging.result == 'success' && vars.DEPLOY_FREEZE != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: staging
+    concurrency:
+      group: deploy-drop-staging
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Roll staging back, check it, roll forward
+        shell: bash
+        working-directory: apps/drop
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          PREVIOUS: ${{ needs.deploy-staging.outputs.previous }}
+          CURRENT: ${{ needs.deploy-staging.outputs.version }}
+          ORIGIN: ${{ needs.deploy-staging.outputs.url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PREVIOUS:-}" ] || [ -z "${CURRENT:-}" ] || [ "$PREVIOUS" = "$CURRENT" ]; then
+            echo "::error::Staging has no distinct previous version to rehearse with (deploy twice first)."
+            exit 1
+          fi
+          live() {
+            pnpm exec wrangler deployments status --env staging --json \
+              | awk 'f || /^\{/ { f = 1; print }' \
+              | jq -r '[.versions[]? | select(.percentage == 100) | .version_id][0] // empty'
+          }
+          healthy() {
+            for attempt in 1 2 3 4 5 6; do
+              code="$(curl -sS --proto '=https' --max-time 15 -o /dev/null -w '%{http_code}' "$ORIGIN/v1/health" || true)"
+              if [ "$code" = "200" ]; then return 0; fi
+              sleep 10
+            done
+            return 1
+          }
+          pnpm exec wrangler rollback "$PREVIOUS" --env staging --message "Rollback rehearsal (back)" --yes
+          [ "$(live)" = "$PREVIOUS" ] || { echo "::error::Staging does not serve the previous version after the rollback."; exit 1; }
+          healthy || { echo "::error::Staging is unhealthy after the rollback."; exit 1; }
+          echo "Rolled back to $PREVIOUS: live and healthy."
+          pnpm exec wrangler rollback "$CURRENT" --env staging --message "Rollback rehearsal (forward)" --yes
+          [ "$(live)" = "$CURRENT" ] || { echo "::error::Staging does not serve the current version after rolling forward."; exit 1; }
+          healthy || { echo "::error::Staging is unhealthy after rolling forward."; exit 1; }
+          echo "Rolled forward to $CURRENT: live and healthy."
+          {
+            echo "## Rollback rehearsal (staging)"
+            echo
+            echo "Back to \`$PREVIOUS\` and forward to \`$CURRENT\`; both live and healthy. Recorded for M1-27b acceptance (§4.5, §8)."
+          } >> "$GITHUB_STEP_SUMMARY"

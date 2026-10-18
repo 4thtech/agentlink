@@ -295,7 +295,7 @@ areas:
         summary: "M2."
       - name: "Encrypted drop service"
         state: in-progress
-        summary: "The 4thTech drop Worker (signed uploads with no accounts, single-use upload targets, a hash-checked commit, signed downloads until expiry, quotas and rate limits, no logs) is built and tested locally (M1-27a). Not deployed: deployment (M1-27b), the storage buckets (M1-28) and sending files through it (M1-13c) follow."
+        summary: "The 4thTech drop Worker (signed uploads with no accounts, single-use upload targets, a hash-checked commit, signed downloads until expiry, quotas and rate limits, no logs) is built and tested locally (M1-27a). Its deploy pipeline (staging, smoke test, production with automatic rollback) is in place but not live yet: it waits for the owner's Cloudflare setup (M1-27b). Sending files through it (M1-13c) follows."
   - id: contracts
     title: "OCC v2 contracts (private repo)"
     intro: "Pre-audit. Nothing in AgentLink uses them yet."
@@ -335,7 +335,7 @@ deploy:
     note: "After the external audit (M3). Not deployed."
   services:
     state: planned
-    note: "None deployed yet. The encrypted drop Worker is built and tested locally (M1-27a); the submitter and faucet are not built yet."
+    note: "None deployed yet. The encrypted drop Worker is built and tested locally (M1-27a) and has its deploy pipeline (M1-27b), which goes live once the owner's Cloudflare setup is done; the submitter and faucet are not built yet."
 
 # Prose for the README Status block and the docs-site page.
 inProgress: "M1b has started. Merged and shipping in the next 0.1.x release: live relay subscriptions, the claude-desktop setup option, clearer status and recovery messages, the localhost approval server and the Node.js 22.14 check. Merged but not used by any tool yet: the safe fetch and path guard, the storage adapters, the files and proof policy rules and the proof hashing. Still open from M1a: the two-person dogfood against the published package (M1-23). Next in M1b: file encryption and the approval page."

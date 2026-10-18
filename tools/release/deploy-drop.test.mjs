@@ -181,7 +181,8 @@ describe('deploy-drop.yml structure', () => {
   });
 
   it('never prints the API token and never traces shell commands', () => {
-    expect(workflow).not.toMatch(/echo[^\n]*CLOUDFLARE_API_TOKEN/);
+    expect(workflow).not.toMatch(/(echo|printf)[^\n]*\$\{?CLOUDFLARE_API_TOKEN/);
+    expect(workflow).not.toMatch(/(echo|printf)[^\n]*\$\{?auth\b/);
     expect(workflow).not.toMatch(/set -x|set -o xtrace/);
   });
 });
