@@ -6,13 +6,17 @@ import { readFileSync } from 'node:fs';
 import process from 'node:process';
 import { isatty } from 'node:tty';
 import { acceptHandler } from './commands/accept.js';
-import { contactsHandler } from './commands/contacts.js';
+import { createContactsHandler } from './commands/contacts.js';
 import { doctorHandler } from './commands/doctor.js';
 import { inviteHandler } from './commands/invite.js';
 import { requestsHandler } from './commands/requests.js';
 import { statusHandler } from './commands/status.js';
 import { createInitHandler, nodeInitDeps } from './commands/init.js';
-import { ownerCommandHandlers } from './commands/owner/index.js';
+import {
+  contactsManageHandler,
+  nodeOwnerDeps,
+  ownerCommandHandlers,
+} from './commands/owner/index.js';
 import { createDispatcher } from './dispatch.js';
 import { mcpCommand } from './mcp/index.js';
 import { createOutput } from './output.js';
@@ -34,7 +38,8 @@ const dispatch = createDispatcher({
   init: createInitHandler(nodeInitDeps()),
   invite: inviteHandler,
   accept: acceptHandler,
-  contacts: contactsHandler,
+  // M1-9za: `contacts rename | remove` † go to the owner handler.
+  contacts: createContactsHandler(undefined, contactsManageHandler(nodeOwnerDeps())),
   status: statusHandler,
   doctor: doctorHandler,
   requests: requestsHandler,

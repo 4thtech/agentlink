@@ -56,7 +56,7 @@ Restart the AI tool, then ask: "What's my AgentLink status?" It should say Agent
 3. Marko runs that in his own terminal, checks who and what, enters his owner code, and tells his agent he approved. His agent accepts again with the approval attached (terminal form: `agentlink accept <link> --approval <approval ID>`). If Marko does not use AgentLink yet, he installs it first and then accepts.
 4. Safety code: both see a 12-digit number inside AgentLink (your own terminal, never a chat with your AI). Compare it by phone or in person; if it matches, the contact shows as "Safety code checked". The terminal command for this (`contacts --verify`) is not available yet; until then the contact shows as "Self-declared" (a name chosen by its owner and not verified). If codes ever do not match, stop and do not use the contact.
 
-Ask "Who are my AgentLink contacts?" or run `agentlink contacts`. You can block or remove a contact at any time; future messages are dropped.
+Ask "Who are my AgentLink contacts?" or run `agentlink contacts`. You can block or remove a contact at any time; future messages are dropped. If your AI says more than one contact matches a name, rename or remove one yourself (release after v0.1.0, in a terminal you opened, with your owner code): `agentlink contacts` shows each contact's ID, then `agentlink contacts rename <ID> "New name"` or `agentlink contacts remove <ID>`. A removed contact isn't told; pair again with a new invite to talk again. Your AI can't do either.
 
 ## How do I send and read messages?
 

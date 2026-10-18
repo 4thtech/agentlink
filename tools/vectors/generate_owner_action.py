@@ -49,6 +49,15 @@ G-7); an unknown contact; a stored pair whose K signature no longer verifies; an
 the encoding rejections. `reference_verify_contact_check` is this generator's own reading of the
 04 §2.5.1 checks, and every contact.check verify case is asserted against it.
 
+`contact.rename` and `contact.remove` (M1-9za; 04 §2.5.1, proposed), version 5: params exactly
+`{contact, alias}` and `{contact}`; `alias` is 1 to 32 code points; L(op) = 600 s. Sign vectors for
+both ops (one alias with a non-ASCII letter, so the JCS text carries UTF-8). Verify accept cases
+for both, and one at exactly `expiresAt`. Rejections, each validly signed unless stated: a lifetime
+of 601 s; `contact` in upper case or EIP-55 case; an empty alias; an alias of 33 code points; an
+unknown params key; remove carrying an `alias`; another signer. The store rules (a stored contact,
+the alias being its own restricted form and unique, a revoked contact refused) are the core's, not
+these vectors'.
+
 Usage: python3 -I tools/vectors/generate_owner_action.py --check [FILE] | --write
 """
 
@@ -66,7 +75,7 @@ import generate_safety_code as safety  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "owner-action"
-VERSION = 4
+VERSION = 5
 TAG = "agentlink/owner-action/v1"
 ENVELOPE_TAG = "agentlink/envelope/v1"
 SPEC = "04 §2.5.1"
@@ -571,6 +580,46 @@ def build():
         if reference_verify_contact_check(signed_body(bad), pairing_ctx):
             v.fail(f"{case_id}: the reference verifier accepts it")
         reject(case_id, why, signed_body(bad), pairing_ctx)
+
+    # contact.rename and contact.remove (M1-9za; 04 §2.5.1, proposed): {contact, alias}, {contact};
+    # L(op) = 600 s; no envelope carrier. Their store rules are the core's (not vectors).
+    rename = op_body("contact.rename", {"contact": other_agent, "alias": "Ana Kovač"})
+    remove = op_body("contact.remove", {"contact": other_agent})
+    for case_id, why, b in [
+        ("sign-contact-rename", "contact.rename, an alias with a non-ASCII letter (M1-9za)", rename),
+        ("sign-contact-remove", "contact.remove (M1-9za)", remove),
+    ]:
+        cases.append(
+            v.case(
+                case_id,
+                f"{SPEC} SignedOwnerAction, {why}",
+                {"op": "sign", "body": b, "secretKey": v.hx(owner), "auxRand": v.hx(aux)},
+                {
+                    "jcs": jcs_lenient(b).decode("utf-8"),
+                    "bodyHash": v.hx(body_hash(b)),
+                    "signatureInput": v.hx(v.tagged_hash(TAG, body_hash(b))),
+                    "sig": sign(b, owner, aux),
+                },
+            )
+        )
+    for case_id, why, signed, ctx in [
+        ("verify-contact-rename", "contact.rename verifies (M1-9za)", signed_body(rename), context),
+        ("verify-contact-remove", "contact.remove verifies (M1-9za)", signed_body(remove), context),
+        ("verify-contact-remove-at-expiry", "contact.remove verified at now = expiresAt (expiry has no skew)", signed_body(remove), {**context, "now": remove["expiresAt"]}),
+    ]:
+        cases.append(v.case(case_id, f"{SPEC}: {why}", {"op": "verify", "signed": signed, "context": ctx}, {"outcome": "accept"}))
+    for case_id, why, signed in [
+        ("reject-contact-rename-lifetime", "expiresAt - issuedAt = 601 s (L(contact.rename) = 600 s)", signed_body(op_body("contact.rename", {"contact": other_agent, "alias": "Ana"}, expires_at=ISSUED_AT + 601))),
+        ("reject-contact-remove-lifetime", "expiresAt - issuedAt = 601 s (L(contact.remove) = 600 s)", signed_body(op_body("contact.remove", {"contact": other_agent}, expires_at=ISSUED_AT + 601))),
+        ("reject-contact-rename-contact-uppercase", "`contact` in upper-case hex (04 §2.4.1)", signed_body(op_body("contact.rename", {"contact": "0x" + other_agent[2:].upper(), "alias": "Ana"}))),
+        ("reject-contact-remove-contact-checksummed", "`contact` in EIP-55 mixed case", signed_body(op_body("contact.remove", {"contact": v.eip55(other_agent)}))),
+        ("reject-contact-rename-alias-empty", "an empty alias", signed_body(op_body("contact.rename", {"contact": other_agent, "alias": ""}))),
+        ("reject-contact-rename-alias-33", "an alias of 33 code points (at most 32)", signed_body(op_body("contact.rename", {"contact": other_agent, "alias": "č" * 33}))),
+        ("reject-contact-rename-unknown-param", "unknown key in contact.rename params", signed_body(op_body("contact.rename", {"contact": other_agent, "alias": "Ana", "note": "x"}))),
+        ("reject-contact-remove-alias", "contact.remove carrying an `alias` (strict params)", signed_body(op_body("contact.remove", {"contact": other_agent, "alias": "Ana"}))),
+        ("reject-contact-rename-other-signer", "signed by another key than `owner`", {"body": rename, "sig": sign(rename, other, aux)}),
+    ]:
+        reject(case_id, why, signed)
 
     # Raw JSON text (04 §2.4.1: integer tokens must match 0|[1-9][0-9]*, checked on the token; I-JSON
     # refuses duplicate keys). Each signature is valid over the JCS of the parsed value, so only the

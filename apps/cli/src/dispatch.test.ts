@@ -71,6 +71,9 @@ describe('--help (06 §8)', () => {
       'agentlink accept <url>',
       'agentlink contacts',
       'agentlink contacts --verify <id>',
+      // M1-9za.
+      'agentlink contacts rename <contactId> <name> [--agent <name>]',
+      'agentlink contacts remove <contactId> [--agent <name>]',
       'agentlink requests [accept | ignore | block <requestId>]',
       'agentlink policy show | set <key> <value>',
       'agentlink approve <approvalId> [--agent <name>]',
@@ -96,7 +99,7 @@ describe('--help (06 §8)', () => {
       expect(help).not.toContain(absent);
     }
     const commandLines = help.split('\n').filter((line) => line.startsWith('  agentlink '));
-    expect(commandLines).toHaveLength(17);
+    expect(commandLines).toHaveLength(19);
   });
 
   it('prints help for no arguments, --help, -h and help', async () => {

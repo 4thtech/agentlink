@@ -89,6 +89,31 @@ export const contactCheckParamsSchema = z.strictObject({
   pairingDigest: sha256Hex,
 });
 
+/** At most 32 code points, as the restricted name (06 §2.1). */
+export const CONTACT_ALIAS_MAX_CODE_POINTS = 32;
+
+/**
+ * `contact.rename` params (04 §2.5.1; 06 §2.1 rule 1; M1-9za): the owner's alias for one contact.
+ * `contact` is the contact's agent ID in its one encoding. `alias` is a non-empty string of at most
+ * 32 code points; that it is already its own restricted form (`restrictName`), so it carries no
+ * label word, control, bidi or confusable character, is the core's rule.
+ */
+export const contactRenameParamsSchema = z.strictObject({
+  contact: evmAddress,
+  alias: z
+    .string()
+    .min(1)
+    .refine(
+      (alias) => Array.from(alias).length <= CONTACT_ALIAS_MAX_CODE_POINTS,
+      'alias must be at most 32 code points',
+    ),
+});
+
+/** `contact.remove` params (04 §2.5.1; 07 §3 `removed`; 02 F-14; M1-9za). */
+export const contactRemoveParamsSchema = z.strictObject({
+  contact: evmAddress,
+});
+
 // --- OwnerAction ---------------------------------------------------------------------------------
 
 const head = {
@@ -157,6 +182,26 @@ export const contactCheckActionSchema = z
   })
   .refine(expiring, EXPIRING_MSG);
 
+/** The owner's alias for a contact (M1-9za). Applied only on the agent's own machine: no envelope. */
+export const contactRenameActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('contact.rename'),
+    params: contactRenameParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG);
+
+/** Removes a contact (tombstone, 07 §3) (M1-9za). Applied only on the agent's own machine. */
+export const contactRemoveActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('contact.remove'),
+    params: contactRemoveParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG);
+
 /** `agent.revoke`: `expiresAt` is exactly 0 (permanent; the core skips expiry and lifetime checks). */
 export const agentRevokeActionSchema = z.strictObject({
   ...head,
@@ -176,6 +221,8 @@ export const ownerActionSchema = z.discriminatedUnion('op', [
   approvalCancelActionSchema,
   policySetActionSchema,
   contactCheckActionSchema,
+  contactRenameActionSchema,
+  contactRemoveActionSchema,
   agentRevokeActionSchema,
 ]);
 
@@ -209,6 +256,8 @@ export type ApprovalCancelParams = z.infer<typeof approvalCancelParamsSchema>;
 export type PolicySetParams = z.infer<typeof policySetParamsSchema>;
 export type AgentRevokeParams = z.infer<typeof agentRevokeParamsSchema>;
 export type ContactCheckParams = z.infer<typeof contactCheckParamsSchema>;
+export type ContactRenameParams = z.infer<typeof contactRenameParamsSchema>;
+export type ContactRemoveParams = z.infer<typeof contactRemoveParamsSchema>;
 export type ApprovalDecideAction = z.infer<typeof approvalDecideActionSchema>;
 export type ApprovalDecideBatchAction = z.infer<typeof approvalDecideBatchActionSchema>;
 export type ApprovalCancelAction = z.infer<typeof approvalCancelActionSchema>;

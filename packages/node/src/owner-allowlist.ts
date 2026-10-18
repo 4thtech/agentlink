@@ -37,6 +37,9 @@ export const OWNER_ACTION_OPS: readonly string[] = Object.freeze([
   'policy.set',
   'agent.revoke',
   'contact.check',
+  // M1-9za: the owner renames or removes a contact (`agentlink contacts rename | remove`).
+  'contact.rename',
+  'contact.remove',
 ]);
 
 export const ownerOperationRefused = (): NodeKeyStoreError =>

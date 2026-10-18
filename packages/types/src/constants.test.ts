@@ -162,6 +162,8 @@ describe('constants (04, 05, 06)', () => {
         'approval.decide',
         'approval.decideBatch',
         'contact.check',
+        'contact.remove',
+        'contact.rename',
         'policy.set',
       ].sort(),
     );
@@ -231,6 +233,8 @@ describe('constants (04, 05, 06)', () => {
       'approval.cancel': 604_800,
       'policy.set': 86_400,
       'contact.check': 86_400,
+      'contact.rename': 600,
+      'contact.remove': 600,
       'agent.revoke': null,
     });
     expect(LATER_OP_DEFAULT_LIFETIME_SECONDS).toBe(600);

@@ -135,6 +135,16 @@ export function restrictName(name: unknown, ownerFingerprintShort: string): Rest
   return text as RestrictedName;
 }
 
+/**
+ * True when `alias` is already its own restricted form (M1-9za, 06 §2.1 rule 1): an owner alias that
+ * `restrictName` would leave unchanged, so it has no label word, control, bidi, zero-width or
+ * confusable character, no mixed scripts, no extra spaces and at most 32 code points. The fallback
+ * fingerprint `·` can never appear in a restricted name, so the fallback never equals an alias.
+ */
+export function isRestrictedAlias(alias: unknown): alias is string {
+  return typeof alias === 'string' && alias !== '' && restrictName(alias, '\u00b7') === alias;
+}
+
 /** A shown name: quoted, followed by its identity label, e.g. `“Marko Novak” (self-declared)`. */
 export function renderContactName(display: ContactDisplayName): string {
   return `“${display.name}” (${display.label})`;

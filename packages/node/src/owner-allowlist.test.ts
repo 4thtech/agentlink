@@ -368,6 +368,9 @@ describe('EIP-712 and owner-action allowlist (M1-8h; 04 §2.4, §2.5.1)', () => 
       ['policy.set', { version: 1, policy: {} }],
       ['agent.revoke', { reason: 'retired' }],
       ['contact.check', { contact: AGENT, pairingDigest: '00'.repeat(32) }],
+      // M1-9za: the owner renames or removes a contact.
+      ['contact.rename', { contact: AGENT, alias: 'Tali laptop' }],
+      ['contact.remove', { contact: AGENT }],
     ];
     for (const [op, params] of ops) {
       const run = scripted([code]);

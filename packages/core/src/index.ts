@@ -88,7 +88,7 @@ export {
   type ContactCheckVerdict,
   type PairingDigestLookup,
 } from './contact-check.js';
-export { renderContactName, restrictName } from './names.js';
+export { isRestrictedAlias, renderContactName, restrictName } from './names.js';
 export {
   computeActionDigest,
   ownerActionHash,

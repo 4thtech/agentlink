@@ -3451,6 +3451,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - One-shot commands log at `warn` by default (`AGENTLINK_LOG=debug|info|warn|error` overrides); no raw JSON "identity created" line in the terminal.
 - **Acceptance:** tests with an injected version; default level hides info lines, `AGENTLINK_LOG` shows them; docs prerequisites and troubleshooting name 22.14.
 
+#### M1-9za · cli: contacts rename and remove (owner) (new, live finding 2026-10-17)
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/types (`owner-action.ts`, `constants.ts`), packages/core (`owner-actions.ts`, `owner-action.ts`, `names.ts`), packages/node (`owner-allowlist.ts`), apps/cli (`commands/owner/contacts-manage.ts`, `commands/contacts.ts`, `dispatch.ts`, `tools/text.ts`); docs-site contacts and troubleshooting
+- **Depends on:** M1-9b, M1-7d, M1-9l
+- **Spec:** 04 §2.5, §2.5.1 (`contact.rename`, `contact.remove`, proposed, owner confirms at merge); 06 §2.1 rule 1, §8; 07 §3 (`removed`), §3.4; 02 F-14; 11 §5.2 (Rename is an owner action)
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Live finding (two-Mac run, 2026-10-17): one agent had two contacts that both declared "oc-test" (a stale test contact and the real one). Every send by that name returned `AMBIGUOUS_CONTACT`, and nothing could rename or remove a contact.
+  - New owner-action ops `contact.rename {contact, alias}` and `contact.remove {contact}` (L(op) 600 s, no envelope carrier), verified and applied by the core in one store transaction with the nonce (the nonce row is the audit record). The alias must be its own restricted form (`restrictName` leaves it unchanged); remove writes the 07 §3 tombstone and refuses a revoked contact; the contact is not notified.
+  - `agentlink contacts rename <contactId> <name>` † and `agentlink contacts remove <contactId>` †: owner-terminal guard (refused under an AI-harness marker or piped stdin), then the owner code at @agentlink/node's prompt; the CLI refuses an alias another active contact already shows. `agentlink contacts` lists each contact's ID. The `AMBIGUOUS_CONTACT` `nextStep` names the two commands. No MCP tool (I-4).
+- **Acceptance:** RED commit; rename resolves the ambiguity (send by name works after it); remove makes the contact unreachable and its later Talk is dropped, never a request; refused under an AI environment; tool surface unchanged; docs-site contacts and troubleshooting pages.
+
 #### M1-9zb · cli: invite approval shows who is inviting (new, live finding 2026-10-17)
 - **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`commands/owner/render.ts`, `strings.ts`), tools/dogfood (`--oc-model` default), docs/runbooks/dogfood-m1a.md

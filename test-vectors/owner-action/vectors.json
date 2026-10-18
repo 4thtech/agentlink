@@ -1,10 +1,10 @@
 {
   "$schema": "../schema/vector-file.schema.json",
   "suite": "owner-action",
-  "version": 4,
+  "version": 5,
   "generator": {
     "tool": "python (hashlib, cryptography 50.0.2, coincurve 21.0.0, pycryptodome 3.23.0, pyhpke 0.6.5, rfc8785 0.1.4)",
-    "version": "cpython 3.13.11",
+    "version": "cpython 3.12.13",
     "script": "tools/vectors/generate_owner_action.py"
   },
   "cases": [
@@ -7443,6 +7443,430 @@
               }
             }
           ]
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "sign-contact-rename",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, contact.rename, an alias with a non-ASCII letter (M1-9za)",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "contact.rename",
+          "params": {
+            "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+            "alias": "Ana Kova\u010d"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 1760000600
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"contact.rename\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"alias\":\"Ana Kova\u010d\",\"contact\":\"0x879e48ea18a3dd814b18b51e5e6e665f87c1e613\"},\"v\":1}",
+        "bodyHash": "dbeb061611cbeaf02bd0ccb22485bb995814625758837a157c41f9055e8506e3",
+        "signatureInput": "76a2dc9458a8d8c2ea9d802279cbd93d3041ff27c492719a6a519c3c56f81789",
+        "sig": "64432b775c4d1e4d3305465ddd0104420839fe015cab808b35bd6e48686a2f69a859516f1925fb7d873200007b2ef2be5451340785e380cc845f35af22a5355f"
+      }
+    },
+    {
+      "id": "sign-contact-remove",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, contact.remove (M1-9za)",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "contact.remove",
+          "params": {
+            "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 1760000600
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"contact.remove\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"contact\":\"0x879e48ea18a3dd814b18b51e5e6e665f87c1e613\"},\"v\":1}",
+        "bodyHash": "517856d5cafe758b33dc4e95adc09cbeac3b96766d044e2198550a4e2e8dfb08",
+        "signatureInput": "efea6e7d19bc9c073ebb8675d8a528365d8b0200a260321bb38bf683c2b4b9dd",
+        "sig": "2cf38ec42b4c267fabcfbb96efa6469604c0968583f1e2c545e04650ddcdf706e4bb3ccb280016b4c294df89bff4efa9c5e38fdb1951b7c9ffe0931bdb81b13a"
+      }
+    },
+    {
+      "id": "verify-contact-rename",
+      "source": "04 \u00a72.5.1: contact.rename verifies (M1-9za)",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.rename",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+              "alias": "Ana Kova\u010d"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "64432b775c4d1e4d3305465ddd0104420839fe015cab808b35bd6e48686a2f69a859516f1925fb7d873200007b2ef2be5451340785e380cc845f35af22a5355f"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "verify-contact-remove",
+      "source": "04 \u00a72.5.1: contact.remove verifies (M1-9za)",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.remove",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "2cf38ec42b4c267fabcfbb96efa6469604c0968583f1e2c545e04650ddcdf706e4bb3ccb280016b4c294df89bff4efa9c5e38fdb1951b7c9ffe0931bdb81b13a"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "verify-contact-remove-at-expiry",
+      "source": "04 \u00a72.5.1: contact.remove verified at now = expiresAt (expiry has no skew)",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.remove",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "2cf38ec42b4c267fabcfbb96efa6469604c0968583f1e2c545e04650ddcdf706e4bb3ccb280016b4c294df89bff4efa9c5e38fdb1951b7c9ffe0931bdb81b13a"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000600
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "reject-contact-rename-lifetime",
+      "source": "04 \u00a72.5.1: expiresAt - issuedAt = 601 s (L(contact.rename) = 600 s); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.rename",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+              "alias": "Ana"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000601
+          },
+          "sig": "0e04f71a465893446b84403dd468d8ae8abd35f2ddae77071e6eaff60933f43ad96416f682c88191d75464274835d744aa89a0ca9d53da9a3c02bfa8950ebb0f"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-contact-remove-lifetime",
+      "source": "04 \u00a72.5.1: expiresAt - issuedAt = 601 s (L(contact.remove) = 600 s); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.remove",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000601
+          },
+          "sig": "418f12ddc0184b646fb1299e21dcfd48c5675fa88ac31dff907e263a08ca661f3d7718e5dc83d433750dbfa27583dbe91d3d5265c80716bfefe6f57a0020dcbf"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-contact-rename-contact-uppercase",
+      "source": "04 \u00a72.5.1: `contact` in upper-case hex (04 \u00a72.4.1); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.rename",
+            "params": {
+              "contact": "0x879E48EA18A3DD814B18B51E5E6E665F87C1E613",
+              "alias": "Ana"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "892ec0039c8ff4b104c5b36dab1b1bb09a915b3b4b71a7cabfc2ff2a24392fb3fc301244e0c81abef8640c6bf652bac5240c25a4f6664ec5ff500f41d34b8814"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-contact-remove-contact-checksummed",
+      "source": "04 \u00a72.5.1: `contact` in EIP-55 mixed case; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.remove",
+            "params": {
+              "contact": "0x879E48eA18A3DD814b18b51E5E6E665f87C1e613"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "5d35c1e88e0f639ec0cbea13f1ca0364bae36d201d9cbf300afb7838029019fb40a5d8f664765673d03d5faa1a816bad74425a75851304e9cf4fd8970f92c6cf"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-contact-rename-alias-empty",
+      "source": "04 \u00a72.5.1: an empty alias; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.rename",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+              "alias": ""
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "6fbe81bbccc8228f54111b73375913ed3667efc344bf85b20d98d89b3b6910c3dad98b5343882a04628b57f5ac97ccbf2e29c40d23473befbd5e2a26f02caf6e"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-contact-rename-alias-33",
+      "source": "04 \u00a72.5.1: an alias of 33 code points (at most 32); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.rename",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+              "alias": "\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d\u010d"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "4577898ffb8bfbfac495023ae98f8cc6bc429dd68eeed48ae3512c47fb28e96c4668069009c6c9ecf204138468048dbe779b3747745eed727547c19f6fcba242"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-contact-rename-unknown-param",
+      "source": "04 \u00a72.5.1: unknown key in contact.rename params; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.rename",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+              "alias": "Ana",
+              "note": "x"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "cfdd0427e1ced05713d9567d3b2cbfc6dc15398b11472ea2f95735e7969d3b53fc106e11eb6700ea40cbbbdeee60ae9b00056de4b7dc359471b91bc6e95bb209"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-contact-remove-alias",
+      "source": "04 \u00a72.5.1: contact.remove carrying an `alias` (strict params); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.remove",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+              "alias": "Ana"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "427d0d9736c9318077b031d8a432e6edc67be96655d94bf9a36c9c1d08ffc44c58acefe9a701417425b7f60471b5fff13ab112a6c9ad5034bf32fce66096c604"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-contact-rename-other-signer",
+      "source": "04 \u00a72.5.1: signed by another key than `owner`; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "contact.rename",
+            "params": {
+              "contact": "0x879e48ea18a3dd814b18b51e5e6e665f87c1e613",
+              "alias": "Ana Kova\u010d"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "e0cbb801e28651aa812f5d5b2fc4f7a8bd78da4506bde2bc3304ef1131c8c59aadbc54ecae37fc178f93f668ebf4c9545b7129a54fe377f75d92451c3f809775"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
         }
       },
       "expected": {
