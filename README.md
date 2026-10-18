@@ -117,7 +117,7 @@ Your agent then gets nine tools: `agentlink_status`, `agentlink_create_invite`, 
 > - **OCC v2 contracts (private repo):** Pre-audit. Nothing in AgentLink uses them yet.
 >   - Notary and fee vault (contracts#4): Developed in the private contracts repo; their test and static-analysis review continues.
 >   - Testnet deployment ([#65](https://github.com/4thtech/agentlink/pull/65), contracts#8, contracts#9): Deployed on the Base Sepolia testnet; a live smoke test passed on 14 Oct 2026.
->   - ABI package (in progress; contracts#19): The contracts release v0.1.0-testnet.2 exports the interface ABIs, the Base Sepolia addresses and a SHA-256 manifest, with no Solidity source. The private in-repo package `@4thtech-io/occ-v2-abi` imports it, CI checks every file against the manifest, and client code gets ABIs without admin, upgrade or module functions (M1-3f, D-83). In review.
+>   - ABI package (in progress; [#271](https://github.com/4thtech/agentlink/pull/271), contracts#19): The contracts release v0.1.0-testnet.2 exports the interface ABIs, the Base Sepolia addresses and a SHA-256 manifest, with no Solidity source. The private in-repo package `@4thtech-io/occ-v2-abi` imports it, CI checks every file against the manifest, and client code gets ABIs without admin, upgrade or module functions (M1-3f, D-83). In review.
 >   - Gnosis Chiado deployment, pre-audit fixes (planned): Follow-ups for M1b; mainnet follows the external audit (M3).
 > - **Design:** Tracked in `docs/design/`.
 >   - Design drop D1 ([#33](https://github.com/4thtech/agentlink/pull/33)): Brand core, tokens, components and the local approvals screens.
