@@ -1907,7 +1907,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Split (orchestrator, 2026-10-17):** M0-2g (R2 test token) is not done, and the MinIO job touches `.github/**`. This card ships the interface and both adapters with unit tests against an in-memory fake endpoint (no network), handled as S2 (`packages/*`). The MinIO and R2 integration tests move to M1-6a-2. The endpoint check is the 04 §4 raw-string grammar; the DNS-level check comes from the SSRF-safe fetch (M1-15) that the caller injects.
 
 #### M1-6a-2 · storage: MinIO and R2 integration tests (new, split from M1-6a)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (sensitive: `.github/**`) · **Phase:** M1b
+- **Status:** in review (PR pending; M0-2g done: bucket `agentlink-r2-test`, environment `r2-test`) · **Size:** S · **Tier:** Sonnet · **Security:** S1 (sensitive: `.github/**`) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage (integration tests), .github/workflows
 - **Depends on:** M1-6a; M0-2g (R2 bucket and bucket-scoped test token) for the R2 job
 - **Spec:** 07 §5.2; 04 §4 (delivery, expiry); `ci-cd.md`; `audit-rules.md` §2 (sensitive paths)

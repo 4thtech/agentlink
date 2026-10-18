@@ -1,0 +1,116 @@
+# Daily Cloudflare R2 integration test of the S3 storage adapter (M1-6a-2; 07 §5.2, 04 §4, I-2, I-7, D-52).
+#
+# Runs packages/storage/src/integration.test.ts against the real R2 test bucket `agentlink-r2-test`
+# (7-day lifecycle rule, bucket-scoped token): ciphertext-only (random bytes) test objects under a
+# random per-run storage prefix are uploaded, presigned for GET (the 7-day cap is asserted),
+# downloaded through the presigned URL, expired and deleted; a log canary checks that no URL, query
+# string, object key, credential or host reaches any log or the console. The workflow then scans
+# the test output once more for the credentials and for `X-Amz-` before anything is printed.
+#
+# It is NOT part of the merge gate: it is not called by `ci.yml`, not in `ci-gate`, never runs for
+# a pull request (no `pull_request_target` anywhere), and a failure never blocks a merge. It runs
+# on a schedule and by manual dispatch, on `main` only, and not at all in a fork. (OPS-CI-7 said
+# the nightly two-machine workflow is the only one on a schedule; the owner added this one for
+# M1-6a-2, "scheduled R2 job".)
+#
+# Security posture (docs/foundation/04 §7): `permissions: {}` at the top and `contents: read` for
+# the job, every action pinned to a full commit SHA, no lifecycle scripts on install, no pnpm
+# store cache in a job that holds secrets, no event data in shell scripts. The three secrets
+# belong to the environment `r2-test` (deployment branches: main only) and are named only in the
+# one step that needs them. The token is bucket-scoped (Object Read and Write on
+# `agentlink-r2-test` only), so it cannot list or write any other bucket (M0-2g).
+name: Storage R2
+
+on:
+  schedule:
+    # 04:41 UTC, a quiet hour that does not collide with the nightly two-machine test.
+    - cron: "41 4 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: storage-r2
+  cancel-in-progress: false
+
+env:
+  TURBO_TELEMETRY_DISABLED: "1"
+  DO_NOT_TRACK: "1"
+
+jobs:
+  r2:
+    name: r2
+    # Main only (the environment also allows main only); skipped, not failed, in a fork.
+    if: github.ref == 'refs/heads/main' && github.repository == '4thtech/agentlink'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: r2-test
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # No pnpm store cache in a job that holds secrets (cache poisoning).
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Build the workspace dependencies of @agentlink/storage
+        run: pnpm exec turbo run build --filter='@agentlink/storage...'
+
+      - name: Run the R2 integration test
+        shell: bash
+        env:
+          AGENTLINK_STORAGE_IT: r2
+          AGENTLINK_STORAGE_IT_BUCKET: agentlink-r2-test
+          AGENTLINK_STORAGE_IT_REGION: auto
+          R2_TEST_ACCOUNT_ID: ${{ secrets.R2_TEST_ACCOUNT_ID }}
+          AGENTLINK_STORAGE_IT_ACCESS_KEY_ID: ${{ secrets.R2_TEST_ACCESS_KEY_ID }}
+          AGENTLINK_STORAGE_IT_SECRET_ACCESS_KEY: ${{ secrets.R2_TEST_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          # A missing secret must fail the run, never skip the test.
+          for name in R2_TEST_ACCOUNT_ID AGENTLINK_STORAGE_IT_ACCESS_KEY_ID AGENTLINK_STORAGE_IT_SECRET_ACCESS_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::the environment r2-test has no value for the secret behind $name"
+              exit 1
+            fi
+          done
+          echo "::add-mask::$R2_TEST_ACCOUNT_ID"
+          export AGENTLINK_STORAGE_IT_ENDPOINT="https://${R2_TEST_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          out="$RUNNER_TEMP/storage-r2.log"
+          report="$RUNNER_TEMP/storage-r2.json"
+          echo "STORAGE_IT_REPORT=$report" >> "$GITHUB_ENV"
+          set +e
+          pnpm --filter @agentlink/storage exec vitest run src/integration.test.ts --reporter=default --reporter=json --outputFile.json="$report" > "$out" 2>&1
+          code=$?
+          set -e
+          # The log canary of the job: the output must hold no URL query string, no credential and no
+          # account host. The report file is checked the same way. Nothing is printed if it does.
+          for file in "$out" "$report"; do
+            [ -f "$file" ] || continue
+            for needle in 'X-Amz-' "$R2_TEST_ACCOUNT_ID" "$AGENTLINK_STORAGE_IT_ACCESS_KEY_ID" "$AGENTLINK_STORAGE_IT_SECRET_ACCESS_KEY" 'r2.cloudflarestorage.com'; do
+              if grep -qF -- "$needle" "$file"; then
+                echo "::error::the test output holds a presigned URL part, a credential or the account host; it is not printed"
+                rm -f "$out" "$report"
+                exit 1
+              fi
+            done
+          done
+          cat "$out"
+          exit "$code"
+
+      - name: Check that the integration test ran in full, with no skipped test
+        run: |
+          node -e '
+            const r = JSON.parse(require("node:fs").readFileSync(process.env.STORAGE_IT_REPORT, "utf8"));
+            const f = r.testResults.filter((x) => /integration\.test\.ts$/.test(x.name));
+            const t = f.length === 1 ? f[0].assertionResults : [];
+            const bad = t.filter((x) => x.status !== "passed");
+            console.log(`integration.test.ts: ${t.length} tests, ${bad.length} not passed`);
+            if (t.length < 5 || bad.length > 0) { console.error("::error::the R2 integration suite must run 5+ tests, all passed"); process.exit(1); }
+          '
