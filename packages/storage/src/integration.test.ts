@@ -113,10 +113,35 @@ const held = (): number => {
 /** `gc()` when the process runs with --expose-gc (NODE_OPTIONS=--expose-gc), else undefined. */
 const forceGc = (globalThis as { gc?: () => void }).gc;
 
+/** Yields one macrotask, so work the collector left for later (freeing ArrayBuffer memory) can finish. */
+const nextTask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+/** Forced collections per settled reading: retained memory is the smallest of these readings. */
+const SETTLE_ROUNDS = 3;
+
+/**
+ * Held memory after the collector has settled: `gc()`, then SETTLE_ROUNDS times a yield, `gc()` and a
+ * reading, keeping the smallest (IR flake 2026-10-18). A reading right after a single `gc()` still
+ * counts ArrayBuffer memory that collection found dead but has not released yet (V8 frees it after the
+ * pause); on CI that left 1-48 MiB of garbage in the figure (retained download 27-70 MiB across runs).
+ * Settling removes only garbage: whatever the pipeline still references stays in every reading.
+ */
+async function settledHeld(gc: () => void): Promise<number> {
+  gc();
+  let least = Number.POSITIVE_INFINITY;
+  for (let round = 0; round < SETTLE_ROUNDS; round += 1) {
+    await nextTask();
+    gc();
+    least = Math.min(least, held());
+  }
+  return least;
+}
+
 /**
  * Peak memory, sampled as bytes flow: RSS and held (heapUsed + arrayBuffers) every 32 calls, and,
- * when `gc()` is exposed, held right after a forced collection every 256 calls (`peakRetained`), which
- * measures what the pipeline keeps alive rather than garbage the collector has not reached yet.
+ * when `gc()` is exposed, held after a settled forced collection every 256 calls (`peakRetained`,
+ * see settledHeld), which measures what the pipeline keeps alive rather than garbage the collector
+ * has not reached or released yet. The stream waits for each sample, so the pipeline's buffers stay
+ * referenced while it is taken.
  */
 function sampler() {
   let peakRss = rss();
@@ -124,14 +149,13 @@ function sampler() {
   let peakRetained = 0;
   let calls = 0;
   return {
-    sample(force = false): void {
+    async sample(force = false): Promise<void> {
       calls += 1;
       if (!force && (calls & 31) !== 0) return;
       peakRss = Math.max(peakRss, rss());
       peakHeld = Math.max(peakHeld, held());
       if (forceGc !== undefined && (force || (calls & 255) === 0)) {
-        forceGc();
-        peakRetained = Math.max(peakRetained, held());
+        peakRetained = Math.max(peakRetained, await settledHeld(forceGc));
       }
     },
     peaks: () => ({ peakRss, peakHeld, peakRetained }),
@@ -139,14 +163,14 @@ function sampler() {
 }
 
 /** `total` bytes of varied plaintext in 64 KiB blocks, hashed as they are produced. */
-function plaintextStream(total: number, onPull: () => void) {
+function plaintextStream(total: number, onPull: () => Promise<void>) {
   const hasher = createSha256();
   const BLOCK = 64 * 1024;
   let sent = 0;
   let digest: string | undefined;
   const stream = new ReadableStream<Uint8Array>({
-    pull(controller) {
-      onPull();
+    async pull(controller) {
+      await onPull();
       if (sent >= total) {
         controller.close();
         return;
@@ -162,14 +186,14 @@ function plaintextStream(total: number, onPull: () => void) {
 }
 
 /** A sink that hashes what it is given and records whether it was committed. */
-function hashSink(onWrite: () => void) {
+function hashSink(onWrite: () => Promise<void>) {
   const hasher = createSha256();
   let size = 0;
   let state = 'open';
   let digest: string | undefined;
   const sink: ProvisionalSink = {
     async write(chunk) {
-      onWrite();
+      await onWrite();
       hasher.update(chunk);
       size += chunk.length;
     },
@@ -340,7 +364,7 @@ describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}
       expiresAt: inFuture(DAY_MS),
     });
     created.push(sealed.object);
-    up.sample(true);
+    await up.sample(true);
     const s3 = make();
     const response = await fetch(await s3.presignGet(sealed.object, inFuture(60 * 60 * 1000)), {
       redirect: 'error',
@@ -372,7 +396,7 @@ describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}
       ciphertextSha256: sealed.ciphertextSha256,
       plaintextSha256: sealed.plaintextSha256,
     }).catch((e: unknown) => e);
-    down.sample(true);
+    await down.sample(true);
     await s3.delete(sealed.object);
     const [u, d] = [up.peaks(), down.peaks()];
     return {
@@ -412,10 +436,13 @@ describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}
   // - RSS growth of the 1 GiB run < 128 MiB (the card's acceptance);
   // - reported, not gated: growth(1 GiB) - growth(256 MiB). RSS noise on macOS made it 26-46 MiB
   //   locally against -8 MiB on CI (IR-M1-6b-2-2), while retained-after-GC held at 48-55 MiB;
-  // - held memory (heapUsed + arrayBuffers) right after a forced collection < 64 MiB (the M1-1d
-  //   limit): what the pipeline keeps alive. vitest.config.ts runs this file with --expose-gc; without
-  //   gc() the test fails rather than skip the check. Unforced held memory is reported only: it
-  //   mostly measures garbage the collector has not reached yet (flaked at 65 MiB, IR-M1-6b-2-1 H-1).
+  // - held memory (heapUsed + arrayBuffers, the whole test process) after a settled forced collection
+  //   < 64 MiB (the M1-1d limit): what the pipeline keeps alive. Settled means repeated gc() with a
+  //   yield in between, smallest reading kept (settledHeld): a reading right after one gc() still
+  //   held released-but-unfreed ArrayBuffers and flaked at 73 MiB on CI. vitest.config.ts runs this
+  //   file with --expose-gc; without gc() the test fails rather than skip the check. Unforced held
+  //   memory is reported only: it mostly measures garbage the collector has not reached yet (flaked
+  //   at 65 MiB, IR-M1-6b-2-1 H-1).
   // The figures are logged on every run (numbers only, through @4thtech-io/log), and go into the
   // assertion messages, an annotation and the JSON report's `meta`.
   // MinIO only: the R2 job runs daily on a shared test bucket and need not move a GiB each day. The
