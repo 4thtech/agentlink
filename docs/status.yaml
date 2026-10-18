@@ -250,8 +250,8 @@ areas:
         summary: "`owner init` signs the agent's first card in the same owner step, so a new agent can pair; the owner key signs only the agent card and the defined owner decisions (M1-8h)."
       - name: "Local approval server"
         state: done
-        prs: [207, 225, 247, 256]
-        summary: "A small server on localhost (loopback only, with a one-time token, host and origin checks and an owner-presence step) that will serve the approval page on `http://localhost:<port>` (M1-8d, M1-31). Owner presence there is the owner code or, after a one-time setup with the owner code, a localhost passkey (WebAuthn PRF, M1-8e). The CLI does not open it yet."
+        prs: [207, 225, 247, 256, 267]
+        summary: "A small server on localhost (loopback only, with a one-time token, host and origin checks and an owner-presence step) that serves the approval page on `http://localhost:<port>` (M1-8d, M1-31). Owner presence there is the owner code or, after a one-time setup with the owner code, a localhost passkey (WebAuthn PRF, M1-8e). `agentlink mcp` starts it when an approval is needed (M1-11a-b)."
       - name: "Owner recovery without an attached agent"
         state: done
         prs: [206, 227]
@@ -289,8 +289,8 @@ areas:
         summary: "One owner key shared by several local agents, each on its own harness: `owner add-agent` and `init --harness` (M1-9t, D-78). Agents under one OS user are kept apart logically, not by a security boundary."
       - name: "Local approval page"
         state: in-progress
-        prs: [207, 225, 247, 256]
-        summary: "The localhost server behind it is merged (see the Node runtime), with a functional, unstyled page: first run with a localhost passkey (M1-8e), approval cards with who, what, cost and the rule, and review together, where one passkey gesture or owner code entry confirms exactly the listed approvals while terms stay single (M1-11a). Session links open once and repeated wrong owner codes make you wait. The design (M1-11b), \"Remember for this contact\" and opening it from the CLI are still to build (M1b)."
+        prs: [207, 225, 247, 256, 267]
+        summary: "The localhost server behind it is merged (see the Node runtime), with a functional, unstyled page: first run with a localhost passkey (M1-8e), approval cards with who, what, cost and the rule, and review together, where one passkey gesture or owner code entry confirms exactly the listed approvals while terms stay single (M1-11a). Session links open once and repeated wrong owner codes make you wait. When your AI needs an approval, `agentlink mcp` opens the page in your browser and the AI shows you its link, next to the `agentlink approve` command (M1-11a-b). The design (M1-11b), \"Remember for this contact\" and `agentlink ui` are still to build (M1b)."
       - name: "Beginner setup page"
         state: done
         prs: [234]
@@ -343,9 +343,9 @@ deploy:
     note: "None deployed yet. The encrypted drop Worker is built and tested locally (M1-27a) and has its deploy pipeline (M1-27b), which goes live once the owner's Cloudflare setup is done; the submitter and faucet are not built yet."
 
 # Prose for the README Status block and the docs-site page.
-inProgress: "M1b is in progress. v0.1.1 (18 Oct 2026) is on npm `latest`. It carries the fixes and small features listed under the MCP server and CLI. In development, merged but not yet usable from the CLI or the MCP tools: STREAM file encryption, the owner-signed Revocation typed data, multipart upload with streaming encryption for your own storage, the localhost approval page (the CLI does not open it yet), the safe fetch and path guard, the files and proof policy rules and the proof hashing. The encrypted drop Worker is built and has its deploy pipeline, but it is not deployed yet: the owner's Cloudflare steps are pending. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23). Next in M1b: sending files through the tools, the designed approval page and proof."
-notYet: "file transfer, proof, credits, the designed local approval page (a functional page with the owner code and a localhost passkey is merged, but the CLI does not open it yet), the encrypted drop service (built, not deployed), the owner console, desktop apps and the cloud agent. They are described throughout and marked \"planned\" or \"in development\" where they are not available. v0.1.1 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha, testnets only) was released on 18 Oct 2026 and is the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`."
-next: "Wire file sending into the tools (encryption, storage and the encrypted drop once it is deployed), open the approval page from the CLI, run the two-person dogfood, then finish M1b: proof and credits on testnets, and cut the 0.2.0 release."
+inProgress: "M1b is in progress. v0.1.1 (18 Oct 2026) is on npm `latest`. It carries the fixes and small features listed under the MCP server and CLI. In development, merged but not yet usable from the CLI or the MCP tools: STREAM file encryption, the owner-signed Revocation typed data, multipart upload with streaming encryption for your own storage, the localhost approval page (`agentlink mcp` opens it when an approval is needed), the safe fetch and path guard, the files and proof policy rules and the proof hashing. The encrypted drop Worker is built and has its deploy pipeline, but it is not deployed yet: the owner's Cloudflare steps are pending. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23). Next in M1b: sending files through the tools, the designed approval page and proof."
+notYet: "file transfer, proof, credits, the designed local approval page (a functional page with the owner code and a localhost passkey is merged, and `agentlink mcp` opens it when an approval is needed), the encrypted drop service (built, not deployed), the owner console, desktop apps and the cloud agent. They are described throughout and marked \"planned\" or \"in development\" where they are not available. v0.1.1 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha, testnets only) was released on 18 Oct 2026 and is the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`."
+next: "Wire file sending into the tools (encryption, storage and the encrypted drop once it is deployed), add `agentlink ui`, run the two-person dogfood, then finish M1b: proof and credits on testnets, and cut the 0.2.0 release."
 
 # Milestones. state: done | in-progress | planned. `gate` is the README wording, `outcome` the
 # docs-site wording, `progress` an optional README note on what is done so far.

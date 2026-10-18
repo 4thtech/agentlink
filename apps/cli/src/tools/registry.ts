@@ -476,9 +476,20 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
+/**
+ * M1-11a-b (06 §2.5, 08 §1): the sentence every tool that can return `pending_approval` ends its
+ * description with. The result's `url` is the owner's approval page; it holds no secret, but only
+ * the owner may use it, in their own browser.
+ */
+export const APPROVAL_LINK_NOTE =
+  "A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.";
+
 /** The registered tools, in 06 §2.0 order. Frozen. */
 export const TOOLS: readonly ToolDefinition[] = deepFreeze(
-  DEFINITIONS.map((tool) => ({ ...tool })),
+  DEFINITIONS.map((tool) => ({
+    ...tool,
+    description: tool.approval ? `${tool.description} ${APPROVAL_LINK_NOTE}` : tool.description,
+  })),
 );
 
 /** The M1a tools still to be registered, and the card that adds them. None: all nine are here. */
