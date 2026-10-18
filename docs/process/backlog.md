@@ -67,7 +67,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 141 (M1a 80, M1b 61, M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| M1 Local beta | 146 (M1a 80, M1b 66, M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
@@ -1118,7 +1118,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - M1-1i-b STREAM vectors (suite `stream`) pass in all runtimes: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`.
   - Dropped final chunk, reordered, duplicated or appended chunks, bit flips and header tampering all fail (tests).
-  - 1 GiB encrypt + decrypt in Node with RSS growth < 64 MiB (slow-tagged benchmark test).
+  - 1 GiB encrypt + decrypt in Node after warm-up, peak `heapUsed + arrayBuffers` stays < 64 MiB, and the peak RSS of a 3 GiB run is within 64 MiB of the 1 GiB run's peak; RSS is reported, not gated (slow-tagged benchmark test).
 
 #### M1-1e · crypto: EIP-712 typed-data hashing and AgentCard
 - **Status:** done (4thtech/agentlink#32, merged 2026-10-14) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1146,6 +1146,19 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - Vector suite `eip712-proof` (M1-1i): its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares; the contracts repo's parity job passes against the same commit (M1-3d). The revoke vectors come from M1-1i-b (D-81): suite `eip712-revocation`, whose harness module M1-1j registers and removes from `test-vectors/pending-suites.json` in the same way.
 - Review note (IR-M1-1j-1 L-1..L-4, 2026-10-17): move the EIP-3009 recipient duty into the module header; add a reject path to the harness op; open owner question: is `cardHash` the struct hash or the full digest of the AgentCard?
+
+#### M1-1j-b · crypto: EIP-712 vector and spec follow-ups (new, follow-up from #258)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/crypto, test-vectors, docs/foundation/04
+- **Depends on:** M1-1j, M1-1i-b
+- **Spec:** 04 §2.4.1; 05 §3.1, §4
+- **Invariants:** I-6
+- **Scope:**
+  - Add vector cases: a domain-reject case and a `keyEpoch` of -0.
+  - Name `keyEpoch` and `deadline` in the 04 §2.4.1 table.
+  - Verify parity with the contracts repo against the same commit (M1-3d).
+- **Acceptance:**
+  - The new cases pass in every runtime the suites declare; the 04 §2.4.1 table names both fields; the contracts parity job passes against the same vectors commit.
 
 #### M1-1f · crypto: owner passphrase wrapping, pairing proof, safety code
 - **Status:** done (4thtech/agentlink#37, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1942,6 +1955,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - 1 GB round trip against MinIO with RSS growth < 128 MiB (measured in the test).
   - An aborted upload leaves no open multipart uploads; lifecycle rule applied and read back on MinIO and R2.
 
+#### M1-6b-b · storage: lifecycle and upload follow-ups (new, follow-up from #254)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/storage
+- **Depends on:** M1-6b, M1-28
+- **Spec:** 07 §5.2, §5.4; 04 §4
+- **Invariants:** I-2, I-3
+- **Scope:**
+  - Lifecycle read-back on R2: needs an R2 token that can change bucket settings, which is an owner operation (M1-28).
+  - L3: the lifecycle read-modify-write is not atomic; make concurrent changes safe or detect them.
+  - L4: wrap errors thrown by the caller's stream in `StorageError`.
+  - L5: handle uploads orphaned when the create or complete response is lost (abort or reclaim).
+- **Acceptance:**
+  - The lifecycle rule is applied and read back on R2 (owner-run check recorded); L3, L4 and L5 each have a test; the lifecycle helper does not discard rules it did not write.
+
 #### M1-6c · storage: drop adapter and storage selection (new, D-48)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage
@@ -2281,6 +2308,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-4, I-5
 - **Scope:** M1-7h applies a verified `revoke` (`revoked_agents`, contact status or `identity.revoked_at`, pending outbox rows stopped as `revoked`) and drops any other. Left here: in the same store transaction, void every pending approval and every open commitment part with the revoked agent as counterparty (void rule 3); the activity line for a revoke; `catchUp` counts that leave out `received` rows whose type is not a message once it is known (F04 a); acks staged for the outbox instead of published inside `syncInbox` (F04 b); a KeyStore failure while listing own keys degrades the fetch instead of failing the sync (F04 c).
 - **Acceptance:** after a contact's revoke, an approval pending for an action with that contact is `void` and its commitment parts are void, in the revoke's transaction; a peer's acks do not raise `catchUp` counts; `syncInbox` returns within its budget with 200 acks pending.
+
+#### M1-7h-d · core: faster sync rate-limit tests (new, follow-up from #252)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core
+- **Depends on:** M1-7h
+- **Spec:** `development-process.md` (CI budget)
+- **Invariants:** —
+- **Scope:**
+  - The `sync.test.ts` rate-limit tests (500 and 300 envelopes) sign every envelope in the test and exceed 120 s on a loaded runner; they now carry a 300 s timeout (#252). Use cached or prebuilt signed fixtures so the timeout can come back down.
+- **Acceptance:**
+  - The tests assert the same rate-limit behaviour (no weaker assertions); each finishes well under 60 s on the CI runner and the 300 s timeout is removed or lowered.
 
 #### M1-7h-c · core: inbox page read with read marking (new, for M1-9p)
 - **Status:** done (4thtech/agentlink#130, merged 2026-10-15) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -2978,6 +3016,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The production bucket's lifecycle rule (7 days) is read back after each deploy, and so is the drop Worker's logging config (observability and request logging, Tail Workers and Logpush off; 04 §4).
 - Review note (IR-M1-27a-2 (PR #218, open), 2026-10-17): tighten per-network limits; account downloads after delivery; document URL normalisation in 07 §5.4; set `cpu_ms` in the deploy config; add a header-whitespace test.
 
+#### M1-27b-b · drop: deploy pipeline follow-ups (new, follow-up from #255)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/deploy-drop.yml`, `docs/process/release-and-deployment.md`
+- **Depends on:** M1-27b
+- **Spec:** `release-and-deployment.md` §4.5, §8; 07 §5.4
+- **Invariants:** I-3, I-7
+- **Scope:**
+  - Rollback on timeout and cancel edge cases of the deploy job.
+  - A tighter `limits.cpu_ms`.
+  - A pre-deploy lifecycle check (the bucket rule exists before the deploy goes live).
+  - `actionlint` in CI for the workflow files.
+- **Acceptance:**
+  - A cancelled or timed-out deploy leaves the previous version serving (rehearsed on staging); `cpu_ms` is set to the measured need plus margin; the pre-deploy check fails the job when the lifecycle rule is missing; `actionlint` runs as a required check.
+
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink-ops · legal/ (counsel brief and sign-off, private); Cloudflare account (buckets, lifecycle rule, hostname)
@@ -3015,6 +3067,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - XSS payloads in contact and file names render inert; a PRF-less authenticator falls back to the passphrase.
 - Review note (IR-M1-8d-1, 2026-10-17): make the session-link exchange one-shot / rotate; add failed-attempt backoff; fix Windows open() result and error handling; add Host test cases.
 - Review note (IR-M1-31-1 L-2..L-5, 2026-10-17): add a `LOCALHOST:<port>` Host test; note the start-time IPv4 decision in D-79; set common headers on the 503 stub; fix the stale example in `packages/core/src/approval-channel.ts:30`.
+
+#### M1-11a-b · local UI: wiring and remember-contact follow-ups (new, follow-up from #256)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (local UI bundle), packages/mcp
+- **Depends on:** M1-11a, M1-9h; G-32 for the last item
+- **Spec:** 08 §1; 11 §6.2, §8; 06 §3
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Wire the local UI into `agentlink mcp` and put its URL in `pending_approval` results, pinned to the local UI origin (see the M1-9d hand-off above). `agentlink ui` is covered by M1-9h and is not repeated here.
+  - "Remember for this contact" after G-32 (proof approvals only, same presence gesture, signed `policy.set`).
+- **Acceptance:**
+  - A `pending_approval` result carries the UI `url`; a test checks the origin pin; "Remember for this contact" adds the contact rule through a `policy.set` whose refusal or success is reported accurately.
 
 #### M1-11c · local UI: settings pages
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -3136,6 +3200,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Deterministic variant green on PRs within 15 minutes; LLM variant pass rate reported per run; no chain is chosen by hand anywhere in the scenario (D-40).
   - Canary scan of all e2e logs and artifacts finds no plaintext, keys or presigned URLs.
+  - J3 (02): an agent with no credits is refused with `needs_credits`, takes the faucet link, receives testnet credits and retries successfully, with no chain chosen by hand (D-40). Added 2026-10-18: no other card covered J3 end to end before M1-GATE.
+  - J5 (02): a third party who has only the exported proof pack runs `agentlink verify` (M1-9h) and gets a pass; a tampered pack fails with its specific reason. Added 2026-10-18: no other card covered J5 end to end before M1-GATE.
 - Review note (IR-M1-27a-2, 2026-10-17): the SDK client signs the drop request URL in its normalised form.
 
 #### M1-13b · prompt-injection suite
