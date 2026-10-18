@@ -22,6 +22,15 @@ The `@4thtech-io` scope is the internal workspace scope; only `@4thtech-io/agent
 
 Integrators use `@4thtech-io/core` with their own `KeyStore` and `Store` and pass their `appId` to earn integrator fees.
 
+## Chain client (`@4thtech-io/chain`)
+
+**In development (M1-4a); not user-facing yet.** It builds on the contract interface package ([Contracts](contracts.md#interface-package)). Nothing here asks the user for a chain, a wallet or gas: chains are picked automatically.
+
+- **Supported chains.** The client knows a chain only when it ships a network entry for it and the pinned contracts release has a deployment there: Base Sepolia today. The two must agree on the chain and the fee tokens, or the client refuses that chain. Nothing is fetched at runtime.
+- **RPC endpoints.** Several public endpoints per chain; users can add up to 5 of their own, which are tried first. An endpoint must be `https://` with a public host name (no IP address, no `localhost` or local name) and no user info, query or fragment. An owner's own endpoint may carry its provider key in the path, so endpoint addresses are treated as secrets and never logged or returned; errors carry fixed codes only. In Node, private and loopback addresses are refused at resolve time and each request connects to the checked address. Each request has a timeout and a few retries before the next endpoint; requests never follow redirects, and only read methods are sent.
+- **Calls.** The client encodes calls only from the client-safe ABIs; it cannot even form an admin, upgrade or module call, and EIP-3009 deposits stay off until the contracts enable them.
+- **Records and receipts.** The builders produce exactly the EIP-712 digests of the shared test vectors. Every Record gets a fresh random nonce and, when it has a recipient, a fresh random 32-byte salt that the caller cannot choose. The record ID is computed as the Notary does: `keccak256(abi.encode(chainId, notary, signer, nonce))`. Signing goes only through the agent's key store.
+
 ## Outline (filled in at release)
 
 - Per package: install, entry points, main types and functions, runtime support, examples

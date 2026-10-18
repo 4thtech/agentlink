@@ -152,6 +152,14 @@ areas:
       - name: "Encrypted drop as the default and storage choice"
         state: planned
         summary: "The 4thTech encrypted drop as the default storage and the choice between it and your own storage (M1-6c)."
+  - id: chain
+    title: "Chain client (@4thtech-io/chain)"
+    intro: "In development; not wired into the MCP tools yet."
+    components:
+      - name: "Chain client foundation"
+        state: in-progress
+        prs: [276]
+        summary: "The client knows Base Sepolia from the shipped entry and the pinned contracts release and picks the chain on its own. It reads through several public endpoints with timeouts, retries and failover. Endpoint addresses are treated as secrets and never logged or returned; private and loopback addresses are refused at resolve time. It can only form client calls, and it builds proof records and receipts that match the shared test vectors, each record with a fresh random salt and nonce (M1-4a). In review. Quotes, credits, submission and proof checks follow (M1-4b to M1-4d)."
   - id: core
     title: "Core (@4thtech-io/core)"
     intro: "Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.1); not published as a separate package."

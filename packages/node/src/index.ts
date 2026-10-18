@@ -101,6 +101,15 @@ export {
   type SafeFetchOptions,
   type SafeFetchResult,
 } from './safe-fetch.js';
+// M1-4a (IR-M1-4a-1 M-1): the address-checked fetch for chain RPC requests (no lookup, CA or route
+// seam).
+export {
+  RPC_FETCH_MAX_BYTES,
+  RpcFetchError,
+  nodeRpcFetch,
+  type RpcFetch,
+  type RpcFetchErrorCode,
+} from './rpc-fetch.js';
 export {
   AllowedPathError,
   createInboxFile,

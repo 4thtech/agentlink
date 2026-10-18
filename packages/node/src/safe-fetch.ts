@@ -113,7 +113,8 @@ export interface SafeFetchSeams {
   readonly route?: (address: string, port: number) => { address: string; port: number };
 }
 
-function systemLookup(host: string): Promise<readonly string[]> {
+/** The system resolver (`dns.lookup`, all answers). Shared with the RPC fetch (rpc-fetch.ts). */
+export function systemLookup(host: string): Promise<readonly string[]> {
   return new Promise((resolve, reject) => {
     dns.lookup(host, { all: true, order: 'verbatim' }, (error, addresses) => {
       if (error !== null || !Array.isArray(addresses)) reject(new Error('lookup failed'));
@@ -208,8 +209,11 @@ export function createSafeFetchWith(seams: SafeFetchSeams = {}): SafeFetch {
   };
 }
 
-/** One lookup per hop; every answer must be globally routable; the first is pinned. */
-async function resolvePinned(
+/**
+ * One lookup per hop; every answer must be globally routable; the first is pinned. Shared with the
+ * RPC fetch (rpc-fetch.ts), never exported from the package entry.
+ */
+export async function resolvePinned(
   target: CheckedFetchUrl,
   lookup: FetchLookup,
   signal: AbortSignal,
@@ -236,7 +240,11 @@ async function resolvePinned(
 }
 
 /** A TLS socket to the checked address, with SNI and certificate checks on the host name. */
-function pinnedTls(target: CheckedFetchUrl, address: string, seams: SafeFetchSeams): TLSSocket {
+export function pinnedTls(
+  target: CheckedFetchUrl,
+  address: string,
+  seams: SafeFetchSeams,
+): TLSSocket {
   const routed =
     seams.route === undefined ? { address, port: target.port } : seams.route(address, target.port);
   const servername = target.literal === undefined ? target.host : undefined;

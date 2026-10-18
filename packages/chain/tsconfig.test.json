@@ -3,6 +3,8 @@
   "compilerOptions": {
     "composite": false,
     "noEmit": true,
+    // Tests only: the fetch mocks use Response, Request, URL and RequestInit (IR-M1-4a-1 L-6).
+    "lib": ["ES2022", "DOM"],
     "declaration": false,
     "rootDir": "."
   },

@@ -41,6 +41,7 @@ Files, proof, credits and the apps are **in development or planned**; they are n
 > - **Shared types (@4thtech-io/types):** 3 merged
 > - **Transport (@4thtech-io/transport-nostr):** 5 merged
 > - **Storage (@4thtech-io/storage):** 1 merged, 1 in progress, 1 planned
+> - **Chain client (@4thtech-io/chain):** 1 in progress
 > - **Core (@4thtech-io/core):** 16 merged
 > - **Node runtime (@4thtech-io/node):** 9 merged, 1 planned
 > - **MCP server, CLI and apps:** 4 merged, 4 in progress, 1 planned
