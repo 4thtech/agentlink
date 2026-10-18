@@ -16,3 +16,16 @@ paths = [
   '''^test-vectors/[a-z0-9-]+/vectors\.json$''',
   '''^tools/vectors/sources/nip44\.vectors\.json$''',
 ]
+
+# M1-3f (D-83): the OCC v2 ABI package carries public contract addresses (20-byte EVM addresses,
+# published on chain and in the docs). gitleaks' generic-api-key rule matches the key name
+# "AccessManager" ("access") next to an address. Only that rule is relaxed, only inside
+# packages/occ-v2-abi/, and only when the matched value is exactly one 0x-prefixed 40-hex address
+# (a 32-byte private key is 64 hex and stays caught). Widening it is a reviewed change.
+[[allowlists]]
+description = "Public OCC v2 contract addresses in the ABI package"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^packages/occ-v2-abi/''']
+regexTarget = "secret"
+regexes = ['''^0x[0-9a-fA-F]{40}$''']
