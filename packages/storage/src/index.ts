@@ -1,8 +1,14 @@
 // @4thtech-io/storage: storage adapters (07 §5). Every adapter receives only ALF1 ciphertext (I-2).
-// M1-6a: the StorageAdapter interface, the inline adapter and the S3-compatible adapter.
+// M1-6a: the StorageAdapter interface, the inline adapter and the S3-compatible adapter. M1-6c: the
+// encrypted-drop adapter and storage selection.
 export const packageName = '@4thtech-io/storage';
 
-export { StorageError, type StorageErrorCode } from './errors.js';
+export {
+  StorageError,
+  type StorageErrorCode,
+  type StorageErrorDetails,
+  type StorageLimit,
+} from './errors.js';
 export type { PutOptions, StorageAdapter, StorageKind, StoredObject } from './adapter.js';
 export {
   INLINE_MAX_CIPHERTEXT_BYTES,
@@ -67,3 +73,30 @@ export {
   type TempFileHandle,
   type TempFileOps,
 } from './stream-sink.js';
+// M1-6c (D-48): the encrypted-drop adapter and storage selection (07 §5.4, §5.6; G-27 option a).
+export {
+  DROP_DEFAULT_ENDPOINT,
+  DROP_MAX_CIPHERTEXT_BYTES,
+  DROP_MAX_EXPIRY_SECONDS,
+  createDropAdapter,
+  type DropAdapter,
+  type DropAdapterConfig,
+  type DropPresignedGet,
+  type DropSigner,
+} from './drop.js';
+export {
+  PAYLOAD_MAX_BYTES,
+  PAYLOAD_MAX_FILES,
+  isInlineEligible,
+  planInline,
+  resolveStorage,
+  selectStorage,
+  selectionForError,
+  type FilesStorage,
+  type NeedsSetupReason,
+  type ResolvedStorage,
+  type RetrySelection,
+  type SelectStorageInput,
+  type StorageAdapters,
+  type StorageSelection,
+} from './select.js';

@@ -9,8 +9,8 @@
 // - Requests go through an injected fetch with redirects refused. The caller passes the SSRF-safe
 //   fetch (M1-15) where one is available; the endpoint grammar check here runs either way.
 // The configuration checks, credentials and signed sending live in session.ts, shared with multipart
-// upload and the lifecycle helper (M1-6b). Multipart for objects above 64 MiB is multipart.ts; routing
-// `put` there, with streaming encryption, is M1-6b part 2.
+// upload and the lifecycle helper (M1-6b). M1-6c: `put` above 64 MiB routes to multipart upload
+// (multipart.ts, 07 §5.2), which streams one part at a time and aborts on any failure.
 import {
   checkFuture,
   checkSize,
@@ -22,13 +22,14 @@ import {
 } from './adapter.js';
 import { isOwnObjectKey, newObjectKey, validateStoragePrefix } from './endpoint.js';
 import { StorageError } from './errors.js';
+import { createS3Multipart } from './multipart.js';
 import { createS3Session, discard, type S3SessionConfig } from './session.js';
 
 export type { FetchLike, S3Credentials, S3CredentialsProvider } from './session.js';
 
 /** SigV4 presigned URLs are valid for at most 7 days. */
 export const MAX_PRESIGN_SECONDS = 604_800;
-/** Larger objects need multipart upload (07 §5.2, M1-6b). */
+/** Larger objects go by multipart upload (07 §5.2; `put` routes them there, M1-6c). */
 export const S3_MAX_SINGLE_PUT_BYTES = 64 * 1024 * 1024;
 
 export interface S3AdapterConfig extends S3SessionConfig {
@@ -52,6 +53,7 @@ export function createS3Adapter(config: S3AdapterConfig): S3Adapter {
   const session = createS3Session(config, 's3');
   const storagePrefix = validateStoragePrefix(config.storagePrefix);
   const { log, now } = session;
+  const multipart = createS3Multipart(config);
 
   const objectUrl = (key: string): string => `${session.bucketUrl}/${key}`;
 
@@ -90,6 +92,10 @@ export function createS3Adapter(config: S3AdapterConfig): S3Adapter {
     kind: 's3',
 
     async put(ciphertext, opts: PutOptions): Promise<StoredObject> {
+      if (opts !== null && typeof opts === 'object' && Number.isSafeInteger(opts.size)) {
+        // Above the single-PUT limit: multipart, under the same prefix, with its own size cap.
+        if (opts.size > S3_MAX_SINGLE_PUT_BYTES) return multipart.put(ciphertext, opts);
+      }
       checkSize(opts.size, S3_MAX_SINGLE_PUT_BYTES);
       const at = now();
       checkFuture(opts.expiresAt, at, 'expiresAt');

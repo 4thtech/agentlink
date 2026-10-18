@@ -33,7 +33,8 @@ describe('selectStorage: the 07 §5.6 table', () => {
     ownConfigured: boolean,
     fits: 'within' | 'above',
   ): StorageSelection => {
-    if (policy === 'own') return ownConfigured ? { mode: 'own' } : { mode: 'needs_setup', reason: 'no_own_storage' };
+    if (policy === 'own')
+      return ownConfigured ? { mode: 'own' } : { mode: 'needs_setup', reason: 'no_own_storage' };
     if (policy === 'auto' && ownConfigured) return { mode: 'own' };
     return fits === 'within' ? { mode: 'drop' } : { mode: 'needs_setup', reason: 'size' };
   };
@@ -42,9 +43,9 @@ describe('selectStorage: the 07 §5.6 table', () => {
     for (const ownConfigured of [true, false]) {
       for (const fits of ['within', 'above'] as const) {
         it(`${policy} × own ${ownConfigured ? 'configured' : 'none'} × ${fits} the drop limit`, () => {
-          expect(
-            selectStorage({ policy, ownConfigured, ciphertextSize: sizes[fits] }),
-          ).toEqual(expected(policy, ownConfigured, fits));
+          expect(selectStorage({ policy, ownConfigured, ciphertextSize: sizes[fits] })).toEqual(
+            expected(policy, ownConfigured, fits),
+          );
         });
       }
     }
@@ -52,7 +53,11 @@ describe('selectStorage: the 07 §5.6 table', () => {
 
   it('the size limit is inclusive', () => {
     expect(
-      selectStorage({ policy: 'drop', ownConfigured: false, ciphertextSize: DROP_MAX_CIPHERTEXT_BYTES }),
+      selectStorage({
+        policy: 'drop',
+        ownConfigured: false,
+        ciphertextSize: DROP_MAX_CIPHERTEXT_BYTES,
+      }),
     ).toEqual({ mode: 'drop' });
   });
 
@@ -69,7 +74,12 @@ describe('selectStorage: the 07 §5.6 table', () => {
 
   it('honours a smaller configured drop limit (staging, self-hosting)', () => {
     expect(
-      selectStorage({ policy: 'auto', ownConfigured: false, ciphertextSize: 2 * MiB, dropMaxBytes: MiB }),
+      selectStorage({
+        policy: 'auto',
+        ownConfigured: false,
+        ciphertextSize: 2 * MiB,
+        dropMaxBytes: MiB,
+      }),
     ).toEqual({ mode: 'needs_setup', reason: 'size' });
   });
 
@@ -77,9 +87,9 @@ describe('selectStorage: the 07 §5.6 table', () => {
     expect(() =>
       selectStorage({ policy: 'cloud' as FilesStorage, ownConfigured: false, ciphertextSize: 1 }),
     ).toThrow(StorageError);
-    expect(() => selectStorage({ policy: 'auto', ownConfigured: false, ciphertextSize: 0 })).toThrow(
-      StorageError,
-    );
+    expect(() =>
+      selectStorage({ policy: 'auto', ownConfigured: false, ciphertextSize: 0 }),
+    ).toThrow(StorageError);
   });
 });
 
@@ -119,8 +129,9 @@ describe('resolveStorage: no silent fallback, and never the drop under own', () 
       { own: failingOwn, drop: spy.factory },
     );
     expect(choice.adapter).toBe(failingOwn);
-    await expect(choice.adapter!.put(new Uint8Array(1), { size: 1, expiresAt: new Date(Date.now() + 1e6) }))
-      .rejects.toMatchObject({ code: 'upload_failed' });
+    await expect(
+      choice.adapter!.put(new Uint8Array(1), { size: 1, expiresAt: new Date(Date.now() + 1e6) }),
+    ).rejects.toMatchObject({ code: 'upload_failed' });
     expect(spy.built()).toBe(0);
     expect(spy.requests).toHaveLength(0);
 
@@ -135,8 +146,10 @@ describe('resolveStorage: no silent fallback, and never the drop under own', () 
   it('auto with own storage uses own; without it, the drop', () => {
     const spy = spyDrop();
     expect(
-      resolveStorage({ policy: 'auto', ownConfigured: true, ciphertextSize: MiB }, { own, drop: spy.factory })
-        .adapter,
+      resolveStorage(
+        { policy: 'auto', ownConfigured: true, ciphertextSize: MiB },
+        { own, drop: spy.factory },
+      ).adapter,
     ).toBe(own);
     expect(spy.built()).toBe(0);
     const viaDrop = resolveStorage(
@@ -157,9 +170,9 @@ describe('resolveStorage: no silent fallback, and never the drop under own', () 
 
 describe('selectionForError: drop refusals (IR-D48-1 F10)', () => {
   it('size and quota limits keep needs_setup', () => {
-    expect(
-      selectionForError(new StorageError('needs_setup', 'x', 413, { limit: 'size' })),
-    ).toEqual({ mode: 'needs_setup', reason: 'size' });
+    expect(selectionForError(new StorageError('needs_setup', 'x', 413, { limit: 'size' }))).toEqual(
+      { mode: 'needs_setup', reason: 'size' },
+    );
     expect(
       selectionForError(new StorageError('needs_setup', 'x', 403, { limit: 'quota' })),
     ).toEqual({ mode: 'needs_setup', reason: 'quota' });

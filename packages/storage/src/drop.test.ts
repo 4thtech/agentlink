@@ -116,7 +116,7 @@ function setup(script?: Script, overrides: Partial<DropAdapterConfig> = {}) {
   return { drop, adapter };
 }
 
-function ciphertext(size: number, seed = 3): Uint8Array {
+function ciphertext(size: number, seed = 3): Uint8Array<ArrayBuffer> {
   const out = new Uint8Array(size);
   for (let i = 0; i < size; i += 1) out[i] = (i * 7 + seed) & 0xff;
   return out;
@@ -140,9 +140,9 @@ describe('drop adapter: configuration (04 §4 SSRF rules, IR-D48-1 F16)', () => 
   it('defaults to the 4thTech drop and accepts a configured https endpoint', () => {
     expect(DROP_DEFAULT_ENDPOINT).toBe('https://drop.agentlink.4thtech.io');
     expect(createDropAdapter(base()).origin).toBe(DROP_DEFAULT_ENDPOINT);
-    expect(createDropAdapter({ ...base(), endpoint: 'https://drop.staging.example.com/' }).origin).toBe(
-      'https://drop.staging.example.com',
-    );
+    expect(
+      createDropAdapter({ ...base(), endpoint: 'https://drop.staging.example.com/' }).origin,
+    ).toBe('https://drop.staging.example.com');
     expect(DROP_MAX_CIPHERTEXT_BYTES).toBe(100 * 1024 * 1024);
   });
 
@@ -217,7 +217,9 @@ describe('drop adapter: put, presignGet and delete', () => {
     await adapter.delete(obj);
     const signedBodies = drop.requests.filter((r) => r.method !== 'PUT');
     expect(signedBodies).toHaveLength(3);
-    const keys = signedBodies.map((r) => Object.keys(JSON.parse(decodeUtf8(r.body)) as object).sort());
+    const keys = signedBodies.map((r) =>
+      Object.keys(JSON.parse(decodeUtf8(r.body)) as object).sort(),
+    );
     expect(keys).toEqual([
       ['expiresAt', 'nonce', 'size', 'ts', 'v'],
       ['ciphertextSha256', 'nonce', 'objectId', 'ts', 'v'],
@@ -238,7 +240,9 @@ describe('drop adapter: put, presignGet and delete', () => {
       expect(drop.signed[i]!.body).toEqual(r.body);
     }
     // Every nonce is fresh.
-    const nonces = signedBodies.map((r) => (JSON.parse(decodeUtf8(r.body)) as { nonce: string }).nonce);
+    const nonces = signedBodies.map(
+      (r) => (JSON.parse(decodeUtf8(r.body)) as { nonce: string }).nonce,
+    );
     expect(new Set(nonces).size).toBe(3);
     // The PUT carries the ciphertext only: no signature, no metadata headers.
     const put = drop.requests.find((r) => r.method === 'PUT')!;
@@ -319,13 +323,30 @@ describe('drop adapter: put, presignGet and delete', () => {
     const { adapter, drop } = setup();
     const foreign: StoredObject[] = [
       { kind: 's3', locator: getUrl(NOW_S + 3600), size: 1, sha256: '0'.repeat(64) },
-      { kind: 'drop', locator: getUrl(NOW_S + 3600, 'https://evil.example.com'), size: 1, sha256: '0'.repeat(64) },
-      { kind: 'drop', locator: getUrl(NOW_S + 3600).replace('https:', 'http:'), size: 1, sha256: '0'.repeat(64) },
-      { kind: 'drop', locator: `${ORIGIN}/v1/put/${OBJECT_ID}/0?e=1&m=${MAC}`, size: 1, sha256: '0'.repeat(64) },
+      {
+        kind: 'drop',
+        locator: getUrl(NOW_S + 3600, 'https://evil.example.com'),
+        size: 1,
+        sha256: '0'.repeat(64),
+      },
+      {
+        kind: 'drop',
+        locator: getUrl(NOW_S + 3600).replace('https:', 'http:'),
+        size: 1,
+        sha256: '0'.repeat(64),
+      },
+      {
+        kind: 'drop',
+        locator: `${ORIGIN}/v1/put/${OBJECT_ID}/0?e=1&m=${MAC}`,
+        size: 1,
+        sha256: '0'.repeat(64),
+      },
       { kind: 'drop', locator: `${getUrl(NOW_S + 3600)}&x=1`, size: 1, sha256: '0'.repeat(64) },
     ];
     for (const obj of foreign) {
-      expect(await codeOf(adapter.presignGet(obj, inADay))).toMatchObject({ code: 'invalid_argument' });
+      expect(await codeOf(adapter.presignGet(obj, inADay))).toMatchObject({
+        code: 'invalid_argument',
+      });
       expect(await codeOf(adapter.delete(obj))).toMatchObject({ code: 'invalid_argument' });
     }
     expect(drop.requests).toHaveLength(0);
@@ -362,7 +383,12 @@ describe('drop adapter: SSRF and response checks (04 §4)', () => {
   ])('refuses an uploadUrl on %s and never PUTs the ciphertext', async (_name, uploadUrl) => {
     const { drop, adapter } = setup((req) =>
       new URL(req.url).pathname === '/v1/upload'
-        ? json(201, { objectId: OBJECT_ID, uploadUrl, expiresAt: NOW_S + 3600, uploadExpiresAt: NOW_S + 900 })
+        ? json(201, {
+            objectId: OBJECT_ID,
+            uploadUrl,
+            expiresAt: NOW_S + 3600,
+            uploadExpiresAt: NOW_S + 900,
+          })
         : undefined,
     );
     const error = await codeOf(adapter.put(ciphertext(10), { size: 10, expiresAt: inADay }));
@@ -375,7 +401,10 @@ describe('drop adapter: SSRF and response checks (04 §4)', () => {
   it.each([
     ['another host', getUrl(NOW_S + 3600, 'https://evil.example.com')],
     ['http', getUrl(NOW_S + 3600).replace('https:', 'http:')],
-    ['another object', getUrl(NOW_S + 3600).replace(OBJECT_ID, encodeBase64url(new Uint8Array(16)))],
+    [
+      'another object',
+      getUrl(NOW_S + 3600).replace(OBJECT_ID, encodeBase64url(new Uint8Array(16))),
+    ],
     ['a put path', putUrl(0)],
   ])('refuses a getUrl on %s from the commit', async (_name, url) => {
     const { adapter } = setup((req) =>
@@ -388,7 +417,10 @@ describe('drop adapter: SSRF and response checks (04 §4)', () => {
   it('does not follow a redirect', async () => {
     const { drop, adapter } = setup((req) =>
       new URL(req.url).pathname === '/v1/upload'
-        ? new Response(null, { status: 307, headers: { location: 'https://evil.example.com/v1/upload' } })
+        ? new Response(null, {
+            status: 307,
+            headers: { location: 'https://evil.example.com/v1/upload' },
+          })
         : undefined,
     );
     const error = await codeOf(adapter.put(ciphertext(10), { size: 10, expiresAt: inADay }));
@@ -400,7 +432,9 @@ describe('drop adapter: SSRF and response checks (04 §4)', () => {
     const huge = `{"objectId":"${OBJECT_ID}","pad":"${'x'.repeat(100_000)}"}`;
     for (const body of [huge, `not json ${ECHO_SECRET}`, '[]', '{"objectId":1}']) {
       const { adapter } = setup((req) =>
-        new URL(req.url).pathname === '/v1/upload' ? new Response(body, { status: 201 }) : undefined,
+        new URL(req.url).pathname === '/v1/upload'
+          ? new Response(body, { status: 201 })
+          : undefined,
       );
       const error = await codeOf(adapter.put(ciphertext(10), { size: 10, expiresAt: inADay }));
       expect(error).toMatchObject({ code: 'invalid_response' });
@@ -441,9 +475,9 @@ describe('drop adapter: typed errors (07 §5.4 Limits, IR-D48-1 F10)', () => {
 
   it('caps a hostile Retry-After and ignores a malformed one', async () => {
     const big = upload(() => json(429, { error: 'rate_limited' }, { 'retry-after': '99999999' }));
-    expect(await codeOf(big.adapter.put(ciphertext(10), { size: 10, expiresAt: inADay }))).toMatchObject(
-      { code: 'rate_limited', retryAfter: 3600 },
-    );
+    expect(
+      await codeOf(big.adapter.put(ciphertext(10), { size: 10, expiresAt: inADay })),
+    ).toMatchObject({ code: 'rate_limited', retryAfter: 3600 });
     const bad = upload(() => json(503, { error: 'unavailable' }, { 'retry-after': 'soon' }));
     const error = await codeOf(bad.adapter.put(ciphertext(10), { size: 10, expiresAt: inADay }));
     expect(error).toMatchObject({ code: 'unavailable' });

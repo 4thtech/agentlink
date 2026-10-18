@@ -51,7 +51,7 @@ interface Captured {
   readonly method: string;
   readonly url: string;
   readonly headers: Headers;
-  readonly body: Uint8Array;
+  readonly body: Uint8Array<ArrayBuffer>;
 }
 
 function harness(opts: { maxBytes?: number } = {}) {
@@ -239,7 +239,9 @@ describe('drop adapter × drop Worker (Miniflare)', () => {
     });
     const puts = h.requests.filter((r) => r.method === 'PUT');
     expect(puts.map((r) => new URL(r.url).pathname.split('/').pop())).toEqual(['1', '2']);
-    const response = await SELF.fetch(await adapter.presignGet(result.object, new Date(Date.now() + DAY_MS)));
+    const response = await SELF.fetch(
+      await adapter.presignGet(result.object, new Date(Date.now() + DAY_MS)),
+    );
     const sink = memorySink();
     await decryptDownload(response.body!, sink, {
       fileKey: result.fileKey,
