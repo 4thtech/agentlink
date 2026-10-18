@@ -319,8 +319,12 @@ async function harness(extra: ApprovalServerInternals = {}): Promise<Harness> {
     opened,
     notified,
     ownerStoresOpened,
+    // M1-11a: the session link is one-shot, so every new cookie comes through a new link.
     async cookie() {
-      const res = await send(port, `/?t=${token}`);
+      const at = opened.length; // open() hands its link to the opener synchronously
+      await server.open();
+      const fresh = new URL(opened[at] ?? '').searchParams.get('t') ?? '';
+      const res = await send(port, `/?t=${fresh}`);
       expect(res.status).toBe(303);
       const set = res.headers['set-cookie']?.[0] ?? '';
       return set.split(';')[0] ?? '';
@@ -407,7 +411,7 @@ describe('binding and the session token (08 §1)', () => {
     const set = res.headers['set-cookie']?.[0] ?? '';
     expect(set).toContain(`agentlink_${String(h.port)}=`);
     expect(set).toContain('HttpOnly');
-    expect(set).toContain('SameSite=Lax');
+    expect(set).toContain('SameSite=Strict');
     expect(set).toContain('Path=/');
     expect(set).not.toMatch(/Expires|Max-Age/i);
     const cookie = await h.cookie();
@@ -921,26 +925,30 @@ describe('the token and the owner code stay out of files, logs and URLs (08 §1,
 
 describe('the M1-8c same-user script against the running server (10 M1-8, D-67)', () => {
   it('cannot approve or deny without the owner code, even holding the token', async () => {
-    const h = await harness();
-    for (const n of [1, 2, 3]) h.source.add(n);
-    const cookie = await h.cookie();
-    const csrf = await h.csrf(cookie);
     const jobFile = join(root, 'server-job.json');
     const outFile = join(root, 'server-script-result.json');
-    const rows = await Promise.all([1, 2, 3].map((n) => h.source.get(id(n))));
-    writeFileSync(
-      jobFile,
-      JSON.stringify({
-        port: h.port,
-        origin: h.origin,
-        token: h.token,
-        cookie,
-        csrf,
-        keychainFile,
-        approvals: rows.map((r) => ({ approvalId: r?.approvalId, digest: r?.actionDigest })),
-        outFile,
-      }),
-    );
+    /** A server with three pending requests, and the script's job file for it. */
+    const serverWithJob = async (): Promise<Harness> => {
+      const h = await harness();
+      for (const n of [1, 2, 3]) h.source.add(n);
+      const cookie = await h.cookie();
+      const csrf = await h.csrf(cookie);
+      const rows = await Promise.all([1, 2, 3].map((n) => h.source.get(id(n))));
+      writeFileSync(
+        jobFile,
+        JSON.stringify({
+          port: h.port,
+          origin: h.origin,
+          token: h.token,
+          cookie,
+          csrf,
+          keychainFile,
+          approvals: rows.map((r) => ({ approvalId: r?.approvalId, digest: r?.actionDigest })),
+          outFile,
+        }),
+      );
+      return h;
+    };
     type ScriptResult = { attempts: { name: string; status: number }[] };
     const run = async (guess: string): Promise<ScriptResult> => {
       await execFileAsync(process.execPath, [SCRIPT, jobFile], {
@@ -954,16 +962,21 @@ describe('the M1-8c same-user script against the running server (10 M1-8, D-67)'
       return JSON.parse(readFileSync(outFile, 'utf8')) as ScriptResult;
     };
 
+    const h = await serverWithJob();
     const result = await run('AAAA BBBB CCCC DDDD EEEE FFFF');
     expect(result.attempts.length).toBeGreaterThan(10);
     expect(result.attempts.filter((a) => a.status === 200).map((a) => a.name)).toEqual([]);
     expect(h.source.applied).toEqual([]);
+    // M1-11a: the wrong guesses also ran into the backoff.
+    expect(result.attempts.some((a) => a.status === 429)).toBe(true);
 
-    // Harness control (not vacuous): the same script holding the owner code does approve.
+    // Harness control (not vacuous): the same script holding the owner code does approve. It runs
+    // against a fresh server, since the guesses above left this one in the M1-11a backoff.
+    const fresh = await serverWithJob();
     const leaked = await run(code);
     expect(leaked.attempts.some((a) => a.status === 200)).toBe(true);
-    expect(h.source.applied.length).toBeGreaterThan(0);
-    for (const s of h.source.applied) expect(ownerSigValid(s.body, s.sig)).toBe(true);
+    expect(fresh.source.applied.length).toBeGreaterThan(0);
+    for (const s of fresh.source.applied) expect(ownerSigValid(s.body, s.sig)).toBe(true);
   }, 120_000);
 });
 
