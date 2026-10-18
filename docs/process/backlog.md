@@ -3463,6 +3463,14 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `agentlink contacts rename <contactId> <name>` † and `agentlink contacts remove <contactId>` †: owner-terminal guard (refused under an AI-harness marker or piped stdin), then the owner code at @agentlink/node's prompt; the CLI refuses an alias another active contact already shows. `agentlink contacts` lists each contact's ID. The `AMBIGUOUS_CONTACT` `nextStep` names the two commands. No MCP tool (I-4).
 - **Acceptance:** RED commit; rename resolves the ambiguity (send by name works after it); remove makes the contact unreachable and its later Talk is dropped, never a request; refused under an AI environment; tool surface unchanged; docs-site contacts and troubleshooting pages.
 
+#### M1-9zb · cli: invite approval shows who is inviting (new, live finding 2026-10-17)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`commands/owner/render.ts`, `strings.ts`), tools/dogfood (`--oc-model` default), docs/runbooks/dogfood-m1a.md
+- **Depends on:** M1-9o
+- **Spec:** 06 §2.1 (restrictName), 11 §5 (copy); I-5
+- **Scope:** the accept-invite approval "Who" line shows the inviter's self-declared name (labelled, restricted) plus the owner fingerprint from the invite's verified card, e.g. `“oc-test” (self-declared) · owner B254·C21B · not in your contacts yet`; fingerprint only when no usable name. The action and its digest are unchanged (re-derived from the link at render time).
+- **Acceptance:** tests for name+fingerprint, hostile name, missing name; dogfood `--oc-model` defaults to `opencode/deepseek-v4.1-flash-free`.
+
 #### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
 - **Status:** done (4thtech/agentlink#196) · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/06-mcp-server.md §4

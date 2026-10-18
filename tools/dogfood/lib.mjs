@@ -18,6 +18,8 @@ import { scanForCanaries } from '../../e2e/src/canary-scan.mjs';
 
 export const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 export const DEFAULT_OUT_ROOT = join(homedir(), 'agentlink-dogfood');
+/** OpenCode's own default model may lack tool use; this free one works (M1-9zb live finding). */
+export const DEFAULT_OC_MODEL = 'opencode/deepseek-v4.1-flash-free';
 
 export const DEFAULTS = Object.freeze({
   ccAgent: 'cc-test',
@@ -26,7 +28,7 @@ export const DEFAULTS = Object.freeze({
   claudeBin: 'claude',
   opencodeBin: 'opencode',
   ccModel: undefined,
-  ocModel: undefined,
+  ocModel: DEFAULT_OC_MODEL,
   maxTurns: 12,
   stepTimeoutMs: 300_000,
   approvalTimeoutMs: 900_000,
@@ -58,7 +60,7 @@ export const USAGE = `usage: node tools/dogfood/run.mjs [options]
   --claude <bin>               default claude
   --opencode <bin>             default opencode
   --cc-model <model>           optional, passed to claude --model
-  --oc-model <provider/model>  optional, passed to opencode -m (default: the one set in OpenCode)
+  --oc-model <provider/model>  optional, passed to opencode -m (default: opencode/deepseek-v4.1-flash-free; OpenCode's own default may lack tool use)
   --max-turns <n>              Claude Code turn cap per step (default 12)
   --step-timeout <seconds>     wall-clock limit per harness step (default 300)
   --approval-timeout <minutes> how long to wait for you to approve (default 15)
