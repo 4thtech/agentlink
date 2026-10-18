@@ -1011,13 +1011,13 @@ describe('KeychainOwnerKeyStore', () => {
     expect(captured.seeds.every(zeroed)).toBe(true);
   });
 
-  it('refuses a passkey proof (M1-8e) and wipes it; refuses a damaged item', async () => {
+  it('refuses a passkey proof with no passkey set up (M1-8e) and wipes it; refuses a damaged item', async () => {
     const keychain = new FakeKeychain();
     const { result } = await setUpOwner(keychain);
     const store = await KeychainOwnerKeyStore.open(keychain, result.owner);
     const prf = new Uint8Array(32).fill(9);
     expect(await codeOf(() => store.unlock({ kind: 'passkey-prf', prfOutput: prf }))).toBe(
-      'presence_required',
+      'presence_rejected',
     );
     expect(zeroed(prf)).toBe(true);
     keychain.items.set(OWNER_ACCOUNT, new Uint8Array(89));
