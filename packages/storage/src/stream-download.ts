@@ -145,21 +145,30 @@ export async function decryptDownload(
     } else if (typeof source === 'function') {
       // A source that ignores a rejection of onChunk and keeps delivering is still stopped: the
       // first failure is kept and every later piece is refused.
+      // Calls are also serialised, in call order: a source that does not await onChunk never runs
+      // two decryptions or sink writes at once, and the download ends only after the last one.
       let failure: unknown;
-      const guarded = async (chunk: Uint8Array): Promise<void> => {
-        if (failure !== undefined) throw failure;
-        try {
-          await onChunk(chunk);
-        } catch (error) {
-          failure = error;
-          throw error;
-        }
+      let queue: Promise<void> = Promise.resolve();
+      const guarded = (chunk: Uint8Array): Promise<void> => {
+        const run = queue.then(async () => {
+          if (failure !== undefined) throw failure;
+          try {
+            await onChunk(chunk);
+          } catch (error) {
+            failure = error;
+            throw error;
+          }
+        });
+        queue = run.catch(() => undefined);
+        return run;
       };
       try {
         await source(cap, guarded);
       } catch (error) {
+        await queue;
         throw failure ?? error;
       }
+      await queue;
       if (failure !== undefined) throw failure;
     } else {
       throw invalid('missing ciphertext source');

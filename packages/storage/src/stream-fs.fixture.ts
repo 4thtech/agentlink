@@ -71,6 +71,9 @@ export function fakeFolder(): FakeFolder {
       async remove(name: string) {
         folder.files.delete(name);
       },
+      async list() {
+        return [...folder.files.keys()];
+      },
     },
   };
   return folder;

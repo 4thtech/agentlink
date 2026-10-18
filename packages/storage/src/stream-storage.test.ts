@@ -15,6 +15,7 @@ import {
   alf1CiphertextSize,
   createS3Multipart,
   createTempFileSink,
+  removeStaleTempFiles,
   decryptDownload,
   putEncrypted,
   type CiphertextSource,
@@ -521,5 +522,57 @@ describe('putEncrypted: aborts on any error and leaves no open upload', () => {
       expect(codeOf(error)).toBe('invalid_argument');
     }
     expect(fake.requests.length).toBe(0);
+  });
+});
+
+describe('review IR-M1-6b-2-1 lows', () => {
+  it('L-1: removeStaleTempFiles removes only the temporary files this module makes', async () => {
+    const folder = fakeFolder();
+    const stale = await createTempFileSink(folder.ops, 'a.bin');
+    await stale.write(new Uint8Array([1, 2, 3]));
+    // A crash: neither commit nor discard ran. Other files in the folder must stay.
+    const keep = [
+      'report.pdf',
+      '.agentlink-partial-notours',
+      `.agentlink-partial-${'a'.repeat(32)}.pdf`,
+    ];
+    for (const name of keep) await (await folder.ops.create(name)).close();
+    expect(await removeStaleTempFiles(folder.ops)).toBe(1);
+    expect([...folder.files.keys()].sort()).toEqual([...keep].sort());
+    expect(await removeStaleTempFiles(folder.ops)).toBe(0);
+  });
+
+  it('L-2: a pull source that does not await onChunk is serialised, in order', async () => {
+    const plaintext = patternBytes(4 * CHUNK + 99, 12);
+    const { sealed, stored } = await upload(plaintext);
+    let active = 0;
+    let maxActive = 0;
+    const parts: Uint8Array[] = [];
+    const sink: ProvisionalSink = {
+      async write(chunk) {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        parts.push(chunk.slice());
+        active -= 1;
+      },
+      async commit() {},
+      async discard() {},
+    };
+    // Fires every piece at once and returns without awaiting any of them.
+    const source: CiphertextSource = async (_max, onChunk) => {
+      for (let at = 0; at < stored.length; at += 300_000) {
+        void onChunk(stored.slice(at, at + 300_000));
+      }
+    };
+    await decryptDownload(source, sink, optsOf(sealed));
+    expect(maxActive).toBe(1);
+    const joined = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+    let at = 0;
+    for (const p of parts) {
+      joined.set(p, at);
+      at += p.length;
+    }
+    expect(hex(joined)).toBe(hex(plaintext));
   });
 });

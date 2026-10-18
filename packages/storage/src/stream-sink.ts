@@ -35,19 +35,43 @@ export interface TempFileHandle {
 
 /**
  * The file operations the sink needs, on names inside one folder the caller chose and checked.
- * - `create` makes a new file exclusively (never overwrites, never follows a symbolic link);
+ * - `create` makes a new file exclusively (never overwrites, never follows a symbolic link), readable
+ *   and writable by the owner only (mode 0600, or the platform's equivalent): it holds plaintext that
+ *   has not verified yet;
  * - `rename` never overwrites an existing file;
- * - `remove` succeeds when the file is already gone.
+ * - `remove` succeeds when the file is already gone;
+ * - `list` returns the names of the entries directly in the folder (for removeStaleTempFiles).
  */
 export interface TempFileOps {
   create(name: string): Promise<TempFileHandle>;
   rename(from: string, to: string): Promise<void>;
   remove(name: string): Promise<void>;
+  list(): Promise<readonly string[]>;
 }
+
+const TEMP_PREFIX = '.agentlink-partial-';
+const TEMP_NAME = /^\.agentlink-partial-[0-9a-f]{32}$/;
 
 /** The temporary name: hidden and random, so it never clashes with or looks like a final file. */
 function tempName(): string {
-  return `.agentlink-partial-${encodeHex(randomBytes(16))}`;
+  return `${TEMP_PREFIX}${encodeHex(randomBytes(16))}`;
+}
+
+/**
+ * Removes the temporary files a crash left behind (names this module makes, and nothing else). Call it
+ * at start-up for each download folder, before any download into it runs. Returns how many it removed.
+ */
+export async function removeStaleTempFiles(ops: TempFileOps): Promise<number> {
+  if (ops === null || typeof ops !== 'object' || typeof ops.list !== 'function') {
+    throw new StorageError('invalid_argument', 'missing file operations');
+  }
+  let removed = 0;
+  for (const name of await ops.list()) {
+    if (typeof name !== 'string' || !TEMP_NAME.test(name)) continue;
+    await ops.remove(name);
+    removed += 1;
+  }
+  return removed;
 }
 
 /**

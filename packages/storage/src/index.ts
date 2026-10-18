@@ -62,6 +62,7 @@ export {
 } from './stream-download.js';
 export {
   createTempFileSink,
+  removeStaleTempFiles,
   type ProvisionalSink,
   type TempFileHandle,
   type TempFileOps,
