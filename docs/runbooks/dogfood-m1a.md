@@ -298,6 +298,8 @@ node tools/dogfood/run.mjs --role a --auto-sync --remote <mac-b-user>@<mac-b-hos
 
 Mac A finds Mac B's waiting run over ssh and both sides go on by themselves.
 
+With a local build, add `--agentlink '["node","<repo>/apps/cli/dist/agentlink.js"]'` to the Mac A command; Mac B's `--oc-model` defaults to `opencode/deepseek-v4.1-flash-free` (OpenCode's own default model may lack tool use; pass `--oc-model <provider/model>` to change it).
+
 - **What crosses ssh:** only files in `<results folder>/<run>/sync` on Mac B (folder 0700, files 0600): a `waiting` marker, a status file per side, and the invite. Every status line carries a random per-run nonce that Mac B created and Mac A read over the same ssh channel; lines without it are ignored. Status is written by the script from step outcomes, never from model output. Mac A writes the invite link with `cat >` on the ssh standard input (never in argv); Mac B deletes the file as soon as it has read it. No agentlink or keychain call is made over ssh, and no owner code ever crosses it.
 - **Approvals stay human and local.** When a step needs the owner, that Mac prints a box with the exact approve command (`agentlink approve --agent <name> <id>`, or its `npx` form). Open a second Terminal window **on that Mac** and type it, then the owner code. Mac B's owner approves P2; Mac A's owner approves T5. Agents never approve and the script never approves.
 - **Waiting.** Each side polls (every 3 s) with timeouts: Mac B waits up to 30 minutes for Mac A to appear; a step the other Mac does not finish within the step limit counts as failed with its step ID.

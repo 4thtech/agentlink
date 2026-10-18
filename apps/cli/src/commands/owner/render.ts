@@ -21,7 +21,7 @@
 // stored summary or any text the agent passed in (IR-M1-8c-1 F-4).
 import { renderContactName, type AgentLinkClient } from '@agentlink/core';
 import { canonicalize, type JsonObject, type JsonValue } from '@agentlink/crypto';
-import { isUsdAmount, parseUsd } from '@agentlink/types';
+import { RESTRICTED_NAME_FALLBACK, isUsdAmount, parseUsd } from '@agentlink/types';
 import { isApprovalId } from '../../approval/next-step.js';
 import { FROM_YOUR_AI, terminalOneLine, untrustedRegion } from '../../terminal/sanitize.js';
 import { formatDate, formatTime, formatUsd } from '../../tools/strings/index.js';
@@ -78,7 +78,32 @@ async function contactLabel(client: AgentLinkClient, action: JsonObject): Promis
     const name = terminalOneLine(renderContactName(contact.display));
     return name === '' ? OWNER_TEXT.notAContact : name;
   } catch {
-    return OWNER_TEXT.notAContact;
+    return (await inviterLabel(client, action)) ?? OWNER_TEXT.notAContact;
+  }
+}
+
+/**
+ * M1-9zb: who an accept-invite approval connects to, from the invite's verified card (checked again
+ * here, nothing stored): the inviter's self-declared name under the 06 §2.1 rule (omitted when
+ * restrictName fell back to "Contact <fingerprint>"), then the owner fingerprint. `undefined` when
+ * the action is not an accept or the link no longer checks.
+ */
+async function inviterLabel(
+  client: AgentLinkClient,
+  action: JsonObject,
+): Promise<string | undefined> {
+  if (action['tool'] !== 'agentlink_accept_invite') return undefined;
+  const link = asObject(action['args'])?.['inviteUrl'];
+  if (typeof link !== 'string') return undefined;
+  try {
+    const { display, ownerFingerprint } = (await client.pairing.acceptInvite({ link })).contact;
+    const fingerprint = terminalOneLine(ownerFingerprint.short);
+    if (fingerprint === '') return undefined;
+    const fallback = `${RESTRICTED_NAME_FALLBACK} ${ownerFingerprint.short}`;
+    const name = display.name === fallback ? '' : terminalOneLine(renderContactName(display));
+    return OWNER_TEXT.inviter(name, fingerprint);
+  } catch {
+    return undefined;
   }
 }
 
