@@ -1749,7 +1749,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Chain client (`@4thtech-io/chain`)
 
 #### M1-4a · chain: config, clients, typed-data builders, parity
-- **Status:** in review (#276, 2026-10-18) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#276, merged 2026-10-18; IR-M1-4a-2 R-1 to R-3 carried into M1-4b) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain
 - **Depends on:** M1-1j, M1-1g, M1-3f, M1-14
 - **Spec:** 07 §6.1, §6.2; 03 §7; 05 §8
@@ -1763,7 +1763,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Every Record gets a fresh 32-byte CSPRNG salt; the builder takes no salt from its caller and exposes no salt derivation (04 §5, D-61).
 
 #### M1-4b · chain: quotes, USD display, credits
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (#277, 2026-10-19; built and reviewed as S2 on the orchestrator's direction) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain
 - **Depends on:** M1-4a (G-30 resolved by D-46)
 - **Spec:** 07 §6.2; 06 §2.1 (`agentlink_status` `credits` and `prices`, D-53), §2.4; 02 F-45, F-47; 03 §4.4; 12 §4–§5; D-46
