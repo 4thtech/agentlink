@@ -9,7 +9,7 @@
 <!-- status-summary:start -->
 **Phase:** M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026 (pre-alpha); M1b (files, proof, credits) in progress, with the first parts merged but not yet released. The repository [README](https://github.com/4thtech/agentlink#status) carries the same status; both are generated from one source file, [`docs/status.yaml`](https://github.com/4thtech/agentlink/blob/main/docs/status.yaml).
 
-**Not yet:** file transfer, proof, credits, the local approval page and passkey step, the owner console, desktop apps and the cloud agent. Live relay subscriptions are merged but not released yet. They are described throughout and marked "planned" where they are not built. v0.1.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha, testnets only) was released on 16 Oct 2026 and is still the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`.
+**Not yet:** file transfer, proof, credits, the designed local approval page (a functional page with the owner code and a localhost passkey is merged, but the CLI does not open it yet), the owner console, desktop apps and the cloud agent. Live relay subscriptions are merged but not released yet. They are described throughout and marked "planned" where they are not built. v0.1.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha, testnets only) was released on 16 Oct 2026 and is still the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`.
 
 **Testnet:** OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit; AgentLink does not use them yet. **Mainnet:** After the external audit (M3). Not deployed. **Services:** Submitter, faucet and encrypted drop are not built or deployed yet.
 
@@ -73,7 +73,7 @@ Code that is merged is not necessarily published: nothing is released or install
 | Node runtime (@agentlink/node) | Relay connection | Done | [#81](https://github.com/4thtech/agentlink/pull/81), [#84](https://github.com/4thtech/agentlink/pull/84) |
 | Node runtime (@agentlink/node) | Policy version record in the keychain | Done | [#86](https://github.com/4thtech/agentlink/pull/86) |
 | Node runtime (@agentlink/node) | First agent card at owner setup | Done | [#118](https://github.com/4thtech/agentlink/pull/118) |
-| Node runtime (@agentlink/node) | Local approval server | Done | [#207](https://github.com/4thtech/agentlink/pull/207), [#225](https://github.com/4thtech/agentlink/pull/225) |
+| Node runtime (@agentlink/node) | Local approval server | Done | [#207](https://github.com/4thtech/agentlink/pull/207), [#225](https://github.com/4thtech/agentlink/pull/225), [#247](https://github.com/4thtech/agentlink/pull/247) |
 | Node runtime (@agentlink/node) | Owner recovery without an attached agent | Done | [#206](https://github.com/4thtech/agentlink/pull/206), [#227](https://github.com/4thtech/agentlink/pull/227) |
 | Node runtime (@agentlink/node) | Path guard fixes for Windows and macOS | Done | [#229](https://github.com/4thtech/agentlink/pull/229), [#214](https://github.com/4thtech/agentlink/pull/214) |
 | Node runtime (@agentlink/node) | Passphrase-locked key file for headless machines | Planned | - |
@@ -82,7 +82,7 @@ Code that is merged is not necessarily published: nothing is released or install
 | MCP server, CLI and apps | End-to-end tests | In progress | [#155](https://github.com/4thtech/agentlink/pull/155), [#163](https://github.com/4thtech/agentlink/pull/163), [#165](https://github.com/4thtech/agentlink/pull/165), [#166](https://github.com/4thtech/agentlink/pull/166), [#169](https://github.com/4thtech/agentlink/pull/169), [#171](https://github.com/4thtech/agentlink/pull/171), [#232](https://github.com/4thtech/agentlink/pull/232) |
 | MCP server, CLI and apps | Multi-harness dogfood runbook | Done | [#168](https://github.com/4thtech/agentlink/pull/168), [#202](https://github.com/4thtech/agentlink/pull/202), [#236](https://github.com/4thtech/agentlink/pull/236) |
 | MCP server, CLI and apps | Several agents of one owner on one computer | Done | [#172](https://github.com/4thtech/agentlink/pull/172), [#178](https://github.com/4thtech/agentlink/pull/178) |
-| MCP server, CLI and apps | Local approval page | In progress | [#207](https://github.com/4thtech/agentlink/pull/207), [#225](https://github.com/4thtech/agentlink/pull/225) |
+| MCP server, CLI and apps | Local approval page | In progress | [#207](https://github.com/4thtech/agentlink/pull/207), [#225](https://github.com/4thtech/agentlink/pull/225), [#247](https://github.com/4thtech/agentlink/pull/247) |
 | MCP server, CLI and apps | Beginner setup page | Done | [#234](https://github.com/4thtech/agentlink/pull/234) |
 | MCP server, CLI and apps | Owner console, desktop apps, cloud agent | Planned | - |
 | OCC v2 contracts (private repo) | Notary and fee vault | Done | contracts#4 |

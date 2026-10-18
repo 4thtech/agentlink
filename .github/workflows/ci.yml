@@ -506,9 +506,11 @@ jobs:
         shell: bash
         run: pnpm exec turbo run build --filter='@agentlink/node...'
 
+      # M1-8e: the real-browser passkey test needs Playwright's Chromium, which only the `checks`
+      # job installs (and there a missing browser fails the test). It is excluded here only.
       - name: Run the @agentlink/node tests
         shell: bash
-        run: pnpm --filter @agentlink/node exec vitest run
+        run: pnpm --filter @agentlink/node exec vitest run --exclude src/approval-passkey-browser.test.ts
 
   # M1-5b-b: the Node relay connector's Docker suite (packages/node/src/relay-docker.test.ts): the
   # pool and the outbox against real relays, strfry and rnostr, pinned by digest in the test file.

@@ -61,6 +61,7 @@ import {
   normalizeSecret,
   openOwnerSeed,
   openOwnerSeedWithoutCard,
+  openPasskeySeed,
   sealOwnerSeed,
   signEnvelopeHash,
   signTypedData,
@@ -78,6 +79,12 @@ import type { KeychainBackend } from './keychain.js';
 
 /** The keychain account of the owner's wrapped seed (04 §2.2, D-67 (2)(d)). */
 export const OWNER_ACCOUNT = 'owner';
+
+/**
+ * M1-8e: the keychain account of the owner seed wrapped under the localhost passkey's PRF output
+ * (`ALKP` v1, 04 §2.3.1; proposed, owner confirms at merge). One per OS user in M1b.
+ */
+export const OWNER_PASSKEY_ACCOUNT = 'owner-passkey';
 
 /** `ALKO` v1 is exactly 90 bytes; byte 5 is `secretKind` (04 §2.8). */
 const ALKO_LENGTH = 90;
@@ -155,6 +162,11 @@ function publicKeysOf(seed: Uint8Array): OwnerPublicKeys {
     ownerNostr: nostr.publicKey,
     ownerEnc: enc.publicKey,
   });
+}
+
+/** True when `seed` derives exactly the owner keys `owner` (04 §2.1, epoch 0). */
+export function sameOwnerKeys(seed: Uint8Array, owner: OwnerPublicKeys): boolean {
+  return sameOwner(publicKeysOf(seed), owner);
 }
 
 function sameOwner(a: OwnerPublicKeys, b: OwnerPublicKeys): boolean {
@@ -883,14 +895,18 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
   }
 
   /**
-   * 04 §2.5: unwraps the owner seed with the owner code or passphrase typed at the prompt, checks it
-   * against the expected owner, derives the session's owner keys and wipes the seed. The presented
-   * secret is wiped whether or not it unlocks. A passkey proof is M1-8e and is refused here.
+   * 04 §2.5: unwraps the owner seed with the owner code or passphrase typed at the prompt (the
+   * `owner` item, `ALKO`), or with the localhost passkey's PRF output after the owner's gesture
+   * (M1-8e: the `owner-passkey` item, `ALKP` v1, 04 §2.3.1), checks it against the expected owner,
+   * derives the session's owner keys and wipes the seed. The presented secret or PRF output is wiped
+   * whether or not it unlocks. A wrong passkey, a missing or tampered `owner-passkey` item, another
+   * owner and a blob of another type are one answer, `presence_rejected`. The caller has checked the
+   * assertion (credential ID, user handle, rpIdHash, UP and UV) before it hands the PRF output here.
    */
   async unlock(presence: OwnerPresence, options: UnlockOptions = {}): Promise<OwnerSession> {
     const generation = this.#generation;
-    const secret = presenceSecret(presence);
-    let blob: Uint8Array | undefined;
+    const proof = presenceProof(presence);
+    let blob: Uint8Array | null | undefined;
     let seed: Uint8Array | undefined;
     try {
       const ttlMs = options.ttlMs ?? OWNER_SESSION_DEFAULT_TTL_MS;
@@ -900,18 +916,33 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
           'owner keystore: ttlMs must be an integer from 1 to OWNER_SESSION_MAX_TTL_MS',
         );
       }
-      blob = await this.#blob();
-      try {
-        seed = await openOwnerSeed(
-          blob,
-          { secret, source: 'prompt' },
-          { ownerEvm: this.#expected.ownerEvm, ownerNostr: this.#expected.ownerNostr },
-          { fileKeystoreMachine: false },
-        );
-      } catch (error) {
-        // A wrong secret, a damaged item and a foreign owner are one answer (04 §2.8 tests).
-        if (error instanceof CryptoInputError) throw presenceRejected();
-        throw error;
+      if (proof.kind === 'passphrase') {
+        blob = await this.#blob();
+        try {
+          seed = await openOwnerSeed(
+            blob,
+            { secret: proof.bytes, source: 'prompt' },
+            { ownerEvm: this.#expected.ownerEvm, ownerNostr: this.#expected.ownerNostr },
+            { fileKeystoreMachine: false },
+          );
+        } catch (error) {
+          // A wrong secret, a damaged item and a foreign owner are one answer (04 §2.8 tests).
+          if (error instanceof CryptoInputError) throw presenceRejected();
+          throw error;
+        }
+      } else {
+        this.#open();
+        blob = await guarded(() => this.#keychain.get(OWNER_PASSKEY_ACCOUNT), this.#timeoutMs);
+        if (blob === null) throw presenceRejected();
+        try {
+          seed = await openPasskeySeed(blob, proof.bytes, {
+            expectedOwnerNostr: this.#expected.ownerNostr,
+          });
+        } catch (error) {
+          // A wrong passkey, a tampered blob, another owner or type: one answer (04 §2.3.1).
+          if (error instanceof CryptoInputError) throw presenceRejected();
+          throw error;
+        }
       }
       if (!sameOwner(publicKeysOf(seed), this.#expected)) throw presenceRejected();
       if (this.#closed || generation !== this.#generation) {
@@ -920,7 +951,7 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
       return this.#issue(seed, ttlMs);
     } finally {
       // The presented secret, the blob and the seed never outlive this call (04 §8.3).
-      wipe(secret, blob, seed);
+      wipe(proof.bytes, blob ?? undefined, seed);
     }
   }
 
@@ -1042,8 +1073,30 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
 }
 
 /**
- * The owner secret of a presence proof. Anything but a non-empty passphrase proof is
- * `presence_required`, and any bytes it carried are wiped; the passkey PRF path is M1-8e.
+ * The bytes of a presence proof for unlock: a non-empty passphrase, or a 32-byte passkey PRF output
+ * (M1-8e). Anything else is `presence_required`, and any bytes it carried are wiped.
+ */
+function presenceProof(presence: unknown): {
+  readonly kind: 'passphrase' | 'passkey-prf';
+  readonly bytes: Uint8Array;
+} {
+  if (typeof presence !== 'object' || presence === null) throw presenceRequired();
+  const { kind, secret, prfOutput } = presence as Record<string, unknown>;
+  if (kind === 'passphrase' && secret instanceof Uint8Array && secret.length > 0) {
+    if (prfOutput instanceof Uint8Array) wipe(prfOutput);
+    return { kind, bytes: secret };
+  }
+  if (kind === 'passkey-prf' && prfOutput instanceof Uint8Array && prfOutput.length === 32) {
+    if (secret instanceof Uint8Array) wipe(secret);
+    return { kind, bytes: prfOutput };
+  }
+  for (const value of [secret, prfOutput]) if (value instanceof Uint8Array) wipe(value);
+  throw presenceRequired();
+}
+
+/**
+ * The owner secret of a passphrase presence proof (owner add-agent without a card stays code-only).
+ * Anything else is `presence_required`, and any bytes it carried are wiped.
  */
 function presenceSecret(presence: unknown): Uint8Array {
   if (typeof presence !== 'object' || presence === null) throw presenceRequired();
