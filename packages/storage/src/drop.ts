@@ -450,7 +450,10 @@ export function createDropAdapter(config: DropAdapterConfig): DropAdapter {
       const result = await readJson(committed);
       if (result === null) throw invalidResponse();
       const expiry = signedUrlExpiry(result.getUrl, origin, `/v1/get/${objectId}`);
-      if (expiry === null || result.expiresAt !== expiry) throw invalidResponse();
+      // The drop may not grant a longer life than requested (IR-M1-6c-1 L1).
+      if (expiry === null || result.expiresAt !== expiry || expiry > expiresAt) {
+        throw invalidResponse();
+      }
       log?.debug('drop put', { size: opts.size, parts: targets.length });
       return { kind: 'drop', locator: result.getUrl as string, size: opts.size, sha256 };
     } catch (error) {
@@ -488,20 +491,31 @@ export function createDropAdapter(config: DropAdapterConfig): DropAdapter {
     maxGetUrlLength,
 
     async put(ciphertext, opts: PutOptions): Promise<StoredObject> {
-      if (opts === null || typeof opts !== 'object') {
-        throw new StorageError('invalid_argument', 'missing upload options');
-      }
-      checkSize(opts.size, Number.MAX_SAFE_INTEGER);
-      if (opts.size > maxBytes) {
-        throw new StorageError('needs_setup', 'the file is above the drop limits', undefined, {
-          limit: 'size',
-        });
-      }
-      const at = now();
-      checkFuture(opts.expiresAt, at, 'expiresAt');
-      if (ciphertext instanceof Uint8Array && ciphertext.length !== opts.size) throw sizeMismatch();
-      if (!(ciphertext instanceof Uint8Array) && !(ciphertext instanceof ReadableStream)) {
-        throw new StorageError('invalid_argument', 'ciphertext must be bytes or a stream');
+      let at: Date;
+      try {
+        if (opts === null || typeof opts !== 'object') {
+          throw new StorageError('invalid_argument', 'missing upload options');
+        }
+        checkSize(opts.size, Number.MAX_SAFE_INTEGER);
+        if (opts.size > maxBytes) {
+          throw new StorageError('needs_setup', 'the file is above the drop limits', undefined, {
+            limit: 'size',
+          });
+        }
+        at = now();
+        checkFuture(opts.expiresAt, at, 'expiresAt');
+        if (ciphertext instanceof Uint8Array && ciphertext.length !== opts.size) {
+          throw sizeMismatch();
+        }
+        if (!(ciphertext instanceof Uint8Array) && !(ciphertext instanceof ReadableStream)) {
+          throw new StorageError('invalid_argument', 'ciphertext must be bytes or a stream');
+        }
+      } catch (error) {
+        // A refused stream is cancelled, so its source stops (IR-M1-6c-1 L4).
+        if (ciphertext instanceof ReadableStream && !ciphertext.locked) {
+          await ciphertext.cancel().catch(() => undefined);
+        }
+        throw error;
       }
       const source = partSource(ciphertext);
       try {

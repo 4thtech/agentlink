@@ -16,6 +16,10 @@ Files are encrypted on the device in chunks (default 1 MiB) with AES-256-GCM in 
 
 Every backend receives only `ALF1` ciphertext. The file key, file name and `plaintextSha256` travel only inside the end-to-end-encrypted envelope.
 
+### Storage selection (in development)
+
+The drop adapter and the selection rules are built in `@4thtech-io/storage` (M1-6c) but not yet used by the file tools. Small files go inline first (D-85): every file of at most 12 288 bytes of ciphertext is placed inline, and while the encrypted payload would exceed the 17 136 bytes a receiver accepts, the largest inline file moves to storage; a message that still cannot fit is refused and nothing is sent. Everything else goes to the encrypted drop by default, with no setup. With `files.storage: own`, or with own storage configured under `auto`, files go to your own storage and never silently fall back to the drop. A file above the drop's size or weekly quota asks you to set up own storage; a busy or unavailable drop asks you to try again later. Whatever the backend, it receives only ciphertext, its size and SHA-256, and an expiry; the drop's signed links are treated as secrets and never logged.
+
 ## The encrypted drop
 
 - **No accounts.** Requests are signed with the dedicated drop key, unlinkable to the agent card, EVM address or any billing profile. Replays are rejected.

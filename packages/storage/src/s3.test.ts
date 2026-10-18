@@ -147,6 +147,37 @@ describe('S3 adapter: put', () => {
     await expect(adapter.presignGet(obj, inADay)).resolves.toMatch(/^https:/);
   });
 
+  it('aborts a routed multipart upload when a part fails, leaving no open upload (IR-M1-6c-1 L3)', async () => {
+    const fake = fakeMultipartS3(BUCKET);
+    const adapter = createS3Adapter({
+      endpoint: ENDPOINT,
+      bucket: BUCKET,
+      storagePrefix: testPrefix(),
+      credentials: async () => ({ accessKeyId: ACCESS_KEY_ID, secretAccessKey: SECRET }),
+      fetch: fake.fetch,
+      now: () => NOW,
+    });
+    let parts = 0;
+    fake.override = (req) => {
+      if (req.method === 'PUT' && req.url.searchParams.has('partNumber')) {
+        parts += 1;
+        if (parts === 2) return new Response(`<Error>${SECRET}</Error>`, { status: 500 });
+      }
+      return undefined;
+    };
+    const size = S3_MAX_SINGLE_PUT_BYTES + 1;
+    const error = await adapter
+      .put(chunked(patternBytes(size, 6), 1024 * 1024), { size, expiresAt: inADay })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(StorageError);
+    expect((error as Error).message).not.toContain(SECRET);
+    expect(fake.uploads.size).toBe(0);
+    expect(fake.objects.size).toBe(0);
+    expect(
+      fake.requests.some((r) => r.method === 'DELETE' && r.url.searchParams.has('uploadId')),
+    ).toBe(true);
+  });
+
   it('keeps a put of exactly 64 MiB a single PUT', async () => {
     const { adapter, fake } = setup();
     const size = S3_MAX_SINGLE_PUT_BYTES;

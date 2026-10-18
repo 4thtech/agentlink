@@ -67,7 +67,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 146 (M1a 80, M1b 66, M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| M1 Local beta | 147 (M1a 80, M1b 67, M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
@@ -1273,7 +1273,22 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - A concurrent advance fails the compare-and-set and changes nothing; a crash at each step leaves a state that either finishes or refuses to send, never one that sends under a key no contact knows. The epoch + 1 preview returns public keys only, and signing and decryption at that epoch stay `epoch_unavailable`.
 
+#### M1-1g-e · crypto: KeyStore drop-request signer (new, IR-M1-6c-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/crypto (KeyStore interface, MemoryKeyStore), packages/node (backends with M1-8a, M1-8f)
+- **Depends on:** M1-1g, M1-27a
+- **Spec:** 04 §2.1 (drop key), §4 (encrypted drop); 07 §5.4 (signature format)
+- **Invariants:** I-1, I-3, I-7
+- **Scope:**
+  - `KeyStore.signDropRequest(request, createdAt)` returning the `Authorization` header value, the `DropSigner` that `@4thtech-io/storage`'s drop adapter takes (M1-6c, #268). Until it exists nothing in production can build the drop adapter.
+  - The KeyStore builds the event itself: kind 27235 and the `domain` tag `agentlink/v1/drop` are fixed inside (`dropAuthEvent`), never taken from the caller, so the signer is never a general Nostr signer.
+  - Signs with the separate drop key (KEY_LABELS.drop, 04 §2.1), never the Nostr or EVM identity key; the drop key never leaves the KeyStore.
+  - Allows only `POST` and `DELETE`; checks that `createdAt` equals the body's `ts` (the body is parsed as the drop's JSON) and refuses otherwise.
+- **Acceptance:**
+  - Tests first: passes the `test-vectors/drop-auth` vectors; the signature verifies with `verifyDropAuthorization` and its pubkey is the drop key's, not the Nostr or EVM key; GET, PUT, a `createdAt` other than the body `ts`, a non-JSON body and a non-https URL are refused; nothing is logged.
+
 ### Types (`@4thtech-io/types`)
+
 
 #### M1-1l · crypto: key commitment and CEK-derived wraps (G-46, D-66) (new)
 - **Status:** done (4thtech/agentlink#61, merged 2026-10-14; vectors from the independent session on `feat/M1-1l-v-vectors`) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1992,7 +2007,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (IR-D48-1 F10) Today `limit` maps to `needs_setup` (07 §5.4 Limits, 06 §2.3). Split the drop's errors: size, quota and policy limits keep `needs_setup`; transient rate limits and an unavailable drop map to a retryable `rate_limited` or `unavailable` and are described in 07 §5.6, so a busy drop never tells the user to set up own storage.
   - (IR-D48-1 F16) The drop endpoint is configuration, not a constant: default `drop.agentlink.4thtech.io`, overridable for staging and self-hosting, and always https, with the same off-origin refusal for `uploadUrl` and `getUrl`.
 - **Acceptance:**
-  - Tests first for the signing path. Miniflare integration against M1-27a: 5 MB and 100 MB round trips, quota exceeded → `needs_setup`, a replayed upload signature rejected.
+  - Tests first for the signing path. Miniflare integration against M1-27a: 5 MB round trip and a two-part multipart round trip, quota exceeded → `needs_setup`, a replayed upload signature rejected. The 100 MB round trip moves to the deployed-drop smoke in M1-27b-b (Miniflare's R2 is too slow on the CI runner, IR-M1-27a-1 H-1; amended per IR-M1-6c-1).
   - Selection table test over every `files.storage` value × own storage configured or not × within or above the drop limits; under `own` a network spy shows no request to the drop.
   - Canary: no signed URL, nonce or key material in logs; captured drop requests carry no file name or metadata beyond size and hash, and are signed with the drop key, never the Nostr or EVM identity key.
   - The encryptor runs once per send (test); a file modified during upload never leads to a second encryption under the same key and nonce prefix; an off-origin `uploadUrl` or `getUrl` is refused.
@@ -2255,7 +2270,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-7f · core: files (send, fetch, refresh link, crypto-shredding)
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core
-- **Depends on:** M1-7b, M1-6b, M1-6c, M1-15; gap G-27 resolved (G-44 resolved)
+- **Depends on:** M1-7b, M1-6b, M1-6c, M1-1g-e, M1-15; gap G-27 resolved (G-44 resolved)
 - **Spec:** 04 §4; 03 §4.2; 06 §2.3; 07 §5.6; 02 F-30–F-34; D-18, D-48
 - **Invariants:** I-2, I-5, I-7
 - **Scope:**
@@ -2270,6 +2285,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-15-1, 2026-10-17): extend filename character filtering; handle inbox name-length edge cases; relative redirect forms are conservative (watch in dogfooding).
 - Review note (IR-M1-8d-1 / IR-M1-15-1, 2026-10-17): two `isInsideFolder` helpers have different semantics (policy engine: a folder is not inside itself; path guard: it is). Unify them into one shared helper when wiring files here. Locations: `packages/core/src/path-guard.ts` (`isInsideFolder(path, folder, flavor)`, a folder is inside itself) and `packages/core/src/policy-engine.ts` (`isInsideFolder(realpath, folder)`, a folder is not inside itself). Acceptance: one exported helper, the self-inclusion rule explicit in its name or option, both call sites and `path-guard.test.ts` / `policy-files-proofs.test.ts` cover it. Source: review low, 2026-10-18.
 - Review note (IR-M1-7i-1 L3, 2026-10-17): derive `ruleEligible` and `counterparty` from the contact book and test it.
+- Review note (IR-M1-6c-1, 2026-10-18): a drop object's `locator` is its signed GET URL, a bearer secret like any presigned URL (I-7). Store it encrypted at rest with the file key; send it only inside end-to-end-encrypted payloads or owner copies, never to any 4thTech service other than the drop itself; never log it. Also (IR-M1-6c-1 L2): `planInline` returns an all-stored plan even when that plan cannot fit; check the all-stored payload size before any upload so a send that can never fit is refused before anything reaches storage.
 
 #### M1-7g · core: proofs and receipts
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -3035,8 +3051,9 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A tighter `limits.cpu_ms`.
   - A pre-deploy lifecycle check (the bucket rule exists before the deploy goes live).
   - `actionlint` in CI for the workflow files.
+  - (IR-M1-6c-1) A 100 MB round trip through the drop adapter (`@4thtech-io/storage`, M1-6c) against the deployed staging drop: upload, commit, download, hash check, delete.
 - **Acceptance:**
-  - A cancelled or timed-out deploy leaves the previous version serving (rehearsed on staging); `cpu_ms` is set to the measured need plus margin; the pre-deploy check fails the job when the lifecycle rule is missing; `actionlint` runs as a required check.
+  - A cancelled or timed-out deploy leaves the previous version serving (rehearsed on staging); `cpu_ms` is set to the measured need plus margin; the pre-deploy check fails the job when the lifecycle rule is missing; `actionlint` runs as a required check. The 100 MB staging round trip passes in the deploy smoke.
 
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b

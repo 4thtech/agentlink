@@ -290,6 +290,37 @@ describe('drop adapter: put, presignGet and delete', () => {
     expect(drop.requests.some((r) => r.url.endsWith('/commit'))).toBe(false);
   });
 
+  it('cancels a stream it refuses before reading it (IR-M1-6c-1 L4)', async () => {
+    const { drop, adapter } = setup(undefined, { maxBytes: 1_000 });
+    for (const opts of [
+      { size: 1_001, expiresAt: inADay },
+      { size: 10, expiresAt: new Date(NOW.getTime() - 1) },
+    ]) {
+      let cancelled = false;
+      const stream = new ReadableStream<Uint8Array>({
+        cancel() {
+          cancelled = true;
+        },
+      });
+      await codeOf(adapter.put(stream, opts));
+      expect(cancelled).toBe(true);
+    }
+    expect(drop.requests).toHaveLength(0);
+  });
+
+  it('refuses a commit that grants a longer life than requested (IR-M1-6c-1 L1)', async () => {
+    const longer = NOW_S + 3 * 86_400;
+    const { drop, adapter } = setup((req) =>
+      req.url.endsWith('/commit')
+        ? json(200, { getUrl: getUrl(longer), expiresAt: longer })
+        : undefined,
+    );
+    const error = await codeOf(adapter.put(ciphertext(10), { size: 10, expiresAt: inADay }));
+    expect(error).toMatchObject({ code: 'invalid_response' });
+    // The uncommitted object is cleaned up.
+    expect(drop.requests.at(-1)?.method).toBe('DELETE');
+  });
+
   it('refuses a size above the configured drop limit before any request', async () => {
     const { drop, adapter } = setup(undefined, { maxBytes: 1_000 });
     const error = await codeOf(adapter.put(ciphertext(1_001), { size: 1_001, expiresAt: inADay }));
