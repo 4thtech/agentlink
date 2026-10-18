@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { encodeHex, sha256 } from '@4thtech-io/crypto';
 import {
   MAX_PRESIGN_SECONDS,
+  MULTIPART_DEFAULT_PART_BYTES,
   MULTIPART_MAX_BYTES,
   S3_MAX_SINGLE_PUT_BYTES,
   StorageError,
@@ -122,7 +123,11 @@ describe('S3 adapter: put', () => {
     expect(fake.requests).toHaveLength(0);
   });
 
-  it('routes a put above 64 MiB to multipart upload, one part in memory at a time', async () => {
+  // Timeout: CI run 39164524348 timed out at the 20 s default on the loaded Linux runner (1.5 s on
+  // macOS). Three SHA-256 passes over 64 MiB are inherent to the path under test (multipart's running
+  // hash, the SigV4 payload hash of each part, the fake's ETag), plus the test's expected hash; the
+  // data is a cheap fill instead of a PRNG. 90 s leaves margin over the measured CI time.
+  it('routes a put above 64 MiB to multipart upload, reading at most one part ahead', async () => {
     const fake = fakeMultipartS3(BUCKET);
     const storagePrefix = testPrefix();
     const adapter = createS3Adapter({
@@ -134,18 +139,52 @@ describe('S3 adapter: put', () => {
       now: () => NOW,
     });
     const size = S3_MAX_SINGLE_PUT_BYTES + 1;
-    const data = patternBytes(size, 5);
-    const obj = await adapter.put(chunked(data, 1024 * 1024), { size, expiresAt: inADay });
-    expect(obj).toMatchObject({ kind: 's3', size, sha256: encodeHex(sha256(data)) });
+    const CHUNK = 1024 * 1024;
+    const data = new Uint8Array(size);
+    for (let i = 0; i < size; i += CHUNK) data.fill((i / CHUNK) & 0xff, i, i + CHUNK);
+    data[size - 1] = 0xa5;
+
+    // Structural memory check: when a part reaches the store, the source has been read at most
+    // one chunk beyond the bytes of the parts sent so far, so no more than one part is buffered.
+    let pulled = 0;
+    let sent = 0;
+    let maxAhead = 0;
+    const source = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulled >= size) {
+          controller.close();
+          return;
+        }
+        const end = Math.min(pulled + CHUNK, size);
+        controller.enqueue(data.slice(pulled, end));
+        pulled = end;
+      },
+    });
+    const partSizes: number[] = [];
+    fake.override = (req) => {
+      if (req.method === 'PUT' && req.url.searchParams.has('partNumber')) {
+        sent += req.body.length;
+        partSizes.push(req.body.length);
+        maxAhead = Math.max(maxAhead, pulled - sent);
+      }
+      return undefined;
+    };
+
+    const obj = await adapter.put(source, { size, expiresAt: inADay });
+    const expected = encodeHex(sha256(data));
+    expect(obj).toMatchObject({ kind: 's3', size, sha256: expected });
     expect(obj.locator).toMatch(new RegExp(`^agentlink/${storagePrefix}/[A-Za-z0-9_-]{22}$`));
     expect(fake.objects.get(obj.locator)?.length).toBe(size);
     const methods = fake.requests.map((r) => r.method);
     expect(methods[0]).toBe('POST');
-    expect(methods.filter((m) => m === 'PUT').length).toBeGreaterThan(1);
+    expect(partSizes.length).toBeGreaterThan(1);
+    expect(partSizes.reduce((n, p) => n + p, 0)).toBe(size);
+    for (const part of partSizes) expect(part).toBeLessThanOrEqual(MULTIPART_DEFAULT_PART_BYTES);
+    expect(maxAhead).toBeLessThanOrEqual(CHUNK);
     expect(fake.uploads.size).toBe(0);
     // The object it stored is the adapter's own: presign and delete accept it.
     await expect(adapter.presignGet(obj, inADay)).resolves.toMatch(/^https:/);
-  });
+  }, 90_000);
 
   it('aborts a routed multipart upload when a part fails, leaving no open upload (IR-M1-6c-1 L3)', async () => {
     const fake = fakeMultipartS3(BUCKET);
