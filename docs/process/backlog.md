@@ -1763,7 +1763,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Every Record gets a fresh 32-byte CSPRNG salt; the builder takes no salt from its caller and exposes no salt derivation (04 §5, D-61).
 
 #### M1-4b · chain: quotes, USD display, credits
-- **Status:** in review (#PRNUM, 2026-10-19; redo of #277) · **Size:** M · **Tier:** Opus · **Security:** S2 (touches packages/node, IR-M1-4b-1 L-5) · **Phase:** M1b
+- **Status:** in review (#279, 2026-10-19; redo of #277) · **Size:** M · **Tier:** Opus · **Security:** S2 (touches packages/node, IR-M1-4b-1 L-5) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain
 - **Depends on:** M1-4a (G-30 resolved by D-46)
 - **Spec:** 07 §6.2; 06 §2.1 (`agentlink_status` `credits` and `prices`, D-53), §2.4; 02 F-45, F-47; 03 §4.4; 12 §4–§5; D-46
