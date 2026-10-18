@@ -5,10 +5,12 @@
 //   shipped public ones. Every URL passes the 04 §4 raw-string rule (`checkRpcUrl`) before the client
 //   exists. A URL may carry the owner's provider key in its path, so every URL is a secret: it is
 //   never logged, never put in an error (every rejection is a fixed-code ChainError, M-2) and never
-//   exposed on the client's `chain` object.
-// - `fetchFn` is required: the platform decides how a host is resolved. In Node it is
-//   `@4thtech-io/node` nodeRpcFetch, which refuses loopback, private, link-local and unique-local
-//   answers at resolve time and pins the checked address per request (04 §4; IR-M1-4a-1 M-1).
+//   reachable from the object callers get (`clientView`: no URL in `chain` or `transport`, and
+//   `extend` stays wrapped; IR-M1-4a-2 R-1, R-2).
+// - `fetchFn` is required and must be the platform's address-checked fetch (`checked-fetch.ts`,
+//   IR-M1-4a-2 R-3): in Node, `@4thtech-io/node` nodeRpcFetch, which refuses loopback, private,
+//   link-local and unique-local answers at resolve time and pins the checked address per request
+//   (04 §4; IR-M1-4a-1 M-1). A plain fetch is refused.
 // - Requests never follow a redirect (`redirect: "error"`), send no cookies and no referrer.
 // - Only read methods reach an RPC: signing, accounts and transaction submission are refused before
 //   any request, and the type has no send method. The client holds no key; signing is
@@ -25,6 +27,7 @@ import {
 } from 'viem';
 import { ChainConfigError, type ChainConfig } from '../config/index.js';
 import { toChainError } from './errors.js';
+import { isAddressCheckedFetch } from './checked-fetch.js';
 import { checkRpcUrl } from './rpc-url.js';
 
 /** The JSON-RPC methods the read client sends. Nothing that signs, sends or names an account. */
@@ -123,36 +126,125 @@ function rpcUrlsFor(config: ChainConfig, overrides: readonly string[]): string[]
   return urls;
 }
 
+/** A client-shaped object: its own keys, with functions, namespaces and a transport. */
+type ClientLike = Record<string, unknown>;
+
+const isPlainObject = (value: unknown): value is ClientLike => {
+  if (typeof value !== 'object' || value === null) return false;
+  const prototype: unknown = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
+
 /**
- * Every function of the client rejects (or throws) a URL-free ChainError instead of viem's error,
- * which names the URL. Contract readers built on it inherit this, since viem's actions look the
- * action up on the client.
+ * The transport as the client shows it: its type and the per-URL transport types, which viem's
+ * watch actions read, and nothing else. The real transports (each holding its URL) stay inside
+ * viem's closures, where no property path reaches them (IR-M1-4a-2 R-2).
  */
-function redacting<T extends object>(client: T): T {
-  return new Proxy(client, {
-    get(target, property, receiver) {
-      const value: unknown = Reflect.get(target, property, receiver);
-      if (typeof value !== 'function') return value;
-      return (...args: unknown[]): unknown => {
+function transportView(transport: unknown): Readonly<ClientLike> {
+  const t: ClientLike = isPlainObject(transport) ? transport : {};
+  const inner = Array.isArray(t.transports) ? (t.transports as unknown[]) : [];
+  return Object.freeze({
+    key: t.key,
+    name: t.name,
+    type: t.type,
+    retryCount: t.retryCount,
+    retryDelay: t.retryDelay,
+    timeout: t.timeout,
+    transports: Object.freeze(
+      inner.map((x) => {
+        const config = (x as { config?: ClientLike } | null)?.config;
+        return Object.freeze({
+          config: Object.freeze({ key: config?.key, name: config?.name, type: config?.type }),
+        });
+      }),
+    ),
+  });
+}
+
+type AnyFunction = (...args: unknown[]) => unknown;
+
+/** `fn` on `self`, with every throw, rejection and `onError` report as a URL-free ChainError. */
+function guarded(fn: AnyFunction, self: unknown): AnyFunction {
+  return (...args: unknown[]): unknown => {
+    // A watch action reports failures through `onError`: it gets the ChainError, never viem's.
+    const first = args[0];
+    if (isPlainObject(first) && typeof first.onError === 'function') {
+      const onError = first.onError as (error: unknown) => unknown;
+      args[0] = { ...first, onError: (error: unknown) => onError(toChainError(error)) };
+    }
+    try {
+      const out = fn.apply(self, args);
+      return out instanceof Promise
+        ? out.catch((error: unknown) => {
+            throw toChainError(error);
+          })
+        : out;
+    } catch (error) {
+      throw toChainError(error);
+    }
+  };
+}
+
+/** A namespace of actions (`client.token`): functions guarded, nested namespaces too. */
+function namespaceView(raw: ClientLike): ClientLike {
+  const view: ClientLike = {};
+  for (const key of Object.keys(raw)) {
+    const value = raw[key];
+    if (typeof value === 'function') view[key] = guarded(value as AnyFunction, raw);
+    else if (isPlainObject(value)) view[key] = namespaceView(value);
+    else view[key] = value;
+  }
+  return Object.freeze(view);
+}
+
+/**
+ * What callers get instead of viem's client (IR-M1-4a-1 M-2; IR-M1-4a-2 R-1, R-2): a new frozen
+ * object with the same keys, where
+ * - every function, also inside a namespace such as `token`, rejects or throws a URL-free
+ *   ChainError and reports one to an `onError` callback. Contract readers built on it inherit this,
+ *   since viem's actions look the action up on the client;
+ * - `transport` is a view without the URLs, so no property path, JSON or inspect output reaches an
+ *   RPC URL;
+ * - `extend(fn)` hands `fn` such a view and returns one again, so an extended client stays wrapped.
+ * The raw client lives only in closures. `chain` is kept as is: it holds no RPC URL (see below).
+ */
+function clientView(raw: ClientLike): ClientLike {
+  const view: ClientLike = {};
+  for (const key of Object.keys(raw)) {
+    const value = raw[key];
+    if (key === 'transport') {
+      view[key] = transportView(value);
+    } else if (key === 'extend' && typeof value === 'function') {
+      const extend = value as (fn: (base: ClientLike) => unknown) => ClientLike;
+      view[key] = (fn: (base: ClientLike) => unknown): ClientLike => {
         try {
-          const out: unknown = (value as (...a: unknown[]) => unknown).apply(target, args);
-          return out instanceof Promise
-            ? out.catch((error: unknown) => {
-                throw toChainError(error);
-              })
-            : out;
+          return clientView(extend.call(raw, (base) => fn(clientView(base))));
         } catch (error) {
           throw toChainError(error);
         }
       };
-    },
-  });
+    } else if (typeof value === 'function') {
+      view[key] = guarded(value as AnyFunction, raw);
+    } else if (key !== 'chain' && isPlainObject(value)) {
+      view[key] = namespaceView(value);
+    } else {
+      view[key] = value;
+    }
+  }
+  return Object.freeze(view);
 }
 
 /** Creates the read client for a supported chain (see `chainRegistry`, `selectChain`). */
 export function createReadClient(config: ChainConfig, options: ReadClientOptions): ReadClient {
   if (typeof options.fetchFn !== 'function') {
     throw new ChainConfigError('bad_client_option', 'fetchFn: a platform RPC fetch is required');
+  }
+  if (!isAddressCheckedFetch(options.fetchFn)) {
+    // IR-M1-4a-2 R-3: a plain fetch would skip the 04 §4 resolve-time address check.
+    throw new ChainConfigError(
+      'unchecked_fetch',
+      'fetchFn: must be the platform address-checked RPC fetch (Node: nodeRpcFetch)',
+    );
   }
   const timeout = bounded(
     options.timeoutMs,
@@ -202,5 +294,5 @@ export function createReadClient(config: ChainConfig, options: ReadClientOptions
     chain,
     transport: fallback(transports, { rank: false, retryCount: 0 }),
   });
-  return redacting(client);
+  return clientView(client as unknown as ClientLike) as unknown as ReadClient;
 }

@@ -38,9 +38,9 @@ import {
 const ZERO = '0x0000000000000000000000000000000000000000';
 const ZERO_APP = `0x${'0'.repeat(64)}` as Hex;
 const APP = `0x${'ab'.repeat(32)}` as Hex;
-const PAYER = '0x1111111111111111111111111111111111111111';
-const OTHER = '0x2222222222222222222222222222222222222222';
-const TREASURY = '0x3333333333333333333333333333333333333333';
+const PAYER: Hex = '0x1111111111111111111111111111111111111111';
+const OTHER: Hex = '0x2222222222222222222222222222222222222222';
+const TREASURY: Hex = '0x3333333333333333333333333333333333333333';
 const USDC = BASE_SEPOLIA.feeTokens[0]?.address as Hex;
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -110,7 +110,7 @@ function vaultFetch(config: ChainConfig, vault: FakeVault) {
       fn: functionName,
       args: [...(args ?? [])],
     });
-    const a = (args ?? []) as unknown[];
+    const a = (args ?? []) as unknown as unknown[];
     let result: unknown;
     if (functionName === 'quote') {
       const [t, token, appId] = a as [number, string, string];
@@ -427,11 +427,7 @@ function eventOf(name: string): AbiEvent {
 }
 
 let logIndex = 0;
-function logOf(
-  name: string,
-  args: Record<string, unknown>,
-  over: Partial<RawLog> & { blockNumber?: bigint } = {},
-): RawLog {
+function logOf(name: string, args: Record<string, unknown>, over: Partial<RawLog> = {}): RawLog {
   const event = eventOf(name);
   const indexed = Object.fromEntries(
     event.inputs.filter((i) => i.indexed === true).map((i) => [i.name, args[i.name as string]]),
