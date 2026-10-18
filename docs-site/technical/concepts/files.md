@@ -20,6 +20,21 @@ Every backend receives only `ALF1` ciphertext. The file key, file name and `plai
 
 The drop adapter and the selection rules are built in `@4thtech-io/storage` (M1-6c) but not yet used by the file tools. Small files go inline first (D-85): every file of at most 12 288 bytes of ciphertext is placed inline, and while the encrypted payload would exceed the 17 136 bytes a receiver accepts, the largest inline file moves to storage; a message that still cannot fit is refused and nothing is sent. Everything else goes to the encrypted drop by default, with no setup. With `files.storage: own`, or with own storage configured under `auto`, files go to your own storage and never silently fall back to the drop. A file above the drop's size or weekly quota asks you to set up own storage; a busy or unavailable drop asks you to try again later. Whatever the backend, it receives only ciphertext, its size and SHA-256, and an expiry; the drop's signed links are treated as secrets and never logged.
 
+### Sending and fetching (in development)
+
+The core sends and fetches files end to end (M1-7f); the file tools that expose it come with the CLI and MCP tools (M1-9d). The design, in the order the core applies it:
+
+- **Nothing is read before every check passed.** Each file's size cap, its realpath strictly inside an allowed folder, and where it would be stored are checked first. Then the inline plan (D-85) is made, and a message whose files cannot fit even with every file stored is refused (`PAYLOAD_TOO_LARGE`) before any file is read or uploaded. A file that would need storage the agent cannot use returns `needs_setup`, again before any upload.
+- **One fresh key per file.** Each file is read once and encrypted with a new 32-byte key; the payload carries the key, both hashes and either the inline ciphertext or the download link. If anything fails after an upload, or the final payload check refuses the message, the uploaded objects are deleted.
+- **Drop requests are signed by the agent's key store** with its dedicated drop key; the core never holds the key.
+- **Links are secrets.** A drop link is a signed download URL that works for anyone who has it, so it is stored only encrypted at rest (with the file key, in the sender's `files` row) and sent only inside the end-to-end-encrypted message; it never appears in logs or error messages.
+- **Fetching** checks the size cap first, refuses an expired link, checks the URL against the download rules, and for an inline file checks the ciphertext hash before decrypting. The file is decrypted into a hidden quarantine file in the inbox folder and gets its name only after the last chunk and both hashes verified; a tampered, truncated or over-long download leaves nothing behind.
+- **Names** from the sender are sanitised (no folders, no control or direction characters, no hidden or reserved names) and never overwrite an existing entry, including a planted link: a ` (1)`, ` (2)`, … suffix is added within the 255-byte limit.
+
+A send retried after a crash between the upload and the stored message uploads the file again; the first copy is never referenced and expires with the drop or the storage lifecycle rule (the residual of 07 §3.3).
+
+Not yet built (M1-7f-2): the refresh-link request and answer, and retention (deleting the object and both sides' file keys at expiry or on receipt).
+
 ## The encrypted drop
 
 - **No accounts.** Requests are signed with the dedicated drop key, unlinkable to the agent card, EVM address or any billing profile. Replays are rejected.

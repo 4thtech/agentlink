@@ -15,7 +15,7 @@
       "@4thtech-io/crypto/testing": ["../crypto/src/testing.ts"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "test"],
   "exclude": [],
   "references": []
 }

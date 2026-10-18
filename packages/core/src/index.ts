@@ -120,7 +120,6 @@ export {
   evaluate,
   evaluateFileSend,
   evaluateProof,
-  isInsideFolder,
   policyLimits,
   type BudgetEntryView,
   type BudgetLedgerView,
@@ -190,6 +189,8 @@ export {
 } from './idempotency.js';
 // M1-7k: the send pipeline, the Transport adapter and the outbox over the Store (07 §2, §3.2, §4).
 export {
+  FILE_TOO_LARGE,
+  PAYLOAD_TOO_LARGE,
   POLICY_DENIED,
   SEND_TOOL,
   USE_TERMS_TOOLS,
@@ -341,15 +342,34 @@ export {
   type FetchUrlCheck,
   type FetchUrlRefusal,
 } from './fetch-url.js';
-export { FALLBACK_FILE_NAME, MAX_FILE_NAME_BYTES, sanitizeFileName } from './file-name.js';
+export {
+  FALLBACK_FILE_NAME,
+  MAX_FILE_NAME_BYTES,
+  sanitizeFileName,
+  withNameSuffix,
+} from './file-name.js';
 export {
   decidePath,
   expandHome,
+  isInsideFolder,
   parseAbsolutePath,
   protectedRoots,
   segmentsBelow,
+  type InsideFolderOptions,
   type PathCheck,
   type PathDecisionInput,
   type PathFlavor,
   type PathRefusal,
 } from './path-guard.js';
+// M1-7f: files (04 §3.4, §4; 06 §2.3; 07 §5.6; D-84, D-85). The platform half (realpath, the SSRF-safe
+// fetch and download, the inbox file operations) is supplied by @4thtech-io/node (M1-9d).
+export type { DropConfig, FilesPlatform, InboxFolder, OutgoingFile } from './files/platform.js';
+export type { FetchFileInput, FetchFileResult } from './files/incoming.js';
+export type { FileEntry, FilesNeedsSetup, SentFile } from './files/outgoing.js';
+export {
+  measurePayload,
+  planPacking,
+  type PackingBase,
+  type PackingFile,
+  type PackingPlan,
+} from './files/packing.js';

@@ -38,7 +38,7 @@ import {
 } from './adapter.js';
 import { validateS3Endpoint } from './endpoint.js';
 import { StorageError, type StorageErrorCode, type StorageLimit } from './errors.js';
-import { discard, readCappedText, type FetchLike } from './session.js';
+import { discard, readCappedText, type FetchLike } from './http.js';
 
 const MiB = 1024 * 1024;
 

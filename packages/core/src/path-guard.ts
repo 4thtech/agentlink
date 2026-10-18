@@ -98,9 +98,38 @@ export function segmentsBelow(
   return p.segments.slice(f.segments.length);
 }
 
-/** True when `path` is `folder` or inside it (segment-wise: `/a/bc` is not inside `/a/b`). */
-export function isInsideFolder(path: string, folder: string, flavor: PathFlavor): boolean {
-  return segmentsBelow(path, folder, flavor) !== undefined;
+export interface InsideFolderOptions {
+  /** The path flavour. Default: posix when `path` starts with `/`, otherwise win32. */
+  readonly flavor?: PathFlavor;
+  /**
+   * Whether `folder` itself counts as inside `folder`. Required, because the call sites differ
+   * (M1-7f, IR-M1-8d-1 / IR-M1-15-1): the allowed-folder decision (decidePath, `inside`) reads
+   * nothing from the folder itself anyway; the policy engine's `file.send` check (`outside`) needs
+   * a file strictly below an allowed folder.
+   */
+  readonly self: 'inside' | 'outside';
+}
+
+/**
+ * The one folder-membership check of the core (04 §4): true when `path` is strictly below `folder`,
+ * or is `folder` itself when `self` is `inside`. Segment-wise (`/a/bc` is not inside `/a/b`), on
+ * paths already resolved with realpath, case-insensitive on win32. Fails closed: a relative or
+ * malformed path, a `.`, `..` or empty segment, mixed flavours or a missing `self` rule is never
+ * inside anything.
+ */
+export function isInsideFolder(
+  path: string,
+  folder: string,
+  options: InsideFolderOptions,
+): boolean {
+  if (options === null || typeof options !== 'object') return false;
+  const { self } = options;
+  if (self !== 'inside' && self !== 'outside') return false;
+  const flavor: PathFlavor =
+    options.flavor ?? (typeof path === 'string' && path.startsWith('/') ? 'posix' : 'win32');
+  const below = segmentsBelow(path, folder, flavor);
+  if (below === undefined) return false;
+  return self === 'inside' || below.length > 0;
 }
 
 /**

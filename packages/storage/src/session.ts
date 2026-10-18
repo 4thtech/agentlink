@@ -13,6 +13,8 @@ import { AwsClient } from 'aws4fetch';
 import type { Logger } from '@4thtech-io/log';
 import { validateBucket, validateRegion, validateS3Endpoint } from './endpoint.js';
 import { StorageError } from './errors.js';
+// The response helpers live in http.ts so the drop adapter can use them without the S3 signer.
+export { discard, readCappedText } from './http.js';
 
 export interface S3Credentials {
   readonly accessKeyId: string;
@@ -25,7 +27,8 @@ export interface S3Credentials {
 /** Called for every operation, so rotated or refreshed credentials take effect at once. */
 export type S3CredentialsProvider = () => Promise<S3Credentials>;
 
-export type FetchLike = (request: Request) => Promise<Response>;
+export type { FetchLike } from './http.js';
+import type { FetchLike } from './http.js';
 
 export interface S3SessionConfig {
   /** `https://host[:port]`; path-style requests go to `<endpoint>/<bucket>/...`. */
@@ -143,45 +146,6 @@ export function createS3Session(config: S3SessionConfig, scope: string): S3Sessi
       }
     },
   };
-}
-
-/**
- * Reads a response body as text, refusing more than `max` bytes (a hostile or broken endpoint cannot
- * make the client buffer without bound). Returns null when the body is over the cap.
- */
-export async function readCappedText(response: Response, max: number): Promise<string | null> {
-  if (response.body === null) return '';
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.length;
-      if (total > max) {
-        await reader.cancel().catch(() => undefined);
-        return null;
-      }
-      chunks.push(value);
-    }
-  } catch {
-    throw new StorageError('network', 'storage request failed');
-  } finally {
-    reader.releaseLock();
-  }
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    out.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return new TextDecoder('utf-8', { fatal: false }).decode(out);
-}
-
-/** Discards a response body we do not need. */
-export async function discard(response: Response): Promise<void> {
-  await response.body?.cancel().catch(() => undefined);
 }
 
 /** Escapes text for an XML element body. */

@@ -64,7 +64,33 @@ describe('isInsideFolder', () => {
     ['\\\\?\\C:\\Users\\Me\\Work\\a', 'C:\\Users\\Me\\Work', 'win32', true],
     ['\\\\srv\\share\\a', 'C:\\', 'win32', false],
   ] as const)('%s in %s (%s) -> %s', (path, folder, flavor, expected) => {
-    expect(isInsideFolder(path, folder, flavor)).toBe(expected);
+    expect(isInsideFolder(path, folder, { flavor, self: 'inside' })).toBe(expected);
+  });
+
+  // M1-7f (IR-M1-8d-1 / IR-M1-15-1 low): one helper for both call sites; the only difference
+  // between them is whether the folder itself counts, and the caller must say which.
+  it.each([
+    ['/home/u/Work', '/home/u/Work', 'posix'],
+    ['/home/u/Work/', '/home/u/Work', 'posix'],
+    ['C:\\Users\\Me\\Work', 'c:\\users\\me\\work', 'win32'],
+  ] as const)('the folder itself: inside only with self "inside" (%s)', (path, folder, flavor) => {
+    expect(isInsideFolder(path, folder, { flavor, self: 'inside' })).toBe(true);
+    expect(isInsideFolder(path, folder, { flavor, self: 'outside' })).toBe(false);
+  });
+
+  it('infers the flavour from the path when none is given', () => {
+    expect(isInsideFolder('/a/b/c', '/a/b', { self: 'outside' })).toBe(true);
+    expect(
+      isInsideFolder('C:\\Users\\u\\Work\\x.pdf', 'C:\\Users\\u\\Work', { self: 'outside' }),
+    ).toBe(true);
+    // A posix path is never inside a win32 folder, and the reverse.
+    expect(isInsideFolder('/a/b/c', 'C:\\a\\b', { self: 'outside' })).toBe(false);
+    expect(isInsideFolder('C:\\a\\b\\c', '/a/b', { self: 'outside' })).toBe(false);
+  });
+
+  it('refuses a call without the self rule (fail closed)', () => {
+    expect(isInsideFolder('/a/b/c', '/a/b', {} as never)).toBe(false);
+    expect(isInsideFolder('/a/b/c', '/a/b', undefined as never)).toBe(false);
   });
 });
 
