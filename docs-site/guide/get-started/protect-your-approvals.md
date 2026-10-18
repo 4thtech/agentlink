@@ -32,7 +32,7 @@ Each agent has its own identity, contacts and approvals: an approval you give on
 
 ## Change your owner code
 
-If your owner code was exposed, for example typed into a chat with your AI or into a terminal your AI can read, replace it (from the next release after v0.1.0):
+If your owner code was exposed, for example typed into a chat with your AI or into a terminal your AI can read, replace it (since v0.1.1):
 
 1. **Open a terminal window yourself**, as for `owner init`.
 2. **Run `npx -y @4thtech-io/agentlink owner change-code`.** It asks for your current owner code first. Three wrong entries end the command and nothing changes.
