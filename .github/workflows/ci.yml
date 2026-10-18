@@ -353,7 +353,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 dbus
+          sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 libsecret-tools dbus
 
       # The workspace dependencies of @agentlink/node (core, crypto) are consumed from dist/. The
       # CLI package and its dependencies are built too: the child processes of the CLI two-process
@@ -378,10 +378,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          dbus-run-session -- bash -euo pipefail -c '
-            keyring_env="$(openssl rand -hex 16 | gnome-keyring-daemon --unlock --components=secrets)"
-            eval "$keyring_env"
-            export GNOME_KEYRING_CONTROL
+          dbus-run-session -- tools/ci/with-keyring.sh bash -euo pipefail -c '
             pnpm --filter @agentlink/node exec vitest run src/keychain-native.test.ts --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
             pnpm --filter @4thtech-io/agentlink exec vitest run test/two-process.keychain.test.ts --reporter=default --reporter=json --outputFile.json="$CLI_KEYCHAIN_REPORT"
           '

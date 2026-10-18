@@ -66,7 +66,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 dbus
+          sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 libsecret-tools dbus
 
       - name: Build the e2e dependencies (the CLI and its packages)
         run: pnpm exec turbo run build --filter='@agentlink/e2e^...'
@@ -86,10 +86,7 @@ jobs:
       - name: Run the deterministic scenario
         run: |
           set -euo pipefail
-          dbus-run-session -- bash -euo pipefail -c '
-            keyring_env="$(openssl rand -hex 16 | gnome-keyring-daemon --unlock --components=secrets)"
-            eval "$keyring_env"
-            export GNOME_KEYRING_CONTROL
+          dbus-run-session -- tools/ci/with-keyring.sh bash -euo pipefail -c '
             pnpm --filter @agentlink/e2e exec vitest run test/pair-and-message.test.ts test/negotiate-and-agree.test.ts --reporter=default --reporter=json --outputFile.json="$E2E_REPORT"
           ' 2>&1 | tee "$AGENTLINK_E2E_ARTIFACTS/vitest-output.log"
 
@@ -176,7 +173,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 dbus
+          sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 libsecret-tools dbus
 
       # The Claude Code Bash sandbox on Linux needs bubblewrap and socat; Ubuntu 24.04 restricts
       # unprivileged user namespaces, so bwrap gets the AppArmor profile from the Claude Code docs.
@@ -250,10 +247,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           set -euo pipefail
-          dbus-run-session -- bash -euo pipefail -c '
-            keyring_env="$(openssl rand -hex 16 | gnome-keyring-daemon --unlock --components=secrets)"
-            eval "$keyring_env"
-            export GNOME_KEYRING_CONTROL
+          dbus-run-session -- tools/ci/with-keyring.sh bash -euo pipefail -c '
             pnpm --filter @agentlink/e2e exec vitest run llm/llm-run.test.ts --reporter=default
           ' 2>&1 | tee "$AGENTLINK_E2E_ARTIFACTS/vitest-output.log"
 
