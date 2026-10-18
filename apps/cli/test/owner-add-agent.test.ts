@@ -18,7 +18,7 @@ import {
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
 import type { Sealed, SealContext, StoreCipher } from '@agentlink/core';
 import { createLogger } from '@agentlink/log';
-import type { AddAgentOptions } from '@agentlink/node';
+import { NodeKeyStoreError, type AddAgentOptions } from '@agentlink/node';
 import { describe, expect, it } from 'vitest';
 import {
   ownerCommandHandlers,
@@ -82,6 +82,7 @@ interface Machine {
   readonly agents: Map<string, OwnerAgent>;
   readonly owner: MemoryOwnerKeyStore;
   readonly calls: AddAgentOptions[];
+  readonly deps: OwnerCommandDeps;
   readonly out: string[];
   readonly err: string[];
   run(argv: string[], terminal?: TerminalContext): Promise<number>;
@@ -130,7 +131,7 @@ async function machine(names: readonly string[], aliceHasCard = true): Promise<M
       try {
         const view = await options.card.identity.init({
           owner: session,
-          ownerKeys: options.owner,
+          ownerKeys: options.owner ?? ownerKeys,
           name: options.card.name,
           relays: options.card.relays,
         });
@@ -139,6 +140,7 @@ async function machine(names: readonly string[], aliceHasCard = true): Promise<M
         await session.close();
       }
     },
+    changeOwnerCode: () => Promise.reject(new Error('not used')),
     decide: () => Promise.reject(new Error('not used')),
     signOwnerAction: () => Promise.reject(new Error('not used')),
     ask: () => Promise.resolve(''),
@@ -150,6 +152,7 @@ async function machine(names: readonly string[], aliceHasCard = true): Promise<M
     agents,
     owner,
     calls,
+    deps,
     out,
     err,
     run: (argv, terminal = TTY) =>
@@ -171,8 +174,8 @@ describe('agentlink owner add-agent (M1-9t, D-78)', () => {
     const alice = m.agents.get('alice');
     if (call === undefined || bob === undefined || alice === undefined) throw new Error('setup');
     const ownerKeys = await m.owner.getPublicKeys();
-    expect(call.owner.ownerNostr).toEqual(ownerKeys.ownerNostr);
-    expect(call.owner.ownerEvm).toEqual(ownerKeys.ownerEvm);
+    expect(call.owner?.ownerNostr).toEqual(ownerKeys.ownerNostr);
+    expect(call.owner?.ownerEvm).toEqual(ownerKeys.ownerEvm);
     expect(call.card.agent).toBe(bob.client.agentId);
     expect(call.card.name).toBe('bob');
     expect(call.card.relays).toEqual(RELAYS);
@@ -205,15 +208,104 @@ describe('agentlink owner add-agent (M1-9t, D-78)', () => {
     expect(await m.agents.get('bob')?.client.identity.get()).toBeUndefined();
   });
 
-  it('refuses when no agent on this computer names an owner yet, and points to owner init', async () => {
+  // M1-9x: no agent names an owner (for example after every carded agent was removed). The command
+  // hands node no owner keys; node takes them from the owner item itself after the owner code, or
+  // refuses with `owner init` when there is no owner item (node's owner-recovery.test.ts).
+  it('with no agent naming an owner, hands node no owner keys so it reads them from the owner item', async () => {
     const m = await machine(['alice', 'bob'], false);
-    expect(await m.run(['owner', 'add-agent', '--agent', 'bob'])).toBe(1);
+    expect(await m.run(['owner', 'add-agent', '--agent', 'bob'])).toBe(0);
+    expect(m.calls).toHaveLength(1);
+    const call = m.calls[0];
+    const bob = m.agents.get('bob');
+    if (call === undefined || bob === undefined) throw new Error('setup');
+    expect(call.owner).toBeUndefined();
+    expect(call.card.agent).toBe(bob.client.agentId);
+    expect(call.card.name).toBe('bob');
+    const view = await bob.client.identity.get();
+    if (view === undefined) throw new Error('no card');
+    expect(view.card.ownerNostr).toBe(encodeHex0x((await m.owner.getPublicKeys()).ownerNostr));
+  });
+
+  it('with no agent naming an owner and no owner item, shows node’s owner init refusal', async () => {
+    const m = await machine(['alice', 'bob'], false);
+    const refusal = 'No owner is set up on this computer yet. Run `agentlink owner init`.';
+    const ownerless: string[] = [];
+    const handlers = ownerCommandHandlers({
+      ...m.deps,
+      addAgent: () => {
+        ownerless.push('called');
+        return Promise.reject(new NodeKeyStoreError('owner_missing', refusal));
+      },
+    });
+    const err: string[] = [];
+    const code = await createDispatcher(handlers)(['owner', 'add-agent', '--agent', 'bob'], {
+      output: createOutput({ log: () => undefined, error: (l) => err.push(l) }),
+      terminal: TTY,
+      version: '0.0.0',
+    });
+    expect(code).toBe(1);
+    expect(ownerless).toHaveLength(1);
+    expect(err.join('\n')).toContain(refusal);
+    expect(await m.agents.get('bob')?.client.identity.get()).toBeUndefined();
+  });
+
+  // IR-M1-9x-1 M-2: the no-card path (no expected owner) only when every other agent was read.
+  it('uses a revoked card’s owner as the expected owner, never the no-card path', async () => {
+    const m = await machine(['alice', 'bob']);
+    const alice = m.agents.get('alice');
+    if (alice === undefined) throw new Error('setup');
+    const view = await alice.client.identity.get();
+    if (view === undefined) throw new Error('setup');
+    const revokedAlice = {
+      ...alice,
+      client: {
+        identity: { get: () => Promise.resolve({ ...view, revoked: true }) },
+      } as unknown as OwnerAgent['client'],
+    };
+    const deps: OwnerCommandDeps = {
+      ...m.deps,
+      open: (name) =>
+        name === 'alice'
+          ? Promise.resolve({ status: 'ok' as const, agent: revokedAlice })
+          : m.deps.open(name),
+    };
+    const code = await createDispatcher(ownerCommandHandlers(deps))(
+      ['owner', 'add-agent', '--agent', 'bob'],
+      {
+        output: createOutput({ log: () => undefined, error: () => undefined }),
+        terminal: TTY,
+        version: '0.0.0',
+      },
+    );
+    expect(code).toBe(0);
+    expect(m.calls).toHaveLength(1);
+    expect(m.calls[0]?.owner?.ownerNostr).toEqual((await m.owner.getPublicKeys()).ownerNostr);
+  });
+
+  it('refuses and names an agent it could not read, instead of taking the no-card path', async () => {
+    const m = await machine(['alice', 'bob', 'carol']);
+    const deps: OwnerCommandDeps = {
+      ...m.deps,
+      open: (name) =>
+        name === 'alice'
+          ? Promise.resolve({ status: 'needs_setup' as const, message: 'locked' })
+          : name === 'carol'
+            ? Promise.reject(new Error('corrupt store'))
+            : m.deps.open(name),
+    };
+    const err: string[] = [];
+    const code = await createDispatcher(ownerCommandHandlers(deps))(
+      ['owner', 'add-agent', '--agent', 'bob'],
+      {
+        output: createOutput({ log: () => undefined, error: (l) => err.push(l) }),
+        terminal: TTY,
+        version: '0.0.0',
+      },
+    );
+    expect(code).toBe(1);
     expect(m.calls).toHaveLength(0);
-    expect(m.err.join('\n')).toContain(OWNER_TEXT.addAgentNoOwner);
-    expect(OWNER_TEXT.addAgentNoOwner).toContain('agentlink owner init');
-    // M1-9u: the owner-exists-but-unattached state is named, with the way to see it.
-    expect(OWNER_TEXT.addAgentNoOwner).toContain('already exists');
-    expect(OWNER_TEXT.addAgentNoOwner).toContain('agentlink doctor');
+    expect(err.join('\n')).toContain(OWNER_TEXT.addAgentUnreadable(['alice', 'carol']));
+    expect(await m.agents.get('bob')?.client.identity.get()).toBeUndefined();
   });
 
   it('refuses an agent that is not set up, and points to init --agent', async () => {

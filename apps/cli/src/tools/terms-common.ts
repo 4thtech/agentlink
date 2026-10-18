@@ -223,7 +223,38 @@ export function termsCoreError(error: unknown): HandlerOutput | undefined {
       return fail('error', SEND_TEXT.tooLarge, SEND_TEXT.tooLargeNextStep, 'MESSAGE_TOO_LARGE');
     case 'payload_invalid':
       return invalidArgument();
+    // The scope expired while the owner request was being stored (M1-32-d): the terms' refusal.
+    case 'approval_scope_expired':
+      return termsRefusal('TERMS_EXPIRED', true);
     default:
       return undefined;
   }
+}
+
+// ---- Names instead of addresses (M1-22-b; 06 §2.1, §4; 11 §5) -------------------------------------
+
+/** Our own agent in a summary or a role field (11 §5: the user is "you"). */
+export const YOU = 'you';
+/** A paired contact whose shown name came out empty after the one-line cleaning. */
+export const A_CONTACT = 'a contact';
+
+/** The 04 §2 address form: `0x` and 40 lowercase hex characters. */
+const ADDRESS = /^0x[0-9a-f]{40}$/;
+
+/**
+ * Who an agent address is, in words: "you" for our own agent, the contact's shown name (06 §2.1
+ * rule: owner alias or restricted name, with its label) for a paired contact, or "a contact" when
+ * that name is empty. An address that is neither returns undefined: it is never shown outside the
+ * untrusted block (I-5), so the caller leaves it out.
+ */
+export function addressLabel(
+  address: unknown,
+  selfId: string,
+  contacts: ReadonlyMap<string, ContactRef>,
+): string | undefined {
+  if (typeof address !== 'string' || !ADDRESS.test(address)) return undefined;
+  if (address === selfId) return YOU;
+  const ref = contacts.get(address);
+  if (ref === undefined) return undefined;
+  return oneLineName(ref.name) === '' ? A_CONTACT : nameOf(ref);
 }

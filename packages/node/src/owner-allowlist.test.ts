@@ -9,15 +9,10 @@ import {
   AGENT_CARD_TYPES,
   agentCardNameHash,
   agentCardRelaysHash,
-  decodeHex,
   encodeHex,
   encodeHex0x,
   encodeUtf8,
-  equalBytes,
-  hashTypedData,
   randomBytes,
-  recoverEvmAddress,
-  verifyCardOwnerSig,
   type AgentCard,
   type JsonObject,
   type OwnerPublicKeys,
@@ -27,7 +22,7 @@ import { describe, expect, it } from 'vitest';
 import { NodeKeyStoreError } from './errors.js';
 import { performOwnerOperation } from './index.js';
 import type { KeychainBackend } from './keychain.js';
-import { OWNER_OPERATION_REFUSED } from './owner-allowlist.js';
+import { OWNER_OPERATION_REFUSED, allowedTypedData } from './owner-allowlist.js';
 import { initOwnerWith } from './owner-init.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
 import { runOwnerGesture, runOwnerOperation, type OwnerSignRequest } from './owner-operation.js';
@@ -248,7 +243,7 @@ describe('EIP-712 and owner-action allowlist (M1-8h; 04 §2.4, §2.5.1)', () => 
     expect(OWNER_OPERATION_REFUSED).toBe(REFUSED);
   });
 
-  it('performOwnerOperation refuses every typed data but the agent card, before any prompt', async () => {
+  it('performOwnerOperation refuses every typed data outside the allowlist, before any prompt', async () => {
     const owner = (await ready()).owner;
     for (const [why, typedData] of refusedTypedData(owner)) {
       const item = { kind: 'typed-data', typedData, summary: 'Sign' } as never;
@@ -312,23 +307,52 @@ describe('EIP-712 and owner-action allowlist (M1-8h; 04 §2.4, §2.5.1)', () => 
     await store.close();
   });
 
-  it('signs the agent card (owner EVM key, the card verifies)', async () => {
+  it('the allowlist still accepts a strict agent card (for the bound card sessions)', async () => {
+    const { owner, store } = await ready();
+    const typed = cardTyped(cardFor(owner));
+    expect(allowedTypedData(typed)).toEqual(typed);
+    await store.close();
+  });
+
+  it('IR-M1-8h-1 L3: the generic owner operation signs no agent card, for any agent', async () => {
     const { owner, code, store } = await ready();
+    // A strict, allowlisted card naming this owner: still refused by the generic operation, so it
+    // cannot sign a card for an agent of the caller's choosing. Cards are signed only through the
+    // bound sessions of owner init and owner add-agent (owner-first-card.ts).
     const card = cardFor(owner);
+    const item = { kind: 'typed-data', typedData: cardTyped(card), summary: 'Sign' } as const;
+    expect(await refusal(() => performOwnerOperation(owner, item))).toEqual({
+      code: 'owner_operation_refused',
+      message: REFUSED,
+    });
     const run = scripted([code]);
-    const out = await runOwnerOperation(
-      store,
-      run.terminal,
-      { lines: ['Sign your agent card'] },
-      { kind: 'typed-data', typedData: cardTyped(card) },
-    );
-    if (out.kind !== 'typed-data') throw new Error('expected typed data');
-    expect(verifyCardOwnerSig(card, out.signature)).toBe(true);
-    const recovered = recoverEvmAddress(
-      hashTypedData(cardTyped(card)).digest,
-      decodeHex(out.signature.slice(2)),
-    );
-    expect(equalBytes(recovered, owner.ownerEvm)).toBe(true);
+    expect(
+      await refusal(() =>
+        runOwnerOperation(
+          store,
+          run.terminal,
+          { lines: ['Sign your agent card'] },
+          { kind: 'typed-data', typedData: cardTyped(card) },
+        ),
+      ),
+    ).toEqual({ code: 'owner_operation_refused', message: REFUSED });
+    expect(run.written).toEqual([]);
+    expect(run.labels).toEqual([]);
+    // And not hidden in a gesture next to an allowed owner action.
+    const decide = ownerAction(owner, 'approval.decide', {
+      approvalId: 'apr_test',
+      actionDigest: '00'.repeat(32),
+      decision: 'approve',
+    });
+    expect(
+      await refusal(() =>
+        runOwnerGesture(store, run.terminal, { lines: ['Approve'] }, [
+          { kind: 'owner-action', action: decide },
+          { kind: 'typed-data', typedData: cardTyped(card) },
+        ]),
+      ),
+    ).toEqual({ code: 'owner_operation_refused', message: REFUSED });
+    expect(run.labels).toEqual([]);
     await store.close();
   });
 

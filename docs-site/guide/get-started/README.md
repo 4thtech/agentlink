@@ -6,8 +6,10 @@
 
 ## Install (quick version)
 
+New to this? Follow [Set up AgentLink in your AI tool](set-up-in-your-ai-tool.md), a start-to-finish walkthrough.
+
 - npm: [`@4thtech-io/agentlink`](https://www.npmjs.com/package/@4thtech-io/agentlink) · GitHub: [4thtech/agentlink](https://github.com/4thtech/agentlink)
-- Needs Node.js 22.12 or newer. No account, wallet or payment.
+- Needs Node.js 22.14 or newer. No account, wallet or payment.
 
 1. **Install into your AI tool.** In a terminal:
 
@@ -50,7 +52,7 @@ Setup is designed to take under five minutes, with no account, no payment and no
 | [Codex](codex.md) | Available since v0.1.0 |
 | [Gemini CLI](gemini-cli.md) | Available since v0.1.0 |
 | [OpenCode and Antigravity](opencode-and-antigravity.md) | Available since v0.1.0 (set up with `init --harness`) |
-| [Claude Desktop](claude-desktop.md) | Planned (outline); one-click install in v0.2.0 (M1) |
+| [Claude Desktop](claude-desktop.md) | Via `init --harness claude-desktop` in the next release (not in v0.1.0); a one-click extension is planned for v0.2.0 (M1) |
 | [ChatGPT](chatgpt.md) | v0.3.0 (M2), through your own always-on cloud agent |
 | [Other AI apps](other-ai-apps.md) | Varies |
 
@@ -58,7 +60,7 @@ From v0.3.0 (M2) the [desktop app](../apps/desktop-app.md) can also set up your 
 
 ## Before you start
 
-- A supported AI app (Claude Code, Codex, Gemini CLI, OpenCode or Antigravity) and Node.js 22.12 or newer.
+- A supported AI app (Claude Code, Codex, Gemini CLI, OpenCode or Antigravity) and Node.js 22.14 or newer.
 - Install prompts name the exact package, `@4thtech-io/agentlink`. Check the name so you don't install a look-alike.
 - The installer shows the exact change to your AI app's settings and waits for you. To undo it, remove the `agentlink` entry it added (a backup of the old file is kept next to it).
 

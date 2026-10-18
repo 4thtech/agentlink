@@ -33,7 +33,22 @@ export {
 } from './owner-init.js';
 // M1-9t (D-78): `owner add-agent` signs a further agent's first card with the existing owner key, at
 // the same TTY prompt; the owner store and session stay inside the package.
-export { addAgentToOwner, type AddAgentOptions, type AddAgentResult } from './owner-add-agent.js';
+// M1-9x: with no local agent naming the owner, add-agent takes the owner keys from the owner item;
+// hasOwnerOnMachine is a store-only check (no secret read, nothing unlocked) for doctor and messages.
+export {
+  addAgentToOwner,
+  hasOwnerOnMachine,
+  type AddAgentOptions,
+  type AddAgentResult,
+} from './owner-add-agent.js';
+// M1-9z: `owner change-code` re-wraps the owner seed under a new generated owner code, at the same
+// TTY prompt; the owner identity does not change and nothing secret leaves the package.
+export {
+  changeOwnerCode,
+  hasUnfinishedOwnerCodeChange,
+  type ChangeOwnerCodeOptions,
+  type ChangeOwnerCodeResult,
+} from './owner-change-code.js';
 // M1-8h: `owner init` signs the agent's first card; the caller passes core's IdentityService. Only
 // types: the restricted session stays inside the package (owner-first-card.ts).
 export type { FirstAgentCard, FirstCardIdentity } from './owner-first-card.js';
@@ -49,6 +64,18 @@ export {
   type ApprovalContext,
   type ReviewedApproval,
 } from './owner-approval.js';
+// M1-8d: the local approval server (08 §1). Only the entry point and its types: the owner store,
+// browser opener and notifier seams stay inside the package (startApprovalServerWith).
+export {
+  APPROVAL_SERVER_HOST,
+  startApprovalServer,
+  type ApprovalForDecision,
+  type ApprovalServer,
+  type ApprovalServerEvent,
+  type ApprovalServerOptions,
+  type ApprovalServerSource,
+  type PendingApprovalView,
+} from './approval-server.js';
 // M1-8b: the agent's local SQLite store and the cipher of its `enc` columns (07 §3). The store key
 // stays inside the package: the entry returns only the Store and the cipher (fence.test.ts).
 export { NodeStoreError, type NodeStoreErrorCode } from './store-errors.js';
@@ -62,3 +89,23 @@ export {
   nodeNip11Fetcher,
   nodeRelayConnector,
 } from './relay-io.js';
+// M1-15: the SSRF-safe download (DNS-pinned, 04 §4) and the allowed-folder and inbox file guards.
+// The test seams (an injected lookup, a CA, a route to a local port) stay inside.
+export {
+  SAFE_FETCH_TIMEOUT_MS,
+  SafeFetchError,
+  nodeSafeFetch,
+  type SafeFetch,
+  type SafeFetchErrorCode,
+  type SafeFetchOptions,
+  type SafeFetchResult,
+} from './safe-fetch.js';
+export {
+  AllowedPathError,
+  createInboxFile,
+  openAllowedFile,
+  resolveAllowedFile,
+  type AllowedFile,
+  type AllowedPathErrorCode,
+  type AllowedPathOptions,
+} from './allowed-path.js';

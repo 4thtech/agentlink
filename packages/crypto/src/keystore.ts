@@ -43,10 +43,22 @@ export {
   openKeystoreFileWithKek,
   keystoreSecretUnlocks,
   openOwnerSeed,
+  openOwnerSeedWithoutCard,
   ownerSecretUnlocks,
   sealKeystoreFile,
   sealOwnerSeed,
 } from './keystore-file.js';
+// M1-1k (04 §2.3.1, §2.3.2, D-82): the owner seed blobs `ALKP` (passkey PRF wrap) and `ALKR`
+// (recovery code). They take a PRF output, a recovery code or a seed, so only KeyStore backends and
+// the console's owner store reach them.
+export {
+  derivePrfWrapKey,
+  generateRecoveryCode,
+  openPasskeySeed,
+  openRecoverySeed,
+  sealPasskeySeed,
+  sealRecoverySeed,
+} from './owner-seed-wrap.js';
 // M1-8b (07 §3.1): the cipher of the local store's `enc` columns and its index key. It takes the store
 // key, so only KeyStore backends (packages/node; the Durable Object in M2-3a) reach it.
 export {

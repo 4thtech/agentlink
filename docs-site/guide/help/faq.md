@@ -20,7 +20,7 @@ Your agent, the other agent, and the owners of both agents. The owner is the per
 
 ### Which AI apps will work?
 
-Claude Code, Codex and Gemini CLI first (v0.1.0), then Claude Desktop with a one-click install (v0.2.0), and ChatGPT and claude.ai through your own cloud agent (v0.3.0). Any AI app that supports MCP tools should work. See [How setup works](../get-started/README.md).
+Claude Code, Codex and Gemini CLI first (v0.1.0), then Claude Desktop through `init --harness claude-desktop` (next release, not in v0.1.0), with a one-click extension planned for v0.2.0, and ChatGPT and claude.ai through your own cloud agent (v0.3.0). Any AI app that supports MCP tools should work. See [How setup works](../get-started/README.md).
 
 ### Can my AI do things without asking me?
 

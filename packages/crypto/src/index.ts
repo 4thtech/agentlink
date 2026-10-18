@@ -206,6 +206,47 @@ export {
   type AgentCard,
   type AgentCardHashes,
 } from './agent-card.js';
+// M1-1j: the OCC v2 proof types (05 §3.1, §4; 04 §5), the recipient commitment and the EIP-3009
+// typed data. The revoke struct waits for G-20 (M1-1i-b).
+export {
+  OCC_V2_DOMAIN_NAME,
+  OCC_V2_DOMAIN_VERSION,
+  RECEIPT_TYPES,
+  RECEIVE_WITH_AUTHORIZATION_TYPES,
+  RECORD_TYPES,
+  REGISTRATION_TYPES,
+  hashReceipt,
+  hashReceiveWithAuthorization,
+  hashRecord,
+  hashRegistration,
+  occV2Domain,
+  parseReceipt,
+  parseReceiveWithAuthorization,
+  parseRecord,
+  parseRegistration,
+  receiptTypedData,
+  receiveWithAuthorizationTypedData,
+  recipientCommitment,
+  recordStructHash,
+  recordTypedData,
+  registrationTypedData,
+  type OccReceipt,
+  type OccRecord,
+  type OccRegistration,
+  type OccV2Domain,
+  type ProofTypeHashes,
+  type ReceiveWithAuthorization,
+  type TokenDomain,
+} from './proof-types.js';
+// M1-1k (04 §2.3, D-82): the passkey PRF salt and the public header of an `ALKP` blob (owner key and
+// credential ID). Sealing and opening the owner seed blobs are in @agentlink/crypto/keystore.
+export {
+  ownerPrfSalt,
+  readPasskeyBlobHeader,
+  type ExpectedOwnerNostr,
+  type PasskeyBlobHeader,
+  type RecoveryCodeSecret,
+} from './owner-seed-wrap.js';
 // M1-1f: the pairing proof and the safety code (04 §3.6, §3.6.1; only the commit-checked functions
 // produce digits, IR-M1-1f-1 L-7), and the public constants of the
 // file KeyStore and owner wrap (04 §2.8). Argon2id, password() and the ALKS / ALKO seal and open

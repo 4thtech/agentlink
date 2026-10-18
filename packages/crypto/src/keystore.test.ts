@@ -42,11 +42,20 @@ const SEED_OR_SECRET = [
   'openKeystoreFileWithKek',
   'sealOwnerSeed',
   'openOwnerSeed',
+  // M1-9x (04 §2.8): the owner wrap opened when no local card names the owner.
+  'openOwnerSeedWithoutCard',
   // IR-M1-1f-1 L-3: the agent ≠ owner probes take a candidate secret (04 §2.8).
   'ownerSecretUnlocks',
   'keystoreSecretUnlocks',
   // M1-8b (07 §3.1): the store's column cipher, which takes the store key.
   'createStoreColumnCipher',
+  // M1-1k (04 §2.3.1, §2.3.2): the ALKP and ALKR owner seed blobs, the PRF wrap key and the code.
+  'derivePrfWrapKey',
+  'generateRecoveryCode',
+  'sealPasskeySeed',
+  'openPasskeySeed',
+  'sealRecoverySeed',
+  'openRecoverySeed',
 ];
 
 // The one deterministic test seam (@agentlink/crypto/testing, never built or exported).
@@ -65,6 +74,9 @@ const TEST_SEAM = [
   'argon2idWithSecretAndAd',
   'sealKeystoreFileWithNonce',
   'sealOwnerSeedWithNonce',
+  // M1-1k: fixed nonce (and salt) for ALKP and ALKR.
+  'sealPasskeySeedWithNonce',
+  'sealRecoverySeedWithSaltAndNonce',
   // IR-M1-1f-1 L-7: pairingDigest for the labels vectors.
   'pairingDigest',
   // M1-1g (IR-M1-1g-G2-1 M-2): the in-memory KeyStore doubles, which hold a seed in plain memory.
@@ -190,6 +202,10 @@ describe('@agentlink/crypto/keystore', () => {
       'sealOwnerSeedWithNonceUnsafe',
       'sealKeystoreFileWithNonce',
       'sealOwnerSeedWithNonce',
+      'sealPasskeySeedWithNonceUnsafe',
+      'sealRecoverySeedWithSaltAndNonceUnsafe',
+      'sealPasskeySeedWithNonce',
+      'sealRecoverySeedWithSaltAndNonce',
     ]) {
       expect(Object.keys(main), name).not.toContain(name);
       expect(Object.keys(keystore), name).not.toContain(name);

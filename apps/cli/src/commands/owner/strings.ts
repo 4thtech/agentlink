@@ -1,6 +1,7 @@
 // Fixed text of the owner commands (M1-9b) that the M1-9g catalogue (src/tools/strings/en.ts) has no
 // entry for yet. Every line is fixed: nothing the caller typed and no stored value is ever inserted
-// (I-5). The catalogue entries that exist (`cli.approve.*`) are used through `copy()`.
+// (I-5), except the local agent names `addAgentUnreadable` lists, which passed isAgentName. The
+// catalogue entries that exist (`cli.approve.*`) are used through `copy()`.
 export const OWNER_TEXT = Object.freeze({
   // Card facts (11 §5 vocabulary).
   free: 'Free',
@@ -43,14 +44,18 @@ export const OWNER_TEXT = Object.freeze({
 
   // Owner add-agent (M1-9t, D-78; 04 §2.8).
   addAgentDone: 'OK       This agent can now pair. Restart the app that runs it.',
-  addAgentNoOwner:
-    "No agent on this computer has a card from an owner, so AgentLink can't tell which owner to add this agent to. Nothing was changed. If you have never set up an owner, run `agentlink owner init` yourself, in your own terminal, for your first agent, and don't let your AI run it or see the code it shows. If `agentlink owner init` says an owner already exists here, none of this computer's agents is attached to it: run `agentlink doctor` in your own terminal to see the state.",
   addAgentUnknown:
     'AgentLink is not set up for this agent on this machine yet. Run `agentlink init --agent <name>` yourself first, in your own terminal.',
   addAgentHasCard:
     'This agent already has a card from an owner. AgentLink never replaces a card. Nothing was changed.',
+  // IR-M1-9x-1 M-2: names only local agent names that passed isAgentName (I-5).
+  addAgentUnreadable: (agents: readonly string[]): string =>
+    `AgentLink couldn't read these agents on this computer, so it can't tell which owner they name: ${agents.join(', ')}. Nothing was changed. Run \`agentlink doctor\` in your own terminal, then try again.`,
   addAgentSeveralOwners:
     "The agents on this computer name different owners, so AgentLink can't tell which one to use. Nothing was changed. Run `agentlink doctor` in your own terminal.",
+
+  // Owner change-code (M1-9z; 04 §2.8 "Changing the owner code").
+  changeCodeDone: 'OK       Use your new owner code from now on, for every agent on this computer.',
 
   // Owner init.
   ownerUnknownAgent:

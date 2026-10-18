@@ -14,6 +14,7 @@
   - `<github-login>.md`: one file per person (`talirezun.md`, `denisjazbec.md`)
   - `.github/workflows/secret-scan.yml`: a small stub that runs the reusable secret scan from `main` (pinned to a `main` commit) on every push to `sync`. A push only triggers workflows that exist on the pushed branch, so this stub is required; a weekly job on `main` re-scans `sync` as a backstop. Details: `ci-cd.md`.
 - Locally, the branch is checked out as a git worktree at **`../agentlink-sync`**, a sibling of the main checkout.
+- **Re-pinning the secret-scan stub.** The stub pins `secret-scan.yml` on `main` to a commit SHA, but that workflow loads `.gitleaks.toml` from `main` at run time. When either file changes on `main`, re-pin the stub on `sync` (the owner, or an agent he directs): take the current 40-character `origin/main` SHA, put it in the `uses:` line of `.github/workflows/secret-scan.yml` on `sync`, and push. The `sync-pin` job in `security.yml` (push to `main` and weekly) fails while the pin is older than the last change to either file. Details: `ci-cd.md`, "The sync branch".
 - Code never goes on `sync`, and sync files never go on `main`. The branch has no PR requirement, but a ruleset blocks force-push and deletion, and every push to it is scanned for secrets (gitleaks, `security.yml`).
 
 ## 2. One-time setup per machine

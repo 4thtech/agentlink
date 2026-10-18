@@ -5,6 +5,7 @@ import type { ContactView, InboxSender, OpenOffer } from '@agentlink/core';
 import { encodeUtf8 } from '@agentlink/crypto';
 import { createLogger, type Logger } from '@agentlink/log';
 import type { ContactDisplayName, RestrictedName } from '@agentlink/types';
+import { Ajv } from 'ajv';
 import { describe, expect, it } from 'vitest';
 import type {
   InboxPage,
@@ -17,6 +18,7 @@ import type {
 } from './context.js';
 import { INBOX_MAX_TEXT_BYTES, INBOX_SYNC_BUDGET_MS, INBOX_TEXT } from './inbox.js';
 import { callTool } from './index.js';
+import { findTool } from './registry.js';
 import type { FinishedResult } from './result.js';
 import { copy, UNTRUSTED_FOOTER } from './strings/index.js';
 
@@ -227,8 +229,21 @@ function context(client: ToolClient, logger: Logger = capture().logger): ToolCon
   };
 }
 
-const inbox = (input: Record<string, unknown>, client: Fake, logger?: Logger) =>
-  callTool('agentlink_inbox', input, context(client, logger));
+/**
+ * The MCP server rejects a result that does not match the tool's output schema, so every result
+ * these tests produce is validated against it too (M1-22-b regression: `termsParties`).
+ */
+function assertMatchesOutputSchema(name: string, structured: unknown): void {
+  const validate = new Ajv({ strict: false }).compile(findTool(name)!.outputSchema);
+  const valid = validate(structured);
+  expect(valid, JSON.stringify(validate.errors)).toBe(true);
+}
+
+const inbox = async (input: Record<string, unknown>, client: Fake, logger?: Logger) => {
+  const result = await callTool('agentlink_inbox', input, context(client, logger));
+  assertMatchesOutputSchema('agentlink_inbox', result.structured);
+  return result;
+};
 
 type Message = Record<string, unknown> & {
   untrusted: Record<string, unknown>;
@@ -333,6 +348,100 @@ describe('agentlink_inbox: sync and query (06 §2.2, §6)', () => {
       messages: [],
     });
     expect(client.queries[0]).toMatchObject({ envelopeIds: [] });
+  });
+
+  const D = `0x${'d'.repeat(40)}`;
+  const termsOffer = (envelopeId: string, termsKey: string, terms: Record<string, unknown>) =>
+    inbound({
+      envelopeId,
+      type: 'offer',
+      body: null,
+      terms,
+      note: null,
+      termsRef: {
+        termsId: THREAD,
+        version: 1,
+        termsHash: [...termsKey]
+          .map((c) => c.charCodeAt(0).toString(16))
+          .join('')
+          .padEnd(64, '0'),
+        validUntil: T0 + 86_400,
+      },
+    });
+  const openOffer22b = (envelopeId: string): OpenOffer => ({
+    envelopeId,
+    contactId: B,
+    termsId: THREAD,
+    version: 1,
+    validUntil: T0 + 86_400,
+  });
+
+  it('M1-22-b: terms addresses become you / a contact name / null, never text in the summary', async () => {
+    const terms = {
+      parties: [A, B],
+      deliverables: [
+        { description: 'x', by: B },
+        { description: 'y', by: D },
+      ],
+      price: { amount: '5', currency: 'USD', payer: A },
+    };
+    const client = fake({ items: [termsOffer(E1, 'h1', terms)], openOffers: [openOffer22b(E1)] });
+    const result = await inbox({ openOffers: true }, client);
+    const [message] = messagesOf(result);
+    expect(message!['termsParties']).toEqual({
+      parties: ['you', '“Marko” (self-declared)'],
+      payer: 'you',
+      deliverablesBy: ['“Marko” (self-declared)', null],
+    });
+    expect(String(result.structured.summary)).not.toMatch(/0x[0-9a-f]{40}/);
+    const roles = JSON.stringify(message!['termsParties']);
+    expect(roles).not.toContain(A);
+    expect(roles).not.toContain(D);
+  });
+
+  it('M1-22-b: a contact whose shown name is empty is "a contact"', async () => {
+    const client = fake({ items: [termsOffer(E1, 'h1', { parties: [B] })] });
+    const original = client.contacts;
+    client.contacts = async () => {
+      const [b, ...rest] = await original();
+      return [{ ...b!, display: display('') }, ...rest];
+    };
+    const result = await inbox({}, client);
+    expect((messagesOf(result)[0]!['termsParties'] as { parties: unknown[] }).parties).toEqual([
+      'a contact',
+    ]);
+  });
+
+  it('M1-22-b: identical open offers from one contact give one hint line; offers unchanged', async () => {
+    const terms = { parties: [A, B] };
+    const client = fake({
+      items: [
+        termsOffer(E1, 'same', terms),
+        termsOffer(E2, 'same', terms),
+        termsOffer(E3, 'other', terms),
+      ],
+      openOffers: [openOffer22b(E1), openOffer22b(E2), openOffer22b(E3)],
+    });
+    const result = await inbox({ openOffers: true }, client);
+    const hint = copy('chat.inbox.duplicateOffers', {
+      contactName: '“Marko” (self-declared)',
+      count: 2,
+    });
+    expect(String(result.structured.summary)).toBe(`${INBOX_TEXT.someOpenOffers(3)} ${hint}`);
+    expect(messagesOf(result)).toHaveLength(3);
+  });
+
+  it('M1-22-b: no hint for distinct offers, nor outside openOffers mode', async () => {
+    const terms = { parties: [A, B] };
+    const distinct = fake({
+      items: [termsOffer(E1, 'a', terms), termsOffer(E2, 'b', terms)],
+      openOffers: [openOffer22b(E1), openOffer22b(E2)],
+    });
+    expect((await inbox({ openOffers: true }, distinct)).structured.summary).toBe(
+      INBOX_TEXT.someOpenOffers(2),
+    );
+    const same = fake({ items: [termsOffer(E1, 'x', terms), termsOffer(E2, 'x', terms)] });
+    expect((await inbox({}, same)).structured.summary).toBe(INBOX_TEXT.someMessages(2));
   });
 
   it('since accepts an RFC 3339 date or date-time and is passed as unix seconds', async () => {

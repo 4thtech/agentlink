@@ -10,6 +10,8 @@ import {
   type OpenOffer,
 } from '@agentlink/core';
 import { createLogger, type Logger } from '@agentlink/log';
+import { Ajv } from 'ajv';
+import { findTool } from './registry.js';
 import type { ContactDisplayName, OwnerAlias, RestrictedName } from '@agentlink/types';
 import { describe, expect, it } from 'vitest';
 import { resolveContact } from './contacts.js';
@@ -169,6 +171,27 @@ const dump = (result: FinishedResult): string =>
 describe('agentlink_status (06 §2.1, §6.1)', () => {
   const marko = contact(B, display('Marko Novak'));
   const ana = contact(C, display('Ana', 'safety-code-checked'));
+
+  it('M1-22-b: ok results with offers and unread match the declared output schema', async () => {
+    const client = fakeClient({
+      counts: { inbox: [{ contactId: B, unread: 2 }], requests: 1 },
+      contacts: [marko, ana],
+      openOffers: [
+        {
+          envelopeId: 'RW52ZWxvcGVPbmVFbnZlbA',
+          contactId: B,
+          termsId: 't',
+          version: 1,
+          validUntil: 1,
+        },
+      ],
+    });
+    for (const name of ['agentlink_status', 'agentlink_list_contacts']) {
+      const result = await callTool(name, {}, context(client));
+      const validate = new Ajv({ strict: false }).compile(findTool(name)!.outputSchema);
+      expect(validate(result.structured), `${name} ${JSON.stringify(validate.errors)}`).toBe(true);
+    }
+  });
 
   it('ok: identity, counts by contact under the name rule, requests and storage', async () => {
     const client = fakeClient({

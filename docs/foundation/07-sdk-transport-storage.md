@@ -464,7 +464,12 @@ The console and the desktop app keep the owner's own store, never an agent's. Th
 interface Transport {
   wrap(envelope: Envelope, recipients: NostrRecipient[], keys: EnvelopeKeys): Promise<WrappedEnvelope>; // one gift wrap per distinct recipient key; publishes nothing
   publish(storedWrap: SignedWrap, relays: RelayUrl[]): Promise<PublishResult>; // exactly the row's relays (§3.2, §4.3), never any other
-  subscribe(keys: EnvelopeKeys, onEnvelope: (e: Envelope, meta) => void): Unsubscribe;
+  subscribe(options: {                           // live form of sync (M1-9s): backlog from the cursor, then live
+    relays: RelayUrl[];                          // the own list only (§4.3)
+    identities: { pubkey: string; epoch?: number }[];
+    persistence: { getCursor; setCursor; isSeen }; // the same object as for sync
+    onEnvelope(item: { envelope; giftWrapId; relay; recipient }): 'processed' | 'verified' | 'retry';
+  }): () => Promise<void>;                       // unsubscribe: CLOSE, no reconnect; resolves when in-flight handlers settle
   sync(options: {
     relays: RelayUrl[];                          // the own list only (§4.3); AUTH only there
     identities: { pubkey: string; epoch?: number }[]; // own Nostr keys at every epoch: the REQ's #p
@@ -835,6 +840,7 @@ Encodings follow 04 §2.4.1, and a verifier rejects a pack in any other form. `r
 ```
 agentlink init --keystore file             # opt-in; interactive terminal only; agent identity only (06 §7)
 agentlink owner init                     † # owner key on a file-KeyStore machine (and on keychain machines until M1b, 04 §2.2): generated owner code; run it yourself (04 §2.8)
+agentlink owner change-code              † # replace an exposed owner code with a new generated one; asks for the current one; same owner (04 §2.8, M1-9z; proposed, owner confirms at merge)
 agentlink keystore passphrase              # change the unlock code or passphrase; asks for the current one at the prompt
 agentlink doctor                           # backend, unlock source, owner-key location and their warnings
 ```
@@ -866,6 +872,8 @@ No "wallet", "seed phrase", "private key" or "encryption key" in default output.
 | `owner init` when an owner exists | "This agent already has an owner ({fingerprint}). AgentLink won't replace it. To use an owner from another device, link it from that device." |
 | `doctor`, owner | "Owner: {fingerprint}, set up {date}. If you never saw an owner code yourself, this owner isn't yours: replace the agent." |
 | Owner step needed (`owner_missing`, agent relays it) | "One step left, and you must do it yourself: run `agentlink owner init` in your own terminal. Don't let your AI run it or see the code it shows. It's what stops any AI, including your own, from approving its own actions." |
+| `owner change-code`, before the new code (M1-9z, proposed) | "This replaces your owner code with a new one. Your owner fingerprint stays the same, and your agents keep their cards." Then: "Store this new owner code off this machine, for example in your password manager. Keep your current owner code too until this finishes. Never type either into a chat or let your AI see them." |
+| `owner change-code`, after the new code (M1-9z, proposed) | "Owner code changed. Your old owner code no longer works, so you can now discard it. Your owner fingerprint is still {fingerprint}." · "If you saved a recovery kit, it isn't changed: it still restores this owner with its own recovery code." |
 | Changing the unlock code | "Changing the unlock code doesn't protect copies of the file made earlier (backups, image layers, snapshots). If the code or the file leaked, replace the agent." |
 | `needs_setup` `keystore_locked` (agent relays it) | "AgentLink can't unlock your agent's identity on this machine. Set AGENTLINK_KEYSTORE_PASSPHRASE_FILE to the file that holds your unlock code, then restart your AI app." While unlocking: "AgentLink is starting up. Try again in a few seconds." |
 | `doctor`, file backend | "Agent identity: passphrase-locked file (no system keychain). Unlocked from: secret file." |

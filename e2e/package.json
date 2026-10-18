@@ -8,7 +8,7 @@
   "scripts": {
     "test:e2e": "vitest run test/pair-and-message.test.ts test/negotiate-and-agree.test.ts",
     "test:e2e:llm": "vitest run llm/llm-run.test.ts",
-    "test": "vitest run test/canary-scan.test.ts test/harness-parse.test.ts test/inbox-ids.test.ts",
+    "test": "vitest run test/canary-scan.test.ts test/harness-parse.test.ts test/inbox-ids.test.ts test/nightly-workflow.test.ts test/rendezvous.test.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {

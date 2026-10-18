@@ -3,6 +3,7 @@ import { aeadEnvelope } from './aead-envelope';
 import { bip340 } from './bip340';
 import { dropAuth } from './drop-auth';
 import { eip712 } from './eip712';
+import { eip712Proof } from './eip712-proof';
 import { encodings } from './encodings';
 import { fingerprint } from './fingerprint';
 import { hkdfDerive } from './hkdf-derive';
@@ -16,6 +17,7 @@ import { ownerWrap } from './owner-wrap';
 import { pairing } from './pairing';
 import { pairingBodies } from './pairing-bodies';
 import { placeholderSha256 } from './placeholder-sha256';
+import { prfWrap } from './prf-wrap';
 import { safetyCode } from './safety-code';
 import { safetyCodeRecompute } from './safety-code-recompute';
 import { taggedHashSuite } from './tagged-hash';
@@ -32,6 +34,7 @@ export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['bip340', bip340],
   ['drop-auth', dropAuth],
   ['eip712', eip712],
+  ['eip712-proof', eip712Proof],
   ['encodings', encodings],
   ['fingerprint', fingerprint],
   ['hkdf-derive', hkdfDerive],
@@ -45,6 +48,7 @@ export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['pairing', pairing],
   ['pairing-bodies', pairingBodies],
   ['placeholder-sha256', placeholderSha256],
+  ['prf-wrap', prfWrap],
   ['safety-code', safetyCode],
   ['safety-code-recompute', safetyCodeRecompute],
   ['tagged-hash', taggedHashSuite],

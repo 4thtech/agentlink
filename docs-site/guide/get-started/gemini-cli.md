@@ -4,7 +4,7 @@
 
 **Purpose:** set up AgentLink in Gemini CLI.
 
-You need Node.js 22.12 or newer and Gemini CLI.
+You need Node.js 22.14 or newer and Gemini CLI.
 
 ## 1. Ask Gemini to install it
 

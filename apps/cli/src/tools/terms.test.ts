@@ -457,6 +457,7 @@ describe('agentlink_respond_to_terms: results (06 §2.2a, §2.5; 11 §6.1)', () 
       ['identity_missing', 'needs_setup'],
       ['contact_not_active', 'error'],
       ['identity_revoked', 'error'],
+      ['approval_scope_expired', 'rejected'],
     ] as const) {
       const client = fake({
         respond: () => Promise.reject(new CoreError(code, `core said ${CANARY}`)),

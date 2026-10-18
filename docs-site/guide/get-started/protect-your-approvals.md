@@ -26,7 +26,21 @@ You set up the owner code once per computer user. Every further agent, for examp
 1. Create the agent for that app: `npx -y @4thtech-io/agentlink init --agent <name> --harness <app>` (for example `--agent opencode --harness opencode`).
 2. In a terminal you opened yourself, run `npx -y @4thtech-io/agentlink owner add-agent --agent <name>`. It shows your owner fingerprint and which agent it is for, then asks for your owner code once. That entry signs this one agent's card and nothing else. It never changes your owner code.
 
+If you removed every agent that had a card but your owner is still set up on this computer, `owner add-agent` still works: your owner code unlocks the saved owner first, then it shows your owner fingerprint and asks you to confirm it's the one you saw at `owner init` before it signs the card.
+
 Each agent has its own identity, contacts and approvals: an approval you give one agent can't be used by another. They still run as the same user on this computer, so this keeps them apart in AgentLink, not against each other. Agents that must not be able to act as each other need separate computer users or computers.
+
+## Change your owner code
+
+If your owner code was exposed, for example typed into a chat with your AI or into a terminal your AI can read, replace it (from the next release after v0.1.0):
+
+1. **Open a terminal window yourself**, as for `owner init`.
+2. **Run `npx -y @4thtech-io/agentlink owner change-code`.** It asks for your current owner code first. Three wrong entries end the command and nothing changes.
+3. **Write down the new owner code it shows**, and type its last four characters back. Keep your current code too until the command says the owner code changed; only then discard the old one.
+
+Your owner fingerprint stays the same and your agents keep their cards, so your contacts see no change. From then on only the new code works. If anything fails before the change is complete, your current code keeps working. If a change was interrupted, `doctor` says so: run `owner change-code` again, and it finishes or cleans up the earlier change. If you saved a recovery kit, it isn't changed: it has its own recovery code.
+
+Changing the code doesn't protect copies of the old saved owner key made earlier, for example in a backup, from someone who also has the old code. If you think that happened, set up a new owner and agent.
 
 ## What this protects, and what it can't
 
