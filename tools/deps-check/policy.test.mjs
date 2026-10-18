@@ -74,7 +74,11 @@ describe('policy data', () => {
       '@4thtech-io/types',
       '@4thtech-io/log',
       '@4thtech-io/crypto',
+      '@4thtech-io/occ-v2-abi',
     ]);
+    // The ABI package (M1-3f, D-83) is data only and imports no workspace package.
+    expect(allowedWorkspaceNames('packages/occ-v2-abi')).toEqual(['@4thtech-io/occ-v2-abi']);
+    expect(violationFor('packages/occ-v2-abi', '@4thtech-io/crypto')).toMatch(/layering/);
     // The logger (M0-8) imports no workspace package, and the trusted base does not import it.
     expect(violationFor('packages/log', '@4thtech-io/types')).toMatch(/layering/);
     expect(violationFor('packages/crypto', '@4thtech-io/log')).toMatch(/layering/);

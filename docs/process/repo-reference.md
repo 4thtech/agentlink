@@ -20,6 +20,7 @@ agentlink/
 │  ├─ types/                     # shared types + zod schemas
 │  ├─ log/                       # redacting logger + secret-canary test helper (zero dependencies)
 │  ├─ crypto/                    # key derivation, HPKE, AES-GCM, STREAM, JCS, BIP-340, EIP-712
+│  ├─ occ-v2-abi/                # vendored contracts release (ABIs, testnet addresses, manifest; private, D-83)
 │  ├─ chain/                     # viem clients, OCC v2 bindings (ABIs from @4thtech-io/occ-v2-abi)
 │  ├─ transport-nostr/           # NIP-17/59 gift wraps, relay pool, sync
 │  ├─ storage/                   # inline, drop and S3 (aws4fetch) adapters; Drive/Dropbox/OneDrive connectors (M2)

@@ -1,0 +1,33 @@
+{
+  "name": "@4thtech-io/occ-v2-abi",
+  "version": "0.0.0",
+  "private": true,
+  "description": "OCC v2 contract ABIs and testnet addresses, imported from the private contracts repository's tagged releases and verified against their SHA-256 manifest. Bundled into the CLI; never published (D-83).",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/4thtech/agentlink.git",
+    "directory": "packages/occ-v2-abi"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!dist/tsconfig.tsbuildinfo"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "import": "node ../../tools/occ-v2-abi/import.mjs"
+  }
+}
