@@ -4,6 +4,7 @@
     { "path": "packages/types" },
     { "path": "packages/log" },
     { "path": "packages/crypto" },
+    { "path": "packages/occ-v2-abi" },
     { "path": "packages/chain" },
     { "path": "packages/transport-nostr" },
     { "path": "packages/storage" },

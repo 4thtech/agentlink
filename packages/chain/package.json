@@ -34,6 +34,8 @@
   },
   "dependencies": {
     "@4thtech-io/types": "workspace:*",
-    "@4thtech-io/crypto": "workspace:*"
+    "@4thtech-io/crypto": "workspace:*",
+    "@4thtech-io/occ-v2-abi": "workspace:*",
+    "viem": "2.57.4"
   }
 }
