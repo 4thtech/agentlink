@@ -40,7 +40,7 @@ import type {
 import { defaultPolicy } from '@agentlink/types';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createContactsHandler } from '../src/commands/contacts.js';
 import { contactsManageHandler, type OwnerCommandDeps } from '../src/commands/owner/index.js';
 import { createDeps } from '../src/commands/shared.js';
@@ -51,6 +51,11 @@ import type { TerminalContext } from '../src/runtime/guards.js';
 import type { OpenedAgent } from '../src/runtime/open-agent.js';
 import type { ToolContext } from '../src/tools/index.js';
 import { TOOLS } from '../src/tools/registry.js';
+
+// Each test pairs three agents over the relay double first (two full pairings with real crypto):
+// on the shared CI runner that setup alone took over 10 s (PR #245 run 39106091704, "Hook timed out
+// in 10000ms"). Same assertions, only more time.
+vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 
 // --- doubles (as in send-inbox-mcp.test.ts) -----------------------------------------------------------
 
