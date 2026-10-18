@@ -150,6 +150,8 @@ async function setUpPasskey(page: Page): Promise<void> {
 }
 
 const card = (page: Page, n: number) => page.locator(`section[data-approval="${id(n)}"]`);
+/** The wrong-code backoff's free attempts (approval-server.ts), pinned. */
+const FREE_ATTEMPTS = 3;
 const XSS = '<img src=x onerror="window.__xss=1"><script>window.__xss=2</script>';
 
 describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', () => {
@@ -367,17 +369,22 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     await page.goto(await link());
     await page.goto(server.approvalUrl(id(1)));
     const box = card(page, 1);
-    for (let i = 0; i <= FREE_PRESENCE_ATTEMPTS; i += 1) {
+    // Pinned (IR-M1-11a-1 L-1): without the exported constant this fails instead of looping zero times.
+    expect(FREE_PRESENCE_ATTEMPTS).toBe(FREE_ATTEMPTS);
+    let tries = 0;
+    for (let i = 0; i <= FREE_ATTEMPTS; i += 1) {
+      tries += 1;
       await box.getByRole('button', { name: 'Approve', exact: true }).click();
       await page.getByLabel('Owner code or owner passphrase').fill('AAAA BBBB CCCC DDDD EEEE FFFF');
       await page.getByRole('button', { name: 'Confirm approval' }).click();
       await box
-        .getByText(i < FREE_PRESENCE_ATTEMPTS ? "That didn't match" : 'Too many wrong tries.', {
+        .getByText(i < FREE_ATTEMPTS ? "That didn't match" : 'Too many wrong tries.', {
           exact: false,
         })
         .last()
         .waitFor();
     }
+    expect(tries).toBe(FREE_ATTEMPTS + 1);
     expect(source.applied).toEqual([]);
   }, 120_000);
 
@@ -389,7 +396,9 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     const { link } = await start(source);
     const { page } = await pageWithAuthenticator(true);
     await page.goto(await link());
-    await page.getByText('Set up your owner key first', { exact: false }).waitFor();
+    await page.getByText('Set up your owner code first', { exact: false }).waitFor();
+    // 11 §5.1: never "owner key" in the default UI.
+    expect(await page.getByText('owner key', { exact: false }).count()).toBe(0);
     expect(await page.getByRole('button', { name: 'Set up a passkey' }).count()).toBe(0);
     expect(await page.getByRole('button', { name: /^Approve/ }).count()).toBe(0);
   }, 60_000);

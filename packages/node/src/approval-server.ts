@@ -14,7 +14,7 @@
 //   127.0.0.1 only and a fixed `ipv6_unavailable` event. Requests from a non-loopback peer are refused.
 // - M1-11a, the session link is one-shot (IR-M1-8d-1 L-3): each `open()` mints a new random 256-bit
 //   link token, in memory only, put in the URL it opens (`/?t=…`). The first request with it
-//   exchanges it for a new random session secret in an HttpOnly, SameSite=Lax cookie scoped to this
+//   exchanges it for a new random session secret in an HttpOnly, SameSite=Strict cookie scoped to this
 //   port's name and redirects to the same path without the token; the link token is then gone, so a
 //   link left in browser history never opens the page again. An unused link dies after
 //   SESSION_LINK_LIFETIME_MS. At most MAX_LINKS links and MAX_SESSIONS sessions are held (the oldest
@@ -54,7 +54,9 @@
 //   answers 429 `wait` with Retry-After before its body is read or the owner store is opened; the
 //   wait doubles with each further failure up to MAX_PRESENCE_BACKOFF_S, and a success resets it.
 //   It lives in memory: a same-user process that restarts the server is the accepted G-1 residual,
-//   and the KDF cost still bounds each guess.
+//   and the KDF cost still bounds each guess. It is this server's counter only: `agentlink approve`
+//   in the owner's own terminal is a separate process and is never held back by it (IR-M1-11a-1
+//   L-3), so a process that keeps the page waiting cannot lock the owner out.
 //
 // Out of scope and accepted (G-1, D-67; 04 §2.5): a same-user process that reads memory, modifies the
 // installed package, or serves a look-alike page on another localhost port. Cookies are not isolated
@@ -1050,7 +1052,10 @@ export async function startApprovalServerWith(
         if (!consumeLink(t)) return reject(res, 401, 'token');
         res.setHeader(
           'Set-Cookie',
-          `${cookieName}=${newSession()}; HttpOnly; SameSite=Lax; Path=/`,
+          // SameSite=Strict (IR-M1-11a-1 L-2): the OS opens the link as a top-level navigation
+          // with no initiator, which counts as same-site. No `Secure`: WebKit drops a Secure cookie
+          // set over http://localhost (checked with Playwright WebKit), so the page would not open.
+          `${cookieName}=${newSession()}; HttpOnly; SameSite=Strict; Path=/`,
         );
         res.setHeader('Location', path);
         sendText(res, 303, 'text/plain; charset=utf-8', '');

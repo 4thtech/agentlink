@@ -35,7 +35,7 @@ export const UI_STRINGS = Object.freeze({
   desktopNote: 'The desktop app protects approvals more strongly.',
   needsOwnerTitle: 'Set up AgentLink',
   needsOwner:
-    'Set up your owner key first: run agentlink owner init in your own terminal. Until then, nothing can be approved here.',
+    'Set up your owner code first: run agentlink owner init in your own terminal. Until then, nothing can be approved here.',
   passkeyTitle: 'Approve with a passkey',
   passkeyIntro:
     'Set up a passkey to approve with Touch ID, Face ID or Windows Hello instead of typing your owner code. Your owner code keeps working.',
@@ -90,7 +90,7 @@ export const UI_STRINGS = Object.freeze({
   presenceRequired: 'Enter your owner code or owner passphrase. Nothing was changed.',
   presenceRejected:
     "That didn't match your passkey, owner code or owner passphrase. Nothing was changed.",
-  wait: 'Too many wrong tries. Wait {seconds} seconds, then try again. Nothing was changed.',
+  wait: 'Too many wrong tries. Wait {seconds} seconds, then try again. Nothing was changed. You can also run agentlink approve in your own terminal.',
   notPending: 'This request is no longer waiting for you.',
   listNotPending:
     'Some of these requests are no longer waiting for you. Nothing was changed. Review the list again.',
@@ -100,7 +100,7 @@ export const UI_STRINGS = Object.freeze({
   busy: 'Another approval is being confirmed. Try again in a moment.',
   refused: 'This decision was not applied. Nothing was changed.',
   listRefused: 'These decisions were not applied. Nothing was changed. Review the list again.',
-  needsSetup: 'Set up your owner key first: run agentlink owner init in your own terminal.',
+  needsSetup: 'Set up your owner code first: run agentlink owner init in your own terminal.',
   notUsed: "The passkey wasn't used. Nothing was changed. You can enter your owner code instead.",
   passkeyRegistered: 'Passkey set up. Next time, approve with your passkey.',
   passkeyPresenceRequired: 'Enter your owner code. Nothing was changed.',

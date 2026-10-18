@@ -411,7 +411,7 @@ describe('binding and the session token (08 §1)', () => {
     const set = res.headers['set-cookie']?.[0] ?? '';
     expect(set).toContain(`agentlink_${String(h.port)}=`);
     expect(set).toContain('HttpOnly');
-    expect(set).toContain('SameSite=Lax');
+    expect(set).toContain('SameSite=Strict');
     expect(set).toContain('Path=/');
     expect(set).not.toMatch(/Expires|Max-Age/i);
     const cookie = await h.cookie();
