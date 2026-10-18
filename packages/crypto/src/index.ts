@@ -290,3 +290,31 @@ export {
   type KeystoreUnlockSecret,
   type SealOwnerSeedOptions,
 } from './keystore-file.js';
+// M1-1d: ALF1 STREAM file encryption (04 §4, D-80): push-based sealer and opener, Web Streams
+// transforms and whole-buffer helpers. The fixed-nonce-prefix sealer is in the test seam only.
+export {
+  ALF1_DEFAULT_CHUNK_SIZE,
+  ALF1_FILE_KEY_LENGTH,
+  ALF1_HEADER_LENGTH,
+  ALF1_MAX_CHUNKS,
+  ALF1_MAX_CHUNK_SIZE,
+  ALF1_MIN_CHUNK_SIZE,
+  ALF1_NONCE_PREFIX_LENGTH,
+  ALF1_TAG_LENGTH,
+  ALF1_VERSION,
+  alf1DecryptStream,
+  alf1EncryptStream,
+  createAlf1Opener,
+  createAlf1Sealer,
+  openAlf1,
+  sealAlf1,
+  type Alf1Digests,
+  type Alf1Finished,
+  type Alf1OpenOptions,
+  type Alf1Opened,
+  type Alf1Processor,
+  type Alf1Readable,
+  type Alf1Sealed,
+  type Alf1TransformStream,
+  type Alf1Writable,
+} from './stream.js';

@@ -7,6 +7,8 @@
 // - M1-1f: sealKeystoreFile and sealOwnerSeed with a fixed nonce, Argon2id with a secret value (K)
 //   and associated data (X) for the RFC 9106 vector, and pairingDigest for the `labels` vectors.
 // - M1-1k: sealPasskeySeed and sealRecoverySeed with a fixed nonce (and salt).
+// - M1-1d: the ALF1 sealer with a fixed nonce prefix and any chunk size from 1 B to 16 MiB (the
+//   `stream` vectors use 16 and 32 B chunks besides the 1 MiB default).
 // - M1-1g: MemoryKeyStore and MemoryOwnerKeyStore, in-memory KeyStore doubles that hold a seed in
 //   plain memory (below; IR-M1-1g-G2-1 M-2: one test seam, one policy entry).
 //
@@ -67,6 +69,7 @@ import {
   type NostrEvent,
   type UnsignedNostrEvent,
 } from './nostr-event.js';
+import { createAlf1SealerAt, type Alf1Processor } from './stream.js';
 import { wipe } from './wipe.js';
 
 export {
@@ -78,6 +81,17 @@ export {
 } from './hpke.js';
 // M1-1l: the three derivations from the CEK (04 §3.3), for the one-case-per-label vectors.
 export { deriveKeyCommitment, derivePayloadKey, encryptPayloadWithIv } from './aead.js';
+// M1-1d: a fixed nonce prefix in production would reuse GCM nonces across files under one key.
+export { sealAlf1At as sealAlf1WithNoncePrefix } from './stream.js';
+
+/** M1-1d: a push-based ALF1 sealer with a fixed nonce prefix and chunk size. */
+export function createAlf1SealerWithNoncePrefix(
+  fileKey: Uint8Array,
+  noncePrefix: Uint8Array,
+  chunkSize: number,
+): Alf1Processor {
+  return createAlf1SealerAt(fileKey, noncePrefix, chunkSize, 0);
+}
 
 /**
  * M1-1l (04 §3.3): one of the three derivations from the CEK, chosen by its exact label: the two

@@ -4,10 +4,6 @@
     "eip712-revocation": {
       "card": "M1-1j",
       "phase": "M1b"
-    },
-    "stream": {
-      "card": "M1-1d",
-      "phase": "M1b"
     }
   },
   "cases": {}
