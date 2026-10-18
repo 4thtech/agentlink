@@ -31,6 +31,7 @@ import {
   type S3AdapterConfig,
   type StoredObject,
 } from './index.js';
+import { MiB, RETAINED_LIMIT, forceGc, rss, sampler } from './memory-gate.fixture.js';
 
 // The package has no Node type definitions (it runs in Workers too); only this test reads the environment.
 const env: Record<string, string | undefined> =
@@ -70,7 +71,6 @@ function target(): Target {
 const hexOf = (bytes: Uint8Array): string => encodeHex(sha256(bytes));
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 const inFuture = (ms: number): Date => new Date(Date.now() + ms);
-const MiB = 1024 * 1024;
 const toBase64 = (bytes: Uint8Array): string => {
   const url = encodeBase64url(bytes).replace(/-/g, '+').replace(/_/g, '/');
   return url + '='.repeat((4 - (url.length % 4)) % 4);
@@ -96,57 +96,15 @@ function randomStream(total: number, failAfter?: number): ReadableStream<Uint8Ar
   });
 }
 
-interface NodeProcess {
-  memoryUsage: {
-    (): { readonly heapUsed: number; readonly arrayBuffers: number };
-    rss(): number;
-  };
-}
-const nodeProcess = (globalThis as { process?: NodeProcess }).process;
-const rss = (): number => nodeProcess?.memoryUsage.rss() ?? 0;
-/** JS heap in use plus ArrayBuffer memory: the buffers the process actually holds (M1-1d gate). */
-const held = (): number => {
-  const m = nodeProcess?.memoryUsage();
-  return m === undefined ? 0 : m.heapUsed + m.arrayBuffers;
-};
-
-/** `gc()` when the process runs with --expose-gc (NODE_OPTIONS=--expose-gc), else undefined. */
-const forceGc = (globalThis as { gc?: () => void }).gc;
-
-/**
- * Peak memory, sampled as bytes flow: RSS and held (heapUsed + arrayBuffers) every 32 calls, and,
- * when `gc()` is exposed, held right after a forced collection every 256 calls (`peakRetained`), which
- * measures what the pipeline keeps alive rather than garbage the collector has not reached yet.
- */
-function sampler() {
-  let peakRss = rss();
-  let peakHeld = held();
-  let peakRetained = 0;
-  let calls = 0;
-  return {
-    sample(force = false): void {
-      calls += 1;
-      if (!force && (calls & 31) !== 0) return;
-      peakRss = Math.max(peakRss, rss());
-      peakHeld = Math.max(peakHeld, held());
-      if (forceGc !== undefined && (force || (calls & 255) === 0)) {
-        forceGc();
-        peakRetained = Math.max(peakRetained, held());
-      }
-    },
-    peaks: () => ({ peakRss, peakHeld, peakRetained }),
-  };
-}
-
 /** `total` bytes of varied plaintext in 64 KiB blocks, hashed as they are produced. */
-function plaintextStream(total: number, onPull: () => void) {
+function plaintextStream(total: number, onPull: () => Promise<void>) {
   const hasher = createSha256();
   const BLOCK = 64 * 1024;
   let sent = 0;
   let digest: string | undefined;
   const stream = new ReadableStream<Uint8Array>({
-    pull(controller) {
-      onPull();
+    async pull(controller) {
+      await onPull();
       if (sent >= total) {
         controller.close();
         return;
@@ -162,14 +120,14 @@ function plaintextStream(total: number, onPull: () => void) {
 }
 
 /** A sink that hashes what it is given and records whether it was committed. */
-function hashSink(onWrite: () => void) {
+function hashSink(onWrite: () => Promise<void>) {
   const hasher = createSha256();
   let size = 0;
   let state = 'open';
   let digest: string | undefined;
   const sink: ProvisionalSink = {
     async write(chunk) {
-      onWrite();
+      await onWrite();
       hasher.update(chunk);
       size += chunk.length;
     },
@@ -340,7 +298,7 @@ describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}
       expiresAt: inFuture(DAY_MS),
     });
     created.push(sealed.object);
-    up.sample(true);
+    await up.sample(true);
     const s3 = make();
     const response = await fetch(await s3.presignGet(sealed.object, inFuture(60 * 60 * 1000)), {
       redirect: 'error',
@@ -372,7 +330,7 @@ describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}
       ciphertextSha256: sealed.ciphertextSha256,
       plaintextSha256: sealed.plaintextSha256,
     }).catch((e: unknown) => e);
-    down.sample(true);
+    await down.sample(true);
     await s3.delete(sealed.object);
     const [u, d] = [up.peaks(), down.peaks()];
     return {
@@ -412,10 +370,14 @@ describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}
   // - RSS growth of the 1 GiB run < 128 MiB (the card's acceptance);
   // - reported, not gated: growth(1 GiB) - growth(256 MiB). RSS noise on macOS made it 26-46 MiB
   //   locally against -8 MiB on CI (IR-M1-6b-2-2), while retained-after-GC held at 48-55 MiB;
-  // - held memory (heapUsed + arrayBuffers) right after a forced collection < 64 MiB (the M1-1d
-  //   limit): what the pipeline keeps alive. vitest.config.ts runs this file with --expose-gc; without
-  //   gc() the test fails rather than skip the check. Unforced held memory is reported only: it
-  //   mostly measures garbage the collector has not reached yet (flaked at 65 MiB, IR-M1-6b-2-1 H-1).
+  // - held memory (heapUsed + arrayBuffers, the whole test process) after a settled forced collection
+  //   < 64 MiB (the M1-1d limit): what the pipeline keeps alive. Settled means repeated gc() with a
+  //   yield in between, then the reading (settledHeld in memory-gate.fixture.ts, whose
+  //   negative control is memory-gate.test.ts): a reading right after one gc() still
+  //   held released-but-unfreed ArrayBuffers and flaked at 73 MiB on CI. vitest.config.ts runs this
+  //   file with --expose-gc; without gc() the test fails rather than skip the check. Unforced held
+  //   memory is reported only: it mostly measures garbage the collector has not reached yet (flaked
+  //   at 65 MiB, IR-M1-6b-2-1 H-1).
   // The figures are logged on every run (numbers only, through @4thtech-io/log), and go into the
   // assertion messages, an annotation and the JSON report's `meta`.
   // MinIO only: the R2 job runs daily on a shared test bucket and need not move a GiB each day. The
@@ -426,7 +388,6 @@ describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}
       task,
     }) => {
       const RSS_GROWTH_LIMIT = 128 * MiB;
-      const RETAINED_LIMIT = 64 * MiB;
       const mib = (n: number): number => Math.round(n / MiB);
       expect(forceGc, 'run with --expose-gc (vitest.config.ts integration project)').toBeTypeOf(
         'function',
