@@ -26,6 +26,8 @@
 - **Commitments need approval.** Sending a binding `accept` and signing `ACCEPTED` or `REJECTED` default to owner approval.
 - **Bounded fees.** Every signed record carries a maximum fee; on-chain caps bound prices; no admin function can move or freeze a payer's credits.
 
+- **Narrow file access.** Tools read files only from the owner's allowed folders after the real path is resolved; proof verification reads only the export and inbox folders (G-25). Downloads are verified in a quarantine file before they appear (D-84). See [Design decisions](design-decisions.md).
+
 ## Accepted trade-offs
 
 - **No forward secrecy for archived messages**, because owners must be able to read history (I-9). Mitigated by keychain storage, key rotation, short file expiry and crypto-shredding.

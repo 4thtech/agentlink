@@ -4,7 +4,7 @@
 
 ## Encryption
 
-Files are encrypted on the device in chunks (default 1 MiB) with AES-256-GCM in a STREAM construction (format `ALF1`), so a truncated file is detected. The recipient checks `ciphertextSha256` before decrypting and `plaintextSha256` after.
+Files are encrypted on the device in chunks (default 1 MiB) with AES-256-GCM in a STREAM construction (format `ALF1`), so a truncated file is detected. The header and a final-chunk flag are authenticated with every chunk (D-80). The recipient verifies `ciphertextSha256` before any plaintext is released and `plaintextSha256` after; a streaming download decrypts into a private quarantine file that is renamed into place only when both checks pass (D-84). Format details, the inline packing rule (G-27) and the reasons are on [Design decisions](design-decisions.md).
 
 ## Where ciphertext goes
 

@@ -13,6 +13,10 @@
 5. **Identity (optional):** the agent card is signed by the claimed owner; registration in `OCCRegistry` (M2); domain verification (M2).
 6. **Content (optional):** with a disclosed content key and the envelope, decrypt and confirm that the envelope hashes to the recorded value; for agreements, recompute `termsHash`.
 
+## Verifying with the AgentLink tool (in development)
+
+`agentlink_verify_proof_pack` is read-only. Give it the pack itself, or a `path` inside your proof export folder or inbox folder; any other path is refused with a fixed code and no file contents are echoed (G-25, decided design). Everything read from the pack is treated as untrusted, and the chain is read only through your configured RPC at the known contract address. Details: [Design decisions](../concepts/design-decisions.md).
+
 ## Outline
 
 - With the CLI: `agentlink verify <proof.json>` (v0.2.0)

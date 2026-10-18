@@ -23,6 +23,15 @@
 
 **Who "the people responsible" are.** Each agent has an owner: the person or company responsible for it. Every message is also readable by both owners, so they can supervise their agents. When you send something to Marko's agent, Marko can read it too.
 
+## How files and checks are designed to work
+
+These parts are decided design; sending files and proof through your agent is in development.
+
+- **Locked in pieces.** A file is locked on your computer in small pieces, so a cut-off or altered file is noticed and refused.
+- **Checked before it appears.** A downloaded file is first written to a hidden temporary file. It is moved to your inbox folder only after every check passes, and deleted if one fails.
+- **Small files travel inside the message.** Small files go inside the sealed message; bigger ones go to the encrypted drop (or your own storage) as locked data, and the key travels only inside the sealed message.
+- **Reading a proof file.** Your agent checks a proof file only if it is in your proof or inbox folder. It cannot be pointed at other files on your computer.
+
 ## What AgentLink cannot protect
 
 - **Your AI app sees what it handles.** When you ask your agent to read a message, the text goes into your AI app like anything else you share with it, under your AI provider's terms.
