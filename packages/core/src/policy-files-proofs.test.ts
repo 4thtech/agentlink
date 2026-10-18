@@ -10,13 +10,13 @@ import {
 } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { CoreError } from './errors.js';
+import { decidePath, isInsideFolder } from './path-guard.js';
 import {
   BUDGET_WINDOW_SECONDS,
   budgetSpentMicros,
   evaluate,
   evaluateFileSend,
   evaluateProof,
-  isInsideFolder,
   type BudgetEntryView,
   type BudgetLedgerView,
   type EffectivePolicy,
@@ -698,16 +698,53 @@ describe('files: send (06 §2.3, §3, D-48)', () => {
   });
 
   it('isInsideFolder is a strict descendant check on resolved paths', () => {
-    expect(isInsideFolder('/a/b/c', '/a/b')).toBe(true);
-    expect(isInsideFolder('/a/b/c', '/a/b/')).toBe(true);
-    expect(isInsideFolder('/a/bc', '/a/b')).toBe(false);
-    expect(isInsideFolder('/a/b', '/a/b')).toBe(false);
-    expect(isInsideFolder('/a/b/./c', '/a/b')).toBe(false);
-    expect(isInsideFolder('/a/b//c', '/a/b')).toBe(false);
-    expect(isInsideFolder('a/b/c', 'a/b')).toBe(false);
-    expect(isInsideFolder('/a/b/c', 'relative')).toBe(false);
-    expect(isInsideFolder('C:\\Users\\u\\Work\\x.pdf', 'C:\\Users\\u\\Work')).toBe(true);
-    expect(isInsideFolder('C:\\Users\\u\\Workshop\\x.pdf', 'C:\\Users\\u\\Work')).toBe(false);
+    const strict = { self: 'outside' } as const;
+    expect(isInsideFolder('/a/b/c', '/a/b', strict)).toBe(true);
+    expect(isInsideFolder('/a/b/c', '/a/b/', strict)).toBe(true);
+    expect(isInsideFolder('/a/bc', '/a/b', strict)).toBe(false);
+    expect(isInsideFolder('/a/b', '/a/b', strict)).toBe(false);
+    expect(isInsideFolder('/a/b/./c', '/a/b', strict)).toBe(false);
+    expect(isInsideFolder('/a/b//c', '/a/b', strict)).toBe(false);
+    expect(isInsideFolder('a/b/c', 'a/b', strict)).toBe(false);
+    expect(isInsideFolder('/a/b/c', 'relative', strict)).toBe(false);
+    expect(isInsideFolder('C:\\Users\\u\\Work\\x.pdf', 'C:\\Users\\u\\Work', strict)).toBe(true);
+    expect(isInsideFolder('C:\\Users\\u\\Workshop\\x.pdf', 'C:\\Users\\u\\Work', strict)).toBe(
+      false,
+    );
+  });
+
+  // M1-7f: the policy engine and the path guard use the one helper, and agree on every path but the
+  // folder itself (the policy engine: not inside; the path guard: inside).
+  it.each([
+    ['/home/u/Work/report.pdf', true],
+    ['/home/u/Work/a/b/c.txt', true],
+    ['/home/u/Work', false],
+    ['/home/u/Work/', false],
+    ['/home/u/Workshop/x.pdf', false],
+    ['/home/u/work/x.pdf', false],
+    ['/home/u/Work/../x.pdf', false],
+    ['/home/u/Work//x.pdf', false],
+    ['home/u/Work/x.pdf', false],
+  ] as const)('evaluateFileSend and decidePath agree with isInsideFolder: %s', (path, inside) => {
+    expect(isInsideFolder(path, WORK, { self: 'outside' })).toBe(inside);
+    const sent = evaluateFileSend(
+      withFolder(),
+      { kind: 'file.send', sizeBytes: 10, realpath: path },
+      fileCtx(),
+    );
+    expect(sent.decision === 'allow').toBe(inside);
+    if (!inside) expect(sent).toEqual({ decision: 'deny', reason: 'outside_folder' });
+    const guarded = decidePath({
+      requested: path,
+      resolved: path,
+      allowedFolders: [WORK],
+      protectedRoots: [],
+      flavor: 'posix',
+    });
+    // The path guard counts the folder itself as inside (it then reads no file there).
+    const self = isInsideFolder(path, WORK, { flavor: 'posix', self: 'inside' });
+    expect(guarded.ok).toBe(self);
+    expect(self).toBe(inside || path === WORK || path === `${WORK}/`);
   });
 });
 
