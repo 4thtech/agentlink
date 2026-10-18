@@ -506,9 +506,11 @@ jobs:
         shell: bash
         run: pnpm exec turbo run build --filter='@agentlink/node...'
 
+      # M1-8e: the real-browser passkey test needs Playwright's Chromium, which only the `checks`
+      # job installs (and there a missing browser fails the test). It is excluded here only.
       - name: Run the @agentlink/node tests
         shell: bash
-        run: pnpm --filter @agentlink/node exec vitest run
+        run: pnpm --filter @agentlink/node exec vitest run --exclude src/approval-passkey-browser.test.ts
 
   # M1-5b-b: the Node relay connector's Docker suite (packages/node/src/relay-docker.test.ts): the
   # pool and the outbox against real relays, strfry and rnostr, pinned by digest in the test file.
@@ -551,6 +553,118 @@ jobs:
             const bad = t.filter((x) => x.status !== "passed");
             console.log(`relay-docker.test.ts: ${t.length} tests, ${bad.length} not passed`);
             if (t.length < 4 || bad.length > 0) { console.error("::error::the Docker relay suite must run 4+ tests, all passed"); process.exit(1); }
+          '
+
+  # M1-6a-2: the S3 adapter (packages/storage) against a real MinIO on every pull request, push and
+  # merge-queue run: put, presign, download through the presigned URL, delete, the 7-day presign
+  # cap, expiry and a log canary (packages/storage/src/integration.test.ts, AGENTLINK_STORAGE_IT=minio).
+  # The adapter accepts only https endpoints with a real-looking name, so the job generates a
+  # one-day self-signed certificate for `minio.agentlink-ci.test`, maps that name to 127.0.0.1 and
+  # trusts the certificate through NODE_EXTRA_CA_CERTS; the adapter is not changed for CI. MinIO
+  # runs with `docker run` (a service container cannot mount the certificate or take arguments)
+  # from an image pinned by digest (the legacy Bitnami build, because the upstream project no
+  # longer publishes an image we can pin; a bump is its own reviewed change). Its root credentials
+  # are random per run and exist only in this job. No repository secret is used or needed, so a
+  # fork pull request runs it too. MinIO's own container log is never printed once the tests start
+  # (it would hold request paths). In `ci-gate`'s `needs`.
+  storage-minio:
+    name: storage-minio
+    needs: detect
+    if: needs.detect.outputs.has_skeleton == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      MINIO_HOST: minio.agentlink-ci.test
+      MINIO_IMAGE: docker.io/bitnamilegacy/minio:2025.7.23@sha256:8935e75fa5d11295c17171e4aa49efe390a1193cd7f12e4d21b92af9ffef09d7
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build the workspace dependencies of @agentlink/storage
+        run: pnpm exec turbo run build --filter='@agentlink/storage...'
+
+      - name: Create the certificate, the credentials and the host entry
+        shell: bash
+        run: |
+          set -euo pipefail
+          certs="$RUNNER_TEMP/minio-certs"
+          mkdir -p "$certs"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -keyout "$certs/private.key" -out "$certs/public.crt" -subj "/CN=${MINIO_HOST}" -addext "subjectAltName=DNS:${MINIO_HOST}" 2> /dev/null
+          chmod 644 "$certs/private.key" "$certs/public.crt"
+          user="ci$(openssl rand -hex 6)"
+          pass="$(openssl rand -hex 16)"
+          echo "::add-mask::$user"
+          echo "::add-mask::$pass"
+          {
+            echo "MINIO_CERTS=$certs"
+            echo "MINIO_USER=$user"
+            echo "MINIO_PASS=$pass"
+            echo "NODE_EXTRA_CA_CERTS=$certs/public.crt"
+          } >> "$GITHUB_ENV"
+          echo "127.0.0.1 ${MINIO_HOST}" | sudo tee -a /etc/hosts > /dev/null
+
+      - name: Start MinIO with TLS
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name minio --publish 127.0.0.1:9000:9000 \
+            --env MINIO_ROOT_USER="$MINIO_USER" --env MINIO_ROOT_PASSWORD="$MINIO_PASS" \
+            --env MINIO_SCHEME=https --env MINIO_SKIP_CLIENT=yes \
+            --volume "$MINIO_CERTS:/certs:ro" "$MINIO_IMAGE" > /dev/null
+          for _ in $(seq 1 60); do
+            if curl --silent --fail --cacert "$MINIO_CERTS/public.crt" "https://${MINIO_HOST}:9000/minio/health/ready" > /dev/null; then
+              echo "MinIO is ready."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::MinIO did not become ready"
+          docker logs --tail 40 minio || true
+          exit 1
+
+      - name: Run the storage integration test
+        shell: bash
+        env:
+          AGENTLINK_STORAGE_IT: minio
+          AGENTLINK_STORAGE_IT_ENDPOINT: https://minio.agentlink-ci.test:9000
+          AGENTLINK_STORAGE_IT_BUCKET: agentlink-it
+          AGENTLINK_STORAGE_IT_REGION: us-east-1
+        run: |
+          set -euo pipefail
+          export AGENTLINK_STORAGE_IT_ACCESS_KEY_ID="$MINIO_USER" AGENTLINK_STORAGE_IT_SECRET_ACCESS_KEY="$MINIO_PASS"
+          out="$RUNNER_TEMP/storage-it.log"
+          report="$RUNNER_TEMP/storage-it.json"
+          echo "STORAGE_IT_REPORT=$report" >> "$GITHUB_ENV"
+          set +e
+          pnpm --filter @agentlink/storage exec vitest run src/integration.test.ts --reporter=default --reporter=json --outputFile.json="$report" > "$out" 2>&1
+          code=$?
+          set -e
+          # The log canary of the job: the output must hold no URL query string and no credential.
+          for needle in 'X-Amz-' "$MINIO_USER" "$MINIO_PASS"; do
+            if grep -qF -- "$needle" "$out"; then
+              echo "::error::the test output holds a presigned URL part or a credential; it is not printed"
+              exit 1
+            fi
+          done
+          cat "$out"
+          exit "$code"
+
+      - name: Check that the integration test ran in full, with no skipped test
+        run: |
+          node -e '
+            const r = JSON.parse(require("node:fs").readFileSync(process.env.STORAGE_IT_REPORT, "utf8"));
+            const f = r.testResults.filter((x) => /integration\.test\.ts$/.test(x.name));
+            const t = f.length === 1 ? f[0].assertionResults : [];
+            const bad = t.filter((x) => x.status !== "passed");
+            console.log(`integration.test.ts: ${t.length} tests, ${bad.length} not passed`);
+            if (t.length < 5 || bad.length > 0) { console.error("::error::the storage integration suite must run 5+ tests, all passed"); process.exit(1); }
           '
 
   # M1-9c-c (IR-M1-9c-1 F07; D-76, 06 §1): the neutral-platform bundle check. A plain Linux runner
@@ -696,7 +810,7 @@ jobs:
     # merge with `main`. Only the latter may satisfy the required check `ci-gate`, so a feature
     # branch push publishes `ci-gate (push)` instead.
     name: ${{ (github.event_name == 'push' && github.ref != 'refs/heads/main') && 'ci-gate (push)' || 'ci-gate' }}
-    needs: [detect, checks, vectors, keychain, path-guard, context-budget, relays-docker, bundle-check, changesets, e2e-deterministic]
+    needs: [detect, checks, vectors, keychain, path-guard, context-budget, relays-docker, storage-minio, bundle-check, changesets, e2e-deterministic]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

@@ -237,6 +237,7 @@ function getAgent(address agentEvm) external view returns (AgentEntry memory);
 - Fee: `REGISTER`, charged to `card.ownerEvm`.
 - A higher `keyEpoch` from the same owner replaces the entry (new registration and fee).
 - **Revocation (D-81).** `struct Revocation { address agentEvm; uint32 keyEpoch; uint256 nonce; uint64 deadline; }` (`keyEpoch` type aligned to the stored `uint32`), signed by `ownerEvm` (EIP-712, OCC v2 chain domain; ERC-1271 accepted). The signer must equal the stored `ownerEvm` of `agentEvm`, otherwise `InvalidSignature()`. `Registration` and `Revocation` nonces are random, single-use per owner, tracked in `usedNonces[ownerEvm][nonce]` and shared by both types. Reverts if expired (`Expired()`), the nonce is used (`NonceUsed()`), `keyEpoch` ≠ stored epoch (`EpochMismatch()`), the agent is not registered (`AgentNotRegistered()`) or is already revoked (`AlreadyRevoked()`). Revoke works while paused (§5.1).
+- **Revocation JSON form (proposed, owner confirms at merge; 04 §2.4.1).** As the §3.1 JSON form of `Record` and `Receipt`: exactly the four keys `agentEvm`, `keyEpoch`, `nonce` and `deadline`; `agentEvm` is `0x` + 40 lowercase hex; `nonce` is a canonical decimal string (`^(0|[1-9][0-9]*)$`) of at most 2^256 − 1; `keyEpoch` (at most 2^32 − 1) and `deadline` (at most 2^53 − 1) are JSON integers. Every other form is rejected, never normalised.
 - Stores `{ownerEvm, cardHash, keyEpoch, registeredAt, revoked}`; emits full card fields in `AgentRegistered`.
 - ERC-8004 bridge (P2).
 

@@ -45,7 +45,11 @@ export type NodeKeyStoreErrorCode =
   /** A policy version outside [0, 2^53 - 1] was given to the mark (M1-8g). */
   | 'policy_version_invalid'
   /** The mark did not read back as raised after the write (M1-8g). */
-  | 'policy_mark_not_raised';
+  | 'policy_mark_not_raised'
+  /** M1-8e: a localhost passkey is already set up for this OS user (one in M1b); never replaced. */
+  | 'owner_passkey_exists'
+  /** M1-8e: the authenticator returned no PRF output; nothing is stored, the owner code stays. */
+  | 'passkey_unsupported';
 
 export class NodeKeyStoreError extends Error {
   readonly code: NodeKeyStoreErrorCode;

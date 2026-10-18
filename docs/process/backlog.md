@@ -1032,7 +1032,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - Review note (IR-M1-1i-1 L1/L2/L3, 2026-10-17): record the Registration domain interpretation (Registry as `verifyingContract` under `{OCC, "2"}`) in the open spec points, since a different choice on the contracts side changes every Registration digest; record what remains for the parity job (M1-3d) so the card is not closed early; uint64 deadlines above 2^53-1 are out of JSON scope by design.
 
 #### M1-1i-b · Independent test vectors: STREAM and revoke (new, split from M1-1i on 2026-10-17)
-- **Status:** backlog (unblocked: G-26 resolved by D-80, G-20 by D-81) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in-progress (vectors in review) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/
 - **Depends on:** M1-1i (G-26 resolved by D-80; G-20 resolved by D-81)
 - **Spec:** 04 §4; 05 §4; `development-process.md` §9.1
@@ -1040,7 +1040,8 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Scope:**
   - Same rules and generators as M1-1h and M1-1i (written by a session that does not implement the TypeScript code).
   - Suite `stream` (pending under M1-1d): STREAM `ALF1` vectors for empty, 1 B, exactly 1 chunk, chunk + 1 and multi-chunk plaintexts, with the AAD `header (17 B) ‖ u8(isFinal)` (04 §4, D-80), plus the tamper rejections of M1-1d.
-  - EIP-712 vectors for the 05 §4 `Revocation` struct (D-81), and the shared `Registration`/`Revocation` nonce cases, in `eip712-proof` (or a new suite if `eip712-proof` is no longer pending).
+  - EIP-712 vectors for the 05 §4 `Revocation` struct (D-81), and the shared `Registration`/`Revocation` nonce cases, in `eip712-proof` (or a new suite if `eip712-proof` is no longer pending). `eip712-proof` is implemented (M1-1j, #221), so they are the new suite `eip712-revocation` (pending under M1-1j). Generators `tools/vectors/generate_stream.py` and `tools/vectors/generate_eip712_revocation.py`.
+  - Spec rules this card proposed (owner confirms at merge; 04 §4, §2.4.1 and 05 §4, each marked proposed): the ALF1 version byte is `0x01` only; a plaintext of an exact multiple of `chunkSize` ends with a full final chunk, and an empty final chunk exists only for the empty file (33 bytes); senders use `chunkSize` 1 MiB and recipients accept 1 ≤ `chunkSize` ≤ 16 MiB; the `Revocation` JSON form follows 05 §3.1 (lowercase `agentEvm`, decimal-string `nonce`, JSON-integer `keyEpoch` ≤ 2^32 − 1 and `deadline` ≤ 2^53 − 1, exactly four keys). The seal vectors also use 16 and 32 B chunks through M1-1d's test seam.
 - **Acceptance:**
   - Every case records generator, version and inputs; regeneration reproduces the files byte for byte.
 
@@ -1108,7 +1109,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Web-Streams encrypt/decrypt with bounded memory: header `"ALF1" ‖ u8 version ‖ u32be chunkSize ‖ noncePrefix(8)`; chunk nonce = noncePrefix ‖ u32be(index); AAD = header (17 B) ‖ u8(isFinal) (D-80); default chunk 1 MiB.
   - Incremental SHA-256 of ciphertext and plaintext while streaming; chunk-size bounds and maximum chunk count enforced.
 - **Acceptance:**
-  - M1-1i-b STREAM vectors pass in all runtimes.
+  - M1-1i-b STREAM vectors (suite `stream`) pass in all runtimes: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`.
   - Dropped final chunk, reordered, duplicated or appended chunks, bit flips and header tampering all fail (tests).
   - 1 GiB encrypt + decrypt in Node with RSS growth < 64 MiB (slow-tagged benchmark test).
 
@@ -1136,7 +1137,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - `recordStructHash`; recipient commitment `keccak256(abi.encode(recipientAgentEvm, salt))`.
   - EIP-3009 `ReceiveWithAuthorization` typed data (used in M3-4b); the token's domain is read from chain, never hard-coded.
 - **Acceptance:**
-  - Vector suite `eip712-proof` (M1-1i): its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares; the contracts repo's parity job passes against the same commit (M1-3d). The revoke vectors come from M1-1i-b (D-81).
+  - Vector suite `eip712-proof` (M1-1i): its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares; the contracts repo's parity job passes against the same commit (M1-3d). The revoke vectors come from M1-1i-b (D-81): suite `eip712-revocation`, whose harness module M1-1j registers and removes from `test-vectors/pending-suites.json` in the same way.
 - Review note (IR-M1-1j-1 L-1..L-4, 2026-10-17): move the EIP-3009 recipient duty into the module header; add a reject path to the harness op; open owner question: is `cardHash` the struct hash or the full digest of the AgentCard?
 
 #### M1-1f · crypto: owner passphrase wrapping, pairing proof, safety code
@@ -1907,7 +1908,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Split (orchestrator, 2026-10-17):** M0-2g (R2 test token) is not done, and the MinIO job touches `.github/**`. This card ships the interface and both adapters with unit tests against an in-memory fake endpoint (no network), handled as S2 (`packages/*`). The MinIO and R2 integration tests move to M1-6a-2. The endpoint check is the 04 §4 raw-string grammar; the DNS-level check comes from the SSRF-safe fetch (M1-15) that the caller injects.
 
 #### M1-6a-2 · storage: MinIO and R2 integration tests (new, split from M1-6a)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (sensitive: `.github/**`) · **Phase:** M1b
+- **Status:** in review (PR pending; M0-2g done: bucket `agentlink-r2-test`, environment `r2-test`) · **Size:** S · **Tier:** Sonnet · **Security:** S1 (sensitive: `.github/**`) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage (integration tests), .github/workflows
 - **Depends on:** M1-6a; M0-2g (R2 bucket and bucket-scoped test token) for the R2 job
 - **Spec:** 07 §5.2; 04 §4 (delivery, expiry); `ci-cd.md`; `audit-rules.md` §2 (sensitive paths)
@@ -2480,7 +2481,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Approving without presence fails; the M1-8c same-user script test also passes against the running server.
 
 #### M1-8e · node: OwnerKeyStore localhost passkey (PRF) path (new, split from M1-8c)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in-review (4thtech/agentlink#247; keychain account `owner-passkey`, one passkey per OS user, registration as its own owner operation, UP/UV and rpIdHash checks: proposed, owner confirms at merge; the file-KeyStore `owner.alkp` lands with M1-8f) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node
 - **Depends on:** M1-8c, M1-8d, M1-1k; gap G-1 accepted as a documented M1 residual (D-67)
 - **Spec:** 04 §2.2, §2.3, §2.5; 08 §1; D-16
@@ -2962,6 +2963,9 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - CI-only `wrangler deploy`; staging on `workers.dev` previews; beta hostname `drop.agentlink.4thtech.io`; R2 bucket bindings per environment.
   - Any Worker signing secret (for GET and PUT URLs) set by the owner with `wrangler secret put`; never in GitHub, logs or sync files.
   - Adds the drop to `release-and-deployment.md`: hostname (§1.1), deployables (§2), Workers pipeline (§4.5), secrets inventory (§6) and rollback matrix (§8).
+  - (IR-M1-27a-1) From M1-27a: bindings `DROP_BUCKET` (R2) and `DROP_STATE` (Durable Object, class `DropState`, with its migration); secret `DROP_URL_KEY` (32 random bytes, base64url) per environment; var `DROP_CORS_ORIGINS` (the console origins).
+  - (IR-M1-27a-1 L-3) Workers paid plan with `limits.cpu_ms` raised (for example 30 000): the commit hashes up to 100 MiB of stored ciphertext, about 0.4 s of CPU; the free plan's 10 ms fails every large commit.
+  - (IR-M1-27a-1 M-2) A Cloudflare rate-limiting rule in front of the drop host (per IP, unauthenticated floods) as the first line, so junk never reaches the Worker's Durable Objects; values recorded in `release-and-deployment.md`.
 - **Acceptance:**
   - **Deploy (D-25):** staging deploy on merge; smoke test (signed upload, GET and DELETE with a test key; an expired GET refused); production automatically once staging smoke is green (`production` environment, D-52); health check after deploy with automatic `wrangler rollback` on failure (rehearsed); deploy record written; nothing runs while `DEPLOY_FREEZE` is set.
   - The production bucket's lifecycle rule (7 days) is read back after each deploy, and so is the drop Worker's logging config (observability and request logging, Tail Workers and Logpush off; 04 §4).
@@ -3421,6 +3425,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - L-3: `hasOwnerOnMachine` reads the whole wrapped item and has no AI-app guard. It is wired nowhere yet; before M1-9u wires it into `doctor` (or anything an agent can run), switch it to a metadata-only existence check.
   - L-4: the node test checks output, errors and the result for the owner code; node itself cannot log (ESLint CONSOLE_SYNTAX), indirect logging from dependencies is not captured.
   - L-5: give the confirmation a real reference: `owner init` should tell the owner to note the owner fingerprint next to the code, and the M1b recovery kit (M1-9h/M1-9i) should print it.
+
+#### M1-9z · CLI: change the owner code (new, live finding 2026-10-17)
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (owner key wrap, I-1, I-4) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/node (`owner-change-code.ts`, `owner-keystore.ts`), apps/cli (`owner change-code`), docs-site `protect-your-approvals.md`
+- **Depends on:** M1-9b, M1-9x
+- **Spec:** 04 §2.8 ("Changing the owner code", proposed, owner confirms at merge), §2.5; 06 §8; 07 §9.3, §9.4
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - Live finding (owner, 2026-10-17): an owner code was exposed (typed into a shell and a chat), and AgentLink had no way to change it.
+  - `agentlink owner change-code` †: TTY only; refused under an AI-app marker before the owner item is read; requires the current owner code (or opted-in passphrase), three tries; the item must unlock to the owner the local cards name, when they name one.
+  - Shows a new generated owner code (the `owner init` rules: once, last four re-typed, screen cleared) and re-wraps the same owner seed in `ALKO` v1 with a fresh salt and nonce. Staged in the keychain account `owner-next`, read back and opened with the new code (same owner), then the `owner` item is replaced (only if unchanged since it was opened) and read back; the seed is never lost on failure.
+  - The owner fingerprint and every agent card stay valid. A recovery-kit `ALKR` blob is never read or changed, and the copy says so.
+- **Acceptance:** tests first (RED commit): success path (new code opens to the same owner, old code refused, fingerprint unchanged); three wrong current codes change nothing; refused under an AI-app marker with no keychain read; crash safety (a failing or dropped replace, and a failing staging write, keep the old code working); no owner code in output other than the one display of the new code, nor in an error.
+- **Notes (IR-M1-9z-1):** round 1 fixes: F1 the copy says to keep the current code until the change finishes, and to discard it only after success; F2 a leftover `owner-next` is noticed by `owner change-code` (finish it with the new code, or clean it up when the current code still opens the owner item) and named by `doctor`; a stale leftover is removed at the next successful run.
 
 #### M1-9y · cli: require Node 22.14+ with a clear message; quiet info logs (new, live finding 2026-10-17)
 - **Status:** done (4thtech/agentlink#235) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b

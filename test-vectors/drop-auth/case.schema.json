@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/drop-auth/case.schema.json",
+  "title": "drop-auth case",
+  "description": "07 \u00a75.4 encrypted drop. `urlMac`: the URL MAC. `authEvent`: the body hash and NIP-01 id of the unsigned kind-27235 event for a request and a drop key. `verify`: accept (with the drop key) or reject (with the reason).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "key",
+            "purpose",
+            "objectId",
+            "part",
+            "expiresAt"
+          ],
+          "properties": {
+            "op": {
+              "const": "urlMac"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "purpose": {
+              "enum": [
+                "put",
+                "get"
+              ]
+            },
+            "objectId": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "part": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$"
+            },
+            "expiresAt": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mac"
+          ],
+          "properties": {
+            "mac": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "method",
+            "url",
+            "body",
+            "createdAt",
+            "pubkey"
+          ],
+          "properties": {
+            "op": {
+              "const": "authEvent"
+            },
+            "method": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "body": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "createdAt": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$"
+            },
+            "pubkey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "payload",
+            "eventId"
+          ],
+          "properties": {
+            "payload": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "eventId": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "authorization",
+            "method",
+            "url",
+            "body",
+            "now"
+          ],
+          "properties": {
+            "op": {
+              "const": "verify"
+            },
+            "authorization": {
+              "type": "string"
+            },
+            "method": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "body": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "now": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome",
+                "pubkey"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                },
+                "pubkey": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome",
+                "reason"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                },
+                "reason": {
+                  "enum": [
+                    "malformed",
+                    "request_mismatch",
+                    "stale",
+                    "invalid_signature"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

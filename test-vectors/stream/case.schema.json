@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/stream/case.schema.json",
+  "title": "stream case",
+  "description": "ALF1 STREAM file encryption (04 \u00a74, D-80). `seal`: the object (header || chunks, hex) for a file key, nonce prefix, chunk size (1 to 16 MiB) and plaintext, its 17-byte header, and the SHA-256 of the object and of the plaintext; decrypting the object must return the plaintext. `open`: an object that must be refused. Byte strings are lowercase hex without 0x.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "fileKey",
+            "noncePrefix",
+            "chunkSize",
+            "plaintext"
+          ],
+          "properties": {
+            "op": {
+              "const": "seal"
+            },
+            "fileKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "noncePrefix": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{16}$"
+            },
+            "chunkSize": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16777216
+            },
+            "plaintext": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "header",
+            "ciphertext",
+            "ciphertextSha256",
+            "plaintextSha256"
+          ],
+          "properties": {
+            "header": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{34}$"
+            },
+            "ciphertext": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "ciphertextSha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "plaintextSha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "fileKey",
+            "ciphertext"
+          ],
+          "properties": {
+            "op": {
+              "const": "open"
+            },
+            "fileKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "ciphertext": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "outcome"
+          ],
+          "properties": {
+            "outcome": {
+              "const": "reject"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

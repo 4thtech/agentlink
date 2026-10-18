@@ -245,8 +245,8 @@ areas:
         summary: "`owner init` signs the agent's first card in the same owner step, so a new agent can pair; the owner key signs only the agent card and the defined owner decisions (M1-8h)."
       - name: "Local approval server"
         state: done
-        prs: [207, 225]
-        summary: "A small server on localhost (loopback only, with a one-time token, host and origin checks and an owner-presence step) that will serve the approval page; passkey-ready on `http://localhost:<port>` (M1-8d, M1-31). The page itself and the passkey step are not built yet."
+        prs: [207, 225, 247]
+        summary: "A small server on localhost (loopback only, with a one-time token, host and origin checks and an owner-presence step) that will serve the approval page on `http://localhost:<port>` (M1-8d, M1-31). Owner presence there is the owner code or, after a one-time setup with the owner code, a localhost passkey (WebAuthn PRF, M1-8e). The CLI does not open it yet."
       - name: "Owner recovery without an attached agent"
         state: done
         prs: [206, 227]
@@ -265,7 +265,7 @@ areas:
       - name: "MCP server and CLI"
         state: in-progress
         prs: [102, 103, 107, 111, 112, 113, 115, 124, 125, 127, 131, 132, 135, 142, 143, 178, 183, 184, 185, 186, 190, 192, 193, 199, 200, 201, 205, 206, 219, 231, 235, 238]
-        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising), `init`, `invite`, `accept`, `contacts`, `status`, `doctor`, `requests` and the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) have landed, with the in-chat copy sheet. The MCP server over stdio (the frozen M1a tool list, the untrusted-content wrapper) and its tools have landed: status, contacts, get approval (real approval data, with the sender code of an unknown sender), invite, accept, send, inbox and the terms tools (propose, respond, and the owner's terms approval card in `approve`). A conformance and tool-surface guard test pins the tool list. A background loop in the running MCP server keeps one active publisher per agent through the publisher lease, receives new messages over live relay subscriptions as they reach a relay (M1-9s, after the v0.1.0 release), catches up every 5 min as a fallback and delivers queued messages every 30 s, so a pairing completes without a tool call. Owner commands now include `owner add-agent` and `init --harness` for several agents of one owner (M1-9t). v0.1.0 was released on 16 Oct 2026: `@4thtech-io/agentlink` on npm (`latest`), one bundled file with the libraries built in, published from CI with provenance (OPS-REL-1; release checklist `docs/runbooks/release-v0.1.0.md`). Merged after v0.1.0 and shipping in the next 0.1.x release: live relay subscriptions in the background loop (M1-9s), `init --harness claude-desktop` and Gemini CLI detection by its binary or settings file (M1-9w), `status` and `doctor` naming a missing owner card (M1-9u), owner recovery with no attached agent (M1-9x), the terms tools passing `clientRequestId` and a fixed approval clock (M1-32-c, M1-32-d), contact names instead of raw addresses in summaries (M1-22-b), `termsParties` declared in the inbox output schema, a clear message when Node.js is older than 22.14 and quieter one-shot commands (M1-9y), the neutral-platform bundle-check CI job (M1-9c-c), and the owner commands `contacts rename` and `contacts remove`, which fix two contacts with the same name (M1-9za). npm `latest` is still 0.1.0."
+        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising), `init`, `invite`, `accept`, `contacts`, `status`, `doctor`, `requests` and the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) have landed, with the in-chat copy sheet. The MCP server over stdio (the frozen M1a tool list, the untrusted-content wrapper) and its tools have landed: status, contacts, get approval (real approval data, with the sender code of an unknown sender), invite, accept, send, inbox and the terms tools (propose, respond, and the owner's terms approval card in `approve`). A conformance and tool-surface guard test pins the tool list. A background loop in the running MCP server keeps one active publisher per agent through the publisher lease, receives new messages over live relay subscriptions as they reach a relay (M1-9s, after the v0.1.0 release), catches up every 5 min as a fallback and delivers queued messages every 30 s, so a pairing completes without a tool call. Owner commands now include `owner add-agent` and `init --harness` for several agents of one owner (M1-9t). v0.1.0 was released on 16 Oct 2026: `@4thtech-io/agentlink` on npm (`latest`), one bundled file with the libraries built in, published from CI with provenance (OPS-REL-1; release checklist `docs/runbooks/release-v0.1.0.md`). Merged after v0.1.0 and shipping in the next 0.1.x release: live relay subscriptions in the background loop (M1-9s), `init --harness claude-desktop` and Gemini CLI detection by its binary or settings file (M1-9w), `status` and `doctor` naming a missing owner card (M1-9u), owner recovery with no attached agent (M1-9x), the terms tools passing `clientRequestId` and a fixed approval clock (M1-32-c, M1-32-d), contact names instead of raw addresses in summaries (M1-22-b), `termsParties` declared in the inbox output schema, a clear message when Node.js is older than 22.14 and quieter one-shot commands (M1-9y), `owner change-code` to replace an exposed owner code without changing the owner (M1-9z), the neutral-platform bundle-check CI job (M1-9c-c), and the owner commands `contacts rename` and `contacts remove`, which fix two contacts with the same name (M1-9za). npm `latest` is still 0.1.0."
       - name: "Agent skill file and quickstart guides"
         state: done
         prs: [151, 152]
@@ -284,8 +284,8 @@ areas:
         summary: "One owner key shared by several local agents, each on its own harness: `owner add-agent` and `init --harness` (M1-9t, D-78). Agents under one OS user are kept apart logically, not by a security boundary."
       - name: "Local approval page"
         state: in-progress
-        prs: [207, 225]
-        summary: "The localhost server behind it is merged (see the Node runtime); the page for owner approvals and settings and the passkey step are still to build (M1b)."
+        prs: [207, 225, 247]
+        summary: "The localhost server behind it is merged (see the Node runtime), with a functional, unstyled page that approves with the owner code or a localhost passkey (M1-8e). The designed page for owner approvals and settings, and opening it from the CLI, are still to build (M1b)."
       - name: "Beginner setup page"
         state: done
         prs: [234]
@@ -293,6 +293,9 @@ areas:
       - name: "Owner console, desktop apps, cloud agent"
         state: planned
         summary: "M2."
+      - name: "Encrypted drop service"
+        state: in-progress
+        summary: "The 4thTech drop Worker (signed uploads with no accounts, single-use upload targets, a hash-checked commit, signed downloads until expiry, quotas and rate limits, no logs) is built and tested locally (M1-27a). Not deployed: deployment (M1-27b), the storage buckets (M1-28) and sending files through it (M1-13c) follow."
   - id: contracts
     title: "OCC v2 contracts (private repo)"
     intro: "Pre-audit. Nothing in AgentLink uses them yet."
@@ -332,11 +335,11 @@ deploy:
     note: "After the external audit (M3). Not deployed."
   services:
     state: planned
-    note: "Submitter, faucet and encrypted drop are not built or deployed yet."
+    note: "None deployed yet. The encrypted drop Worker is built and tested locally (M1-27a); the submitter and faucet are not built yet."
 
 # Prose for the README Status block and the docs-site page.
 inProgress: "M1b has started. Merged and shipping in the next 0.1.x release: live relay subscriptions, the claude-desktop setup option, clearer status and recovery messages, the localhost approval server and the Node.js 22.14 check. Merged but not used by any tool yet: the safe fetch and path guard, the storage adapters, the files and proof policy rules and the proof hashing. Still open from M1a: the two-person dogfood against the published package (M1-23). Next in M1b: file encryption and the approval page."
-notYet: "file transfer, proof, credits, the local approval page and passkey step, the owner console, desktop apps and the cloud agent. Live relay subscriptions are merged but not released yet. They are described throughout and marked \"planned\" where they are not built. v0.1.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha, testnets only) was released on 16 Oct 2026 and is still the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`."
+notYet: "file transfer, proof, credits, the designed local approval page (a functional page with the owner code and a localhost passkey is merged, but the CLI does not open it yet), the owner console, desktop apps and the cloud agent. Live relay subscriptions are merged but not released yet. They are described throughout and marked \"planned\" where they are not built. v0.1.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha, testnets only) was released on 16 Oct 2026 and is still the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`."
 next: "Cut the next 0.1.x release with the M1b work merged so far, run the two-person dogfood (the M1a gate), then finish M1b: files, proof and credits on testnets."
 
 # Milestones. state: done | in-progress | planned. `gate` is the README wording, `outcome` the

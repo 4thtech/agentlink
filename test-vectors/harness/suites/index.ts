@@ -1,6 +1,7 @@
 import type { SuiteModule } from '../suite';
 import { aeadEnvelope } from './aead-envelope';
 import { bip340 } from './bip340';
+import { dropAuth } from './drop-auth';
 import { eip712 } from './eip712';
 import { eip712Proof } from './eip712-proof';
 import { encodings } from './encodings';
@@ -31,6 +32,7 @@ import { ucd15Table } from './ucd15-table';
 export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['aead-envelope', aeadEnvelope],
   ['bip340', bip340],
+  ['drop-auth', dropAuth],
   ['eip712', eip712],
   ['eip712-proof', eip712Proof],
   ['encodings', encodings],

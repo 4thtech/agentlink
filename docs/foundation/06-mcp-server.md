@@ -504,6 +504,7 @@ Commands marked † are owner operations: they require owner presence (passkey v
 agentlink init [--agent <name>] [--keystore file] [--harness <id|none>] [--config <path>]   # create identity, configure harnesses (one with --harness; none = identity only, D-78); file KeyStore only without an OS keychain (07 §9)
 agentlink owner init                   † # create the owner key with a generated owner code (run it yourself): file-KeyStore machines; keychain machines until the M1b setup page
 agentlink owner add-agent --agent <name>   † # sign the first card of a further agent with the existing owner key (run it yourself; 04 §2.8, D-78)
+agentlink owner change-code                † # replace an exposed owner code with a new generated one; same owner (run it yourself; 04 §2.8, M1-9z; proposed, owner confirms at merge)
 agentlink keystore passphrase            # file KeyStore only: change its passphrase or unlock code (terminal only)
 agentlink ui                             # open local approval/settings UI
 agentlink status [--brief]               # same data as agentlink_status; --brief prints only unread counts and contact names under the §2.1 rule (§6.1)

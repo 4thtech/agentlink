@@ -140,6 +140,7 @@ async function machine(names: readonly string[], aliceHasCard = true): Promise<M
         await session.close();
       }
     },
+    changeOwnerCode: () => Promise.reject(new Error('not used')),
     decide: () => Promise.reject(new Error('not used')),
     signOwnerAction: () => Promise.reject(new Error('not used')),
     ask: () => Promise.resolve(''),

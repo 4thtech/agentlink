@@ -64,6 +64,7 @@ describe('--help (06 §8)', () => {
       'agentlink init [--agent <name>]',
       'agentlink owner init',
       'agentlink owner add-agent --agent <name>',
+      'agentlink owner change-code',
       'agentlink init [--agent <name>] [--harness <id|none>] [--config <path>]',
       'agentlink status [--brief]',
       'agentlink invite',
@@ -98,7 +99,7 @@ describe('--help (06 §8)', () => {
       expect(help).not.toContain(absent);
     }
     const commandLines = help.split('\n').filter((line) => line.startsWith('  agentlink '));
-    expect(commandLines).toHaveLength(18);
+    expect(commandLines).toHaveLength(19);
   });
 
   it('prints help for no arguments, --help, -h and help', async () => {

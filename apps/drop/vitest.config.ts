@@ -1,0 +1,90 @@
+// apps/drop tests (M1-27a). Pure helpers run in Node (src/**/*.test.ts); the Worker runs under
+// Miniflare (workerd) with an in-memory R2 bucket and its Durable Object (test/**/*.test.ts), with
+// test-sized limits so the limit paths run fast. No Cloudflare account, secret or network is needed.
+//
+// The crypto test seam `@agentlink/crypto/testing` (signDropAuthorization; M1-1g-b, 04 §3.1.1) has no
+// package export and is never built: this alias is the only thing that resolves it, and only for
+// tests. deps-check and ESLint allow it by that exact name in `apps/drop/test/**/*.test.ts` only
+// (tools/deps-check/policy.mjs `testDirs`). `@agentlink/crypto` maps to the same source, so a test
+// sees one copy of the crypto module.
+import { cloudflareTest } from '@cloudflare/vitest-plugin';
+import { defineConfig } from 'vitest/config';
+
+const cryptoSource = (file: string): string =>
+  decodeURIComponent(new URL(`../../packages/crypto/src/${file}`, import.meta.url).pathname);
+
+const resolve = {
+  alias: [
+    { find: /^@agentlink\/crypto$/, replacement: cryptoSource('index.ts') },
+    { find: /^@agentlink\/crypto\/testing$/, replacement: cryptoSource('testing.ts') },
+  ],
+};
+
+const MiB = 1024 * 1024;
+
+// A fixed, obviously synthetic URL key for tests (32 bytes of 0x5a, base64url). Production reads a
+// Worker secret that M1-27b provisions; it is never committed.
+const TEST_URL_KEY = 'WlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlo';
+
+const testBindings = {
+  DROP_URL_KEY: TEST_URL_KEY,
+  DROP_CORS_ORIGINS: 'https://console.example',
+  DROP_MAX_SIZE: String(8 * MiB),
+  DROP_PART_SIZE: String(5 * MiB),
+  DROP_WEEKLY_QUOTA: String(20 * MiB),
+  DROP_IP_NEW_KEYS_PER_DAY: '3',
+  DROP_IP_REQUESTS_PER_HOUR: '8',
+};
+
+function workerProject(
+  name: string,
+  include: string[],
+  bindings: Record<string, string>,
+  testTimeout = 20_000,
+) {
+  return {
+    plugins: [
+      cloudflareTest({
+        main: './src/index.ts',
+        miniflare: {
+          compatibilityDate: '2026-08-01',
+          r2Buckets: ['DROP_BUCKET'],
+          durableObjects: { DROP_STATE: 'DropState' },
+          bindings,
+        },
+      }),
+    ],
+    resolve,
+    test: {
+      name,
+      include,
+      // Repository-wide test timeout policy (M0-10e): 20 s, not the 5 s default.
+      testTimeout,
+    },
+  };
+}
+
+export default defineConfig({
+  test: {
+    projects: [
+      {
+        resolve,
+        test: {
+          name: 'node',
+          environment: 'node',
+          include: ['src/**/*.test.ts'],
+          testTimeout: 20_000,
+        },
+      },
+      workerProject('drop', ['test/drop.test.ts'], testBindings),
+      workerProject('drop-global-cap', ['test/global-cap.test.ts'], {
+        ...testBindings,
+        DROP_GLOBAL_BYTES_PER_DAY: String(MiB),
+      }),
+      // The one 5 MiB multipart round trip runs alone. Evidence for its 60 s timeout: on the Linux CI
+      // runner a 6 MiB version took 32.6 s in Miniflare's R2 (CI run 39018466636; 1.9 s on macOS),
+      // so 20 s is too tight there (IR-M1-27a-1 H-1). The data is already the smallest two-part object.
+      workerProject('drop-multipart', ['test/multipart.test.ts'], testBindings, 60_000),
+    ],
+  },
+});

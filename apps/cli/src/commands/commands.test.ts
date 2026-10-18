@@ -15,7 +15,7 @@ import { createContactsHandler } from './contacts.js';
 import { createDoctorHandler } from './doctor.js';
 import { createInviteHandler } from './invite.js';
 import { createRequestsHandler } from './requests.js';
-import { createDeps, type CommandDeps, type Prompter } from './shared.js';
+import { TEXT, createDeps, type CommandDeps, type Prompter } from './shared.js';
 import { createStatusHandler } from './status.js';
 
 const TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
@@ -494,6 +494,19 @@ describe('status (06 §2.0, D-73)', () => {
 });
 
 describe('doctor (07 §9.4)', () => {
+  it('names an unfinished owner code change and points to owner change-code (M1-9z)', async () => {
+    const yes = await harness(fakeAgent(), {
+      unfinishedOwnerCodeChange: () => Promise.resolve(true),
+    }).run(['doctor']);
+    expect(yes.code).toBe(1);
+    expect(yes.text).toContain(TEXT.doctorOwnerCodeUnfinished);
+    expect(yes.text).toContain('agentlink owner change-code');
+    const no = await harness(fakeAgent(), {
+      unfinishedOwnerCodeChange: () => Promise.resolve(false),
+    }).run(['doctor']);
+    expect(no.text).not.toContain(TEXT.doctorOwnerCodeUnfinished);
+  });
+
   const noCard = (): Fake => fakeAgent({ identity: { get: () => Promise.resolve(undefined) } });
 
   it('names the missing owner card, never suggests init, and stops (M1-9u)', async () => {

@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/eip712-revocation/case.schema.json",
+  "title": "eip712-revocation case",
+  "description": "EIP-712 hashing of the OCCRegistry Revocation struct (05 \u00a74, D-81). `revocation`: typeHash, domain separator, struct hash and digest (32-byte hex without 0x) of a Revocation in its JSON form under a domain {name, version, chainId, verifyingContract}, or a rejection of a non-canonical Revocation. `registration`: the same hashes of a Registration that shares its owner nonce with a Revocation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "domain",
+            "revocation"
+          ],
+          "properties": {
+            "op": {
+              "const": "revocation"
+            },
+            "domain": {
+              "type": "object"
+            },
+            "revocation": {
+              "type": "object"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "typeHash",
+                "domainSeparator",
+                "structHash",
+                "digest"
+              ],
+              "properties": {
+                "typeHash": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "domainSeparator": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "structHash": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "domain",
+            "registration"
+          ],
+          "properties": {
+            "op": {
+              "const": "registration"
+            },
+            "domain": {
+              "type": "object"
+            },
+            "registration": {
+              "type": "object"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "typeHash",
+            "domainSeparator",
+            "structHash",
+            "digest"
+          ],
+          "properties": {
+            "typeHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "domainSeparator": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "structHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "digest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
