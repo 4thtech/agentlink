@@ -1,0 +1,15 @@
+{
+  "compiler": "0.8.37+commit.f401782d",
+  "files": {
+    "abi/IOCCErrors.json": "e072b05a6601e4cee38d6eaf514cce3805e14bafe7f50b68718a67e373b2caa0",
+    "abi/IOCCFeeVault.json": "28134918472b6fa86c141435bf99429193ed4f0ec54d7dfdf5a211aff720d82f",
+    "abi/IOCCManaged.json": "caa6f1a2f84ca525d7bcc9f760963c93e9db10ed19bad952699962508f00c199",
+    "abi/IOCCNotary.json": "f8f6adc5fb822aa7933b21ff7432e7b09cbb1521c2cdc29efbd064211e3be521",
+    "abi/OpenZeppelinInherited.json": "22a6c5b849406ce930a66118c7d33ebf3db43f8090eaa82cb28b63e7e7b3fb3b",
+    "addresses/84532.json": "e7a090c22b21e94419c56200ac05b655471be6b3b6f958bf4ddbda4ae2e96732"
+  },
+  "package": "@4thtech-io/occ-v2-abi",
+  "schemaVersion": 1,
+  "sourceCommit": "d46545b60bb324f63fb16a77af445bd50a51317a",
+  "tag": "v0.1.0-testnet.2"
+}
