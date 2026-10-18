@@ -133,6 +133,8 @@ struct Receipt {
 }
 ```
 
+**Kind mapping (G-13, D-86; decided by Tali in chat, 2026-10-18).** The core sets `kind` from the notarized envelope's payload (04 §3.4); no tool takes a kind as input. `offer` → 3 OFFER; `accept` → 4 ACCEPT; `delivery` → 5 DELIVERY; `note` → 6 NOTE; `file` → 2 FILE; `text` and `request` → 2 FILE when `files` is non-empty, otherwise 1 MESSAGE; `reject` → 1 MESSAGE. Every other type (`ack`, `handshake`, `handshake-ack`, `proof`, `approval`, `approval-request`, `policy`, `card-update`, `revoke`) is never notarized: the call returns `rejected` with code `NOT_NOTARIZABLE` and records nothing. `kind` is public and permanent, so it reveals the category of the message, never its content. **Checks.** Before signing any receipt, a recipient checks that the record's `kind` equals this mapping for the envelope it holds (with `envelopeHash`, 04 §3.4 `proof`); otherwise it signs nothing and flags the contact. A verifier with a disclosed content key (07 §8) applies the same check after step 6; on a mismatch the pack proves no content (`contentVerified: false`), while the record and receipts are still verified. Values 7–255 are reserved; adding one is a spec change.
+
 **JSON form (04 §2.4.1).** Wherever these values appear in JSON (the `proof` body, proof packs, tool results, the submitter API), addresses and every `bytes32` (`recordId`, `salt`, `envelopeHash`, `recipientCommitment`, `parentRecordId`, `appId`), transaction hashes and signatures are `0x` + lowercase hex; `uint256` values (`maxFee`, `nonce`) are decimal strings; the other integers are JSON integers. Anything else is rejected, never normalised.
 
 ### 3.2 Functions
