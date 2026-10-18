@@ -15,3 +15,7 @@ test-vectors/*/vectors.json
 test-vectors/*/case.schema.json
 # Published vector copies, pinned by SHA-256 in their generators.
 tools/vectors/sources/
+# The vendored OCC v2 contracts release: byte-exact, pinned by SHA-256 in its manifest (M1-3f, D-83).
+packages/occ-v2-abi/artifacts/
+# Generated from those files by tools/occ-v2-abi/import.mjs and checked byte for byte by check.mjs.
+packages/occ-v2-abi/src/generated/

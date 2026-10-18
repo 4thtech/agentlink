@@ -1,0 +1,27 @@
+{
+  "campaign": "campaign-1",
+  "capabilities": {
+    "depositWithAuthorization": false
+  },
+  "chainId": 84532,
+  "chainKey": "base-sepolia",
+  "contracts": {
+    "AccessManager": "0x7B05B6C56E4f073df60da9Fa640b1f7ffCD9D3A2",
+    "OCCFeeVault": "0x91A40104553Bd1731c3fBe05209A908B40e50f8d",
+    "OCCNotary": "0xB29dEdEe26D480105DAD5b90f549a09d376d855F"
+  },
+  "deployBlock": 48120712,
+  "deployedOn": "2026-10-14",
+  "feeTokens": [
+    {
+      "address": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      "decimals": 6,
+      "eip3009": false,
+      "native": false,
+      "symbol": "USDC"
+    }
+  ],
+  "name": "Base Sepolia",
+  "schemaVersion": 1,
+  "testnet": true
+}

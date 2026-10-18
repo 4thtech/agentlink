@@ -1562,7 +1562,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The suppression sits at the narrowest scope that keeps Slither clean; no new finding appears.
 
 #### M1-3f · contracts: ABI release artifacts and `@4thtech-io/occ-v2-abi` (private, in-repo)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (contracts export: 4thtech/occ-v2-contracts#19, release `v0.1.0-testnet.2`, audited AUDIT-FABLE-OCC19-1 PASS; agentlink import: branch `m1-3f-occ-v2-abi`) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · release workflow; agentlink · packages/occ-v2-abi
 - **Depends on:** M1-3d, M0-2e (G-10 resolved by D-83)
 - **Spec:** 05 §9; D-19; `development-process.md` §9.1–§9.3; `release-and-deployment.md` §2

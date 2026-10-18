@@ -400,6 +400,13 @@ Notes:
 
 `Expired()`, `InvalidSignature()`, `NonceUsed()`, `EpochMismatch()`, `AgentNotRegistered()`, `AlreadyRevoked()`, `RecordExists()`, `RecordNotFound()`, `ReceiptExists()`, `ConflictingReceipt()`, `NotRecipient()`, `NotSigner()`, `InsufficientCredits(address payer, address token, uint256 needed, uint256 available)`, `FeeAboveMax(uint256 total, uint256 maxTotal)`, `TokenNotAllowed(address token)`, `BelowMinDeposit()`, `NotModule()`, `AppExists()`, `AppInactive()`, `NotIntegrator()`, `FeeAboveCap()`, `EnforcedPause()` (renamed from `Paused()`, which collided with the event `Paused`; proposed, §6), `UpgradesAreFrozen()`, `ZeroAddress()`, `TransferFailed()`, `InvalidCapChange()` (G-3; decided, D-59), `ExpectedPause()` and `MultipleAboveMax()` (proposed; §5.2).
 
+**Inherited OpenZeppelin errors and events (M1-3f; proposed, IR-M1-3b-1 choices 1 and 10, owner confirms at merge).** The deployed contracts inherit OpenZeppelin Contracts v5 (upgradeable), so calls can also revert with, and the proxies can also emit, items that are not in the interfaces above. The contracts release exports them as `abi/OpenZeppelinInherited.json`, and `@4thtech-io/occ-v2-abi` adds them to the client ABIs so a client can decode every revert and event:
+
+- Errors: `AccessManagedUnauthorized(address caller)`, `AccessManagedRequiredDelay(address caller, uint32 delay)`, `AccessManagedInvalidAuthority(address authority)` (reachable only through `setAuthority`, which only the manager calls), `ReentrancyGuardReentrantCall()`, `SafeERC20FailedOperation(address token)`, `UUPSUnauthorizedCallContext()`, `UUPSUnsupportedProxiableUUID(bytes32 slot)`, `ERC1967InvalidImplementation(address implementation)`, `ERC1967NonPayable()`, `AddressEmptyCode(address target)` (exported, but not reachable: `ERC1967InvalidImplementation` fires first), `FailedCall()`, `InvalidInitialization()` and `NotInitializing()`.
+- Events: `Upgraded(address indexed implementation)` (ERC-1967), `Initialized(uint64 version)` and `AuthorityUpdated(address authority)`.
+- A token's own revert data is passed through unchanged (OpenZeppelin 5.7 `SafeERC20`; Circle USDC reverts with `Error(string)`), so it needs no entry here.
+- A native-value mismatch reverts `TransferFailed()`; the exported ABI has no dedicated `ValueMismatch()`. Adding one is a contracts change in a later release.
+
 ---
 
 ## 8. Testing and security gates

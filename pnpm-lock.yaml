@@ -327,6 +327,9 @@ importers:
       '@4thtech-io/crypto':
         specifier: workspace:*
         version: link:../crypto
+      '@4thtech-io/occ-v2-abi':
+        specifier: workspace:*
+        version: link:../occ-v2-abi
       '@4thtech-io/types':
         specifier: workspace:*
         version: link:../types
@@ -403,6 +406,8 @@ importers:
       '@types/ws':
         specifier: 8.18.2
         version: 8.18.2
+
+  packages/occ-v2-abi: {}
 
   packages/storage:
     dependencies:
