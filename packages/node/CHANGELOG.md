@@ -1,5 +1,30 @@
 # @agentlink/node
 
+## 0.1.1
+
+### Patch Changes
+
+- 8a3f76e: Local approval page (not opened by the CLI yet): review your waiting approvals together and confirm the list with one passkey or owner code entry (terms are still approved one at a time); each page link opens once; repeated wrong owner codes make you wait before the next try.
+- 5773ac4: M1-15-b: Windows path-guard fixes: tests run on Windows with no skip; a folder swap is refused check→open on every OS, and post-open where the OS allows it.
+- 053a2cb: M1-15: SSRF-safe download (DNS-pinned, at most 2 re-checked redirects, byte cap, deadline), allowed-folder path guard with realpath on both sides, and a download file-name sanitiser. Not wired into any tool yet.
+- e3b9df1: The local approval page now opens at `http://localhost:<port>` (listening on 127.0.0.1 and ::1 on the same port), so a browser passkey can be used for approvals later.
+- 42497b7: Adds the local approval server (not wired into the CLI yet): it runs on 127.0.0.1, shows pending approvals, and every approve or deny needs your owner code or owner passphrase.
+- c00bc2f: Adds the localhost passkey to the local approval server (not wired into the CLI yet): set up a passkey with your owner code once, then approve or deny with it; the owner code keeps working.
+- e768cd1: `owner add-agent` recovers an owner with no attached agent: the owner keys come from the saved owner itself after the owner code, and the owner confirms the fingerprint (M1-9x).
+- 1ba92cb: Add `agentlink owner change-code` to replace an exposed owner code without changing the owner
+- 58df129: M1-9za: owner commands `contacts rename` and `contacts remove`, signed as the new owner actions `contact.rename` and `contact.remove`; `contacts` lists each contact's ID.
+- Updated dependencies [088b5fd]
+- Updated dependencies [053a2cb]
+- Updated dependencies [4dcc340]
+- Updated dependencies [af00aaa]
+- Updated dependencies [b26ef46]
+- Updated dependencies [2a6716d]
+- Updated dependencies [e768cd1]
+- Updated dependencies [58df129]
+  - @agentlink/core@0.1.1
+  - @agentlink/transport-nostr@0.1.1
+  - @agentlink/crypto@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes

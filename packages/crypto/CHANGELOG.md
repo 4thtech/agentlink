@@ -1,5 +1,15 @@
 # @agentlink/crypto
 
+## 0.1.1
+
+### Patch Changes
+
+- 4dcc340: ALF1 STREAM file encryption (M1-1d, D-80): push-based sealer and opener, Web Streams encrypt and decrypt transforms and whole-buffer helpers for the 04 §4 object (AAD = header ‖ isFinal), with incremental SHA-256 of ciphertext and plaintext, chunk-size and chunk-count bounds, and optional expected-hash checks when opening.
+- af00aaa: OCC v2 proof types (M1-1j): EIP-712 typed data, strict JSON-form parsing and hashing for `Record`, `Receipt` and `Registration`; `recordStructHash`; the recipient commitment; EIP-3009 `ReceiveWithAuthorization` typed data under a caller-supplied token domain.
+- b26ef46: Revocation typed data (M1-1j, D-81): `REVOCATION_TYPES`, `parseRevocation`, `revocationTypedData` and `hashRevocation` for the OCCRegistry `Revocation` struct (05 §4), with the strict JSON form (`keyEpoch` as `uint32`).
+- 2a6716d: crypto: the encrypted drop's request signature (verifyDropAuthorization, dropAuthEvent, encodeDropAuthorization), its URL MAC (dropUrlMac, verifyDropUrlMac) and an incremental SHA-256 (createSha256), for the drop Worker (M1-27a)
+- e768cd1: `owner add-agent` recovers an owner with no attached agent: the owner keys come from the saved owner itself after the owner code, and the owner confirms the fingerprint (M1-9x).
+
 ## 0.1.0
 
 ### Minor Changes
