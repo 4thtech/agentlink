@@ -737,6 +737,13 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** `MINIO_IMAGE` is `docker.io/bitnamilegacy/minio:2025.7.23@sha256:...`. Use the explicit `2025.7.23-debian-12-r5` tag and keep the digest pin (the repo convention is tag plus digest); re-resolve the digest for that tag. Source: review low, 2026-10-18.
 - **Acceptance:** `storage-minio` stays green with the new tag and digest; no other workflow change.
 
+#### OPS-CI-9 · Wait for the Linux keyring before the keychain and e2e tests (new, flake 2026-10-18)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/ci.yml`, `.github/workflows/e2e.yml`, `tools/ci/**`
+- **Depends on:** OPS-CI-6
+- **Scope:** Merge-group run 39144772282 failed with `NodeKeyStoreError` because gnome-keyring was not ready. `tools/ci/with-keyring.sh` starts the keyring and `tools/ci/wait-for-keyring.sh` probes a store/lookup round trip (10 x 1 s, `::error::` if it never answers); the `keychain` (Linux) job and both e2e jobs use it. No retries in the tests.
+- **Acceptance:** tests for the probe (ready, retried, never ready); no gate or test weakened; actions unchanged.
+
 #### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
 - **Status:** done (4thtech/agentlink#198) · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/release.yml` or a Changesets hook, `tools/**`, `docs/process/versioning.md` §5
