@@ -13,6 +13,9 @@
     },
     {
       "path": "../../packages/crypto"
+    },
+    {
+      "path": "../../packages/occ-v2-abi"
     }
   ]
 }
