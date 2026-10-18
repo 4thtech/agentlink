@@ -19,7 +19,6 @@ import type {
   CommitmentCard,
   ContactView,
   RespondToTermsResult,
-  Terms,
 } from '@4thtech-io/core';
 import { createLogger } from '@4thtech-io/log';
 import {
@@ -27,16 +26,12 @@ import {
   type ApprovalServer,
   type ApprovalServerSource,
 } from '@4thtech-io/node';
-import type { ContactDisplayName, RestrictedName } from '@4thtech-io/types';
+import type { ContactDisplayName, RestrictedName, Terms } from '@4thtech-io/types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OpenedAgent } from '../runtime/index.js';
-import {
-  TOOLS,
-  callTool,
-  type TermsTools,
-  type ToolClient,
-  type ToolContext,
-} from '../tools/index.js';
+import type { TermsTools } from '../tools/context.js';
+import { TOOLS, callTool, type ToolClient, type ToolContext } from '../tools/index.js';
+import { acceptRetryStep } from '../tools/invite-common.js';
 import { APPROVAL_LINK_NOTE } from '../tools/registry.js';
 import {
   BROWSER_OPEN_INTERVAL_MS,
@@ -51,10 +46,10 @@ const B = `0x${'b'.repeat(40)}`;
 const ENVELOPE = 'Q2xhaW1zQ2xhaW1zQ2xhaQ';
 const HASH = 'ab'.repeat(32);
 const APPROVAL = 'apr_AAAAAAAAAAAAAAAAAAAAAA';
-const APPROVAL_2 = 'apr_BBBBBBBBBBBBBBBBBBBBBB';
+const APPROVAL_2 = 'apr_BBBBBBBBBBBBBBBBBBBBBA'; // canonical: 16 bytes
 const VALID_UNTIL = 1_761_206_400;
 const silent = createLogger({ sink: () => undefined });
-const NEVER_FETCH = /never open or fetch it yourself/;
+const NEVER_FETCH = /never open or fetch this link/i;
 
 // ---- A fake approval server (the real one is used further down) ---------------------------------
 
@@ -234,6 +229,14 @@ describe('the nextStep with the link (06 §2.5; 11 §6.10)', () => {
     );
     for (const word of [/\bwallet/i, /\bgas\b/i, /seed phrase/i, /transaction/i]) {
       expect(text).not.toMatch(word);
+    }
+  });
+
+  it('leaves room for a tool sentence after it (the accept retry) within the 500-character limit', () => {
+    const url = `http://localhost:65535/approve/${APPROVAL}`;
+    for (const name of ['default', 'work-laptop-agent']) {
+      const text = `${approvalLinkNextStep(APPROVAL, url, name)} ${acceptRetryStep(APPROVAL)}`;
+      expect(Array.from(text).length, name).toBeLessThanOrEqual(500);
     }
   });
 

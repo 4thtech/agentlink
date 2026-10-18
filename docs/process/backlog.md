@@ -3077,7 +3077,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-31-1 L-2..L-5, 2026-10-17): add a `LOCALHOST:<port>` Host test; note the start-time IPv4 decision in D-79; set common headers on the 503 stub; fix the stale example in `packages/core/src/approval-channel.ts:30`.
 
 #### M1-11a-b · local UI: wiring and remember-contact follow-ups (new, follow-up from #256)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (wiring; "Remember for this contact" still waits for G-32) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (local UI bundle), packages/mcp
 - **Depends on:** M1-11a, M1-9h; G-32 for the last item
 - **Spec:** 08 §1; 11 §6.2, §8; 06 §3
