@@ -313,6 +313,7 @@ beforeEach(async () => {
     backendOf: () => Promise.resolve('keychain'),
     initOwner: () => Promise.reject(new Error('not used')),
     addAgent: () => Promise.reject(new Error('not used')),
+    changeOwnerCode: () => Promise.reject(new Error('not used')),
     decide: () => Promise.reject(new Error('not used')),
     // Stands in for @agentlink/node's performOwnerOperation: the summary is shown, the owner code is
     // read once, and exactly the given object is signed.
