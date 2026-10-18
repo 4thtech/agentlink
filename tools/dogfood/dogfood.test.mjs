@@ -605,6 +605,8 @@ describe('step logic', () => {
           '20261017-101500',
         ]),
       ).toMatchObject({ role: 'b', invite: 'https://x.test/i#a', runId: '20261017-101500' });
+      expect(parseArgs([...out, '--role', 'b']).ocModel).toBe('opencode/deepseek-v4.1-flash-free');
+      expect(parseArgs([...out, '--role', 'b', '--oc-model', 'x/y']).ocModel).toBe('x/y');
       expect(parseArgs([...out, '--role', 'b', '--paired']).paired).toBe(true);
       expect(() => parseArgs([...out, '--role', 'c'])).toThrow('a or b');
       expect(() => parseArgs([...out, '--same-owner'])).toThrow('needs --role');

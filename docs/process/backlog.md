@@ -3433,6 +3433,14 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - One-shot commands log at `warn` by default (`AGENTLINK_LOG=debug|info|warn|error` overrides); no raw JSON "identity created" line in the terminal.
 - **Acceptance:** tests with an injected version; default level hides info lines, `AGENTLINK_LOG` shows them; docs prerequisites and troubleshooting name 22.14.
 
+#### M1-9zb · cli: invite approval shows who is inviting (new, live finding 2026-10-17)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`commands/owner/render.ts`, `strings.ts`), tools/dogfood (`--oc-model` default), docs/runbooks/dogfood-m1a.md
+- **Depends on:** M1-9o
+- **Spec:** 06 §2.1 (restrictName), 11 §5 (copy); I-5
+- **Scope:** the accept-invite approval "Who" line shows the inviter's self-declared name (labelled, restricted) plus the owner fingerprint from the invite's verified card, e.g. `“oc-test” (self-declared) · owner B254·C21B · not in your contacts yet`; fingerprint only when no usable name. The action and its digest are unchanged (re-derived from the link at render time).
+- **Acceptance:** tests for name+fingerprint, hostile name, missing name; dogfood `--oc-model` defaults to `opencode/deepseek-v4.1-flash-free`.
+
 #### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
 - **Status:** done (4thtech/agentlink#196) · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/06-mcp-server.md §4

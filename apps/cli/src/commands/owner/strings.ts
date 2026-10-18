@@ -8,6 +8,9 @@ export const OWNER_TEXT = Object.freeze({
   noteToSelf: 'You (a note to yourself)',
   noContact: 'No contact',
   notAContact: 'Someone who is not in your contacts yet',
+  /** `name` is the already-sanitized “name” (self-declared) form, or '' when there is none. */
+  inviter: (name: string, fingerprint: string): string =>
+    `${name === '' ? '' : `${name} · `}owner ${fingerprint} · not in your contacts yet`,
   unknownWhat: 'An action AgentLink does not recognise',
   consequence:
     'If you approve, your AI can do exactly this, once, before it expires. If you deny, nothing is sent.',
