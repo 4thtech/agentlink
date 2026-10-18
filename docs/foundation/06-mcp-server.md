@@ -28,7 +28,7 @@
 
 ## 2. Tools
 
-Notation: `?` = optional. `Contact` = contact ID, display name or invite alias (resolved locally; ambiguous → `status: "error", code: "AMBIGUOUS_CONTACT"` with candidates).
+Notation: `?` = optional. `Contact` = contact ID, display name or invite alias (resolved locally; ambiguous → `status: "error", code: "AMBIGUOUS_CONTACT"` with candidates, and a `nextStep` that also names `agentlink contacts rename` and `remove` for the owner, M1-9za). No tool renames or removes a contact (I-4): only the owner commands of §8 do.
 
 ### 2.0 Tool surface (D-53, D-55, frozen at 0.1.0)
 
@@ -509,9 +509,11 @@ agentlink ui                             # open local approval/settings UI
 agentlink status [--brief]               # same data as agentlink_status; --brief prints only unread counts and contact names under the §2.1 rule (§6.1)
 agentlink invite
 agentlink accept <url> [--approval <approvalId>]   # (proposed, owner confirms at merge; IR-M1-9l-1) without `--approval` it follows `contacts.acceptInvites` and, when approval is needed, creates the request and prints the approve command; after the owner approves, run it again with `--approval <approvalId>` to pair exactly once
-agentlink contacts                       # list contacts under the §2.1 name rule
+agentlink contacts                       # list contacts under the §2.1 name rule, each with its contact ID (M1-9za) for rename and remove
 agentlink requests [accept | ignore | block <requestId>]   # interactive terminal only, no harness marker: lists requests and shows each inside the untrusted container; also `ignore --all`, `blocked`, `unblock <senderKey>` (proposed, owner confirms at merge; IR-M1-9l-1: block purges the key's request rows, so no request ID exists to unblock by, and an ID chosen by the sender is never used, IR-D-72-1 F03); never creates a contact (07 §3.2, D-72)
 agentlink contacts --verify <id>       † # interactive terminal only, no harness marker: shows the safety code; "They match" signs contact.check (04 §3.6.1)
+agentlink contacts rename <contactId> <name> [--agent <name>]   † # (M1-9za; proposed, owner confirms at merge) interactive terminal only, no harness marker: sets the owner alias (§2.1 rule 1) by signing contact.rename (04 §2.5.1); the name must already be its own restricted form and differ from every other active contact's shown name, or it is refused before the owner code is asked
+agentlink contacts remove <contactId> [--agent <name>]   † # (M1-9za; proposed, owner confirms at merge) interactive terminal only, no harness marker: signs contact.remove (04 §2.5.1): the contact is tombstoned (07 §3), leaves every listing, its later envelopes are dropped, and it is not notified; only a new pairing brings it back
 agentlink storage connect              † # optional: guided S3-compatible setup (creds → keychain); not needed for files within the drop limits
 agentlink policy show | set <key> <value>   †
 agentlink credits [--topup]              # shows agent address, balances, top-up options
