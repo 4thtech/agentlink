@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { captureOutput } from '@agentlink/log/testing';
 import {
+  LIFECYCLE_ABORT_INCOMPLETE_DAYS,
   LIFECYCLE_DEFAULT_DAYS,
   LIFECYCLE_PREFIX,
   LIFECYCLE_RULE_ID,
@@ -49,7 +50,12 @@ describe('lifecycle: apply and read back', () => {
     const { lc, fake } = setup();
     expect(await lc.read()).toBeNull();
     await lc.apply();
-    expect(await lc.read()).toEqual({ prefix: 'agentlink/', days: 30, enabled: true });
+    expect(await lc.read()).toEqual({
+      prefix: 'agentlink/',
+      days: 30,
+      abortIncompleteDays: 1,
+      enabled: true,
+    });
 
     const put = fake.requests.find((r) => r.method === 'PUT')!;
     expect(put.url.searchParams.has('lifecycle')).toBe(true);
@@ -62,15 +68,30 @@ describe('lifecycle: apply and read back', () => {
     expect(doc).toContain(`<ID>${LIFECYCLE_RULE_ID}</ID>`);
     expect(doc).toContain('<Prefix>agentlink/</Prefix>');
     expect(doc).toContain('<Days>30</Days>');
+    // The backstop for an upload whose own abort failed (multipart.ts).
+    expect(doc).toContain(
+      '<AbortIncompleteMultipartUpload><DaysAfterInitiation>1</DaysAfterInitiation></AbortIncompleteMultipartUpload>',
+    );
+    expect(LIFECYCLE_ABORT_INCOMPLETE_DAYS).toBe(1);
   });
 
   it('keeps the bucket’s other rules and replaces only its own', async () => {
     const fake = fakeMultipartS3(BUCKET);
     fake.lifecycle = `<LifecycleConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">${OTHER_RULE}<Rule><ID>${LIFECYCLE_RULE_ID}</ID><Filter><Prefix>agentlink/</Prefix></Filter><Status>Enabled</Status><Expiration><Days>90</Days></Expiration></Rule></LifecycleConfiguration>`;
     const { lc } = setup({}, fake);
-    expect(await lc.read()).toEqual({ prefix: 'agentlink/', days: 90, enabled: true });
+    expect(await lc.read()).toEqual({
+      prefix: 'agentlink/',
+      days: 90,
+      abortIncompleteDays: null,
+      enabled: true,
+    });
     await lc.apply({ days: 14 });
-    expect(await lc.read()).toEqual({ prefix: 'agentlink/', days: 14, enabled: true });
+    expect(await lc.read()).toEqual({
+      prefix: 'agentlink/',
+      days: 14,
+      abortIncompleteDays: 1,
+      enabled: true,
+    });
     expect(fake.lifecycle).toContain(OTHER_RULE);
     expect(fake.lifecycle!.split(`<ID>${LIFECYCLE_RULE_ID}</ID>`)).toHaveLength(2);
   });
@@ -87,7 +108,12 @@ describe('lifecycle: apply and read back', () => {
     const fake = fakeMultipartS3(BUCKET);
     fake.lifecycle = `<LifecycleConfiguration><Rule><ID>${LIFECYCLE_RULE_ID}</ID><Prefix>agentlink/</Prefix><Status>Disabled</Status><Expiration><Days>30</Days></Expiration></Rule></LifecycleConfiguration>`;
     const { lc } = setup({}, fake);
-    expect(await lc.read()).toEqual({ prefix: 'agentlink/', days: 30, enabled: false });
+    expect(await lc.read()).toEqual({
+      prefix: 'agentlink/',
+      days: 30,
+      abortIncompleteDays: null,
+      enabled: false,
+    });
   });
 
   it('returns null when the bucket has rules but none of its own', async () => {
@@ -131,6 +157,20 @@ describe('lifecycle: failures', () => {
     expect(codeOf(await lc.read().catch((e: unknown) => e))).toBe('lifecycle_failed');
     expect(codeOf(await lc.apply().catch((e: unknown) => e))).toBe('lifecycle_failed');
     expect(fake.requests.some((r) => r.method === 'PUT')).toBe(false);
+  });
+
+  it('writes nothing when a rule element is not one it can carry over (IR-M1-6b-1-1 L2)', async () => {
+    for (const doc of [
+      `<LifecycleConfiguration><Rule id="x"><ID>attributed</ID><Status>Enabled</Status></Rule>${OTHER_RULE}</LifecycleConfiguration>`,
+      `<LifecycleConfiguration><Rule\n><ID>spaced</ID><Status>Enabled</Status></Rule></LifecycleConfiguration>`,
+    ]) {
+      const fake = fakeMultipartS3(BUCKET);
+      fake.lifecycle = doc;
+      const { lc } = setup({}, fake);
+      expect(codeOf(await lc.apply().catch((e: unknown) => e))).toBe('lifecycle_failed');
+      expect(fake.requests.some((r) => r.method === 'PUT')).toBe(false);
+      expect(fake.lifecycle).toBe(doc);
+    }
   });
 
   it('refuses an oversized or malformed lifecycle document', async () => {

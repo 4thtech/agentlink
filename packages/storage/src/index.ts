@@ -36,6 +36,7 @@ export {
   type S3MultipartConfig,
 } from './multipart.js';
 export {
+  LIFECYCLE_ABORT_INCOMPLETE_DAYS,
   LIFECYCLE_DEFAULT_DAYS,
   LIFECYCLE_PREFIX,
   LIFECYCLE_RULE_ID,

@@ -12,8 +12,11 @@
 //   redirects refused, credentials per request and never logged, no URL, bucket name or provider
 //   response text in a log or an error.
 //
+// The rule also aborts incomplete multipart uploads under `agentlink/` after a day, the backstop for an
+// upload whose own abort failed.
+//
 // Changing a bucket's lifecycle is a bucket-level permission, which the recommended bucket-scoped key
-// (PutObject, GetObject, DeleteObject) does not have; the caller maps `lifecycle_failed` with status 403
+// (07 §5.2: object read, write and delete, plus multipart abort and listing) does not have; the caller maps `lifecycle_failed` with status 403
 // to "add the rule in the provider's console" guidance.
 import { encodeBase64url, encodeHex, sha256 } from '@agentlink/crypto';
 import { StorageError } from './errors.js';
@@ -32,6 +35,11 @@ export const LIFECYCLE_RULE_ID = 'agentlink-expire-objects';
 export const LIFECYCLE_PREFIX = 'agentlink/';
 /** 07 §5.2: delete after 30 days. */
 export const LIFECYCLE_DEFAULT_DAYS = 30;
+/**
+ * Incomplete multipart uploads under `agentlink/` are aborted this many days after they start: the
+ * backstop for an upload whose abort failed (multipart.ts). Expiration alone does not remove them.
+ */
+export const LIFECYCLE_ABORT_INCOMPLETE_DAYS = 1;
 const MAX_DAYS = 3650;
 const MAX_DOCUMENT_BYTES = 256 * 1024;
 /** S3's limit on rules per bucket. */
@@ -42,6 +50,8 @@ export type S3LifecycleConfig = S3SessionConfig;
 export interface LifecycleRuleState {
   readonly prefix: string;
   readonly days: number;
+  /** Days after which incomplete multipart uploads are aborted, or null when the rule has none. */
+  readonly abortIncompleteDays: number | null;
   readonly enabled: boolean;
 }
 
@@ -68,20 +78,31 @@ function ruleId(rule: string): string | null {
 function ownRuleXml(days: number): string {
   return (
     `<Rule><ID>${LIFECYCLE_RULE_ID}</ID><Filter><Prefix>${LIFECYCLE_PREFIX}</Prefix></Filter>` +
-    `<Status>Enabled</Status><Expiration><Days>${days}</Days></Expiration></Rule>`
+    `<Status>Enabled</Status><Expiration><Days>${days}</Days></Expiration>` +
+    `<AbortIncompleteMultipartUpload><DaysAfterInitiation>${LIFECYCLE_ABORT_INCOMPLETE_DAYS}</DaysAfterInitiation></AbortIncompleteMultipartUpload></Rule>`
   );
+}
+
+/** A small non-negative integer from `<tag>` inside `<block>` of `rule`, or null. */
+function blockNumber(rule: string, block: string, tag: string): number | null {
+  const inner = new RegExp(`<${block}>([\\s\\S]*?)</${block}>`).exec(rule)?.[1];
+  const text = inner === undefined ? null : xmlText(inner, tag);
+  return text !== null && /^[0-9]{1,5}$/.test(text) ? Number(text) : null;
 }
 
 function parseOwnRule(rule: string): LifecycleRuleState {
   const prefix = xmlText(rule, 'Prefix');
   const status = xmlText(rule, 'Status');
-  const expiration = /<Expiration>([\s\S]*?)<\/Expiration>/.exec(rule)?.[1];
-  const daysText = expiration === undefined ? null : xmlText(expiration, 'Days');
-  const days = daysText !== null && /^[0-9]{1,5}$/.test(daysText) ? Number(daysText) : Number.NaN;
-  if (prefix === null || (status !== 'Enabled' && status !== 'Disabled') || Number.isNaN(days)) {
+  const days = blockNumber(rule, 'Expiration', 'Days');
+  if (prefix === null || (status !== 'Enabled' && status !== 'Disabled') || days === null) {
     throw failed();
   }
-  return { prefix, days, enabled: status === 'Enabled' };
+  return {
+    prefix,
+    days,
+    abortIncompleteDays: blockNumber(rule, 'AbortIncompleteMultipartUpload', 'DaysAfterInitiation'),
+    enabled: status === 'Enabled',
+  };
 }
 
 export function createS3Lifecycle(config: S3LifecycleConfig): S3Lifecycle {
@@ -93,12 +114,16 @@ export function createS3Lifecycle(config: S3LifecycleConfig): S3Lifecycle {
     return url.toString();
   };
 
-  /** The bucket's rules as raw `<Rule>` elements; [] when it has no lifecycle configuration. */
-  async function currentRules(): Promise<string[]> {
+  /**
+   * The bucket's rules as raw `<Rule>` elements; [] when it has no lifecycle configuration.
+   * `complete` is false when the document holds a rule element this parser did not extract (for
+   * example `<Rule attr="...">`): writing then would silently drop that rule.
+   */
+  async function currentRules(): Promise<{ rules: string[]; complete: boolean }> {
     const response = await session.send(lifecycleUrl(), { method: 'GET' });
     const text = await readCappedText(response, MAX_DOCUMENT_BYTES);
     if (response.status === 404 && text !== null && text.includes('NoSuchLifecycleConfiguration')) {
-      return [];
+      return { rules: [], complete: true };
     }
     if (!response.ok || text === null || !text.includes('<LifecycleConfiguration')) {
       log?.warn('storage lifecycle read failed', { status: response.status });
@@ -106,7 +131,8 @@ export function createS3Lifecycle(config: S3LifecycleConfig): S3Lifecycle {
     }
     const rules = text.match(/<Rule>[\s\S]*?<\/Rule>/g) ?? [];
     if (rules.length > MAX_RULES) throw failed(response.status);
-    return rules;
+    const elements = text.match(/<Rule(?=[\s>/])/g)?.length ?? 0;
+    return { rules, complete: elements === rules.length };
   }
 
   return {
@@ -118,7 +144,12 @@ export function createS3Lifecycle(config: S3LifecycleConfig): S3Lifecycle {
           'lifecycle days must be an integer from 1 to 3650',
         );
       }
-      const others = (await currentRules()).filter((rule) => ruleId(rule) !== LIFECYCLE_RULE_ID);
+      const current = await currentRules();
+      if (!current.complete) {
+        log?.warn('storage lifecycle document not understood; nothing written');
+        throw failed();
+      }
+      const others = current.rules.filter((rule) => ruleId(rule) !== LIFECYCLE_RULE_ID);
       if (others.length + 1 > MAX_RULES) throw failed();
       const body = new TextEncoder().encode(
         '<?xml version="1.0" encoding="UTF-8"?>' +
@@ -147,7 +178,7 @@ export function createS3Lifecycle(config: S3LifecycleConfig): S3Lifecycle {
     },
 
     async read(): Promise<LifecycleRuleState | null> {
-      const own = (await currentRules()).find((rule) => ruleId(rule) === LIFECYCLE_RULE_ID);
+      const own = (await currentRules()).rules.find((rule) => ruleId(rule) === LIFECYCLE_RULE_ID);
       return own === undefined ? null : parseOwnRule(own);
     },
   };

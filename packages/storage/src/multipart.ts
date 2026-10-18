@@ -6,8 +6,8 @@
 //   parts).
 // - On any failure after the upload is created (a part, the source stream, a size mismatch, completion)
 //   the upload is aborted, so no open multipart upload is left behind. `abortOpenUploads` cleans up after
-//   a crash, under this agent's own prefix only; the lifecycle rule (lifecycle.ts) is the backstop for
-//   objects.
+//   a crash, under this agent's own prefix only; the lifecycle rule (lifecycle.ts) is the backstop: it
+//   aborts incomplete uploads under `agentlink/` after a day and expires objects after 30.
 // - The same rules as the adapter (s3.ts, 04 §4, I-7): endpoint grammar check before any request,
 //   redirects refused, credentials per request and never logged, no URL, object key, upload ID or
 //   provider response text in a log or an error.

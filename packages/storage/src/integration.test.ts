@@ -267,11 +267,26 @@ describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}
           secretAccessKey: cfg.secretAccessKey,
         }),
       });
+      // MinIO (2025.7.23) accepts the rule's AbortIncompleteMultipartUpload element (the PUT succeeds) but
+      // does not store it: it expires stale multipart uploads itself (MINIO_API_STALE_UPLOADS_EXPIRY,
+      // 24 h by default). The read-back pins that behaviour; S3 and R2 keep the element (1 day), which
+      // the unit tests check on the document sent. If a MinIO upgrade starts keeping it, set this to 1.
+      const MINIO_ABORT_INCOMPLETE = null;
       expect(await lc.read()).toBeNull();
       await lc.apply();
-      expect(await lc.read()).toEqual({ prefix: 'agentlink/', days: 30, enabled: true });
+      expect(await lc.read()).toEqual({
+        prefix: 'agentlink/',
+        days: 30,
+        abortIncompleteDays: MINIO_ABORT_INCOMPLETE,
+        enabled: true,
+      });
       await lc.apply({ days: 31 });
-      expect(await lc.read()).toEqual({ prefix: 'agentlink/', days: 31, enabled: true });
+      expect(await lc.read()).toEqual({
+        prefix: 'agentlink/',
+        days: 31,
+        abortIncompleteDays: MINIO_ABORT_INCOMPLETE,
+        enabled: true,
+      });
 
       // Read back independently: both rules are on the bucket, ours once.
       const res = await raw().fetch(`${cfg.endpoint}/${cfg.bucket}?lifecycle`, {
@@ -282,6 +297,7 @@ describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}
       const text = await res.text();
       expect(text.includes('<ID>it-keep-other</ID>')).toBe(true);
       expect(text.split(`<ID>${LIFECYCLE_RULE_ID}</ID>`).length).toBe(2);
+      expect(text.includes('<DaysAfterInitiation>')).toBe(MINIO_ABORT_INCOMPLETE !== null);
     });
   }
 
