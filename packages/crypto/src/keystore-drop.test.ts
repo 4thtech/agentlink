@@ -5,8 +5,7 @@
 // - It signs with the separate drop key at the current epoch, never the Nostr or EVM identity key.
 // - Only POST and DELETE; the body must be the drop's signed JSON and its `ts` must equal createdAt.
 // - Everything else is refused with one fixed error that never contains an input (I-7).
-import { readFileSync } from 'node:fs';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   DROP_AUTH_DOMAIN,
   DROP_AUTH_KIND,
@@ -78,21 +77,47 @@ function expectRefused(error: unknown): void {
   expect((error as CryptoInputError).message).toBe(DROP_REQUEST_REFUSED);
 }
 
-// test-vectors/drop-auth (M1-27a), read from the repository: the cross-runtime suite.
-interface VectorCase {
-  readonly id: string;
-  readonly input: Record<string, string>;
-  readonly expected: Record<string, string>;
-}
-const VECTORS = (
-  JSON.parse(
-    readFileSync(new URL('../../../test-vectors/drop-auth/vectors.json', import.meta.url), 'utf8'),
-  ) as { cases: VectorCase[] }
-).cases;
+// test-vectors/drop-auth (M1-27a), copied here: the package's tests take no Node built-ins, and
+// the harness runs the full suite in every runtime. A vector change fails these on purpose.
+const VECTOR_EVENT_UPLOAD = {
+  method: 'POST',
+  url: 'https://drop.agentlink.4thtech.io/v1/upload',
+  body: '7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d',
+  createdAt: 1790000000,
+  pubkey: '5aa35e889ea5fbffde7aa19195ad0dd4d7f33e6f86304732d8006f764f13ed6c',
+  payload: 'f9393fe37b0a32977d670db149d551f7808dd5ae8029f02f26838d0b6dc3528b',
+  eventId: '3439499b79920745bf0c167eada44eff1389d5c2f48886856d5c478cab615379',
+} as const;
+/** The requests of the accepting `verify` vectors, with their created_at and the verifier's now. */
+const VECTOR_ACCEPTED = [
+  {
+    id: 'verify-accept',
+    method: 'POST',
+    url: 'https://drop.agentlink.4thtech.io/v1/upload',
+    body: '7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d',
+    ts: 1790000000,
+    now: 1790000000,
+  },
+  {
+    id: 'verify-accept-skew-edge',
+    method: 'POST',
+    url: 'https://drop.agentlink.4thtech.io/v1/upload',
+    body: '7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d',
+    ts: 1790000000,
+    now: 1790000060,
+  },
+  {
+    id: 'verify-accept-delete',
+    method: 'DELETE',
+    url: 'https://drop.agentlink.4thtech.io/v1/o/ZWOMpLAsUhfSBVsghbLRDw',
+    body: '7b2276223a312c226f626a6563744964223a225a574f4d704c4173556866534256736768624c524477222c226e6f6e6365223a2276414e7069505f504d705874446966455f4a33663441222c227473223a313739303030303030307d',
+    ts: 1790000000,
+    now: 1790000000,
+  },
+] as const;
 
 let store: KeyStore;
 afterEach(async () => {
-  vi.restoreAllMocks();
   await store?.close();
 });
 
@@ -117,36 +142,30 @@ describe('KeyStore.signDropRequest: the signature (07 §5.4)', () => {
   });
 
   it('matches the vectors: the signed event of the event-upload request has the vector id', async () => {
-    const vector = VECTORS.find((c) => c.id === 'event-upload');
-    expect(vector).toBeDefined();
-    const { method, url, body, createdAt } = (vector as VectorCase).input;
-    const request = { method, url, body: decodeHex(body) } as DropAuthRequest;
+    const v = VECTOR_EVENT_UPLOAD;
+    const request: DropAuthRequest = { method: v.method, url: v.url, body: decodeHex(v.body) };
     store = new MemoryKeyStore(SEED);
-    const event = decode(await store.signDropRequest(request, Number(createdAt)));
-    expect(event.tags[2]).toEqual(['payload', (vector as VectorCase).expected.payload]);
+    const event = decode(await store.signDropRequest(request, v.createdAt));
+    expect(event.tags[2]).toEqual(['payload', v.payload]);
     // The vector's own pubkey over the event this KeyStore built gives the vector's NIP-01 id.
-    const { id: _id, pubkey: _pubkey, sig: _sig, ...unsigned } = event;
-    expect(nostrEventId((vector as VectorCase).input.pubkey, unsigned)).toBe(
-      (vector as VectorCase).expected.eventId,
-    );
+    const unsigned = {
+      kind: event.kind,
+      created_at: event.created_at,
+      tags: event.tags,
+      content: '',
+    };
+    expect(nostrEventId(v.pubkey, unsigned)).toBe(v.eventId);
   });
 
   it('signs every request the accepting vectors carry, and the Worker verifier accepts it', async () => {
     store = new MemoryKeyStore(SEED);
-    const accepting = VECTORS.filter(
-      (c) => c.input.op === 'verify' && c.expected.outcome === 'accept',
+    expect(VECTOR_ACCEPTED.map((c) => c.method)).toEqual(
+      expect.arrayContaining(['POST', 'DELETE']),
     );
-    expect(accepting.length).toBeGreaterThanOrEqual(2);
-    for (const c of accepting) {
-      const request = {
-        method: c.input.method,
-        url: c.input.url,
-        body: decodeHex(c.input.body as string),
-      } as DropAuthRequest;
-      const ts = decode(c.input.authorization as string).created_at;
-      const authorization = await store.signDropRequest(request, ts);
-      const result = verifyDropAuthorization(authorization, request, Number(c.input.now));
-      expect(result.ok, c.id).toBe(true);
+    for (const c of VECTOR_ACCEPTED) {
+      const request: DropAuthRequest = { method: c.method, url: c.url, body: decodeHex(c.body) };
+      const authorization = await store.signDropRequest(request, c.ts);
+      expect(verifyDropAuthorization(authorization, request, c.now).ok, c.id).toBe(true);
     }
   });
 
@@ -162,8 +181,8 @@ describe('KeyStore.signDropRequest: the signature (07 §5.4)', () => {
     expect(ourSig).toMatch(/^[0-9a-f]{128}$/);
     expect(helperSig).toMatch(/^[0-9a-f]{128}$/);
     // The raw-key signer for backends gives the same event as well.
-    const { sig: _s, ...rawRest } = decode(signDropRequest(secret, UPLOAD, TS));
-    expect(rawRest).toEqual(helperRest);
+    const raw = decode(signDropRequest(secret, UPLOAD, TS));
+    expect({ ...raw, sig: helperSig }).toEqual({ ...helperRest, sig: helperSig });
   });
 });
 
@@ -361,15 +380,8 @@ describe('KeyStore.signDropRequest: no key material out (I-1, I-7)', () => {
     }
   });
 
-  it('logs nothing, on success or refusal', async () => {
-    store = new MemoryKeyStore(SEED);
-    const spies = (['log', 'info', 'warn', 'error', 'debug', 'trace'] as const).map((m) =>
-      vi.spyOn(console, m).mockImplementation(() => undefined),
-    );
-    await store.signDropRequest(UPLOAD, TS);
-    await refusal(() => store.signDropRequest({ ...UPLOAD, method: 'GET' }, TS));
-    for (const spy of spies) expect(spy).not.toHaveBeenCalled();
-  });
+  // Nothing is logged: this package has no logger and its lint refuses console output; the
+  // keychain backend's test (packages/node keychain.test.ts) also spies on the console.
 
   it('the raw-key signer refuses the same requests and checks its key', () => {
     const secret = deriveSecretKey(SEED, KEY_LABELS.drop, 0);

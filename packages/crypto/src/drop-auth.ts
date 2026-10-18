@@ -18,7 +18,8 @@
 // multipart PUT parts 1..10000.
 //
 // Everything here takes public inputs or the Worker's URL key, never a drop key: signing happens in
-// a KeyStore (the event comes from dropAuthEvent; the signer is not exported from any entry).
+// a KeyStore (KeyStore.signDropRequest, M1-1g-e), whose checks and raw-key signer are in
+// keystore-drop.ts; the signer is exported only from the restricted @4thtech-io/crypto/keystore entry.
 import { bip340Verify } from './bip340.js';
 import { assertBytes, concatBytes, equalBytes } from './bytes.js';
 import {

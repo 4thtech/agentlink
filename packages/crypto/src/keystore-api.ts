@@ -20,6 +20,7 @@
 // - The key epoch moves only through KeyEpochControl.advanceEpoch (M1-1g-d), an owner-only
 //   compare-and-set on the backend's management surface, never on the KeyStore the agent path uses.
 // - Errors are fixed sentences that never contain an input (I-7).
+import type { DropAuthRequest } from './drop-auth.js';
 import type { TypedData } from './eip712.js';
 import type { WrappedCek } from './hpke.js';
 import type { PublicIdentity } from './keys.js';
@@ -127,6 +128,17 @@ export interface KeyStore extends EnvelopeKeys {
    * ECDSA form of 04 §2.4.1: `0x` + 130 lowercase hex.
    */
   sign712(typedData: TypedData): Promise<string>;
+
+  /**
+   * Signs one encrypted-drop request (M1-1g-e; 07 §5.4, 04 §2.1, §4) with the agent's separate drop
+   * key at the current epoch, never the Nostr or EVM identity key, and returns the `Authorization`
+   * header value `Nostr <base64url(JSON event)>`. The `DropSigner` of @4thtech-io/storage's drop
+   * adapter. The KeyStore builds the event itself: kind 27235 and the `domain` tag are fixed, so it
+   * is never a general Nostr signer. It signs only POST and DELETE to an https URL in serialised
+   * form, over the drop's signed JSON body (`v: 1`, a nonce and `ts`), with `createdAt` equal to
+   * the body's `ts`; anything else is CryptoInputError `invalid_argument` with one fixed message.
+   */
+  signDropRequest(request: DropAuthRequest, createdAt: number): Promise<string>;
 
   /** Wipes what the store holds in memory; every later call fails with `keystore_closed`. */
   close(): Promise<void>;

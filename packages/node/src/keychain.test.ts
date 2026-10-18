@@ -31,7 +31,7 @@ import {
   derivePublicKey,
   deriveSecretKey,
 } from '@4thtech-io/crypto/keystore';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // The raw keychain backend is internal (IR-M1-8a-1 M-2): tests reach it through the modules, never
 // through the package entry, which exports only opaque entry points (fence.test.ts).
 import { NodeKeyStoreError } from './errors.js';
@@ -375,6 +375,21 @@ describe('KeychainKeyStore.signDropRequest (M1-1g-e)', () => {
     expect(decoded).not.toContain(encodeHex(SEED_A));
     await store.close();
     expect(await codeOf(() => store.signDropRequest(UPLOAD, TS))).toBe('keystore_closed');
+  });
+
+  it('logs nothing, on success or refusal (I-7)', async () => {
+    const store = await KeychainKeyStore.open(keychain, ID_A);
+    const spies = (['log', 'info', 'warn', 'error', 'debug', 'trace'] as const).map((name) =>
+      vi.spyOn(console, name).mockImplementation(() => undefined),
+    );
+    try {
+      await store.signDropRequest(UPLOAD, TS);
+      await codeOf(() => store.signDropRequest({ ...UPLOAD, method: 'GET' }, TS));
+      for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+    } finally {
+      vi.restoreAllMocks();
+      await store.close();
+    }
   });
 
   it('is on the KeyStore facade that openRecordedKeyStore returns', async () => {
