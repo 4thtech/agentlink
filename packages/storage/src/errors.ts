@@ -13,7 +13,11 @@ export type StorageErrorCode =
   | 'network'
   | 'upload_failed'
   | 'delete_failed'
-  | 'lifecycle_failed';
+  | 'lifecycle_failed'
+  /** M1-6b: the downloaded file did not decrypt or did not match its hashes (04 §4). */
+  | 'integrity_failed'
+  /** M1-6b: the ciphertext source of a download failed. */
+  | 'download_failed';
 
 export class StorageError extends Error {
   override readonly name = 'StorageError';
