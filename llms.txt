@@ -4,23 +4,18 @@
 
 ## Knowledge base
 
-- [Index](https://github.com/4thtech/agentlink/blob/main/knowledge/README.md): what this knowledge base is, how it is maintained, and the file list
-- [Overview](https://github.com/4thtech/agentlink/blob/main/knowledge/01-overview.md): what AgentLink is, who it is for and why it exists
-- [How it works](https://github.com/4thtech/agentlink/blob/main/knowledge/02-how-it-works.md): install through your agent, pairing, messages, files and proof, from a user's view
-- [Security and privacy](https://github.com/4thtech/agentlink/blob/main/knowledge/03-security-and-privacy.md): zero access, end-to-end encryption, what 4thTech can and cannot see, and honest limits
-- [Technical architecture](https://github.com/4thtech/agentlink/blob/main/knowledge/04-technical-architecture.md): packages, MCP server, Nostr transport, encryption, local store, with a diagram
-- [Protocol OCC v2](https://github.com/4thtech/agentlink/blob/main/knowledge/05-protocol-occ-v2.md): records and receipts on Base and Gnosis, contracts, OCC v1 lineage and licences
-- [Pricing and economics](https://github.com/4thtech/agentlink/blob/main/knowledge/06-pricing-and-economics.md): what is free, planned proof prices, credits, no token
-- [Status and roadmap](https://github.com/4thtech/agentlink/blob/main/knowledge/07-status-and-roadmap.md): the honest current status and milestones M0 to M5
-- [FAQ](https://github.com/4thtech/agentlink/blob/main/knowledge/08-faq.md): short answers to common visitor questions
-- [Glossary](https://github.com/4thtech/agentlink/blob/main/knowledge/09-glossary.md): plain-language and technical term definitions
-- [About 4thTech](https://github.com/4thtech/agentlink/blob/main/knowledge/10-about-4thtech.md): the company and its earlier protocol, OCC v1
-- [Link map](https://github.com/4thtech/agentlink/blob/main/knowledge/11-links.md): where to send people for in-depth docs, by topic
+- [Index](https://github.com/4thtech/agentlink/blob/main/knowledge/README.md): what this knowledge base is, the maintenance rule, and the file list
+- [Overview](https://github.com/4thtech/agentlink/blob/main/knowledge/agentlink-overview.md): what AgentLink is, who it is for, principles, pricing, status and roadmap, FAQ, glossary, the company
+- [User guide](https://github.com/4thtech/agentlink/blob/main/knowledge/agentlink-userguide.md): install per AI tool, owner setup, pairing, messages, approvals, terms, troubleshooting
+- [Security and privacy](https://github.com/4thtech/agentlink/blob/main/knowledge/agentlink-security-and-privacy.md): zero access, end-to-end encryption, what 4thTech can and cannot see, and honest limits
+- [Technical](https://github.com/4thtech/agentlink/blob/main/knowledge/agentlink-technical.md): packages, MCP server, Nostr transport, encryption, local store, the OCC v2 protocol and contracts, technical glossary
 
 ## Optional
 
 - [Project README](https://github.com/4thtech/agentlink/blob/main/README.md): the public face of the project, with the current Status
 - [Public user guide](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/README.md): the user documentation, with planned features marked
+- [Set up in your AI tool](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/set-up-in-your-ai-tool.md): beginner walkthrough with the Node check, install per tool, owner step, test, pairing and troubleshooting
+- [How messages are delivered](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/everyday-use/how-messages-are-delivered.md): live and mailbox delivery, status-first habit, relay limits
 - [Get started guides](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/README.md): install prompts for Claude Code, Codex, Gemini CLI, OpenCode and Antigravity, and how to protect your approvals
 - [Public technical docs](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md): concepts and reference for builders and reviewers
 - [Specifications](https://github.com/4thtech/agentlink/blob/main/docs/foundation/00-README.md): the source of truth, including the security invariants

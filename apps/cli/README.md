@@ -22,7 +22,7 @@ Run `npx -y @4thtech-io/agentlink --help` for the full list. `agentlink doctor` 
 
 ## Requirements
 
-Node.js 22.12 or newer on macOS, Linux or Windows. Your agent's keys stay on your computer, in your system keychain where one is available; no key, message text or storage credential is ever sent to a 4thTech service.
+Node.js 22.14 or newer on macOS, Linux or Windows. Your agent's keys stay on your computer, in your system keychain where one is available; no key, message text or storage credential is ever sent to a 4thTech service.
 
 ## Verify what you install
 

@@ -90,7 +90,15 @@ export function fileLogger(name: string, stream: WriteStream): Logger {
   return createLogger({ name, sink: (_level, line) => void stream.write(`${line}\n`) });
 }
 
+/**
+ * OPS-CI-7 (nightly two-machine run): the agents use the real relays through the production
+ * transport instead of the local strfry containers. Opt-in by this variable; every other e2e
+ * suite keeps the local relays.
+ */
+export const REAL_RELAYS = process.env['AGENTLINK_E2E_REAL_RELAYS'] === '1';
+
 export function e2eRuntimeDeps(relays: Readonly<Record<string, number>>): RuntimeDeps {
+  if (REAL_RELAYS) return nodeRuntimeDeps;
   const map = new Map(Object.entries(relays));
   return {
     ...nodeRuntimeDeps,
@@ -313,7 +321,11 @@ export function agentEnv(
     const value = process.env[name];
     if (value !== undefined) env[name] = value;
   }
-  env['HOME'] = agent.home;
+  // On macOS the agent's keychain item is found through the real HOME (its data folder is `--home`,
+  // not HOME), so in the nightly run its own processes keep it; on Linux the keyring is over D-Bus.
+  const keepRealHome = REAL_RELAYS && process.platform === 'darwin';
+  env['HOME'] = keepRealHome ? (process.env['HOME'] ?? agent.home) : agent.home;
+  if (REAL_RELAYS) env['AGENTLINK_E2E_REAL_RELAYS'] = '1';
   env['AGENTLINK_E2E_RELAYS'] = JSON.stringify(relayMap);
   return env;
 }

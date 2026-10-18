@@ -54,6 +54,9 @@ export const OWNER_TEXT = Object.freeze({
   addAgentSeveralOwners:
     "The agents on this computer name different owners, so AgentLink can't tell which one to use. Nothing was changed. Run `agentlink doctor` in your own terminal.",
 
+  // Owner change-code (M1-9z; 04 §2.8 "Changing the owner code").
+  changeCodeDone: 'OK       Use your new owner code from now on, for every agent on this computer.',
+
   // Owner init.
   ownerUnknownAgent:
     'AgentLink is not set up for this agent on this machine yet. Run `agentlink init` yourself, in your own terminal.',

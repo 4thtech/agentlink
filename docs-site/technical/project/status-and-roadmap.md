@@ -1,21 +1,21 @@
 # Status and roadmap
 
 <!-- status-hint:start -->
-> **Status: Current as of 16 Oct 2026 (M1a, walking skeleton: pair and talk, v0.1.0).** Derived from the [build plan](https://github.com/4thtech/agentlink/blob/main/docs/foundation/10-build-plan.md) and updated at every milestone. Durations are indicative, not commitments.
+> **Status: Current as of 17 Oct 2026 (M1a, walking skeleton: pair and talk, v0.1.0).** Derived from the [build plan](https://github.com/4thtech/agentlink/blob/main/docs/foundation/10-build-plan.md) and updated at every milestone. Durations are indicative, not commitments.
 <!-- status-hint:end -->
 
 ## Where we are
 
 <!-- status-summary:start -->
-**Phase:** M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026 (pre-alpha). The repository [README](https://github.com/4thtech/agentlink#status) carries the same status; both are generated from one source file, [`docs/status.yaml`](https://github.com/4thtech/agentlink/blob/main/docs/status.yaml).
+**Phase:** M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026 (pre-alpha); M1b (files, proof, credits) in progress, with the first parts merged but not yet released. The repository [README](https://github.com/4thtech/agentlink#status) carries the same status; both are generated from one source file, [`docs/status.yaml`](https://github.com/4thtech/agentlink/blob/main/docs/status.yaml).
 
-**Not yet:** files, proof, credits, live relay subscriptions, the local approval page, the owner console, desktop apps and the cloud agent. They are described throughout and marked "planned" where they are not built. v0.1.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha, testnets only) was released on 16 Oct 2026; install it with `npx -y @4thtech-io/agentlink init`.
+**Not yet:** file transfer, proof, credits, the designed local approval page (a functional page with the owner code and a localhost passkey is merged, but the CLI does not open it yet), the owner console, desktop apps and the cloud agent. Live relay subscriptions are merged but not released yet. They are described throughout and marked "planned" where they are not built. v0.1.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha, testnets only) was released on 16 Oct 2026 and is still the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`.
 
 **Testnet:** OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit; AgentLink does not use them yet. **Mainnet:** After the external audit (M3). Not deployed. **Services:** Submitter, faucet and encrypted drop are not built or deployed yet.
 
-**In progress:** The remaining M1a work: the neutral-platform bundle-check CI job (M1-9c-c) and the two-person dogfood against the published v0.1.0 package (M1-23). Next: file encryption and the remaining contract work (M1b).
+**In progress:** M1b has started. Merged and shipping in the next 0.1.x release: live relay subscriptions, the claude-desktop setup option, clearer status and recovery messages, the localhost approval server and the Node.js 22.14 check. Merged but not used by any tool yet: the safe fetch and path guard, the storage adapters, the files and proof policy rules and the proof hashing. Still open from M1a: the two-person dogfood against the published package (M1-23). Next in M1b: file encryption and the approval page.
 
-**Next:** Run the two-person dogfood against the published v0.1.0 (the M1a gate), then M1b adds files, proof and credits on testnets.
+**Next:** Cut the next 0.1.x release with the M1b work merged so far, run the two-person dogfood (the M1a gate), then finish M1b: files, proof and credits on testnets.
 
 ### Components
 
@@ -34,8 +34,9 @@ Code that is merged is not necessarily published: nothing is released or install
 | Crypto (@agentlink/crypto) | Key derivation and public identities | Done | [#29](https://github.com/4thtech/agentlink/pull/29) |
 | Crypto (@agentlink/crypto) | Envelope encryption | In progress | [#38](https://github.com/4thtech/agentlink/pull/38), [#61](https://github.com/4thtech/agentlink/pull/61) |
 | Crypto (@agentlink/crypto) | EIP-712 typed data and the agent card | Done | [#32](https://github.com/4thtech/agentlink/pull/32) |
-| Crypto (@agentlink/crypto) | EIP-712 proof types | In progress | [#221](https://github.com/4thtech/agentlink/pull/221) |
+| Crypto (@agentlink/crypto) | EIP-712 proof types | In progress | [#221](https://github.com/4thtech/agentlink/pull/221), [#212](https://github.com/4thtech/agentlink/pull/212) |
 | Crypto (@agentlink/crypto) | Owner passphrase wrap, pairing proof, safety code | Done | [#37](https://github.com/4thtech/agentlink/pull/37) |
+| Crypto (@agentlink/crypto) | Passkey seed wrap and recovery code | Done | [#222](https://github.com/4thtech/agentlink/pull/222), [#228](https://github.com/4thtech/agentlink/pull/228) |
 | Crypto (@agentlink/crypto) | Key interfaces, NIP-44 v2, gift wrap | Done | [#41](https://github.com/4thtech/agentlink/pull/41), [#42](https://github.com/4thtech/agentlink/pull/42), [#55](https://github.com/4thtech/agentlink/pull/55) |
 | Crypto (@agentlink/crypto) | Independent test vectors | In progress | [#25](https://github.com/4thtech/agentlink/pull/25), [#35](https://github.com/4thtech/agentlink/pull/35), [#72](https://github.com/4thtech/agentlink/pull/72), [#75](https://github.com/4thtech/agentlink/pull/75), [#104](https://github.com/4thtech/agentlink/pull/104) |
 | Crypto (@agentlink/crypto) | Sender code for unknown senders | Done | [#110](https://github.com/4thtech/agentlink/pull/110) |
@@ -62,6 +63,9 @@ Code that is merged is not necessarily published: nothing is released or install
 | Core (@agentlink/core) | Held cards need the sender's own owner entry | Done | [#90](https://github.com/4thtech/agentlink/pull/90) |
 | Core (@agentlink/core) | Send pipeline | Done | [#99](https://github.com/4thtech/agentlink/pull/99), [#133](https://github.com/4thtech/agentlink/pull/133) |
 | Core (@agentlink/core) | Inbox sync, delivery acknowledgements, owner card update | Done | [#106](https://github.com/4thtech/agentlink/pull/106), [#130](https://github.com/4thtech/agentlink/pull/130), [#131](https://github.com/4thtech/agentlink/pull/131) |
+| Core (@agentlink/core) | Live relay subscriptions | Done | [#204](https://github.com/4thtech/agentlink/pull/204) |
+| Core (@agentlink/core) | Policy rules for files, proofs and the budget ledger | Done | [#217](https://github.com/4thtech/agentlink/pull/217) |
+| Core (@agentlink/core) | SSRF-safe fetch and the allowed-folder path guard | Done | [#208](https://github.com/4thtech/agentlink/pull/208) |
 | Core (@agentlink/core) | Terms and one approval per agreement | Done | [#126](https://github.com/4thtech/agentlink/pull/126), [#134](https://github.com/4thtech/agentlink/pull/134) |
 | Node runtime (@agentlink/node) | Agent key store in the OS keychain | Done | [#54](https://github.com/4thtech/agentlink/pull/54), [#57](https://github.com/4thtech/agentlink/pull/57), [#83](https://github.com/4thtech/agentlink/pull/83) |
 | Node runtime (@agentlink/node) | Local SQLite database | Done | [#60](https://github.com/4thtech/agentlink/pull/60), [#68](https://github.com/4thtech/agentlink/pull/68) |
@@ -69,13 +73,17 @@ Code that is merged is not necessarily published: nothing is released or install
 | Node runtime (@agentlink/node) | Relay connection | Done | [#81](https://github.com/4thtech/agentlink/pull/81), [#84](https://github.com/4thtech/agentlink/pull/84) |
 | Node runtime (@agentlink/node) | Policy version record in the keychain | Done | [#86](https://github.com/4thtech/agentlink/pull/86) |
 | Node runtime (@agentlink/node) | First agent card at owner setup | Done | [#118](https://github.com/4thtech/agentlink/pull/118) |
+| Node runtime (@agentlink/node) | Local approval server | Done | [#207](https://github.com/4thtech/agentlink/pull/207), [#225](https://github.com/4thtech/agentlink/pull/225), [#247](https://github.com/4thtech/agentlink/pull/247) |
+| Node runtime (@agentlink/node) | Owner recovery without an attached agent | Done | [#206](https://github.com/4thtech/agentlink/pull/206), [#227](https://github.com/4thtech/agentlink/pull/227) |
+| Node runtime (@agentlink/node) | Path guard fixes for Windows and macOS | Done | [#229](https://github.com/4thtech/agentlink/pull/229), [#214](https://github.com/4thtech/agentlink/pull/214) |
 | Node runtime (@agentlink/node) | Passphrase-locked key file for headless machines | Planned | - |
-| MCP server, CLI and apps | MCP server and CLI | In progress | [#102](https://github.com/4thtech/agentlink/pull/102), [#103](https://github.com/4thtech/agentlink/pull/103), [#107](https://github.com/4thtech/agentlink/pull/107), [#111](https://github.com/4thtech/agentlink/pull/111), [#112](https://github.com/4thtech/agentlink/pull/112), [#113](https://github.com/4thtech/agentlink/pull/113), [#115](https://github.com/4thtech/agentlink/pull/115), [#124](https://github.com/4thtech/agentlink/pull/124), [#125](https://github.com/4thtech/agentlink/pull/125), [#127](https://github.com/4thtech/agentlink/pull/127), [#131](https://github.com/4thtech/agentlink/pull/131), [#132](https://github.com/4thtech/agentlink/pull/132), [#135](https://github.com/4thtech/agentlink/pull/135), [#142](https://github.com/4thtech/agentlink/pull/142), [#143](https://github.com/4thtech/agentlink/pull/143), [#178](https://github.com/4thtech/agentlink/pull/178), [#183](https://github.com/4thtech/agentlink/pull/183), [#184](https://github.com/4thtech/agentlink/pull/184), [#185](https://github.com/4thtech/agentlink/pull/185), [#186](https://github.com/4thtech/agentlink/pull/186), [#190](https://github.com/4thtech/agentlink/pull/190), [#192](https://github.com/4thtech/agentlink/pull/192), [#193](https://github.com/4thtech/agentlink/pull/193) |
+| MCP server, CLI and apps | MCP server and CLI | In progress | [#102](https://github.com/4thtech/agentlink/pull/102), [#103](https://github.com/4thtech/agentlink/pull/103), [#107](https://github.com/4thtech/agentlink/pull/107), [#111](https://github.com/4thtech/agentlink/pull/111), [#112](https://github.com/4thtech/agentlink/pull/112), [#113](https://github.com/4thtech/agentlink/pull/113), [#115](https://github.com/4thtech/agentlink/pull/115), [#124](https://github.com/4thtech/agentlink/pull/124), [#125](https://github.com/4thtech/agentlink/pull/125), [#127](https://github.com/4thtech/agentlink/pull/127), [#131](https://github.com/4thtech/agentlink/pull/131), [#132](https://github.com/4thtech/agentlink/pull/132), [#135](https://github.com/4thtech/agentlink/pull/135), [#142](https://github.com/4thtech/agentlink/pull/142), [#143](https://github.com/4thtech/agentlink/pull/143), [#178](https://github.com/4thtech/agentlink/pull/178), [#183](https://github.com/4thtech/agentlink/pull/183), [#184](https://github.com/4thtech/agentlink/pull/184), [#185](https://github.com/4thtech/agentlink/pull/185), [#186](https://github.com/4thtech/agentlink/pull/186), [#190](https://github.com/4thtech/agentlink/pull/190), [#192](https://github.com/4thtech/agentlink/pull/192), [#193](https://github.com/4thtech/agentlink/pull/193), [#199](https://github.com/4thtech/agentlink/pull/199), [#200](https://github.com/4thtech/agentlink/pull/200), [#201](https://github.com/4thtech/agentlink/pull/201), [#205](https://github.com/4thtech/agentlink/pull/205), [#206](https://github.com/4thtech/agentlink/pull/206), [#219](https://github.com/4thtech/agentlink/pull/219), [#231](https://github.com/4thtech/agentlink/pull/231), [#235](https://github.com/4thtech/agentlink/pull/235), [#238](https://github.com/4thtech/agentlink/pull/238) |
 | MCP server, CLI and apps | Agent skill file and quickstart guides | Done | [#151](https://github.com/4thtech/agentlink/pull/151), [#152](https://github.com/4thtech/agentlink/pull/152) |
-| MCP server, CLI and apps | End-to-end tests | In progress | [#155](https://github.com/4thtech/agentlink/pull/155), [#163](https://github.com/4thtech/agentlink/pull/163), [#165](https://github.com/4thtech/agentlink/pull/165), [#166](https://github.com/4thtech/agentlink/pull/166), [#169](https://github.com/4thtech/agentlink/pull/169), [#171](https://github.com/4thtech/agentlink/pull/171) |
-| MCP server, CLI and apps | Multi-harness dogfood runbook | Done | [#168](https://github.com/4thtech/agentlink/pull/168) |
+| MCP server, CLI and apps | End-to-end tests | In progress | [#155](https://github.com/4thtech/agentlink/pull/155), [#163](https://github.com/4thtech/agentlink/pull/163), [#165](https://github.com/4thtech/agentlink/pull/165), [#166](https://github.com/4thtech/agentlink/pull/166), [#169](https://github.com/4thtech/agentlink/pull/169), [#171](https://github.com/4thtech/agentlink/pull/171), [#232](https://github.com/4thtech/agentlink/pull/232) |
+| MCP server, CLI and apps | Multi-harness dogfood runbook | Done | [#168](https://github.com/4thtech/agentlink/pull/168), [#202](https://github.com/4thtech/agentlink/pull/202), [#236](https://github.com/4thtech/agentlink/pull/236) |
 | MCP server, CLI and apps | Several agents of one owner on one computer | Done | [#172](https://github.com/4thtech/agentlink/pull/172), [#178](https://github.com/4thtech/agentlink/pull/178) |
-| MCP server, CLI and apps | Local approval page | Planned | - |
+| MCP server, CLI and apps | Local approval page | In progress | [#207](https://github.com/4thtech/agentlink/pull/207), [#225](https://github.com/4thtech/agentlink/pull/225), [#247](https://github.com/4thtech/agentlink/pull/247) |
+| MCP server, CLI and apps | Beginner setup page | Done | [#234](https://github.com/4thtech/agentlink/pull/234) |
 | MCP server, CLI and apps | Owner console, desktop apps, cloud agent | Planned | - |
 | OCC v2 contracts (private repo) | Notary and fee vault | Done | contracts#4 |
 | OCC v2 contracts (private repo) | Testnet deployment | Done | [#65](https://github.com/4thtech/agentlink/pull/65), contracts#8, contracts#9 |
@@ -91,7 +99,7 @@ Code that is merged is not necessarily published: nothing is released or install
 |---|---|---|---|---|
 | **M0** Foundations | Repository, CI and rules in place | 0.0.x | ~1 week | In progress |
 | **M1a** Walking skeleton: pair and talk | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 | ~2–3 weeks | In progress |
-| **M1b** Files, proof, credits | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI | 0.2.0 (M1 gate) | ~3–4 weeks | Planned |
+| **M1b** Files, proof, credits | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI | 0.2.0 (M1 gate) | ~3–4 weeks | In progress |
 | **M2** Owner console, desktop apps, self-host, design | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors | 0.3.0 | ~4–6+ weeks | Planned |
 | **M3** Mainnet beta (Base, Gnosis) | External audit; contracts on Base and Gnosis; paid proof with credits | 1.0.0 | ~4 weeks | Planned |
 | **M4** Expansion | More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters | after 1.0.0 | rolling | Planned |

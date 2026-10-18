@@ -13,6 +13,7 @@ import {
   DISPATCH_TEXT,
   type CommandHandler,
 } from '../dispatch.js';
+import { hasUnfinishedOwnerCodeChange } from '@agentlink/node';
 import { listAgentNames, readAgentConfig } from '../runtime/agent-dir.js';
 import { isAgentName } from '../runtime/agent-name.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
@@ -75,6 +76,13 @@ export function createDoctorHandler(deps: CommandDeps = createDeps()): CommandHa
     const { agent } = opened;
     try {
       emit(copy('cli.doctor.keysFound'));
+
+      // M1-9z (IR-M1-9z-1 F2): a leftover owner code change; `owner change-code` finishes it.
+      if (deps.unfinishedOwnerCodeChange !== undefined) {
+        if (await deps.unfinishedOwnerCodeChange().catch(() => false)) {
+          emit(TEXT.doctorOwnerCodeUnfinished, true);
+        }
+      }
 
       // M1-9u: the agent exists but no owner card is stored for it. Read from the agent's own store
       // (no KeyStore secret); the later checks would only fail in confusing ways.
@@ -150,4 +158,6 @@ export function createDoctorHandler(deps: CommandDeps = createDeps()): CommandHa
   };
 }
 
-export const doctorHandler: CommandHandler = createDoctorHandler();
+export const doctorHandler: CommandHandler = createDoctorHandler(
+  createDeps({ unfinishedOwnerCodeChange: hasUnfinishedOwnerCodeChange }),
+);

@@ -6,7 +6,7 @@
 // "Interactive only" is a UX guard, not a security boundary (04 §2.8): a same-user process can fake a
 // terminal. It keeps the owner secret out of the agent's normal flow; it does not stop a tampered
 // installation or a fake prompt (04 §2.5, G-1, D-67).
-import { wipe } from '@agentlink/crypto';
+import { wipe, type OwnerPresence } from '@agentlink/crypto';
 import { NodeKeyStoreError } from './errors.js';
 
 /** What owner flows need from a terminal. Tests script it; production uses ttyOwnerTerminal. */
@@ -17,8 +17,19 @@ export interface OwnerTerminal {
   readSecret(label: string): Promise<Uint8Array>;
   /** Asks a visible yes/no question; anything but y or yes is no. */
   confirm(question: string): Promise<boolean>;
+  /**
+   * M1-8h-b: reads one visible line of non-secret text (the display name at `owner init`). Optional:
+   * a terminal without it is never asked, and the caller keeps its default.
+   */
+  readText?(label: string): Promise<string>;
   /** Clears the screen and the scrollback after a generated code was shown (04 §2.8). */
   clearScreen(): void;
+  /**
+   * M1-8e: the presence proof itself, for surfaces that are not a TTY (the localhost page: the owner
+   * code, or the localhost passkey's PRF output after the gesture). Optional: without it the owner
+   * flows read the owner code with readSecret. Never reachable from agent-facing code (I-4).
+   */
+  readPresence?(label: string): Promise<OwnerPresence>;
 }
 
 /** The parts of a TTY read stream the prompt uses (`process.stdin`). */
@@ -175,6 +186,16 @@ export function ttyOwnerTerminal(streams: TtyStreams = {}): OwnerTerminal {
         const text = new TextDecoder().decode(answer).trim().toLowerCase();
         wipe(answer);
         return text === 'y' || text === 'yes';
+      });
+    },
+    readText(label: string): Promise<string> {
+      return serial(async () => {
+        output.write(`${label} `);
+        const answer = await readLine(input, output, true);
+        // Invalid UTF-8 becomes U+FFFD, which the caller's rule refuses.
+        const text = new TextDecoder().decode(answer);
+        wipe(answer);
+        return text;
       });
     },
     clearScreen(): void {

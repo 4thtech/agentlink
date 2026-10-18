@@ -89,6 +89,7 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
     usage: [
       'agentlink owner init                     †',
       'agentlink owner add-agent --agent <name>   †',
+      'agentlink owner change-code              †',
     ],
     guard: 'owner',
     options: AGENT,

@@ -25,8 +25,14 @@
 // - The token grants viewing only (08 §1). A decision needs owner presence: the owner code or owner
 //   passphrase, sent as the raw request body, unlocks the owner key for exactly one owner operation
 //   (04 §2.5, D-68: one `approval.decide`), and the buffer is wiped. The signed object goes to the
-//   source (core's `ownerActions.apply`), which verifies it (I-4). No route decides without it; the
-//   localhost passkey path (WebAuthn PRF) is M1-8e.
+//   source (core's `ownerActions.apply`), which verifies it (I-4). No route decides without it.
+// - M1-8e, the localhost passkey (owner-passkey.ts): with `X-AgentLink-Presence: passkey` the body is
+//   the passkey assertion (credential ID, authenticator data, user handle, PRF output). The server
+//   checks it against the stored `owner-passkey` item and the owner (credential ID, user handle,
+//   rpIdHash = SHA-256("localhost"), UP and UV) before the PRF output unlocks the owner key for one
+//   owner operation. `/api/owner/passkey` shows the public registration data (GET) and registers the
+//   one passkey (POST: the owner code plus the assertion), its own owner operation that signs
+//   nothing. The PRF output never leaves this process and is wiped after use.
 // - What is signed is what the page showed: the page sends back the action digest it displayed; the
 //   server re-reads the request, recomputes the digest from the stored action and refuses any
 //   difference before the owner store is opened.
@@ -49,17 +55,28 @@ import {
   equalBytes,
   randomBytes,
   sha256,
+  ownerPrfSalt,
   wipe,
   type JsonObject,
   type JsonValue,
+  type OwnerPresence,
   type OwnerPublicKeys,
 } from '@agentlink/crypto';
 import { osBrowserOpener, osNotifier, type BrowserOpener, type OsNotifier } from './approval-os.js';
 import { APP_JS, EXPIRED_HTML, pageHtml } from './approval-page.js';
 import { NodeKeyStoreError } from './errors.js';
-import { osKeychain } from './keychain.js';
+import { osKeychain, type KeychainBackend } from './keychain.js';
 import { decideReviewedWith, type ApprovalContext } from './owner-approval.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
+import {
+  PASSKEY_RP_ID,
+  assertPasskeyAssertion,
+  parsePasskeyAssertion,
+  parsePasskeyRegistration,
+  readOwnerPasskeyHeader,
+  registerOwnerPasskey,
+  type PasskeyAssertion,
+} from './owner-passkey.js';
 import type { PromptingOwnerKeyStore } from './owner-operation.js';
 import type { OwnerTerminal } from './owner-terminal.js';
 
@@ -74,6 +91,9 @@ const MAX_PORT_ATTEMPTS = 5;
 const NO_IPV6 = new Set(['EADDRNOTAVAIL', 'EAFNOSUPPORT']);
 /** Longest accepted owner secret in bytes (the same bound as the TTY prompt). */
 const MAX_SECRET_BYTES = 1024;
+/** Longest accepted passkey body (assertion, or owner code plus assertion), M1-8e. */
+const MAX_PASSKEY_BYTES = 4096;
+const PASSKEY_PATH = '/api/owner/passkey';
 const NOTIFICATION = ['AgentLink', 'An approval is waiting for you.'] as const;
 
 const APPROVAL_ID = /^apr_[A-Za-z0-9_-]{22}$/;
@@ -151,6 +171,19 @@ export type ApprovalServerEvent =
         | 'needs_setup'
         | 'failed';
     }
+  /** M1-8e: the outcome of a passkey registration. */
+  | {
+      readonly kind: 'passkey';
+      readonly outcome:
+        | 'registered'
+        | 'presence_required'
+        | 'presence_rejected'
+        | 'passkey_exists'
+        | 'passkey_unsupported'
+        | 'busy'
+        | 'needs_setup'
+        | 'failed';
+    }
   | { readonly kind: 'closed' };
 
 export interface ApprovalServerOptions {
@@ -171,6 +204,8 @@ export interface ApprovalServerInternals {
   /** Listens `server` as asked; rejects with the socket error (its `code`). Default: server.listen. */
   readonly listen?: (server: Server, options: ApprovalListenOptions) => Promise<void>;
   readonly openOwnerStore?: (owner: OwnerPublicKeys) => Promise<PromptingOwnerKeyStore>;
+  /** The keychain holding the `owner` and `owner-passkey` items (M1-8e). Default: the OS keychain. */
+  readonly keychain?: KeychainBackend;
   readonly opener?: BrowserOpener;
   readonly notifier?: OsNotifier;
 }
@@ -201,6 +236,7 @@ export interface ApprovalServer {
 }
 
 type DecisionOutcome = Extract<ApprovalServerEvent, { kind: 'decision' }>['outcome'];
+type PasskeyOutcome = Extract<ApprovalServerEvent, { kind: 'passkey' }>['outcome'];
 type RejectReason = Extract<ApprovalServerEvent, { kind: 'rejected' }>['reason'];
 
 /** The default listen: one `server.listen`, rejecting with the socket error. */
@@ -236,17 +272,21 @@ const errorCode = (error: unknown): unknown =>
 const invalidId = (): NodeKeyStoreError =>
   new NodeKeyStoreError('owner_operation_invalid', 'That is not a valid approval ID.');
 
-/** A terminal for one page decision: shows nothing, the click was the confirmation, one secret. */
-function pageTerminal(secret: Uint8Array): OwnerTerminal {
+/**
+ * A terminal for one page decision: shows nothing, the click was the confirmation, one presence
+ * proof (the owner code, or the passkey's PRF output, M1-8e), handed over once.
+ */
+function pageTerminal(presence: OwnerPresence): OwnerTerminal {
   let given = false;
   return {
     write: () => undefined,
     // The owner clicked Approve or Deny on the card for exactly this request and digest.
     confirm: () => Promise.resolve(true),
-    readSecret: () => {
+    readSecret: () => Promise.reject(new KeyStoreError('presence_rejected', 'presence')),
+    readPresence: () => {
       if (given) return Promise.reject(new KeyStoreError('presence_rejected', 'presence'));
       given = true;
-      return Promise.resolve(secret);
+      return Promise.resolve(presence);
     },
     clearScreen: () => undefined,
   };
@@ -301,9 +341,11 @@ export async function startApprovalServerWith(
   internals: ApprovalServerInternals = {},
 ): Promise<ApprovalServer> {
   const { source } = options;
+  let keychainInstance: KeychainBackend | undefined = internals.keychain;
+  const keychainOf = (): KeychainBackend => (keychainInstance ??= osKeychain());
   const openOwnerStore =
     internals.openOwnerStore ??
-    ((owner: OwnerPublicKeys) => KeychainOwnerKeyStore.open(osKeychain(), owner));
+    ((owner: OwnerPublicKeys) => KeychainOwnerKeyStore.open(keychainOf(), owner));
   const opener = internals.opener ?? osBrowserOpener;
   const notifier = internals.notifier ?? osNotifier;
   const listen = internals.listen ?? listenOnce;
@@ -402,14 +444,17 @@ export async function startApprovalServerWith(
     return site === undefined || site === 'same-origin';
   };
 
-  /** Reads the owner secret body into one bounded buffer; chunks are wiped after copying. */
-  const readSecret = (req: IncomingMessage): Promise<Uint8Array | 'too_large'> =>
+  /** Reads a secret body into one bounded buffer; chunks are wiped after copying. */
+  const readSecret = (
+    req: IncomingMessage,
+    limit: number = MAX_SECRET_BYTES,
+  ): Promise<Uint8Array | 'too_large'> =>
     new Promise((resolve, rejectRead) => {
-      const buffer = new Uint8Array(MAX_SECRET_BYTES);
+      const buffer = new Uint8Array(limit);
       let length = 0;
       let over = false;
       req.on('data', (chunk: Buffer) => {
-        if (!over && length + chunk.length <= MAX_SECRET_BYTES) {
+        if (!over && length + chunk.length <= limit) {
           buffer.set(chunk, length);
           length += chunk.length;
         } else {
@@ -443,29 +488,67 @@ export async function startApprovalServerWith(
     sendJson(res, status, { status: outcome, ...extra });
   };
 
+  const finishPasskey = (res: ServerResponse, status: number, outcome: PasskeyOutcome): void => {
+    emit({ kind: 'passkey', outcome });
+    sendJson(res, status, { status: outcome });
+  };
+
+  /** Reads a bounded body after the declared length check; 'too_large' was answered already. */
+  async function boundedBody(
+    req: IncomingMessage,
+    res: ServerResponse,
+    limit: number,
+  ): Promise<Uint8Array | undefined> {
+    const declared = Number(header(req, 'content-length') ?? '0');
+    if (Number.isFinite(declared) && declared > limit) {
+      res.setHeader('Connection', 'close');
+      reject(res, 413, 'too_large');
+      req.resume();
+      return undefined;
+    }
+    const body = await readSecret(req, limit);
+    if (body === 'too_large') {
+      reject(res, 413, 'too_large');
+      return undefined;
+    }
+    return body;
+  }
+
   async function decide(
     req: IncomingMessage,
     res: ServerResponse,
     approvalId: string,
     decision: 'approve' | 'deny',
   ): Promise<void> {
-    const declared = Number(header(req, 'content-length') ?? '0');
-    if (Number.isFinite(declared) && declared > MAX_SECRET_BYTES) {
-      res.setHeader('Connection', 'close');
-      reject(res, 413, 'too_large');
+    const mode = header(req, 'x-agentlink-presence');
+    const passkey = mode === 'passkey';
+    if (mode !== undefined && !passkey) {
+      finishDecision(res, 403, 'presence_required');
       req.resume();
       return;
     }
-    const body = await readSecret(req);
-    if (body === 'too_large') {
-      reject(res, 413, 'too_large');
-      return;
-    }
-    let secret: Uint8Array | undefined = body;
+    const body = await boundedBody(req, res, passkey ? MAX_PASSKEY_BYTES : MAX_SECRET_BYTES);
+    if (body === undefined) return;
+    // Every secret byte this request carried; wiped whatever happens (unlock also wipes its copy).
+    let assertion: PasskeyAssertion | undefined;
+    let presence: OwnerPresence | undefined;
     try {
-      if (secret.length === 0) {
+      if (body.length === 0) {
         finishDecision(res, 403, 'presence_required');
         return;
+      }
+      if (passkey) {
+        try {
+          assertion = parsePasskeyAssertion(body);
+        } catch {
+          finishDecision(res, 403, 'presence_required');
+          return;
+        }
+        if (assertion.prfOutput.length === 0) {
+          // A PRF-less authenticator: the owner code is the way (the page offers it).
+          finishDecision(res, 403, 'presence_required');
+          return;
+        }
       }
       // Check and claim with no await in between: one owner operation at a time.
       if (decided.has(approvalId)) {
@@ -506,6 +589,21 @@ export async function startApprovalServerWith(
           finishDecision(res, 503, 'needs_setup');
           return;
         }
+        if (assertion !== undefined) {
+          // 04 §2.3.1: the assertion names the stored credential, the owner as user handle, RP ID
+          // localhost and UP and UV, before its PRF output is used at all.
+          try {
+            const stored = await readOwnerPasskeyHeader(keychainOf());
+            if (stored === null) throw new KeyStoreError('presence_rejected', 'presence');
+            assertPasskeyAssertion(stored, context.owner, assertion);
+          } catch {
+            finishDecision(res, 403, 'presence_rejected');
+            return;
+          }
+          presence = { kind: 'passkey-prf', prfOutput: assertion.prfOutput };
+        } else {
+          presence = { kind: 'passphrase', secret: body };
+        }
         let store: PromptingOwnerKeyStore;
         try {
           store = await openOwnerStore(context.owner);
@@ -515,9 +613,8 @@ export async function startApprovalServerWith(
         }
         let signed: { readonly body: JsonObject; readonly sig: string };
         try {
-          const typed = secret;
-          secret = undefined; // unlock wipes it, whether or not it unlocks
-          signed = await decideReviewedWith(store, pageTerminal(typed), context, [
+          // unlock wipes the presented bytes, whether or not they unlock.
+          signed = await decideReviewedWith(store, pageTerminal(presence), context, [
             {
               approvalId,
               action: entry.action,
@@ -551,7 +648,76 @@ export async function startApprovalServerWith(
         busy = false;
       }
     } finally {
-      if (secret !== undefined) wipe(secret);
+      wipe(body, assertion?.prfOutput);
+    }
+  }
+
+  /** GET /api/owner/passkey: the public data the page needs for the WebAuthn ceremony. */
+  async function passkeyInfo(res: ServerResponse): Promise<void> {
+    const context = await source.context();
+    if (context === undefined) {
+      sendJson(res, 503, { status: 'needs_setup' });
+      return;
+    }
+    const stored = await readOwnerPasskeyHeader(keychainOf());
+    const usable = stored !== null && equalBytes(stored.ownerNostr, context.owner.ownerNostr);
+    sendJson(res, 200, {
+      passkey: {
+        registered: usable,
+        rpId: PASSKEY_RP_ID,
+        userId: encodeBase64url(context.owner.ownerNostr),
+        prfSalt: encodeBase64url(ownerPrfSalt()),
+        ...(usable ? { credentialId: encodeBase64url(stored.credentialId) } : {}),
+      },
+    });
+  }
+
+  /**
+   * POST /api/owner/passkey: registers the one localhost passkey (M1-8e). Its own owner operation:
+   * one entry of the owner code, no signature; the code, the PRF output and the seed are wiped.
+   */
+  async function passkeyRegister(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const body = await boundedBody(req, res, MAX_PASSKEY_BYTES);
+    if (body === undefined) return;
+    let parsed: ReturnType<typeof parsePasskeyRegistration> | undefined;
+    try {
+      try {
+        parsed = parsePasskeyRegistration(body);
+      } catch {
+        finishPasskey(res, 403, 'presence_required');
+        return;
+      }
+      if (busy) {
+        finishPasskey(res, 409, 'busy');
+        return;
+      }
+      busy = true;
+      try {
+        const context = await source.context();
+        if (context === undefined) {
+          finishPasskey(res, 503, 'needs_setup');
+          return;
+        }
+        const { ownerSecret, assertion } = parsed;
+        parsed = undefined; // registerOwnerPasskey wipes the code and the PRF output
+        try {
+          await registerOwnerPasskey(keychainOf(), context.owner, ownerSecret, assertion);
+        } catch (error) {
+          const code = (error as { code?: unknown } | null)?.code;
+          if (code === 'owner_passkey_exists') finishPasskey(res, 409, 'passkey_exists');
+          else if (code === 'passkey_unsupported') finishPasskey(res, 422, 'passkey_unsupported');
+          else if (code === 'presence_rejected') finishPasskey(res, 403, 'presence_rejected');
+          else if (code === 'presence_required') finishPasskey(res, 403, 'presence_required');
+          else if (code === 'owner_missing') finishPasskey(res, 503, 'needs_setup');
+          else finishPasskey(res, 500, 'failed');
+          return;
+        }
+        finishPasskey(res, 200, 'registered');
+      } finally {
+        busy = false;
+      }
+    } finally {
+      wipe(body, parsed?.ownerSecret, parsed?.assertion.prfOutput);
     }
   }
 
@@ -604,21 +770,30 @@ export async function startApprovalServerWith(
 
     const one = API_ONE.exec(path);
     const decideMatch = API_DECIDE.exec(path);
-    if (path !== '/api/approvals' && one === null && decideMatch === null) {
+    const passkeyRoute = path === PASSKEY_PATH;
+    if (path !== '/api/approvals' && one === null && decideMatch === null && !passkeyRoute) {
       reject(res, 404, 'not_found');
       return;
     }
-    const wanted = decideMatch === null ? 'GET' : 'POST';
-    if (method !== wanted) return reject(res, 405, 'method');
+    const post = decideMatch !== null || (passkeyRoute && method === 'POST');
+    if (method !== (post ? 'POST' : 'GET')) return reject(res, 405, 'method');
     if (!matches(cookieToken(req), tokenBytes)) return reject(res, 401, 'token');
     if (!fetchSiteOk(req)) return reject(res, 403, 'fetch_site');
-    if (decideMatch !== null && originHeader === undefined) return reject(res, 403, 'origin');
+    if (post && originHeader === undefined) return reject(res, 403, 'origin');
     if (!matches(header(req, 'x-agentlink-csrf'), csrfBytes)) return reject(res, 403, 'csrf');
 
-    if (decideMatch !== null) {
+    if (post) {
       const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
       if (type !== 'application/octet-stream') return reject(res, 415, 'content_type');
+      if (decideMatch === null) {
+        await passkeyRegister(req, res);
+        return;
+      }
       await decide(req, res, decideMatch[1] as string, decideMatch[2] as 'approve' | 'deny');
+      return;
+    }
+    if (passkeyRoute) {
+      await passkeyInfo(res);
       return;
     }
     if (one !== null) {

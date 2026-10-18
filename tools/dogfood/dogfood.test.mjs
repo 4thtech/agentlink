@@ -8,6 +8,11 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   OPENCODE_DENIED_PERMISSIONS,
+  ambiguityProblem,
+  contactIdOf,
+  contactsNamed,
+  errorCodeNotes,
+  errorCodeOf,
   checkSummary,
   handoffBox,
   manualBox,
@@ -1385,5 +1390,77 @@ describe('F1 path resolution and the outside-workspace rule (IR-M1-23-F1-1)', ()
     const r = verdict(oc('read', { filePath: '/tmp/x' }, 'error', RULE));
     expect(r.ok).toBe(false);
     expect(r.notes.join()).toContain('inconclusive');
+  });
+});
+
+describe('tool error codes and ambiguous contacts (M1-23-c)', () => {
+  const ambiguous = { status: 'error', code: 'AMBIGUOUS_CONTACT', summary: 'x', nextStep: 'y' };
+
+  it('reads the error code from a JSON result and from OpenCode text', () => {
+    expect(errorCodeOf(call('agentlink_send', {}, ambiguous))).toBe('AMBIGUOUS_CONTACT');
+    expect(errorCodeOf(call('agentlink_send', {}, { status: 'ok' }))).toBeUndefined();
+    expect(
+      errorCodeOf({
+        name: 'agentlink_send',
+        input: {},
+        result: 'Failed: AMBIGUOUS_CONTACT, two matches',
+        isError: true,
+      }),
+    ).toBe('AMBIGUOUS_CONTACT');
+  });
+
+  it('puts the code in the note of a failed step', async () => {
+    const m1 = buildSteps(names).filter((s) => s.id === 'M1');
+    const { results } = await runPlan(m1, {
+      now: () => 0,
+      log: () => {},
+      agentOf: (h) => (h === 'cc' ? 'cc-test' : 'oc-test'),
+      initialCtx: { paired: true },
+      run: () => Promise.resolve(runOf([call('agentlink_send', {}, ambiguous)])),
+    });
+    expect(results[0].outcome).toBe('fail');
+    expect(results[0].notes).toContain('AMBIGUOUS_CONTACT: two contacts share that name');
+    expect(errorCodeNotes(runOf([call('agentlink_send', {}, ambiguous)]))).toEqual([
+      'AMBIGUOUS_CONTACT: two contacts share that name',
+    ]);
+  });
+
+  const listing =
+    '2 contacts\n\n1. “oc-test” (self-declared)\n   paired\n2. “oc-test” (self-declared)\n   paired\n';
+
+  it('counts contacts with the peer name in the CLI listing', () => {
+    expect(contactsNamed(listing, 'oc-test')).toBe(2);
+    expect(contactsNamed(listing, 'cc-test')).toBe(0);
+    expect(contactsNamed('1. “oc-test” (self-declared)\n', 'OC-test')).toBe(1);
+  });
+
+  it('stops the preflight only for more than one match', () => {
+    expect(ambiguityProblem(listing, 'cc-test', 'oc-test')).toMatch(/--oc-agent/);
+    expect(
+      ambiguityProblem('1. “oc-test” (self-declared)\n', 'cc-test', 'oc-test'),
+    ).toBeUndefined();
+  });
+
+  it('addresses the peer by contact ID once P4 has listed it', () => {
+    const one = runOf([
+      call('agentlink_list_contacts', {}, { contacts: [{ id: 'agt_1', name: 'oc-test' }] }),
+    ]);
+    expect(contactIdOf(one, 'oc-test')).toBe('agt_1');
+    const two = runOf([
+      call(
+        'agentlink_list_contacts',
+        {},
+        {
+          contacts: [
+            { id: 'agt_1', name: 'oc-test' },
+            { id: 'agt_2', name: 'oc-test' },
+          ],
+        },
+      ),
+    ]);
+    expect(contactIdOf(two, 'oc-test')).toBeUndefined();
+    const m1 = buildSteps(names).find((s) => s.id === 'M1');
+    expect(m1.prompt({})).toContain('Send oc-test a short note');
+    expect(m1.prompt({ peerContactId: 'agt_1' })).toContain('oc-test (contact ID agt_1)');
   });
 });

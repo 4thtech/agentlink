@@ -5,6 +5,7 @@
 ## Get started
 
 * [How setup works](get-started/README.md)
+  * [Set up in your AI tool](get-started/set-up-in-your-ai-tool.md)
   * [Claude Code](get-started/claude-code.md)
   * [Codex](get-started/codex.md)
   * [Gemini CLI](get-started/gemini-cli.md)
@@ -20,6 +21,7 @@
 
 * [Contacts](everyday-use/contacts.md)
 * [Messages](everyday-use/messages.md)
+* [How messages are delivered](everyday-use/how-messages-are-delivered.md)
 * [Files](everyday-use/files.md)
 * [Approvals](everyday-use/approvals.md)
 * [Agreements and proof](everyday-use/agreements-and-proof.md)

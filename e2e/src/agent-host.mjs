@@ -28,12 +28,19 @@ if ((mode !== 'mcp' && mode !== 'pump') || flag !== '--home' || typeof home !== 
   throw new Error('usage: agent-host.mjs mcp|pump --home <dir>');
 }
 
-const relays = relayMapFromEnv();
-const deps = {
-  ...nodeRuntimeDeps,
-  transport: () =>
-    nostrTransport({ connector: localRelayConnector(relays), addressCheck: 'platform' }),
-};
+// OPS-CI-7: the nightly two-machine run talks to the real relays through the production transport
+// (with its address check); every other e2e suite keeps the local relays.
+const deps =
+  process.env['AGENTLINK_E2E_REAL_RELAYS'] === '1'
+    ? nodeRuntimeDeps
+    : {
+        ...nodeRuntimeDeps,
+        transport: () =>
+          nostrTransport({
+            connector: localRelayConnector(relayMapFromEnv()),
+            addressCheck: 'platform',
+          }),
+      };
 const open = (options) => openAgent({ ...options, home, deps });
 const logger = createLogger({ name: `e2e-${mode}` });
 

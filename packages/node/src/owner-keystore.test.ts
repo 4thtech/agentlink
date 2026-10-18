@@ -534,23 +534,62 @@ describe('one owner operation (04 §2.5, D-68)', () => {
     );
   });
 
-  it('signs typed data with the owner EVM key (the agent card, the one allowlisted type)', async () => {
+  it('a session signs typed data with the owner EVM key (the agent card)', async () => {
     const { owner, code, store } = await ready();
-    const run = scripted([code]);
-    // M1-8h: only the agent card is signed as typed data (owner-allowlist.test.ts refuses the rest).
+    // M1-8h-b (IR-M1-8h-1 L3): the generic owner operation signs no card; only the bound card
+    // sessions of owner init and owner add-agent do (owner-first-card.ts). The key itself is the
+    // owner EVM key.
     const cardTyped = agentCardTyped(owner);
-    const out = await runOwnerOperation(
-      store,
-      run.terminal,
-      { lines: ['Sign your agent profile'] },
-      { kind: 'typed-data', typedData: cardTyped },
-    );
-    if (out.kind !== 'typed-data') throw new Error('expected typed data');
+    const session = await store.unlock({ kind: 'passphrase', secret: encodeUtf8(code) });
+    const signature = await session.sign712(cardTyped);
+    await session.close();
+    await store.close();
     const recovered = recoverEvmAddress(
       hashTypedData(cardTyped).digest,
-      decodeHex(out.signature.slice(2)),
+      decodeHex(signature.slice(2)),
     );
     expect(equalBytes(recovered, owner.ownerEvm)).toBe(true);
+  });
+
+  it('IR-M1-8h-1 L3: one owner operation refuses the agent card, before any prompt', async () => {
+    const { owner, code, store } = await ready();
+    const run = scripted([code]);
+    const refused = await codeOf(() =>
+      runOwnerOperation(
+        store,
+        run.terminal,
+        { lines: ['Sign your agent profile'] },
+        { kind: 'typed-data', typedData: agentCardTyped(owner) },
+      ),
+    );
+    expect(refused).toBe('owner_operation_refused');
+    expect(run.labels).toEqual([]);
+    expect(run.written).toEqual([]);
+    await store.close();
+  });
+
+  it('IR-M1-8h-1 L2: storeOwnerSeed never deletes an owner item it did not write', async () => {
+    // Another run's item lands between this run's write and its read-back.
+    const other = new Uint8Array(90).fill(9);
+    class RacingKeychain extends FakeKeychain {
+      override async set(account: string, value: Uint8Array): Promise<void> {
+        await super.set(account, value);
+        this.items.set(account, other.slice());
+      }
+    }
+    const keychain = new RacingKeychain();
+    const { seed } = newOwnerSeed();
+    expect(
+      await codeOf(() =>
+        storeOwnerSeed(
+          keychain,
+          seed,
+          { secret: encodeUtf8('A'.repeat(24)), secretKind: 1 },
+          { kdf: KDF },
+        ),
+      ),
+    ).toBe('keychain_failed');
+    expect(keychain.items.get(OWNER_ACCOUNT)).toEqual(other);
   });
 
   it('accepts the code in lower case, with dashes, and with 0/1/8 for O/I/B', async () => {
@@ -972,13 +1011,13 @@ describe('KeychainOwnerKeyStore', () => {
     expect(captured.seeds.every(zeroed)).toBe(true);
   });
 
-  it('refuses a passkey proof (M1-8e) and wipes it; refuses a damaged item', async () => {
+  it('refuses a passkey proof with no passkey set up (M1-8e) and wipes it; refuses a damaged item', async () => {
     const keychain = new FakeKeychain();
     const { result } = await setUpOwner(keychain);
     const store = await KeychainOwnerKeyStore.open(keychain, result.owner);
     const prf = new Uint8Array(32).fill(9);
     expect(await codeOf(() => store.unlock({ kind: 'passkey-prf', prfOutput: prf }))).toBe(
-      'presence_required',
+      'presence_rejected',
     );
     expect(zeroed(prf)).toBe(true);
     keychain.items.set(OWNER_ACCOUNT, new Uint8Array(89));
@@ -1053,6 +1092,19 @@ describe('the TTY prompt (04 §2.8, 07 §9.2)', () => {
     expect(out.join('')).toBe('Owner code: \n');
     expect(tty.rawCalls).toEqual([true, false]);
     expect(chunks.every(zeroed)).toBe(true);
+  });
+
+  it('readText reads one visible line as UTF-8 text (the display name, M1-8h-b)', async () => {
+    const tty = new FakeTty();
+    const { out, stream } = fakeOut();
+    const terminal = ttyOwnerTerminal({ input: tty, output: stream });
+    if (terminal.readText === undefined) throw new Error('readText missing');
+    const reading = terminal.readText('Name:');
+    await tick();
+    tty.emit('data', Buffer.from('Ana Kovač\r'));
+    expect(await reading).toBe('Ana Kovač');
+    expect(out.join('')).toContain('Ana Kova');
+    expect(tty.rawCalls).toEqual([true, false]);
   });
 
   it('Ctrl-C cancels', async () => {

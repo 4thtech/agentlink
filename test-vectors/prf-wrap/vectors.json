@@ -3,7 +3,7 @@
   "suite": "prf-wrap",
   "version": 1,
   "generator": {
-    "tool": "python (hashlib, cryptography 50.0.2)",
+    "tool": "python (hashlib, cryptography 50.0.2, coincurve 21.0.0, pycryptodome 3.23.0)",
     "version": "cpython 3.12.13",
     "script": "tools/vectors/generate_prf_wrap.py"
   },
@@ -60,6 +60,1017 @@
       },
       "expected": {
         "wrapKey": "3c5be174698837a20ff601bb30678a87d6c1bbc9e33b5c7ebff1e61062be2889"
+      }
+    },
+    {
+      "id": "seal-passkey-16",
+      "source": "04 \u00a72.3.1 ALKP v1 seal (a 16-byte credential ID); ownerNostr is derived from the seed",
+      "input": {
+        "op": "sealPasskey",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "seed": "06eb3106eb0241e9b71dc560aab403a9a75262eef0a21880895cb4327ccc9091",
+        "credentialId": "89219a56191293d56668e5c9e07e104b",
+        "nonce": "b657b36abe964f7092af525f"
+      },
+      "expected": {
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6"
+      }
+    },
+    {
+      "id": "open-passkey-16",
+      "source": "04 \u00a72.3.1 ALKP v1 open (a 16-byte credential ID) with the expected owner",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": "5a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a"
+      },
+      "expected": {
+        "seed": "06eb3106eb0241e9b71dc560aab403a9a75262eef0a21880895cb4327ccc9091"
+      }
+    },
+    {
+      "id": "header-passkey-16",
+      "source": "04 \u00a72.3.1 ALKP v1 header fields (a 16-byte credential ID), read before any passkey prompt",
+      "input": {
+        "op": "passkeyHeader",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6"
+      },
+      "expected": {
+        "ownerNostr": "5a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a",
+        "credentialId": "89219a56191293d56668e5c9e07e104b"
+      }
+    },
+    {
+      "id": "seal-passkey-1",
+      "source": "04 \u00a72.3.1 ALKP v1 seal (the shortest credential ID (1 byte)); ownerNostr is derived from the seed",
+      "input": {
+        "op": "sealPasskey",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "seed": "06eb3106eb0241e9b71dc560aab403a9a75262eef0a21880895cb4327ccc9091",
+        "credentialId": "ef",
+        "nonce": "9def377a55048376053ffe97"
+      },
+      "expected": {
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a0001ef9def377a55048376053ffe97db36be311a9682f5ce29a531ce642538ae7f0246c1ccd5602f41e8a60f47cd0bab1d64cae26c38cbb9d150cbdf955a9a"
+      }
+    },
+    {
+      "id": "open-passkey-1",
+      "source": "04 \u00a72.3.1 ALKP v1 open (the shortest credential ID (1 byte)) with the expected owner",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a0001ef9def377a55048376053ffe97db36be311a9682f5ce29a531ce642538ae7f0246c1ccd5602f41e8a60f47cd0bab1d64cae26c38cbb9d150cbdf955a9a",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": "5a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a"
+      },
+      "expected": {
+        "seed": "06eb3106eb0241e9b71dc560aab403a9a75262eef0a21880895cb4327ccc9091"
+      }
+    },
+    {
+      "id": "header-passkey-1",
+      "source": "04 \u00a72.3.1 ALKP v1 header fields (the shortest credential ID (1 byte)), read before any passkey prompt",
+      "input": {
+        "op": "passkeyHeader",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a0001ef9def377a55048376053ffe97db36be311a9682f5ce29a531ce642538ae7f0246c1ccd5602f41e8a60f47cd0bab1d64cae26c38cbb9d150cbdf955a9a"
+      },
+      "expected": {
+        "ownerNostr": "5a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a",
+        "credentialId": "ef"
+      }
+    },
+    {
+      "id": "seal-passkey-1023",
+      "source": "04 \u00a72.3.1 ALKP v1 seal (the longest credential ID (1023 bytes)); ownerNostr is derived from the seed",
+      "input": {
+        "op": "sealPasskey",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "seed": "06eb3106eb0241e9b71dc560aab403a9a75262eef0a21880895cb4327ccc9091",
+        "credentialId": "debbf34722e66ea5dc7d94fbc33f1d11b4488184ea50b464867a0141d359b15528e394303a59ed627428f8f6d09b74e13aa8080c37d59d2213c8dfb70ac25119033442ead65abee2f87440188664844ab10d43c7480c76af932c534a013a7b1087d03cc28c2ee60e475f49b06ae726007d29252fb284f1c7de91d90bb3725ff203e3c1bd4b248b944dc847cf9b0d50601e133235a2112aa5f78c0c2d95527b539c08cb2e6c2915accf5d98f3b5096260cafc1b0c8fd65e1cfc0814262e4c2ac14db034276355e26886a5034d3623e6278af922b5547e764005a965a98e6a583c9eef5f65d83cc581adb737c83127dfea03668d786779c5645bbd54ac96d17867b6c01cdab0949ed34559e9eacc99f5e62b64833f3e20405e40bbc44bf920a5039eb61593f6f6a625657adfbf1550a43cbf10b1141e47f71ec86a1bbc9d1e330c4d75bfd8e44e6cb5346ec7103f063a1e540c4545035d4c71f82109325f8aa8cd6bd9e5c9075ffeb131c18b2bf39725b8f592589e132b4ae3dd4f27c84401235ea8fe73b45302f1ddc5062d739a8527d4ff3577035a389442c773de6fe35571a1e28391f98b74c36777aa533fc9c6258be8eae3d9812d15f3bd66e866c2eb35efd92a3f1a29be18922f54ad1f313e8d4d01806481b9f518787376c63313e52f4827d381a681e91cb6c17f9a7c6a55f87431a82c715e6a93fc76423f21ca6f4fd0f567976388e752e0b8fc5c3dc54582c21fad16fa6d06d112ece0dc47a0224b15cc97bbc7956760dc25e0a71fadc8d320f22b9a1807c7b69ef0f1484bc8f6d48892d39dc8de07d2368731da012cc333738c930edce3c8b663f759f7defe44123d7b8ba8c69f08553faa249f077f27d3549f94e04de87dfea2d072e67b018378263ba0324e3162ef3067e523cd5212503423e299ab50080c17585878d4df011b7b2515769c1747f5ac608c3f811c54b8161eb42e40d08711b3277a5b52fdf1e82119478751200bb53a2313d64c66033f4fcf06397ceb27057313aa2bb0a66cff78bbd73ea19808f151b63b37c449dc2d615ce241fe3bdf7f17280452e477a66f36ab10ecdbc1c2899e46737f27be54f69f9ca024428311e3adf38e15d819f4a45d689db4d2da60dd6eda96fd9444dd784d5fd7593a6a7d177f920d876056fac4c8b946f23671eb77c435ed686b1a0c1ed357b9d3e73521cec188d0004cbba4be7cea47798d4a2d62efe5940870914640fcfa5907838cb1f794d45a637ef595e9acae5ee97b85c75e24100110f36a2061de766787f2e2a23e28de18c46dec3ef0c1fe038b1215b047028f544fe2ea7d2de2f445ce3dac9e5641ac271a6a8b5a826d3a41d821d7150ba2a3959559b07ec862534d91e04916ca4f2b3594954cb35f5555df261b42ae07f4b4fa7c63210977023faa0ee09e33c466d851cfcee48935",
+        "nonce": "9d52f0109910af4c764f5432"
+      },
+      "expected": {
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a03ffdebbf34722e66ea5dc7d94fbc33f1d11b4488184ea50b464867a0141d359b15528e394303a59ed627428f8f6d09b74e13aa8080c37d59d2213c8dfb70ac25119033442ead65abee2f87440188664844ab10d43c7480c76af932c534a013a7b1087d03cc28c2ee60e475f49b06ae726007d29252fb284f1c7de91d90bb3725ff203e3c1bd4b248b944dc847cf9b0d50601e133235a2112aa5f78c0c2d95527b539c08cb2e6c2915accf5d98f3b5096260cafc1b0c8fd65e1cfc0814262e4c2ac14db034276355e26886a5034d3623e6278af922b5547e764005a965a98e6a583c9eef5f65d83cc581adb737c83127dfea03668d786779c5645bbd54ac96d17867b6c01cdab0949ed34559e9eacc99f5e62b64833f3e20405e40bbc44bf920a5039eb61593f6f6a625657adfbf1550a43cbf10b1141e47f71ec86a1bbc9d1e330c4d75bfd8e44e6cb5346ec7103f063a1e540c4545035d4c71f82109325f8aa8cd6bd9e5c9075ffeb131c18b2bf39725b8f592589e132b4ae3dd4f27c84401235ea8fe73b45302f1ddc5062d739a8527d4ff3577035a389442c773de6fe35571a1e28391f98b74c36777aa533fc9c6258be8eae3d9812d15f3bd66e866c2eb35efd92a3f1a29be18922f54ad1f313e8d4d01806481b9f518787376c63313e52f4827d381a681e91cb6c17f9a7c6a55f87431a82c715e6a93fc76423f21ca6f4fd0f567976388e752e0b8fc5c3dc54582c21fad16fa6d06d112ece0dc47a0224b15cc97bbc7956760dc25e0a71fadc8d320f22b9a1807c7b69ef0f1484bc8f6d48892d39dc8de07d2368731da012cc333738c930edce3c8b663f759f7defe44123d7b8ba8c69f08553faa249f077f27d3549f94e04de87dfea2d072e67b018378263ba0324e3162ef3067e523cd5212503423e299ab50080c17585878d4df011b7b2515769c1747f5ac608c3f811c54b8161eb42e40d08711b3277a5b52fdf1e82119478751200bb53a2313d64c66033f4fcf06397ceb27057313aa2bb0a66cff78bbd73ea19808f151b63b37c449dc2d615ce241fe3bdf7f17280452e477a66f36ab10ecdbc1c2899e46737f27be54f69f9ca024428311e3adf38e15d819f4a45d689db4d2da60dd6eda96fd9444dd784d5fd7593a6a7d177f920d876056fac4c8b946f23671eb77c435ed686b1a0c1ed357b9d3e73521cec188d0004cbba4be7cea47798d4a2d62efe5940870914640fcfa5907838cb1f794d45a637ef595e9acae5ee97b85c75e24100110f36a2061de766787f2e2a23e28de18c46dec3ef0c1fe038b1215b047028f544fe2ea7d2de2f445ce3dac9e5641ac271a6a8b5a826d3a41d821d7150ba2a3959559b07ec862534d91e04916ca4f2b3594954cb35f5555df261b42ae07f4b4fa7c63210977023faa0ee09e33c466d851cfcee489359d52f0109910af4c764f54324eb0b757155e092e8a8796e02709b7c330e14de5d5ddab3fb679f51ac7329611d1483cadc4627bc403809c9eaff9fba2"
+      }
+    },
+    {
+      "id": "open-passkey-1023",
+      "source": "04 \u00a72.3.1 ALKP v1 open (the longest credential ID (1023 bytes)) with the expected owner",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a03ffdebbf34722e66ea5dc7d94fbc33f1d11b4488184ea50b464867a0141d359b15528e394303a59ed627428f8f6d09b74e13aa8080c37d59d2213c8dfb70ac25119033442ead65abee2f87440188664844ab10d43c7480c76af932c534a013a7b1087d03cc28c2ee60e475f49b06ae726007d29252fb284f1c7de91d90bb3725ff203e3c1bd4b248b944dc847cf9b0d50601e133235a2112aa5f78c0c2d95527b539c08cb2e6c2915accf5d98f3b5096260cafc1b0c8fd65e1cfc0814262e4c2ac14db034276355e26886a5034d3623e6278af922b5547e764005a965a98e6a583c9eef5f65d83cc581adb737c83127dfea03668d786779c5645bbd54ac96d17867b6c01cdab0949ed34559e9eacc99f5e62b64833f3e20405e40bbc44bf920a5039eb61593f6f6a625657adfbf1550a43cbf10b1141e47f71ec86a1bbc9d1e330c4d75bfd8e44e6cb5346ec7103f063a1e540c4545035d4c71f82109325f8aa8cd6bd9e5c9075ffeb131c18b2bf39725b8f592589e132b4ae3dd4f27c84401235ea8fe73b45302f1ddc5062d739a8527d4ff3577035a389442c773de6fe35571a1e28391f98b74c36777aa533fc9c6258be8eae3d9812d15f3bd66e866c2eb35efd92a3f1a29be18922f54ad1f313e8d4d01806481b9f518787376c63313e52f4827d381a681e91cb6c17f9a7c6a55f87431a82c715e6a93fc76423f21ca6f4fd0f567976388e752e0b8fc5c3dc54582c21fad16fa6d06d112ece0dc47a0224b15cc97bbc7956760dc25e0a71fadc8d320f22b9a1807c7b69ef0f1484bc8f6d48892d39dc8de07d2368731da012cc333738c930edce3c8b663f759f7defe44123d7b8ba8c69f08553faa249f077f27d3549f94e04de87dfea2d072e67b018378263ba0324e3162ef3067e523cd5212503423e299ab50080c17585878d4df011b7b2515769c1747f5ac608c3f811c54b8161eb42e40d08711b3277a5b52fdf1e82119478751200bb53a2313d64c66033f4fcf06397ceb27057313aa2bb0a66cff78bbd73ea19808f151b63b37c449dc2d615ce241fe3bdf7f17280452e477a66f36ab10ecdbc1c2899e46737f27be54f69f9ca024428311e3adf38e15d819f4a45d689db4d2da60dd6eda96fd9444dd784d5fd7593a6a7d177f920d876056fac4c8b946f23671eb77c435ed686b1a0c1ed357b9d3e73521cec188d0004cbba4be7cea47798d4a2d62efe5940870914640fcfa5907838cb1f794d45a637ef595e9acae5ee97b85c75e24100110f36a2061de766787f2e2a23e28de18c46dec3ef0c1fe038b1215b047028f544fe2ea7d2de2f445ce3dac9e5641ac271a6a8b5a826d3a41d821d7150ba2a3959559b07ec862534d91e04916ca4f2b3594954cb35f5555df261b42ae07f4b4fa7c63210977023faa0ee09e33c466d851cfcee489359d52f0109910af4c764f54324eb0b757155e092e8a8796e02709b7c330e14de5d5ddab3fb679f51ac7329611d1483cadc4627bc403809c9eaff9fba2",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": "5a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a"
+      },
+      "expected": {
+        "seed": "06eb3106eb0241e9b71dc560aab403a9a75262eef0a21880895cb4327ccc9091"
+      }
+    },
+    {
+      "id": "header-passkey-1023",
+      "source": "04 \u00a72.3.1 ALKP v1 header fields (the longest credential ID (1023 bytes)), read before any passkey prompt",
+      "input": {
+        "op": "passkeyHeader",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a03ffdebbf34722e66ea5dc7d94fbc33f1d11b4488184ea50b464867a0141d359b15528e394303a59ed627428f8f6d09b74e13aa8080c37d59d2213c8dfb70ac25119033442ead65abee2f87440188664844ab10d43c7480c76af932c534a013a7b1087d03cc28c2ee60e475f49b06ae726007d29252fb284f1c7de91d90bb3725ff203e3c1bd4b248b944dc847cf9b0d50601e133235a2112aa5f78c0c2d95527b539c08cb2e6c2915accf5d98f3b5096260cafc1b0c8fd65e1cfc0814262e4c2ac14db034276355e26886a5034d3623e6278af922b5547e764005a965a98e6a583c9eef5f65d83cc581adb737c83127dfea03668d786779c5645bbd54ac96d17867b6c01cdab0949ed34559e9eacc99f5e62b64833f3e20405e40bbc44bf920a5039eb61593f6f6a625657adfbf1550a43cbf10b1141e47f71ec86a1bbc9d1e330c4d75bfd8e44e6cb5346ec7103f063a1e540c4545035d4c71f82109325f8aa8cd6bd9e5c9075ffeb131c18b2bf39725b8f592589e132b4ae3dd4f27c84401235ea8fe73b45302f1ddc5062d739a8527d4ff3577035a389442c773de6fe35571a1e28391f98b74c36777aa533fc9c6258be8eae3d9812d15f3bd66e866c2eb35efd92a3f1a29be18922f54ad1f313e8d4d01806481b9f518787376c63313e52f4827d381a681e91cb6c17f9a7c6a55f87431a82c715e6a93fc76423f21ca6f4fd0f567976388e752e0b8fc5c3dc54582c21fad16fa6d06d112ece0dc47a0224b15cc97bbc7956760dc25e0a71fadc8d320f22b9a1807c7b69ef0f1484bc8f6d48892d39dc8de07d2368731da012cc333738c930edce3c8b663f759f7defe44123d7b8ba8c69f08553faa249f077f27d3549f94e04de87dfea2d072e67b018378263ba0324e3162ef3067e523cd5212503423e299ab50080c17585878d4df011b7b2515769c1747f5ac608c3f811c54b8161eb42e40d08711b3277a5b52fdf1e82119478751200bb53a2313d64c66033f4fcf06397ceb27057313aa2bb0a66cff78bbd73ea19808f151b63b37c449dc2d615ce241fe3bdf7f17280452e477a66f36ab10ecdbc1c2899e46737f27be54f69f9ca024428311e3adf38e15d819f4a45d689db4d2da60dd6eda96fd9444dd784d5fd7593a6a7d177f920d876056fac4c8b946f23671eb77c435ed686b1a0c1ed357b9d3e73521cec188d0004cbba4be7cea47798d4a2d62efe5940870914640fcfa5907838cb1f794d45a637ef595e9acae5ee97b85c75e24100110f36a2061de766787f2e2a23e28de18c46dec3ef0c1fe038b1215b047028f544fe2ea7d2de2f445ce3dac9e5641ac271a6a8b5a826d3a41d821d7150ba2a3959559b07ec862534d91e04916ca4f2b3594954cb35f5555df261b42ae07f4b4fa7c63210977023faa0ee09e33c466d851cfcee489359d52f0109910af4c764f54324eb0b757155e092e8a8796e02709b7c330e14de5d5ddab3fb679f51ac7329611d1483cadc4627bc403809c9eaff9fba2"
+      },
+      "expected": {
+        "ownerNostr": "5a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a",
+        "credentialId": "debbf34722e66ea5dc7d94fbc33f1d11b4488184ea50b464867a0141d359b15528e394303a59ed627428f8f6d09b74e13aa8080c37d59d2213c8dfb70ac25119033442ead65abee2f87440188664844ab10d43c7480c76af932c534a013a7b1087d03cc28c2ee60e475f49b06ae726007d29252fb284f1c7de91d90bb3725ff203e3c1bd4b248b944dc847cf9b0d50601e133235a2112aa5f78c0c2d95527b539c08cb2e6c2915accf5d98f3b5096260cafc1b0c8fd65e1cfc0814262e4c2ac14db034276355e26886a5034d3623e6278af922b5547e764005a965a98e6a583c9eef5f65d83cc581adb737c83127dfea03668d786779c5645bbd54ac96d17867b6c01cdab0949ed34559e9eacc99f5e62b64833f3e20405e40bbc44bf920a5039eb61593f6f6a625657adfbf1550a43cbf10b1141e47f71ec86a1bbc9d1e330c4d75bfd8e44e6cb5346ec7103f063a1e540c4545035d4c71f82109325f8aa8cd6bd9e5c9075ffeb131c18b2bf39725b8f592589e132b4ae3dd4f27c84401235ea8fe73b45302f1ddc5062d739a8527d4ff3577035a389442c773de6fe35571a1e28391f98b74c36777aa533fc9c6258be8eae3d9812d15f3bd66e866c2eb35efd92a3f1a29be18922f54ad1f313e8d4d01806481b9f518787376c63313e52f4827d381a681e91cb6c17f9a7c6a55f87431a82c715e6a93fc76423f21ca6f4fd0f567976388e752e0b8fc5c3dc54582c21fad16fa6d06d112ece0dc47a0224b15cc97bbc7956760dc25e0a71fadc8d320f22b9a1807c7b69ef0f1484bc8f6d48892d39dc8de07d2368731da012cc333738c930edce3c8b663f759f7defe44123d7b8ba8c69f08553faa249f077f27d3549f94e04de87dfea2d072e67b018378263ba0324e3162ef3067e523cd5212503423e299ab50080c17585878d4df011b7b2515769c1747f5ac608c3f811c54b8161eb42e40d08711b3277a5b52fdf1e82119478751200bb53a2313d64c66033f4fcf06397ceb27057313aa2bb0a66cff78bbd73ea19808f151b63b37c449dc2d615ce241fe3bdf7f17280452e477a66f36ab10ecdbc1c2899e46737f27be54f69f9ca024428311e3adf38e15d819f4a45d689db4d2da60dd6eda96fd9444dd784d5fd7593a6a7d177f920d876056fac4c8b946f23671eb77c435ed686b1a0c1ed357b9d3e73521cec188d0004cbba4be7cea47798d4a2d62efe5940870914640fcfa5907838cb1f794d45a637ef595e9acae5ee97b85c75e24100110f36a2061de766787f2e2a23e28de18c46dec3ef0c1fe038b1215b047028f544fe2ea7d2de2f445ce3dac9e5641ac271a6a8b5a826d3a41d821d7150ba2a3959559b07ec862534d91e04916ca4f2b3594954cb35f5555df261b42ae07f4b4fa7c63210977023faa0ee09e33c466d851cfcee48935"
+      }
+    },
+    {
+      "id": "open-passkey-16-no-expected",
+      "source": "04 \u00a72.3.1 ALKP v1 open with no expected owner; the seed still derives the header owner",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "seed": "06eb3106eb0241e9b71dc560aab403a9a75262eef0a21880895cb4327ccc9091"
+      }
+    },
+    {
+      "id": "open-passkey-reject-wrong-prf",
+      "source": "04 \u00a72.3.1 ALKP v1: another PRF output (another passkey)",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6",
+        "prfOutput": "1cb19d0663b12ae626a7c82942bf08bceca47d855f44b446ecde0629876f89a3",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-prf-31",
+      "source": "04 \u00a72.3.1 ALKP v1: a 31-byte PRF output, refused before decryption",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-prf-33",
+      "source": "04 \u00a72.3.1 ALKP v1: a 33-byte PRF output, refused before decryption",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec00",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-other-owner",
+      "source": "04 \u00a72.3.1 ALKP v1: the header owner is not the expected owner, refused before decryption",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": "18cf63fd99553bae5296dcf447ed3a2cc0fb30971f5e2ea6f945102d03883854"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-truncated",
+      "source": "04 \u00a72.3.1 ALKP v1: one byte short",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209ecc",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-extended",
+      "source": "04 \u00a72.3.1 ALKP v1: one byte too many",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc600",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-header-only",
+      "source": "04 \u00a72.3.1 ALKP v1: truncated to the header",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-short",
+      "source": "04 \u00a72.3.1 ALKP v1: shorter than the smallest header",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada7",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-empty",
+      "source": "04 \u00a72.3.1 ALKP v1: empty",
+      "input": {
+        "op": "openPasskey",
+        "blob": "",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-cred-len-0",
+      "source": "04 \u00a72.3.1 ALKP v1: credIdLen 0 (sealed validly)",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a0000b657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589adea0ceb8074fa039bc9bf10729f70db",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-cred-len-1024",
+      "source": "04 \u00a72.3.1 ALKP v1: credIdLen 1024 (sealed validly)",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a0400d8b2ae855e3519bf39658cd08d1d7daf777e34a40f1df04a7741165441836c9b5ad21d4a8d03272c52be4efce1856b0f5e7e4ad1c923dad923c0a881b9d687f6be07fc55c046f9ce2bb0db5ebd6eefce578021b0ac8ff8ac27a60591dd70b4270a71c328ac9f2ab152c73a969ff11dc986074ff0ac84e4ae4ce88d82b4d3c9a076b082386dfd6c42ccea517a6efdb05490e887ca47f1075e2f3e413ef2b2cc15c6fca98c3886fb3b55f014b3ebd8cf58ae358d4e898e07dcf25ef9a1a1bebd89b698aebc9d12da5d04d096748c47acf549d5b6ad9e01790574e9673a4c428c95fdbcbd16b77e505320581c275f33bc099c9fcacef8ed81a211a1e98a24b763b610a52b255949c57633554af095e5debd3d28eb7b1910d3e8f4e394e7daece6cb591fabef3be5244e6b7e8ac1725d87c773d5467ea99410b044303e2e99a1e2efcd266b089fef430862cfc19ee3aecf3af168218ae6eefe21886b3e9a00d31c7611921aba9285c67b9ce585ddd842b25dde84950fa1bc1b60df2ddd00a99ad1d5ff1a9c60fa6599b305689a67b161232351b6a19b8706ecee193caf029d1625d99650a47dd94acdb132b7e06d9bcaedf3145112e81a3798e1c4ed6cad149346a882b658dbc9e0823bd4d027826bf7aa0143f2be8fc4bf140bc55a2d8cd8d875dcc6b1076ac3993f0e77bf3a9be8dbcdae2b9dd74c579ae20259d9182c79fd0be2cb99b0365c2b298d45b0175aeeafb5063e67038dc7ce2ac140d9a3441e8ed290d3e20b8c01d8cfb2647afb0a26e062be8e2b92416aac9924ec067594d055f23007f729f2973875ce8bd33a7b7d10ab57a7f0eda2a3e3f05f39c5d9b211f9277d56b6da07b763eafdbc89f72c1fac5be6e7e9c8931142f1d1b7570611cafdd2e287a197ae1c13a6ba93a10bce7629cb41911532efa24af338b0913890e3e420395e2b6932fe48bad692090b6c14c3ae5e3d1ef377460d9d76b04492d8ea8a6e2e44d0c0e40deb6a3b4108a794de2d1d1d0644afc03a14a772d0dbceea67318ea579741066f28727ff709771a3f81799f253df8d41b8848f4de86ae091bd8547a1c192f9336672a7e0aaf1414f19368f273a11e4c3536268617f8df6622c1a2fdfa1fe5c4eadc12655a2092bac4660fb6e62385fc4b93fbf3aea4303f286d01f0c62c2e0241c4e2f4ab94c5b3ee5e0f2cf74d835ba5103f9da293b0ad73c8bdf79268367f83e868ae210ea22dcc3160daccade74520548fdce3806d80f1ef6b69e33633ca64fb33642e8432f9b2789307cd14b0aa83e9f718a9fe75977a3d6a16ad2ef2098d0ace7b9ee9d1240aad09c3a4068412a9fc5b66f119c329e4d8c22a8cea0c6e33caa9ae13694e2b98a24b73633645bd96f54f2c0c701726a437ebe20c1a95472f0044f2e43c8df1fddd78f11e4a826e56feb8a64b258b771b5f5a729b657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c79958940253224dc618c835c72386cc5888f0b",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-cred-len-mismatch",
+      "source": "04 \u00a72.3.1 ALKP v1: credIdLen one more than the bytes present",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001189219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-version-2",
+      "source": "04 \u00a72.3.1 ALKP v1: version 2 (sealed validly)",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5002015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c7995895d3b8eb0a236978d3e7e983ca05f025e",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-aead-2",
+      "source": "04 \u00a72.3.1 ALKP v1: aead 2 (sealed validly)",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001025a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c7995899383f6c4a012dafc002ad396081e0d08",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-seed-31",
+      "source": "04 \u00a72.3.1 ALKP v1: a 31-byte seed (sealed validly), refused by size",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799582f9db6024228f7b17510030337dc00f",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-seed-33",
+      "source": "04 \u00a72.3.1 ALKP v1: a 33-byte seed (sealed validly), refused by size",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589226fdb4be84f9c9ccf7945418375d3d469",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-seed-not-owner",
+      "source": "04 \u00a72.3.1 ALKP v1: the seed does not derive the header owner (sealed validly with another owner key)",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b50010118cf63fd99553bae5296dcf447ed3a2cc0fb30971f5e2ea6f945102d03883854001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589d8b426c4cb44214f3c2e5878d5c3dd54",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-flip-magic",
+      "source": "04 \u00a72.3.1 ALKP v1: one bit flipped (magic)",
+      "input": {
+        "op": "openPasskey",
+        "blob": "404c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-flip-version",
+      "source": "04 \u00a72.3.1 ALKP v1: one bit flipped (version)",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5000015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-flip-aead",
+      "source": "04 \u00a72.3.1 ALKP v1: one bit flipped (aead)",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001005a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-flip-owner",
+      "source": "04 \u00a72.3.1 ALKP v1: one bit flipped (owner)",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015b59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-flip-cred-len",
+      "source": "04 \u00a72.3.1 ALKP v1: one bit flipped (cred-len)",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001189219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-flip-cred-id",
+      "source": "04 \u00a72.3.1 ALKP v1: one bit flipped (cred-id)",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001088219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-flip-nonce",
+      "source": "04 \u00a72.3.1 ALKP v1: one bit flipped (nonce)",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb757b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-flip-ciphertext",
+      "source": "04 \u00a72.3.1 ALKP v1: one bit flipped (ciphertext)",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f82d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-flip-tag",
+      "source": "04 \u00a72.3.1 ALKP v1: one bit flipped (tag)",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc7",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "header-passkey-reject-version-2",
+      "source": "04 \u00a72.3.1 ALKP v1: the header reader refuses version 2",
+      "input": {
+        "op": "passkeyHeader",
+        "blob": "414c4b5002015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c7995895d3b8eb0a236978d3e7e983ca05f025e"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "header-passkey-reject-truncated",
+      "source": "04 \u00a72.3.1 ALKP v1: the header reader refuses a blob one byte short",
+      "input": {
+        "op": "passkeyHeader",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209ecc"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "seal-recovery-default",
+      "source": "04 \u00a72.3.2 ALKR v1 seal (default parameters m = 64 MiB, t = 3, p = 1)",
+      "input": {
+        "op": "sealRecovery",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "seed": "06eb3106eb0241e9b71dc560aab403a9a75262eef0a21880895cb4327ccc9091",
+        "salt": "fa393ab402db7e53e55f4b19d51fddde",
+        "nonce": "0404eb72e530c239a7218141",
+        "memoryKiB": 65536,
+        "iterations": 3,
+        "parallelism": 1
+      },
+      "expected": {
+        "blob": "414c4b52010101000100000301fa393ab402db7e53e55f4b19d51fddde010404eb72e530c239a7218141ebf4b79b01989c14da366963c1119019ea4ecf0258db6d9bbba2561a56d8ed3265c2bf4ee928e3a442c9078112f43660"
+      }
+    },
+    {
+      "id": "seal-recovery-floor",
+      "source": "04 \u00a72.3.2 ALKR v1 seal (the floor parameters m = 19 MiB, t = 2, p = 1)",
+      "input": {
+        "op": "sealRecovery",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "seed": "06eb3106eb0241e9b71dc560aab403a9a75262eef0a21880895cb4327ccc9091",
+        "salt": "ff977549bf80b2e6d466584d81eda9e7",
+        "nonce": "1841511f1c3be83956f5cf86",
+        "memoryKiB": 19456,
+        "iterations": 2,
+        "parallelism": 1
+      },
+      "expected": {
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7"
+      }
+    },
+    {
+      "id": "open-recovery-default",
+      "source": "04 \u00a72.3.2 ALKR v1 open (default parameters) with the expected owner",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b52010101000100000301fa393ab402db7e53e55f4b19d51fddde010404eb72e530c239a7218141ebf4b79b01989c14da366963c1119019ea4ecf0258db6d9bbba2561a56d8ed3265c2bf4ee928e3a442c9078112f43660",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": "5a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a"
+      },
+      "expected": {
+        "seed": "06eb3106eb0241e9b71dc560aab403a9a75262eef0a21880895cb4327ccc9091"
+      }
+    },
+    {
+      "id": "open-recovery-floor-no-expected",
+      "source": "04 \u00a72.3.2 ALKR v1 open (floor parameters) with no expected owner",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "seed": "06eb3106eb0241e9b71dc560aab403a9a75262eef0a21880895cb4327ccc9091"
+      }
+    },
+    {
+      "id": "open-recovery-spelled",
+      "source": "04 \u00a72.3.2 ALKR v1 open with the code in six lower-case groups of four with dashes (04 \u00a72.8 password kind 1)",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "code": "bhol-qmui-7a5p-zhhv-fkjo-gjjl",
+        "source": "prompt",
+        "expectedOwnerNostr": "5a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a"
+      },
+      "expected": {
+        "seed": "06eb3106eb0241e9b71dc560aab403a9a75262eef0a21880895cb4327ccc9091"
+      }
+    },
+    {
+      "id": "open-recovery-file-newline",
+      "source": "04 \u00a72.3.2 ALKR v1 open with the code read from a file that ends in \\r\\n",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL\r\n",
+        "source": "file",
+        "expectedOwnerNostr": "5a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a"
+      },
+      "expected": {
+        "seed": "06eb3106eb0241e9b71dc560aab403a9a75262eef0a21880895cb4327ccc9091"
+      }
+    },
+    {
+      "id": "open-recovery-reject-wrong-code",
+      "source": "04 \u00a72.3.2 ALKR v1: another recovery code",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "code": "ZJODEAI6IQA6BXCJE5D6QQQE",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-mistyped-char",
+      "source": "04 \u00a72.3.2 ALKR v1: a character outside the base32 alphabet, refused before the KDF",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJ!",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-23-chars",
+      "source": "04 \u00a72.3.2 ALKR v1: 23 characters, refused before the KDF",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJ",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-one-char-changed",
+      "source": "04 \u00a72.3.2 ALKR v1: one character changed (a mistyped code)",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "code": "AHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-other-owner",
+      "source": "04 \u00a72.3.2 ALKR v1: the seed does not derive the expected owner",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": "18cf63fd99553bae5296dcf447ed3a2cc0fb30971f5e2ea6f945102d03883854"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-89-bytes",
+      "source": "04 \u00a72.3.2 ALKR v1: 89 bytes, refused before the KDF",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-91-bytes",
+      "source": "04 \u00a72.3.2 ALKR v1: 91 bytes, refused before the KDF",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a700",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-empty",
+      "source": "04 \u00a72.3.2 ALKR v1: empty",
+      "input": {
+        "op": "openRecovery",
+        "blob": "",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-seed-31",
+      "source": "04 \u00a72.3.2 ALKR v1: a 31-byte seed (sealed validly), refused by size",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a5affab2e6b524d9f9b8983c01c59f8c2",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-version-2",
+      "source": "04 \u00a72.3.2 ALKR v1: version 2 (sealed validly)",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5202010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d5beae725cc3807cce863a9d9fe0fca19",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-kdf-2",
+      "source": "04 \u00a72.3.2 ALKR v1: kdf 2 (sealed validly)",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010200004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d8ed41922b74360d2ecc366a03478789c",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-aead-2",
+      "source": "04 \u00a72.3.2 ALKR v1: aead 2 (sealed validly)",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7021841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d9dd890482a53a70410afe29f591976c3",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-secret-kind-2",
+      "source": "04 \u00a72.3.2 ALKR v1: secretKind 2: a chosen passphrase never wraps a recovery blob (sealed validly)",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201020100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d9aef1cd94bc49c496942474ea3255204",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-secret-kind-0",
+      "source": "04 \u00a72.3.2 ALKR v1: secretKind 0 (sealed validly)",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201000100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2dae4c46d1eb9e6e5670a59e232b3b7f39",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-m-below-floor",
+      "source": "04 \u00a72.3.2 ALKR v1: KDF parameters out of bounds (m = 19455 KiB), refused before the KDF runs",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004bff0201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-m-above-cap",
+      "source": "04 \u00a72.3.2 ALKR v1: KDF parameters out of bounds (m = 262145 KiB), refused before the KDF runs",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b52010101000400010201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-t-1",
+      "source": "04 \u00a72.3.2 ALKR v1: KDF parameters out of bounds (t = 1), refused before the KDF runs",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000101ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-t-9",
+      "source": "04 \u00a72.3.2 ALKR v1: KDF parameters out of bounds (t = 9), refused before the KDF runs",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000901ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-p-5",
+      "source": "04 \u00a72.3.2 ALKR v1: KDF parameters out of bounds (p = 5), refused before the KDF runs",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000205ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-flip-salt",
+      "source": "04 \u00a72.3.2 ALKR v1: one bit flipped (salt)",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201fe977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-flip-nonce",
+      "source": "04 \u00a72.3.2 ALKR v1: one bit flipped (nonce)",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011941511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-flip-ciphertext",
+      "source": "04 \u00a72.3.2 ALKR v1: one bit flipped (ciphertext)",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f40069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-flip-tag",
+      "source": "04 \u00a72.3.2 ALKR v1: one bit flipped (tag)",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a6",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-alko-blob",
+      "source": "04 \u00a72.3.2 ALKR v1: an ALKO blob under the same code (owner-passphrase-wrap label) given to the ALKR reader",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b4f01010100004c000201b86a8a88f58b277f53bcebd4c8c20d8501676d57a9d5c06bb7f9555657cf896c1011b8eed6290f8a47d09a96566f23b7de0c078685ec7884c7e8e584f87a2c33734e81ede20b853cb5bee75a1a",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-alko-magic-patched",
+      "source": "04 \u00a72.3.2 ALKR v1: an ALKO blob with its magic rewritten to ALKR (AAD and label differ)",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201b86a8a88f58b277f53bcebd4c8c20d8501676d57a9d5c06bb7f9555657cf896c1011b8eed6290f8a47d09a96566f23b7de0c078685ec7884c7e8e584f87a2c33734e81ede20b853cb5bee75a1a",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-alko-label",
+      "source": "04 \u00a72.3.2 ALKR v1: an ALKR blob sealed under the ALKO label (agentlink/v1/owner-passphrase-wrap)",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86c6ed603e785bef26d01039a027b348e4a5c5be071bb649d548558aa7cf62a32f046af859fa0d67a73f68e81ee54742e6",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-alkp-blob",
+      "source": "04 \u00a72.3.2 ALKR v1: an ALKP blob given to the ALKR reader",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5001015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c799589608e430919a9452ea3b71a14209eccc6",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-recovery-reject-alks-file",
+      "source": "04 \u00a72.3.2 ALKR v1: an ALKS file under the same code given to the ALKR reader",
+      "input": {
+        "op": "openRecovery",
+        "blob": "414c4b5301010100004c000201c408f443006eb9faa7f28e4dc5e36f9e01b5cd034c70bece9f9bcc5a972a30786536343162666261653564386166333330396662643635623437313566386537316333646334636665a4e5ad99b95dec3ed7831aed384398e9bb10df4fb8054693b01a9829df40e90d37bb6956636761ed902c865482a8444e1c945e73487ead5385",
+        "code": "BHOLQMUI7A5PZHHVFKJOGJJL",
+        "source": "prompt",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-alkr-blob",
+      "source": "04 \u00a72.3.1 ALKP v1: an ALKR blob given to the ALKP reader",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5201010100004c000201ff977549bf80b2e6d466584d81eda9e7011841511f1c3be83956f5cf86f50069324d8872845301bf7360bfeb58c92d0e40bef73025b6d25555717f6a2d551debd5bbb31759fc567295ef3469a7",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-alko-blob",
+      "source": "04 \u00a72.3.1 ALKP v1: an ALKO blob given to the ALKP reader",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b4f01010100004c000201b86a8a88f58b277f53bcebd4c8c20d8501676d57a9d5c06bb7f9555657cf896c1011b8eed6290f8a47d09a96566f23b7de0c078685ec7884c7e8e584f87a2c33734e81ede20b853cb5bee75a1a",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "open-passkey-reject-alkr-magic",
+      "source": "04 \u00a72.3.1 ALKP v1: ALKR magic on an ALKP blob (sealed validly otherwise)",
+      "input": {
+        "op": "openPasskey",
+        "blob": "414c4b5201015a59eb8513d700fb2aff494d882a3b9899c3c9f5eae3ada742dc4ba2a405997a001089219a56191293d56668e5c9e07e104bb657b36abe964f7092af525f83d0162efdc329b91e3cfa11f584607524e5afc1f1acc93f73a350bd9c7995890c076ddbf33587c7d2b4d514a1ea2303",
+        "prfOutput": "af58ca22063b448e043eaae4578e3fad110a2f0dd89a17a1292d9e35e0ae19ec",
+        "expectedOwnerNostr": ""
+      },
+      "expected": {
+        "outcome": "reject"
       }
     }
   ]

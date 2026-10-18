@@ -46,6 +46,12 @@ import type { StoreTx } from './store/store.js';
 
 /** 04 §2.4.1: `apr_` + 16 random bytes, base64url. */
 const APPROVAL_ID_BYTES = 16;
+/**
+ * How far a commitment scope's `createdAt` may lag the clock when its owner request is stored
+ * (M1-32-d): the time one core call takes between building the scope and storing the request.
+ * Anything older, or in the future, is refused as an invalid request.
+ */
+const SCOPE_CLOCK_SLACK_SECONDS = 60;
 
 export interface ApprovalRequestInput {
   /** `{tool, args, context}` (04 §3.4.1), built by the core from verified data. */
@@ -311,7 +317,23 @@ export class ApprovalService {
     }
     const now = nowOf(this.#ctx);
     const scope = commitmentScopeOf(input.action);
-    let expiresAt = now + APPROVAL_TTL_SECONDS;
+    // The request starts when its commitment scope was built (04 §3.4.2: `scope.createdAt` equals
+    // `requestedAt`): one clock read, the caller's, so a second boundary between building the scope
+    // and this call cannot make the request invalid (M1-32-d). Without a scope, the clock now.
+    let requestedAt = now;
+    if (scope !== undefined) {
+      const createdAt = scope.createdAt;
+      if (
+        typeof createdAt !== 'number' ||
+        !Number.isSafeInteger(createdAt) ||
+        createdAt > now ||
+        now - createdAt > SCOPE_CLOCK_SLACK_SECONDS
+      ) {
+        throw new CoreError('approval_action_invalid', 'The approval request is not valid.');
+      }
+      requestedAt = createdAt;
+    }
+    let expiresAt = requestedAt + APPROVAL_TTL_SECONDS;
     if (scope !== undefined) {
       if (typeof scope.expiresAt !== 'number' || scope.expiresAt <= now) {
         throw new CoreError('approval_scope_expired', 'The commitment has already expired.');
@@ -329,7 +351,7 @@ export class ApprovalService {
       action: input.action,
       actionDigest,
       summary: input.summary,
-      requestedAt: now,
+      requestedAt,
       expiresAt,
     });
     if (!body.success) {
@@ -371,11 +393,11 @@ export class ApprovalService {
         summary: sealedSummary,
         status: 'pending',
         expires_at: expiresAt,
-        created_at: now,
+        created_at: requestedAt,
         decided_at: null,
       });
       if (commitment !== undefined) {
-        insertCommitmentPartsTx(tx, approvalId, commitment.parts, now);
+        insertCommitmentPartsTx(tx, approvalId, commitment.parts, requestedAt);
       }
       return true;
     });
