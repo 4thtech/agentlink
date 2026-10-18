@@ -6,7 +6,8 @@ import { createServer, type Server } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { makeTestCertificate, type TestCertificate } from './relay-io.fixture.js';
-import { RpcFetchError, createRpcFetchWith } from './rpc-fetch.js';
+import { readFileSync } from 'node:fs';
+import { RpcFetchError, createRpcFetchWith, nodeRpcFetch } from './rpc-fetch.js';
 import type { FetchLookup } from './safe-fetch.js';
 
 const HOST = 'rpc.agentlink.test';
@@ -207,5 +208,23 @@ describe('nodeRpcFetch: the 04 §4 resolve-time rule for chain RPC', () => {
       route,
     });
     expect((await rpcFetch(url(), rpcInit())).status).toBe(503);
+  });
+
+  it('carries the address-checked brand @4thtech-io/chain requires, read-only (IR-M1-4a-2 R-3)', () => {
+    const brand = Symbol.for('agentlink.address-checked-rpc-fetch');
+    for (const rpcFetch of [
+      nodeRpcFetch(),
+      createRpcFetchWith({ lookup: lookupSequence([PUBLIC_A]) }),
+    ]) {
+      expect((rpcFetch as unknown as Record<symbol, unknown>)[brand]).toBe(true);
+      const descriptor = Object.getOwnPropertyDescriptor(rpcFetch, brand);
+      expect(descriptor).toMatchObject({ value: true, writable: false, configurable: false });
+    }
+    // The chain package checks the same key: a rename on one side only must fail here.
+    const chainSide = readFileSync(
+      new URL('../../chain/src/clients/checked-fetch.ts', import.meta.url),
+      'utf8',
+    );
+    expect(chainSide).toContain("Symbol.for('agentlink.address-checked-rpc-fetch')");
   });
 });
