@@ -4,7 +4,7 @@
 // KeyStore's drop key (KeyStore.signDropRequest, M1-1g-e); the recipient downloads the signed GET
 // URL from the payload. Test limits (vitest.config.ts, project `drop-worker`): 8 MiB per file.
 import { SELF } from 'cloudflare:test';
-import { MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { encodeHex, sha256, type JsonObject } from '@4thtech-io/crypto';
 import type { FetchLike } from '@4thtech-io/storage';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -63,11 +63,11 @@ beforeEach(async () => {
   seen.length = 0;
   // The drop Worker checks request times against its own clock: the agents use the real one.
   clock = new FakeClock(Math.floor(Date.now() / 1000));
-  a = await openFileAgent(clock, 21, ownerA, 'alice', {
+  a = await openFileAgent(clock, new MemoryKeyStore(seed(21)), ownerA, 'alice', {
     relays: RELAYS_A,
     drop: { endpoint: ORIGIN, fetch: dropFetch() },
   });
-  b = await openFileAgent(clock, 22, ownerB, 'bob', {
+  b = await openFileAgent(clock, new MemoryKeyStore(seed(22)), ownerB, 'bob', {
     relays: RELAYS_B,
     drop: { endpoint: ORIGIN, fetch: dropFetch() },
     // The recipient's download: the signed GET URL from the payload, read to the byte cap.

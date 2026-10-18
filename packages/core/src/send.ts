@@ -19,13 +19,23 @@
 //
 // Errors are CoreErrors with fixed sentences; nothing of the message, the contact or a key goes
 // into an error or a log line (I-5, I-7). Logs carry counts only.
-import { encodeUtf8 } from '@4thtech-io/crypto';
+import { canonicalize, encodeUtf8, type JsonValue } from '@4thtech-io/crypto';
+import { PAYLOAD_MAX_BYTES } from '@4thtech-io/storage';
 import { SEND_TOOL_PAYLOAD_TYPES, payloadSchema } from '@4thtech-io/types';
 import { IDEMPOTENCY_KEY_REUSED } from './constants.js';
 import type { ContactBook } from './contacts.js';
 import type { CoreContext } from './context.js';
 import type { EnvelopeService } from './envelopes.js';
 import { CoreError } from './errors.js';
+import {
+  deleteUploaded,
+  prepareOutgoing,
+  type FilesNeedsSetup,
+  type OutgoingRecord,
+  type SentFile,
+} from './files/outgoing.js';
+import type { FilesPlatform, OutgoingFile } from './files/platform.js';
+import { sealFileRows } from './files/records.js';
 import type { IdempotencyRun, IdempotencyService } from './idempotency.js';
 import type { IdentityService } from './identity.js';
 import type { OutboxService } from './outbox.js';
@@ -37,7 +47,7 @@ export const SEND_TOOL = 'agentlink_send';
 
 export type SendMessageType = (typeof SEND_TOOL_PAYLOAD_TYPES)[number];
 
-/** `client.sendMessage` input (06 §2.2; files, `notarize` and `approvalId` join with M1-7f/M1-7i). */
+/** `client.sendMessage` input (06 §2.2, §2.3; `notarize` and `approvalId` join with M1-7i). */
 export interface SendMessageInput {
   /** The contact's agent ID (04 §2.9). Resolving a name to an ID is the MCP layer's (M1-9). */
   readonly to: string;
@@ -48,10 +58,19 @@ export interface SendMessageInput {
   readonly body?: Readonly<Record<string, unknown>>;
   readonly replyTo?: string;
   readonly clientRequestId?: string;
+  /**
+   * Files to attach (06 §2.3, M1-7f), at most 16, each already opened by the platform through its
+   * allowed-folder check; the core checks the realpath again (04 §4).
+   */
+  readonly files?: readonly OutgoingFile[];
 }
 
 export const USE_TERMS_TOOLS = 'USE_TERMS_TOOLS' as const;
 export const POLICY_DENIED = 'POLICY_DENIED' as const;
+/** 04 §3.4 (G-27, D-85): the files cannot fit in one payload, even all stored. Nothing was sent. */
+export const PAYLOAD_TOO_LARGE = 'PAYLOAD_TOO_LARGE' as const;
+/** A file above `files.maxSendSizeMB`. Nothing was read or sent. */
+export const FILE_TOO_LARGE = 'FILE_TOO_LARGE' as const;
 
 export type SendMessageResult =
   | {
@@ -60,17 +79,31 @@ export type SendMessageResult =
       readonly thread: string;
       /** RFC 3339 UTC, seconds: the envelope's createdAt. */
       readonly sentAt: string;
+      /** Where each attached file went (only when files were attached). */
+      readonly files?: readonly SentFile[];
     }
   | {
       readonly status: 'rejected';
-      readonly code: typeof USE_TERMS_TOOLS | typeof IDEMPOTENCY_KEY_REUSED | typeof POLICY_DENIED;
+      readonly code:
+        | typeof USE_TERMS_TOOLS
+        | typeof IDEMPOTENCY_KEY_REUSED
+        | typeof POLICY_DENIED
+        | typeof PAYLOAD_TOO_LARGE
+        | typeof FILE_TOO_LARGE;
     }
+  /** A file send that needs the owner first (06 §2.3): an allowed folder or own storage. */
+  | { readonly status: 'needs_setup'; readonly reason: FilesNeedsSetup }
   /** Another execution holds this clientRequestId: run nothing, try again shortly (07 §3.3). */
   | { readonly status: 'in_progress' };
 
 interface Request {
   readonly to: string;
-  readonly payload: unknown;
+  readonly payload: {
+    readonly type: string;
+    readonly body: unknown;
+    readonly replyTo: string | null;
+  };
+  readonly files: readonly OutgoingFile[];
   /** `args` as for `action.args` (04 §3.4.1): defaults applied, without clientRequestId. */
   readonly args: Readonly<Record<string, unknown>>;
 }
@@ -85,7 +118,7 @@ const invalid = (): never => {
 /** The checked request, or the USE_TERMS_TOOLS refusal. Throws for any other bad input. */
 function readInput(input: SendMessageInput): Request | 'terms' {
   if (!isPlainObject(input)) return invalid();
-  const { to, text, body, replyTo } = input;
+  const { to, text, body, replyTo, files } = input;
   const type = input.type ?? 'text';
   if (body !== undefined && isPlainObject(body) && Object.hasOwn(body, 'terms')) return 'terms';
   if (!(SEND_TOOL_PAYLOAD_TYPES as readonly unknown[]).includes(type)) {
@@ -96,6 +129,7 @@ function readInput(input: SendMessageInput): Request | 'terms' {
   if (text !== undefined && typeof text !== 'string') return invalid();
   if (body !== undefined && !isPlainObject(body)) return invalid();
   if (replyTo !== undefined && typeof replyTo !== 'string') return invalid();
+  if (files !== undefined && (!Array.isArray(files) || files.length > 16)) return invalid();
   const payload = {
     type,
     body: text ?? body,
@@ -103,15 +137,29 @@ function readInput(input: SendMessageInput): Request | 'terms' {
     files: [],
   };
   if (!payloadSchema.safeParse(payload).success) return invalid();
+  const attached: readonly OutgoingFile[] = files ?? [];
   return {
     to,
-    payload,
+    payload: { type: payload.type, body: payload.body, replyTo: payload.replyTo },
+    files: attached,
     args: {
       to,
       type,
       text: text ?? null,
       body: body ?? null,
       replyTo: replyTo ?? null,
+      // Only with files, so the args (and their digest) of a plain message stay as they were. The
+      // realpath stays local: idempotency keeps only a keyed digest of the args (07 §3.3).
+      ...(attached.length === 0
+        ? {}
+        : {
+            files: attached.map((f) => ({
+              realpath: typeof f?.realpath === 'string' ? f.realpath : null,
+              size: typeof f?.size === 'number' ? f.size : null,
+              name: typeof f?.name === 'string' ? f.name : null,
+              mime: typeof f?.mime === 'string' ? f.mime : null,
+            })),
+          }),
     },
   };
 }
@@ -120,7 +168,7 @@ const iso = (seconds: number): string =>
   new Date(seconds * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 const isSendResult = (v: unknown): v is SendMessageResult =>
-  isPlainObject(v) && (v.status === 'ok' || v.status === 'rejected');
+  isPlainObject(v) && (v.status === 'ok' || v.status === 'rejected' || v.status === 'needs_setup');
 
 export interface SendDeps {
   readonly identity: IdentityService;
@@ -129,6 +177,8 @@ export interface SendDeps {
   readonly ownerActions: OwnerActions;
   readonly idempotency: IdempotencyService;
   readonly outbox: OutboxService;
+  /** The files platform (M1-7f); without it a send with files fails with `files_unavailable`. */
+  readonly files?: FilesPlatform;
 }
 
 export class SendService {
@@ -200,15 +250,62 @@ export class SendService {
     run: IdempotencyRun | undefined,
   ): Promise<{ readonly result: SendMessageResult; readonly envelopeId?: string }> {
     const ctx = this.#ctx;
-    const { identity, envelopes, outbox, idempotency } = this.#deps;
+    const { identity, ownerActions } = this.#deps;
     await identity.assertCanSend();
-    // The contact rule before anything is signed; the size rule once the envelope exists.
+    // The contact rule before anything is read, uploaded or signed; the size rule once the
+    // envelope exists.
     if ((await this.#decide(request.to, 0)) !== 'allow') {
       return { result: { status: 'rejected', code: POLICY_DENIED } };
     }
+    if (request.files.length === 0) {
+      return this.#store(request, { ...request.payload, files: [] }, [], run);
+    }
+    const platform = this.#deps.files;
+    if (platform === undefined) {
+      throw new CoreError('files_unavailable', 'This agent cannot send files here.');
+    }
+    const outcome = await prepareOutgoing(
+      { ctx, platform, policy: await ownerActions.loadPolicy() },
+      request.payload,
+      request.files,
+    );
+    if (outcome.kind === 'needs_setup') {
+      return { result: { status: 'needs_setup', reason: outcome.reason } };
+    }
+    if (outcome.kind === 'rejected') return { result: { status: 'rejected', code: outcome.code } };
+    const payload = { ...request.payload, files: outcome.entries };
+    let done: { readonly result: SendMessageResult; readonly envelopeId?: string };
+    try {
+      // The final check after upload (04 §3.4, D-85): the payload exactly as it is encrypted.
+      const bytes = encodeUtf8(canonicalize(payload as unknown as JsonValue)).length;
+      done =
+        bytes > PAYLOAD_MAX_BYTES
+          ? { result: { status: 'rejected', code: PAYLOAD_TOO_LARGE } }
+          : await this.#store(request, payload, outcome.records, run);
+    } catch (error) {
+      await deleteUploaded(ctx, outcome.records);
+      throw error;
+    }
+    if (done.result.status !== 'ok') {
+      // Nothing was stored or sent: the uploads are deleted (04 §3.4).
+      await deleteUploaded(ctx, outcome.records);
+      return done;
+    }
+    return { ...done, result: { ...done.result, files: outcome.sent } };
+  }
+
+  /** Builds, signs and stores the envelope with its outbox rows and its files rows. */
+  async #store(
+    request: Request,
+    payload: Readonly<Record<string, unknown>>,
+    records: readonly OutgoingRecord[],
+    run: IdempotencyRun | undefined,
+  ): Promise<{ readonly result: SendMessageResult; readonly envelopeId?: string }> {
+    const ctx = this.#ctx;
+    const { envelopes, outbox, idempotency } = this.#deps;
     const { built, row } = await envelopes.prepare({
       to: { contact: request.to },
-      payload: request.payload,
+      payload,
     });
     const size = encodeUtf8(row.envelope_json ?? '').length;
     if ((await this.#decide(request.to, size)) !== 'allow') {
@@ -225,6 +322,8 @@ export class SendService {
     }
     const rows = await outbox.prepareRows(built.envelope, routes);
     const envelopeId = built.envelope.id;
+    // Sealed before the transaction: no await inside it (07 §3.1).
+    const fileRows = await sealFileRows(ctx, envelopeId, records);
     const prepared =
       run === undefined ? undefined : await idempotency.prepareEffect(run, [envelopeId]);
     await ctx.store.transaction((tx) => {
@@ -237,9 +336,15 @@ export class SendService {
       }
       tx.insert('envelopes', row);
       for (const r of rows) tx.insert('outbox', r);
+      for (const f of fileRows) tx.insert('files', f);
     });
     if (run !== undefined && prepared !== undefined) idempotency.committed(run, prepared);
-    ctx.log.info('message stored for sending', { wraps: rows.length });
+    ctx.log.info(
+      'message stored for sending',
+      fileRows.length === 0
+        ? { wraps: rows.length }
+        : { wraps: rows.length, files: fileRows.length },
+    );
     return {
       result: {
         status: 'ok',

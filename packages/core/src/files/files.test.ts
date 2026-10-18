@@ -2,8 +2,11 @@
 // 07 §5.6; D-84, D-85). The drop round trip runs against the real drop Worker in
 // files.worker.test.ts; here own storage is an in-memory S3 stand-in, so a download can be tampered
 // with or truncated.
-import { MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
-import { encodeHex, sha256, type JsonObject } from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { encodeHex, sha256 } from '@4thtech-io/crypto';
+
+/** A payload or file entry, editable in a test. */
+type JsonObject = Record<string, unknown>;
 import { beforeEach, describe, expect, it } from 'vitest';
 import { rowKeyOf } from '../store/store.js';
 import type { Sealed } from '../store/schema.js';
@@ -33,8 +36,14 @@ let b: FileAgent;
 beforeEach(async () => {
   clock = new FakeClock();
   own = new MemoryOwnStorage();
-  a = await openFileAgent(clock, 11, ownerA, 'alice', { relays: RELAYS_A, own });
-  b = await openFileAgent(clock, 12, ownerB, 'bob', { relays: RELAYS_B, own });
+  a = await openFileAgent(clock, new MemoryKeyStore(seed(11)), ownerA, 'alice', {
+    relays: RELAYS_A,
+    own,
+  });
+  b = await openFileAgent(clock, new MemoryKeyStore(seed(12)), ownerB, 'bob', {
+    relays: RELAYS_B,
+    own,
+  });
   await pairForFiles(clock, a, b);
 });
 

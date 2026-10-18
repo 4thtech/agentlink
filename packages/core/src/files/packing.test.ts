@@ -12,6 +12,7 @@ const file = (size: number, name = 'f.bin'): PackingFile => ({
   mime: 'application/octet-stream',
   size,
   storedUrlLength: DROP_URL,
+  expiresAt: 1_800_604_800,
 });
 
 /** The bytes the core would encrypt for that plan, built the long way. */
@@ -27,7 +28,7 @@ function serialized(files: readonly PackingFile[], inline: readonly boolean[]): 
       inline: inline[i] === true ? 'A'.repeat(Math.ceil((ct * 4) / 3)) : null,
       url: inline[i] === true ? null : 'h'.repeat(f.storedUrlLength),
       fileKey: 'k'.repeat(43),
-      expiresAt: 1_800_604_800,
+      expiresAt: f.expiresAt,
     };
   });
   const payload = { ...base, files: entries } as unknown as JsonValue;

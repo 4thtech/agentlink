@@ -16,7 +16,6 @@ import {
   type KeyStore,
   type NostrEvent,
 } from '@4thtech-io/crypto';
-import { MemoryKeyStore } from '@4thtech-io/crypto/testing';
 import { createLogger } from '@4thtech-io/log';
 import {
   type CiphertextSource,
@@ -32,13 +31,7 @@ import { AgentLinkClient } from '../client.js';
 import type { FilesPlatform, InboxFolder, OutgoingFile } from '../files/platform.js';
 import { MemoryStore } from '../store/memory-store.js';
 import type { TransportFactory } from '../transport.js';
-import {
-  FakeClock,
-  RecordingApprovalChannel,
-  TestStoreCipher,
-  passphrase,
-  seed,
-} from './fixtures.js';
+import { FakeClock, RecordingApprovalChannel, TestStoreCipher, passphrase } from './fixtures.js';
 import { pairWith, type TestOwner } from './envelopes.js';
 import { MemoryPolicyMark, newNonce, ownerHex, signWith } from './owner.js';
 
@@ -223,14 +216,13 @@ export interface FileAgentOptions {
 /** An agent with a files platform whose allowed folder is WORK and whose inbox is INBOX. */
 export async function openFileAgent(
   clock: FakeClock,
-  n: number,
+  keyStore: KeyStore,
   owner: TestOwner,
   name: string,
   options: FileAgentOptions,
 ): Promise<FileAgent> {
   const store = new MemoryStore();
   const cipher = new TestStoreCipher();
-  const keyStore: KeyStore = new MemoryKeyStore(seed(n));
   const spy = new PublishSpy();
   const inbox = new MemoryInbox();
   const lines: string[] = [];
