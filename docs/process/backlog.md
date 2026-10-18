@@ -1533,21 +1533,21 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - No NatSpec in `src/OCCNotary.sol` describes a resolved gap as pending.
   - The suppression sits at the narrowest scope that keeps Slither clean; no new finding appears.
 
-#### M1-3f · contracts: ABI release artifacts and `@agentlink/occ-v2-abi`
+#### M1-3f · contracts: ABI release artifacts and `@4thtech-io/occ-v2-abi` (private, in-repo)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · release workflow; agentlink · packages/occ-v2-abi
-- **Depends on:** M1-3d, M0-2e; DECISION NEEDED on the publish location (gap G-10)
+- **Depends on:** M1-3d, M0-2e (G-10 resolved by D-83)
 - **Spec:** 05 §9; D-19; `development-process.md` §9.1–§9.3; `release-and-deployment.md` §2
 - **Invariants:** I-6
 - **Scope:**
   - Tagged contracts release emits ABI JSON, per-chain addresses (empty until M1-3g) and a SHA-256 manifest; no Solidity source leaves the private repo.
   - The ABI includes the G-4 events `RecordSkipped` and `ReceiptSkipped` (05 §6).
-  - Proposed (G-10): a PR imports the artifacts into public `packages/occ-v2-abi`; CI verifies the manifest; `release.yml` publishes with provenance (ABIs only, MIT licence).
-  - `@agentlink/chain` pins an exact version; Renovate never automerges it.
-  - Follow-up (IR-M1-3b-1 I-4): no `@agentlink/occ-v2-abi` release is built from a contracts build whose concrete ABI differs from the interface in mutability (the `depositWithAuthorization` stub until M1-3c); generate the ABI from the interface, or publish only after M1-3c.
+  - Decided (G-10, D-83, Tali, 2026-10-18): `@4thtech-io/occ-v2-abi` is a private workspace package in `packages/occ-v2-abi`, built from the exported ABI/addresses/manifest artifacts and the shared vectors, bundled into the CLI and not published to npm. A PR imports the artifacts; CI verifies the manifest. (The rename from `@agentlink/*` to `@4thtech-io/*` is in flight in #250; until it lands the name reads `@agentlink/occ-v2-abi`.)
+  - `@4thtech-io/chain` pins the imported release exactly; Renovate never automerges it.
+  - Follow-up (IR-M1-3b-1 I-4): no `@4thtech-io/occ-v2-abi` import is taken from a contracts build whose concrete ABI differs from the interface in mutability (the `depositWithAuthorization` stub until M1-3c); generate the ABI from the interface, or import only after M1-3c.
   - Spec note (IR-M1-3b-1 choices 1 and 10, proposed; owner confirms at merge): 05 §7 lists the inherited OpenZeppelin errors that appear in the ABI (`AccessManagedUnauthorized`, `ReentrancyGuardReentrantCall`, `SafeERC20FailedOperation`, the UUPS and ERC-1967 errors) and decides whether a dedicated `ValueMismatch()` replaces `TransferFailed()` for a native value mismatch.
 - **Acceptance:**
-  - A `next` prerelease of `@agentlink/occ-v2-abi` published with provenance visible on npm.
+  - `packages/occ-v2-abi` is private (`"private": true`), is bundled into the CLI build, and no workflow publishes it.
   - CI fails if imported files differ from the release manifest; no `.sol` file is present in the public package (check).
 
 #### M1-3g · contracts: CREATE3 deploy script and testnet deployment
@@ -1577,7 +1577,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `deployer-holds-no-role` passes on Base Sepolia, and neither CreateX nor any CREATE3 intermediate address holds a role; fork dry-run in CI before every broadcast.
   - Negative tests for the salt rules (05 §9.1): a salt whose guard bytes differ from CreateX's `msg.sender`, a zero guard, byte 20 not `0x00`, and a predicted address (or CREATE3 intermediate address) that already has code or a nonzero nonce each make the script fail before broadcast; a fork test shows the offline address computation equals the address CreateX deploys to; a test shows every call to the stage deployer reverts.
   - The stage fits the Chiado block gas limit and per-transaction gas cap on a Chiado fork, and its init code is within EIP-3860 (so M1-3j can reproduce the addresses). Proposed (D-64 (2)): it also fits, with margin, the block gas limit and per-transaction gas cap of Base, Gnosis and each planned M4 mainnet, checked on forks, and a test fails if the guard layout or a label would change the committed address file.
-  - Addresses published in the next `@agentlink/occ-v2-abi` prerelease (M1-3f).
+  - Addresses imported into the in-repo `@4thtech-io/occ-v2-abi` (M1-3f, D-83).
   - Negative tests for the config assertions: an allowlisted token with a zero fee or cap, the native coin on a non-Gnosis chain, and a fee-on-transfer mock each make the script fail.
   - Pre-audit conditions (AUDIT-FABLE-OCCv2-1 FA-6, FA-7; proposed, owner confirms at merge; prerequisites of the Base Sepolia broadcast):
     - Config-only rules (FA-6): the contracts do not enforce them, so the script itself asserts them before any broadcast, not only review or M1-14: the native coin is allowlisted only on Gnosis chain IDs, every allowlisted token has a nonzero `NOTARIZE` and `REGISTER` fee and cap, no allowlisted token is fee-on-transfer or rebasing, and the target chain has Cancun (EIP-1153). The Base Sepolia run's assertion output is attached to the PR.
@@ -1599,7 +1599,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Fork dry-run first; the predictions must equal the campaign's address file, which equals the published Base Sepolia addresses; otherwise the run fails closed (05 §9.1).
   - Proposed: deploy soon after Base Sepolia, to shorten the squat window (05 §9.1 control 3). D-71 (1) (15 Oct 2026): the key is a repository secret with process-only protection; the run is a manual `workflow_dispatch` and broadcasts only after the owner's explicit "go"; the workflow refuses mainnet chain IDs (with a test); agents never approve or broadcast on their own.
   - Hard prerequisite of M2-4a (Registry stage on both testnets) and M3-2c (mainnet), so two-chain zero-config selection (D-40), the native-xDAI fee path (D-46) and the Gnosis gas limits run on a live testnet before mainnet. Not an M1-GATE blocker (gate residual in M1-3g, proposed).
-  - After the run: the faucet is configured against the Chiado vault (M1-10b); the next `@agentlink/occ-v2-abi` prerelease and the `@agentlink/chain` config list Chiado.
+  - After the run: the faucet is configured against the Chiado vault (M1-10b); the next `@4thtech-io/occ-v2-abi` import and the `@4thtech-io/chain` config list Chiado.
 - **Acceptance:**
   - Predicted and deployed proxy and AccessManager addresses equal the published Base Sepolia addresses (script output in PR).
   - `deployer-holds-no-role` and the M1-3g post-deploy checks pass on Chiado; the stage fits Chiado's block gas limit and per-transaction gas cap.
@@ -1700,7 +1700,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-6
 - **Scope:**
   - `ChainConfig` (07 §6.1) and the registry for Base Sepolia and Chiado; user RPC overrides; no API keys in the client; viem fallback transport.
-  - ABIs and addresses from the pinned `@agentlink/occ-v2-abi`; builders for `Record`, `Receipt`, `AgentCard`; signing only through `KeyStore.sign712`.
+  - ABIs and addresses from the pinned in-repo `@4thtech-io/occ-v2-abi`; builders for `Record`, `Receipt`, `AgentCard`; signing only through `KeyStore.sign712`.
   - Random 256-bit nonces, 32-byte salts, recipient commitments, recordId computation.
 - **Acceptance:**
   - EIP-712 vector parity in all runtimes; config schema rejects unknown chains and duplicate tokens.
@@ -4279,7 +4279,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Invariants:** I-6, I-10
 - **Scope:**
   - Only the audited commit (bytecode rebuilt and compared); fork dry-run; the owner runs the deploy locally, signing with the mainnet deployer key on his Trezor hardware wallet (D-71 (1); tooling M3-2d), while a second person (by agreement, @denisjazbec) witnesses and independently verifies; identical addresses on both mainnets, equal to the mainnet campaign's address file and different from the testnet addresses (05 §9.1, D-71 (1)); the dry-run checks the audited build's stage against every planned mainnet chain's limits (proposed); all roles to the Safes; deployer roles revoked in the same script.
-  - New `@agentlink/occ-v2-abi` version with mainnet addresses.
+  - New `@4thtech-io/occ-v2-abi` import with mainnet addresses (D-83).
 - **Acceptance:**
   - Scripted check "deployer holds no role" passes on both chains; delays equal `docs/roles.md`; addresses identical on both mainnets and equal to the mainnet campaign's address file; deployed bytecode matches the audited build; witness record stored; the per-chain config lists the mainnet addresses (D-71 (1)).
 
@@ -4759,7 +4759,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
    - **Review IR-G-9-1 fixes:** execution lease (H-1); `received` state for stored, unprocessed envelopes, at most 1 000 (M-1); the signed Record and its salt stored in the reserve transaction (M-2); the policy version checked inside check-and-reserve and part claims (M-3); one live scope while an approved scope has unclaimed parts (M-4); revocation stops queued deliveries (M-5); refused envelopes counted against the contact's rate (M-6); a new `policy.set` resets the broken ledger's clock check (M-7). Round 2: the held pool is aligned with 04 step 7 (R2-M1), and there is no refusal notice to senders (R2-M2).
 
    *Was:* 07 §3 lacked the outbox (07 §4.2, 24 h retry), the ≥ 7-day seen-set (07 §4.2), idempotency results (06 §1 rule 6), budget ledger and rate counters (06 §3), and `SignedOwnerAction` nonces, the stored signed objects, the revoked-agent set and contact status `revoked` (04 §2.5.1, §3.4.1); the policy-version high-water mark lives in the KeyStore (04 §2.5.1). *Blocks:* M1-5b, M1-5c, M1-7a, M1-8b.
-10. **G-10 (M) Where `@agentlink/occ-v2-abi` is published.** 05 §9; D-19. npm provenance is not generated for private source repos (verify). *Proposed* (`development-process.md` §9.2): import release artifacts into public `packages/occ-v2-abi` and publish from there. *Blocks:* M1-3f.
+10. **G-10 (M) Where `@agentlink/occ-v2-abi` is published.** **RESOLVED (D-83, Tali, 2026-10-18):** it is not published. `@4thtech-io/occ-v2-abi` is a private in-repo workspace package built from the contracts repo's exported artifacts and the shared vectors, and bundled into the CLI (`development-process.md` §9.2). *Was:* 05 §9; D-19; npm provenance is not generated for private source repos. *Blocked:* M1-3f.
 11. **G-11 (L) Logger package missing from the package map.** RESOLVED by M0-8: `@agentlink/log` (zero dependencies) is in the 07 §1 package map and `repo-reference.md`. *Was:* 04 §8.4 vs 07 §1. *Blocked:* M0-8.
 12. **G-12 (M) JCS and invite compression.** RESOLVED. *JCS:* by M1-1a (4thtech/agentlink#27): in-repo RFC 8785 code checked against the RFC vectors (`packages/crypto/src/jcs.ts`), the alternative proposed here, so no dependency was added. *Compression:* by 4thtech/agentlink#70 (D-69; the encoding decided by Tali in chat, 2026-10-14; the decoder rules proposed, owner confirms at merge), in 04 §3.6: raw DEFLATE (RFC 1951) with no zlib header or checksum, through the platform `CompressionStream("deflate-raw")` and `DecompressionStream("deflate-raw")`. Proposed with it (revised after review IR-D-69-1): the whole input bounded before URL parsing (the canonical prefix plus at most 21 846 characters of strict base64url, or the bare payload); inflation in bounded slices with a running count, capped at 16 384 bytes before any parse, with an orderly shutdown; the stream must end exactly at the end of the input (malformed, truncated and trailing-byte streams refused in every runtime, the codec detecting trailing input itself where the platform does not); fatal UTF-8 with the BOM kept, I-JSON and the strict schema before use; the encoder checks both limits; compressed bytes never hashed or signed; one codec in `@agentlink/core` (M1-7c). The proof-pack link is not covered (G-52). *Was:* 04 §3.1, §3.6; `AGENTS.md` dependency allowlist. No JCS implementation was allowlisted although `envelopeHash` depends on it; "deflate" did not say raw DEFLATE or zlib. *Proposed:* approve a vetted RFC 8785 implementation (or in-repo code with RFC vectors); specify `deflate-raw` via `CompressionStream`. *Blocked:* M1-1a (done), M1-7c.
 13. **G-13 (L) Record kind ↔ payload type.** 05 §3.1 kinds vs 04 §3.4 payload types; no mapping. *Blocks:* M1-7g.
@@ -4851,7 +4851,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | OPS-L8 | Rotate every live credential found |
 | M1-3g | Testnet deployer key and testnet Safe; fund with low balances; trigger the private-repo deploy workflow for Base Sepolia (D-63) (no testnet explorer verification: D-11, D-19). Keep its offline backup, never import it into a browser extension or hot wallet, clear any terminal scrollback or history that showed it, and set up the deployer monitoring (proposed). D-71 (1): this key is for testnets only; mainnet uses a separate key from your Trezor hardware wallet |
 | M1-3j | Trigger the Chiado deploy with the same testnet deployer key (D-63). D-71 (1): keep the key as a repository secret of the private repo (GitHub Free, no environment); trigger each run by manual dispatch and give the "go" before broadcast; keep write access to the owner and named engineers; delete the secret when the testnets end |
-| M1-3f | **DECISION NEEDED:** where `@agentlink/occ-v2-abi` is built and published (G-10) |
+| M1-3f | Decided by D-83 (18 Oct 2026): G-10 (the ABI package is private and in-repo, not published). No owner action left |
 | M1-3k, M3-1a | Decided by D-66: EIP-7702-delegated agent keys, option (a) now and (b) before mainnet (G-47, M1-3l); the ERC-1271 gas bound is required (FA-1). No owner action left |
 | M1-5c, M1-7b follow-ups | Decided by D-71 (15 Oct 2026): G-49 (M1-5f) and G-51 (M1-7b-b). No owner action left |
 | M1-7e-2 | **DECISION NEEDED:** whether an owner-signed revoke from a blocked key is dropped (IR-M1-7e-2-1 D1-F01; see the card)
