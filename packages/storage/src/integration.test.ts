@@ -16,6 +16,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AwsClient } from 'aws4fetch';
 import { createSha256, encodeBase64url, encodeHex, randomBytes, sha256 } from '@agentlink/crypto';
+import { createLogger } from '@agentlink/log';
 import { captureOutput, findCanaryLeaks, type Canary } from '@agentlink/log/testing';
 import {
   LIFECYCLE_RULE_ID,
@@ -403,47 +404,71 @@ describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}
   }, 120_000);
 
   // 1 GiB through MinIO in bounded memory (card M1-6b acceptance), on the production path: default
-  // part size (8 MiB), 1 MiB ALF1 chunks, download through a presigned URL with global fetch.
-  // - Gated, always: RSS growth < 128 MiB, the card's acceptance: the 1 GiB run's peak RSS against the
-  //   RSS after a 256 MiB warm-up (first use of WebCrypto AES-GCM and TLS grows RSS on its own, see
-  //   stream.slow.test.ts in @agentlink/crypto).
-  // - Gated only with --expose-gc: held memory (heapUsed + arrayBuffers) right after a forced
-  //   collection stays under 64 MiB, the M1-1d limit; that is what the pipeline keeps alive. Without
-  //   gc() held memory is reported only: unforced, it mostly measures garbage the collector has not
-  //   reached yet, and it flaked at 65 MiB on CI (IR-M1-6b-2-1 H-1).
-  // Every figure goes into the assertion messages, an annotation and the JSON report's `meta`.
+  // part size (8 MiB), 1 MiB ALF1 chunks, download through a presigned URL with global fetch. After a
+  // 1 GiB warm-up (first use of WebCrypto AES-GCM and TLS grows RSS on its own, see
+  // stream.slow.test.ts in @agentlink/crypto; allocator pools settle over the first GiB), RSS is
+  // taken as the baseline; then a 256 MiB and a 1 GiB round trip each measure their peak against
+  // that same baseline. Gates:
+  // - RSS growth of the 1 GiB run < 128 MiB (the card's acceptance);
+  // - boundedness: growth(1 GiB) - growth(256 MiB) < 32 MiB, so memory does not grow with the size;
+  // - held memory (heapUsed + arrayBuffers) right after a forced collection < 64 MiB (the M1-1d
+  //   limit): what the pipeline keeps alive. vitest.config.ts runs this file with --expose-gc; without
+  //   gc() the test fails rather than skip the check. Unforced held memory is reported only: it
+  //   mostly measures garbage the collector has not reached yet (flaked at 65 MiB, IR-M1-6b-2-1 H-1).
+  // The figures are logged on every run (numbers only, through @agentlink/log), and go into the
+  // assertion messages, an annotation and the JSON report's `meta`.
   // MinIO only: the R2 job runs daily on a shared test bucket and need not move a GiB each day. The
   // test is not registered (rather than skipped) on R2, since the jobs fail on a skipped test.
   if (MODE === 'minio') {
-    it('stream (M1-6b): 1 GiB encrypted round trip, RSS growth under 128 MiB', async ({
+    it('stream (M1-6b): 1 GiB encrypted round trip in bounded memory', async ({
       annotate,
       task,
     }) => {
       const RSS_GROWTH_LIMIT = 128 * MiB;
+      const BOUNDED_LIMIT = 32 * MiB;
       const RETAINED_LIMIT = 64 * MiB;
       const mib = (n: number): number => Math.round(n / MiB);
+      expect(forceGc, 'run with --expose-gc (vitest.config.ts integration project)').toBeTypeOf(
+        'function',
+      );
       const start = rss();
-      await encryptedRoundTrip(256 * MiB);
+      await encryptedRoundTrip(1024 * MiB);
       forceGc?.();
       const baseline = rss();
+      const small = await encryptedRoundTrip(256 * MiB);
+      forceGc?.();
       const run = await encryptedRoundTrip(1024 * MiB);
+      const growthSmall = small.peakRss - baseline;
       const growth = run.peakRss - baseline;
-      const figures =
-        `RSS: start ${mib(start)}, after warm-up ${mib(baseline)}, 1 GiB peak ${mib(run.peakRss)}, ` +
-        `growth ${mib(growth)} MiB; held (heapUsed + arrayBuffers) peak ${mib(run.peakHeld)} MiB ` +
-        `(upload ${mib(run.upload.peakHeld)}, download ${mib(run.download.peakHeld)}); ` +
-        (forceGc === undefined
-          ? 'retained after GC: not measured (no --expose-gc)'
-          : `retained after GC peak ${mib(run.peakRetained)} MiB ` +
-            `(upload ${mib(run.upload.peakRetained)}, download ${mib(run.download.peakRetained)})`);
-      // Figures only, never a URL or key.
-      (task.meta as Record<string, unknown>)['streamMemory'] = figures;
-      await annotate(`storage stream memory: ${figures}`);
+      const figures = {
+        rssStartMiB: mib(start),
+        rssBaselineMiB: mib(baseline),
+        rssPeak256MiB: mib(small.peakRss),
+        rssPeak1GiBMiB: mib(run.peakRss),
+        growth256MiB: mib(growthSmall),
+        growth1GiBMiB: mib(growth),
+        growthDeltaMiB: mib(growth - growthSmall),
+        heldPeakMiB: mib(run.peakHeld),
+        heldUploadMiB: mib(run.upload.peakHeld),
+        heldDownloadMiB: mib(run.download.peakHeld),
+        retainedPeakMiB: mib(run.peakRetained),
+        retainedUploadMiB: mib(run.upload.peakRetained),
+        retainedDownloadMiB: mib(run.download.peakRetained),
+      };
+      const text = Object.entries(figures)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(' ');
+      // Numbers only, never a URL or key.
+      createLogger({ name: 'storage-it' }).info('storage stream memory', figures);
+      (task.meta as Record<string, unknown>)['streamMemory'] = text;
+      await annotate(`storage stream memory: ${text}`);
       expect(run.out.state()).toBe('committed');
       expect(run.out.size()).toBe(1024 * MiB);
       expect(run.out.sha256()).toBe(run.source.sha256());
-      expect(growth, figures).toBeLessThan(RSS_GROWTH_LIMIT);
-      if (forceGc !== undefined) expect(run.peakRetained, figures).toBeLessThan(RETAINED_LIMIT);
+      expect(small.out.state()).toBe('committed');
+      expect(growth, text).toBeLessThan(RSS_GROWTH_LIMIT);
+      expect(growth - growthSmall, text).toBeLessThan(BOUNDED_LIMIT);
+      expect(run.peakRetained, text).toBeLessThan(RETAINED_LIMIT);
       expect(await openUploads()).toBe(0);
     }, 900_000);
   }
