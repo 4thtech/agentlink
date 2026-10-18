@@ -4,7 +4,8 @@
 //
 // Two projects (M1-6b part 2, IR-M1-6b-2-2 M-3): the storage integration test runs in workers
 // started with --expose-gc, so its 1 GiB memory gate can measure what is still held after a forced
-// collection, in CI as well as locally. Every other test runs without it.
+// collection, in CI as well as locally. The unit project runs with it too, for the gate's negative
+// control (memory-gate.test.ts, IR-CI-memgate-1 H-1), which runs on every CI without MinIO.
 import { defineConfig } from 'vitest/config';
 
 const INTEGRATION = 'src/integration.test.ts';
@@ -19,6 +20,7 @@ export default defineConfig({
           include: ['src/**/*.test.ts'],
           exclude: [INTEGRATION],
           testTimeout: 20_000,
+          execArgv: ['--expose-gc'],
         },
       },
       {
