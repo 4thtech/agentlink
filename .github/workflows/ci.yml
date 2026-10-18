@@ -383,6 +383,13 @@ jobs:
             pnpm --filter @4thtech-io/agentlink exec vitest run test/two-process.keychain.test.ts --reporter=default --reporter=json --outputFile.json="$CLI_KEYCHAIN_REPORT"
           '
 
+      # OPS-CI-10 regression check: kill the Secret Service daemon mid-session; the daemon D-Bus
+      # starts in its place must serve the same items with no prompt (the e2e failure mode).
+      - name: Check that the CI keyring survives a killed daemon (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: dbus-run-session -- tools/ci/with-keyring.sh tools/ci/keyring-restart-check.sh
+
       # "Runs with no skipped test" (M1-8a-b acceptance): the keychain suite must have run and
       # passed in full on this OS. Other files of the package may skip tests of their own; the
       # keychain file may not.
