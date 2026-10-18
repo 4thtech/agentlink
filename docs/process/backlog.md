@@ -1721,7 +1721,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Chain client (`@4thtech-io/chain`)
 
 #### M1-4a · chain: config, clients, typed-data builders, parity
-- **Status:** in review (PR pending, 2026-10-18) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (#275, 2026-10-18) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain
 - **Depends on:** M1-1j, M1-1g, M1-3f, M1-14
 - **Spec:** 07 §6.1, §6.2; 03 §7; 05 §8
