@@ -1693,7 +1693,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-6
 - **Scope:**
   - `ChainConfig` (07 §6.1) and the registry for Base Sepolia and Chiado; user RPC overrides; no API keys in the client; viem fallback transport.
-  - ABIs and addresses from the pinned `@agentlink/occ-v2-abi`; builders for `Record`, `Receipt`, `AgentCard`; signing only through `KeyStore.sign712`.
+  - ABIs and addresses from the pinned in-repo `@4thtech-io/occ-v2-abi`; builders for `Record`, `Receipt`, `AgentCard`; signing only through `KeyStore.sign712`.
   - Random 256-bit nonces, 32-byte salts, recipient commitments, recordId computation.
 - **Acceptance:**
   - EIP-712 vector parity in all runtimes; config schema rejects unknown chains and duplicate tokens.
