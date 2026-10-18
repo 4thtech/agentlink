@@ -41,6 +41,13 @@ export {
   type AddAgentOptions,
   type AddAgentResult,
 } from './owner-add-agent.js';
+// M1-9z: `owner change-code` re-wraps the owner seed under a new generated owner code, at the same
+// TTY prompt; the owner identity does not change and nothing secret leaves the package.
+export {
+  changeOwnerCode,
+  type ChangeOwnerCodeOptions,
+  type ChangeOwnerCodeResult,
+} from './owner-change-code.js';
 // M1-8h: `owner init` signs the agent's first card; the caller passes core's IdentityService. Only
 // types: the restricted session stays inside the package (owner-first-card.ts).
 export type { FirstAgentCard, FirstCardIdentity } from './owner-first-card.js';

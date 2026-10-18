@@ -41,6 +41,8 @@ Approving needs you, present, with your **owner code**. Your AI can ask for an a
 
 **More than one AI tool on the same computer.** The owner code is set up once per computer user. For each further agent: `npx -y @4thtech-io/agentlink init --agent <name> --harness <tool>`, then in a terminal you opened yourself `npx -y @4thtech-io/agentlink owner add-agent --agent <name>`. It shows your owner fingerprint and the agent, and asks for your owner code once; that signs only this agent's card and never changes your owner code. An approval given for one agent cannot be used by another. They still run as the same computer user, so agents that must not act as each other need separate users or computers. A second `owner init` on the same computer is refused.
 
+**Changing an exposed owner code.** If your owner code was typed into a chat or a terminal your AI can read, run `npx -y @4thtech-io/agentlink owner change-code` in a terminal you opened yourself (next release after v0.1.0). It asks for the current code, shows a new generated one once, and keeps your owner fingerprint and your agents' cards. If it fails before finishing, the current code keeps working.
+
 Passkeys (Touch ID, Windows Hello) are planned for v0.2.0; in v0.1.0 you approve with the owner code.
 
 ## How do I check it works?

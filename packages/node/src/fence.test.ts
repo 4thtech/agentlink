@@ -27,6 +27,8 @@ describe('@agentlink/node entry (the 04 §8.1 fence)', () => {
       // M1-9t (D-78): `owner add-agent`, a prompting entry point like initOwner.
       'addAgentToOwner',
       'assertAgentId',
+      // M1-9z: `owner change-code`, a prompting entry point like initOwner (no seed or item seam).
+      'changeOwnerCode',
       'createInboxFile',
       'createOsKeychainAgent',
       'decideReviewedApprovals',

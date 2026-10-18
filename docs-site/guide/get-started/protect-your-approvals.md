@@ -30,6 +30,18 @@ If you removed every agent that had a card but your owner is still set up on thi
 
 Each agent has its own identity, contacts and approvals: an approval you give one agent can't be used by another. They still run as the same user on this computer, so this keeps them apart in AgentLink, not against each other. Agents that must not be able to act as each other need separate computer users or computers.
 
+## Change your owner code
+
+If your owner code was exposed, for example typed into a chat with your AI or into a terminal your AI can read, replace it (from the next release after v0.1.0):
+
+1. **Open a terminal window yourself**, as for `owner init`.
+2. **Run `npx -y @4thtech-io/agentlink owner change-code`.** It asks for your current owner code first. Three wrong entries end the command and nothing changes.
+3. **Write down the new owner code it shows**, and type its last four characters back. Replace the old code in your password manager.
+
+Your owner fingerprint stays the same and your agents keep their cards, so your contacts see no change. From then on only the new code works. If anything fails before the change is complete, your current code keeps working. If you saved a recovery kit, it isn't changed: it has its own recovery code.
+
+Changing the code doesn't protect copies of the old saved owner key made earlier, for example in a backup, from someone who also has the old code. If you think that happened, set up a new owner and agent.
+
 ## What this protects, and what it can't
 
 The owner code stops your AI from approving anything through AgentLink. Without it, the AI can send what your rules allow, and ask you for the rest.

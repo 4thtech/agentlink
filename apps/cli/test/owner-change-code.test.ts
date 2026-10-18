@@ -121,7 +121,11 @@ describe('agentlink owner change-code (M1-9z)', () => {
   it('runs only at an interactive terminal with no AI-app marker (UX guard)', async () => {
     const m = machine({ default: OWNER });
     const pipe: TerminalContext = { stdinIsTTY: false, stdoutIsTTY: false, env: {} };
-    const marked: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: { CLAUDECODE: '1' } };
+    const marked: TerminalContext = {
+      stdinIsTTY: true,
+      stdoutIsTTY: true,
+      env: { CLAUDECODE: '1' },
+    };
     expect(await m.run(['owner', 'change-code'], pipe)).toBe(1);
     expect(await m.run(['owner', 'change-code'], marked)).toBe(1);
     expect(m.calls).toHaveLength(0);

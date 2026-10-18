@@ -3422,6 +3422,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - L-4: the node test checks output, errors and the result for the owner code; node itself cannot log (ESLint CONSOLE_SYNTAX), indirect logging from dependencies is not captured.
   - L-5: give the confirmation a real reference: `owner init` should tell the owner to note the owner fingerprint next to the code, and the M1b recovery kit (M1-9h/M1-9i) should print it.
 
+#### M1-9z · CLI: change the owner code (new, live finding 2026-10-17)
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (owner key wrap, I-1, I-4) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/node (`owner-change-code.ts`, `owner-keystore.ts`), apps/cli (`owner change-code`), docs-site `protect-your-approvals.md`
+- **Depends on:** M1-9b, M1-9x
+- **Spec:** 04 §2.8 ("Changing the owner code", proposed, owner confirms at merge), §2.5; 06 §8; 07 §9.3, §9.4
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - Live finding (owner, 2026-10-17): an owner code was exposed (typed into a shell and a chat), and AgentLink had no way to change it.
+  - `agentlink owner change-code` †: TTY only; refused under an AI-app marker before the owner item is read; requires the current owner code (or opted-in passphrase), three tries; the item must unlock to the owner the local cards name, when they name one.
+  - Shows a new generated owner code (the `owner init` rules: once, last four re-typed, screen cleared) and re-wraps the same owner seed in `ALKO` v1 with a fresh salt and nonce. Staged in the keychain account `owner-next`, read back and opened with the new code (same owner), then the `owner` item is replaced (only if unchanged since it was opened) and read back; the seed is never lost on failure.
+  - The owner fingerprint and every agent card stay valid. A recovery-kit `ALKR` blob is never read or changed, and the copy says so.
+- **Acceptance:** tests first (RED commit): success path (new code opens to the same owner, old code refused, fingerprint unchanged); three wrong current codes change nothing; refused under an AI-app marker with no keychain read; crash safety (a failing or dropped replace, and a failing staging write, keep the old code working); no owner code in output other than the one display of the new code, nor in an error.
+
 #### M1-9y · cli: require Node 22.14+ with a clear message; quiet info logs (new, live finding 2026-10-17)
 - **Status:** done (4thtech/agentlink#235) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`cli.ts`, `node-check.ts`, `runtime/log-level.ts`), docs-site get-started and troubleshooting, README
