@@ -10,10 +10,10 @@
 //   the download (`too_large`); fewer bytes than the cap fail (`size_mismatch`).
 // - Decryption goes through @agentlink/crypto's opener, which checks the header before decrypting
 //   and both hashes at the end (04 §4 Integrity: `ciphertextSha256` and `plaintextSha256` are
-//   mandatory here). Streaming reverses the order of 04 §4's "check `ciphertextSha256` before
-//   decrypting" for the bytes, not for the result: plaintext reaches the sink only as provisional
-//   output, and the sink commits only after the ciphertext hash, the final chunk and the plaintext
-//   hash all verified. On any failure the sink is discarded (stream-sink.ts).
+//   mandatory here). As 04 §4 allows a streaming recipient (D-84), plaintext reaches the sink
+//   only as provisional output (the quarantine), and the sink commits only after the ciphertext
+//   hash, the final chunk and the plaintext hash all verified. On any failure the sink is discarded
+//   (stream-sink.ts).
 // - Memory: one ALF1 chunk plus what the source and the sink buffer.
 // - Errors are fixed StorageErrors with no cause: a source's own error can carry the URL (I-7).
 import {
