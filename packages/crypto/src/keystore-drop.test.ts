@@ -295,6 +295,10 @@ describe('KeyStore.signDropRequest: refusals (IR-M1-6c-1)', () => {
           TS,
         ),
     ],
+    [
+      'URL over 512 characters (IR-M1-1g-e-1 L-1)',
+      () => store.signDropRequest({ ...UPLOAD, url: `${URL_UPLOAD}?${'a'.repeat(512)}` }, TS),
+    ],
     ['URL with a fragment', () => store.signDropRequest({ ...UPLOAD, url: `${URL_UPLOAD}#x` }, TS)],
     [
       'a caller-chosen kind',

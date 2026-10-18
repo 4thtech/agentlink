@@ -7,14 +7,19 @@
 // - the event is built here by dropAuthEvent, so kind 27235, the empty content and the `domain` tag
 //   `agentlink/v1/drop` are fixed; the caller passes exactly {method, url, body} and nothing else;
 // - only POST and DELETE (PUT and GET use the drop's URL MAC instead);
-// - the URL is https, without credentials or fragment, in its WHATWG-serialised form (the Worker
+// - the URL is https, at most 512 characters, without credentials or fragment, in its WHATWG-serialised form (the Worker
 //   compares `u` with the URL as its runtime serialises it, 07 §5.4);
 // - the body is the drop's signed JSON (at most 1024 bytes, strict JSON, an object with v: 1, a
 //   16-byte base64url nonce and an integer ts), and `createdAt` equals its `ts`.
 // Anything else is refused with one fixed error that names no input (I-7). Each request field is
 // read once and the snapshot is what is checked and signed.
 import { assertBytes } from './bytes.js';
-import { dropAuthEvent, encodeDropAuthorization, type DropAuthRequest } from './drop-auth.js';
+import {
+  DROP_AUTH_MAX_URL_LENGTH,
+  dropAuthEvent,
+  encodeDropAuthorization,
+  type DropAuthRequest,
+} from './drop-auth.js';
 import { decodeBase64url, decodeUtf8 } from './encoding.js';
 import { CryptoInputError } from './errors.js';
 import { parseJson } from './jcs.js';
@@ -52,6 +57,9 @@ interface ParsedUrl {
 type UrlConstructor = new (url: string) => ParsedUrl;
 
 function isCanonicalUrl(url: string): boolean {
+  // dropAuthEvent's own URL rules (at most 512 printable ASCII characters), applied here so every
+  // refusal happens before a key is read (IR-M1-1g-e-1 L-1).
+  if (url.length > DROP_AUTH_MAX_URL_LENGTH || !/^[\x21-\x7e]+$/.test(url)) return false;
   const Url = (globalThis as { URL?: UrlConstructor }).URL;
   // No URL parser: refuse rather than sign a URL the drop might read differently.
   if (typeof Url !== 'function') return false;

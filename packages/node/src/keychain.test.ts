@@ -357,6 +357,7 @@ describe('KeychainKeyStore.signDropRequest (M1-1g-e)', () => {
       [{ ...UPLOAD, method: 'PUT' }, TS],
       [UPLOAD, TS + 1],
       [{ ...UPLOAD, body: encodeUtf8('not json') }, TS],
+      [{ ...UPLOAD, url: `${UPLOAD.url}?${'a'.repeat(512)}` }, TS],
     ] as const) {
       expect(await codeOf(() => store.signDropRequest(request, ts))).toBe('invalid_argument');
     }
