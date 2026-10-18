@@ -19,6 +19,7 @@ import {
   createAlf1Opener,
   createAlf1Sealer,
   encodeHex,
+  equalBytes,
   openAlf1,
   sealAlf1,
   sha256,
@@ -30,8 +31,11 @@ import { createAlf1SealerWithNoncePrefix, sealAlf1WithNoncePrefix } from './test
 const KEY = new Uint8Array(32).map((_, i) => i + 1);
 const OTHER_KEY = new Uint8Array(32).map((_, i) => 200 - i);
 const PREFIX = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
-const bytes = (length: number, seed = 7): Uint8Array =>
-  new Uint8Array(length).map((_, i) => (i * 31 + seed) & 0xff);
+const bytes = (length: number, seed = 7): Uint8Array => {
+  const out = new Uint8Array(length);
+  for (let i = 0; i < length; i += 1) out[i] = (i * 31 + seed) & 0xff;
+  return out;
+};
 
 const expectRefused = async (run: () => Promise<unknown>): Promise<CryptoInputError> => {
   const error: unknown = await run().then(
@@ -124,7 +128,9 @@ describe('sealAlf1 / openAlf1', () => {
     const plaintext = bytes(ALF1_DEFAULT_CHUNK_SIZE + 5);
     const sealed = await sealAlf1(KEY, plaintext);
     expect(sealed.ciphertext.length).toBe(17 + plaintext.length + 32);
-    expect((await openAlf1(KEY, sealed.ciphertext)).plaintext).toEqual(plaintext);
+    // equalBytes, not toEqual: a deep diff of 1 MiB arrays takes tens of seconds on CI runners.
+    const opened = await openAlf1(KEY, sealed.ciphertext);
+    expect(equalBytes(opened.plaintext, plaintext)).toBe(true);
   });
 
   it('checks the expected hashes when given', async () => {

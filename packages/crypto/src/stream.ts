@@ -474,8 +474,10 @@ export function createAlf1Sealer(fileKey: Uint8Array): Alf1Processor {
 }
 
 /**
- * An opener. Plaintext pieces come out as their chunks authenticate; only a successful `finish`
- * proves the whole file (see the module header).
+ * An opener. Plaintext pieces come out as their chunks authenticate, before the final chunk is
+ * seen, so they are provisional: a truncated or extended object fails only at `finish`. Keep the
+ * output provisional (for example in a temporary file) until `finish` resolves, and discard it on
+ * any error. Only a successful `finish` proves the whole file.
  */
 export function createAlf1Opener(fileKey: Uint8Array, options?: Alf1OpenOptions): Alf1Processor {
   return createAlf1OpenerAt(fileKey, 0, options);
@@ -538,8 +540,11 @@ export function alf1EncryptStream(fileKey: Uint8Array): Alf1TransformStream {
 }
 
 /**
- * A TransformStream that decrypts an ALF1 object. The readable errors, and `done` rejects, on any
- * refusal, including a missing final chunk at the end: treat its output as provisional until then.
+ * A TransformStream that decrypts an ALF1 object. Its output is provisional until the final chunk
+ * verifies: pieces are released as their chunks authenticate, and a truncated or extended object
+ * fails only at the end. The readable errors, and `done` rejects, on any refusal. Consumers keep the
+ * output provisional (for example in a temporary file) until `done` resolves, and discard it on any
+ * error.
  */
 export function alf1DecryptStream(
   fileKey: Uint8Array,

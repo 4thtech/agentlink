@@ -213,6 +213,10 @@ describe('@agentlink/crypto/keystore', () => {
       'sealAlf1At',
       'createAlf1SealerAt',
       'createAlf1OpenerAt',
+      // M1-1d (IR-M1-1d-1 L-3): the raw AES-GCM key API stays internal to the package.
+      'importAes256GcmKey',
+      'aes256GcmSealWithKey',
+      'aes256GcmOpenWithKey',
     ]) {
       expect(Object.keys(main), name).not.toContain(name);
       expect(Object.keys(keystore), name).not.toContain(name);
