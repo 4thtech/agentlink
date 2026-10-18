@@ -1,12 +1,7 @@
 // M1-4a: the chain registry, automatic chain selection, the RPC URL rule and the read client
 // (07 §6.1, §6.3; 03 §7; 04 §4; D-40; AUDIT-FABLE-OCC19-1 M-1, L-1). No network: every transport
 // runs through an injected fetch.
-import {
-  FUNCTION_TAGS,
-  getDeployment,
-  occFeeVaultAbi,
-  occNotaryAbi,
-} from '@4thtech-io/occ-v2-abi';
+import { FUNCTION_TAGS, getDeployment, occFeeVaultAbi, occNotaryAbi } from '@4thtech-io/occ-v2-abi';
 import { encodeFunctionData } from 'viem';
 import { describe, expect, it, vi } from 'vitest';
 import { BASE_SEPOLIA, GNOSIS_CHIADO } from '../config/index.js';
@@ -188,9 +183,9 @@ describe('chain registry: network entry + pinned OCC v2 contracts', () => {
   });
 
   it('rejects a release deployment that is not a testnet', () => {
-    expect(() =>
-      composeChainConfig(clone(BASE_SEPOLIA), { ...contracts, testnet: false }),
-    ).toThrow(expect.objectContaining({ code: 'not_testnet' }));
+    expect(() => composeChainConfig(clone(BASE_SEPOLIA), { ...contracts, testnet: false })).toThrow(
+      expect.objectContaining({ code: 'not_testnet' }),
+    );
   });
 });
 
@@ -213,11 +208,16 @@ describe('selectChain: automatic, testnet only', () => {
 
 // --- read client -------------------------------------------------------------------------------
 
-type FetchArgs = [string, RequestInit];
+type FetchInput = string | URL | Request;
+type FetchArgs = [FetchInput, RequestInit];
+
+/** viem hands fetch the URL in its serialised form (a bare origin gains a `/`). */
+const sameUrl = (a: unknown, b: string | undefined): boolean =>
+  b !== undefined && new URL(String(a)).href === new URL(b).href;
 
 function rpcResult(result: unknown) {
-  return async (_url: string, init: RequestInit): Promise<Response> => {
-    const body = JSON.parse(String(init.body)) as { id: number };
+  return async (_url: FetchInput, init?: RequestInit): Promise<Response> => {
+    const body = JSON.parse(String(init?.body)) as { id: number };
     return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -235,7 +235,7 @@ describe('createReadClient: fallback transport with timeouts and retries', () =>
     const client = createReadClient(config(), { fetchFn });
     expect(await client.getChainId()).toBe(84532);
     const [url, init] = fetchFn.mock.calls[0] as FetchArgs;
-    expect(url).toBe(BASE_SEPOLIA.rpcUrls[0]);
+    expect(sameUrl(url, BASE_SEPOLIA.rpcUrls[0])).toBe(true);
     expect(init.redirect).toBe('error');
     expect(init.credentials).toBe('omit');
     expect(init.referrerPolicy).toBe('no-referrer');
@@ -248,29 +248,31 @@ describe('createReadClient: fallback transport with timeouts and retries', () =>
       rpcUrls: ['https://my-own-rpc.example-node.io/base'],
     });
     await client.getChainId();
-    expect((fetchFn.mock.calls[0] as FetchArgs)[0]).toBe('https://my-own-rpc.example-node.io/base');
+    expect(
+      sameUrl((fetchFn.mock.calls[0] as FetchArgs)[0], 'https://my-own-rpc.example-node.io/base'),
+    ).toBe(true);
   });
 
   it('retries a failing URL, then fails over to the next', async () => {
     const calls: string[] = [];
     const ok = rpcResult('0x14a34');
-    const fetchFn = vi.fn(async (url: string, init: RequestInit) => {
-      calls.push(url);
-      if (url === BASE_SEPOLIA.rpcUrls[0]) return new Response('busy', { status: 503 });
+    const fetchFn = vi.fn(async (url: FetchInput, init?: RequestInit) => {
+      calls.push(String(url));
+      if (sameUrl(url, BASE_SEPOLIA.rpcUrls[0])) return new Response('busy', { status: 503 });
       return ok(url, init);
     });
     const client = createReadClient(config(), { fetchFn, retryCount: 2, retryDelayMs: 1 });
     expect(await client.getChainId()).toBe(84532);
-    expect(calls.filter((u) => u === BASE_SEPOLIA.rpcUrls[0])).toHaveLength(3);
-    expect(calls.filter((u) => u === BASE_SEPOLIA.rpcUrls[1])).toHaveLength(1);
+    expect(calls.filter((u) => sameUrl(u, BASE_SEPOLIA.rpcUrls[0]))).toHaveLength(3);
+    expect(calls.filter((u) => sameUrl(u, BASE_SEPOLIA.rpcUrls[1]))).toHaveLength(1);
   });
 
   it('times out a hanging URL and fails over', async () => {
     const ok = rpcResult('0x14a34');
-    const fetchFn = vi.fn((url: string, init: RequestInit) => {
-      if (url !== BASE_SEPOLIA.rpcUrls[0]) return ok(url, init);
+    const fetchFn = vi.fn((url: FetchInput, init?: RequestInit) => {
+      if (!sameUrl(url, BASE_SEPOLIA.rpcUrls[0])) return ok(url, init);
       return new Promise<Response>((_, reject) => {
-        init.signal?.addEventListener('abort', () => {
+        init?.signal?.addEventListener('abort', () => {
           reject(new DOMException('aborted', 'AbortError'));
         });
       });
@@ -284,6 +286,10 @@ describe('createReadClient: fallback transport with timeouts and retries', () =>
     const started = Date.now();
     expect(await client.getChainId()).toBe(84532);
     expect(Date.now() - started).toBeLessThan(5_000);
+    expect(fetchFn.mock.calls.map(([u]) => new URL(String(u)).href)).toEqual([
+      new URL(BASE_SEPOLIA.rpcUrls[0] as string).href,
+      new URL(BASE_SEPOLIA.rpcUrls[1] as string).href,
+    ]);
   });
 
   it('fails when every URL fails, without leaking a URL the user added', async () => {
@@ -387,7 +393,11 @@ describe('calls: the client cannot encode admin, upgrade, module or pending func
   it('encodes a client call exactly as the full interface ABI would', () => {
     const signer = '0x52eaefebe4ec263f7ffd6ca678613e4d6195868a';
     expect(encodeNotaryCall({ functionName: 'computeRecordId', args: [signer, 7n] })).toBe(
-      encodeFunctionData({ abi: occNotaryAbi, functionName: 'computeRecordId', args: [signer, 7n] }),
+      encodeFunctionData({
+        abi: occNotaryAbi,
+        functionName: 'computeRecordId',
+        args: [signer, 7n],
+      }),
     );
     expect(
       encodeFeeVaultCall({
@@ -407,7 +417,9 @@ describe('calls: the client cannot encode admin, upgrade, module or pending func
     // @ts-expect-error pause is an admin function, not in the client ABI
     expect(() => encodeNotaryCall({ functionName: 'pause' })).toThrow();
     // @ts-expect-error upgradeToAndCall is an upgrade function, not in the client ABI
-    expect(() => encodeNotaryCall({ functionName: 'upgradeToAndCall', args: [BASE.contracts.OCCNotary, '0x'] })).toThrow();
+    expect(() => encodeNotaryCall({ functionName: 'upgradeToAndCall' })).toThrow();
+    // @ts-expect-error freezeUpgrades is an upgrade function, not in the client ABI
+    expect(() => encodeNotaryCall({ functionName: 'freezeUpgrades' })).toThrow();
     for (const functionName of ADMIN_NOTARY) {
       expect(() =>
         encodeNotaryCall({ functionName } as unknown as Parameters<typeof encodeNotaryCall>[0]),

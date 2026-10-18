@@ -249,7 +249,9 @@ describe('Receipt builder: EIP-712 vector parity (eip712-proof)', () => {
       expect(() => buildReceipt({ ...base, receiptType })).toThrow();
     }
     expect(() => buildReceipt({ ...base, salt: '0x1234' })).toThrow();
-    expect(() => buildReceipt({ ...base, recordId: RECORD_MESSAGE.recordId.toUpperCase() })).toThrow();
+    expect(() =>
+      buildReceipt({ ...base, recordId: RECORD_MESSAGE.recordId.toUpperCase() }),
+    ).toThrow();
   });
 });
 
