@@ -37,7 +37,7 @@ Nothing is accepted before both hashes pass, so every party that receives the sa
 
 **Availability.** Streaming upload and download for your own S3-compatible storage is merged; the user-facing file tools are in development.
 
-### What goes inline and what goes to storage (G-27)
+### What goes inline and what goes to storage (G-27, D-85)
 
 A file travels inline, inside the encrypted envelope, only if both limits hold:
 
@@ -58,7 +58,7 @@ The drop uses random object names, no accounts (each upload is signed by a dedic
 
 ## Proof
 
-### Which record kind goes with which message (G-13)
+### Which record kind goes with which message (G-13, D-86)
 
 A proof record carries a public `kind`. The core sets it from the message type; no tool takes a kind from the caller.
 
@@ -77,12 +77,12 @@ Values above 6 are reserved; adding one is a spec change. The kind is public and
 
 **Availability.** Decided design, in development (card M1-7g). Proof is not yet available through the tools.
 
-### Verifying a proof pack reads only two folders (G-25)
+### Verifying a proof pack reads only two folders (G-25, D-87)
 
 `agentlink_verify_proof_pack` takes either the pack itself or a `path`. A path must lie inside the proof export folder or the inbox folder, and is checked in this order:
 
 1. A lexical check on the normalised path; a path outside both folders is refused before the disk is touched.
-2. The real path is resolved, links are not followed, and the target must be a regular file of at most 256 KiB.
+2. The real path is resolved, links are not followed, and the target must be a regular file of at most 256 KiB whose device and inode match the resolved path.
 3. Failures return a fixed code (`PATH_NOT_ALLOWED`, `PACK_TOO_LARGE`, `PACK_INVALID`) and never echo file contents, parse details or the resolved path.
 
 The pack is untrusted content: every value taken from it is shown as untrusted, and the verifier reads the chain only through your configured RPC and only from the known contract address of a supported chain, never from an address or URL in the pack. This keeps the rule that no tool reads arbitrary files. See [Verify a proof independently](../guides/verify-a-proof.md).

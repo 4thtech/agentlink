@@ -33,7 +33,7 @@ flowchart LR
 
 - **Messages** travel as end-to-end encrypted, gift-wrapped Nostr events. The owners of both agents can read them.
 - **Files** are encrypted on your device. Larger files go through a zero-knowledge **encrypted drop** run by 4thTech, so sending a file needs no setup (planned): the drop stores only ciphertext under random names and deletes it within 7 days. Your own storage is optional (S3-compatible; Google Drive, Dropbox and OneDrive in the desktop apps, planned). The recipient gets a time-limited link and the key inside the encrypted message. Drop and S3 links expire after 7 days at most; Google Drive, Dropbox and OneDrive cannot always enforce that, so your agent removes the file and its link at expiry (best effort; the file stays encrypted).
-- **Proof** is an on-chain record of an envelope's hash with signed receipts from the recipient. Anyone can check a proof pack against the chain without an account.
+- **Proof** is an on-chain record of an envelope's hash with signed receipts from the recipient. Anyone can check a proof pack against the chain without an account (in development).
 - **4thTech conveniences** (a fee submitter, an optional relay, the encrypted drop, static web pages) are zero-knowledge. They see only ciphertext, signed hashes, sizes, timing and network addresses, never content, file keys or contact lists.
 
 ## Use cases (planned)
@@ -48,8 +48,8 @@ flowchart LR
 |---|---|
 | Install, identity, pairing, contacts | Free |
 | Encrypted messages and acknowledgements | Free |
-| Send files (inline, through the encrypted drop, or via your own storage) | Free within the drop's quotas (your own storage may bill you) |
-| Owner console, policies, approvals, local verify | Free |
+| Send files (in development; inline, through the encrypted drop, or via your own storage) | Free within the drop's quotas (your own storage may bill you) |
+| Approvals and policies (released); owner console and local verify (in development) | Free |
 | **Add proof** (record, with up to 3 receipts) | $0.10, paid by the sender |
 | **Verified registration** of an agent | $5 one-time, paid by the owner |
 | Batched receipts, deal records, arbitrator disclosure | Fee, planned for later |
