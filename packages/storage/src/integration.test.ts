@@ -15,7 +15,7 @@
 // never print a URL, an object key or a credential.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AwsClient } from 'aws4fetch';
-import { encodeBase64url, encodeHex, randomBytes, sha256 } from '@agentlink/crypto';
+import { createSha256, encodeBase64url, encodeHex, randomBytes, sha256 } from '@agentlink/crypto';
 import { captureOutput, findCanaryLeaks, type Canary } from '@agentlink/log/testing';
 import {
   LIFECYCLE_RULE_ID,
@@ -23,6 +23,9 @@ import {
   createS3Adapter,
   createS3Lifecycle,
   createS3Multipart,
+  decryptDownload,
+  putEncrypted,
+  type ProvisionalSink,
   type S3Adapter,
   type S3AdapterConfig,
   type StoredObject,
@@ -90,6 +93,86 @@ function randomStream(total: number, failAfter?: number): ReadableStream<Uint8Ar
       sent += n;
     },
   });
+}
+
+interface NodeProcess {
+  memoryUsage: {
+    (): { readonly heapUsed: number; readonly arrayBuffers: number };
+    rss(): number;
+  };
+}
+const nodeProcess = (globalThis as { process?: NodeProcess }).process;
+const rss = (): number => nodeProcess?.memoryUsage.rss() ?? 0;
+/** JS heap in use plus ArrayBuffer memory: the buffers the process actually holds (M1-1d gate). */
+const held = (): number => {
+  const m = nodeProcess?.memoryUsage();
+  return m === undefined ? 0 : m.heapUsed + m.arrayBuffers;
+};
+
+/** Peak memory, sampled as bytes flow. */
+function sampler() {
+  let peakRss = rss();
+  let peakHeld = held();
+  let calls = 0;
+  return {
+    sample(force = false): void {
+      calls += 1;
+      if (!force && (calls & 31) !== 0) return;
+      peakRss = Math.max(peakRss, rss());
+      peakHeld = Math.max(peakHeld, held());
+    },
+    peaks: () => ({ peakRss, peakHeld }),
+  };
+}
+
+/** `total` bytes of varied plaintext in 64 KiB blocks, hashed as they are produced. */
+function plaintextStream(total: number, onPull: () => void) {
+  const hasher = createSha256();
+  const BLOCK = 64 * 1024;
+  let sent = 0;
+  let digest: string | undefined;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      onPull();
+      if (sent >= total) {
+        controller.close();
+        return;
+      }
+      const block = new Uint8Array(Math.min(BLOCK, total - sent)).fill((sent / BLOCK) & 0xff);
+      new DataView(block.buffer).setUint32(0, sent / BLOCK);
+      hasher.update(block);
+      controller.enqueue(block);
+      sent += block.length;
+    },
+  });
+  return { stream, sha256: () => (digest ??= encodeHex(hasher.digest())) };
+}
+
+/** A sink that hashes what it is given and records whether it was committed. */
+function hashSink(onWrite: () => void) {
+  const hasher = createSha256();
+  let size = 0;
+  let state = 'open';
+  let digest: string | undefined;
+  const sink: ProvisionalSink = {
+    async write(chunk) {
+      onWrite();
+      hasher.update(chunk);
+      size += chunk.length;
+    },
+    async commit() {
+      state = 'committed';
+    },
+    async discard() {
+      state = 'discarded';
+    },
+  };
+  return {
+    sink,
+    size: () => size,
+    state: () => state,
+    sha256: () => (digest ??= encodeHex(hasher.digest())),
+  };
 }
 
 describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}`, () => {
@@ -233,6 +316,90 @@ describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}
     expect(await openUploads()).toBe(0);
     expect(await mp.openUploads()).toBe(0);
   }, 120_000);
+
+  /** Encrypts `bytes` into a multipart upload, downloads it through a presigned URL and decrypts it. */
+  const encryptedRoundTrip = async (bytes: number, tamper = false) => {
+    const mem = sampler();
+    const source = plaintextStream(bytes, () => mem.sample());
+    const sealed = await putEncrypted(multipart(), source.stream, {
+      plaintextSize: bytes,
+      expiresAt: inFuture(DAY_MS),
+    });
+    created.push(sealed.object);
+    mem.sample(true);
+    const s3 = make();
+    const response = await fetch(await s3.presignGet(sealed.object, inFuture(60 * 60 * 1000)), {
+      redirect: 'error',
+    });
+    expect(response.status).toBe(200);
+    const out = hashSink(() => mem.sample());
+    let body = response.body!;
+    if (tamper) {
+      // Flip one bit in the last byte, after every earlier chunk has gone to the sink.
+      let seen = 0;
+      const total = sealed.object.size;
+      body = body.pipeThrough(
+        new TransformStream<Uint8Array, Uint8Array>({
+          transform(chunk, controller) {
+            seen += chunk.length;
+            if (seen === total) {
+              const copy = chunk.slice();
+              copy[copy.length - 1] = (copy[copy.length - 1] ?? 0) ^ 1;
+              controller.enqueue(copy);
+            } else controller.enqueue(chunk);
+          },
+        }),
+      );
+    }
+    const result = await decryptDownload(body, out.sink, {
+      fileKey: sealed.fileKey,
+      plaintextSize: sealed.plaintextSize,
+      ciphertextSha256: sealed.ciphertextSha256,
+      plaintextSha256: sealed.plaintextSha256,
+    }).catch((e: unknown) => e);
+    mem.sample(true);
+    await s3.delete(sealed.object);
+    return { sealed, result, out, source, ...mem.peaks() };
+  };
+
+  it('stream (M1-6b): encrypted multipart upload, decrypted download, tamper refused', async () => {
+    const size = 9 * MiB + 321;
+    const ok = await encryptedRoundTrip(size);
+    expect(ok.out.state()).toBe('committed');
+    expect(ok.out.size()).toBe(size);
+    expect(ok.out.sha256()).toBe(ok.source.sha256());
+    expect(ok.sealed.plaintextSha256).toBe(ok.source.sha256());
+    expect(ok.sealed.ciphertextSha256).toBe(ok.sealed.object.sha256);
+
+    const bad = await encryptedRoundTrip(size, true);
+    expect((bad.result as { code?: string }).code).toBe('integrity_failed');
+    expect(bad.out.state()).toBe('discarded');
+    expect(await openUploads()).toBe(0);
+  }, 120_000);
+
+  // 1 GiB through MinIO in bounded memory (card M1-6b acceptance; the gate of M1-1d's slow test).
+  // MinIO only: the R2 job runs daily on a shared test bucket and need not move a GiB each day. The
+  // test is not registered (rather than skipped) on R2, since the jobs fail on a skipped test.
+  if (MODE === 'minio') {
+    it('stream (M1-6b): 1 GiB encrypted round trip holds under 64 MiB after warm-up', async () => {
+      const LIMIT = 64 * MiB;
+      const mib = (n: number): number => Math.round(n / MiB);
+      const start = rss();
+      await encryptedRoundTrip(64 * MiB);
+      const baseline = rss();
+      const run = await encryptedRoundTrip(1024 * MiB);
+      const figures =
+        `RSS: start ${mib(start)}, after warm-up ${mib(baseline)}, 1 GiB peak ${mib(run.peakRss)} MiB; ` +
+        `held (heapUsed + arrayBuffers) peak ${mib(run.peakHeld)} MiB`;
+      // Reported in the job log: figures only, never a URL or key.
+      console.info(`storage stream memory: ${figures}`);
+      expect(run.out.state()).toBe('committed');
+      expect(run.out.size()).toBe(1024 * MiB);
+      expect(run.out.sha256()).toBe(run.source.sha256());
+      expect(run.peakHeld, figures).toBeLessThan(LIMIT);
+      expect(await openUploads()).toBe(0);
+    }, 900_000);
+  }
 
   // The lifecycle rule is a bucket setting. It runs on MinIO only: the R2 job uses a shared test bucket
   // with an object-scoped token and its own 7-day backstop rule, which this test must not rewrite. The
