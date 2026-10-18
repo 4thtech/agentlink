@@ -29,6 +29,8 @@ export { signEnvelopeHash } from './envelope.js';
 // M1-1e (IR-M1-1e-1 M-1): ECDSA signing with a secret key. cardSig and cardAgentSig are signed
 // through the KeyStore; everyone else verifies with the main entry (verifyAgentCard and friends).
 export { signDigestEcdsa } from './ecdsa.js';
+// M1-1g-e (IR-M1-6c-1): a drop request signed with the drop key, for KeyStore.signDropRequest.
+export { signDropRequest } from './keystore-drop.js';
 export { signTypedData } from './eip712.js';
 export { signAgentCard } from './agent-card.js';
 // M1-1f (04 §2.8): Argon2id, password() normalisation and the generated code, and the ALKS file

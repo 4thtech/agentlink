@@ -60,6 +60,7 @@ import {
   type OwnerSession,
   type UnlockOptions,
 } from './keystore-api.js';
+import { dropRequestSnapshot, signDropRequest as signDropRequestWithKey } from './keystore-drop.js';
 import { nip44ConversationKey, nip44DecryptWithKey, nip44EncryptWithKey } from './nip44.js';
 import {
   NOSTR_KIND_AUTH,
@@ -403,6 +404,16 @@ export class MemoryKeyStore implements KeyStore {
         signTypedData(typedData, secretKey),
       ),
     );
+  }
+
+  signDropRequest(request: DropAuthRequest, createdAt: number): Promise<string> {
+    // The drop key of the current epoch (04 §2.1); the request is checked before the seed is used.
+    return Promise.resolve().then(() => {
+      const snapshot = dropRequestSnapshot(request, createdAt);
+      return withSecret(this.#open(), KEY_LABELS.drop, this.#keyEpoch, (secretKey) =>
+        signDropRequestWithKey(secretKey, snapshot, createdAt),
+      );
+    });
   }
 
   close(): Promise<void> {

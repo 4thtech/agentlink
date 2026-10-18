@@ -10,11 +10,13 @@ import {
   MAX_KEY_EPOCH,
   decodeHex,
   decodeHex0x,
+  dropRequestSnapshot,
   encodeHex,
   equalBytes,
   nostrEventId,
   randomBytes,
   wipe,
+  type DropAuthRequest,
   type EpochOptions,
   type KeyLabel,
   type KeyStore,
@@ -33,6 +35,7 @@ import {
   nip44ConversationKey,
   nip44DecryptWithKey,
   nip44EncryptWithKey,
+  signDropRequest,
   signEnvelopeHash,
   signTypedData,
   unwrapCek,
@@ -319,6 +322,17 @@ export class KeychainKeyStore implements KeyStore {
     );
   }
 
+  async signDropRequest(request: DropAuthRequest, createdAt: number): Promise<string> {
+    // Checked before the seed is read: a refused request never touches the keychain (M1-1g-e).
+    const snapshot = dropRequestSnapshot(request, createdAt);
+    // The drop key of the current epoch (04 §2.1), never the Nostr or EVM identity key.
+    return this.#withSeed((seed) =>
+      withSecret(seed, KEY_LABELS.drop, this.#keyEpoch, (secretKey) =>
+        signDropRequest(secretKey, snapshot, createdAt),
+      ),
+    );
+  }
+
   /**
    * The store key of the encrypted SQLite columns (07 §3), for the Store (M1-8b). It is read for
    * this call only and wiped when `fn` settles; `fn` must not keep it.
@@ -421,6 +435,8 @@ function keyStoreFacade(store: KeychainKeyStore): KeyStore {
     unwrapCek: (wrapped: WrappedCek, envelopeId: Uint8Array, options?: EpochOptions) =>
       store.unwrapCek(wrapped, envelopeId, options),
     sign712: (typedData: TypedData) => store.sign712(typedData),
+    signDropRequest: (request: DropAuthRequest, createdAt: number) =>
+      store.signDropRequest(request, createdAt),
     close: () => store.close(),
   });
 }
