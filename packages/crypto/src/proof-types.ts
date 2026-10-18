@@ -1,4 +1,5 @@
-// The OCC v2 proof types (05 §3.1, §4; 04 §5): `Record`, `Receipt` and `Registration` under the
+// The OCC v2 proof types (05 §3.1, §4; 04 §5): `Record`, `Receipt`, `Registration` and `Revocation`
+// (D-81) under the
 // chain domain {name: "OCC", version: "2", chainId, verifyingContract}, the record struct hash, the
 // recipient commitment, and the EIP-3009 `ReceiveWithAuthorization` typed data (03 §5, 05 §2.5).
 // Hashing is eip712.ts over @noble/hashes keccak-256; nothing here is a primitive (I-8).
@@ -10,7 +11,8 @@
 // - `uint256` values as decimal strings matching `^(0|[1-9][0-9]*)$`, at most 2^256 - 1;
 // - other integers as JSON integers in [0, 2^53 - 1] and in range for their uint type.
 // Anything else is refused, never normalised. 04 §2.4.1 lists no `Registration` paths yet; it gets
-// the same form (the vectors of M1-1i do too). An object no longer shows how its numbers were
+// the same form (the vectors of M1-1i do too). `Revocation` follows the same form (05 §4, proposed,
+// owner confirms at merge): `keyEpoch` is a JSON integer of at most 2^32 - 1. An object no longer shows how its numbers were
 // spelled, so a message read from JSON text needs a token-level check first (parseJson
 // `integersOnly`), as for the AgentCard.
 //
@@ -19,8 +21,11 @@
 // `eip712Domain()`) and MUST refuse to sign unless `to` equals the configured fee vault for that
 // chain (05 §2.5: payee = vault, so front-running cannot redirect funds). That is M3-4b's duty.
 //
-// The revoke struct waits for G-20 (M1-1i-b). Signing goes through the KeyStore's signTypedData
-// with the typed data the builders below return.
+// `Revocation` (05 §4, D-81) is signed by the agent's `ownerEvm` under the OCC v2 chain domain with
+// the Registry as `verifyingContract`. Its nonce is random and single use per owner, in the same
+// `usedNonces[ownerEvm][nonce]` as `Registration`; that, the expiry and the epoch check are the
+// Registry's (M2-4a), this module only hashes. Signing goes through the KeyStore's signTypedData with
+// the typed data the builders below return.
 //
 // Errors never contain the input (I-7): see errors.ts.
 import { concatBytes } from './bytes.js';
@@ -90,6 +95,14 @@ export interface OccRegistration {
   readonly deadline: number;
 }
 
+/** 05 §4 `Revocation` (D-81) in its JSON form. */
+export interface OccRevocation {
+  readonly agentEvm: string;
+  readonly keyEpoch: number;
+  readonly nonce: string;
+  readonly deadline: number;
+}
+
 /** EIP-3009 `ReceiveWithAuthorization` in its JSON form (04 §2.4.1: `auth`, 07 §7). */
 export interface ReceiveWithAuthorization {
   readonly from: string;
@@ -151,6 +164,17 @@ export const REGISTRATION_TYPES: TypedDataTypes = Object.freeze({
     field('feeToken', 'address'),
     field('maxFee', 'uint256'),
     field('appId', 'bytes32'),
+    field('nonce', 'uint256'),
+    field('deadline', 'uint64'),
+  ]),
+});
+
+/** 05 §4 `Revocation` (D-81; `revoke(rev, ownerSig)`), `keyEpoch` as the stored `uint32`. */
+export const REVOCATION_TYPES: TypedDataTypes = Object.freeze({
+  EIP712Domain: DOMAIN_TYPE,
+  Revocation: Object.freeze([
+    field('agentEvm', 'address'),
+    field('keyEpoch', 'uint32'),
     field('nonce', 'uint256'),
     field('deadline', 'uint64'),
   ]),
@@ -246,6 +270,7 @@ function parseJsonForm(types: TypedDataTypes, primary: string, value: unknown): 
     else if (type === 'bytes32') out[name] = canonicalHex(v, 32);
     else if (type === 'uint256') out[name] = canonicalUint256(v);
     else if (type === 'uint8') out[name] = jsonInteger(v, 255);
+    else if (type === 'uint32') out[name] = jsonInteger(v, 0xffffffff);
     else if (type === 'uint64') out[name] = jsonInteger(v, Number.MAX_SAFE_INTEGER);
     else throw invalid('unsupported proof field type');
   }
@@ -336,6 +361,11 @@ export function parseRegistration(value: unknown): OccRegistration {
   return parseJsonForm(REGISTRATION_TYPES, 'Registration', value) as OccRegistration;
 }
 
+/** Parses a `Revocation` in its 05 §4 JSON form; refuses, never normalises. */
+export function parseRevocation(value: unknown): OccRevocation {
+  return parseJsonForm(REVOCATION_TYPES, 'Revocation', value) as OccRevocation;
+}
+
 /** Parses an EIP-3009 authorization: addresses and `nonce` `0x` hex, amounts and times decimal. */
 export function parseReceiveWithAuthorization(value: unknown): ReceiveWithAuthorization {
   return parseJsonForm(
@@ -379,6 +409,16 @@ export function registrationTypedData(domain: unknown, registration: unknown): T
   );
 }
 
+/** Typed data of a `Revocation` under the OCC v2 chain domain (the Registry), signed by `ownerEvm`. */
+export function revocationTypedData(domain: unknown, revocation: unknown): TypedData {
+  return typedData(
+    REVOCATION_TYPES,
+    'Revocation',
+    parseOccDomain(domain),
+    parseRevocation(revocation),
+  );
+}
+
 /**
  * Typed data of an EIP-3009 `ReceiveWithAuthorization` under the token's own domain, which the
  * caller reads from chain. The payee (`to`) must be the fee vault (05 §2.5); that check is the
@@ -413,6 +453,11 @@ export function hashReceipt(domain: unknown, receipt: unknown): ProofTypeHashes 
 /** Type hash, domain separator, struct hash and digest of a `Registration` (05 §4). */
 export function hashRegistration(domain: unknown, registration: unknown): ProofTypeHashes {
   return hashesOf(registrationTypedData(domain, registration));
+}
+
+/** Type hash, domain separator, struct hash and digest of a `Revocation` (05 §4, D-81). */
+export function hashRevocation(domain: unknown, revocation: unknown): ProofTypeHashes {
+  return hashesOf(revocationTypedData(domain, revocation));
 }
 
 /** Type hash, domain separator, struct hash and digest of an EIP-3009 authorization. */
