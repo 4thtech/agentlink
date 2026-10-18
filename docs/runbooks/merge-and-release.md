@@ -46,6 +46,12 @@ The orchestrator (Opus) enables auto-merge and prepares releases. The owner give
    Never edit a version in `package.json`, a changelog heading or a tag by hand.
 8. **`next` (automatic).** In pre mode (`pnpm changeset pre enter next`), CI opens the "Version packages" PR; merging it publishes `x.y.z-next.N` to npm `next` with no human click. It is a bot-authored PR, so `review-gate` (c) waits for an APPROVED review by the owner (or Denis) on its head commit; agents never approve.
 9. **`latest` (the owner's click).** A PR runs `pnpm changeset pre exit`; the next "Version packages" PR carries the stable versions and the rolled changelog; merging it starts `publish-latest`, which waits for the owner's approval in environment `npm-publish`. Agents prepare the release checklist (`release-and-deployment.md` §5.1) and tell the owner it is waiting; they never approve it.
+10. **Release PR traps (learned on 0.1.1).**
+    - A PR opened by the bot does not start its checks: close and reopen it to run them.
+    - The owner's approval must be on the current head commit; a new head (for example after the bot regenerates the PR) needs a fresh approval.
+    - A `review-gate` run that failed before the approval stays as a stale failing check; re-run it after approving.
+    - An S2 release PR (crypto or contract changes) needs the `Threat note` and `Tests-first` sections added to the bot body after every regeneration.
+    - Watch the merge queue: a PR can be ejected silently, so confirm it merged and re-enqueue if not.
 
 ## Verify
 - `gh pr view <n> --json state,mergedAt,mergeCommit` shows `MERGED`.

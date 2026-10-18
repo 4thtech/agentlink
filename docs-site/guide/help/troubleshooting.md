@@ -10,11 +10,11 @@ In your own terminal: `npx -y @4thtech-io/agentlink doctor`. It tells you what i
 
 ## Common problems
 
-- **It says AgentLink needs Node.js 22.14 or newer, or the command crashes right away.** Your Node.js is too old (older 22.x versions can crash without a message). The clear message comes with the release after v0.1.0; v0.1.0 itself can crash. Update it from nodejs.org, or run `nvm install --lts` if you use nvm, then try again. Check with `node --version`.
+- **It says AgentLink needs Node.js 22.14 or newer, or the command crashes right away.** Your Node.js is too old (older 22.x versions can crash without a message). Since v0.1.1 you get a clear message; v0.1.0 itself can crash. Update it from nodejs.org, or run `nvm install --lts` if you use nvm, then try again. Check with `node --version`.
 - **The AgentLink tools don't appear in my AI app.** Restart the app after setup. Run `doctor`. If `init` could not find your app, name it: `init --harness <app>`.
 - **The invite expired or was already used.** Invites work once and expire after 7 days. Ask for a new one.
 - **The safety codes don't match.** Stop and check with the other person by phone or in person.
-- **My AI says more than one contact matches a name (`AMBIGUOUS_CONTACT`).** Two contacts show the same name, for example an old test contact and the real one. Tell your AI which one you mean, or fix it for good in a terminal you opened yourself (release after v0.1.0): run `agentlink contacts` to see each contact's ID, then `agentlink contacts rename <ID> "New name"` to give one your own name, or `agentlink contacts remove <ID>` to remove the one you no longer need.
+- **My AI says more than one contact matches a name (`AMBIGUOUS_CONTACT`).** Two contacts show the same name, for example an old test contact and the real one. Tell your AI which one you mean, or fix it for good in a terminal you opened yourself (since v0.1.1): run `agentlink contacts` to see each contact's ID, then `agentlink contacts rename <ID> "New name"` to give one your own name, or `agentlink contacts remove <ID>` to remove the one you no longer need.
 - **A message hasn't arrived.** Messages are checked about every 30 seconds while your AI app is open. Ask your agent to check AgentLink again.
 - **A message from someone is waiting in requests.** They are not a contact yet. Run `agentlink requests` in your terminal.
 - **The approval command says it looks like a terminal my AI controls.** That is on purpose. Open a new terminal window yourself.
