@@ -744,6 +744,13 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** Merge-group run 39144772282 failed with `NodeKeyStoreError` because gnome-keyring was not ready. `tools/ci/with-keyring.sh` starts the keyring and `tools/ci/wait-for-keyring.sh` probes a store/lookup round trip (10 x 1 s, `::error::` if it never answers); the `keychain` (Linux) job and both e2e jobs use it. No retries in the tests.
 - **Acceptance:** tests for the probe (ready, retried, never ready); no gate or test weakened; actions unchanged.
 
+#### OPS-CI-10 · Root cause of the intermittent Linux keyring refusal in e2e (new, flake 2026-10-18)
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/ci.yml`, `tools/ci/**`
+- **Depends on:** OPS-CI-9
+- **Scope:** Runs 39144772282 and 39153323893 (the second with the OPS-CI-9 probe, which passed) failed the same way: the gnome-keyring daemon died mid-run without cleanup (stale control socket, "Connection refused"), D-Bus started a fresh `gnome-keyring-daemon --start`, which could not unlock the login keyring (random password) without SystemPrompter, so every keychain call was refused. `tools/ci/with-keyring.sh` now creates a passwordless default ("login") collection in a private folder that any daemon of the session opens without a prompt, runs the daemon in its own session, waits for it to own the Secret Service name, and reports a mid-run daemon death as a `::warning::`. `tools/ci/keyring-restart-check.sh` (keychain job, Linux) kills the daemon and checks the replacement serves the same items with no prompt.
+- **Acceptance:** the restart check fails on the OPS-CI-9 script and passes on the new one; `e2e-deterministic` green on repeated runs; no gate or test weakened.
+
 #### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
 - **Status:** done (4thtech/agentlink#198) · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/release.yml` or a Changesets hook, `tools/**`, `docs/process/versioning.md` §5
