@@ -182,7 +182,12 @@ export class FileFetcher {
       const url = entry.url as string;
       if (nowOf(ctx) >= entry.expiresAt) return { status: 'rejected', code: 'LINK_EXPIRED' };
       if (!checkFetchUrl(url).ok) return { status: 'rejected', code: 'URL_REFUSED' };
-      source = platform.download(url);
+      try {
+        source = platform.download(url);
+      } catch {
+        // The platform's own error can carry the URL (I-7).
+        throw new CoreError('file_download_failed', 'The file could not be downloaded.');
+      }
     }
 
     // The inbox folder and a free, safe name inside it.
@@ -210,7 +215,12 @@ export class FileFetcher {
       }
       this.#swept.add(folder);
     }
-    const name = await freeName(ops, sanitizeFileName(entry.name));
+    let name: string;
+    try {
+      name = await freeName(ops, sanitizeFileName(entry.name));
+    } catch {
+      throw inboxUnavailable();
+    }
     const savedTo = placeIn(folder, name, flavor);
     let sink;
     try {

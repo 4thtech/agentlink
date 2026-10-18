@@ -180,6 +180,29 @@ describe('send and fetch between two agents (06 §2.3, 04 §4)', () => {
     expect(a.spy.published).toHaveLength(0);
   });
 
+  it.each(['/home/u/Work/.env', '/home/u/Work/.git/config'])(
+    'refuses a hidden file below the allowed folder without opening it: %s',
+    async (realpath) => {
+      let opened = false;
+      const result = await a.client.sendMessage({
+        to: b.id,
+        text: 'x',
+        files: [
+          {
+            realpath,
+            size: 10,
+            open: () => {
+              opened = true;
+              return Promise.resolve(new Uint8Array(10));
+            },
+          },
+        ],
+      });
+      expect(result).toEqual({ status: 'needs_setup', reason: 'outside_folder' });
+      expect(opened).toBe(false);
+    },
+  );
+
   it('not_found for an unknown envelope or file index', async () => {
     const envelopeId = await sendOne(fileBytes(100));
     expect(await b.client.fetchFile({ envelopeId, fileIndex: 1 })).toEqual({ status: 'not_found' });

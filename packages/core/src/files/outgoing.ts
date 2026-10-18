@@ -35,7 +35,7 @@ import { MAX_URL_LENGTH } from '@4thtech-io/types';
 import { nowOf, type CoreContext } from '../context.js';
 import { CoreError } from '../errors.js';
 import { evaluateFileSend, policyLimits, type EffectivePolicy } from '../policy-engine.js';
-import { parseAbsolutePath } from '../path-guard.js';
+import { decidePath, parseAbsolutePath } from '../path-guard.js';
 import { planPacking, type PackingBase, type PackingFile } from './packing.js';
 import type { FilesPlatform, OutgoingFile } from './platform.js';
 
@@ -191,10 +191,15 @@ export async function prepareOutgoing(
   const drop = dropAdapter(ctx, platform);
   const dropMax = drop?.maxBytes ?? DROP_MAX_CIPHERTEXT_BYTES;
   const filesPolicy = policy.mode === 'fail_closed' ? undefined : policy.policy.files;
-  const folders =
-    limits.allowedFolders.length > 0
-      ? await platform.allowedFolderRealpaths(limits.allowedFolders)
-      : [];
+  let folders: readonly string[] = [];
+  if (limits.allowedFolders.length > 0) {
+    try {
+      folders = await platform.allowedFolderRealpaths(limits.allowedFolders);
+    } catch {
+      // The platform's own error can name a path; it is replaced (I-7).
+      throw new CoreError('files_unavailable', 'The allowed folders cannot be read now.');
+    }
+  }
 
   // 1. Every file is checked before any is read.
   const checked: Checked[] = [];
@@ -231,6 +236,16 @@ export async function prepareOutgoing(
       }
       // needs_storage: decided below, per file, only if the file is stored after packing.
     }
+    // 04 §4: no hidden file or folder below the allowed folder (the platform refuses them as well,
+    // with the protected roots it alone knows).
+    const guarded = decidePath({
+      requested: realpath,
+      resolved: realpath,
+      allowedFolders: folders,
+      protectedRoots: [],
+      flavor,
+    });
+    if (!guarded.ok) return { kind: 'needs_setup', reason: 'outside_folder' };
     let stored: Checked['stored'] = 'no_own_storage';
     if (filesPolicy !== undefined) {
       const selection = selectStorage({
