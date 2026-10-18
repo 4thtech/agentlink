@@ -2,7 +2,7 @@
 
 This folder is the public, compressed knowledge base for AgentLink by 4thTech. It is written for AI assistants (for example the chat support on the future AgentLink website, fed through Lumina) and for human readers, and it is also the source for social posts. Each file stands on its own and owns its facts: a fact is stated once, in the file that owns it, because the whole folder is loaded into the chat's context on every answer.
 
-Last reviewed: 17 October 2026. Project phase: pre-alpha. The first usable version (v0.1.0, M1a) was released on 16 Oct 2026 and installs with `npx -y @4thtech-io/agentlink init`; files, proof and the apps are not built yet.
+Last reviewed: 18 October 2026. Project phase: pre-alpha. The first usable version (v0.1.0, M1a) was released on 16 Oct 2026, v0.1.1 followed on 18 Oct 2026, and it installs with `npx -y @4thtech-io/agentlink init`; sending files, proof and the apps are in development.
 
 The folder follows the pattern of The Curator's `llm-docs/`: few files, each with a clear owner role, headings written as the question a visitor would type.
 

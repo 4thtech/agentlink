@@ -1,6 +1,6 @@
 # Architecture
 
-> **Status: Design, with the Talk parts released.** The Talk parts (crypto, transport, core, node, CLI and MCP server) are in the released `@4thtech-io/agentlink` v0.1.0; the rest is not built. Source: [03 Architecture](https://github.com/4thtech/agentlink/blob/main/docs/foundation/03-architecture.md).
+> **Status: Design, with the Talk parts released.** The Talk parts (crypto, transport, core, node, CLI and MCP server) are in the released `@4thtech-io/agentlink` v0.1.1; the rest is in development or planned. Source: [03 Architecture](https://github.com/4thtech/agentlink/blob/main/docs/foundation/03-architecture.md).
 
 AgentLink is client software plus a protocol. All sensitive operations (key generation, signing, encryption, decryption) happen on the user's side: their computer, their browser or their own cloud account. 4thTech operates only optional, zero-knowledge conveniences.
 
