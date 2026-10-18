@@ -46,7 +46,7 @@ Each layer has its own number; the product version never stands in for a format'
 | **Proof pack** | `version: 1` | 07 §8 | An incompatible change |
 | **Invite** | `v: 1` | 04 §3.6 | An incompatible change |
 | **Spec pack** | `0.3` | `00-README.md` revision history | §8 |
-| **Contracts** | `occ-v2-contracts` tags `v*`; `@4thtech-io/occ-v2-abi` has its own SemVer line | 05; `development-process.md` §9 | A contract release. ABI package: MAJOR = ABI-breaking, MINOR = additive (function, event, chain entry), PATCH = metadata. `@4thtech-io/chain` pins it exactly |
+| **Contracts** | `occ-v2-contracts` tags `v*`; the in-repo `@4thtech-io/occ-v2-abi` (private, never published, D-83) has its own SemVer line | 05; `development-process.md` §9 | A contract release. ABI package: MAJOR = ABI-breaking, MINOR = additive (function, event, chain entry), PATCH = metadata. `@4thtech-io/chain` pins the imported release exactly |
 | **Desktop builds** (M2) | Product version; build identity `<version>+<short commit>` per OS | 08 §8 | With the product. Update channels mirror npm `latest` and `next` (M2-11) |
 
 A format version changes only with a spec change, a decision-log entry, new test vectors (`test-vectors/`) and a §7 row.
@@ -95,7 +95,7 @@ Agents MUST NOT bump a version by hand: not in `package.json`, a changelog headi
 - **Product tag** `v<version>` (stable versions only), created at the released commit together with the GitHub Release. The release body is that version's `CHANGELOG.md` section, nothing generated. SBOMs and, from M2, the desktop installers, update manifests and SHA-256 hashes attach to it; the desktop pipeline adds assets and never creates a release.
 - **Per-package tags** (`<package>@<version>`) MAY exist; Changesets pushes them. A GitHub Release exists **only** for `v*` product tags: `release.yml` sets `create-github-releases: false` on the Changesets publish steps, and `publish-latest` creates the product release after the health check, in the owner-approved environment. Prereleases get per-package tags, no GitHub Release.
 - If a release is rolled back, the owner edits or deletes its GitHub Release. In M0 (pipeline off) the owner creates `v0.0.x` by hand.
-- **Contracts repo:** its own SemVer line and `v*` tags, unrelated to product numbers; each tag maps to deployment records and the `@4thtech-io/occ-v2-abi` version published from it.
+- **Contracts repo:** its own SemVer line and `v*` tags, unrelated to product numbers; each tag maps to deployment records and the `@4thtech-io/occ-v2-abi` version imported from it (not published, D-83).
 
 ---
 

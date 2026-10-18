@@ -67,7 +67,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 141 (M1a 80, M1b 61, M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| M1 Local beta | 146 (M1a 80, M1b 66, M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
 | M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5 | 2 epics |
@@ -730,6 +730,13 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:**
   - Not a required check; no secret, invite or plaintext in any log or artifact; actions pinned; timeout under 45 min; summary with both sides; a failure fails the run.
 
+#### OPS-CI-8 · Pin the MinIO CI image to the `-debian-12-r5` tag (new, review low 2026-10-18)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/ci.yml` (job `storage-minio`, `MINIO_IMAGE`)
+- **Depends on:** —
+- **Scope:** `MINIO_IMAGE` is `docker.io/bitnamilegacy/minio:2025.7.23@sha256:...`. Use the explicit `2025.7.23-debian-12-r5` tag and keep the digest pin (the repo convention is tag plus digest); re-resolve the digest for that tag. Source: review low, 2026-10-18.
+- **Acceptance:** `storage-minio` stays green with the new tag and digest; no other workflow change.
+
 #### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
 - **Status:** done (4thtech/agentlink#198) · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/release.yml` or a Changesets hook, `tools/**`, `docs/process/versioning.md` §5
@@ -1112,7 +1119,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - M1-1i-b STREAM vectors (suite `stream`) pass in all runtimes: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`.
   - Dropped final chunk, reordered, duplicated or appended chunks, bit flips and header tampering all fail (tests).
-  - 1 GiB encrypt + decrypt in Node with RSS growth < 64 MiB (slow-tagged benchmark test).
+  - 1 GiB encrypt + decrypt in Node after warm-up, peak `heapUsed + arrayBuffers` stays < 64 MiB, and the peak RSS of a 3 GiB run is within 64 MiB of the 1 GiB run's peak; RSS is reported, not gated (slow-tagged benchmark test).
 
 #### M1-1e · crypto: EIP-712 typed-data hashing and AgentCard
 - **Status:** done (4thtech/agentlink#32, merged 2026-10-14) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1140,6 +1147,19 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - Vector suite `eip712-proof` (M1-1i): its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares; the contracts repo's parity job passes against the same commit (M1-3d). The revoke vectors come from M1-1i-b (D-81): suite `eip712-revocation`, whose harness module M1-1j registers and removes from `test-vectors/pending-suites.json` in the same way.
 - Review note (IR-M1-1j-1 L-1..L-4, 2026-10-17): move the EIP-3009 recipient duty into the module header; add a reject path to the harness op; open owner question: is `cardHash` the struct hash or the full digest of the AgentCard?
+
+#### M1-1j-b · crypto: EIP-712 vector and spec follow-ups (new, follow-up from #258)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/crypto, test-vectors, docs/foundation/04
+- **Depends on:** M1-1j, M1-1i-b
+- **Spec:** 04 §2.4.1; 05 §3.1, §4
+- **Invariants:** I-6
+- **Scope:**
+  - Add vector cases: a domain-reject case and a `keyEpoch` of -0.
+  - Name `keyEpoch` and `deadline` in the 04 §2.4.1 table.
+  - Verify parity with the contracts repo against the same commit (M1-3d).
+- **Acceptance:**
+  - The new cases pass in every runtime the suites declare; the 04 §2.4.1 table names both fields; the contracts parity job passes against the same vectors commit.
 
 #### M1-1f · crypto: owner passphrase wrapping, pairing proof, safety code
 - **Status:** done (4thtech/agentlink#37, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1527,21 +1547,21 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - No NatSpec in `src/OCCNotary.sol` describes a resolved gap as pending.
   - The suppression sits at the narrowest scope that keeps Slither clean; no new finding appears.
 
-#### M1-3f · contracts: ABI release artifacts and `@4thtech-io/occ-v2-abi`
+#### M1-3f · contracts: ABI release artifacts and `@4thtech-io/occ-v2-abi` (private, in-repo)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · release workflow; agentlink · packages/occ-v2-abi
-- **Depends on:** M1-3d, M0-2e; DECISION NEEDED on the publish location (gap G-10)
+- **Depends on:** M1-3d, M0-2e (G-10 resolved by D-83)
 - **Spec:** 05 §9; D-19; `development-process.md` §9.1–§9.3; `release-and-deployment.md` §2
 - **Invariants:** I-6
 - **Scope:**
   - Tagged contracts release emits ABI JSON, per-chain addresses (empty until M1-3g) and a SHA-256 manifest; no Solidity source leaves the private repo.
   - The ABI includes the G-4 events `RecordSkipped` and `ReceiptSkipped` (05 §6).
-  - Proposed (G-10): a PR imports the artifacts into public `packages/occ-v2-abi`; CI verifies the manifest; `release.yml` publishes with provenance (ABIs only, MIT licence).
-  - `@4thtech-io/chain` pins an exact version; Renovate never automerges it.
-  - Follow-up (IR-M1-3b-1 I-4): no `@4thtech-io/occ-v2-abi` release is built from a contracts build whose concrete ABI differs from the interface in mutability (the `depositWithAuthorization` stub until M1-3c); generate the ABI from the interface, or publish only after M1-3c.
+  - Decided (G-10, D-83, Tali, 2026-10-18): `@4thtech-io/occ-v2-abi` is a private workspace package in `packages/occ-v2-abi`, built from the exported ABI/addresses/manifest artifacts and the shared vectors, bundled into the CLI and not published to npm. A PR imports the artifacts; CI verifies the manifest. (The rename from `@4thtech-io/*` to `@4thtech-io/*` is in flight in #250; until it lands the name reads `@4thtech-io/occ-v2-abi`.)
+  - `@4thtech-io/chain` pins the imported release exactly; Renovate never automerges it.
+  - Follow-up (IR-M1-3b-1 I-4): no `@4thtech-io/occ-v2-abi` import is taken from a contracts build whose concrete ABI differs from the interface in mutability (the `depositWithAuthorization` stub until M1-3c); generate the ABI from the interface, or import only after M1-3c.
   - Spec note (IR-M1-3b-1 choices 1 and 10, proposed; owner confirms at merge): 05 §7 lists the inherited OpenZeppelin errors that appear in the ABI (`AccessManagedUnauthorized`, `ReentrancyGuardReentrantCall`, `SafeERC20FailedOperation`, the UUPS and ERC-1967 errors) and decides whether a dedicated `ValueMismatch()` replaces `TransferFailed()` for a native value mismatch.
 - **Acceptance:**
-  - A `next` prerelease of `@4thtech-io/occ-v2-abi` published with provenance visible on npm.
+  - `packages/occ-v2-abi` is private (`"private": true`), is bundled into the CLI build, and no workflow publishes it.
   - CI fails if imported files differ from the release manifest; no `.sol` file is present in the public package (check).
 
 #### M1-3g · contracts: CREATE3 deploy script and testnet deployment
@@ -1571,7 +1591,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `deployer-holds-no-role` passes on Base Sepolia, and neither CreateX nor any CREATE3 intermediate address holds a role; fork dry-run in CI before every broadcast.
   - Negative tests for the salt rules (05 §9.1): a salt whose guard bytes differ from CreateX's `msg.sender`, a zero guard, byte 20 not `0x00`, and a predicted address (or CREATE3 intermediate address) that already has code or a nonzero nonce each make the script fail before broadcast; a fork test shows the offline address computation equals the address CreateX deploys to; a test shows every call to the stage deployer reverts.
   - The stage fits the Chiado block gas limit and per-transaction gas cap on a Chiado fork, and its init code is within EIP-3860 (so M1-3j can reproduce the addresses). Proposed (D-64 (2)): it also fits, with margin, the block gas limit and per-transaction gas cap of Base, Gnosis and each planned M4 mainnet, checked on forks, and a test fails if the guard layout or a label would change the committed address file.
-  - Addresses published in the next `@4thtech-io/occ-v2-abi` prerelease (M1-3f).
+  - Addresses imported into the in-repo `@4thtech-io/occ-v2-abi` (M1-3f, D-83).
   - Negative tests for the config assertions: an allowlisted token with a zero fee or cap, the native coin on a non-Gnosis chain, and a fee-on-transfer mock each make the script fail.
   - Pre-audit conditions (AUDIT-FABLE-OCCv2-1 FA-6, FA-7; proposed, owner confirms at merge; prerequisites of the Base Sepolia broadcast):
     - Config-only rules (FA-6): the contracts do not enforce them, so the script itself asserts them before any broadcast, not only review or M1-14: the native coin is allowlisted only on Gnosis chain IDs, every allowlisted token has a nonzero `NOTARIZE` and `REGISTER` fee and cap, no allowlisted token is fee-on-transfer or rebasing, and the target chain has Cancun (EIP-1153). The Base Sepolia run's assertion output is attached to the PR.
@@ -1593,7 +1613,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Fork dry-run first; the predictions must equal the campaign's address file, which equals the published Base Sepolia addresses; otherwise the run fails closed (05 §9.1).
   - Proposed: deploy soon after Base Sepolia, to shorten the squat window (05 §9.1 control 3). D-71 (1) (15 Oct 2026): the key is a repository secret with process-only protection; the run is a manual `workflow_dispatch` and broadcasts only after the owner's explicit "go"; the workflow refuses mainnet chain IDs (with a test); agents never approve or broadcast on their own.
   - Hard prerequisite of M2-4a (Registry stage on both testnets) and M3-2c (mainnet), so two-chain zero-config selection (D-40), the native-xDAI fee path (D-46) and the Gnosis gas limits run on a live testnet before mainnet. Not an M1-GATE blocker (gate residual in M1-3g, proposed).
-  - After the run: the faucet is configured against the Chiado vault (M1-10b); the next `@4thtech-io/occ-v2-abi` prerelease and the `@4thtech-io/chain` config list Chiado.
+  - After the run: the faucet is configured against the Chiado vault (M1-10b); the next `@4thtech-io/occ-v2-abi` import and the `@4thtech-io/chain` config list Chiado.
 - **Acceptance:**
   - Predicted and deployed proxy and AccessManager addresses equal the published Base Sepolia addresses (script output in PR).
   - `deployer-holds-no-role` and the M1-3g post-deploy checks pass on Chiado; the stage fits Chiado's block gas limit and per-transaction gas cap.
@@ -1694,7 +1714,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-6
 - **Scope:**
   - `ChainConfig` (07 §6.1) and the registry for Base Sepolia and Chiado; user RPC overrides; no API keys in the client; viem fallback transport.
-  - ABIs and addresses from the pinned `@4thtech-io/occ-v2-abi`; builders for `Record`, `Receipt`, `AgentCard`; signing only through `KeyStore.sign712`.
+  - ABIs and addresses from the pinned in-repo `@4thtech-io/occ-v2-abi`; builders for `Record`, `Receipt`, `AgentCard`; signing only through `KeyStore.sign712`.
   - Random 256-bit nonces, 32-byte salts, recipient commitments, recordId computation.
 - **Acceptance:**
   - EIP-712 vector parity in all runtimes; config schema rejects unknown chains and duplicate tokens.
@@ -1935,6 +1955,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - 1 GB round trip against MinIO with RSS growth < 128 MiB (measured in the test).
   - An aborted upload leaves no open multipart uploads; lifecycle rule applied and read back on MinIO and R2.
+
+#### M1-6b-b · storage: lifecycle and upload follow-ups (new, follow-up from #254)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/storage
+- **Depends on:** M1-6b, M1-28
+- **Spec:** 07 §5.2, §5.4; 04 §4
+- **Invariants:** I-2, I-3
+- **Scope:**
+  - Lifecycle read-back on R2: needs an R2 token that can change bucket settings, which is an owner operation (M1-28).
+  - L3: the lifecycle read-modify-write is not atomic; make concurrent changes safe or detect them.
+  - L4: wrap errors thrown by the caller's stream in `StorageError`.
+  - L5: handle uploads orphaned when the create or complete response is lost (abort or reclaim).
+- **Acceptance:**
+  - The lifecycle rule is applied and read back on R2 (owner-run check recorded); L3, L4 and L5 each have a test; the lifecycle helper does not discard rules it did not write.
 
 #### M1-6c · storage: drop adapter and storage selection (new, D-48)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -2227,7 +2261,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Expired link → refresh-link flow returns a working URL; after the retention trigger the object returns 404 and file-key rows are gone on both sides.
   - With `deleteAfter: expiry`, a drop object stays retrievable by the owner console after the recipient's `DELIVERED` (I-9).
 - Review note (IR-M1-15-1, 2026-10-17): extend filename character filtering; handle inbox name-length edge cases; relative redirect forms are conservative (watch in dogfooding).
-- Review note (IR-M1-8d-1 / IR-M1-15-1, 2026-10-17): two `isInsideFolder` helpers have different semantics (policy engine: a folder is not inside itself; path guard: it is). Unify them into one shared helper when wiring files here.
+- Review note (IR-M1-8d-1 / IR-M1-15-1, 2026-10-17): two `isInsideFolder` helpers have different semantics (policy engine: a folder is not inside itself; path guard: it is). Unify them into one shared helper when wiring files here. Locations: `packages/core/src/path-guard.ts` (`isInsideFolder(path, folder, flavor)`, a folder is inside itself) and `packages/core/src/policy-engine.ts` (`isInsideFolder(realpath, folder)`, a folder is not inside itself). Acceptance: one exported helper, the self-inclusion rule explicit in its name or option, both call sites and `path-guard.test.ts` / `policy-files-proofs.test.ts` cover it. Source: review low, 2026-10-18.
 - Review note (IR-M1-7i-1 L3, 2026-10-17): derive `ruleEligible` and `counterparty` from the contact book and test it.
 
 #### M1-7g · core: proofs and receipts
@@ -2275,6 +2309,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-4, I-5
 - **Scope:** M1-7h applies a verified `revoke` (`revoked_agents`, contact status or `identity.revoked_at`, pending outbox rows stopped as `revoked`) and drops any other. Left here: in the same store transaction, void every pending approval and every open commitment part with the revoked agent as counterparty (void rule 3); the activity line for a revoke; `catchUp` counts that leave out `received` rows whose type is not a message once it is known (F04 a); acks staged for the outbox instead of published inside `syncInbox` (F04 b); a KeyStore failure while listing own keys degrades the fetch instead of failing the sync (F04 c).
 - **Acceptance:** after a contact's revoke, an approval pending for an action with that contact is `void` and its commitment parts are void, in the revoke's transaction; a peer's acks do not raise `catchUp` counts; `syncInbox` returns within its budget with 200 acks pending.
+
+#### M1-7h-d · core: faster sync rate-limit tests (new, follow-up from #252)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core
+- **Depends on:** M1-7h
+- **Spec:** `development-process.md` (CI budget)
+- **Invariants:** —
+- **Scope:**
+  - The `sync.test.ts` rate-limit tests (500 and 300 envelopes) sign every envelope in the test and exceed 120 s on a loaded runner; they now carry a 300 s timeout (#252). Use cached or prebuilt signed fixtures so the timeout can come back down.
+- **Acceptance:**
+  - The tests assert the same rate-limit behaviour (no weaker assertions); each finishes well under 60 s on the CI runner and the 300 s timeout is removed or lowered.
 
 #### M1-7h-c · core: inbox page read with read marking (new, for M1-9p)
 - **Status:** done (4thtech/agentlink#130, merged 2026-10-15) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -2972,6 +3017,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The production bucket's lifecycle rule (7 days) is read back after each deploy, and so is the drop Worker's logging config (observability and request logging, Tail Workers and Logpush off; 04 §4).
 - Review note (IR-M1-27a-2 (PR #218, open), 2026-10-17): tighten per-network limits; account downloads after delivery; document URL normalisation in 07 §5.4; set `cpu_ms` in the deploy config; add a header-whitespace test.
 
+#### M1-27b-b · drop: deploy pipeline follow-ups (new, follow-up from #255)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/deploy-drop.yml`, `docs/process/release-and-deployment.md`
+- **Depends on:** M1-27b
+- **Spec:** `release-and-deployment.md` §4.5, §8; 07 §5.4
+- **Invariants:** I-3, I-7
+- **Scope:**
+  - Rollback on timeout and cancel edge cases of the deploy job.
+  - A tighter `limits.cpu_ms`.
+  - A pre-deploy lifecycle check (the bucket rule exists before the deploy goes live).
+  - `actionlint` in CI for the workflow files.
+- **Acceptance:**
+  - A cancelled or timed-out deploy leaves the previous version serving (rehearsed on staging); `cpu_ms` is set to the measured need plus margin; the pre-deploy check fails the job when the lifecycle rule is missing; `actionlint` runs as a required check.
+
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink-ops · legal/ (counsel brief and sign-off, private); Cloudflare account (buckets, lifecycle rule, hostname)
@@ -2991,7 +3050,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Local approval UI (`apps/cli` local UI)
 
 #### M1-11a · local UI: owner setup and approvals
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#256; "Remember for this contact" deferred to G-32, CLI wiring to M1-9h) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (local UI bundle)
 - **Depends on:** M1-8d, M1-8e, M1-2e; gap G-32 resolved
 - **Spec:** 08 §1; 11 §6.2 (first run, approval), §6.2.1 (review together); 02 J4; 04 §2.5, §2.5.2 (D-68)
@@ -3009,6 +3068,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - XSS payloads in contact and file names render inert; a PRF-less authenticator falls back to the passphrase.
 - Review note (IR-M1-8d-1, 2026-10-17): make the session-link exchange one-shot / rotate; add failed-attempt backoff; fix Windows open() result and error handling; add Host test cases.
 - Review note (IR-M1-31-1 L-2..L-5, 2026-10-17): add a `LOCALHOST:<port>` Host test; note the start-time IPv4 decision in D-79; set common headers on the 503 stub; fix the stale example in `packages/core/src/approval-channel.ts:30`.
+
+#### M1-11a-b · local UI: wiring and remember-contact follow-ups (new, follow-up from #256)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (local UI bundle), packages/mcp
+- **Depends on:** M1-11a, M1-9h; G-32 for the last item
+- **Spec:** 08 §1; 11 §6.2, §8; 06 §3
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Wire the local UI into `agentlink mcp` and put its URL in `pending_approval` results, pinned to the local UI origin (see the M1-9d hand-off above). `agentlink ui` is covered by M1-9h and is not repeated here.
+  - "Remember for this contact" after G-32 (proof approvals only, same presence gesture, signed `policy.set`).
+- **Acceptance:**
+  - A `pending_approval` result carries the UI `url`; a test checks the origin pin; "Remember for this contact" adds the contact rule through a `policy.set` whose refusal or success is reported accurately.
 
 #### M1-11c · local UI: settings pages
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -3130,6 +3201,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Deterministic variant green on PRs within 15 minutes; LLM variant pass rate reported per run; no chain is chosen by hand anywhere in the scenario (D-40).
   - Canary scan of all e2e logs and artifacts finds no plaintext, keys or presigned URLs.
+  - J3 (02): an agent with no credits is refused with `needs_credits`, takes the faucet link, receives testnet credits and retries successfully, with no chain chosen by hand (D-40). Added 2026-10-18: no other card covered J3 end to end before M1-GATE.
+  - J5 (02): a third party who has only the exported proof pack runs `agentlink verify` (M1-9h) and gets a pass; a tampered pack fails with its specific reason. Added 2026-10-18: no other card covered J5 end to end before M1-GATE.
 - Review note (IR-M1-27a-2, 2026-10-17): the SDK client signs the drop request URL in its normalised form.
 
 #### M1-13b · prompt-injection suite
@@ -3370,6 +3443,16 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:** `--role b --auto-sync` (Mac B, waits) and `--role a --auto-sync --remote <host>` (Mac A): each agent runs in its own Mac's terminal; ssh only moves small files in a 0700 sync folder on Mac B (per-run nonce, sealed status lines, invite through stdin and deleted after reading). Approvals typed locally on each Mac. One combined table on Mac A. `--two-mac` preflight detects the keychain failure and points to `--auto-sync`.
 - **Acceptance:** tests with a fake ssh for the file protocol (nonce, invite via stdin, status parsing, timeouts); existing modes unchanged.
 
+#### M1-23-f · Dogfood lows: error text cap, SSH keychain wording, auto-sync cleanup (new, review lows 2026-10-18)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`tools/dogfood/**`; sensitive path `docs/runbooks/**`: merges only on Tali's "merge") · **Phase:** M1b
+- **Repo/path:** agentlink · `tools/dogfood/**`, `docs/runbooks/dogfood-m1a.md` (RB-17)
+- **Depends on:** M1-23-e
+- **Scope:** source: review lows, 2026-10-18.
+  - Cap the length of error text and tokens the tool copies into notes and results (truncate with a marker); a secret-scan pass still runs on the capped text.
+  - The hands-free SSH preflight names the macOS limitation: the login keychain is unavailable in SSH sessions, so the agent must run in the Mac's own terminal (`--auto-sync`).
+  - Auto-sync fixes: RB-17 documents how Mac A handles `--agentlink`; a stale invite file left behind on Mac B is removed at start and on exit; Mac A sends ABORT to Mac B on any early exit.
+- **Acceptance:** tests with a fake ssh: oversized error text is truncated; keychain failure message names the SSH limitation; early exit sends ABORT and leaves no invite file.
+
 #### M1-9t · CLI: several agents under one OS user, and init for one harness (new, found by the M1-23 runbook)
 - **Status:** merged (#178) · **Size:** M · **Tier:** Opus · **Security:** S2 (owner key and card signing, I-4) · **Phase:** M1a (needed for the one-computer part of M1-23, not for the gate)
 - **Repo/path:** agentlink · apps/cli (`init`, `owner init`), packages/node (`initOwner`)
@@ -3471,6 +3554,27 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 06 §2.1 (restrictName), 11 §5 (copy); I-5
 - **Scope:** the accept-invite approval "Who" line shows the inviter's self-declared name (labelled, restricted) plus the owner fingerprint from the invite's verified card, e.g. `“oc-test” (self-declared) · owner B254·C21B · not in your contacts yet`; fingerprint only when no usable name. The action and its digest are unchanged (re-derived from the link at render time).
 - **Acceptance:** tests for name+fingerprint, hostile name, missing name; dogfood `--oc-model` defaults to `opencode/deepseek-v4.1-flash-free`.
+
+#### M1-9zc · cli: bundle test that no native module loads before the Node version check (new, review low 2026-10-18)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 (test only) · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`cli.ts`, `node-check.ts`, bundle test)
+- **Depends on:** M1-9y
+- **Scope:** M1-9y relies on `cli.ts` checking Node >= 22.14 before `main.ts` loads any native module. Add a test on the built bundle that fails if a static import of a native module (or `main.ts`) is reachable before the check runs. Source: review low, 2026-10-18.
+- **Acceptance:** the test fails when a native import is moved ahead of the check; existing tests unchanged.
+
+#### M1-9zd · cli: owner code typed at a shell prompt (new, UX review low 2026-10-18)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`commands/owner/**`, `strings.ts`), docs-site troubleshooting; 11 §5
+- **Depends on:** M1-9z
+- **Scope:** `owner-code-typed-at-shell-prompt` (the M1-9z incident: a code typed into a shell and a chat). The code prompt states that it is not a shell command and not for chat; guard where feasible (for example a hint when the entry looks like a command). Never log or echo the entry (I-1).
+- **Acceptance:** prompt copy per 11 §5 and tests for the guard; nothing about the entry is logged.
+
+#### M1-9ze · core: invite acceptance checks the invite's contact id equals the counterparty (new, review low 2026-10-18)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (`client.ts`, `card.ts`, pairing tests)
+- **Depends on:** M1-9zb
+- **Scope:** when an invite is accepted, require the contact id derived from the invite to equal the counterparty's verified card id; refuse otherwise with no state change. Source: review low, 2026-10-18.
+- **Acceptance:** RED commit; test with a mismatching invite is refused and writes nothing; the matching case passes.
 
 #### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
 - **Status:** done (4thtech/agentlink#196) · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
@@ -4242,7 +4346,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Invariants:** I-6, I-10
 - **Scope:**
   - Only the audited commit (bytecode rebuilt and compared); fork dry-run; the owner runs the deploy locally, signing with the mainnet deployer key on his Trezor hardware wallet (D-71 (1); tooling M3-2d), while a second person (by agreement, @denisjazbec) witnesses and independently verifies; identical addresses on both mainnets, equal to the mainnet campaign's address file and different from the testnet addresses (05 §9.1, D-71 (1)); the dry-run checks the audited build's stage against every planned mainnet chain's limits (proposed); all roles to the Safes; deployer roles revoked in the same script.
-  - New `@4thtech-io/occ-v2-abi` version with mainnet addresses.
+  - New `@4thtech-io/occ-v2-abi` import with mainnet addresses (D-83).
 - **Acceptance:**
   - Scripted check "deployer holds no role" passes on both chains; delays equal `docs/roles.md`; addresses identical on both mainnets and equal to the mainnet campaign's address file; deployed bytecode matches the audited build; witness record stored; the per-chain config lists the mainnet addresses (D-71 (1)).
 
@@ -4722,7 +4826,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
    - **Review IR-G-9-1 fixes:** execution lease (H-1); `received` state for stored, unprocessed envelopes, at most 1 000 (M-1); the signed Record and its salt stored in the reserve transaction (M-2); the policy version checked inside check-and-reserve and part claims (M-3); one live scope while an approved scope has unclaimed parts (M-4); revocation stops queued deliveries (M-5); refused envelopes counted against the contact's rate (M-6); a new `policy.set` resets the broken ledger's clock check (M-7). Round 2: the held pool is aligned with 04 step 7 (R2-M1), and there is no refusal notice to senders (R2-M2).
 
    *Was:* 07 §3 lacked the outbox (07 §4.2, 24 h retry), the ≥ 7-day seen-set (07 §4.2), idempotency results (06 §1 rule 6), budget ledger and rate counters (06 §3), and `SignedOwnerAction` nonces, the stored signed objects, the revoked-agent set and contact status `revoked` (04 §2.5.1, §3.4.1); the policy-version high-water mark lives in the KeyStore (04 §2.5.1). *Blocks:* M1-5b, M1-5c, M1-7a, M1-8b.
-10. **G-10 (M) Where `@4thtech-io/occ-v2-abi` is published.** 05 §9; D-19. npm provenance is not generated for private source repos (verify). *Proposed* (`development-process.md` §9.2): import release artifacts into public `packages/occ-v2-abi` and publish from there. *Blocks:* M1-3f.
+10. **G-10 (M) Where `@4thtech-io/occ-v2-abi` is published.** **RESOLVED (D-83, Tali, 2026-10-18):** it is not published. `@4thtech-io/occ-v2-abi` is a private in-repo workspace package built from the contracts repo's exported artifacts and the shared vectors, and bundled into the CLI (`development-process.md` §9.2). *Was:* 05 §9; D-19; npm provenance is not generated for private source repos. *Blocked:* M1-3f.
 11. **G-11 (L) Logger package missing from the package map.** RESOLVED by M0-8: `@4thtech-io/log` (zero dependencies) is in the 07 §1 package map and `repo-reference.md`. *Was:* 04 §8.4 vs 07 §1. *Blocked:* M0-8.
 12. **G-12 (M) JCS and invite compression.** RESOLVED. *JCS:* by M1-1a (4thtech/agentlink#27): in-repo RFC 8785 code checked against the RFC vectors (`packages/crypto/src/jcs.ts`), the alternative proposed here, so no dependency was added. *Compression:* by 4thtech/agentlink#70 (D-69; the encoding decided by Tali in chat, 2026-10-14; the decoder rules proposed, owner confirms at merge), in 04 §3.6: raw DEFLATE (RFC 1951) with no zlib header or checksum, through the platform `CompressionStream("deflate-raw")` and `DecompressionStream("deflate-raw")`. Proposed with it (revised after review IR-D-69-1): the whole input bounded before URL parsing (the canonical prefix plus at most 21 846 characters of strict base64url, or the bare payload); inflation in bounded slices with a running count, capped at 16 384 bytes before any parse, with an orderly shutdown; the stream must end exactly at the end of the input (malformed, truncated and trailing-byte streams refused in every runtime, the codec detecting trailing input itself where the platform does not); fatal UTF-8 with the BOM kept, I-JSON and the strict schema before use; the encoder checks both limits; compressed bytes never hashed or signed; one codec in `@4thtech-io/core` (M1-7c). The proof-pack link is not covered (G-52). *Was:* 04 §3.1, §3.6; `AGENTS.md` dependency allowlist. No JCS implementation was allowlisted although `envelopeHash` depends on it; "deflate" did not say raw DEFLATE or zlib. *Proposed:* approve a vetted RFC 8785 implementation (or in-repo code with RFC vectors); specify `deflate-raw` via `CompressionStream`. *Blocked:* M1-1a (done), M1-7c.
 13. **G-13 (L) Record kind ↔ payload type.** 05 §3.1 kinds vs 04 §3.4 payload types; no mapping. *Blocks:* M1-7g.
@@ -4814,7 +4918,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | OPS-L8 | Rotate every live credential found |
 | M1-3g | Testnet deployer key and testnet Safe; fund with low balances; trigger the private-repo deploy workflow for Base Sepolia (D-63) (no testnet explorer verification: D-11, D-19). Keep its offline backup, never import it into a browser extension or hot wallet, clear any terminal scrollback or history that showed it, and set up the deployer monitoring (proposed). D-71 (1): this key is for testnets only; mainnet uses a separate key from your Trezor hardware wallet |
 | M1-3j | Trigger the Chiado deploy with the same testnet deployer key (D-63). D-71 (1): keep the key as a repository secret of the private repo (GitHub Free, no environment); trigger each run by manual dispatch and give the "go" before broadcast; keep write access to the owner and named engineers; delete the secret when the testnets end |
-| M1-3f | **DECISION NEEDED:** where `@4thtech-io/occ-v2-abi` is built and published (G-10) |
+| M1-3f | Decided by D-83 (18 Oct 2026): G-10 (the ABI package is private and in-repo, not published). No owner action left |
 | M1-3k, M3-1a | Decided by D-66: EIP-7702-delegated agent keys, option (a) now and (b) before mainnet (G-47, M1-3l); the ERC-1271 gas bound is required (FA-1). No owner action left |
 | M1-5c, M1-7b follow-ups | Decided by D-71 (15 Oct 2026): G-49 (M1-5f) and G-51 (M1-7b-b). No owner action left |
 | M1-7e-2 | **DECISION NEEDED:** whether an owner-signed revoke from a blocked key is dropped (IR-M1-7e-2-1 D1-F01; see the card)

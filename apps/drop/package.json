@@ -1,6 +1,6 @@
 {
   "name": "@4thtech-io/drop",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Encrypted drop Worker and R2 storage (D-48).",
   "license": "MIT",
@@ -31,5 +31,8 @@
   },
   "dependencies": {
     "@4thtech-io/crypto": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "4.149.0"
   }
 }

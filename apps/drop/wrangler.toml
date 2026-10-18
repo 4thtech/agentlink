@@ -1,0 +1,130 @@
+# The 4thTech encrypted drop Worker (M1-27b, D-48). Deployed only by CI
+# (.github/workflows/deploy-drop.yml, release-and-deployment.md §4.5); never `wrangler deploy` from a
+# workstation. Always pass --env: `staging` (workers.dev) or `production` (the Custom Domain).
+#
+# No secrets here. Per environment the owner sets one Worker secret with `wrangler secret put`:
+#   DROP_URL_KEY       32 random bytes, base64url (the URL MAC and IP-bucket key)
+# The deploy workflow skips cleanly until it exists. No account ID here either: CI passes
+# CLOUDFLARE_ACCOUNT_ID from the GitHub Environment.
+#
+# DROP_CORS_ORIGINS (08 §7) is a var per environment, here, so the browser allowlist is reviewed in
+# PRs and asserted by test/smoke-config.test.ts: exact `https://host` origins, comma-separated; empty
+# means no CORS headers at all. Never set it as a Worker secret too (the deploy fails if one exists).
+#
+# Bindings, limits and logging are NOT inherited by environments, so each one repeats them; the
+# assertions in test/smoke-config.test.ts read this file back for each environment.
+#
+# Logging (04 §4, I-7): observability, invocation logs, traces, Logpush and Tail Workers are off in
+# every environment, and the deploy workflow reads the live settings back after each deploy.
+#
+# Durable Object migrations are forward-only (release-and-deployment.md §4.5): a release that adds
+# one is marked in its PR with a forward-fix plan.
+
+# Top level: local development only (`wrangler dev`). The bucket name does not exist on the account,
+# so a deploy without --env fails instead of creating a third Worker.
+name = "agentlink-drop-local"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+workers_dev = false
+preview_urls = false
+send_metrics = false
+logpush = false
+upload_source_maps = false
+
+[observability]
+enabled = false
+
+[observability.logs]
+enabled = false
+invocation_logs = false
+
+[observability.traces]
+enabled = false
+
+[vars]
+DROP_CORS_ORIGINS = ""
+
+[limits]
+# The commit hashes up to 100 MiB of stored ciphertext, about 0.4 s of CPU (IR-M1-27a-1 L-3).
+# Needs the Workers paid plan.
+cpu_ms = 30000
+
+[[r2_buckets]]
+binding = "DROP_BUCKET"
+bucket_name = "agentlink-drop-local"
+
+[[durable_objects.bindings]]
+name = "DROP_STATE"
+class_name = "DropState"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DropState"]
+
+# ---------------------------------------------------------------------------------------------------
+# Staging: workers.dev only, deployed on every merge to main.
+[env.staging]
+name = "agentlink-drop-staging"
+workers_dev = true
+preview_urls = false
+logpush = false
+routes = []
+
+[env.staging.observability]
+enabled = false
+
+[env.staging.observability.logs]
+enabled = false
+invocation_logs = false
+
+[env.staging.observability.traces]
+enabled = false
+
+[env.staging.vars]
+# No staging console exists yet; add its origin here when it does.
+DROP_CORS_ORIGINS = ""
+
+[env.staging.limits]
+cpu_ms = 30000
+
+[[env.staging.r2_buckets]]
+binding = "DROP_BUCKET"
+bucket_name = "agentlink-drop-staging"
+
+[[env.staging.durable_objects.bindings]]
+name = "DROP_STATE"
+class_name = "DropState"
+
+# ---------------------------------------------------------------------------------------------------
+# Production: the Custom Domain only (release-and-deployment.md §1.1), no workers.dev or preview
+# URLs. Deployed automatically once the staging smoke is green (D-52).
+[env.production]
+name = "agentlink-drop"
+workers_dev = false
+preview_urls = false
+logpush = false
+routes = [{ pattern = "drop.agentlink.4thtech.io", custom_domain = true }]
+
+[env.production.observability]
+enabled = false
+
+[env.production.observability.logs]
+enabled = false
+invocation_logs = false
+
+[env.production.observability.traces]
+enabled = false
+
+[env.production.vars]
+DROP_CORS_ORIGINS = "https://console.agentlink.4thtech.io"
+
+[env.production.limits]
+cpu_ms = 30000
+
+[[env.production.r2_buckets]]
+binding = "DROP_BUCKET"
+bucket_name = "agentlink-drop-prod"
+
+[[env.production.durable_objects.bindings]]
+name = "DROP_STATE"
+class_name = "DropState"

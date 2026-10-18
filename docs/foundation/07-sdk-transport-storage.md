@@ -608,8 +608,8 @@ type StoredObject = { kind: string; locator: string; size: number; sha256: strin
 - Object key: `agentlink/<storagePrefix>/<random 128-bit>`: a random per-agent prefix, never the agent ID (04 §2.9), and no file names or contact info.
 - Multipart upload for files > 64 MB; streaming encryption so large files never fully load into memory.
 - Presigned GET valid until `expiresAt` (max 7 days per SigV4; shorter with temporary credentials). The recipient can ask for a fresh link (`request` envelope, `kind: refresh-link`); the sender's core answers when online.
-- Lifecycle: the CLI's `storage connect` offers to set a bucket lifecycle rule deleting `agentlink/` objects after 30 days as a safety net.
-- Credentials (access key ID + secret) stored in the OS keychain (local) or Worker secrets (cloud). Recommended: a bucket-scoped key with only `PutObject`, `GetObject`, `DeleteObject`.
+- Lifecycle: the CLI's `storage connect` offers to set a bucket lifecycle rule deleting `agentlink/` objects after 30 days, and aborting incomplete multipart uploads under `agentlink/` after 1 day, as a safety net; the bucket's other rules are kept (M1-6b).
+- Credentials (access key ID + secret) stored in the OS keychain (local) or Worker secrets (cloud). Recommended: a bucket-scoped key with only `PutObject`, `GetObject`, `DeleteObject`, `AbortMultipartUpload` and `ListBucketMultipartUploads` (the last two let a failed or interrupted multipart upload be cancelled and cleaned up, M1-6b; on AWS IAM they are separate actions, so without them an abort is refused). Setting the lifecycle rule needs the bucket-level `PutLifecycleConfiguration` (and `GetLifecycleConfiguration` to read it back), which this key does not include; when the key lacks it, `storage connect` explains how to add the rule in the provider console instead.
 - **Guided setup** (`agentlink storage connect` and local UI): provider picker → step-by-step instructions with links → test upload/download/delete → save.
 
 ### 5.3 Inline adapter (P0)
@@ -698,7 +698,7 @@ type Source = { url: string; verifiedOn: string };  // https URL; YYYY-MM-DD
 
 - Every chain entry and every `feeTokens[]` element carries a required `source`: the issuer's or chain's official page and the date it was last checked (12 §3.2). The private deploy configuration (occ-v2-contracts `script/config`) records the same values, and its verify-chain script checks them against chain state.
 - `finalizedTag` is true where the chain answers the `finalized` block tag (proven by verify-chain), so the client never probes. There, 04 §5 reads chain state at `finalized`, and `confirmations` is only the threshold for showing a proof as included. On a chain without the tag, `confirmations` is also the 04 §5 fallback depth. It is never a reorg-safety bound.
-- The client ships one network entry per chain without `contracts` (`@4thtech-io/chain`, M1-14). The registry (M1-4a) composes each `ChainConfig` from that entry plus `contracts` from the pinned `@4thtech-io/occ-v2-abi`, once M1-3g has deployed them.
+- The client ships one network entry per chain without `contracts` (`@4thtech-io/chain`, M1-14). The registry (M1-4a) composes each `ChainConfig` from that entry plus `contracts` from the pinned in-repo `@4thtech-io/occ-v2-abi`, once M1-3g has deployed them.
 - At most one fee token per symbol on a chain, so the user can tell tokens apart by symbol.
 
 At launch `feeTokens` lists only USD stablecoins (D-46, 12 §3): USDC, USDT where available, and on Gnosis the native xDAI (`symbol: "NATIVE"`, `address: null`). A volatile native coin is never a fee token at launch (`NATIVE` on other chains is used only for gas in direct mode).

@@ -441,6 +441,9 @@ describe('syncInbox (07 §2, §4.2): fetch, verify once, store, process', () => 
 // --- Rate limit -----------------------------------------------------------------------------------
 
 describe('per-contact rate limit (07 §3.2 rate_counters; 06 §3)', () => {
+  // Timeout: 300 s. Real signing and verification of 300-500 envelopes: about 18 s alone on a laptop, but
+  // 87-113 s on the loaded CI runner (all packages' tests run in parallel) in green runs, and over 120 s
+  // on main run 39107965796. Nothing in the code under test changed; the assertions are unchanged.
   it('500 envelopes from one contact are limited without delaying another contact', async () => {
     const net = new RelayNetwork();
     const a = await openAgent(1, 'alice', RELAYS_A, net);
@@ -489,7 +492,7 @@ describe('per-contact rate limit (07 §3.2 rate_counters; 06 §3)', () => {
       later.envelope.id,
     ]);
     expect((await rowsOf(b)).rate.every((r) => r.bucket > clock.t - 3_600)).toBe(true);
-  }, 120_000);
+  }, 300_000);
 });
 
 // --- Fetch-only catch-up --------------------------------------------------------------------------
@@ -912,5 +915,5 @@ describe('IR-M1-7h-1 F02: rate limit at processing time', () => {
         (r.type === 'text' || r.type === 'card-update'),
     );
     expect(okFromA).toHaveLength(limit);
-  }, 120_000);
+  }, 300_000);
 });

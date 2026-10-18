@@ -40,7 +40,7 @@ Hosting is Cloudflare Workers, with static sites as Workers static assets. The z
 | `invite.agentlink.4thtech.io` | Invite landing | `apps/invite` |
 | `pay.agentlink.4thtech.io` | Deposit page, isolated origin (M3-4) | Static site (path set by its task) |
 | `submit.agentlink.4thtech.io` | Submitter API and testnet faucet | `apps/submitter` |
-| `drop.agentlink.4thtech.io` | Encrypted drop (D-48, M1-27) | `apps/drop` |
+| `drop.agentlink.4thtech.io` | Encrypted drop (D-48, M1-27); Worker `agentlink-drop`, Custom Domain set in `apps/drop/wrangler.toml` (M1-27b; the owner confirms the name when he attaches the domain). Staging: Worker `agentlink-drop-staging` on `workers.dev` | `apps/drop` |
 | Assigned by its task | Cloud-agent demo, once it exists | `apps/cloud-agent` |
 
 **Phases (owner, 12 Oct 2026):**
@@ -66,12 +66,12 @@ Hosting is Cloudflare Workers, with static sites as Workers static assets. The z
 | `@4thtech-io/agentlink` (CLI + MCP stdio; the `@4thtech-io/*` libraries bundled in, OPS-REL-1; npm org `4thtech-io`, because the `@4thtech` scope was not available, owner decision 2026-10-16) | public `apps/cli` | `release.yml` (§4.1) | npm `next` (automatic) | Owner's click (`npm-publish`, D-52); a release that changes crypto also needs the owner's "merge" and an independent review (D-51) |
 | `@4thtech-io/types`, `crypto`, `chain`, `transport-nostr`, `storage`, `core`, `node`, `ui` | public `packages/*` | Not published: `"private": true`, bundled into `@4thtech-io/agentlink` (owner decision, 2026-10-16, OPS-REL-1). Publishing one later is a decision plus its own trusted publishers | — | — |
 | Claude Desktop extension bundle (06 §7) | public `apps/cli` | DECISION NEEDED: build, signing and distribution | — | Owner |
-| `@4thtech-io/occ-v2-abi` (ABIs + addresses) | contracts release artifacts | DECISION NEEDED (`development-process.md` §9.2) | npm `next` | Owner's click (`npm-publish`, D-52) |
+| `@4thtech-io/occ-v2-abi` (ABIs + addresses) | contracts release artifacts | Private in-repo workspace package, bundled into the CLI (D-83, `development-process.md` §9.2) | Not published | None: it ships inside the CLI release |
 | `OCCFeeVault`, `OCCNotary` (M1), `OCCRegistry` (M2) proxies and implementations | private `src/`, `script/` | §4.2 testnet (CI, private repo), §4.3 mainnet (by hand) | Testnets | Mainnet: owner by hand after an independent review, with a second person witnessing; `@denisjazbec`'s review recommended |
 | Contract upgrades and config changes | private repo + Safe | §4.4 (by hand) | Testnet Safe | Owner + Safe signers |
 | Submitter Worker (+ DO rate limits), `submit.` | public `apps/submitter` | Cloudflare deploy workflow (§4.5) | `workers.dev` (automatic) | Automatic after staging smoke (`production`, D-52) |
 | Testnet credits faucet | public `apps/submitter` | §4.5 | `workers.dev` | Part of the submitter; testnet chain IDs only, wherever it runs |
-| Encrypted drop Worker (+ DO quota counters, R2 bucket), `drop.` (D-48) | public `apps/drop` | Cloudflare deploy workflow (§4.5) | `workers.dev` (automatic) | Automatic after staging smoke (`production`, D-52), as for the submitter |
+| Encrypted drop Worker (+ DO quota counters, R2 bucket), `drop.` (D-48) | public `apps/drop` (`wrangler.toml`) | `deploy-drop.yml` (§4.5, M1-27b) | `workers.dev` (automatic) | Automatic after staging smoke (`production`, D-52), as for the submitter |
 | Static sites: landing, console, verify, invite, `pay.` deposit page (M3-4) | public, see §1.1 | Cloudflare deploy workflow (§4.6) | `workers.dev` (automatic) | Automatic after staging smoke (`production`, D-52) |
 | Cloud-agent demo instance (when it exists) | public `apps/cloud-agent` | §4.5 | `workers.dev` | Automatic after staging smoke (`production`, D-52) |
 | Public docs (D-29, D-57) | GitBook, synced from `docs-site/` on `main` by Git Sync | §4.9 (not a Workers deploy) | — | Merge to `main` publishes |
@@ -149,7 +149,7 @@ Testnet contract deploys stay CI-driven from the private repo (§4.2).
 1. `contracts-gate` green on the commit; the commit is tagged in the private repo.
 2. CI in the private repo runs `script/Deploy.s.sol` per chain with the per-chain config: **CreateX CREATE3**, deployer-guarded salts per 05 §9.1, all roles transferred to the testnet Safe in the same script, after a fork dry-run (05 §9.1). The testnet deployer key is a **repository secret** (the repo stays on GitHub Free, where private repositories have no environments, D-27). Protection is process-only: the workflow runs only by manual `workflow_dispatch`, broadcasts only after the owner's explicit "go", and refuses mainnet chain IDs; agents never approve or broadcast on their own. The secret is for testnets only and is deleted when the testnets end (D-71 (1)). Order: Base Sepolia first; Gnosis Chiado later (D-63 (1)), with the same testnet deployer key and campaign (card M1-3j).
 3. Post-deploy checks in CI: proxy addresses equal the campaign's address file (05 §9.1), and on Gnosis Chiado equal to the published Base Sepolia addresses; roles check; deployer holds no role.
-4. ABIs and addresses published as an `@4thtech-io/occ-v2-abi` prerelease (`next`); `@4thtech-io/chain` bumped by PR (`development-process.md` §9.3).
+4. ABIs and addresses imported into the private in-repo `@4thtech-io/occ-v2-abi` by PR (not published, D-83); `@4thtech-io/chain` bumped by PR (`development-process.md` §9.3).
 5. Faucet configured against the new vault (§4.5), on each chain only after that chain's deployment.
 
 **No explorer or Sourcify source verification on testnets.** The source stays private during the beta (D-11), and 05 §9 verifies at mainnet. Testnet deploys publish ABIs and addresses only.
@@ -208,7 +208,7 @@ DECISION NEEDED (owner): who witnesses when `@denisjazbec` is unavailable.
 - Contracts stay paused (05 §5.1). Order: role check (above) → wait until `getRoleGrantDelay` and `getTargetAdminDelay` return the configured values (deployment + 5 days) → the Safe unpauses (`PAUSE_ADMIN`) → smoke test → publish. Each step is recorded.
 - Smoke test with small amounts (after unpausing): deposit credits, `notarize`, `acknowledge`, verify the proof pack via `agentlink verify` and the verify page, withdraw the remaining credits.
 
-**Publishing:** addresses and ABIs in `@4thtech-io/occ-v2-abi` (`latest`, through §4.1); `@4thtech-io/chain` config PR; audit reports and verified source published; release notes; owner's sync file updated.
+**Publishing:** addresses and ABIs imported into the in-repo `@4thtech-io/occ-v2-abi` (not published, D-83); `@4thtech-io/chain` config PR; audit reports and verified source published; release notes; owner's sync file updated.
 
 ### 4.4 Contract upgrades and configuration changes
 
@@ -235,7 +235,7 @@ Every upgrade MUST have: the full test suite; an ERC-7201 storage-layout diff; a
 
 ### 4.5 Workers: submitter, faucet, encrypted drop, cloud-agent demo
 
-The Cloudflare deploy workflow does not exist yet; no app exists yet. This section and §4.6 are the **contract** for the task that builds it, together with the first deployable Workers (M1-10, submitter; M1-27, encrypted drop). Static sites join it with their tasks (M2-2, M2-5, M3-4 and the landing page).
+This section and §4.6 are the **contract** for the Cloudflare deploy workflows. The encrypted drop is the first deployable Worker and has its own workflow, `.github/workflows/deploy-drop.yml` (M1-27b), which implements the jobs below for one Worker; its specifics are in §4.5.1. The shared `deploy-cloudflare.yml` arrives with the submitter (M1-10) and may absorb the drop's jobs then. Static sites join with their tasks (M2-2, M2-5, M3-4 and the landing page).
 
 **Workflow `.github/workflows/deploy-cloudflare.yml`** (push to `main`; `permissions: {}` at the top; SHA-pinned actions; `timeout-minutes` on every job; no event data in `run:`; no job-level cancellation of deploys in flight):
 
@@ -255,7 +255,26 @@ The Cloudflare deploy workflow does not exist yet; no app exists yet. This secti
 | Alerts | Gas balance below threshold; error rate; queue depth; failed simulations spike. |
 | Encrypted drop | The R2 bucket and its 7-day lifecycle rule are created by the owner (`10-build-plan.md`, owner tasks); the Worker holds an R2 binding and its URL-signing key (a Worker secret, §6). Workers observability and request logging, Tail Workers and Logpush stay off for it in production, read back after each deploy (04 §4). Promotion is staging, then production automatically once staging smoke is green (D-52), as for the submitter. |
 | Rollback | Automatic in `deploy-production` (`wrangler rollback`). **DO migrations are forward-only**: a release containing one is marked in its release PR, carries a written forward-fix plan, and its automatic rollback is limited to Workers without the migration; the owner decides the rest. |
-| Account and tokens | Cloudflare 2FA. One API token per environment with least privilege: staging Workers Scripts only; production Workers Scripts and Routes plus `4thtech.io` zone DNS / Workers Routes. Agents never run `wrangler deploy` from a workstation, and the owner's Wrangler OAuth login is never used by agents or CI (§1.1). |
+| Account and tokens | Cloudflare 2FA. One API token per environment with least privilege: staging Workers Scripts only; production Workers Scripts and Routes plus `4thtech.io` zone DNS / Workers Routes. The drop's tokens also need R2 read (lifecycle read-back, §4.5.1). Agents never run `wrangler deploy` from a workstation, and the owner's Wrangler OAuth login is never used by agents or CI (§1.1). |
+
+#### 4.5.1 Encrypted drop (`deploy-drop.yml`, M1-27b)
+
+| Topic | Rule |
+|---|---|
+| Trigger | Push to `main` touching `apps/drop/**`, `packages/crypto/**`, the lockfile, the setup action or the workflow; manual dispatch. `ci-green` first waits for this commit's `ci-gate` and `security-gate`, as `release.yml` does. |
+| Workers and buckets | Staging: Worker `agentlink-drop-staging` on `workers.dev`, bucket `agentlink-drop-staging`. Production: Worker `agentlink-drop` on the Custom Domain `drop.agentlink.4thtech.io` only (no `workers.dev`, no preview URLs), bucket `agentlink-drop-prod`. The top level of `wrangler.toml` is local development only (`agentlink-drop-local`). |
+| Bindings | `DROP_BUCKET` (R2), `DROP_STATE` (Durable Object `DropState`, migration `v1`, SQLite-backed). Repeated per environment (bindings are not inherited); `apps/drop/test/smoke-config.test.ts` reads them back for each environment. |
+| Worker secret and vars | Secret `DROP_URL_KEY` (32 random bytes, base64url), set per environment by the owner with `wrangler secret put` (§6); never in `wrangler.toml`, GitHub, logs or sync files. Var `DROP_CORS_ORIGINS` (exact `https://host` console origins, comma-separated; empty = no CORS headers) per environment in `wrangler.toml`, so the browser allowlist is reviewed in PRs and asserted by `smoke-config.test.ts` (staging: empty until a staging console exists; production: `https://console.agentlink.4thtech.io`). A Worker secret of the same name fails the deploy. |
+| Plan and CPU | `limits.cpu_ms = 30000` in every environment (a commit hashes up to 100 MiB, about 0.4 s of CPU; IR-M1-27a-1 L-3). Needs the Workers paid plan. |
+| Skips or fails | Until the owner has set them, a missing `CLOUDFLARE_API_TOKEN` or `CLOUDFLARE_ACCOUNT_ID` in the environment, a Worker that does not exist yet (HTTP 404) or a missing `DROP_URL_KEY` on it (the Cloudflare secrets listing, names only) skips the deploy with a notice; the run stays green and nothing later runs. A token the API refuses (401, 403, any other error) or a malformed answer fails the job loudly. |
+| Ordering | Runs can finish out of order. Before the production deploy the job checks that the run's commit is still the head of `main` (`gh api`); if not, it skips with a notice and the newer run owns production. The job-level concurrency group `deploy-drop-production` (no cancellation) serializes runs. A rollback is never gated on the head of `main`: once this run has deployed, its version is live and is rolled back on failure even if `main` moved on. |
+| Build once | `build` (no credentials) bundles with `wrangler deploy --dry-run`; both environments deploy that `index.js` with `--no-bundle` after checking its SHA-256. |
+| Staging smoke | `smoke-staging` (no credentials) runs `apps/drop/test/smoke-remote.test.ts` against the staging origin: `/v1/health`; an unsigned upload answers 401 (503 would mean the secret is missing); a signed upload, GET (bytes and headers) and DELETE round trip with a fresh random drop key; an object with a 5-second expiry is served, then refused with 410 `expired`. The same steps run on every `pnpm test` under Miniflare (`test/smoke.test.ts`). |
+| Production checks | HTTP only (no repository code runs against production): `/v1/health` answers `{"ok":true}` and an unsigned upload answers 401, retried for up to 150 s. Then the read-backs. |
+| Read-backs | After each deploy, in both environments: the Worker's live settings (`/workers/scripts/<name>/script-settings`: Logpush, observability, invocation logs and traces off, no Tail Workers) and the bucket's lifecycle rule (`/r2/buckets/<bucket>/lifecycle`: an enabled whole-bucket rule deleting objects at an age of at most 604 800 s). `wrangler.toml` also sets observability, logs, traces and Logpush off and source-map upload off. |
+| Rollback | Any failure or cancellation after the production deploy started: `wrangler rollback` to the version recorded before the deploy, then a check that this version is live (`wrangler deployments status`) and a health re-check; `freeze` sets `DEPLOY_FREEZE`. With no recorded version (first deploy), the freeze alone. Rehearsal: dispatch the workflow with `rehearse-rollback` (staging: back to the previous version, check it, forward again; needs two staging deploys). |
+| Rate limiting | A Cloudflare WAF rate-limiting rule on the zone, in front of the drop host (IR-M1-27a-1 M-2), so floods never reach the Worker's Durable Objects. Proposed values (owner confirms when creating it): requests with hostname `drop.agentlink.4thtech.io`, counted per IP, 100 requests per 10 seconds, action Block for 10 seconds (the Free plan's period and duration). The Worker's own per-IP and per-key limits (07 §5.4) stay the second line. Staging on `workers.dev` has no zone rule; it relies on the Worker's limits. |
+| G-40 (open) | Assumption until G-40 is resolved: `staging` serves only testing and CI, and `production` (`drop.agentlink.4thtech.io`) is the beta drop that the M1–M2 testnet clients use, as §1 states for services. If G-40 decides otherwise, only the client default and this row change. |
 
 ### 4.6 Static sites (landing, console, verify, invite, pay)
 
@@ -329,9 +348,10 @@ Secrets MUST NEVER appear in a repository (incl. `sync`), logs, CI output, Curat
 | Two ops hardware keys (`PAUSER`, `GUARDIAN`) | Emergency pause; cancelling unexpected scheduled operations | Dedicated hardware wallets, never a Safe-signer device, CI, agent machine or hot wallet | Tali and Denis, one each (proposed, 05 §5.1; owner confirms at merge) | On suspicion: the Safe revokes both roles at once via `PAUSE_ADMIN` |
 | Submitter gas keys | Gas per chain and environment | Worker secrets (`wrangler secret put`), staging and production | Owner | On suspicion; DECISION NEEDED: periodic interval |
 | Faucet key | Testnet credits | Worker secret per environment (testnet chains only) | Owner | As needed |
-| Drop URL-signing key | MAC key for the drop's signed GET and PUT URLs (D-48) | Worker secret per environment (`wrangler secret put`) | Owner | On suspicion; rotate with an overlap window (old key accepted for 7 days) so outstanding links stay valid |
+| Drop URL-signing key `DROP_URL_KEY` | MAC key for the drop's signed GET and PUT URLs (D-48); 32 random bytes, base64url | Worker secret per environment (`wrangler secret put`); the deploy skips until it exists (§4.5.1) | Owner | On suspicion; rotate with an overlap window (old key accepted for 7 days) so outstanding links stay valid. The overlap is not implemented yet: until it is, rotating invalidates outstanding drop links |
+| Drop CORS origins `DROP_CORS_ORIGINS` | Console origins allowed to fetch drop objects (08 §7); not a secret | Var per environment in `apps/drop/wrangler.toml` (reviewed in PRs; never also a Worker secret) | PR + review | When the console origin changes |
 | Encrypted drop R2 binding | Ciphertext storage for the drop (D-48) | Worker binding in `wrangler.toml` per environment; no user secrets or keys | Owner | Not a secret; access follows the Cloudflare deploy tokens below |
-| Cloudflare deploy tokens | CI deploys | `CLOUDFLARE_API_TOKEN` as Environment secret of `staging` and of `production` (one token each); `CLOUDFLARE_ACCOUNT_ID` as Environment variable | Owner | DECISION NEEDED: interval (proposed 90 days) |
+| Cloudflare deploy tokens | CI deploys | `CLOUDFLARE_API_TOKEN` as Environment secret of `staging` and of `production` (one token each); `CLOUDFLARE_ACCOUNT_ID` as Environment variable (and, for the drop, optional `DROP_STAGING_URL` in `staging`) | Owner | DECISION NEEDED: interval (proposed 90 days) |
 | Owner's Wrangler OAuth login | Owner's own Cloudflare administration | Owner's machine | Owner (personal) | Never used by agents or CI |
 | R2 test bucket token | Storage-adapter integration tests (M1-6) | Bucket-scoped token; location decided with the e2e credentials (`development-process.md` §10); never reachable from PR workflows | Owner | On suspicion |
 | `DEPLOY_FREEZE_TOKEN` | Lets CI set `DEPLOY_FREEZE` (`release.yml` → `freeze`, `deploy-freeze.yml`); creation steps and round-trip test in `ci-cd.md` §8 | Environment secret of `deploy-freeze` (`main` only); can write Actions variables only | Owner | DECISION NEEDED (`ci-cd.md`, owner setup checklist §8): fine-grained token (≤ 90 days) or GitHub App |
@@ -381,8 +401,8 @@ Every automatic rollback sets `DEPLOY_FREEZE`; the owner clears it after the inc
 | Artifact | Rollback | Limits |
 |---|---|---|
 | npm packages | **Automatic:** `publish-latest` moves `latest` back to the recorded version after a failed health check; after a failed smoke test, `rollback-latest` does the same after one click (D-52). **Manual (owner, 2FA):** `npm dist-tag add <pkg>@<previous> latest`; `npm deprecate` the bad version; publish a patch | Never unpublish; the first version of a package has no previous version (deprecate instead); users who installed keep the bad version until they update |
-| `@4thtech-io/occ-v2-abi` | Same as npm | Wrong addresses are Critical: deprecate immediately |
-| Submitter / faucet / encrypted drop / cloud-agent demo Worker | **Automatic:** `deploy-production` runs `wrangler rollback` to the recorded versions after a failed health check. Manual: redeploy the previous release through the pipeline | DO migrations are forward-only (§4.5) |
+| `@4thtech-io/occ-v2-abi` | Revert the import PR and re-release the CLI | Wrong addresses are Critical: fix and release immediately |
+| Submitter / faucet / encrypted drop / cloud-agent demo Worker | **Automatic:** `deploy-production` runs `wrangler rollback` to the recorded versions after a failed health check (drop: also after a failed read-back, §4.5.1; rehearsed on staging with the `rehearse-rollback` dispatch). Manual: redeploy the previous release through the pipeline | DO migrations are forward-only (§4.5); the drop's first production deploy has no earlier version to roll back to (freeze only) |
 | Static sites | **Automatic:** back to the previous version (hash-identical) | Clients may cache; service-worker update needed |
 | Contracts (upgradeable, Notary before freeze) | Manual (§3.2): pause charging; schedule an upgrade back to the previous implementation | 7-day delay (05 §5); storage layout must stay compatible; users can always withdraw |
 | Notary after freeze | None | Records are permanent; a new deployment needs a spec change |

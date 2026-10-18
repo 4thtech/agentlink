@@ -1,6 +1,6 @@
 {
   "name": "@4thtech-io/log",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Redacting structured logger and secret-canary test helper. Zero dependencies.",
   "license": "MIT",

@@ -144,7 +144,7 @@ The signed `maxFee` (§4) protects every payer even if a change happens between 
 
 - **Verifiable quotes.** `quote()` is a public view function; anyone can compare it with what a client shows.
 - **USD in every quote.** The price list in `agentlink_status` (06 §2.1, D-53) and every paid-action result show the price in USD before anything is charged.
-- **Published configuration.** At each deployment, 4thTech publishes per chain, in these docs and in `@4thtech-io/occ-v2-abi`: contract addresses, treasury Safe address, allowlisted fee tokens (with issuer source), fees, caps, `minDeposit` and the integrator multiple. Each entry can be checked against the chain.
+- **Published configuration.** At each deployment, 4thTech publishes per chain, in these docs and in the in-repo `@4thtech-io/occ-v2-abi` (private, bundled into the CLI, D-83): contract addresses, treasury Safe address, allowlisted fee tokens (with issuer source), fees, caps, `minDeposit` and the integrator multiple. Each entry can be checked against the chain.
 - **Permissionless sweep.** `sweep` can be called by anyone and only ever pays the published treasury.
 - **Events.** Every charge, deposit, withdrawal and configuration change emits an event (05 §6).
 

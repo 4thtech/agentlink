@@ -72,11 +72,26 @@ export default defineConfig({
         test: {
           name: 'node',
           environment: 'node',
-          include: ['src/**/*.test.ts'],
+          // M1-27b: the deploy configuration assertions (wrangler.toml, deploy-drop.yml).
+          include: ['src/**/*.test.ts', 'test/smoke-config.test.ts'],
           testTimeout: 20_000,
         },
       },
+      // M1-27b: the deploy smoke test against a deployed drop. The deploy workflow sets
+      // DROP_SMOKE_URL (the staging origin); without it the suite is skipped. Plain fetch, no secrets.
+      {
+        resolve,
+        test: {
+          name: 'drop-smoke-remote',
+          environment: 'node',
+          include: ['test/smoke-remote.test.ts'],
+          provide: { dropSmokeUrl: process.env.DROP_SMOKE_URL ?? '' },
+          testTimeout: 60_000,
+        },
+      },
       workerProject('drop', ['test/drop.test.ts'], testBindings),
+      // M1-27b: the same smoke steps as the deploy workflow, against the Worker under Miniflare.
+      workerProject('drop-smoke', ['test/smoke.test.ts'], testBindings),
       workerProject('drop-global-cap', ['test/global-cap.test.ts'], {
         ...testBindings,
         DROP_GLOBAL_BYTES_PER_DAY: String(MiB),
