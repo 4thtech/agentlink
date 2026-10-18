@@ -423,7 +423,7 @@ Notes:
 - **Testnet faucet:** a 4thTech-run `depositFor` faucet credits testnet agents (M1) so testers never need gas.
 - Verify on Sourcify and explorers at mainnet.
 - Deployer key: on testnets a testnet-only key (D-64, D-71 (1)); on mainnet a separate key from the owner's Trezor hardware wallet, used only for deployment (D-71 (1), superseding D-64's shared key), so testnet and mainnet addresses differ (§9.1). All roles are transferred to the Safe in the same script; the deployer retains no role (CI check). Mainnet contracts are initialised paused and unpaused by the Safe once the configured grant and target admin delays are in effect (§5).
-- Publish ABIs and addresses as `@agentlink/occ-v2-abi`.
+- Export ABIs and addresses as release artifacts, imported into the private in-repo package `@4thtech-io/occ-v2-abi` and bundled into the CLI; never published to npm (D-83).
 
 ### 9.1 Salts, addresses and the deployer key (G-8)
 

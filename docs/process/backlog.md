@@ -1537,7 +1537,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The ABI includes the G-4 events `RecordSkipped` and `ReceiptSkipped` (05 §6).
   - Decided (G-10, D-83, Tali, 2026-10-18): `@4thtech-io/occ-v2-abi` is a private workspace package in `packages/occ-v2-abi`, built from the exported ABI/addresses/manifest artifacts and the shared vectors, bundled into the CLI and not published to npm. A PR imports the artifacts; CI verifies the manifest. (The rename from `@agentlink/*` to `@4thtech-io/*` is in flight in #250; until it lands the name reads `@agentlink/occ-v2-abi`.)
   - `@4thtech-io/chain` pins the imported release exactly; Renovate never automerges it.
-  - Follow-up (IR-M1-3b-1 I-4): no `@agentlink/occ-v2-abi` release is built from a contracts build whose concrete ABI differs from the interface in mutability (the `depositWithAuthorization` stub until M1-3c); generate the ABI from the interface, or publish only after M1-3c.
+  - Follow-up (IR-M1-3b-1 I-4): no `@4thtech-io/occ-v2-abi` import is taken from a contracts build whose concrete ABI differs from the interface in mutability (the `depositWithAuthorization` stub until M1-3c); generate the ABI from the interface, or import only after M1-3c.
   - Spec note (IR-M1-3b-1 choices 1 and 10, proposed; owner confirms at merge): 05 §7 lists the inherited OpenZeppelin errors that appear in the ABI (`AccessManagedUnauthorized`, `ReentrancyGuardReentrantCall`, `SafeERC20FailedOperation`, the UUPS and ERC-1967 errors) and decides whether a dedicated `ValueMismatch()` replaces `TransferFailed()` for a native value mismatch.
 - **Acceptance:**
   - `packages/occ-v2-abi` is private (`"private": true`), is bundled into the CLI build, and no workflow publishes it.
@@ -1570,7 +1570,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `deployer-holds-no-role` passes on Base Sepolia, and neither CreateX nor any CREATE3 intermediate address holds a role; fork dry-run in CI before every broadcast.
   - Negative tests for the salt rules (05 §9.1): a salt whose guard bytes differ from CreateX's `msg.sender`, a zero guard, byte 20 not `0x00`, and a predicted address (or CREATE3 intermediate address) that already has code or a nonzero nonce each make the script fail before broadcast; a fork test shows the offline address computation equals the address CreateX deploys to; a test shows every call to the stage deployer reverts.
   - The stage fits the Chiado block gas limit and per-transaction gas cap on a Chiado fork, and its init code is within EIP-3860 (so M1-3j can reproduce the addresses). Proposed (D-64 (2)): it also fits, with margin, the block gas limit and per-transaction gas cap of Base, Gnosis and each planned M4 mainnet, checked on forks, and a test fails if the guard layout or a label would change the committed address file.
-  - Addresses published in the next `@agentlink/occ-v2-abi` prerelease (M1-3f).
+  - Addresses imported into the in-repo `@4thtech-io/occ-v2-abi` (M1-3f, D-83).
   - Negative tests for the config assertions: an allowlisted token with a zero fee or cap, the native coin on a non-Gnosis chain, and a fee-on-transfer mock each make the script fail.
   - Pre-audit conditions (AUDIT-FABLE-OCCv2-1 FA-6, FA-7; proposed, owner confirms at merge; prerequisites of the Base Sepolia broadcast):
     - Config-only rules (FA-6): the contracts do not enforce them, so the script itself asserts them before any broadcast, not only review or M1-14: the native coin is allowlisted only on Gnosis chain IDs, every allowlisted token has a nonzero `NOTARIZE` and `REGISTER` fee and cap, no allowlisted token is fee-on-transfer or rebasing, and the target chain has Cancun (EIP-1153). The Base Sepolia run's assertion output is attached to the PR.
@@ -1592,7 +1592,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Fork dry-run first; the predictions must equal the campaign's address file, which equals the published Base Sepolia addresses; otherwise the run fails closed (05 §9.1).
   - Proposed: deploy soon after Base Sepolia, to shorten the squat window (05 §9.1 control 3). D-71 (1) (15 Oct 2026): the key is a repository secret with process-only protection; the run is a manual `workflow_dispatch` and broadcasts only after the owner's explicit "go"; the workflow refuses mainnet chain IDs (with a test); agents never approve or broadcast on their own.
   - Hard prerequisite of M2-4a (Registry stage on both testnets) and M3-2c (mainnet), so two-chain zero-config selection (D-40), the native-xDAI fee path (D-46) and the Gnosis gas limits run on a live testnet before mainnet. Not an M1-GATE blocker (gate residual in M1-3g, proposed).
-  - After the run: the faucet is configured against the Chiado vault (M1-10b); the next `@agentlink/occ-v2-abi` prerelease and the `@agentlink/chain` config list Chiado.
+  - After the run: the faucet is configured against the Chiado vault (M1-10b); the next `@4thtech-io/occ-v2-abi` import and the `@4thtech-io/chain` config list Chiado.
 - **Acceptance:**
   - Predicted and deployed proxy and AccessManager addresses equal the published Base Sepolia addresses (script output in PR).
   - `deployer-holds-no-role` and the M1-3g post-deploy checks pass on Chiado; the stage fits Chiado's block gas limit and per-transaction gas cap.
@@ -4241,7 +4241,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Invariants:** I-6, I-10
 - **Scope:**
   - Only the audited commit (bytecode rebuilt and compared); fork dry-run; the owner runs the deploy locally, signing with the mainnet deployer key on his Trezor hardware wallet (D-71 (1); tooling M3-2d), while a second person (by agreement, @denisjazbec) witnesses and independently verifies; identical addresses on both mainnets, equal to the mainnet campaign's address file and different from the testnet addresses (05 §9.1, D-71 (1)); the dry-run checks the audited build's stage against every planned mainnet chain's limits (proposed); all roles to the Safes; deployer roles revoked in the same script.
-  - New `@agentlink/occ-v2-abi` version with mainnet addresses.
+  - New `@4thtech-io/occ-v2-abi` import with mainnet addresses (D-83).
 - **Acceptance:**
   - Scripted check "deployer holds no role" passes on both chains; delays equal `docs/roles.md`; addresses identical on both mainnets and equal to the mainnet campaign's address file; deployed bytecode matches the audited build; witness record stored; the per-chain config lists the mainnet addresses (D-71 (1)).
 
