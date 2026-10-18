@@ -1,6 +1,6 @@
 # @talirezun — sync
 **Headline:** M1b in progress: ~35 PRs merged on 2026-10-17 (wave 1 + most of waves 3–4); npm latest still 0.1.0; two-Mac M1 gate test started
-_Updated 2026-10-17 13:00 UTC · claude-code / claude-opus-5-5 · orchestrator session 2026-10-17_
+_Updated 2026-10-18 06:30 UTC · claude-code / claude-opus-5-5 · orchestrator_
 
 ## Now
 - **2026-10-17 merged:** live relay subscriptions; `init --harness claude-desktop`; Gemini CLI vs Antigravity detection; "no card from your owner yet" status/doctor; owner recovery without an attached agent; local approval server on localhost (passkey-ready, D-79); terms idempotency; SSRF-safe fetch + path guard (Windows fixes); storage adapters; files/proof policy engine; EIP-712 proof hashing + vectors; ALKP/ALKR backup formats spec (D-82); G-26/G-20 resolved (D-80/D-81); Node ≥ 22.14 check; contact names instead of addresses; changelog fragments (`changelog.d/`); CI gates (bundle-check, e2e in merge gate, Windows/macOS path tests, sync pin guard); knowledge/ consolidated; beginner setup page; two-machine dogfood.
@@ -8,6 +8,7 @@ _Updated 2026-10-17 13:00 UTC · claude-code / claude-opus-5-5 · orchestrator s
 - **Two-Mac gate run 1:** pairing + receive passed; sends hit AMBIGUOUS_CONTACT (stale duplicate test contact; product behaved correctly). Rerun with fresh agent names pending.
 
 ## In flight
+- 2026-10-18: merging owner change-code, contacts rename/remove, passkey unlock (M1-8e), encrypted drop Worker (M1-27a), STREAM/Revocation vectors, invite approval shows inviter, storage integration CI; nightly two-machine CI live.
 - #228 M1-1k ALKP/ALKR code (queued); #237 docs pass; e2e J8 flake fix; #218 encrypted drop and #230 STREAM/Revocation vectors await owner confirmation of spec details.
 
 ## Next
