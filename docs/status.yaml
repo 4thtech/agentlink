@@ -245,7 +245,7 @@ areas:
         summary: "`owner init` signs the agent's first card in the same owner step, so a new agent can pair; the owner key signs only the agent card and the defined owner decisions (M1-8h)."
       - name: "Local approval server"
         state: done
-        prs: [207, 225, 246]
+        prs: [207, 225, 247]
         summary: "A small server on localhost (loopback only, with a one-time token, host and origin checks and an owner-presence step) that will serve the approval page on `http://localhost:<port>` (M1-8d, M1-31). Owner presence there is the owner code or, after a one-time setup with the owner code, a localhost passkey (WebAuthn PRF, M1-8e). The CLI does not open it yet."
       - name: "Owner recovery without an attached agent"
         state: done
@@ -284,7 +284,7 @@ areas:
         summary: "One owner key shared by several local agents, each on its own harness: `owner add-agent` and `init --harness` (M1-9t, D-78). Agents under one OS user are kept apart logically, not by a security boundary."
       - name: "Local approval page"
         state: in-progress
-        prs: [207, 225, 246]
+        prs: [207, 225, 247]
         summary: "The localhost server behind it is merged (see the Node runtime), with a functional, unstyled page that approves with the owner code or a localhost passkey (M1-8e). The designed page for owner approvals and settings, and opening it from the CLI, are still to build (M1b)."
       - name: "Beginner setup page"
         state: done
