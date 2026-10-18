@@ -659,7 +659,7 @@ The default store for files over 12 255 bytes, so file exchange needs no setup. 
 
 Applied by the core for every file (06 §3 `files.storage`):
 
-1. File of at most 12 255 bytes → `inline` (§5.3).
+1. File of at most 12 255 bytes → `inline` (§5.3), unless the payload would then exceed 17 136 bytes: the largest inline files move to steps 2–5 until it fits, and a payload that still does not fit is `rejected` `PAYLOAD_TOO_LARGE` (04 §3.4 inline packing, G-27, D-85).
 2. `files.storage: own` → own storage; if none is configured → `needs_setup`. Never the drop.
 3. `files.storage: auto` (default) and own storage configured → own storage. No silent fallback to the drop if own storage fails.
 4. `auto` or `drop`, within the drop limits (size cap, weekly quota) → `drop`.
