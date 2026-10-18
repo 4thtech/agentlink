@@ -8,6 +8,7 @@ import { nodeOwnerDeps, type OwnerCommandDeps } from './deps.js';
 import { ownerHandler } from './owner-init.js';
 
 export { nodeOwnerDeps, type OwnerAgent, type OwnerCommandDeps } from './deps.js';
+export { contactsManageHandler } from './contacts-manage.js';
 export { PROVISIONAL_CARD_RELAYS } from './card-relays.js';
 
 /** The handlers to register with createDispatcher. */

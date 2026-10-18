@@ -20,9 +20,9 @@ import {
   signedOwnerActionSchema,
 } from './index.js';
 import { expectReject, expectRoundTrip } from './testing/assert.js';
-import { AGENT_EVM, CONTACT_A, OWNER_NOSTR, signed } from './testing/fixtures.js';
+import { AGENT_EVM, CONTACT_A, OWNER_NOSTR, b64u, signed } from './testing/fixtures.js';
 
-const NONCE = 'X'.repeat(22);
+const NONCE = b64u(16, 'X');
 
 const renameAction = (
   params: Record<string, unknown> = { contact: CONTACT_A, alias: 'Tali laptop' },

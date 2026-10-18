@@ -2,7 +2,8 @@
 //
 // A name appears only as the owner's alias or the restricted name with its identity label
 // (`display`, rendered by renderContactName), never as the name the contact declared (D-53, I-5).
-// The list carries no safety code and no message text. `contacts --verify <id>` is an owner
+// The list carries no safety code and no message text. Each contact's ID is listed for
+// `contacts rename | remove` † (M1-9za), which the dispatcher guards and the owner handler runs. `contacts --verify <id>` is an owner
 // operation (M1-9m): the dispatcher already requires an interactive terminal for it, and until that
 // card lands this handler says it is not available.
 import { renderContactName } from '@agentlink/core';
@@ -17,8 +18,14 @@ import { terminalOneLine } from '../terminal/sanitize.js';
 import { TEXT, createDeps, fill, printAll, withAgent, type CommandDeps } from './shared.js';
 import { renderCopy } from '../tools/strings/index.js';
 
-export function createContactsHandler(deps: CommandDeps = createDeps()): CommandHandler {
+export function createContactsHandler(
+  deps: CommandDeps = createDeps(),
+  /** `contacts rename | remove` † (M1-9za): the owner handler the subcommands are handed to. */
+  manage?: CommandHandler,
+): CommandHandler {
   return (context) => {
+    const sub = context.parsed.positionals[0];
+    if (manage !== undefined && (sub === 'rename' || sub === 'remove')) return manage(context);
     if (context.parsed.positionals.length > 0) {
       context.output.printError(DISPATCH_TEXT.badArguments);
       return Promise.resolve(EXIT_USAGE);
@@ -54,6 +61,8 @@ export function createContactsHandler(deps: CommandDeps = createDeps()): Command
             checked,
             fingerprint: terminalOneLine(contact.ownerFingerprint.short),
           }),
+          // M1-9za: the ID `contacts rename` and `contacts remove` take (04 §2.9; checked hex).
+          fill('   ID {id}', { id: terminalOneLine(contact.id) }),
         );
       });
       printAll(context, lines);

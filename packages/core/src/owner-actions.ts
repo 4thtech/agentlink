@@ -8,7 +8,9 @@
 //   batch that is authentic and fresh but does not match burns its nonce in the same transaction,
 //   so it can never apply later (04 §2.5.2). A refused single op writes nothing (07 §3.4). A
 //   `contact.check` is routed to ContactBook.applyContactCheck (M1-7c-b), which recomputes the
-//   pairing digest from the stored pair; `agent.revoke` is applied by M1-7h.
+//   pairing digest from the stored pair; `agent.revoke` is applied by M1-7h. `contact.rename` and
+//   `contact.remove` (M1-9za) change one stored contact: the owner alias (06 §2.1 rule 1), or the
+//   07 §3 tombstone. The nonce row is their audit record; nothing is sent to the contact.
 // - loadPolicy(): the G-6 loader. The stored `policy.set` is re-verified on every load and its
 //   version must equal the KeyStore high-water mark; the defaults are used only while the mark is 0
 //   and no row exists. Anything else fails closed (policy-engine.ts).
@@ -31,6 +33,7 @@ import { isCommitmentAction } from './commitments.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import type { ContactBook } from './contacts.js';
 import type { IdentityService } from './identity.js';
+import { isRestrictedAlias } from './names.js';
 import {
   computeActionDigest,
   ownerActionHash,
@@ -237,6 +240,9 @@ export class OwnerActions {
         return this.#applyPolicy(text, value, base);
       case 'contact.check':
         return this.#applyContactCheck(value);
+      case 'contact.rename':
+      case 'contact.remove':
+        return this.#applyContactChange(value, base);
       case 'agent.revoke': {
         // Verified for the report, applied elsewhere: revocation delivery is M1-7h. Nothing is
         // written here.
@@ -259,6 +265,69 @@ export class OwnerActions {
     const outcome = await this.#contacts.applyContactCheck(value);
     if (outcome.status === 'refused') return refused('contact.check', outcome.reason);
     return { status: 'applied', op: 'contact.check' };
+  }
+
+  /**
+   * `contact.rename` and `contact.remove` (M1-9za; 04 §2.5.1; 06 §2.1 rule 1; 07 §3; 02 F-14). The
+   * object checks and the nonce first. Then the op's rule: the alias must already be its own
+   * restricted form (`isRestrictedAlias`), and the contact must be stored and not removed (a revoked
+   * contact is never removed: removing never changes `revoked`, 07 §3). In one store transaction the
+   * nonce is checked again and recorded (the audit row: op, action hash, applied time) and the
+   * contact row is written: the sealed alias with `name_source` `owner`, or status `removed`, which
+   * keeps the keys so later envelopes from them are dropped. A refusal writes nothing. Nothing is
+   * sent to the contact.
+   */
+  async #applyContactChange(
+    value: unknown,
+    base: OwnerActionCheckContext,
+  ): Promise<OwnerActionOutcome> {
+    const shaped = signedOwnerActionSchema.parse(value);
+    const usedBefore = await this.#nonceUsed(shaped.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) return this.#report(fromVerdict(verdict));
+    const { signed, actionHash } = verdict;
+    const { body } = signed;
+    if (body.op !== 'contact.rename' && body.op !== 'contact.remove') {
+      return this.#report(refused(body.op, 'malformed'));
+    }
+    const op = body.op;
+    const contactId = body.params.contact;
+    let sealedAlias: Sealed | undefined;
+    if (body.op === 'contact.rename') {
+      if (!isRestrictedAlias(body.params.alias)) return this.#report(refused(op, 'alias_invalid'));
+      sealedAlias = await seal(this.#ctx, 'contacts', 'name', [contactId], body.params.alias);
+    }
+    const now = base.now;
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: body.nonce }) !== undefined) {
+        return refused(op, 'nonce_used');
+      }
+      const row = tx.get('contacts', { contact_id: contactId });
+      if (row === undefined || row.status === 'removed') return refused(op, 'contact_unknown');
+      if (sealedAlias !== undefined) {
+        tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+        tx.update(
+          'contacts',
+          { contact_id: contactId, status: row.status },
+          { name: sealedAlias, name_source: 'owner', updated_at: now },
+        );
+        return { status: 'applied', op };
+      }
+      if (
+        row.status === 'revoked' ||
+        tx.get('revoked_agents', { agent_evm: contactId }) !== undefined
+      ) {
+        return refused(op, 'contact_revoked');
+      }
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      tx.update(
+        'contacts',
+        { contact_id: contactId, status: { in: ['active', 'blocked'] } },
+        { status: 'removed', updated_at: now },
+      );
+      return { status: 'applied', op };
+    });
+    return outcome.status === 'refused' ? this.#report(outcome) : outcome;
   }
 
   async #nonceUsed(nonce: string): Promise<boolean> {

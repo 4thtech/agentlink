@@ -31,7 +31,7 @@ export const TOOL_TEXT = Object.freeze({
     "Call agentlink_list_contacts to see the user's contacts, then use a contact's id or name.",
   contactAmbiguous: 'More than one contact matches that name, so nothing was done.',
   contactAmbiguousNextStep:
-    'Ask the user which of these contacts they mean, then call the tool again with its id.',
+    'Ask the user which of these contacts they mean, then call the tool again with its id. If two contacts share a name, the user can rename or remove one in their own terminal with agentlink contacts rename or agentlink contacts remove.',
 
   // agentlink_get_approval (06 §2.5)
   approvalPending: "The owner hasn't decided on this request yet.",

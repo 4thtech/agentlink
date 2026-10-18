@@ -108,9 +108,16 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
   },
   {
     name: 'contacts',
-    usage: ['agentlink contacts', 'agentlink contacts --verify <id>       †'],
+    usage: [
+      'agentlink contacts',
+      'agentlink contacts --verify <id>       †',
+      'agentlink contacts rename <contactId> <name> [--agent <name>]   †',
+      'agentlink contacts remove <contactId> [--agent <name>]   †',
+    ],
     guard: 'owner',
-    guardWhen: (parsed) => parsed.values['verify'] !== undefined,
+    // `--verify` (M1-9m) and the `rename` and `remove` subcommands (M1-9za) are owner operations;
+    // the plain list is not.
+    guardWhen: (parsed) => parsed.values['verify'] !== undefined || parsed.positionals.length > 0,
     options: { ...AGENT, verify: { type: 'string' } },
   },
   {

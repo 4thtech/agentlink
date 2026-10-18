@@ -185,7 +185,8 @@ describe('contact.remove (M1-9za; 04 §2.5.1; 07 §3; 02 F-14)', () => {
     expect(await a.client.envelopes.processReceived()).toEqual([
       { envelopeId: built.envelope.id, outcome: 'dropped', reason: 'removed', flagged: false },
     ]);
-    expect(await a.store.transaction((tx) => tx.count('requests'))).toBe(0);
+    expect(await a.client.inbox.counts()).toEqual({ inbox: [], requests: 0 });
+    expect(await a.store.transaction((tx) => tx.count('held_envelopes'))).toBe(0);
   });
 
   it('refuses an already removed or unknown contact', async () => {

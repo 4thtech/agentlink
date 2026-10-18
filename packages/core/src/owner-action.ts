@@ -57,6 +57,8 @@ export type OwnerActionRefusal =
   | 'commitment_in_batch'
   | 'item_refused'
   | 'contact_unknown'
+  | 'contact_revoked'
+  | 'alias_invalid'
   | 'pairing_unavailable'
   | 'unsupported_op'
   // store side (owner-actions.ts)
@@ -285,9 +287,12 @@ export function verifyOwnerAction(
       return match('unsupported_op');
     case 'approval.cancel':
     case 'policy.set':
+    case 'contact.rename':
+    case 'contact.remove':
     case 'agent.revoke':
       // Their rules need the store (cancel: an approved row; policy.set: the version above, already
-      // checked; agent.revoke: none) and are applied by the store side.
+      // checked; contact.rename and contact.remove: a stored contact, M1-9za; agent.revoke: none)
+      // and are applied by the store side.
       break;
   }
   return { ok: true, signed, actionHash: ownerActionHash(input) };
