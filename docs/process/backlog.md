@@ -1749,7 +1749,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Chain client (`@4thtech-io/chain`)
 
 #### M1-4a · chain: config, clients, typed-data builders, parity
-- **Status:** in review (#276, 2026-10-18) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#276, merged 2026-10-18; IR-M1-4a-2 R-1 to R-3 carried into M1-4b) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain
 - **Depends on:** M1-1j, M1-1g, M1-3f, M1-14
 - **Spec:** 07 §6.1, §6.2; 03 §7; 05 §8
@@ -1763,7 +1763,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Every Record gets a fresh 32-byte CSPRNG salt; the builder takes no salt from its caller and exposes no salt derivation (04 §5, D-61).
 
 #### M1-4b · chain: quotes, USD display, credits
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (#PRNUM, 2026-10-19; redo of #277) · **Size:** M · **Tier:** Opus · **Security:** S2 (touches packages/node, IR-M1-4b-1 L-5) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain
 - **Depends on:** M1-4a (G-30 resolved by D-46)
 - **Spec:** 07 §6.2; 06 §2.1 (`agentlink_status` `credits` and `prices`, D-53), §2.4; 02 F-45, F-47; 03 §4.4; 12 §4–§5; D-46
@@ -1789,6 +1789,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Submitter client (`/v1/notarize`, `/v1/receipt`, `/v1/status`) with failover across a list; direct mode (`notarizeDirect`, direct `acknowledge`) when the agent has native gas, simulated before sending; confirmations per chain config.
   - Idempotent retry: the same signed record is resubmitted. A replacement (new nonce) is signed only under 04 §5: the deadline has passed and `getRecord` at the `finalized` block (timestamp after the deadline) shows no record; configured confirmations only on a chain without that tag. `RecordExists` with matching on-chain state, and a submitter's `skipped`, count as success with the existing `recordId` once a chain read confirms it.
   - Results are trusted only after reading chain state, never from submitter responses alone.
+  - Follow-up (IR-M1-4b-1 L-3): before sending `buildDeposit`'s steps, read the current allowance; for a token that reverts on a nonzero-to-nonzero `approve` (USDT style), approve 0 first. Check the amount against the vault's `minDeposit` where the top-up path needs it (gasless top-up, M1-3c).
+  - Follow-up (IR-M1-4b-1 L-2): `ChainError` and `ChainInputError` text says "chain" and "contract"; the tool layer maps their codes to 11 §5 copy (no "chain", "gas" or "transaction").
 - **Acceptance:**
   - Testnet integration: notarize via submitter and via direct mode; receipts both ways.
   - Fake-submitter tests (wrong tx hash, silent drop, modified record) are detected via chain reads and fail over.
@@ -2895,6 +2897,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - M1-9e's deny rules (`apps/cli/test/tool-surface.test.ts`) flag some M1b tools (`export` in `agentlink_export_proof_pack`, `path` and `file` arguments on send and fetch_file). Do not loosen the rules: add an explicit per-tool allowlist entry with a justification, and register the six M1b tools against the 06 §2.0 table there.
   - No tool asks for or requires a chain in its default inputs; the chain is picked automatically (M1-26, D-40).
   - (IR-D48-1 F15f) `agentlink_fetch_file` and `agentlink_send` (with `path`) results carry size, hash, name (untrusted) and expiry only: never the drop or presigned URL, the share link, or the file key (shape per `InboundMessage` in M1-9j).
+  - (IR-M1-4b-1 L-2) Map `@4thtech-io/chain` error codes (`bad_answer`, `fee_token_not_offered`, `rpc_*`, …) to 11 §5 copy in tool results; never pass the SDK's "chain"/"contract" text through.
 - **Acceptance:**
   - `agentlink_send` with a `path` outside allowed folders → `needs_setup`, and a filesystem spy shows the file was never opened; a symlink escaping an allowed folder is refused.
   - With no own storage: a 5 MB `agentlink_send` with `path` → `ok` with `delivery: "drop"`; above the drop cap or quota → `needs_setup` (own storage); `agentlink_status` reports `storage.mode` (06 §2.1, D-48).

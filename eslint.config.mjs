@@ -204,6 +204,34 @@ export default tseslint.config(
       testDir: dir,
     }),
   })),
+  // The address-checked RPC fetch brand (IR-M1-4a-2 R-3, M1-4b): @4thtech-io/chain createReadClient
+  // builds a client only over a fetch that carries a registered-symbol brand, which only
+  // @4thtech-io/node nodeRpcFetch (the 04 §4 resolve-time check) sets. Production code may not call
+  // Symbol.for anywhere else, so it cannot brand a plain fetch by mistake. The rule names the
+  // property only, so an alias (`const S = Symbol; S['for'](…)`) and a computed member are refused
+  // too (IR-M1-4b-1 L-1). A guard against wiring mistakes, not against a malicious in-process
+  // caller; tests may brand their fakes.
+  {
+    files: [`packages/**/*.${SOURCE}`, `apps/**/*.${SOURCE}`],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          property: 'for',
+          message:
+            'Symbol.for is reserved for the address-checked RPC fetch brand (packages/node/src/rpc-fetch.ts, packages/chain/src/clients/checked-fetch.ts).',
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      'packages/node/src/rpc-fetch.ts',
+      'packages/chain/src/clients/checked-fetch.ts',
+      '**/*.test.ts',
+    ],
+    rules: { 'no-restricted-properties': 'off' },
+  },
   // The tool module's fence (above): files directly in src/tools/ may not go up a level, files in
   // its subfolders not two levels.
   {

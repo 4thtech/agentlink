@@ -1,11 +1,13 @@
 // @4thtech-io/chain: chain clients and OCC v2 bindings. M1-4a: registry, read clients, typed-data
-// builders and IDs; quotes and submission land with M1-4b…c.
+// builders and IDs. M1-4b: quotes in USD, credits, the deposit helper and credit events. Submission
+// lands with M1-4c.
 export const packageName = '@4thtech-io/chain';
 
 export * from './config/index.js';
 export { loadOccV2Contracts, type OccV2Contracts } from './occ-v2.js';
 export * from './clients/index.js';
 export * from './typed-data/index.js';
+export * from './fees/index.js';
 // The salt generator stays internal: only buildRecord draws salts (04 §5, D-61).
 export {
   ChainInputError,

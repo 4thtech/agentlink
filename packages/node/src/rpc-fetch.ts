@@ -181,7 +181,7 @@ function send(
 /** The RPC fetch with test seams. Production: nodeRpcFetch(). Not exported from the package. */
 export function createRpcFetchWith(seams: SafeFetchSeams = {}): RpcFetch {
   const lookup = seams.lookup ?? systemLookup;
-  return async function rpcFetch(input, init) {
+  const rpcFetch: RpcFetch = async function rpcFetch(input, init) {
     const signal = init?.signal ?? new AbortController().signal;
     try {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
@@ -200,6 +200,16 @@ export function createRpcFetchWith(seams: SafeFetchSeams = {}): RpcFetch {
       throw fromSafeFetch(error, signal);
     }
   };
+  // The brand @4thtech-io/chain createReadClient requires (IR-M1-4a-2 R-3): only this fetch, which
+  // applies the 04 §4 resolve-time check, may build a read client. Read-only; the key is spelled
+  // the same in packages/chain/src/clients/checked-fetch.ts (rpc-fetch.test.ts checks both).
+  Object.defineProperty(rpcFetch, Symbol.for('agentlink.address-checked-rpc-fetch'), {
+    value: true,
+    writable: false,
+    enumerable: false,
+    configurable: false,
+  });
+  return rpcFetch;
 }
 
 /**
