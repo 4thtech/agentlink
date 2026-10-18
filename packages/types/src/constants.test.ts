@@ -162,6 +162,8 @@ describe('constants (04, 05, 06)', () => {
         'approval.decide',
         'approval.decideBatch',
         'contact.check',
+        'contact.remove',
+        'contact.rename',
         'policy.set',
       ].sort(),
     );
