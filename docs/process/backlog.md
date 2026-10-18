@@ -2990,7 +2990,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Local approval UI (`apps/cli` local UI)
 
 #### M1-11a · local UI: owner setup and approvals
-- **Status:** in review (branch m1-11a-local-ui; "Remember for this contact" deferred to G-32, CLI wiring to M1-9h) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#256; "Remember for this contact" deferred to G-32, CLI wiring to M1-9h) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (local UI bundle)
 - **Depends on:** M1-8d, M1-8e, M1-2e; gap G-32 resolved
 - **Spec:** 08 §1; 11 §6.2 (first run, approval), §6.2.1 (review together); 02 J4; 04 §2.5, §2.5.2 (D-68)
