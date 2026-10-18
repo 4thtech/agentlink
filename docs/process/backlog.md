@@ -2480,7 +2480,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Approving without presence fails; the M1-8c same-user script test also passes against the running server.
 
 #### M1-8e · node: OwnerKeyStore localhost passkey (PRF) path (new, split from M1-8c)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in-review (keychain account `owner-passkey`, one passkey per OS user, registration as its own owner operation, UP/UV and rpIdHash checks: proposed, owner confirms at merge; the file-KeyStore `owner.alkp` lands with M1-8f) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node
 - **Depends on:** M1-8c, M1-8d, M1-1k; gap G-1 accepted as a documented M1 residual (D-67)
 - **Spec:** 04 §2.2, §2.3, §2.5; 08 §1; D-16

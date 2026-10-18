@@ -68,7 +68,12 @@ const userHandle = b64(job.userHandle);
 
 // Every 32-byte value the script can find or make: zeros, pseudo-random bytes, the PRF salt, the
 // owner key, slices of every keychain item (the ALKP blob's nonce and ciphertext included).
-const prfGuesses = [new Uint8Array(32), new Uint8Array(32).fill(0xff), b64(job.prfSalt), userHandle];
+const prfGuesses = [
+  new Uint8Array(32),
+  new Uint8Array(32).fill(0xff),
+  b64(job.prfSalt),
+  userHandle,
+];
 const random = new Uint8Array(32);
 for (let i = 0; i < 32; i += 1) random[i] = Math.floor(Math.random() * 256);
 prfGuesses.push(random);
@@ -115,7 +120,11 @@ for (const code of ['', 'AAAA BBBB CCCC DDDD EEEE FFFF', job.csrf]) {
     secret,
     assertion(own, authenticatorData, userHandle, random),
   ]);
-  await attempt('register own passkey', '/api/owner/passkey', { method: 'POST', headers: page, body });
+  await attempt('register own passkey', '/api/owner/passkey', {
+    method: 'POST',
+    headers: page,
+    body,
+  });
 }
 
 writeFileSync(job.outFile, JSON.stringify({ attempts }));

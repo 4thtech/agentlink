@@ -12,6 +12,7 @@ import {
   parseJson,
   type JsonObject,
   type OwnerKeyStore,
+  type OwnerPresence,
   type OwnerPublicKeys,
   type SecretKind,
   type TypedData,
@@ -150,12 +151,13 @@ export async function runOwnerGesture(
   if (review.question !== undefined && !(await terminal.confirm(review.question))) {
     throw new NodeKeyStoreError('owner_prompt_cancelled', 'Cancelled. Nothing was changed.');
   }
-  const secret = await terminal.readSecret(secretLabel(kind));
-  // unlock wipes the secret whether or not it unlocks (OwnerKeyStore contract).
-  const session = await store.unlock(
-    { kind: 'passphrase', secret },
-    { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS },
-  );
+  // The TTY reads the owner code; the localhost page hands over the code or the passkey's PRF output
+  // (M1-8e). unlock wipes either whether or not it unlocks (OwnerKeyStore contract).
+  const presence: OwnerPresence =
+    terminal.readPresence === undefined
+      ? { kind: 'passphrase', secret: await terminal.readSecret(secretLabel(kind)) }
+      : await terminal.readPresence(secretLabel(kind));
+  const session = await store.unlock(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS });
   try {
     const out: OwnerSignature[] = [];
     for (const request of frozen) {

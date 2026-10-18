@@ -43,7 +43,11 @@ import {
   type JsonValue,
   type OwnerPublicKeys,
 } from '@agentlink/crypto';
-import { sealPasskeySeed, sealRecoverySeed, generateRecoveryCode } from '@agentlink/crypto/keystore';
+import {
+  sealPasskeySeed,
+  sealRecoverySeed,
+  generateRecoveryCode,
+} from '@agentlink/crypto/keystore';
 import type { OwnerActionOutcome } from '@agentlink/core';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { APP_JS } from './approval-page.js';
@@ -284,12 +288,7 @@ describe('registering the localhost passkey: one owner operation (04 §2.2, §2.
     const auth = new VirtualPrfAuthenticator();
     const assertion = auth.create(owner.ownerNostr, salt);
     await expectCode(
-      registerOwnerPasskey(
-        keychain,
-        owner,
-        encodeUtf8('AAAA BBBB CCCC DDDD EEEE FFFF'),
-        assertion,
-      ),
+      registerOwnerPasskey(keychain, owner, encodeUtf8('AAAA BBBB CCCC DDDD EEEE FFFF'), assertion),
       'presence_rejected',
     );
     expect(assertion.prfOutput.every((b) => b === 0)).toBe(true);
@@ -731,10 +730,13 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
       data[32] = value;
       return { ...auth.get(salt), authenticatorData: data };
     };
-    const otherRp = { ...auth.get(salt), authenticatorData: concatBytes(
-      sha256(encodeUtf8('127.0.0.1')),
-      good.authenticatorData.slice(32),
-    ) };
+    const otherRp = {
+      ...auth.get(salt),
+      authenticatorData: concatBytes(
+        sha256(encodeUtf8('127.0.0.1')),
+        good.authenticatorData.slice(32),
+      ),
+    };
     for (const bad of [otherRp, flags(0x04), flags(0x01), flags(0x00)]) {
       const res = await decideVia(h, id(1), 'approve', bad);
       expect(res.status).toBe(403);
@@ -831,9 +833,7 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
       403,
     );
     expect((await registerVia(h, code, make(), { 'X-AgentLink-CSRF': 'wrong' })).status).toBe(403);
-    expect(
-      (await registerVia(h, code, make(), { 'Content-Type': 'text/plain' })).status,
-    ).toBe(415);
+    expect((await registerVia(h, code, make(), { 'Content-Type': 'text/plain' })).status).toBe(415);
     expect(await keychain.get(OWNER_PASSKEY_ACCOUNT)).toBeNull();
   });
 
