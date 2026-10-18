@@ -21,6 +21,7 @@ import { placeholderSha256 } from './placeholder-sha256';
 import { prfWrap } from './prf-wrap';
 import { safetyCode } from './safety-code';
 import { safetyCodeRecompute } from './safety-code-recompute';
+import { stream } from './stream';
 import { taggedHashSuite } from './tagged-hash';
 import { terms } from './terms';
 import { ucd15Table } from './ucd15-table';
@@ -53,6 +54,7 @@ export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['prf-wrap', prfWrap],
   ['safety-code', safetyCode],
   ['safety-code-recompute', safetyCodeRecompute],
+  ['stream', stream],
   ['tagged-hash', taggedHashSuite],
   ['terms', terms],
   ['ucd15-table', ucd15Table],

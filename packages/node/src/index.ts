@@ -69,6 +69,7 @@ export {
 export {
   APPROVAL_SERVER_HOST,
   startApprovalServer,
+  type ApprovalDetails,
   type ApprovalForDecision,
   type ApprovalServer,
   type ApprovalServerEvent,
