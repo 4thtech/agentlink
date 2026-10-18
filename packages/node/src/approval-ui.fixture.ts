@@ -51,7 +51,10 @@ export class FileKeychain implements KeychainBackend {
     return Promise.resolve(value === undefined ? null : decodeBase64url(value));
   }
   set(account: string, value: Uint8Array): Promise<void> {
-    writeFileSync(this.file, JSON.stringify({ ...this.#read(), [account]: encodeBase64url(value) }));
+    writeFileSync(
+      this.file,
+      JSON.stringify({ ...this.#read(), [account]: encodeBase64url(value) }),
+    );
     return Promise.resolve();
   }
   delete(account: string): Promise<boolean> {

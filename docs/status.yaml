@@ -285,7 +285,7 @@ areas:
       - name: "Local approval page"
         state: in-progress
         prs: [207, 225, 247]
-        summary: "The localhost server behind it is merged (see the Node runtime), with a functional, unstyled page that approves with the owner code or a localhost passkey (M1-8e). The designed page for owner approvals and settings, and opening it from the CLI, are still to build (M1b)."
+        summary: "The localhost server behind it is merged (see the Node runtime), with a functional, unstyled page: first run with a localhost passkey (M1-8e), approval cards with who, what, cost and the rule, and review together, where one passkey gesture or owner code entry confirms exactly the listed approvals while terms stay single (M1-11a). Session links open once and repeated wrong owner codes make you wait. The design (M1-11b), \"Remember for this contact\" and opening it from the CLI are still to build (M1b)."
       - name: "Beginner setup page"
         state: done
         prs: [234]

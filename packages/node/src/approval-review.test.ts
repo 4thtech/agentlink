@@ -111,7 +111,9 @@ async function itemsHeader(h: Harness, picks: readonly Pick[]): Promise<string> 
   const parts: string[] = [];
   for (const [n, decision] of picks) {
     const row = await h.source.get(id(n));
-    parts.push(`${id(n)}:${row?.actionDigest ?? '0'.repeat(64)}:${decision === 'approve' ? 'a' : 'd'}`);
+    parts.push(
+      `${id(n)}:${row?.actionDigest ?? '0'.repeat(64)}:${decision === 'approve' ? 'a' : 'd'}`,
+    );
   }
   return parts.join(',');
 }
@@ -283,7 +285,11 @@ describe('review together: one owner code entry, exactly the listed items (D-68,
     expect(json(gone)).toMatchObject({ status: 'not_pending', items: [id(2)] });
     h.source.add(2);
     h.source.add(3, { actionDigest: '0'.repeat(64), storedDigest: '0'.repeat(64) });
-    const changed = await review(h, await itemsHeader(h, [[1, 'approve']]) + ',' + items.split(',')[2], world.code);
+    const changed = await review(
+      h,
+      (await itemsHeader(h, [[1, 'approve']])) + ',' + items.split(',')[2],
+      world.code,
+    );
     expect(changed.status).toBe(409);
     expect(json(changed)).toMatchObject({ status: 'changed' });
     expect(h.ownerStoresOpened.count).toBe(0);

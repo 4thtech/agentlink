@@ -52,6 +52,7 @@ import type { OwnerActionOutcome } from '@agentlink/core';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { APP_JS } from './approval-page.js';
 import {
+  MAX_PRESENCE_BACKOFF_S,
   startApprovalServerWith,
   type ApprovalForDecision,
   type ApprovalServer,
@@ -567,12 +568,21 @@ interface Harness {
   readonly origin: string;
   readonly events: ApprovalServerEvent[];
   readonly page: Record<string, string>;
+  /** The server's clock (ms): tests step past the M1-11a wrong-code backoff with it. */
+  readonly clock: { ms: number };
 }
 
-async function harness(): Promise<Harness> {
+/** Steps the clock past the longest M1-11a backoff, so each refused case is checked on its own. */
+const pastBackoff = (h: Harness): void => {
+  h.clock.ms += MAX_PRESENCE_BACKOFF_S * 1000 + 1;
+};
+
+/** `clockStep`: ms the clock moves on every read (a control that steps past every backoff). */
+async function harness(clockStep = 0): Promise<Harness> {
   const source = fakeSource();
   const events: ApprovalServerEvent[] = [];
   const opened: string[] = [];
+  const clock = { ms: Date.now() };
   const server = await startApprovalServerWith(
     { source, onEvent: (e) => void events.push(e) },
     {
@@ -583,6 +593,7 @@ async function harness(): Promise<Harness> {
         return Promise.resolve(true);
       },
       notifier: () => Promise.resolve(true),
+      now: () => (clock.ms += clockStep),
     },
   );
   servers.push(server);
@@ -599,6 +610,7 @@ async function harness(): Promise<Harness> {
     port,
     origin: server.origin,
     events,
+    clock,
     page: {
       Cookie: cookie,
       Origin: server.origin,
@@ -738,6 +750,7 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
       ),
     };
     for (const bad of [otherRp, flags(0x04), flags(0x01), flags(0x00)]) {
+      pastBackoff(h);
       const res = await decideVia(h, id(1), 'approve', bad);
       expect(res.status).toBe(403);
       expect(JSON.parse(res.body)).toMatchObject({ status: 'presence_rejected' });
@@ -763,6 +776,7 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
       { ...auth.get(salt), userHandle: randomBytes(32) },
     ];
     for (const bad of cases) {
+      pastBackoff(h);
       const res = await decideVia(h, id(1), 'approve', bad);
       expect(res.status).toBe(403);
       expect(JSON.parse(res.body)).toMatchObject({ status: 'presence_rejected' });
@@ -916,18 +930,18 @@ describe('the M1-8c same-user script with the passkey path enabled (10 M1-8, D-6
     const h = await harness();
     const auth = new VirtualPrfAuthenticator();
     expect((await registerVia(h, code, auth.create(owner.ownerNostr, salt))).status).toBe(200);
-    for (const n of [1, 2]) h.source.add(n);
-    const rows = await Promise.all([1, 2].map((n) => h.source.get(id(n))));
     const jobFile = join(root, 'passkey-job.json');
     const outFile = join(root, 'passkey-script-result.json');
-    const job = (leakedPrf?: Uint8Array): void =>
+    const job = async (target: Harness, leakedPrf?: Uint8Array): Promise<void> => {
+      for (const n of [1, 2]) target.source.add(n);
+      const rows = await Promise.all([1, 2].map((n) => target.source.get(id(n))));
       writeFileSync(
         jobFile,
         JSON.stringify({
-          port: h.port,
-          origin: h.origin,
-          cookie: h.page['Cookie'],
-          csrf: h.page['X-AgentLink-CSRF'],
+          port: target.port,
+          origin: target.origin,
+          cookie: target.page['Cookie'],
+          csrf: target.page['X-AgentLink-CSRF'],
           keychainFile,
           credentialId: encodeBase64url(auth.credentialId),
           authenticatorData: encodeBase64url(auth.get(salt).authenticatorData),
@@ -938,6 +952,7 @@ describe('the M1-8c same-user script with the passkey path enabled (10 M1-8, D-6
           ...(leakedPrf === undefined ? {} : { leakedPrf: encodeBase64url(leakedPrf) }),
         }),
       );
+    };
     type ScriptResult = { attempts: { name: string; status: number }[] };
     const run = async (): Promise<ScriptResult> => {
       await execFileAsync(process.execPath, [SCRIPT, jobFile], {
@@ -951,21 +966,27 @@ describe('the M1-8c same-user script with the passkey path enabled (10 M1-8, D-6
       return JSON.parse(readFileSync(outFile, 'utf8')) as ScriptResult;
     };
 
-    job();
+    await job(h);
     const result = await run();
     expect(result.attempts.length).toBeGreaterThan(10);
     expect(result.attempts.filter((a) => a.status === 200).map((a) => a.name)).toEqual([]);
     expect(h.source.applied).toEqual([]);
+    // M1-11a: the wrong guesses also ran into the backoff.
+    expect(result.attempts.some((a) => a.status === 429)).toBe(true);
     const blob = await keychain.get(OWNER_PASSKEY_ACCOUNT);
     expect(blob === null ? undefined : readPasskeyBlobHeader(blob).credentialId).toEqual(
       auth.credentialId,
     );
 
-    // Harness control (not vacuous): the same script holding the PRF output does approve.
-    job(auth.get(salt).prfOutput);
+    // Harness control (not vacuous): the same script holding the PRF output does approve. It runs
+    // against a fresh server (same keychain and passkey), since the guesses above left this one in
+    // the M1-11a backoff; its clock steps past any backoff on every read, because the script tries
+    // its wrong guesses before the leaked PRF output.
+    const fresh = await harness(MAX_PRESENCE_BACKOFF_S * 1000 + 1);
+    await job(fresh, auth.get(salt).prfOutput);
     const leaked = await run();
     expect(leaked.attempts.some((a) => a.status === 200)).toBe(true);
-    expect(h.source.applied.length).toBeGreaterThan(0);
-    for (const s of h.source.applied) expect(ownerSigValid(s.body, s.sig)).toBe(true);
+    expect(fresh.source.applied.length).toBeGreaterThan(0);
+    for (const s of fresh.source.applied) expect(ownerSigValid(s.body, s.sig)).toBe(true);
   }, 120_000);
 });

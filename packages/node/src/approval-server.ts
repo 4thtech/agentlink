@@ -12,10 +12,14 @@
 //   server and no other program can answer there. If another program holds ::1 on the chosen port,
 //   both listeners close and a new port is tried (at most 5 times). A machine with no IPv6 gets
 //   127.0.0.1 only and a fixed `ipv6_unavailable` event. Requests from a non-loopback peer are refused.
-// - A random 256-bit session token, in memory only, is put in the URL the process opens (`/?t=…`);
-//   the first request exchanges it for an HttpOnly, SameSite=Lax session cookie scoped to this port's
-//   name and redirects to the same path without the token. No token, cookie or CSRF value is written
-//   to disk, logged, put in an event, an approval URL or an error body.
+// - M1-11a, the session link is one-shot (IR-M1-8d-1 L-3): each `open()` mints a new random 256-bit
+//   link token, in memory only, put in the URL it opens (`/?t=…`). The first request with it
+//   exchanges it for a new random session secret in an HttpOnly, SameSite=Lax cookie scoped to this
+//   port's name and redirects to the same path without the token; the link token is then gone, so a
+//   link left in browser history never opens the page again. An unused link dies after
+//   SESSION_LINK_LIFETIME_MS. At most MAX_LINKS links and MAX_SESSIONS sessions are held (the oldest
+//   is dropped). No token, cookie or CSRF value is written to disk, logged, put in an event, an
+//   approval URL or an error body.
 // - DNS rebinding: the `Host` header must be exactly `localhost:<port>` (so `127.0.0.1:<port>`,
 //   `[::1]:<port>`, `LOCALHOST:<port>` and `localhost.:<port>` are refused); any `Origin` header present
 //   must be exactly `http://localhost:<port>`; a POST must carry that Origin.
@@ -38,6 +42,19 @@
 //   difference before the owner store is opened.
 // - One owner operation at a time; an approval ID decided through this server is never decided
 //   again through it (the core's nonce and row state are the authority; this is defence in depth).
+// - M1-11a, review together (D-68, 04 §2.5.2): `POST /api/approvals/review` carries 1 to 20 items the
+//   page listed (`X-AgentLink-Items`: `<approvalId>:<actionDigest shown>:<a|d>`, comma separated)
+//   and the same presence body as a single decision. The server re-reads every item and refuses the
+//   whole request, before the owner store is opened, when one is malformed, a duplicate, no longer
+//   pending, changed, or a commitment (D-31: terms are always decided alone, on their own card). One
+//   presence entry then signs one `approval.decideBatch` over exactly those items (one
+//   `approval.decide` for one item) and core applies it whole or not at all.
+// - M1-11a, wrong-code backoff (IR-M1-8d-1 L-2): after FREE_PRESENCE_ATTEMPTS rejected presence
+//   proofs in a row (owner code, owner passphrase or passkey), every owner operation of this server
+//   answers 429 `wait` with Retry-After before its body is read or the owner store is opened; the
+//   wait doubles with each further failure up to MAX_PRESENCE_BACKOFF_S, and a success resets it.
+//   It lives in memory: a same-user process that restarts the server is the accepted G-1 residual,
+//   and the KDF cost still bounds each guess.
 //
 // Out of scope and accepted (G-1, D-67; 04 §2.5): a same-user process that reads memory, modifies the
 // installed package, or serves a look-alike page on another localhost port. Cookies are not isolated
@@ -95,6 +112,32 @@ const MAX_SECRET_BYTES = 1024;
 const MAX_PASSKEY_BYTES = 4096;
 const PASSKEY_PATH = '/api/owner/passkey';
 const NOTIFICATION = ['AgentLink', 'An approval is waiting for you.'] as const;
+const REVIEW_PATH = '/api/approvals/review';
+
+/** M1-11a: an unused session link dies after 10 minutes (one-shot either way). */
+export const SESSION_LINK_LIFETIME_MS = 10 * 60 * 1000;
+/** Outstanding session links and live sessions held at most; the oldest is dropped. */
+const MAX_LINKS = 8;
+const MAX_SESSIONS = 8;
+/** M1-11a: rejected presence proofs in a row before the server makes the owner wait. */
+export const FREE_PRESENCE_ATTEMPTS = 3;
+/** The first wait, doubled for each further rejected proof, up to MAX_PRESENCE_BACKOFF_S. */
+const FIRST_BACKOFF_S = 5;
+export const MAX_PRESENCE_BACKOFF_S = 300;
+/** 04 §2.5.2 (D-71 (3)): at most 20 items in one review. */
+const MAX_REVIEW_ITEMS = 20;
+/** Bounds on the card data a view may carry to the page (fail closed above them). */
+const MAX_DETAIL_CHARS = 1024;
+const MAX_VALUE_CHARS = 16_384;
+const MAX_FIELDS = 64;
+
+/** The wait in seconds after `failures` rejected presence proofs in a row (0 = no wait). */
+export function presenceBackoffSeconds(failures: number): number {
+  if (!Number.isSafeInteger(failures) || failures < FREE_PRESENCE_ATTEMPTS) return 0;
+  const steps = failures - FREE_PRESENCE_ATTEMPTS;
+  if (steps >= 16) return MAX_PRESENCE_BACKOFF_S;
+  return Math.min(MAX_PRESENCE_BACKOFF_S, FIRST_BACKOFF_S * 2 ** steps);
+}
 
 const APPROVAL_ID = /^apr_[A-Za-z0-9_-]{22}$/;
 const DIGEST = /^[0-9a-f]{64}$/;
@@ -102,6 +145,28 @@ const BASE64URL = /^[A-Za-z0-9_-]+$/;
 const APPROVE_PAGE = /^\/approve\/(apr_[A-Za-z0-9_-]{22})$/;
 const API_ONE = /^\/api\/approvals\/(apr_[A-Za-z0-9_-]{22})$/;
 const API_DECIDE = /^\/api\/approvals\/(apr_[A-Za-z0-9_-]{22})\/(approve|deny)$/;
+const REVIEW_ITEM = /^(apr_[A-Za-z0-9_-]{22}):([0-9a-f]{64}):([ad])$/;
+
+/**
+ * What the approval card shows (11 §6.2.1, §8), built by the agent's runtime from the parsed stored
+ * action (never from the row's stored summary or text the agent passed in, IR-M1-8c-1 F-4). Every
+ * value is plain text: the page renders it with textContent only (I-5). `fromAi` are the arguments
+ * the AI chose, shown in their own marked region; they may hold anything, including markup.
+ */
+export interface ApprovalDetails {
+  /** The contact, under the 06 §2.1 name rule. */
+  readonly who: string;
+  readonly what: string;
+  /** "$0.10", or "Free". */
+  readonly cost: string;
+  /** "12 Oct 2026 14:02 UTC". */
+  readonly expires: string;
+  /** The policy rule that asked for this approval, in plain words. */
+  readonly rule: string;
+  readonly fromAi: readonly { readonly name: string; readonly value: string }[];
+  /** For terms: the terms card's lines (headline, the contact's terms, what changed). */
+  readonly terms?: readonly string[];
+}
 
 /** One pending request as the page shows it. `summary` is fixed text built by core (I-5, 06 §2.1). */
 export interface PendingApprovalView {
@@ -113,6 +178,8 @@ export interface PendingApprovalView {
   readonly expiresAt: number;
   /** A commitment (D-31): decided alone. */
   readonly commitment: boolean;
+  /** M1-11a: the card's facts; without them the page shows the summary only. */
+  readonly details?: ApprovalDetails;
 }
 
 /** One live pending request, re-read for a decision, with the stored action it covers. */
@@ -162,6 +229,12 @@ export type ApprovalServerEvent =
       readonly kind: 'decision';
       readonly outcome:
         | 'applied'
+        /** M1-11a: the review list was malformed, a duplicate, empty or too long. */
+        | 'invalid'
+        /** M1-11a: a commitment was in a review list (decided alone, D-31). */
+        | 'commitment'
+        /** M1-11a: wrong-code backoff in force. */
+        | 'wait'
         | 'refused'
         | 'presence_required'
         | 'presence_rejected'
@@ -182,6 +255,7 @@ export type ApprovalServerEvent =
         | 'passkey_unsupported'
         | 'busy'
         | 'needs_setup'
+        | 'wait'
         | 'failed';
     }
   | { readonly kind: 'closed' };
@@ -208,6 +282,8 @@ export interface ApprovalServerInternals {
   readonly keychain?: KeychainBackend;
   readonly opener?: BrowserOpener;
   readonly notifier?: OsNotifier;
+  /** The clock in milliseconds (link lifetime, backoff). Default: Date.now. */
+  readonly now?: () => number;
 }
 
 export interface ApprovalServer {
@@ -226,8 +302,9 @@ export interface ApprovalServer {
    */
   approvalUrl(approvalId: string): string;
   /**
-   * Opens the owner's browser at the session link (`/?t=…`), or at `/approve/<id>?t=…`. The link is
-   * handed only to the OS opener, never returned. Resolves false when no browser could be started.
+   * Opens the owner's browser at a new one-shot session link (`/?t=…`), or at `/approve/<id>?t=…`.
+   * The link is handed only to the OS opener, never returned. Resolves false when no browser could
+   * be started.
    */
   open(approvalId?: string): Promise<boolean>;
   /** Raises the fixed OS notification for a new request and returns its approvalUrl. */
@@ -320,10 +397,49 @@ const header = (req: IncomingMessage, name: string): string | undefined => {
   return Array.isArray(value) ? value[0] : value;
 };
 
+const isText = (value: unknown, max: number, empty = false): value is string =>
+  typeof value === 'string' && value.length <= max && (empty || value.length > 0);
+
+/** The card facts, checked field by field; undefined when anything is off (fail closed). */
+function detailsOf(value: unknown): ApprovalDetails | undefined | false {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'object' || value === null) return false;
+  const { who, what, cost, expires, rule, fromAi, terms } = value as Record<string, unknown>;
+  for (const field of [who, what, cost, expires, rule]) {
+    if (!isText(field, MAX_DETAIL_CHARS)) return false;
+  }
+  if (!Array.isArray(fromAi) || fromAi.length > MAX_FIELDS) return false;
+  const fields: { name: string; value: string }[] = [];
+  for (const entry of fromAi as unknown[]) {
+    if (typeof entry !== 'object' || entry === null) return false;
+    const { name, value: text } = entry as Record<string, unknown>;
+    if (!isText(name, MAX_DETAIL_CHARS) || !isText(text, MAX_VALUE_CHARS, true)) return false;
+    fields.push({ name, value: text });
+  }
+  let lines: string[] | undefined;
+  if (terms !== undefined) {
+    if (!Array.isArray(terms) || terms.length > MAX_FIELDS * 4) return false;
+    lines = [];
+    for (const line of terms as unknown[]) {
+      if (!isText(line, MAX_VALUE_CHARS, true)) return false;
+      lines.push(line);
+    }
+  }
+  return {
+    who: who as string,
+    what: what as string,
+    cost: cost as string,
+    expires: expires as string,
+    rule: rule as string,
+    fromAi: fields,
+    ...(lines === undefined ? {} : { terms: lines }),
+  };
+}
+
 /** The view sent to the page: only checked, structured fields; never the action. */
 function view(item: unknown): PendingApprovalView | undefined {
   if (typeof item !== 'object' || item === null) return undefined;
-  const { approvalId, summary, actionDigest, expiresAt, commitment } = item as Record<
+  const { approvalId, summary, actionDigest, expiresAt, commitment, details } = item as Record<
     string,
     unknown
   >;
@@ -332,7 +448,47 @@ function view(item: unknown): PendingApprovalView | undefined {
   if (typeof actionDigest !== 'string' || !DIGEST.test(actionDigest)) return undefined;
   if (typeof expiresAt !== 'number' || !Number.isSafeInteger(expiresAt)) return undefined;
   if (typeof commitment !== 'boolean') return undefined;
-  return { approvalId, summary, actionDigest, expiresAt, commitment };
+  const facts = detailsOf(details);
+  if (facts === false) return undefined;
+  return {
+    approvalId,
+    summary,
+    actionDigest,
+    expiresAt,
+    commitment,
+    ...(facts === undefined ? {} : { details: facts }),
+  };
+}
+
+/** One item of a decision as the page sent it: the ID, the digest it showed and the decision. */
+interface Pick {
+  readonly approvalId: string;
+  readonly shown: string | undefined;
+  readonly decision: 'approve' | 'deny';
+}
+
+/** Parses `X-AgentLink-Items` strictly: 1 to 20 well-formed, distinct items, or undefined. */
+function parseReviewItems(raw: string | undefined): Pick[] | undefined {
+  if (raw === undefined || raw.length === 0 || raw.length > MAX_REVIEW_ITEMS * 100) {
+    return undefined;
+  }
+  const parts = raw.split(',');
+  if (parts.length > MAX_REVIEW_ITEMS) return undefined;
+  const picks: Pick[] = [];
+  const seen = new Set<string>();
+  for (const part of parts) {
+    const match = REVIEW_ITEM.exec(part);
+    if (match === null) return undefined;
+    const approvalId = match[1] as string;
+    if (seen.has(approvalId)) return undefined;
+    seen.add(approvalId);
+    picks.push({
+      approvalId,
+      shown: match[2] as string,
+      decision: match[3] === 'a' ? 'approve' : 'deny',
+    });
+  }
+  return picks;
 }
 
 /** Starts the server with the test seams (internal; the package entry is startApprovalServer). */
@@ -357,16 +513,23 @@ export async function startApprovalServerWith(
     }
   };
 
-  const token = encodeBase64url(randomBytes(32));
-  const tokenBytes = encodeUtf8(token);
+  const now = internals.now ?? Date.now;
+  /** One-shot session links (M1-11a): token bytes and the time each dies, oldest first. */
+  const links: { readonly bytes: Uint8Array; readonly expiresAt: number }[] = [];
+  /** Live session secrets (the cookie values), oldest first. */
+  const sessions: Uint8Array[] = [];
   const csrf = encodeBase64url(randomBytes(32));
   const csrfBytes = encodeUtf8(csrf);
   const decided = new Set<string>();
   let busy = false;
+  /** Rejected presence proofs in a row, and when the wait they caused ends (ms). */
+  let failures = 0;
+  let waitUntil = 0;
 
   // One request handler and one session behind both loopback listeners. Until both are bound, a
   // request (only possible on 127.0.0.1, in that short window) gets 503 and nothing else.
   let dispatch = (_req: IncomingMessage, res: ServerResponse): void => {
+    setCommonHeaders(res);
     res.statusCode = 503;
     res.end();
   };
@@ -413,12 +576,67 @@ export async function startApprovalServerWith(
   const origin = `http://${hostValue}`;
   const cookieName = `agentlink_${String(port)}`;
 
-  const matches = (candidate: string | undefined, expected: Uint8Array): boolean =>
+  const wellFormed = (candidate: string | undefined): candidate is string =>
     candidate !== undefined &&
     candidate.length > 0 &&
     candidate.length <= 128 &&
-    BASE64URL.test(candidate) &&
-    equalBytes(encodeUtf8(candidate), expected);
+    BASE64URL.test(candidate);
+
+  const matches = (candidate: string | undefined, expected: Uint8Array): boolean =>
+    wellFormed(candidate) && equalBytes(encodeUtf8(candidate), expected);
+
+  /** Compares against every held value (no early exit on a match). */
+  const matchIndex = (candidate: string | undefined, held: readonly Uint8Array[]): number => {
+    if (!wellFormed(candidate)) return -1;
+    const bytes = encodeUtf8(candidate);
+    let found = -1;
+    held.forEach((value, i) => {
+      if (equalBytes(bytes, value)) found = i;
+    });
+    return found;
+  };
+
+  /** Mints a one-shot session link token (M1-11a). */
+  const mintLink = (): string => {
+    const token = encodeBase64url(randomBytes(32));
+    links.push({ bytes: encodeUtf8(token), expiresAt: now() + SESSION_LINK_LIFETIME_MS });
+    while (links.length > MAX_LINKS) links.shift();
+    return token;
+  };
+
+  /** Consumes a link token: true once for a live link, which is then gone. */
+  const consumeLink = (candidate: string): boolean => {
+    const at = matchIndex(
+      candidate,
+      links.map((l) => l.bytes),
+    );
+    if (at < 0) return false;
+    const [link] = links.splice(at, 1);
+    return link !== undefined && now() < link.expiresAt;
+  };
+
+  /** A new session secret for the cookie. */
+  const newSession = (): string => {
+    const secret = encodeBase64url(randomBytes(32));
+    sessions.push(encodeUtf8(secret));
+    while (sessions.length > MAX_SESSIONS) sessions.shift();
+    return secret;
+  };
+
+  /** Seconds the owner must still wait after rejected presence proofs (0 = none). */
+  const waitSeconds = (): number => {
+    const left = waitUntil - now();
+    return left > 0 ? Math.ceil(left / 1000) : 0;
+  };
+  const presenceFailed = (): void => {
+    failures += 1;
+    const wait = presenceBackoffSeconds(failures);
+    if (wait > 0) waitUntil = now() + wait * 1000;
+  };
+  const presenceSucceeded = (): void => {
+    failures = 0;
+    waitUntil = 0;
+  };
 
   const cookieToken = (req: IncomingMessage): string | undefined => {
     const raw = header(req, 'cookie');
@@ -514,12 +732,37 @@ export async function startApprovalServerWith(
     return body;
   }
 
+  /** 429 `wait` while the wrong-code backoff is in force (before the body is read). */
+  function waiting(
+    req: IncomingMessage,
+    res: ServerResponse,
+    kind: 'decision' | 'passkey',
+  ): boolean {
+    const wait = waitSeconds();
+    if (wait === 0) return false;
+    req.resume();
+    res.setHeader('Retry-After', String(wait));
+    if (kind === 'decision') finishDecision(res, 429, 'wait', { retryAfter: wait });
+    else {
+      emit({ kind: 'passkey', outcome: 'wait' });
+      sendJson(res, 429, { status: 'wait', retryAfter: wait });
+    }
+    return true;
+  }
+
+  /**
+   * One owner operation over `picks`: one item from `/api/approvals/<id>/<decision>`, or the 1 to
+   * 20 items of a review (`review`). Every item is re-read and checked before presence is used; the
+   * whole request is refused if one fails. Then one presence entry signs one object over exactly
+   * these items, and core applies it.
+   */
   async function decide(
     req: IncomingMessage,
     res: ServerResponse,
-    approvalId: string,
-    decision: 'approve' | 'deny',
+    picks: readonly Pick[],
+    review: boolean,
   ): Promise<void> {
+    if (waiting(req, res, 'decision')) return;
     const mode = header(req, 'x-agentlink-presence');
     const passkey = mode === 'passkey';
     if (mode !== undefined && !passkey) {
@@ -529,6 +772,8 @@ export async function startApprovalServerWith(
     }
     const body = await boundedBody(req, res, passkey ? MAX_PASSKEY_BYTES : MAX_SECRET_BYTES);
     if (body === undefined) return;
+    const ids = picks.map((p) => p.approvalId);
+    const listed = (items: readonly string[]): Record<string, unknown> => (review ? { items } : {});
     // Every secret byte this request carried; wiped whatever happens (unlock also wipes its copy).
     let assertion: PasskeyAssertion | undefined;
     let presence: OwnerPresence | undefined;
@@ -551,8 +796,9 @@ export async function startApprovalServerWith(
         }
       }
       // Check and claim with no await in between: one owner operation at a time.
-      if (decided.has(approvalId)) {
-        finishDecision(res, 409, 'not_pending');
+      const already = ids.filter((approvalId) => decided.has(approvalId));
+      if (already.length > 0) {
+        finishDecision(res, 409, 'not_pending', listed(already));
         return;
       }
       if (busy) {
@@ -561,27 +807,44 @@ export async function startApprovalServerWith(
       }
       busy = true;
       try {
-        const shown = header(req, 'x-agentlink-digest');
-        const entry = await source.get(approvalId);
-        if (entry?.approvalId !== approvalId || decided.has(approvalId)) {
-          finishDecision(res, 409, 'not_pending');
+        const entries: (ApprovalForDecision | undefined)[] = [];
+        for (const pick of picks) entries.push(await source.get(pick.approvalId));
+        const gone = picks
+          .filter((p, i) => entries[i]?.approvalId !== p.approvalId || decided.has(p.approvalId))
+          .map((p) => p.approvalId);
+        if (gone.length > 0) {
+          finishDecision(res, 409, 'not_pending', listed(gone));
           return;
         }
-        let recomputed: string;
-        try {
-          recomputed = encodeHex(sha256(canonicalizeToBytes(entry.action)));
-        } catch {
-          finishDecision(res, 409, 'changed');
-          return;
+        const live = entries as ApprovalForDecision[];
+        if (review) {
+          // D-31, 04 §2.5.2: terms are never part of a review list; each is decided on its own card.
+          const terms = live.filter((e) => e.commitment).map((e) => e.approvalId);
+          if (terms.length > 0) {
+            finishDecision(res, 409, 'commitment', { items: terms });
+            return;
+          }
         }
-        if (
-          shown === undefined ||
-          !DIGEST.test(shown) ||
-          recomputed !== entry.storedDigest ||
-          shown !== entry.storedDigest
-        ) {
-          // 04 §2.5.2 step 2: a request whose digest does not match is never offered.
-          finishDecision(res, 409, 'changed');
+        const changed = picks
+          .filter((pick, i) => {
+            const entry = live[i] as ApprovalForDecision;
+            let recomputed: string;
+            try {
+              recomputed = encodeHex(sha256(canonicalizeToBytes(entry.action)));
+            } catch {
+              return true;
+            }
+            // 04 §2.5.2 step 2: a request whose digest does not match is never offered.
+            return (
+              pick.shown === undefined ||
+              !DIGEST.test(pick.shown) ||
+              recomputed !== entry.storedDigest ||
+              pick.shown !== entry.storedDigest
+            );
+          })
+          .map((p) => p.approvalId);
+        if (changed.length > 0) {
+          finishDecision(res, 409, 'changed', listed(changed));
           return;
         }
         const context = await source.context();
@@ -597,6 +860,7 @@ export async function startApprovalServerWith(
             if (stored === null) throw new KeyStoreError('presence_rejected', 'presence');
             assertPasskeyAssertion(stored, context.owner, assertion);
           } catch {
+            presenceFailed();
             finishDecision(res, 403, 'presence_rejected');
             return;
           }
@@ -614,19 +878,26 @@ export async function startApprovalServerWith(
         let signed: { readonly body: JsonObject; readonly sig: string };
         try {
           // unlock wipes the presented bytes, whether or not they unlock.
-          signed = await decideReviewedWith(store, pageTerminal(presence), context, [
-            {
-              approvalId,
-              action: entry.action,
-              storedDigest: entry.storedDigest,
-              decision,
-              commitment: entry.commitment,
-              summary: entry.summary,
-              requestExpiresAt: entry.expiresAt,
-            },
-          ]);
+          signed = await decideReviewedWith(
+            store,
+            pageTerminal(presence),
+            context,
+            picks.map((pick, i) => {
+              const entry = live[i] as ApprovalForDecision;
+              return {
+                approvalId: pick.approvalId,
+                action: entry.action,
+                storedDigest: entry.storedDigest,
+                decision: pick.decision,
+                commitment: entry.commitment,
+                summary: entry.summary,
+                requestExpiresAt: entry.expiresAt,
+              };
+            }),
+          );
         } catch (error) {
           if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
+            presenceFailed();
             finishDecision(res, 403, 'presence_rejected');
           } else if (error instanceof NodeKeyStoreError) {
             finishDecision(res, 409, 'changed');
@@ -637,12 +908,26 @@ export async function startApprovalServerWith(
         } finally {
           await store.close().catch(() => undefined);
         }
+        presenceSucceeded();
         const outcome = await source.apply(signed);
         if (outcome.status === 'applied') {
-          decided.add(approvalId);
-          finishDecision(res, 200, 'applied', { decision });
+          for (const approvalId of ids) decided.add(approvalId);
+          if (review) {
+            const items = [...picks]
+              .sort((a, b) =>
+                a.approvalId < b.approvalId ? -1 : a.approvalId > b.approvalId ? 1 : 0,
+              )
+              .map((p) => ({ approvalId: p.approvalId, decision: p.decision }));
+            finishDecision(res, 200, 'applied', { items });
+          } else {
+            finishDecision(res, 200, 'applied', { decision: picks[0]?.decision });
+          }
         } else {
-          finishDecision(res, 409, 'refused');
+          // 04 §2.5.2: core names the items that did not match; only IDs we sent are echoed.
+          const named = (outcome.items ?? [])
+            .map((i) => i.approvalId)
+            .filter((approvalId) => ids.includes(approvalId));
+          finishDecision(res, 409, 'refused', listed(named));
         }
       } finally {
         busy = false;
@@ -677,6 +962,7 @@ export async function startApprovalServerWith(
    * one entry of the owner code, no signature; the code, the PRF output and the seed are wiped.
    */
   async function passkeyRegister(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (waiting(req, res, 'passkey')) return;
     const body = await boundedBody(req, res, MAX_PASSKEY_BYTES);
     if (body === undefined) return;
     let parsed: ReturnType<typeof parsePasskeyRegistration> | undefined;
@@ -706,12 +992,15 @@ export async function startApprovalServerWith(
           const code = (error as { code?: unknown } | null)?.code;
           if (code === 'owner_passkey_exists') finishPasskey(res, 409, 'passkey_exists');
           else if (code === 'passkey_unsupported') finishPasskey(res, 422, 'passkey_unsupported');
-          else if (code === 'presence_rejected') finishPasskey(res, 403, 'presence_rejected');
-          else if (code === 'presence_required') finishPasskey(res, 403, 'presence_required');
+          else if (code === 'presence_rejected') {
+            presenceFailed();
+            finishPasskey(res, 403, 'presence_rejected');
+          } else if (code === 'presence_required') finishPasskey(res, 403, 'presence_required');
           else if (code === 'owner_missing') finishPasskey(res, 503, 'needs_setup');
           else finishPasskey(res, 500, 'failed');
           return;
         }
+        presenceSucceeded();
         finishPasskey(res, 200, 'registered');
       } finally {
         busy = false;
@@ -757,13 +1046,17 @@ export async function startApprovalServerWith(
       if (method !== 'GET') return reject(res, 405, 'method');
       const t = url.searchParams.get('t');
       if (t !== null) {
-        if (!matches(t, tokenBytes)) return reject(res, 401, 'token');
-        res.setHeader('Set-Cookie', `${cookieName}=${token}; HttpOnly; SameSite=Lax; Path=/`);
+        // One-shot (M1-11a): the link is consumed here and never opens the page again.
+        if (!consumeLink(t)) return reject(res, 401, 'token');
+        res.setHeader(
+          'Set-Cookie',
+          `${cookieName}=${newSession()}; HttpOnly; SameSite=Lax; Path=/`,
+        );
         res.setHeader('Location', path);
         sendText(res, 303, 'text/plain; charset=utf-8', '');
         return;
       }
-      if (!matches(cookieToken(req), tokenBytes)) return reject(res, 401, 'token');
+      if (matchIndex(cookieToken(req), sessions) < 0) return reject(res, 401, 'token');
       sendText(res, 200, 'text/html; charset=utf-8', pageHtml(csrf));
       return;
     }
@@ -771,13 +1064,20 @@ export async function startApprovalServerWith(
     const one = API_ONE.exec(path);
     const decideMatch = API_DECIDE.exec(path);
     const passkeyRoute = path === PASSKEY_PATH;
-    if (path !== '/api/approvals' && one === null && decideMatch === null && !passkeyRoute) {
+    const reviewRoute = path === REVIEW_PATH;
+    if (
+      path !== '/api/approvals' &&
+      one === null &&
+      decideMatch === null &&
+      !passkeyRoute &&
+      !reviewRoute
+    ) {
       reject(res, 404, 'not_found');
       return;
     }
-    const post = decideMatch !== null || (passkeyRoute && method === 'POST');
+    const post = decideMatch !== null || reviewRoute || (passkeyRoute && method === 'POST');
     if (method !== (post ? 'POST' : 'GET')) return reject(res, 405, 'method');
-    if (!matches(cookieToken(req), tokenBytes)) return reject(res, 401, 'token');
+    if (matchIndex(cookieToken(req), sessions) < 0) return reject(res, 401, 'token');
     if (!fetchSiteOk(req)) return reject(res, 403, 'fetch_site');
     if (post && originHeader === undefined) return reject(res, 403, 'origin');
     if (!matches(header(req, 'x-agentlink-csrf'), csrfBytes)) return reject(res, 403, 'csrf');
@@ -785,11 +1085,32 @@ export async function startApprovalServerWith(
     if (post) {
       const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
       if (type !== 'application/octet-stream') return reject(res, 415, 'content_type');
+      if (reviewRoute) {
+        const picks = parseReviewItems(header(req, 'x-agentlink-items'));
+        if (picks === undefined) {
+          req.resume();
+          finishDecision(res, 400, 'invalid');
+          return;
+        }
+        await decide(req, res, picks, true);
+        return;
+      }
       if (decideMatch === null) {
         await passkeyRegister(req, res);
         return;
       }
-      await decide(req, res, decideMatch[1] as string, decideMatch[2] as 'approve' | 'deny');
+      await decide(
+        req,
+        res,
+        [
+          {
+            approvalId: decideMatch[1] as string,
+            shown: header(req, 'x-agentlink-digest'),
+            decision: decideMatch[2] as 'approve' | 'deny',
+          },
+        ],
+        false,
+      );
       return;
     }
     if (passkeyRoute) {
@@ -833,7 +1154,7 @@ export async function startApprovalServerWith(
     open: async (approvalId?: string) => {
       // A malformed ID rejects the returned promise (never a synchronous throw).
       const path = approvalId === undefined ? '/' : new URL(approvalUrl(approvalId)).pathname;
-      return opener(`${origin}${path}?t=${token}`).catch(() => false);
+      return opener(`${origin}${path}?t=${mintLink()}`).catch(() => false);
     },
     notifyNewApproval: async (approvalId: string) => {
       const url = approvalUrl(approvalId);

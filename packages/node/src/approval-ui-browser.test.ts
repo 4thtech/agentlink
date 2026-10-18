@@ -136,7 +136,7 @@ async function pageWithoutPasskeys(): Promise<Page> {
   contexts.push(context);
   const page = await context.newPage();
   await page.addInitScript(() => {
-    Reflect.deleteProperty(window, 'PublicKeyCredential');
+    Reflect.deleteProperty(globalThis, 'PublicKeyCredential');
   });
   return page;
 }
@@ -228,7 +228,9 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     expect(await card(page, 2).getByLabel('Later', { exact: true }).isChecked()).toBe(true);
     const before = await signCounts();
     await page.getByRole('button', { name: 'Approve 2 and deny 1' }).click();
-    await page.getByText('This covers exactly these 3. Anything new waits for your next review.').waitFor();
+    await page
+      .getByText('This covers exactly these 3. Anything new waits for your next review.')
+      .waitFor();
     expect(source.applied).toEqual([]);
     await page.getByRole('button', { name: 'Confirm with your passkey' }).click();
     await page.getByText('Done: approved 2 and denied 1.').waitFor();
@@ -296,7 +298,7 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     for (const view of ['/', `/approve/${id(1)}`]) {
       await page.goto(`${server.origin}${view}`);
       await card(page, 1).getByText(`/tmp/${XSS}.pdf`).waitFor();
-      expect(await page.evaluate(() => (window as { __xss?: unknown }).__xss)).toBeUndefined();
+      expect(await page.evaluate(() => (globalThis as { __xss?: unknown }).__xss)).toBeUndefined();
       expect(await page.locator('#app img').count()).toBe(0);
       expect(await page.locator('#app script').count()).toBe(0);
       expect(await page.getByRole('button', { name: 'Approve 9' }).count()).toBe(0);

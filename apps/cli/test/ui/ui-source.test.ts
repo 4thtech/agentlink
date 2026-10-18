@@ -47,7 +47,11 @@ class TestCipher implements StoreCipher {
   open(context: SealContext, sealed: Sealed): Promise<string> {
     return Promise.resolve().then(() => {
       const parsed = JSON.parse(decodeUtf8(decodeBase64url(sealed.slice(2)))) as unknown[];
-      if (parsed[0] !== context.table || parsed[1] !== context.column || parsed[2] !== context.rowKey)
+      if (
+        parsed[0] !== context.table ||
+        parsed[1] !== context.column ||
+        parsed[2] !== context.rowKey
+      )
         throw new Error('test cipher: wrong context');
       return parsed[3] as string;
     });
@@ -98,7 +102,13 @@ async function world() {
     relays: ['wss://relay.agentlink.dev', 'wss://nos.lol'],
   });
   await session.close();
-  const agent: OwnerAgent = { name: 'default', client, store, cipher, close: () => Promise.resolve() };
+  const agent: OwnerAgent = {
+    name: 'default',
+    client,
+    store,
+    cipher,
+    close: () => Promise.resolve(),
+  };
   const source = createUiApprovalSource(agent, { now: () => clock.t });
   const request = async (args: JsonObject = { to: 'Ana', text: 'hello' }) => {
     const action = sendAction(args);
@@ -136,9 +146,10 @@ describe('the local UI approval source (M1-11a)', () => {
     });
     expect(view.details?.who.length).toBeGreaterThan(0);
     expect(view.details?.expires).toMatch(/UTC$/);
+    // In the stored action's canonical (JCS) key order.
     expect(view.details?.fromAi).toEqual([
-      { name: 'to', value: 'Ana' },
       { name: 'text', value: 'hello' },
+      { name: 'to', value: 'Ana' },
     ]);
   });
 
@@ -147,9 +158,9 @@ describe('the local UI approval source (M1-11a)', () => {
     await w.request({ to: XSS, text: XSS, path: `/tmp/${XSS}.pdf` });
     const [view] = await w.source.list();
     expect(view?.details?.fromAi).toEqual([
-      { name: 'to', value: XSS },
-      { name: 'text', value: XSS },
       { name: 'path', value: `/tmp/${XSS}.pdf` },
+      { name: 'text', value: XSS },
+      { name: 'to', value: XSS },
     ]);
   });
 
