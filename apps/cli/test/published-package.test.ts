@@ -184,7 +184,8 @@ describe('the bundle (dist/agentlink.js)', () => {
 
 // IR-OPS-REL-1-1 M-1: what npm receives is the publish directory dist/package/ (written by the
 // build, bundle.config.mjs `stagePackage`). Its package.json is generated: no devDependencies, no
-// scripts and no `@4thtech-io/*` name (that npm scope belongs to a third party).
+// scripts, no workspace package name besides the CLI's own `@4thtech-io/agentlink`, and nothing in
+// the old `@agentlink` npm scope, which belongs to a third party (OPS-REL-2).
 describe('the published tarball (dist/package)', () => {
   const stageDir = join(packageDir, 'dist', 'package');
   const packDir = mkdtempSync(join(tmpdir(), 'agentlink-pack-'));
@@ -231,6 +232,10 @@ describe('the published tarball (dist/package)', () => {
     expect(packed.manifest.split('@4thtech-io/')).toHaveLength(2);
     expect(packed.manifest).toContain(`"name": "${manifest.name}"`);
     expect(packed.manifest).not.toContain('workspace:');
+    // OPS-REL-2: no name in the third-party scope, in any letter case (spelled without its slash
+    // so the repository scan in tools/retired-scope.test.mjs does not match this file).
+    const oldScope = '@agentlink';
+    expect(packed.manifest).not.toMatch(new RegExp(`${oldScope}/`, 'i'));
     expect(published.devDependencies).toBeUndefined();
     expect(published.scripts).toBeUndefined();
     expect(Object.keys(published)).toEqual([
