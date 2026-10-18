@@ -214,3 +214,36 @@ describe('M1-1g-b: no build can include the crypto test seam (IR-M1-1c-G2-1 L-1)
     }
   });
 });
+
+// OPS-REL-2: the @agentlink npm scope belongs to a third party. The workspace packages moved to
+// @4thtech-io/*, and any import from the old scope is refused in every zone, in any letter case.
+// The old scope is spelled without its slash here so the repository scan (retired-scope.test.mjs)
+// finds no `<scope>/<name>` text outside history.
+const OLD = '@agentlink';
+const OLD_MIXED = '@AgentLink';
+describe('retired @agentlink scope (OPS-REL-2)', () => {
+  const RETIRED = /@agentlink npm scope.*third party/;
+
+  it('names no workspace package in the @agentlink scope', () => {
+    for (const name of WORKSPACE_NAMES) {
+      expect(name.toLowerCase().startsWith(`${OLD}/`)).toBe(false);
+      expect(name.startsWith('@4thtech-io/')).toBe(true);
+    }
+  });
+
+  it.each([
+    ['packages/core', `${OLD}/types`, 'packages/core/src/a.ts'],
+    ['packages/core', `${OLD}/crypto/testing`, 'packages/core/src/a.test.ts'],
+    ['apps/cli', `${OLD}/node`, 'apps/cli/src/a.ts'],
+    ['apps/drop', `${OLD_MIXED}/crypto`, 'apps/drop/src/a.ts'],
+    ['packages/types', `${OLD}/anything-else`, 'packages/types/src/a.ts'],
+    [null, `${OLD}/core`, 'somewhere/a.ts'],
+  ])('refuses %s importing %s', (zone, specifier, file) => {
+    expect(violationFor(zone, specifier, file)).toMatch(RETIRED);
+  });
+
+  it('still allows the renamed workspace packages along the layering', () => {
+    expect(violationFor('packages/core', '@4thtech-io/types', 'packages/core/src/a.ts')).toBeNull();
+    expect(violationFor('apps/cli', '@4thtech-io/node', 'apps/cli/src/a.ts')).toBeNull();
+  });
+});

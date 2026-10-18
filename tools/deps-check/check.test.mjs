@@ -444,3 +444,50 @@ describe('bundled workspace packages (policy `bundles`, OPS-REL-1)', () => {
     expect(src('apps/cli', `import { sha256 } from '@noble/hashes/sha2.js';`)).toHaveLength(1);
   });
 });
+
+// OPS-REL-2: deps-check refuses any dependency or import in the third-party @agentlink scope.
+// The old scope is spelled without its slash here so the repository scan (retired-scope.test.mjs)
+// finds no `<scope>/<name>` text outside history.
+const OLD = '@agentlink';
+describe('retired @agentlink scope (OPS-REL-2)', () => {
+  const RETIRED = expect.stringMatching(/@agentlink npm scope.*third party/);
+  const core = { name: '@4thtech-io/core' };
+
+  it.each(['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'])(
+    'refuses a package in the @agentlink scope in %s',
+    (field) => {
+      expect(
+        checkManifest('packages/core', { ...core, [field]: { [`${OLD}/types`]: 'workspace:*' } }),
+      ).toEqual(expect.arrayContaining([RETIRED]));
+    },
+  );
+
+  it('refuses an npm: alias that points into the @agentlink scope', () => {
+    expect(
+      checkManifest('packages/core', {
+        ...core,
+        devDependencies: { innocent: `npm:${OLD}/types@1.0.0` },
+      }),
+    ).toEqual(expect.arrayContaining([RETIRED]));
+  });
+
+  it('refuses a package named in the @agentlink scope', () => {
+    expect(checkManifest('packages/core', { name: `${OLD}/core` })).toEqual(
+      expect.arrayContaining([RETIRED]),
+    );
+  });
+
+  it('refuses a source import from the @agentlink scope', () => {
+    expect(src('packages/core', `import { x } from '${OLD}/types';`)).toEqual([RETIRED]);
+    expect(src('apps/cli', `const m = await import('${OLD}/node');`)).toEqual([RETIRED]);
+  });
+
+  it('accepts the renamed layering', () => {
+    expect(
+      checkManifest('packages/core', {
+        ...core,
+        dependencies: { '@4thtech-io/types': 'workspace:*' },
+      }),
+    ).toEqual([]);
+  });
+});
