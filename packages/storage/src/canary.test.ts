@@ -49,7 +49,7 @@ describe('storage log canary', () => {
       await s3.put(bytes(64), { size: 64, expiresAt: inADay }).catch(() => undefined);
       await s3.delete(obj).catch(() => undefined);
 
-      const inline = createInlineAdapter({ logger });
+      const inline = createInlineAdapter({ logger, now: () => NOW });
       const small = await inline.put(bytes(8), { size: 8, expiresAt: inADay });
       seen.push(small.locator);
       await inline.presignGet(small, inADay).catch(() => undefined);

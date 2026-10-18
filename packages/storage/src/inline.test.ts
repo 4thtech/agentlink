@@ -9,11 +9,11 @@ const expiresAt = new Date(NOW.getTime() + DAY_MS);
 describe('inline adapter', () => {
   it('has kind "inline" and a 12 288-byte limit (04 §3.4, 07 §5.3)', () => {
     expect(INLINE_MAX_CIPHERTEXT_BYTES).toBe(12_288);
-    expect(createInlineAdapter().kind).toBe('inline');
+    expect(createInlineAdapter({ now: () => NOW }).kind).toBe('inline');
   });
 
   it('stores the ciphertext as base64url in the locator with its SHA-256', async () => {
-    const adapter = createInlineAdapter();
+    const adapter = createInlineAdapter({ now: () => NOW });
     const ct = bytes(1000, 3);
     const obj = await adapter.put(ct, { size: ct.length, expiresAt });
     expect(obj).toEqual({
@@ -26,7 +26,7 @@ describe('inline adapter', () => {
   });
 
   it('accepts exactly the limit and refuses one byte more', async () => {
-    const adapter = createInlineAdapter();
+    const adapter = createInlineAdapter({ now: () => NOW });
     const max = bytes(INLINE_MAX_CIPHERTEXT_BYTES);
     await expect(adapter.put(max, { size: max.length, expiresAt })).resolves.toMatchObject({
       size: INLINE_MAX_CIPHERTEXT_BYTES,
@@ -38,7 +38,7 @@ describe('inline adapter', () => {
   });
 
   it('reads a stream and refuses a size mismatch', async () => {
-    const adapter = createInlineAdapter();
+    const adapter = createInlineAdapter({ now: () => NOW });
     const obj = await adapter.put(streamOf(bytes(10), bytes(5)), { size: 15, expiresAt });
     expect(obj.size).toBe(15);
     await expect(
@@ -50,14 +50,14 @@ describe('inline adapter', () => {
   });
 
   it('refuses an empty object and invalid sizes', async () => {
-    const adapter = createInlineAdapter();
+    const adapter = createInlineAdapter({ now: () => NOW });
     for (const size of [0, -1, 1.5, Number.NaN]) {
       await expect(adapter.put(bytes(1), { size, expiresAt })).rejects.toBeInstanceOf(StorageError);
     }
   });
 
   it('has no URL to presign: inline content travels in the payload', async () => {
-    const adapter = createInlineAdapter();
+    const adapter = createInlineAdapter({ now: () => NOW });
     const obj = await adapter.put(bytes(4), { size: 4, expiresAt });
     await expect(adapter.presignGet(obj, expiresAt)).rejects.toMatchObject({
       code: 'not_supported',
@@ -65,13 +65,13 @@ describe('inline adapter', () => {
   });
 
   it('delete is a no-op', async () => {
-    const adapter = createInlineAdapter();
+    const adapter = createInlineAdapter({ now: () => NOW });
     const obj = await adapter.put(bytes(4), { size: 4, expiresAt });
     await expect(adapter.delete(obj)).resolves.toBeUndefined();
   });
 
   it('read refuses a tampered object (hash or size mismatch, wrong kind)', async () => {
-    const adapter = createInlineAdapter();
+    const adapter = createInlineAdapter({ now: () => NOW });
     const obj = await adapter.put(bytes(8), { size: 8, expiresAt });
     expect(() => adapter.read({ ...obj, sha256: '00'.repeat(32) })).toThrow(StorageError);
     expect(() => adapter.read({ ...obj, size: 9 })).toThrow(StorageError);
