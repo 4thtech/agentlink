@@ -7,11 +7,11 @@
 //   - any tracked or untracked (not ignored) file whose name ends in `.sol`, in any letter case;
 //   - any such file with a `pragma solidity` line (at a line start).
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** Larger files are not read for the pragma (no source file is this big). */
+/** Larger files are skipped by the pragma scan (no source file is this big). */
 const MAX_SCAN_BYTES = 2 * 1024 * 1024;
 
 export const isSolidityPath = (path) => /\.sol$/i.test(path);
@@ -42,12 +42,15 @@ export function findSolidity(root, files) {
       found.push(`${path}: a .sol file`);
       continue;
     }
-    const full = join(root, path);
-    if (!existsSync(full)) continue;
-    const stat = statSync(full);
-    if (!stat.isFile() || stat.size > MAX_SCAN_BYTES) continue;
-    const bytes = readFileSync(full);
-    if (bytes.includes(0)) continue;
+    // One read, no exists/stat check first (no check-then-use race): a missing path or a
+    // directory throws and is skipped.
+    let bytes;
+    try {
+      bytes = readFileSync(join(root, path));
+    } catch {
+      continue;
+    }
+    if (bytes.length > MAX_SCAN_BYTES || bytes.includes(0)) continue;
     if (hasSolidityPragma(bytes.toString('utf8'))) found.push(`${path}: Solidity source (pragma)`);
   }
   return found;
