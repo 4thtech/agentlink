@@ -48,6 +48,15 @@ function creditsOf(address payer, address token) external view returns (uint256)
 
 Current import: `v0.1.0-testnet.2` of the contracts repository (commit `d46545b`), manifest SHA-256 `b1a8daa57d51bcbfbecbc91e6c5d2740d76428a4f63bbd5f1043537591188c1b`.
 
+## Chain client
+
+**In development (M1-4a); not user-facing yet.** `@4thtech-io/chain` builds on the interface package. Nothing here asks the user for a chain, a wallet or gas: chains are picked automatically.
+
+- **Supported chains.** The client knows a chain only when it ships a network entry for it and the pinned release has a deployment there: Base Sepolia today. The two must agree on the chain and the fee tokens, or the client refuses to start with that chain. Nothing is fetched at runtime.
+- **RPC endpoints.** Several public, keyless endpoints per chain; users can add their own, which are tried first. Every endpoint must be plain `https://` with a public host name (no IP address, no `localhost` or local name), and no user info, query or fragment, so no API key can be embedded. Each request has a timeout and a few retries before the next endpoint. Requests never follow redirects, and only read methods are sent.
+- **Calls.** The client encodes calls only from the client-safe ABIs; it cannot even form an admin, upgrade or module call, and EIP-3009 deposits stay off until the contracts enable them.
+- **Records and receipts.** The builders produce exactly the EIP-712 digests of the shared test vectors. Every Record gets a fresh random nonce and, when it has a recipient, a fresh random 32-byte salt that the caller cannot choose. The record ID is computed as the Notary does: `keccak256(abi.encode(chainId, notary, signer, nonce))`. Signing goes only through the agent's key store.
+
 ## Addresses
 
 **Testnet only, in development.** These are the pre-audit Base Sepolia deployment (14 Oct 2026), for development and testing; they hold no real value and may be redeployed. The source of truth is the release's `addresses/84532.json`, carried by `@4thtech-io/occ-v2-abi` (`getDeployment(84532)`) and checked against the release manifest; there is no mainnet entry, and CI refuses one.
