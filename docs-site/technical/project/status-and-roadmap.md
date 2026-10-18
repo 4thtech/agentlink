@@ -89,7 +89,7 @@ Code that is merged is not necessarily published: nothing is released or install
 | MCP server, CLI and apps | Encrypted drop service | In progress | - |
 | OCC v2 contracts (private repo) | Notary and fee vault | Done | contracts#4 |
 | OCC v2 contracts (private repo) | Testnet deployment | Done | [#65](https://github.com/4thtech/agentlink/pull/65), contracts#8, contracts#9 |
-| OCC v2 contracts (private repo) | ABI package | In progress | contracts#19 |
+| OCC v2 contracts (private repo) | ABI package | In progress | [#273](https://github.com/4thtech/agentlink/pull/273), contracts#19 |
 | OCC v2 contracts (private repo) | Gnosis Chiado deployment, pre-audit fixes | Planned | - |
 | Design | Design drop D1 | Done | [#33](https://github.com/4thtech/agentlink/pull/33) |
 | Design | Design drop D2 | In progress | [#82](https://github.com/4thtech/agentlink/pull/82) |

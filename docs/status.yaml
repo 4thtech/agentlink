@@ -315,7 +315,7 @@ areas:
         summary: "Deployed on the Base Sepolia testnet; a live smoke test passed on 14 Oct 2026."
       - name: "ABI package"
         state: in-progress
-        prs: ["contracts#19"]
+        prs: [273, "contracts#19"]
         summary: "The contracts release v0.1.0-testnet.2 exports the interface ABIs, the Base Sepolia addresses and a SHA-256 manifest, with no Solidity source. The private in-repo package `@4thtech-io/occ-v2-abi` imports it, CI checks every file against the manifest, and client code gets ABIs without admin, upgrade or module functions (M1-3f, D-83). In review."
       - name: "Gnosis Chiado deployment, pre-audit fixes"
         state: planned
