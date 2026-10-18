@@ -370,9 +370,9 @@ jobs:
           pnpm --filter @4thtech-io/node exec vitest run src/keychain-native.test.ts --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
           pnpm --filter @4thtech-io/agentlink exec vitest run test/two-process.keychain.test.ts --reporter=default --reporter=json --outputFile.json="$CLI_KEYCHAIN_REPORT"
 
-      # A fresh D-Bus session, then gnome-keyring started with --unlock, which creates and unlocks
-      # the default ("login") collection from a throwaway password read on stdin (random per run,
-      # never printed; the runner is ephemeral).
+      # A fresh D-Bus session and a throwaway gnome-keyring whose default ("login") collection has
+      # no password, so no daemon serving the session ever needs a prompt (tools/ci/with-keyring.sh,
+      # OPS-CI-10; the runner is ephemeral).
       - name: Run the keychain tests against the real keychain (Linux, gnome-keyring)
         if: runner.os == 'Linux'
         shell: bash
