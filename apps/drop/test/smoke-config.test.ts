@@ -5,12 +5,20 @@
 // contract is tested in tools/release/deploy-drop.test.mjs.
 import { unstable_readConfig } from 'wrangler';
 import { describe, expect, it } from 'vitest';
+import { readConfig } from '../src/config.js';
 import wranglerToml from '../wrangler.toml?raw';
 
 const ENVIRONMENTS = {
-  staging: { name: 'agentlink-drop-staging', bucket: 'agentlink-drop-staging' },
-  production: { name: 'agentlink-drop', bucket: 'agentlink-drop-prod' },
+  staging: { name: 'agentlink-drop-staging', bucket: 'agentlink-drop-staging', cors: [] },
+  production: {
+    name: 'agentlink-drop',
+    bucket: 'agentlink-drop-prod',
+    cors: ['https://console.agentlink.4thtech.io'],
+  },
 } as const;
+
+// A synthetic URL key (32 bytes of 0x5a), only to run the Worker's own config parser on the vars.
+const TEST_URL_KEY = 'WlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlo';
 
 type EnvName = keyof typeof ENVIRONMENTS;
 
@@ -64,13 +72,26 @@ describe('wrangler.toml', () => {
         expect(config.upload_source_maps ?? false).toBe(false);
       });
 
-      it('holds no secret: DROP_URL_KEY and DROP_CORS_ORIGINS are Worker secrets', () => {
+      it('holds no secret: DROP_URL_KEY is a Worker secret, the only var is DROP_CORS_ORIGINS', () => {
         const vars = read(env).vars;
-        expect(Object.keys(vars)).not.toContain('DROP_URL_KEY');
-        expect(Object.keys(vars)).not.toContain('DROP_CORS_ORIGINS');
-        for (const name of Object.keys(vars)) {
-          expect(name).not.toMatch(/KEY|SECRET|TOKEN|PASSWORD/i);
+        expect(Object.keys(vars)).toEqual(['DROP_CORS_ORIGINS']);
+      });
+
+      it('allows CORS only for the reviewed console origins (08 §7)', () => {
+        const raw = read(env).vars.DROP_CORS_ORIGINS;
+        expect(typeof raw).toBe('string');
+        const origins = String(raw)
+          .split(',')
+          .map((origin) => origin.trim())
+          .filter((origin) => origin !== '');
+        expect(origins).toEqual(expected.cors);
+        for (const origin of origins) {
+          expect(origin).toMatch(/^https:\/\/[a-z0-9.-]+$/);
+          expect(origin).not.toContain('*');
         }
+        // The Worker's own parser accepts the value (an invalid one would make it answer 503).
+        const config = readConfig({ DROP_URL_KEY: TEST_URL_KEY, DROP_CORS_ORIGINS: raw });
+        expect(config?.corsOrigins).toEqual(expected.cors);
       });
     });
   }

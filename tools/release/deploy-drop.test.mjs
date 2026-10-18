@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -117,8 +117,7 @@ describe('deploy-drop.yml structure', () => {
     for (const name of ['deploy-staging', 'deploy-production']) {
       const body = job(name);
       expect(body).toMatch(/CLOUDFLARE_API_TOKEN/);
-      expect(body).toMatch(/secret list/);
-      expect(body).toMatch(/DROP_URL_KEY/);
+      expect(body).toMatch(/SECRET-CHECK-BEGIN/);
       expect(body).toMatch(/ready=false/);
     }
   });
@@ -146,7 +145,27 @@ describe('deploy-drop.yml structure', () => {
     expect(production).toMatch(/deployments status/);
     expect(production).toMatch(/wrangler rollback/);
     expect(production).toMatch(/\/v1\/health/);
-    expect(production).toMatch(/if: failure\(\)/);
+    expect(production).toMatch(
+      /if: \(failure\(\) \|\| cancelled\(\)\) && steps\.deploy\.outputs\.deployed == 'true' && steps\.head-rollback\.outputs\.current == 'true'/,
+    );
+    // The rollback is verified by the live version, not only by /v1/health.
+    const rollback = production.slice(production.indexOf('id: rollback'));
+    expect(rollback).toMatch(/deployments status[\s\S]*"\$live" != "\$PREVIOUS"/);
+  });
+
+  it('changes production only while this commit is the head of main (IR-M1-27b-1 M-2)', () => {
+    const production = job('deploy-production');
+    const head = production.indexOf('id: head\n');
+    const ready = production.indexOf('id: ready');
+    const deploy = production.indexOf('id: deploy\n');
+    expect(head).toBeGreaterThan(-1);
+    expect(head).toBeLessThan(ready);
+    expect(ready).toBeLessThan(deploy);
+    expect(production).toMatch(/id: ready\n {8}if: steps\.head\.outputs\.current == 'true'/);
+    expect(production.indexOf('id: head-rollback')).toBeLessThan(
+      production.indexOf('id: rollback\n'),
+    );
+    expect(job('deploy-production')).toMatch(/concurrency:\n {6}group: deploy-drop-production/);
   });
 
   it('reads back the lifecycle rule and the logging settings after each deploy', () => {
@@ -258,8 +277,14 @@ describe('logging settings read-back', () => {
     expect(check({ success: true, result: { tail_consumers: null } }).ok).toBe(true);
   });
 
-  it('refuses Logpush, observability, invocation logs or a Tail Worker', () => {
+  it('refuses Logpush, observability, invocation logs, traces or a Tail Worker', () => {
     expect(check({ success: true, result: off({ logpush: true }) }).ok).toBe(false);
+    expect(
+      check({
+        success: true,
+        result: off({ observability: { enabled: false, traces: { enabled: true } } }),
+      }).ok,
+    ).toBe(false);
     expect(check({ success: true, result: off({ observability: { enabled: true } }) }).ok).toBe(
       false,
     );
@@ -285,5 +310,149 @@ describe('logging settings read-back', () => {
   it('refuses an API error and a response that is not JSON', () => {
     expect(check({ success: false, errors: [{ code: 10007 }] }).ok).toBe(false);
     expect(check('not json').ok).toBe(false);
+  });
+});
+
+/** A directory with fake `curl` and `gh` that answer from fixture files (no network). */
+function fakeTools({ httpCode = '200', body = '{}', head = '' } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'drop-fake-'));
+  const bin = join(dir, 'bin');
+  mkdirSync(bin);
+  writeFileSync(join(dir, 'body.json'), body);
+  writeFileSync(
+    join(bin, 'curl'),
+    [
+      '#!/usr/bin/env bash',
+      'out=""',
+      'while [ $# -gt 0 ]; do if [ "$1" = "-o" ]; then out="$2"; shift; fi; shift; done',
+      `[ -n "$out" ] && cp ${JSON.stringify(join(dir, 'body.json'))} "$out"`,
+      `printf '%s' ${JSON.stringify(httpCode)}`,
+    ].join('\n'),
+  );
+  writeFileSync(join(bin, 'gh'), `#!/usr/bin/env bash\nprintf '%s\\n' ${JSON.stringify(head)}\n`);
+  chmodSync(join(bin, 'curl'), 0o755);
+  chmodSync(join(bin, 'gh'), 0o755);
+  const output = join(dir, 'github-output');
+  writeFileSync(output, '');
+  return { dir, bin, output };
+}
+
+function runWithFakes(script, fakes, env) {
+  const result = (() => {
+    try {
+      const stdout = execFileSync('bash', ['-euo', 'pipefail', '-c', script], {
+        env: { PATH: `${fakes.bin}:${process.env.PATH}`, ...env },
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      return { ok: true, output: stdout };
+    } catch (error) {
+      return { ok: false, output: `${error.stdout ?? ''}${error.stderr ?? ''}` };
+    }
+  })();
+  return { ...result, github: readFileSync(fakes.output, 'utf8') };
+}
+
+describe('credential and Worker secret check', () => {
+  const copies = block('SECRET-CHECK');
+  const script = copies[0] ?? '';
+  const ACCOUNT = '0123456789abcdef0123456789abcdef';
+  const run = (fake, env = {}) => {
+    const fakes = fakeTools(fake);
+    return runWithFakes(script, fakes, {
+      CLOUDFLARE_API_TOKEN: 'test-token-value',
+      CLOUDFLARE_ACCOUNT_ID: ACCOUNT,
+      DEPLOY_ENV: 'staging',
+      WORKER: 'agentlink-drop-staging',
+      RUNNER_TEMP: fakes.dir,
+      GITHUB_OUTPUT: fakes.output,
+      ...env,
+    });
+  };
+  const listing = (names) =>
+    JSON.stringify({ success: true, result: names.map((name) => ({ name, type: 'secret_text' })) });
+
+  it('is the same block in staging and production', () => {
+    expect(copies.length).toBe(2);
+    expect(copies[1]).toBe(copies[0]);
+  });
+
+  it('skips cleanly without credentials', () => {
+    const result = run({}, { CLOUDFLARE_API_TOKEN: '' });
+    expect(result.ok).toBe(true);
+    expect(result.github).toContain('ready=false');
+  });
+
+  it('skips cleanly while the Worker does not exist or has no DROP_URL_KEY', () => {
+    const missing = run({ httpCode: '404', body: '{"success":false}' });
+    expect(missing.ok).toBe(true);
+    expect(missing.github).toContain('ready=false');
+    const noKey = run({ body: listing(['OTHER']) });
+    expect(noKey.ok).toBe(true);
+    expect(noKey.github).toContain('ready=false');
+  });
+
+  it('is ready with DROP_URL_KEY set', () => {
+    const result = run({ body: listing(['DROP_URL_KEY']) });
+    expect(result.ok).toBe(true);
+    expect(result.github).toContain('ready=true');
+  });
+
+  it('fails loudly for a token the API refuses, an unreachable API or a malformed answer', () => {
+    for (const code of ['401', '403', '500', '000', '']) {
+      const result = run({ httpCode: code, body: '{"success":false}' });
+      expect(result.ok).toBe(false);
+      expect(result.github).not.toContain('ready=');
+    }
+    expect(run({ body: '<html>' }).ok).toBe(false);
+  });
+
+  it('fails when DROP_CORS_ORIGINS exists as a Worker secret (it is a reviewed var)', () => {
+    expect(run({ body: listing(['DROP_URL_KEY', 'DROP_CORS_ORIGINS']) }).ok).toBe(false);
+  });
+
+  it('fails for a malformed account ID and never prints the token', () => {
+    expect(run({}, { CLOUDFLARE_ACCOUNT_ID: 'not-an-id' }).ok).toBe(false);
+    for (const code of ['200', '403', '404']) {
+      expect(run({ httpCode: code, body: listing(['DROP_URL_KEY']) }).output).not.toContain(
+        'test-token-value',
+      );
+    }
+  });
+});
+
+describe('head-of-main check', () => {
+  const copies = block('HEAD-CHECK');
+  const script = copies[0] ?? '';
+  const SHA = 'a'.repeat(40);
+  const run = (head, commit = SHA) => {
+    const fakes = fakeTools({ head });
+    return runWithFakes(script, fakes, {
+      REPOSITORY: '4thtech/agentlink',
+      COMMIT: commit,
+      GITHUB_OUTPUT: fakes.output,
+    });
+  };
+
+  it('is the same block before the deploy and before the rollback', () => {
+    expect(copies.length).toBe(2);
+    expect(copies[1]).toBe(copies[0]);
+  });
+
+  it('is current when main still points at this commit', () => {
+    const result = run(SHA);
+    expect(result.ok).toBe(true);
+    expect(result.github).toContain('current=true');
+  });
+
+  it('is not current once main moved on (a newer run owns production)', () => {
+    const result = run('b'.repeat(40));
+    expect(result.ok).toBe(true);
+    expect(result.github).toContain('current=false');
+  });
+
+  it('fails when the head of main cannot be read', () => {
+    expect(run('').ok).toBe(false);
+    expect(run('not-a-sha').ok).toBe(false);
   });
 });

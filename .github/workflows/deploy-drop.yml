@@ -16,7 +16,8 @@
 #                      settings.
 #   smoke-staging      no credentials: health, signed upload / GET / DELETE round trip, expired GET
 #                      refused (apps/drop/test/smoke-remote.test.ts against the staging origin).
-#   deploy-production  environment `production`, only after a green staging smoke. Records the live
+#   deploy-production  environment `production`, only after a green staging smoke, and only while this
+#                      commit is still main's head (runs can finish out of order). Records the live
 #                      version (rollback target), deploys to the Custom Domain, health-checks over
 #                      HTTP (no repository code runs against production), reads back the lifecycle
 #                      rule and the logging settings, and on any failure rolls back automatically
@@ -24,6 +25,10 @@
 #   freeze             sets DEPLOY_FREEZE when deploy-production failed after deploying.
 #   rollback-rehearsal manual dispatch with `rehearse-rollback`: on staging, rolls back to the
 #                      previous version, checks it, and rolls forward again (§4.5 "rehearsed").
+#
+# SKIPPING VS FAILING: absent credentials, an absent Worker or an absent DROP_URL_KEY skip with a
+# notice; a token the API refuses fails the job. DROP_CORS_ORIGINS is a wrangler.toml var per
+# environment; a Worker secret of that name fails the job (it would shadow the reviewed value).
 #
 # DEPLOY_FREEZE: every deploy job is skipped while the repository variable is 'true' and re-checks it
 # when it starts (after any approval wait). Rollback is remediation and still runs.
@@ -34,8 +39,8 @@
 #                             Wrangler does not report it).
 #   Environment `production`: secret CLOUDFLARE_API_TOKEN (production token), variable CLOUDFLARE_ACCOUNT_ID.
 #   Environment `deploy-freeze`: secret DEPLOY_FREEZE_TOKEN (exists, OPS-CI-2).
-#   Worker secrets DROP_URL_KEY and DROP_CORS_ORIGINS are set per environment by the owner with
-#   `wrangler secret put`; GitHub never holds them.
+#   Worker secret DROP_URL_KEY is set per environment by the owner with `wrangler secret put`;
+#   GitHub never holds it.
 #
 # Zero access (AGENTS.md): no step prints an object URL, a drop key or a token. Only the drop's
 # origin, HTTP status codes and Worker version IDs appear in logs.
@@ -233,14 +238,17 @@ jobs:
       - name: Check credentials and the Worker secret
         id: ready
         shell: bash
-        working-directory: apps/drop
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_ENV: staging
+          WORKER: agentlink-drop-staging
         run: |
           set -euo pipefail
+          # SECRET-CHECK-BEGIN
+          # Absent credentials or an absent Worker secret skip cleanly; a token that does not work fails.
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
-            echo "::notice::Environment staging has no CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID yet (owner steps, M1-27b). The drop is not deployed."
+            echo "::notice::Environment $DEPLOY_ENV has no CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID yet (owner steps, M1-27b). Not deployed."
             echo "ready=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -248,19 +256,38 @@ jobs:
             echo "::error::CLOUDFLARE_ACCOUNT_ID is not a 32-character hex account ID."
             exit 1
           fi
-          # Names only; Wrangler never prints secret values.
-          if ! listing="$(pnpm exec wrangler secret list --env staging --format json)"; then
-            echo "::warning::Could not list the secrets of Worker agentlink-drop-staging (not created yet, or the token lacks access). The drop is not deployed."
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          listing="$RUNNER_TEMP/secret-names.json"
+          # Names only: the API never returns secret values.
+          code="$(curl -sS --proto '=https' --max-time 30 -o "$listing" -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$WORKER/secrets" || true)"
+          case "$code" in
+            200) ;;
+            404)
+              echo "::notice::Worker $WORKER does not exist yet (owner: wrangler secret put creates it). Not deployed."
+              echo "ready=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            *)
+              echo "::error::Listing the secrets of $WORKER failed with HTTP ${code:-none}: the token is invalid, expired or lacks Workers Scripts access."
+              exit 1
+              ;;
+          esac
+          if ! jq -e '.success == true and (.result | type == "array")' "$listing" > /dev/null 2>&1; then
+            echo "::error::The secrets listing of $WORKER is not a valid API response."
+            exit 1
           fi
-          json="$(printf '%s\n' "$listing" | awk 'f || /^\[/ { f = 1; print }')"
-          if ! jq -e 'any(.[]; .name == "DROP_URL_KEY")' <<<"$json" > /dev/null; then
-            echo "::notice::Worker secret DROP_URL_KEY is not set on agentlink-drop-staging yet (owner: wrangler secret put). The drop is not deployed."
+          if jq -e 'any(.result[]; .name == "DROP_CORS_ORIGINS")' "$listing" > /dev/null; then
+            echo "::error::$WORKER has a Worker secret DROP_CORS_ORIGINS; it is a wrangler.toml var now. Owner: wrangler secret delete DROP_CORS_ORIGINS --env $DEPLOY_ENV."
+            exit 1
+          fi
+          if ! jq -e 'any(.result[]; .name == "DROP_URL_KEY")' "$listing" > /dev/null; then
+            echo "::notice::Worker secret DROP_URL_KEY is not set on $WORKER yet (owner: wrangler secret put). Not deployed."
             echo "ready=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "ready=true" >> "$GITHUB_OUTPUT"
+          # SECRET-CHECK-END
 
       - name: Record the live version (rollback rehearsal target)
         id: previous
@@ -336,12 +363,13 @@ jobs:
             and ((.result.observability.enabled // false) == false)
             and ((.result.observability.logs.enabled // false) == false)
             and ((.result.observability.logs.invocation_logs // false) == false)
+            and ((.result.observability.traces.enabled // false) == false)
             and (((.result.tail_consumers // []) | length) == 0)
           ' "$SETTINGS_JSON" > /dev/null; then
-            echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs and Tail Workers must stay off for the drop (04 §4)."
+            echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs, traces and Tail Workers must stay off for the drop (04 §4)."
             exit 1
           fi
-          echo "Logging settings read back: Logpush, observability, invocation logs and Tail Workers are off."
+          echo "Logging settings read back: Logpush, observability, invocation logs, traces and Tail Workers are off."
           # READBACK-SETTINGS-END
 
       - name: Read back the bucket lifecycle rule (7 days)
@@ -432,6 +460,30 @@ jobs:
             exit 1
           fi
 
+      - name: Check that this commit is still the head of main
+        id: head
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # HEAD-CHECK-BEGIN
+          # Runs can finish out of order: only the run for main's current head may change production.
+          head="$(gh api "repos/$REPOSITORY/commits/main" --jq .sha)"
+          if ! [[ "$head" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Could not read the head of main."
+            exit 1
+          fi
+          if [ "$head" != "$COMMIT" ]; then
+            echo "::notice::main has moved on from $COMMIT to $head; the newer run handles production. Skipped."
+            echo "current=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          fi
+          # HEAD-CHECK-END
+
       - name: Set up Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
         with:
@@ -454,15 +506,19 @@ jobs:
 
       - name: Check credentials and the Worker secret
         id: ready
+        if: steps.head.outputs.current == 'true'
         shell: bash
-        working-directory: apps/drop
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_ENV: production
+          WORKER: agentlink-drop
         run: |
           set -euo pipefail
+          # SECRET-CHECK-BEGIN
+          # Absent credentials or an absent Worker secret skip cleanly; a token that does not work fails.
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
-            echo "::notice::Environment production has no CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID yet (owner steps, M1-27b). Production is not deployed."
+            echo "::notice::Environment $DEPLOY_ENV has no CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID yet (owner steps, M1-27b). Not deployed."
             echo "ready=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -470,18 +526,38 @@ jobs:
             echo "::error::CLOUDFLARE_ACCOUNT_ID is not a 32-character hex account ID."
             exit 1
           fi
-          if ! listing="$(pnpm exec wrangler secret list --env production --format json)"; then
-            echo "::warning::Could not list the secrets of Worker agentlink-drop (not created yet, or the token lacks access). Production is not deployed."
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          listing="$RUNNER_TEMP/secret-names.json"
+          # Names only: the API never returns secret values.
+          code="$(curl -sS --proto '=https' --max-time 30 -o "$listing" -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$WORKER/secrets" || true)"
+          case "$code" in
+            200) ;;
+            404)
+              echo "::notice::Worker $WORKER does not exist yet (owner: wrangler secret put creates it). Not deployed."
+              echo "ready=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            *)
+              echo "::error::Listing the secrets of $WORKER failed with HTTP ${code:-none}: the token is invalid, expired or lacks Workers Scripts access."
+              exit 1
+              ;;
+          esac
+          if ! jq -e '.success == true and (.result | type == "array")' "$listing" > /dev/null 2>&1; then
+            echo "::error::The secrets listing of $WORKER is not a valid API response."
+            exit 1
           fi
-          json="$(printf '%s\n' "$listing" | awk 'f || /^\[/ { f = 1; print }')"
-          if ! jq -e 'any(.[]; .name == "DROP_URL_KEY")' <<<"$json" > /dev/null; then
-            echo "::notice::Worker secret DROP_URL_KEY is not set on agentlink-drop yet (owner: wrangler secret put). Production is not deployed."
+          if jq -e 'any(.result[]; .name == "DROP_CORS_ORIGINS")' "$listing" > /dev/null; then
+            echo "::error::$WORKER has a Worker secret DROP_CORS_ORIGINS; it is a wrangler.toml var now. Owner: wrangler secret delete DROP_CORS_ORIGINS --env $DEPLOY_ENV."
+            exit 1
+          fi
+          if ! jq -e 'any(.result[]; .name == "DROP_URL_KEY")' "$listing" > /dev/null; then
+            echo "::notice::Worker secret DROP_URL_KEY is not set on $WORKER yet (owner: wrangler secret put). Not deployed."
             echo "ready=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "ready=true" >> "$GITHUB_OUTPUT"
+          # SECRET-CHECK-END
 
       - name: Record the live version (rollback target)
         id: previous
@@ -575,12 +651,13 @@ jobs:
             and ((.result.observability.enabled // false) == false)
             and ((.result.observability.logs.enabled // false) == false)
             and ((.result.observability.logs.invocation_logs // false) == false)
+            and ((.result.observability.traces.enabled // false) == false)
             and (((.result.tail_consumers // []) | length) == 0)
           ' "$SETTINGS_JSON" > /dev/null; then
-            echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs and Tail Workers must stay off for the drop (04 §4)."
+            echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs, traces and Tail Workers must stay off for the drop (04 §4)."
             exit 1
           fi
-          echo "Logging settings read back: Logpush, observability, invocation logs and Tail Workers are off."
+          echo "Logging settings read back: Logpush, observability, invocation logs, traces and Tail Workers are off."
           # READBACK-SETTINGS-END
 
       - name: Read back the bucket lifecycle rule (7 days)
@@ -611,9 +688,34 @@ jobs:
       # Any failure after the deploy started rolls back. Durable Object migrations are forward-only
       # (§4.5): a version from before a migration may be refused; the freeze then stops everything
       # and the owner decides the forward fix.
+      - name: Check that this commit is still the head of main (before rollback)
+        id: head-rollback
+        if: (failure() || cancelled()) && steps.deploy.outputs.deployed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # HEAD-CHECK-BEGIN
+          # Runs can finish out of order: only the run for main's current head may change production.
+          head="$(gh api "repos/$REPOSITORY/commits/main" --jq .sha)"
+          if ! [[ "$head" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Could not read the head of main."
+            exit 1
+          fi
+          if [ "$head" != "$COMMIT" ]; then
+            echo "::notice::main has moved on from $COMMIT to $head; the newer run handles production. Skipped."
+            echo "current=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          fi
+          # HEAD-CHECK-END
+
       - name: Roll back to the recorded version
         id: rollback
-        if: failure() && steps.deploy.outputs.deployed == 'true'
+        if: (failure() || cancelled()) && steps.deploy.outputs.deployed == 'true' && steps.head-rollback.outputs.current == 'true'
         shell: bash
         working-directory: apps/drop
         env:
@@ -629,16 +731,24 @@ jobs:
             exit 1
           fi
           pnpm exec wrangler rollback "$PREVIOUS" --env production --message "Automatic rollback after a failed post-deploy check (run $RUN_ID)" --yes
+          live="$(pnpm exec wrangler deployments status --env production --json \
+            | awk 'f || /^\{/ { f = 1; print }' \
+            | jq -r '[.versions[]? | select(.percentage == 100) | .version_id][0] // empty' || true)"
+          if [ "$live" != "$PREVIOUS" ]; then
+            echo "::error::After the rollback the live version is ${live:-unknown}, not $PREVIOUS."
+            echo "result=rollback-not-live" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
           for attempt in 1 2 3 4 5 6; do
             health="$(curl -sS --proto '=https' --max-time 15 -o /dev/null -w '%{http_code}' "$DROP_PRODUCTION_ORIGIN/v1/health" || true)"
             if [ "$health" = "200" ]; then
-              echo "::warning::Rolled back to $PREVIOUS; /v1/health answers 200. DEPLOY_FREEZE is set by the freeze job."
+              echo "::warning::Rolled back: $PREVIOUS is live and /v1/health answers 200. DEPLOY_FREEZE is set by the freeze job."
               echo "result=rolled-back" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             sleep 10
           done
-          echo "::error::Rolled back to $PREVIOUS, but /v1/health does not answer 200."
+          echo "::error::Rolled back: $PREVIOUS is live, but /v1/health does not answer 200."
           echo "result=rolled-back-unhealthy" >> "$GITHUB_OUTPUT"
           exit 1
 
@@ -657,6 +767,7 @@ jobs:
           SETTINGS_RESULT: ${{ steps.settings.outcome }}
           LIFECYCLE_RESULT: ${{ steps.lifecycle.outcome }}
           ROLLBACK_RESULT: ${{ steps.rollback.outputs.result }}
+          ROLLBACK_HEAD: ${{ steps.head-rollback.outputs.current }}
         run: |
           set -euo pipefail
           {
@@ -678,7 +789,11 @@ jobs:
             echo "| Health check | ${HEALTH_RESULT:-skipped} |"
             echo "| Logging read-back | ${SETTINGS_RESULT:-skipped} |"
             echo "| Lifecycle read-back | ${LIFECYCLE_RESULT:-skipped} |"
-            echo "| Rollback | ${ROLLBACK_RESULT:-not needed} |"
+            if [ "${ROLLBACK_HEAD:-}" = "false" ]; then
+              echo "| Rollback | skipped: main moved on, the newer run owns production |"
+            else
+              echo "| Rollback | ${ROLLBACK_RESULT:-not needed} |"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
   freeze:

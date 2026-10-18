@@ -2,11 +2,14 @@
 # (.github/workflows/deploy-drop.yml, release-and-deployment.md §4.5); never `wrangler deploy` from a
 # workstation. Always pass --env: `staging` (workers.dev) or `production` (the Custom Domain).
 #
-# No secrets here. Per environment the owner sets two Worker secrets with `wrangler secret put`:
+# No secrets here. Per environment the owner sets one Worker secret with `wrangler secret put`:
 #   DROP_URL_KEY       32 random bytes, base64url (the URL MAC and IP-bucket key)
-#   DROP_CORS_ORIGINS  the console origins, comma-separated (08 §7)
-# The deploy workflow skips cleanly until DROP_URL_KEY exists. No account ID here either: CI passes
+# The deploy workflow skips cleanly until it exists. No account ID here either: CI passes
 # CLOUDFLARE_ACCOUNT_ID from the GitHub Environment.
+#
+# DROP_CORS_ORIGINS (08 §7) is a var per environment, here, so the browser allowlist is reviewed in
+# PRs and asserted by test/smoke-config.test.ts: exact `https://host` origins, comma-separated; empty
+# means no CORS headers at all. Never set it as a Worker secret too (the deploy fails if one exists).
 #
 # Bindings, limits and logging are NOT inherited by environments, so each one repeats them; the
 # assertions in test/smoke-config.test.ts read this file back for each environment.
@@ -37,6 +40,9 @@ invocation_logs = false
 
 [observability.traces]
 enabled = false
+
+[vars]
+DROP_CORS_ORIGINS = ""
 
 [limits]
 # The commit hashes up to 100 MiB of stored ciphertext, about 0.4 s of CPU (IR-M1-27a-1 L-3).
@@ -74,6 +80,10 @@ invocation_logs = false
 [env.staging.observability.traces]
 enabled = false
 
+[env.staging.vars]
+# No staging console exists yet; add its origin here when it does.
+DROP_CORS_ORIGINS = ""
+
 [env.staging.limits]
 cpu_ms = 30000
 
@@ -104,6 +114,9 @@ invocation_logs = false
 
 [env.production.observability.traces]
 enabled = false
+
+[env.production.vars]
+DROP_CORS_ORIGINS = "https://console.agentlink.4thtech.io"
 
 [env.production.limits]
 cpu_ms = 30000
