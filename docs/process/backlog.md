@@ -1759,6 +1759,10 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Follow-up (IR-M1-3b-1 I-2): the client ignores zero-amount `Deposited`, `Swept` and `IntegratorWithdrawn` events when it reads credits or history; events are verified against the canonical contract address.
 - **Acceptance:**
   - Quotes equal the contract's `quote` including the integrator cap, with the protocol and integrator parts in USD; `creditsOf` read on every supported chain (fork or mocked RPC); a fee token outside the configured stablecoin allowlist is never priced or offered.
+  - Read-client follow-ups (IR-M1-4a-2, Low; tests first):
+    - `client.extend()` returns a client that stays wrapped: every rejection is still a URL-free `ChainError`.
+    - No RPC URL is reachable through the client object, including `client.transport.transports[i].value.url`: hide it or wrap the transport.
+    - The product path never builds a read client with a plain `fetch`: it requires `nodeRpcFetch` or an equivalent address-checked fetch, enforced by a lint rule or a factory-only export.
 
 #### M1-4c · chain: submission, direct mode, inclusion tracking
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
