@@ -1,0 +1,407 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "drop-auth",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib, coincurve 21.0.0)",
+    "version": "cpython 3.12.13",
+    "script": "tools/vectors/generate_drop_auth.py"
+  },
+  "cases": [
+    {
+      "id": "url-mac-get",
+      "source": "07 \u00a75.4 drop URL MAC: get part 0",
+      "input": {
+        "op": "urlMac",
+        "key": "2949d6a56af574dcacbd6345f1fb7c972e51232f08b2b8aba3a903fbdc528991",
+        "purpose": "get",
+        "objectId": "65638ca4b02c5217d2055b2085b2d10f",
+        "part": "0",
+        "expiresAt": "1790604800"
+      },
+      "expected": {
+        "mac": "78943a6684ce6ec259eafe17ba9be158f80c522df2a04ce5e0409c087bca21c1"
+      }
+    },
+    {
+      "id": "url-mac-put-single",
+      "source": "07 \u00a75.4 drop URL MAC: put part 0",
+      "input": {
+        "op": "urlMac",
+        "key": "2949d6a56af574dcacbd6345f1fb7c972e51232f08b2b8aba3a903fbdc528991",
+        "purpose": "put",
+        "objectId": "65638ca4b02c5217d2055b2085b2d10f",
+        "part": "0",
+        "expiresAt": "1790000900"
+      },
+      "expected": {
+        "mac": "d285c0e1418512b2b5b914b7e1f84c0aeefc7d2a4fc55a48fe7c2b41e0ec2663"
+      }
+    },
+    {
+      "id": "url-mac-put-part-3",
+      "source": "07 \u00a75.4 drop URL MAC: put part 3",
+      "input": {
+        "op": "urlMac",
+        "key": "2949d6a56af574dcacbd6345f1fb7c972e51232f08b2b8aba3a903fbdc528991",
+        "purpose": "put",
+        "objectId": "65638ca4b02c5217d2055b2085b2d10f",
+        "part": "3",
+        "expiresAt": "1790000900"
+      },
+      "expected": {
+        "mac": "51f2544d15ebbacd31d08167ac6c2b11004ca9919a1fab0ec72e58110131677c"
+      }
+    },
+    {
+      "id": "url-mac-put-part-max",
+      "source": "07 \u00a75.4 drop URL MAC: put part 10000",
+      "input": {
+        "op": "urlMac",
+        "key": "2949d6a56af574dcacbd6345f1fb7c972e51232f08b2b8aba3a903fbdc528991",
+        "purpose": "put",
+        "objectId": "65638ca4b02c5217d2055b2085b2d10f",
+        "part": "10000",
+        "expiresAt": "1790000900"
+      },
+      "expected": {
+        "mac": "98be762eaba2c2d7e7f7e98de2c723469d70d4134fe1f36ac665b99b360d9966"
+      }
+    },
+    {
+      "id": "url-mac-expiry-above-2-32",
+      "source": "07 \u00a75.4 drop URL MAC: get part 0",
+      "input": {
+        "op": "urlMac",
+        "key": "2949d6a56af574dcacbd6345f1fb7c972e51232f08b2b8aba3a903fbdc528991",
+        "purpose": "get",
+        "objectId": "65638ca4b02c5217d2055b2085b2d10f",
+        "part": "0",
+        "expiresAt": "4294967301"
+      },
+      "expected": {
+        "mac": "493d100fda2cf0d292da54e1fc46234019cdb80382245c4667c3a5b98f4b869d"
+      }
+    },
+    {
+      "id": "event-upload",
+      "source": "07 \u00a75.4 drop request signature: the unsigned event and its NIP-01 id for an upload request",
+      "input": {
+        "op": "authEvent",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "createdAt": "1790000000",
+        "pubkey": "5aa35e889ea5fbffde7aa19195ad0dd4d7f33e6f86304732d8006f764f13ed6c"
+      },
+      "expected": {
+        "payload": "f9393fe37b0a32977d670db149d551f7808dd5ae8029f02f26838d0b6dc3528b",
+        "eventId": "3439499b79920745bf0c167eada44eff1389d5c2f48886856d5c478cab615379"
+      }
+    },
+    {
+      "id": "verify-accept",
+      "source": "07 \u00a75.4 drop request signature: a correctly signed upload request",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6IjM0Mzk0OTliNzk5MjA3NDViZjBjMTY3ZWFkYTQ0ZWZmMTM4OWQ1YzJmNDg4ODY4NTZkNWM0NzhjYWI2MTUzNzkiLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL2Ryb3AiXV0sImNvbnRlbnQiOiIiLCJzaWciOiI0Mjg3ZjZlNGJlNjFhYzNiNTQ0NzI4OGRlYWMzMjQ2ODRmNGU3MDgzMDVkODlkZjU4ODViZmRiYTQ0OGU5ZWRkMmIyMjg4YjNkYzg2ZjI1N2JjZmY0ZDliYjFjMGZkYmQyMjc1ODMwZGQ1YThlNjExNjM2ZmU4ZWZkM2UzNDMzMCJ9",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1790000000"
+      },
+      "expected": {
+        "outcome": "accept",
+        "pubkey": "5aa35e889ea5fbffde7aa19195ad0dd4d7f33e6f86304732d8006f764f13ed6c"
+      }
+    },
+    {
+      "id": "verify-accept-skew-edge",
+      "source": "07 \u00a75.4 drop request signature: created_at exactly 60 s before now",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6IjM0Mzk0OTliNzk5MjA3NDViZjBjMTY3ZWFkYTQ0ZWZmMTM4OWQ1YzJmNDg4ODY4NTZkNWM0NzhjYWI2MTUzNzkiLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL2Ryb3AiXV0sImNvbnRlbnQiOiIiLCJzaWciOiI0Mjg3ZjZlNGJlNjFhYzNiNTQ0NzI4OGRlYWMzMjQ2ODRmNGU3MDgzMDVkODlkZjU4ODViZmRiYTQ0OGU5ZWRkMmIyMjg4YjNkYzg2ZjI1N2JjZmY0ZDliYjFjMGZkYmQyMjc1ODMwZGQ1YThlNjExNjM2ZmU4ZWZkM2UzNDMzMCJ9",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1790000060"
+      },
+      "expected": {
+        "outcome": "accept",
+        "pubkey": "5aa35e889ea5fbffde7aa19195ad0dd4d7f33e6f86304732d8006f764f13ed6c"
+      }
+    },
+    {
+      "id": "verify-accept-delete",
+      "source": "07 \u00a75.4 drop request signature: a signed DELETE",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6IjE5MmY5YjJlNzdlYjE4NGQzMzUwYzA5ODFhOTA5N2RmYjdhZWNhYjBkYjQ0MDkzNGExMjRiNGU2YjYyZTdhYTciLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvby9aV09NcExBc1VoZlNCVnNnaGJMUkR3Il0sWyJtZXRob2QiLCJERUxFVEUiXSxbInBheWxvYWQiLCI3OWJmZTRlNjQ0NDlhYzljMDhiM2NhZGY2N2JlY2I1ZmM2YmE0MmVkMTFhYjY1OTI2NmQyM2FiMDdhMjljZjU2Il0sWyJkb21haW4iLCJhZ2VudGxpbmsvdjEvZHJvcCJdXSwiY29udGVudCI6IiIsInNpZyI6ImFjYWRiNDdiMDI1ODNiNjQ5MmZjMjc3ODc0NGZmNzQyOTlkMzdjZGZhNTdmZjA1NDk1YzZkZTFlODNlNWQ0NjJiNGJkOWUzYWI5OWVlMjk0ZGU5Yzg1YzUxNGI0MGJlYzNmYjRmNjM1YTc4YjE4YjFmOTcxM2UxMjU4MDE1YWJlIn0",
+        "method": "DELETE",
+        "url": "https://drop.agentlink.4thtech.io/v1/o/ZWOMpLAsUhfSBVsghbLRDw",
+        "body": "7b2276223a312c226f626a6563744964223a225a574f4d704c4173556866534256736768624c524477222c226e6f6e6365223a2276414e7069505f504d705874446966455f4a33663441222c227473223a313739303030303030307d",
+        "now": "1790000000"
+      },
+      "expected": {
+        "outcome": "accept",
+        "pubkey": "5aa35e889ea5fbffde7aa19195ad0dd4d7f33e6f86304732d8006f764f13ed6c"
+      }
+    },
+    {
+      "id": "verify-reject-stale",
+      "source": "07 \u00a75.4 drop request signature: created_at 61 s before now",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6IjM0Mzk0OTliNzk5MjA3NDViZjBjMTY3ZWFkYTQ0ZWZmMTM4OWQ1YzJmNDg4ODY4NTZkNWM0NzhjYWI2MTUzNzkiLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL2Ryb3AiXV0sImNvbnRlbnQiOiIiLCJzaWciOiI0Mjg3ZjZlNGJlNjFhYzNiNTQ0NzI4OGRlYWMzMjQ2ODRmNGU3MDgzMDVkODlkZjU4ODViZmRiYTQ0OGU5ZWRkMmIyMjg4YjNkYzg2ZjI1N2JjZmY0ZDliYjFjMGZkYmQyMjc1ODMwZGQ1YThlNjExNjM2ZmU4ZWZkM2UzNDMzMCJ9",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1790000061"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "stale"
+      }
+    },
+    {
+      "id": "verify-reject-future",
+      "source": "07 \u00a75.4 drop request signature: created_at 61 s after now",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6IjM0Mzk0OTliNzk5MjA3NDViZjBjMTY3ZWFkYTQ0ZWZmMTM4OWQ1YzJmNDg4ODY4NTZkNWM0NzhjYWI2MTUzNzkiLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL2Ryb3AiXV0sImNvbnRlbnQiOiIiLCJzaWciOiI0Mjg3ZjZlNGJlNjFhYzNiNTQ0NzI4OGRlYWMzMjQ2ODRmNGU3MDgzMDVkODlkZjU4ODViZmRiYTQ0OGU5ZWRkMmIyMjg4YjNkYzg2ZjI1N2JjZmY0ZDliYjFjMGZkYmQyMjc1ODMwZGQ1YThlNjExNjM2ZmU4ZWZkM2UzNDMzMCJ9",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1789999939"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "stale"
+      }
+    },
+    {
+      "id": "verify-reject-other-url",
+      "source": "07 \u00a75.4 drop request signature: signed for another URL",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6IjM0Mzk0OTliNzk5MjA3NDViZjBjMTY3ZWFkYTQ0ZWZmMTM4OWQ1YzJmNDg4ODY4NTZkNWM0NzhjYWI2MTUzNzkiLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL2Ryb3AiXV0sImNvbnRlbnQiOiIiLCJzaWciOiI0Mjg3ZjZlNGJlNjFhYzNiNTQ0NzI4OGRlYWMzMjQ2ODRmNGU3MDgzMDVkODlkZjU4ODViZmRiYTQ0OGU5ZWRkMmIyMjg4YjNkYzg2ZjI1N2JjZmY0ZDliYjFjMGZkYmQyMjc1ODMwZGQ1YThlNjExNjM2ZmU4ZWZkM2UzNDMzMCJ9",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload?x=1",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1790000000"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "request_mismatch"
+      }
+    },
+    {
+      "id": "verify-reject-other-host",
+      "source": "07 \u00a75.4 drop request signature: signed for another host",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6IjM0Mzk0OTliNzk5MjA3NDViZjBjMTY3ZWFkYTQ0ZWZmMTM4OWQ1YzJmNDg4ODY4NTZkNWM0NzhjYWI2MTUzNzkiLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL2Ryb3AiXV0sImNvbnRlbnQiOiIiLCJzaWciOiI0Mjg3ZjZlNGJlNjFhYzNiNTQ0NzI4OGRlYWMzMjQ2ODRmNGU3MDgzMDVkODlkZjU4ODViZmRiYTQ0OGU5ZWRkMmIyMjg4YjNkYzg2ZjI1N2JjZmY0ZDliYjFjMGZkYmQyMjc1ODMwZGQ1YThlNjExNjM2ZmU4ZWZkM2UzNDMzMCJ9",
+        "method": "POST",
+        "url": "https://evil.example/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1790000000"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "request_mismatch"
+      }
+    },
+    {
+      "id": "verify-reject-other-method",
+      "source": "07 \u00a75.4 drop request signature: signed for POST, sent as DELETE",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6IjM0Mzk0OTliNzk5MjA3NDViZjBjMTY3ZWFkYTQ0ZWZmMTM4OWQ1YzJmNDg4ODY4NTZkNWM0NzhjYWI2MTUzNzkiLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL2Ryb3AiXV0sImNvbnRlbnQiOiIiLCJzaWciOiI0Mjg3ZjZlNGJlNjFhYzNiNTQ0NzI4OGRlYWMzMjQ2ODRmNGU3MDgzMDVkODlkZjU4ODViZmRiYTQ0OGU5ZWRkMmIyMjg4YjNkYzg2ZjI1N2JjZmY0ZDliYjFjMGZkYmQyMjc1ODMwZGQ1YThlNjExNjM2ZmU4ZWZkM2UzNDMzMCJ9",
+        "method": "DELETE",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1790000000"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "request_mismatch"
+      }
+    },
+    {
+      "id": "verify-reject-other-body",
+      "source": "07 \u00a75.4 drop request signature: signed over another body",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6IjM0Mzk0OTliNzk5MjA3NDViZjBjMTY3ZWFkYTQ0ZWZmMTM4OWQ1YzJmNDg4ODY4NTZkNWM0NzhjYWI2MTUzNzkiLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL2Ryb3AiXV0sImNvbnRlbnQiOiIiLCJzaWciOiI0Mjg3ZjZlNGJlNjFhYzNiNTQ0NzI4OGRlYWMzMjQ2ODRmNGU3MDgzMDVkODlkZjU4ODViZmRiYTQ0OGU5ZWRkMmIyMjg4YjNkYzg2ZjI1N2JjZmY0ZDliYjFjMGZkYmQyMjc1ODMwZGQ1YThlNjExNjM2ZmU4ZWZkM2UzNDMzMCJ9",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d20",
+        "now": "1790000000"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "request_mismatch"
+      }
+    },
+    {
+      "id": "verify-reject-signature",
+      "source": "07 \u00a75.4 drop request signature: a changed signature",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6IjM0Mzk0OTliNzk5MjA3NDViZjBjMTY3ZWFkYTQ0ZWZmMTM4OWQ1YzJmNDg4ODY4NTZkNWM0NzhjYWI2MTUzNzkiLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL2Ryb3AiXV0sImNvbnRlbnQiOiIiLCJzaWciOiI0Mjg3ZjZlNGJlNjFhYzNiNTQ0NzI4OGRlYWMzMjQ2ODRmNGU3MDgzMDVkODlkZjU4ODViZmRiYTQ0OGU5ZWRkMmIyMjg4YjNkYzg2ZjI1N2JjZmY0ZDliYjFjMGZkYmQyMjc1ODMwZGQ1YThlNjExNjM2ZmU4ZWZkM2UzNDMwMCJ9",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1790000000"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "invalid_signature"
+      }
+    },
+    {
+      "id": "verify-reject-id",
+      "source": "07 \u00a75.4 drop request signature: an id that is not the event's NIP-01 id",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6ImI1OTY0MjgxMGMyZTgyNzA0ODM2ZWYwMzc0YTYyNDY0NGNhNGQyMmZlMDY5OTdmY2RiODgxYzIzMThkNjZlYWQiLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL2Ryb3AiXV0sImNvbnRlbnQiOiIiLCJzaWciOiI0Mjg3ZjZlNGJlNjFhYzNiNTQ0NzI4OGRlYWMzMjQ2ODRmNGU3MDgzMDVkODlkZjU4ODViZmRiYTQ0OGU5ZWRkMmIyMjg4YjNkYzg2ZjI1N2JjZmY0ZDliYjFjMGZkYmQyMjc1ODMwZGQ1YThlNjExNjM2ZmU4ZWZkM2UzNDMzMCJ9",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1790000000"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "invalid_signature"
+      }
+    },
+    {
+      "id": "verify-reject-pubkey-swap",
+      "source": "07 \u00a75.4 drop request signature: another key's pubkey on this signature",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6IjM0Mzk0OTliNzk5MjA3NDViZjBjMTY3ZWFkYTQ0ZWZmMTM4OWQ1YzJmNDg4ODY4NTZkNWM0NzhjYWI2MTUzNzkiLCJwdWJrZXkiOiJjZjcxOGU3YTAwMTZmZTM1NDA0NGI1ZTIzYzdjNTcxM2RhYzNmOTJiNWQ0YTI5ZmFmOTM5ZmRiMjdhOGM5MGQ4IiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL2Ryb3AiXV0sImNvbnRlbnQiOiIiLCJzaWciOiI0Mjg3ZjZlNGJlNjFhYzNiNTQ0NzI4OGRlYWMzMjQ2ODRmNGU3MDgzMDVkODlkZjU4ODViZmRiYTQ0OGU5ZWRkMmIyMjg4YjNkYzg2ZjI1N2JjZmY0ZDliYjFjMGZkYmQyMjc1ODMwZGQ1YThlNjExNjM2ZmU4ZWZkM2UzNDMzMCJ9",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1790000000"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "invalid_signature"
+      }
+    },
+    {
+      "id": "verify-reject-kind",
+      "source": "07 \u00a75.4 drop request signature: kind 22242 (relay AUTH) instead of 27235",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6IjQ4ZWFhYjI5MmE3MGY1Yjc4OGI0NmRlYmY3ZjcwZThlNmVkMjg3MDJkOWU5OTU5Nzc5MjJmMDA3ZGJlODg3YzEiLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjIyNDIsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL2Ryb3AiXV0sImNvbnRlbnQiOiIiLCJzaWciOiJlY2YwZjJmMDhlYjI4ZDU2NWIyNWNkMGI5Mzk0ZTE0NDExZGQ2ZjliYzA3NWI3YTA4Y2YyNzczMmZkMmVlNzFiY2Q1NTAxMGIyMjM0YzVjZWZjNWQwMjU4NDFmYzM3YzdlYjQ3NDQ1N2EwMjc4ZTc0ZTExZDgyMzcyZWZhNTAxYSJ9",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1790000000"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "malformed"
+      }
+    },
+    {
+      "id": "verify-reject-domain",
+      "source": "07 \u00a75.4 drop request signature: another domain tag",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6IjVmMGIxNTNlYzY4ZTczOGJmNjY0ODE5YjFmYjBlNzE1NmMyZGE2ZjVhN2E1MDk1NmM4MTM2MjcyMGNmMmY3ZDAiLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL290aGVyIl1dLCJjb250ZW50IjoiIiwic2lnIjoiMzE0NjMyNDNiNjY5MDE0YTA4ZjZhYzdmMzYzNDZkYmFjY2VhYWNkN2FjOWMwZTQ0NGUwMjg4MWEwMzJiOGQ0YzYyZWFkNTk5MTgyNzIzOTllOTYyN2I3NGY2Yjk5N2NmNjU0OThmNmVkMWQ1ZjZlNzkxMTkzZmM5ZGI1Yjc1NjgifQ",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1790000000"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "malformed"
+      }
+    },
+    {
+      "id": "verify-reject-no-domain",
+      "source": "07 \u00a75.4 drop request signature: no domain tag (plain NIP-98)",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6ImNkZGViMGM1MmJmOGQyOTJhNWJhMjc0MDdhNDQ5Yjg2ZGVkZWZiM2FmZTljYjYzMGE4ZGUwYTYwMTMwM2IwYTYiLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdXSwiY29udGVudCI6IiIsInNpZyI6IjFiZjkzNWIwZmYzZmNjYTc5NTkwMzllMmQzM2JiMGY4MzQxZjY0Y2I0OWMzNDJkMTAyNWI1OGMwNWEwMTI2YWMxMGI4Nzg5MTQzYTgxMjAxOGM4ZjFkY2I2N2JiYTI3ZGFkYWVjM2Q5YWQyZmEyMzc0NjMwNjdiNzVhOTY3NmZjIn0",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1790000000"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "malformed"
+      }
+    },
+    {
+      "id": "verify-reject-content",
+      "source": "07 \u00a75.4 drop request signature: non-empty content",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6ImNmMmVjMjMzNDA3OTRkNTE2NjEwYzc3ODZjOTA3OWM1ZTk3NDI2MWRjMjQ3NzdhMWMxZTc1MjRmYTJhZDE3NTciLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL2Ryb3AiXV0sImNvbnRlbnQiOiJ4Iiwic2lnIjoiNDc1ZGIxNDkzNGU0OTVmNzZkYmYzNDBlODdlYmUzNjk5NmE2MTFiMTY0MGY4MWZkMDkzODNmNDc2YTRlNGJkNTk3ZGNkNzJkYjc2NTZjNDkxMGY3NTQ3OWZjOWY4NmY2NTlhYjdmMzBmNTU4YzZlZWViYzk0OTU5ZWIxMDZjZmQifQ",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1790000000"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "malformed"
+      }
+    },
+    {
+      "id": "verify-reject-extra-key",
+      "source": "07 \u00a75.4 drop request signature: an extra event property",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6IjM0Mzk0OTliNzk5MjA3NDViZjBjMTY3ZWFkYTQ0ZWZmMTM4OWQ1YzJmNDg4ODY4NTZkNWM0NzhjYWI2MTUzNzkiLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL2Ryb3AiXV0sImNvbnRlbnQiOiIiLCJzaWciOiI0Mjg3ZjZlNGJlNjFhYzNiNTQ0NzI4OGRlYWMzMjQ2ODRmNGU3MDgzMDVkODlkZjU4ODViZmRiYTQ0OGU5ZWRkMmIyMjg4YjNkYzg2ZjI1N2JjZmY0ZDliYjFjMGZkYmQyMjc1ODMwZGQ1YThlNjExNjM2ZmU4ZWZkM2UzNDMzMCIsImV4dHJhIjoiMSJ9",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1790000000"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "malformed"
+      }
+    },
+    {
+      "id": "verify-reject-scheme",
+      "source": "07 \u00a75.4 drop request signature: another Authorization scheme",
+      "input": {
+        "op": "verify",
+        "authorization": "Bearer eyJpZCI6IjM0Mzk0OTliNzk5MjA3NDViZjBjMTY3ZWFkYTQ0ZWZmMTM4OWQ1YzJmNDg4ODY4NTZkNWM0NzhjYWI2MTUzNzkiLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL2Ryb3AiXV0sImNvbnRlbnQiOiIiLCJzaWciOiI0Mjg3ZjZlNGJlNjFhYzNiNTQ0NzI4OGRlYWMzMjQ2ODRmNGU3MDgzMDVkODlkZjU4ODViZmRiYTQ0OGU5ZWRkMmIyMjg4YjNkYzg2ZjI1N2JjZmY0ZDliYjFjMGZkYmQyMjc1ODMwZGQ1YThlNjExNjM2ZmU4ZWZkM2UzNDMzMCJ9",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1790000000"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "malformed"
+      }
+    },
+    {
+      "id": "verify-reject-padded",
+      "source": "07 \u00a75.4 drop request signature: base64url with padding",
+      "input": {
+        "op": "verify",
+        "authorization": "Nostr eyJpZCI6IjM0Mzk0OTliNzk5MjA3NDViZjBjMTY3ZWFkYTQ0ZWZmMTM4OWQ1YzJmNDg4ODY4NTZkNWM0NzhjYWI2MTUzNzkiLCJwdWJrZXkiOiI1YWEzNWU4ODllYTVmYmZmZGU3YWExOTE5NWFkMGRkNGQ3ZjMzZTZmODYzMDQ3MzJkODAwNmY3NjRmMTNlZDZjIiwiY3JlYXRlZF9hdCI6MTc5MDAwMDAwMCwia2luZCI6MjcyMzUsInRhZ3MiOltbInUiLCJodHRwczovL2Ryb3AuYWdlbnRsaW5rLjR0aHRlY2guaW8vdjEvdXBsb2FkIl0sWyJtZXRob2QiLCJQT1NUIl0sWyJwYXlsb2FkIiwiZjkzOTNmZTM3YjBhMzI5NzdkNjcwZGIxNDlkNTUxZjc4MDhkZDVhZTgwMjlmMDJmMjY4MzhkMGI2ZGMzNTI4YiJdLFsiZG9tYWluIiwiYWdlbnRsaW5rL3YxL2Ryb3AiXV0sImNvbnRlbnQiOiIiLCJzaWciOiI0Mjg3ZjZlNGJlNjFhYzNiNTQ0NzI4OGRlYWMzMjQ2ODRmNGU3MDgzMDVkODlkZjU4ODViZmRiYTQ0OGU5ZWRkMmIyMjg4YjNkYzg2ZjI1N2JjZmY0ZDliYjFjMGZkYmQyMjc1ODMwZGQ1YThlNjExNjM2ZmU4ZWZkM2UzNDMzMCJ9=",
+        "method": "POST",
+        "url": "https://drop.agentlink.4thtech.io/v1/upload",
+        "body": "7b2276223a312c2273697a65223a32303030302c22657870697265734174223a313739303038363430302c226e6f6e6365223a2249516d5951782d6b366f4b465734714a777374484677222c227473223a313739303030303030307d",
+        "now": "1790000000"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "malformed"
+      }
+    }
+  ]
+}

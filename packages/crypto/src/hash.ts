@@ -53,3 +53,38 @@ export function taggedHash(tag: string, message: Uint8Array): Uint8Array {
   const tagHash = nobleSha256(encodeUtf8(tag));
   return nobleSha256.create().update(tagHash).update(tagHash).update(message).digest();
 }
+
+/** An incremental SHA-256 (M1-27a): `update` in order, then `digest` once. */
+export interface Sha256Hasher {
+  /** Adds `data` and returns the same hasher. Refused after `digest`. */
+  update(data: Uint8Array): Sha256Hasher;
+  /** The 32-byte digest of everything added. The hasher is finished afterwards. */
+  digest(): Uint8Array;
+}
+
+/**
+ * A new incremental SHA-256, for data that arrives in chunks (the encrypted drop hashes stored
+ * ciphertext as it streams it, 07 §5.4). Gives the same digest as `sha256` over the concatenation.
+ */
+export function createSha256(): Sha256Hasher {
+  const state = nobleSha256.create();
+  let finished = false;
+  const hasher: Sha256Hasher = {
+    update(data: Uint8Array): Sha256Hasher {
+      assertBytes(data, 'createSha256: data');
+      if (finished) {
+        throw new CryptoInputError('invalid_argument', 'createSha256: the hasher is finished');
+      }
+      state.update(data);
+      return hasher;
+    },
+    digest(): Uint8Array {
+      if (finished) {
+        throw new CryptoInputError('invalid_argument', 'createSha256: the hasher is finished');
+      }
+      finished = true;
+      return state.digest();
+    },
+  };
+  return Object.freeze(hasher);
+}
